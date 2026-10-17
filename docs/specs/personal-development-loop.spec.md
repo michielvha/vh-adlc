@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Draft since 2026-10-17: references to private earlier tooling removed and the repository recreated public with a single commit, so every earlier review is unreachable. Phases 1 and 2 done. Needs a clean review of this revision and the owner's acceptance before phase 3."
+status: planned
+status_description: "Accepted by the owner on 2026-10-17 against review R-15 at 4cf3f92. Phases 1 and 2 done; the repository is public as michielvha/vh-adlc. Next: phase 3, the binary as a child feature."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
@@ -985,13 +985,13 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 
 ## Implementation Phases
 
-Phase 1 is a PR in `vhco-pro/docs`. Phase 2 is the rename and visibility change, which are owner actions,
+Phase 1 is a PR in `vhco-pro/docs`. Phase 2 publishes the repository as public, through owner actions,
 not a PR. Phase 3 is the binary, a child feature with its own feature document and PR, merged and released
 before the plugin can pin it. Phases 4 to 7 are this feature and its one PR. All but phase 1 happen in `michielvha/vh-adlc`. Each phase ends usable, so the owner may ship phase 4 early as a child
 feature at acceptance.
 
 1. **Docs.** Everything under [Docs changes](#docs-changes-phase-1). The merged SHA becomes the plugin pin.
-2. **One repository.** The audit, the owner's confirmation, the rename and the visibility change, in the
+2. **One repository.** The audit, the owner's confirmation, and publishing the repository as public, in the
    order under [One repository](#one-repository).
 3. **Binary.** Adapt the template files at the root; all seven commands with their tests and golden files;
    CI gates; the first path-filtered release (GitVersion decides its number from the whole history). Its
@@ -1008,7 +1008,7 @@ feature at acceptance.
 Guardrails: work only in `vhco-pro/docs` and `michielvha/vh-adlc`; never
 install, update or disable a plugin in the owner's own profiles (use isolated profiles and
 `--plugin-dir`); do not touch the agents, commands or documents of any repository other than `vhco-pro/docs` and
-`michielvha/vh-adlc`, and change nothing in `plugins/github-app-registration/` beyond what the rename moves; resolve the docs pin before
+`michielvha/vh-adlc`, and change nothing in `plugins/github-app-registration/` beyond what carrying it over moves; resolve the docs pin before
 writing any skill text, and treat any convention you are tempted to write into a skill or the binary as a
 missing docs page.
 
@@ -1144,6 +1144,8 @@ them is current. Review IDs continue from R-14.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-17 | R-14 | spec | `b016cf5` | fable | procedural | Review of the scrub against the last clean version. One blocking finding (Design still described a rename with a redirect after the repository was recreated) and three further findings. Applied. |
+| 2026-10-17 | R-15 | spec | `4cf3f92` | fable | procedural | Diff-only check of the R-14 fixes. Two nits, nothing blocking; one nit applied outside the normative baseline. |
+| 2026-10-17 | R-15 | spec | `4cf3f92` | n/a | n/a | accepted by owner |
 
 ### R-14
 
@@ -1174,6 +1176,22 @@ SEVERITY: nit
 WHERE: Design, Operation names
 EVIDENCE: "none matches a skill in the other plugins the owner uses" replaced a claim scoped to one named plugin on the owner's work machine. The claim is now wider and was not re-verified in this run (the paragraph is dated 2026-10-17 and lists no plugin). It holds for the plugin set loaded on this workstation today (no `vh-adlc-*` skill in any installed plugin; plugin names redacted at the owner's request), but it is a Design-section fact with a broader reach than its evidence.
 PROPOSAL: Either keep the claim to hosts' built-ins only, or say "no plugin installed on the owner's machine on 2026-10-17 provides a `vh-adlc-*` skill" so the reach matches what was checked.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Implementation Phases (intro and item 2), Guardrails sentence, Tasks T10 and T11 titles
+EVIDENCE: "Phase 2 is the rename and visibility change", "The audit, the owner's confirmation, the rename and the visibility change, in the order under One repository", "beyond what the rename moves", T10 "owner renames `michielvha/claude-plugins` to `michielvha/vh-adlc` and makes it public", T11 "Marketplace refresh in disposable host profiles resolves the renamed public repository". One repository step 3 now reads "Publish the audited history as the public `michielvha/vh-adlc` ... delete and recreate" and step 4 "add the marketplace as `michielvha/vh-adlc`", so the phase summary and the ticked task titles still name a rename and a refresh that the Design procedure no longer lists. Not false (T10's evidence records the rename as an intermediate step, and the spec itself says to preserve checked tasks as history), but a reader of Implementation Phases is sent to a procedure that does not say "rename".
+PROPOSAL: In Implementation Phases say "Phase 2 publishes the repository as public" and "the audit, the owner's confirmation, and publishing the repository as public, in the order under One repository"; in Guardrails say "beyond what carrying it over moves". Leave T10 and T11 as historical ticks, or add "(as performed: recreate, then add)" to their titles.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Operation names
+EVIDENCE: "On 2026-10-17 none of these is a Claude Code or Copilot CLI built-in, and no plugin installed on the owner's machine on 2026-10-17 provides a `vh-adlc-*` skill." The date appears twice in one sentence, and the line now wraps at 140 columns where the surrounding paragraph wraps at about 100.
+PROPOSAL: "On 2026-10-17 none of these is a Claude Code or Copilot CLI built-in, and no plugin installed on the owner's machine provides a `vh-adlc-*` skill." and rewrap.
 
 ## Sources
 
