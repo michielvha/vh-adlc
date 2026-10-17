@@ -1,0 +1,1 @@
+{"schema_version":1,"command":"knowledge","result":"missing-page","knowledge":null,"data":null,"findings":[{"code":"missing-page","message":"guides/absent.md does not exist at vhco-pro/docs@eda18fdf1c171d59dd486cf56ab3b5a8d215d5e4; bump the pin to a revision that has it","path":"guides/absent.md","line":0}]}
