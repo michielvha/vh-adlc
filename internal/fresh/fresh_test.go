@@ -61,7 +61,11 @@ func (f *fixture) review(id, kind, commit string) {
 		records = "CRITERION: AC-01 The first end state, wrapped onto a second line.\nVERDICT: met\nEVIDENCE: x\n\nCRITERION: AC-02 The second end state.\nVERDICT: met\nEVIDENCE: x"
 	}
 	row := "| 2026-01-01 | " + id + " | " + kind + " | `" + commit + "` | fable | procedural | Review. |\n"
-	f.text = strings.Replace(f.text, logHeader, logHeader+row, 1) + "\n### " + id + "\n\n" + records + "\n"
+	i := strings.Index(f.text, logHeader) + len(logHeader)
+	for strings.HasPrefix(f.text[i:], "|") {
+		i += strings.Index(f.text[i:], "\n") + 1
+	}
+	f.text = f.text[:i] + row + f.text[i:] + "\n### " + id + "\n\n" + records + "\n"
 	f.repo.Write(docPath, f.text)
 }
 

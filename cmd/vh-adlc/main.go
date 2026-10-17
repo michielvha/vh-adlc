@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/michielvha/vh-adlc/internal/doc"
+	"github.com/michielvha/vh-adlc/internal/fresh"
 	"github.com/michielvha/vh-adlc/internal/knowledge"
 	"github.com/michielvha/vh-adlc/internal/report"
 )
@@ -83,7 +84,9 @@ func commands() []command {
 			return doc.LintCommand(ctx, o.knowledge(), args[0])
 		}},
 		{name: "gate", positionals: []string{"target-status", "doc"}},
-		{name: "fresh", positionals: []string{"doc"}},
+		{name: "fresh", positionals: []string{"doc"}, run: func(ctx context.Context, o *options, args []string) *report.Report {
+			return fresh.Command(ctx, o.knowledge(), args[0])
+		}},
 		{name: "next", positionals: []string{"doc"}},
 		{name: "review check", positionals: []string{"doc"}, flags: func(fs *flag.FlagSet, o *options) {
 			fs.StringVar(&o.review, "review", "", "review ID, for example R-3")
