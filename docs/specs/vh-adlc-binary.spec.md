@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Drafted from the parent spec's Deterministic core; not yet reviewed."
+status_description: "Draft. Reviews R-1 and R-2 applied; the owner chose the post-release completion path. Awaiting the next independent review."
 issue: null
 goal: "A released, signed vh-adlc binary that answers every mechanical question of the development loop from the files and Git alone, byte-identically for identical inputs."
 covers:
@@ -34,8 +34,9 @@ those sections. It adds the implementation decisions they leave open, the binary
 Test Plan and its tasks. Where this document and the parent disagree, the parent wins and the
 disagreement is a finding.
 
-The parent's task T12 makes this a child feature with its own document and PR. Its criteria AC-23,
-AC-24 and AC-27, and the binary halves of AC-04, AC-09 and AC-16, are proven here. The parent pins
+The parent's task T12 makes this a child feature with its own document and PR. Its criteria AC-23 and
+AC-24, the binary and release halves of AC-27, and the binary halves of AC-04, AC-09 and AC-16 are
+proven here; AC-27's observed non-release of a plugin-only commit stays with the parent's proof row. The parent pins
 `vhco-pro/docs` at `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a` (parent D-28), and the conventions below
 are read at that revision.
 
@@ -52,7 +53,9 @@ Measured on 2026-10-17:
   and carries a "TODO: add lint / test / scanning steps here" line. It has no `go.mod` and no Go source.
 - `michielvha/gitversion-tag-action` at `8cf5869` takes `configFilePath` (empty uses the config shipped
   with the action), `prefix`, `dry-run` and `tagMessage`, and its bundled `gitversion.yml` uses
-  `GitHubFlow/v1` with Conventional Commit bump messages.
+  `GitHubFlow/v1` with Conventional Commit bump messages. Its outputs include `tagged` and
+  `skip-reason`; `scripts/tag.sh` writes `skip-reason=tag-exists` and exits 0 when
+  `git ls-remote --tags origin` already lists the computed tag.
 - `michielvha/goreleaser-action` at `a86fcdf` requires `github-token` and `pgp-private-key`, defaults
   `go-version` to `1.25.11`, and runs `golangci-lint` with `continue-on-error: true` before GoReleaser.
 - The `PGP_PRIVATE_KEY` secret exists on `michielvha/vh-adlc` (`gh secret list`, set 2026-10-17).
@@ -81,16 +84,17 @@ per command (see Invocation for argument order).
 Packages under `internal/`: the parent's seven (`knowledge`, `doc`, `rules`, `gate`, `fresh`, `next`,
 `review`) plus `gitcmd`, which runs Git and parses its output, `report`, which owns the JSON contract
 and exit codes, and `testrepo`, a test helper that builds fixture repositories. `cmd/vh-adlc` holds
-only `main.go` and its tests; `main.go` imports only the standard library and `internal/` packages,
+only `main.go`, its `*_test.go` files and `testdata/`; `main.go` imports only the standard library and `internal/` packages,
 parses flags, creates a `context.Context` with `signal.NotifyContext`, calls one package function and
 writes its report. `knowledge` and `gitcmd` take that context, so an interrupt cancels a fetch or a
 Git call.
 
 `gitcmd` runs `git --no-pager` with `LC_ALL=C` and `GIT_OPTIONAL_LOCKS=0`, so `git status` never
-rewrites the index. It fixes every setting that changes output shape on the command line: `-z` on every
-command that lists paths, `--no-renames` on `git diff` and `git status`, and `-c core.quotePath=false`.
-The user's other Git configuration still applies, because it does not change these outputs. Git is
-never read through a library.
+rewrites the index. It fixes these output-shaping settings on the command line: `-z` on every command
+that lists paths, `--no-renames` on `git diff` and `git status`, `--no-follow` and
+`--no-show-signature` on `git log`, and `-c core.quotePath=false`. Git is never read through a library.
+The binary needs Git 2.35 or later (`git var GIT_DEFAULT_BRANCH` arrived in 2.35); `gitcmd` checks
+`git --version` once and reports an older Git as `error` with the version it found.
 
 The lint configuration adapts the template's `.golangci.yml` as it is, because it already uses
 version 2 with `linters` and `formatters` sections. The root `.gitignore` gains `/vh-adlc` and `/dist/`.
@@ -104,7 +108,8 @@ root. The parent's table shows `--plugin-pin` only on `knowledge`; this is a del
 because every document command resolves knowledge itself, so the phase-4 skills pass the pin on every
 call. Flags may come before or after the positional arguments: each command parses its flag set, moves
 the first remaining argument to its positional list, and parses again until no arguments remain, so
-the parent's `review check <doc> --review R-<n> --returned <file>` order works as written.
+the parent's `review check <doc> --review R-<n> --returned <file>` order works as written. A positional
+argument may not begin with `-`, and `--` is not supported.
 
 ```text
 vh-adlc knowledge [--page <path>]...
@@ -163,8 +168,10 @@ The `data` of each command:
 
 `gate`'s `line` is the parent's status-commit line, so an operation copies it rather than composing it.
 It reads `vh-adlc gate <target>: pass (rules <schema>, docs <sha7>)` or
-`vh-adlc gate <target>: fail (<failing conditions, comma separated>; rules <schema>, docs <sha7>)`,
-where `<sha7>` is the first seven characters of the resolved revision. `schema/vh-adlc.schema.json`
+`vh-adlc gate <target>: fail (<failures, comma separated>; rules <schema>, docs <sha7>)`, where
+`<sha7>` is the first seven characters of the resolved revision and the failures are
+`transition-not-allowed` first, when it applies, then the failing conditions in gate order, for example
+`vh-adlc gate archived: fail (transition-not-allowed; rules 1, docs e4d58d2)`. `schema/vh-adlc.schema.json`
 (JSON Schema 2020-12) describes this object and enumerates every `result` and finding code.
 
 ### Finding codes
@@ -255,15 +262,16 @@ matches a document whose `issue` is a URL ending in `/issues/<n>` or the string 
 ### Freshness and gates
 
 `internal/fresh` implements the parent's freshness rules. A repository has a remote when `git remote`
-prints anything. With a remote, the default branch is the target of
-`git symbolic-ref refs/remotes/origin/HEAD`, and its absence is `default-branch-unknown`, whatever the
-remote is called. With no remote, the local default branch is the one `git var GIT_DEFAULT_BRANCH` prints, which is
+prints anything. With a remote, the default branch is the target of `git symbolic-ref
+refs/remotes/origin/HEAD`, and its absence is `default-branch-unknown`, whatever the remote is called.
+With no remote, the local default branch is the one `git var GIT_DEFAULT_BRANCH` prints, which is
 `init.defaultBranch` or the installed Git's built-in default; if that branch does not exist, the result
 is `default-branch-unknown`. Nothing else is tried.
 
 A reviewed commit is reachable when it exists and is an ancestor of `HEAD` in the worktree where
-`fresh` runs (`git merge-base --is-ancestor`). A missing object or a non-ancestor, such as the commits
-of a squash-merged branch, is `commit-unreachable`. Covered changes are
+`fresh` runs. The binary first runs `git cat-file -e <sha>^{commit}`, and an absent commit is
+`commit-unreachable`; it then runs `git merge-base --is-ancestor <sha> HEAD`, where exit 1, such as for
+the commits of a squash-merged branch, is `commit-unreachable` and any other non-zero exit is `error`. Covered changes are
 `git diff --name-only -z --no-renames <reviewed>...<remote default>` for spec reviews and
 `git diff --name-only -z --no-renames <reviewed> HEAD` for implementation reviews, filtered by `covers`
 in the binary. The feature tree is `git status --porcelain=v1 -z --no-renames --untracked-files=all`,
@@ -281,7 +289,9 @@ trailing blank lines from both; every other byte must match.
 
 Fixture repositories are built in `t.TempDir()` by `internal/testrepo`. It runs Git with
 `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`, every inherited `GIT_*` variable removed,
-`git init -b main --object-format=sha1`, `-c commit.gpgsign=false`, and fixed author and committer
+`git init -b main --object-format=sha1`, `init.defaultBranch main` in each fixture's local
+configuration (so a fixture without a remote resolves `main`), `-c commit.gpgsign=false`, and fixed
+author and committer
 names, emails and dates, so their commit SHAs are stable on any machine and golden files can contain
 them. A fixture with a remote gets a bare repository as `origin` and `git remote set-head origin main`.
 A fixture docs repository with two commits, A and B, differing in the default document location and
@@ -326,15 +336,21 @@ the checksum file `checksums.txt`. The parent's signing design (D-27) applies as
 `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, and the README gains a section with that fingerprint and the
 parent's verification steps.
 
-The release can only happen after the feature PR merges, so completion takes one step after the merge.
-The PR ships the document `in-progress` with AC-13 and AC-15 unticked. After the release, on the
-feature branch fast-forwarded to the default branch, the loop records the version and, per platform,
-the asset name, the asset's SHA-256 and the extracted binary's SHA-256, computed from the downloaded
-assets rather than copied from `checksums.txt`. It then runs an implementation review against that
-commit, which observes the published release. The released `vh-adlc gate complete` decides the flip,
-and the docs-only completion commit is pushed to the default branch as a fast-forward under D-23. This
-is the one exception to "the document returns to the default branch with the PR", and it exists
-because a release cannot precede its own merge. Parent T17 copies the recorded values into the lock.
+The release can only happen after the feature PR merges, so completion takes one step after the
+merge. The owner chose this path on 2026-10-17, in answer to R-2 F-01, as a recorded exception to
+parent D-20 ("once it has a `branch`, its commits stay on the feature branch and are pushed only on
+ship") and to the document returning to the default branch with its PR. The PR ships the document
+`in-progress` with AC-13 and AC-15 unticked. After the release, the owner's session works by hand with
+the downloaded, verified release binary, because the loop's skills do not exist until phase 4. On the
+feature branch, fast-forwarded to the default branch, it records the version and, per platform, the
+asset name, the asset's SHA-256 and the extracted binary's SHA-256, computed from the downloaded
+assets rather than copied from `checksums.txt`. The merge makes the feature's own covered files drift
+against the reviewed spec commit, so a drift-only spec review at that commit comes first; it keeps the
+acceptance because the baseline is unchanged. An implementation review then observes the published
+release. The released `vh-adlc gate complete` decides the flip, its line goes into the completion
+commit, and the Review Log rows say the steps were run by hand. That docs-only commit is pushed to the
+default branch as a fast-forward with the skip-CI marker (D-23). Parent T17 copies the recorded values
+into the lock.
 
 ## Acceptance Criteria
 
@@ -363,9 +379,9 @@ because a release cannot precede its own merge. Parent T17 copies the recorded v
       default branch, an implementation review is stale after a baseline change or a covered commit on
       the feature branch, and a missing row, a `+dirty` target, a missing reviewed commit or one that is
       not an ancestor of `HEAD` is stale with its own code. Checkbox, evidence (single-line or wrapped),
-      residual, task, status and Review Log edits alone leave both fresh. A renamed covered path counts as
-      changed under any Git configuration. Staged, unstaged and untracked covered changes fail `feature_tree_clean` with their paths,
-      while the document itself and uncovered changes do not.
+      residual, task, status and Review Log edits alone leave both fresh. A renamed covered path counts
+      as changed under any Git configuration. Staged, unstaged and untracked covered changes fail
+      `feature_tree_clean` with their paths, while the document itself and uncovered changes do not.
 - [ ] AC-07: A spec review with a `blocking` finding is not clean and one with only `should-fix` or
       `nit` findings, or exactly `NO FINDINGS`, is; malformed or mixed records are not clean. An
       implementation review is clean only with exactly one record per current criterion, each with the
@@ -406,13 +422,13 @@ because a release cannot precede its own merge. Parent T17 copies the recorded v
 | AC-03 | `go test ./internal/knowledge`: the pin variants, `httptest` 200 and 404 and a closed server, cold and warm cache with `--offline`, `--docs-source` |
 | AC-04 | `go test ./cmd/vh-adlc -run Boundary` and the `httptest` request-path assertion |
 | AC-05 | `go test ./internal/gate`: one fixture per condition per target, a multi-failure fixture, transition and re-check cases, the `line` format |
-| AC-06 | `go test ./internal/fresh`: one fixture per stale reason (including a squash-merged reviewed commit and a missing object), each annotation-only edit (including wrapped evidence), a covered rename under `diff.renames` true and false, staged, unstaged and untracked covered and uncovered paths |
+| AC-06 | `go test ./internal/fresh`: one fixture per stale reason (including a squash-merged reviewed commit, a missing object, and a merged feature drifting against its own spec review), each annotation-only edit (including wrapped evidence), a covered rename under `diff.renames` true and false, staged, unstaged and untracked covered and uncovered paths |
 | AC-07 | `go test ./internal/gate ./internal/review`: record fixtures for each clean and unclean case, `review check` equal and differing files |
-| AC-08 | `go test ./internal/doc`: a conforming fixture and one fixture per lint code |
+| AC-08 | `go test ./internal/doc`: a conforming fixture and one fixture per lint code, with `id-recycled` also run under `log.follow=true` and `log.showSignature=true` |
 | AC-09 | `go test ./internal/next`: one fixture per `next` rule, and the blocking-review and open-question resume fixtures |
 | AC-10 | `go test ./internal/doc -run Find`: issue URL, `#<n>`, `<slug>.md`, `<slug>.spec.md` and no-match fixtures |
 | AC-11 | `go test ./cmd/vh-adlc -run Schema`: each golden file's top-level keys against the schema's `required`, and the binary's code and result lists against the schema's `enum` lists |
-| AC-12 | `go test ./cmd/vh-adlc -run Layout` (`cmd/vh-adlc` holds only `main.go` and `*_test.go`, `main.go` imports only the standard library and `internal/`, the `.gitignore` line), a Go test parsing both workflows for the gate steps and full-SHA `uses:` lines, and the first PR's CI run |
+| AC-12 | `go test ./cmd/vh-adlc -run Layout` (`cmd/vh-adlc` holds only `main.go`, `*_test.go` and `testdata/`, `main.go` imports only the standard library and `internal/`, the `.gitignore` line), a Go test parsing both workflows for the gate steps and full-SHA `uses:` lines, and the first PR's CI run |
 | AC-13 | On the first release, in an empty keyring: import `release-signing-key.asc`, confirm `gpg --show-keys release-signing-key.asc` lists `VHCO Pro (Release Signing Key) <release@vhco.pro>` as the first uid, confirm the fingerprint, `gpg --verify checksums.txt.sig checksums.txt`, `sha256sum --check --ignore-missing checksums.txt` over all four archives |
 | AC-14 | A Go test parsing `release.yml`: its only triggers are `push` to `main` with exactly the binary paths listed under Delivery, and `workflow_dispatch`, and the GoReleaser step's `if:` requires the GitVersion step's `tagged` output to be `true`. The observed half (a plugin-only commit on the default branch produces no release run) is the parent's AC-27 proof, because every non-binary commit this feature pushes is docs-only and carries `[skip ci]` |
 | AC-15 | Extract each archive of the first release; run the linux/amd64 binary with `--version`; `go version -m` on all four binaries; compute both digests per platform and record them in the T24 evidence line |
@@ -451,8 +467,8 @@ because a release cannot precede its own merge. Parent T17 copies the recorded v
 - [ ] T18 `internal/review/`, `cmd/vh-adlc/main.go` - T17 passes; `review check` wired (AC-07)
 - [ ] T19 `cmd/vh-adlc/golden_test.go`, `cmd/vh-adlc/testdata/golden/` - golden, boundary, local-format
       and revision A/B cases pass (AC-01, AC-02, AC-04)
-- [ ] T20 `schema/vh-adlc.schema.json` and its test - every golden file validates and every code is
-      enumerated (AC-11)
+- [ ] T20 `schema/vh-adlc.schema.json` and its test - every golden file has the schema's required
+      top-level keys and every code is enumerated (AC-11)
 - [ ] T21 `.github/workflows/ci.yml` and its parsing test - the CI gates pass on the feature PR (AC-12)
 - [ ] T22 `.goreleaser.yml`, `.github/workflows/release.yml` and the trigger test -
       `goreleaser release --snapshot --clean` builds four archives and `checksums.txt` locally (AC-13,
@@ -461,8 +477,9 @@ because a release cannot precede its own merge. Parent T17 copies the recorded v
       fingerprint matches (AC-13)
 - [ ] T24 `docs/specs/vh-adlc-binary.spec.md` - first release: the PR merged by merge commit under its
       own approval, the release workflow run, the AC-13 and AC-15 checks run on the published assets,
-      version and digests recorded here, the post-release implementation review and the completion
-      commit described under Delivery (AC-13, AC-15)
+      version and digests recorded here, the post-merge drift-only spec review, the post-release
+      implementation review and the completion commit pushed to the default branch, as Delivery
+      describes (AC-13, AC-15)
 
 ## Open Questions
 
@@ -746,4 +763,6 @@ PROPOSAL: Say the owner's session performs these steps by hand with the download
 - [git(1) environment variables](https://git-scm.com/docs/git#_environment_variables): `GIT_OPTIONAL_LOCKS=0` stops optional sub-operations that take a lock, such as the index refresh `git status` performs; `GIT_CONFIG_NOSYSTEM` skips the system configuration.
 - [git-config(1) environment](https://git-scm.com/docs/git-config#ENVIRONMENT): `GIT_CONFIG_GLOBAL` replaces the global configuration file.
 - [git-var(1)](https://git-scm.com/docs/git-var): `GIT_DEFAULT_BRANCH` is the branch `git init` would create, from `init.defaultBranch` or Git's built-in default.
+- [Skipping workflow runs](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs): a push whose commit message contains `[skip ci]` triggers no `push` or `pull_request` workflow run.
+- [Git 2.35.0 release notes](https://github.com/git/git/blob/master/Documentation/RelNotes/2.35.0.adoc): `git var GIT_DEFAULT_BRANCH` is new in 2.35.
 - [GoReleaser signing](https://goreleaser.com/customization/sign/): `artifacts: checksum` signs the checksum file as `${artifact}.sig`.
