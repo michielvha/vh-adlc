@@ -1153,6 +1153,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-14 | spec | `b016cf5` | fable | procedural | Review of the scrub against the last clean version. One blocking finding (Design still described a rename with a redirect after the repository was recreated) and three further findings. Applied. |
 | 2026-10-17 | R-15 | spec | `4cf3f92` | fable | procedural | Diff-only check of the R-14 fixes. Two nits, nothing blocking; one nit applied outside the normative baseline. |
 | 2026-10-17 | R-15 | spec | `4cf3f92` | n/a | n/a | accepted by owner |
+| 2026-10-17 | R-16 | spec | `5c0330f` | fable | procedural | Diff-only review of the D-27 signing revision. Two should-fix findings (no published public key to verify against; action and template claims uncited) and two nits. Nothing blocking. |
 
 ### R-14
 
@@ -1199,6 +1200,36 @@ SEVERITY: nit
 WHERE: Design, Operation names
 EVIDENCE: "On 2026-10-17 none of these is a Claude Code or Copilot CLI built-in, and no plugin installed on the owner's machine on 2026-10-17 provides a `vh-adlc-*` skill." The date appears twice in one sentence, and the line now wraps at 140 columns where the surrounding paragraph wraps at about 100.
 PROPOSAL: "On 2026-10-17 none of these is a Claude Code or Copilot CLI built-in, and no plugin installed on the owner's machine provides a `vh-adlc-*` skill." and rewrap.
+
+### R-16
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The binary in the repository; Acceptance Criteria AC-27; Test Plan AC-27
+EVIDENCE: AC-27 requires "`checksums.txt` published with a detached signature by the owner's release key" and the Test Plan proves it with "`gpg --verify checksums.txt.sig checksums.txt` on the first release against the owner's public key", but no sentence in the document says where the owner's public key or its fingerprint is published (`grep -nE 'public key|fingerprint' spec` hits only the Test Plan cell). The action signs with whatever key the secret holds (`action.yml:76-78` derives `GPG_FINGERPRINT` from the imported secret key, no expected fingerprint is pinned), so `gpg --verify` against an unpublished key cannot distinguish the owner's key from any other, and a third party has no way to verify the release at all. The bootstrap guide (`guides/bootstrap-go-project.md:72-74`) requires documenting the secret name, which the Design does, but says nothing about the public half; the convention's observability rule (`conventions/feature-documents.md:84`) is what AC-27 fails as written.
+PROPOSAL: In Design, name where the public key and its full fingerprint are published (the repository README, and optionally a keyserver), and in the Test Plan have the proof import the key from that location and check the fingerprint before `gpg --verify`; AC-27 can then say "signed by the published release key".
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, The binary in the repository (release bullet) and Sources
+EVIDENCE: The new sentences assert action behaviour ("through the release action's `pgp-private-key` input", "a release without the key fails rather than publishing unsigned") without naming the action revision inspected or the mechanism, while the template is cited inline ("inspected at `9a9321c`") and the convention requires Design claims to cite a `file:line` or command (`conventions/feature-documents.md:75-76`; `knowledge/shared-delivery.md:19,25` "inspect its selected ... signing requirements", "Always inspect the revision a consumer will execute"). The claims are true at `a86fcdf`: `action.yml:16-18` declares `pgp-private-key` (`required: true`, which the runner does not enforce for a present-but-empty `${{ secrets.PGP_PRIVATE_KEY }}`); the failure comes from `action.yml:60,66`, `shell: bash` (`-eo pipefail`) running `echo "${{ inputs.pgp-private-key }}" | gpg --batch --import`, and `echo "" | gpg --batch --import` exits 2 ("no valid OpenPGP data found"), so the step fails before GoReleaser runs. Also, the template has no signing "step": signing is the `signs:` block of `.goreleaser.yml:33-43` (`artifacts: checksum`, `--detach-sign`), with the key import and fingerprint supplied by the action. GoReleaser's `${artifact}.sig` default, which `checksums.txt.sig` relies on, is an external fact absent from Sources.
+PROPOSAL: Cite the action as "inspected at `a86fcdf`" with the import step as the failure mechanism, rename "the template's signing step" to "the template's `signs` block (`.goreleaser.yml`, checksum artifact only)", and add the GoReleaser signing documentation to Sources for the `.sig` name.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, The binary in the repository (release bullet) and Owner decisions D-27
+EVIDENCE: The action imports the key with `gpg --batch` and GoReleaser signs with `--batch --local-user $GPG_FINGERPRINT` (`action.yml:66`, template `.goreleaser.yml:38-43`); the action has no passphrase input (`action.yml` inputs: `go-version`, `gitversion-config-path`, `github-token`, `pgp-private-key`, `goreleaser-version`, `goreleaser-args`, `golangci-lint-config`), so only an ASCII-armoured private key without a passphrase can sign. The document says the secret is "documented by name and never by value" but never states this shape, so a passphrase-protected key would make the first release fail in the same way as a missing key.
+PROPOSAL: Add one clause to the release bullet (or D-27): the secret holds an ASCII-armoured export of the release key without a passphrase, because the pinned action has no passphrase input.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, The binary in the repository (release bullet); Acceptance Criteria AC-27; Test Plan AC-27
+EVIDENCE: The revision turns `checksums.txt` and `checksums.txt.sig` into literals in AC-27 and in the proof command, but the template names its checksum file `{{ .ProjectName }}_{{ .Version }}_SHA256SUMS` (`.goreleaser.yml:31`) and GoReleaser's own default is `{{ .ProjectName }}_{{ .Version }}_checksums.txt`, so neither produces a file called `checksums.txt`. The Design says the template's signing configuration "is kept" without saying that `checksum.name_template` is changed.
+PROPOSAL: Either state in the release bullet that `checksum.name_template` is set to `checksums.txt` (so the literals in AC-27 and the Test Plan are reachable), or write AC-27 and the proof against "the release's checksum file and its `.sig`".
 
 ## Sources
 
