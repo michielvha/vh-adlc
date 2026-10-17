@@ -1,0 +1,6 @@
+{
+  "name": "github-app-registration",
+  "version": "0.1.0",
+  "description": "Register GitHub Apps through the manifest flow and keep their credentials out of chat and Git.",
+  "author": { "name": "Michiel VH" }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "vhco-tools",
+  "owner": { "name": "Michiel VH" },
+  "plugins": [
+    {
+      "name": "github-app-registration",
+      "source": "./plugins/github-app-registration",
+      "description": "Register GitHub Apps through the manifest flow and keep their credentials out of chat and Git."
+    }
+  ]
+}
