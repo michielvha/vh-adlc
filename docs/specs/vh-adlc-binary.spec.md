@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revision during implementation on feat/vh-adlc-binary: state the schema-1 vocabulary the binary reads and the generic error code. Accepted earlier against R-5 at 9453719."
+status: planned
+status_description: "Re-accepted on 2026-10-18 against review R-8 after the schema-1 vocabulary revision; re-entering implementation on feat/vh-adlc-binary."
 issue: null
 branch: feat/vh-adlc-binary
 goal: "A released, signed vh-adlc binary that answers every mechanical question of the development loop from the files and Git alone, byte-identically for identical inputs."
@@ -511,6 +511,8 @@ None.
 | 2026-10-17 | R-5 | spec | `9453719` | n/a | n/a | accepted by owner |
 | 2026-10-18 | R-6 | spec | `4e2f18f` | fable | procedural | Review of the schema-1 vocabulary revision. One blocking finding (open questions matched outside their section, against the parent and the standard) and one should-fix (the by-name list is incomplete). |
 | 2026-10-18 | R-7 | spec | `a988251` | fable | procedural | Check of the R-6 fixes in the spec and the code. One should-fix (an earlier sentence still says no section is compiled in). Nothing blocking. |
+| 2026-10-18 | R-8 | spec | `1244f88` | fable | procedural | Diff-only check of the R-7 fix. No findings. |
+| 2026-10-18 | R-8 | spec | `1244f88` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -884,6 +886,10 @@ SEVERITY: should-fix
 WHERE: Design, Rules (first paragraph)
 EVIDENCE: docs/specs/vh-adlc-binary.spec.md:220 at a988251 still reads "Nothing about statuses, sections, IDs, columns or verdicts is compiled in", while the paragraph that follows (:225-231) now lists the section `Open Questions` among "the values the binary reads by name", and the code compiles it in: internal/doc/doc.go:22 `const sectionOpenQuestions = "Open Questions"`, read by `parseOpenQuestions` at :352. The sentence was already strained by the column names and the verdict `met` (internal/doc/doc.go:25-32, internal/rules/rules.go:26), but this revision is the one that makes its "sections" clause false of the code. Both R-6 findings are otherwise resolved: open questions are read only inside the `Open Questions` section (doc.go:351-361), matching the parent's condition table (personal-development-loop.spec.md:284) and the standard's (conventions/feature-documents.md:281); `TestOpenQuestionsSection` fails at 8ec105c ("a question heading outside Open Questions counted: [25]") and passes at HEAD, and `go test ./...` is green; the gate and next fixtures place `### Q1:` inside Open Questions (internal/gate/gate_test.go:91, internal/next/next_test.go:51,162); every other by-name read in the code (`spec`, `implementation`, `blocking`, `met`, the six column names, `status`, `branch`, `issue`, `covers`, `+dirty`, `Open Questions`) is in the list, and the remaining literals (`/issues/<n>` and `#<n>` in find.go:40-41, `origin` in fresh.go:97-101, `not ` in rules.go:69, `AGENTS.md`) are stated in their own paragraphs. The diff has no em or en dash and its widest added line is 104 columns, inside the document's existing range (105 at 277422f).
 PROPOSAL: Qualify the sentence so it does not contradict the list that follows, for example "No status, transition, section, ID, column or verdict rule is compiled in; the schema-1 names below are the only values the binary knows", or move the by-name paragraph's opening clause ("Schema 1 also fixes ...") into that sentence as its exception.
+
+### R-8
+
+NO FINDINGS
 
 ## Sources
 
