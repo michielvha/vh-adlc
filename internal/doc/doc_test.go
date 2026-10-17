@@ -263,3 +263,15 @@ func TestFind(t *testing.T) {
 		t.Fatalf("absent root: %q, %v", got, err)
 	}
 }
+
+func TestOpenQuestionsSection(t *testing.T) {
+	r := standardRules(t)
+	c := edit(t, conforming(), "The design. A fenced example", "### Q7: A heading that only looks like a question\n\nThe design. A fenced example")
+	if d := Parse("docs/f.md", []byte(c), r); len(d.OpenQuestions) != 0 {
+		t.Fatalf("a question heading outside Open Questions counted: %v", d.OpenQuestions)
+	}
+	c = edit(t, c, "## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Which one?\n")
+	if d := Parse("docs/f.md", []byte(c), r); len(d.OpenQuestions) != 1 {
+		t.Fatalf("open questions = %v, want the one in Open Questions", d.OpenQuestions)
+	}
+}
