@@ -158,7 +158,8 @@ Every operation runs `vh-adlc knowledge` first and states the result in one line
    in that repository adds the pinned `AGENTS.md` and bridges following the docs onboarding guide,
    merged into any existing local instructions, never overwriting them, in its own commit.
 3. **Page missing at the repository pin.** Stop, name the page and the pinned SHA, and recommend the pin
-   bump (D-18).
+   bump (D-18). Every operation requests `guides/humanize-prose.md` with its other pages (D-28), so a
+   repository pin older than `e4d58d2`, which lacks the guide, stops every operation this way.
 4. **Unreachable.** Stop and report what could not be read (D-19).
 5. **Local precedence.** Repository-local instructions beat central conventions, as the docs `AGENTS.md`
    requires. A conflict is reported, never silently resolved.
@@ -181,6 +182,9 @@ Made in `vhco-pro/docs` through its own PR and `npm run check`, before the plugi
 | `conventions/documentation.md` | Findings live in documents; issues stay short and link to them |
 | `conventions/coding.md` | Bun is the default for JavaScript tooling and tests; remove the conflicting Node 24 requirement for that tooling, without requiring unrelated project migrations (D-24) |
 | `README.md` | Task routes for "Specify, plan or implement a feature" and "Ship a change" |
+
+After phase 1, vhco-pro/docs#5 (merged at `e4d58d2`) added `guides/humanize-prose.md` and the "Prose a
+reader sees" section of `conventions/documentation.md`, which D-28 makes the loop depend on.
 
 The proposed rules block. In the standard it is the one fenced block whose info string is exactly
 `yaml vh-adlc-rules`; zero or several such blocks is `rules-block-missing` or `rules-block-ambiguous`
@@ -668,7 +672,7 @@ Who changes status:
 ### Operations
 
 Each operation starts with `vh-adlc knowledge` and the target feature, and ends by reporting what it
-changed, what it verified, every binary result it acted on, and what is left. Before it commits or posts
+changed, what it verified, every binary result it acted on, and what is left. Before it commits, posts or reports
 prose a reader will see, it edits that prose with the humanize prose guide at the resolved pin and names
 the guide and revision in its report (D-28). Records the reviewer returns are stored exactly as returned.
 
@@ -915,10 +919,10 @@ stated.
       reports distinguish skipped CI from a passing verification run.
 - [ ] AC-31: The checker and its CI run on Bun, and the plugin's resolved docs pin names Bun as the
       default for JavaScript tooling and tests without the conflicting Node 24 requirement.
-- [ ] AC-32: Every commit message, PR body, issue update and feature-document prose section the loop
-      writes is edited with the humanize prose guide at its resolved docs revision, and the run report
-      names that guide and revision. None of that text contains an em or en dash, and stored review
-      records stay exactly as the reviewer returned them.
+- [ ] AC-32: Every commit message, PR body, issue update, feature-document prose section, review summary
+      and run report the loop writes is edited with the humanize prose guide at its resolved docs
+      revision: none of that text keeps a canary tell seeded into the fixture inputs or contains an em
+      dash, an en dash or ` -- ` used as a dash, and the run report cites the guide and revision.
 
 ## Test Plan
 
@@ -926,8 +930,8 @@ The checker (`bun test`) enforces, besides the per-criterion checks: one manifes
 `plugin.json`; skill `name` equals its directory and starts with `vh-adlc-`; the agent sets `name` and has
 no `model:`; the reviewer's `tools:` is the agreed union with no editing tool; every referenced path exists
 in the package; each status-changing skill names its `vh-adlc gate` command; no skill mentions
-`--docs-source`; the version-bump rule; no em dash; each skill that commits or posts prose names the
-humanize prose guide. For AC-03 it scans the package for canary sentences
+`--docs-source`; the version-bump rule; no em or en dash; every skill names the humanize prose guide.
+For AC-03 it scans the package for canary sentences
 drawn from the pages at the plugin pin, and any match fails.
 
 The binary's own tests (`go test ./...`) cover every finding code, every gate row, both freshness rules,
@@ -936,7 +940,8 @@ records, blocking versus clean spec reviews, dirty covered paths, pin parsing (f
 several SHAs, none) and determinism (golden files, run twice).
 
 Scenarios run against fixtures, never a real project: a small repository with a test suite, an existing
-feature document, a deliberate failing test, unrelated staged and untracked edits and secret canaries; a
+feature document, a deliberate failing test, unrelated staged and untracked edits, secret canaries, and prose canary tells in issue bodies and
+scripted owner turns; a
 fixture docs repository with two commits that differ in one convention and one rules-block value; and an
 owned throwaway GitHub repository for S13. Claude Code and Copilot CLI run headless (`--plugin-dir` or the
 host's equivalent, isolated profiles), with the owner's turns scripted as follow-up prompts in the same
@@ -964,7 +969,7 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 | ID | Setup | Action | Passes when |
 | --- | --- | --- | --- |
 | S1 | Isolated profile | Install, list, invoke each operation, uninstall; probe the three unestablished host facts | All seven operations and the reviewer listed and invocable; the facts recorded; uninstall leaves the marketplace as before |
-| S2 | Fixture variants: full-SHA pin, no pin, short-SHA pin, `main` pin, two SHAs, pin lacking the standard, docs unreachable | `vh-adlc-spec` on a topic | Pin used; plugin pin plus an onboarding commit; stop with the precise reason in the other five |
+| S2 | Fixture variants: full-SHA pin, no pin, short-SHA pin, `main` pin, two SHAs, pin lacking the standard, pin lacking the humanize prose guide, docs unreachable | `vh-adlc-spec` on a topic | Pin used; plugin pin plus an onboarding commit; stop with the precise reason in the other six |
 | S3 | Fixture docs revisions A and B differing in default document location and one rules value | Same request on each | Location and gate outcome follow the revision; no package change |
 | S4 | Local `AGENTS.md` conflicting with a pinned convention | `vh-adlc-spec` | Local rule followed, conflict reported |
 | S5 | Fixture plugin exposing `spec`, `implement`, `review` | An unrelated request, then each `vh-adlc-*` invocation | The unrelated request does not enter the loop; both plugins' skills still run |
@@ -1012,7 +1017,7 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 | AC-29 | S9; S10 worktree/handoff variants |
 | AC-30 | S9 claim commit; S13 docs-only/mixed commits and CI reports |
 | AC-31 | C checker/CI commands; phase 1 coding-convention review at the plugin pin |
-| AC-32 | C guide reference per prose-writing skill; dash scan over the commits, PR and issue text and changed feature documents of S6, S9 and S13; those run reports name the guide and revision; `vh-adlc review check` in S11 |
+| AC-32 | C guide reference in every skill; S6, S9, S11 and S13 with fixture inputs (issue body, scripted owner turns) seeded with canary tells from §1, §2, §6 and §8 of the guide at the pin, then a scan of their commits, PR and issue text, changed feature documents, Review Log Outcome cells and captured run reports that fails on any surviving canary, em dash, en dash or ` -- ` dash; the reports cite the guide and revision |
 
 ## Implementation Phases
 
@@ -1080,7 +1085,7 @@ numbers within a phase are in dependency order; a partial checker run never mark
       Evidence: `a28d36c`; `npm run check` passes. vhco-pro/docs#4.
 - [x] T8 PR opened under a ship request; after the owner merges it, its merge SHA is recorded here as the
       plugin pin
-      Evidence: vhco-pro/docs#4 merged by merge commit `25c463c8087ebebe34e1051f312a261c2472126d`, CI on main passed (run 39058663878). That SHA is the plugin pin for `plugins/vh-adlc/knowledge.md` (T13).
+      Evidence: vhco-pro/docs#4 merged by merge commit `25c463c8087ebebe34e1051f312a261c2472126d`, CI on main passed (run 39058663878). That SHA is the plugin pin for `plugins/vh-adlc/knowledge.md` (T13) (moved to `e4d58d2` by D-28).
 
 ### Phase 2: One repository (owner actions)
 
@@ -1108,9 +1113,10 @@ numbers within a phase are in dependency order; a partial checker run never mark
 - [ ] T13 `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` - onboard this repository with the
       D-28 pin (`e4d58d2`) and `Feature documents: docs/specs/`; `vh-adlc knowledge` resolves `repository` (AC-04)
 - [ ] T14 `tests/vh-adlc/check.test.ts` - the package checker (manifest, names, agent frontmatter, tools
-      union, root `plugin.json`, references, gate commands, `--docs-source`, version rule, em dash, Bun
-      commands, prose guide reference); explicit test-only phase selection reports unscheduled operations
-      pending, defaults to full v1; fails because the package does not exist (AC-02, AC-22, AC-31, AC-32)
+      union, root `plugin.json`, references, gate commands, `--docs-source`, version rule, Bun commands,
+      the humanize prose guide named in every skill, no em or en dash); explicit test-only phase
+      selection reports unscheduled operations pending, defaults to full v1; fails because the package
+      does not exist (AC-02, AC-22, AC-31, AC-32)
 - [ ] T15 `plugins/vh-adlc/.claude-plugin/plugin.json`, `knowledge.md`, `.claude-plugin/marketplace.json` -
       manifest and marketplace checks in T14 pass; `github-app-registration` entry unchanged (AC-01, AC-02)
 - [ ] T16 `tests/vh-adlc/ensure.test.ts` - S15's valid and invalid PATH/cache/download cases, including
