@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/michielvha/vh-adlc/internal/knowledge"
 	"github.com/michielvha/vh-adlc/internal/report"
 )
 
@@ -49,6 +50,10 @@ func (s *stringList) Set(v string) error {
 	return nil
 }
 
+func (o *options) knowledge() knowledge.Options {
+	return knowledge.Options{Repo: o.repo, PluginPin: o.pluginPin, Offline: o.offline, DocsSource: o.docsSource, Pages: o.pages}
+}
+
 // command describes one subcommand: its name, the positional arguments it
 // takes and the function that answers it.
 type command struct {
@@ -64,6 +69,8 @@ func commands() []command {
 	return []command{
 		{name: "knowledge", flags: func(fs *flag.FlagSet, o *options) {
 			fs.Var(&o.pages, "page", "a docs page the operation will read (repeatable)")
+		}, run: func(ctx context.Context, o *options, _ []string) *report.Report {
+			return knowledge.Command(ctx, o.knowledge())
 		}},
 		{name: "find", flags: func(fs *flag.FlagSet, o *options) {
 			fs.StringVar(&o.issue, "issue", "", "issue number")
