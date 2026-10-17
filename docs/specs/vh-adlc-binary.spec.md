@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Re-accepted on 2026-10-18 against review R-8 after the schema-1 vocabulary revision; re-entering implementation on feat/vh-adlc-binary."
+status: in-progress
+status_description: "In implementation on feat/vh-adlc-binary; accepted against review R-8. Tasks T1 to T23 built; T24 (the first release) follows the merge."
 issue: null
 branch: feat/vh-adlc-binary
 goal: "A released, signed vh-adlc binary that answers every mechanical question of the development loop from the files and Git alone, byte-identically for identical inputs."
