@@ -90,6 +90,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-24 | Bun is the default for JavaScript tooling and tests going forward, including this repository's checker (`tests/vh-adlc` in `michielvha/vh-adlc`); `vhco-pro/docs` keeps its Node checker under the keep-the-runtime clause. Phase 1 removes the conflicting Node 24 requirement for that tooling. Migrating unrelated existing projects or changing `github-app-registration` is not part of this feature. |
 | D-25 | Host-created isolated worktrees are supported, with concurrent work on separate features and one writer per feature branch. Another session resumes the same feature only through an explicit owner-confirmed handoff. The plugin discovers existing worktrees but does not create, remove or force-move them, and claims are not distributed locks. |
 | D-26 | Completion certifies a committed implementation reviewed at an exact commit, not an uncommitted snapshot. Relevant changes are committed before review; relevant dirty changes prevent completion. Unrelated staged, unstaged and untracked work is left untouched. |
+| D-27 | Binary releases are signed: `checksums.txt` carries a detached signature made with the owner's release key, supplied as the `PGP_PRIVATE_KEY` repository secret. The plugin installer's trust root stays the digests pinned in its lock; it does not verify the signature. |
 
 ## Scope
 
@@ -411,8 +412,12 @@ and bootstrap guide at the resolved docs pin require:
   release in CI.
 - Released with `michielvha/gitversion-tag-action` and `michielvha/goreleaser-action`, pinned to full
   commit SHAs (the template's `@main` pins are replaced), with `CGO_ENABLED=0`, `-trimpath`, darwin and
-  linux on amd64 and arm64, and a published `checksums.txt`. The template's container step and PGP key
-  requirement are removed: there is no service image, and signing was not requested.
+  linux on amd64 and arm64, and a published `checksums.txt`. Signing was requested (D-27), so the
+  template's signing step is kept and applied to `checksums.txt` only, through the release action's
+  `pgp-private-key` input fed from the `PGP_PRIVATE_KEY` secret, documented by name and never by value
+  as the bootstrap guide requires. The release publishes `checksums.txt.sig` beside it, and a release
+  without the key fails rather than publishing unsigned. The template's container step is
+  removed: there is no service image.
 - The binary ignore is anchored at the root (`/vh-adlc`), as the Go convention requires, so it cannot hide
   `cmd/vh-adlc/` or `plugins/vh-adlc/`.
 - The release workflow runs only when binary paths change (`cmd/`, `internal/`, `go.mod`, `go.sum`, the
@@ -425,7 +430,8 @@ and bootstrap guide at the resolved docs pin require:
 
 - `plugins/vh-adlc/vh-adlc.lock.json` pins the exact version and, per platform, the asset name,
   `asset_sha256` and `binary_sha256` for the extracted executable, copied in after the release is verified.
-  Both digests are pinned independently of the release's checksum file, as the delivery convention requires.
+  Both digests are pinned independently of the release's checksum file and its signature, as the delivery
+  convention requires; the installer never reads either.
 - `plugins/vh-adlc/scripts/ensure-vh-adlc.sh` (Bash, `set -euo pipefail`) prints the path of a verified
   binary: a `vh-adlc` on `PATH` only if its executable digest matches `binary_sha256` and it reports
   exactly the locked version, else the user cache entry verified the same way on every reuse, else the
@@ -559,9 +565,9 @@ tests/vh-adlc/                     # at the repository root, so hosts never inst
 | ship | `vh-adlc-ship` | `/vh-adlc-ship` |
 | resume | `vh-adlc-resume` | `/vh-adlc-resume` |
 
-On 2026-10-17 none of these is a Claude Code or Copilot CLI built-in, and no plugin installed on the owner's machine on 2026-10-17 provides a `vh-adlc-*`
-skill. Hosts that need the namespaced form (`/vh-adlc:vh-adlc-spec`) get
-it documented in the README from the tested run.
+On 2026-10-17 none of these is a Claude Code or Copilot CLI built-in, and no plugin installed on the
+owner's machine provides a `vh-adlc-*` skill. Hosts that need the namespaced form
+(`/vh-adlc:vh-adlc-spec`) get it documented in the README from the tested run.
 
 ### Activation
 
@@ -876,8 +882,9 @@ stated.
       stops unless the owner allows a procedural gate, which is recorded.
 - [ ] AC-27: The binary in `michielvha/vh-adlc` follows the Go conventions at its pinned docs revision:
       `cmd`/`internal` layout, anchored binary ignore, test, vet and lint gates before release, actions
-      pinned to full SHAs, released platforms equal to the lock's, and no release from a commit that
-      touches no binary path.
+      pinned to full SHAs, released platforms equal to the lock's, `checksums.txt` published with a
+      detached signature by the owner's release key, and no release from a commit that touches no
+      binary path.
 - [ ] AC-28: `michielvha/vh-adlc` is the public successor of `michielvha/claude-plugins`, public only after a
       recorded history audit the owner confirmed; `vh-adlc@vhco-tools` and `github-app-registration@vhco-tools`
       install from it on every claimed host without a credential.
@@ -977,7 +984,7 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 | AC-24 | B rules-block fixtures; S3 |
 | AC-25 | S15; C lock shape |
 | AC-26 | S14 |
-| AC-27 | B; CI configuration review; a plugin-only commit on the default branch produces no release |
+| AC-27 | B; CI configuration review; `gpg --verify checksums.txt.sig checksums.txt` on the first release against the owner's public key; a plugin-only commit on the default branch produces no release |
 | AC-28 | Recorded audit; S1 install of both plugins from the public repository in a profile with no GitHub credential |
 | AC-29 | S9; S10 worktree/handoff variants |
 | AC-30 | S9 claim commit; S13 docs-only/mixed commits and CI reports |
