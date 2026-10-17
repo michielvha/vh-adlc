@@ -2,3 +2,7 @@ node_modules/
 *.pem
 *.env
 credentials*.json
+
+# vh-adlc binary and GoReleaser output, anchored to the root
+/vh-adlc
+/dist/

@@ -1,0 +1,1 @@
+{"schema_version":1,"command":"knowledge","result":"invalid-pin","knowledge":null,"data":null,"findings":[{"code":"invalid-pin","message":"the repository pins vhco-pro/docs at \"abc1234\" (AGENTS.md), which is not a full 40-character SHA","path":"","line":0}]}

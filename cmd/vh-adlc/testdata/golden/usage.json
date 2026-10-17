@@ -1,0 +1,1 @@
+{"schema_version":1,"command":"lint","result":"usage","knowledge":null,"data":null,"findings":[{"code":"usage","message":"--plugin-pin must be a full 40-character lowercase SHA","path":"","line":0}]}

@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/michielvha/vh-adlc/schema/vh-adlc.schema.json",
+  "title": "vh-adlc output",
+  "description": "The one JSON object every vh-adlc command except --version prints. schema_version changes only with a major release; finding codes are added only by a minor release.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "command",
+    "result",
+    "knowledge",
+    "data",
+    "findings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "command": {
+      "type": "string"
+    },
+    "result": {
+      "enum": [
+        "answered",
+        "pass",
+        "fail",
+        "usage",
+        "malformed",
+        "local-format",
+        "error",
+        "invalid-pin",
+        "missing-page",
+        "unreachable"
+      ]
+    },
+    "knowledge": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "revision",
+            "source",
+            "pin_files",
+            "override",
+            "rules_schema",
+            "feature_root",
+            "local_format"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "revision": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "source": {
+              "enum": [
+                "repository",
+                "plugin"
+              ]
+            },
+            "pin_files": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "override": {
+              "type": "boolean"
+            },
+            "rules_schema": {
+              "type": "integer"
+            },
+            "feature_root": {
+              "type": "string"
+            },
+            "local_format": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "data": {
+      "description": "The command's answer; its shape depends on the command."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "path",
+          "line"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "usage",
+              "invalid-pin",
+              "missing-page",
+              "unreachable",
+              "rules-block-missing",
+              "rules-block-ambiguous",
+              "rules-schema-unknown",
+              "rules-condition-unknown",
+              "rules-pattern-invalid",
+              "local-format",
+              "frontmatter-missing",
+              "frontmatter-field-missing",
+              "status-unknown",
+              "section-missing",
+              "section-order",
+              "test-plan-header",
+              "review-log-header",
+              "id-malformed",
+              "id-duplicate",
+              "id-recycled",
+              "test-plan-row-missing",
+              "test-plan-cell",
+              "task-criterion-unknown",
+              "review-row-malformed",
+              "review-subsection-missing",
+              "review-records-malformed",
+              "review-records-mixed",
+              "acceptance-review-unknown",
+              "covers-pattern-unsupported",
+              "no-review",
+              "dirty-target",
+              "commit-unreachable",
+              "baseline-changed",
+              "covered-drift",
+              "covered-changed",
+              "feature-tree-dirty",
+              "default-branch-unknown",
+              "git-too-old",
+              "transition-not-allowed",
+              "review-not-found",
+              "records-differ",
+              "error",
+              "no_open_questions",
+              "test_plan_complete",
+              "spec_review_fresh",
+              "spec_review_clean",
+              "accepted",
+              "tasks_populated",
+              "tasks_open",
+              "on_feature_branch_if_set",
+              "all_met",
+              "impl_review_fresh",
+              "impl_review_clean",
+              "feature_tree_clean"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

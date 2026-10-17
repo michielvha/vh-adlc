@@ -1,0 +1,1 @@
+{"schema_version":1,"command":"knowledge","result":"answered","knowledge":{"revision":"eda18fdf1c171d59dd486cf56ab3b5a8d215d5e4","source":"plugin","pin_files":[],"override":true,"rules_schema":1,"feature_root":"docs/internal/plans","local_format":false},"data":{"pages":["guides/humanize-prose.md"]},"findings":[]}
