@@ -491,6 +491,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-17 | R-1 | spec | `af55148` | fable | procedural | Full review of the draft. Thirteen should-fix findings (argument order, schema validation, Git index writes, rename and config sensitivity, fixture isolation, default branch, reachability, slug matching, wrapped annotations, completion path, parent proofs, untagged releases, capture groups) and eight nits. Nothing blocking. |
 | 2026-10-17 | R-2 | spec | `4673680` | fable | procedural | Review of the R-1 fixes. One blocking finding (the post-merge completion path is an exception to owner decision D-20 and needs the owner), four should-fix findings (post-merge drift, `git log` settings, fixture default branch, layout rule) and ten nits. |
+| 2026-10-17 | R-3 | spec | `cec987e` | fable | procedural | Review of the R-2 fixes and the owner's completion choice. Two should-fix findings (record the exception in the parent; name the two completion commits) and six nits. Nothing blocking. |
 
 ### R-1
 
@@ -747,6 +748,64 @@ SEVERITY: nit
 WHERE: Design, Delivery (post-merge completion path); Tasks T24
 EVIDENCE: docs/specs/vh-adlc-binary.spec.md:331-334 attributes the post-release recording, review and gate to "the loop", but this is parent phase 3 and the phase-4 skills that constitute the loop (personal-development-loop.spec.md:1113 onward) do not exist until this feature has shipped; the standard (conventions/feature-documents.md:15-16) expects such steps to be run by hand with a report that says so, and the plugin lock that would install the binary is written only by parent T17 from this feature's recorded values.
 PROPOSAL: Say the owner's session performs these steps by hand with the downloaded release binary and records that in the Review Log row and the completion commit, whatever path F-01 settles on.
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Delivery (post-merge completion path) versus the parent's Owner decisions
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:339-342 records the owner's choice accurately ("The owner chose this path on 2026-10-17, in answer to R-2 F-01, as a recorded exception to parent D-20 ... and to the document returning to the default branch with its PR"; the D-20 quote matches personal-development-loop.spec.md:87 verbatim). The record lives only in the child's Design paragraph. The parent still says "None. Every decision raised so far is recorded under Owner decisions" (personal-development-loop.spec.md:1178), its authority table (:811-815) grants a default-branch push only to a document without `branch`, and the child's own rule (docs/specs/vh-adlc-binary.spec.md:34-35) is that a disagreement with the parent is a finding. The parent is `planned` and Owner decisions is outside its normative baseline (Scope, Design, Acceptance Criteria, Test Plan, `covers`), so the parent can take the row without losing acceptance.
+PROPOSAL: Add the exception to the parent as a D-29 row (or a dated note on D-20 and D-07) naming the binary child's docs-only completion commit, and have the child cite that ID instead of describing itself as the record.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Delivery (post-merge completion path); Tasks T24
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:345-352 says the session "records the version and ... digests", then "a drift-only spec review at that commit comes first", then an implementation review, then "That docs-only commit is pushed". The paragraph never says the recording is a commit, and the nearest antecedent of "that commit" is "the reviewed spec commit" (:348), which is the stale one. The sequence only passes `gate complete` when the recording is a commit E on the fast-forwarded feature branch and both reviews target E: `spec_review_fresh` holds because `E...M` is empty (M, the merge commit, is E's parent); `impl_review_clean` needs AC-15 `met`, and AC-15's "the version and both digests per platform are recorded for the parent's lock" (:413-414) is observable in the committed state only if the values are already committed at the reviewed commit (the standard binds a completion-eligible review to an exact commit, conventions/feature-documents.md:150 and personal-development-loop.spec.md:758-761). The flip, the two review rows and the gate line then form a second commit C, so the outgoing push range is E and C, not one commit; D-23 (personal-development-loop.spec.md:90) requires that whole range to be documentation-only, which it is.
+PROPOSAL: Name the commits: E, the evidence commit after the fast-forward, which both the drift-only spec review and the implementation review target; C, the completion commit holding the rows, the flip and the gate line; and say the push to the default branch carries E and C, both docs-only, each with the marker.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Delivery (post-merge completion path)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:345-347 "it records the version and, per platform, the asset name, the asset's SHA-256 and the extracted binary's SHA-256" names no place; :348-349 relies on "the baseline is unchanged". Only annotation lines (the AC-13 and AC-15 `Evidence:` lines, dropped from the baseline by :244-246) and the Tasks section (not in `normative_sections`, conventions/feature-documents.md:223) keep the baseline unchanged; recording the values in Delivery prose would change the baseline and fail `accepted` (conventions/feature-documents.md:285). The AC-15 proof row (:434) already says "record them in the T24 evidence line", so the two places disagree on where.
+PROPOSAL: Say in Delivery that the values go into the AC-13 and AC-15 evidence lines and T24's line, never into a normative section, because that is what keeps the acceptance.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Delivery (post-merge completion path)
+EVIDENCE: `--plugin-pin <sha>` is required on every command (docs/specs/vh-adlc-binary.spec.md:104-105) and the repository pin is read from a root `AGENTS.md` (:194-195), but `git ls-files` at the root shows only `.claude-plugin/marketplace.json`, `.gitignore` and `README.md`; `AGENTS.md` with the D-28 pin is parent T13 in phase 4 (personal-development-loop.spec.md:1115-1116). The hand-run `gate complete` therefore resolves knowledge as `plugin` from the pin typed on the command line, which Delivery does not say.
+PROPOSAL: Add that the hand-run passes `--plugin-pin e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a` and resolves `source: plugin`, because the repository has no `AGENTS.md` pin until parent T13.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Delivery (post-merge completion path)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:343-344 "because the loop's skills do not exist until phase 4". The steps run by hand are a review and a ship-shaped completion; the review skill is parent phase 6 T28 (personal-development-loop.spec.md:1157) and the ship skill phase 7 T30 (:1164); phase 4 delivers only the spec skill and the reviewer agent (:1131-1133).
+PROPOSAL: Write "do not exist until phases 4 to 7" or "until the plugin ships".
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Delivery versus the parent's freshness rules
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:347-348 "The merge makes the feature's own covered files drift against the reviewed spec commit" is correct (`X...M` with X an ancestor of the merge commit M is `diff(X, M)`), but the parent states "The feature's own commits cannot cause it" (personal-development-loop.spec.md:359-360) without the "before the merge" qualifier. By the child's rule (:34-35) the disagreement is a finding, and the standard's Acceptance paragraph (conventions/feature-documents.md:197-198) already covers the case as a re-review from default-branch change.
+PROPOSAL: Record the parent sentence as holding only until the feature's merge, as a one-line parent docs gap for its next revision, so the child does not silently contradict it.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Toolchain and module (Git version check); Design, Finding codes
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:96-97 "`gitcmd` checks `git --version` once and reports an older Git as `error` with the version it found", while :136 says every finding carries a `code`, :179 says the codes are API, and :174-175 says the schema enumerates every code. The Finding codes list (:179-190) has no code for this case, so the schema test (AC-11) cannot enumerate it and the message is the only signal.
+PROPOSAL: Give the case a code (for example `git-too-old`) in the Finding codes list, or state which existing code the `error` finding carries.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context; Design, Toolchain and module; Design, Freshness and gates; Design, Tests
+EVIDENCE: Lines new in the diff exceed the document's wrap of about 100 columns: docs/specs/vh-adlc-binary.spec.md:39 is 116 characters ("proven here; AC-27's observed non-release ... The parent pins"), :87 is 124 ("only `main.go`, its `*_test.go` files and `testdata/`; `main.go` imports only ..."), :274 is 122 ("the commits of a squash-merged branch, is `commit-unreachable` and any other non-zero exit is `error`. Covered changes are"), and :294 is a 20-character orphan line ("author and committer") left by an unwrapped insertion at :292-293. R-2 F-11's two lines are fixed; these are the same class. The document contains no em dash or en dash.
+PROPOSAL: Rewrap the four paragraphs.
 
 ## Sources
 
