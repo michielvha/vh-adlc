@@ -19,6 +19,7 @@ import (
 	"github.com/michielvha/vh-adlc/internal/knowledge"
 	"github.com/michielvha/vh-adlc/internal/next"
 	"github.com/michielvha/vh-adlc/internal/report"
+	"github.com/michielvha/vh-adlc/internal/review"
 )
 
 // version is set at build time with -X main.version.
@@ -97,6 +98,8 @@ func commands() []command {
 		{name: "review check", positionals: []string{"doc"}, flags: func(fs *flag.FlagSet, o *options) {
 			fs.StringVar(&o.review, "review", "", "review ID, for example R-3")
 			fs.StringVar(&o.returned, "returned", "", "file holding the records the reviewer returned")
+		}, run: func(ctx context.Context, o *options, args []string) *report.Report {
+			return review.Command(ctx, o.knowledge(), args[0], o.review, o.returned)
 		}},
 	}
 }
@@ -154,9 +157,6 @@ func dispatch(ctx context.Context, args []string) *report.Report {
 		}
 		if !fullSHA.MatchString(o.pluginPin) {
 			return usage(c.name, "--plugin-pin must be a full 40-character lowercase SHA")
-		}
-		if c.run == nil {
-			return report.New(c.name, report.Error, report.Finding{Code: report.CodeError, Message: c.name + " is not implemented"})
 		}
 		return c.run(ctx, o, positionals)
 	}
