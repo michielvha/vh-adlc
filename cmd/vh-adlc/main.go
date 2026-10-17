@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/michielvha/vh-adlc/internal/doc"
 	"github.com/michielvha/vh-adlc/internal/knowledge"
 	"github.com/michielvha/vh-adlc/internal/report"
 )
@@ -75,8 +76,12 @@ func commands() []command {
 		{name: "find", flags: func(fs *flag.FlagSet, o *options) {
 			fs.StringVar(&o.issue, "issue", "", "issue number")
 			fs.StringVar(&o.slug, "slug", "", "document slug")
+		}, run: func(ctx context.Context, o *options, _ []string) *report.Report {
+			return doc.FindCommand(ctx, o.knowledge(), o.issue, o.slug)
 		}},
-		{name: "lint", positionals: []string{"doc"}},
+		{name: "lint", positionals: []string{"doc"}, run: func(ctx context.Context, o *options, args []string) *report.Report {
+			return doc.LintCommand(ctx, o.knowledge(), args[0])
+		}},
 		{name: "gate", positionals: []string{"target-status", "doc"}},
 		{name: "fresh", positionals: []string{"doc"}},
 		{name: "next", positionals: []string{"doc"}},
