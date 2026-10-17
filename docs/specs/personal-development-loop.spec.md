@@ -105,7 +105,8 @@ In scope:
 - The `vhco-pro/docs` changes the loop depends on (see [Docs changes](#docs-changes-phase-1)).
 - Onboarding the repository itself to `vhco-pro/docs`, with `docs/specs/` declared as its
   feature-document root so this document's location is the repository's convention.
-- Install, update and uninstall instructions and a support matrix in the marketplace README.
+- Install, update and uninstall instructions, a support matrix, and the release key's fingerprint with
+  its verification steps in the marketplace README.
 
 Out of scope, by name:
 
@@ -414,20 +415,22 @@ and bootstrap guide at the resolved docs pin require:
 - Released with `michielvha/gitversion-tag-action` and `michielvha/goreleaser-action`, pinned to full
   commit SHAs (the template's `@main` pins are replaced), with `CGO_ENABLED=0`, `-trimpath`, darwin and
   linux on amd64 and arm64, and a published `checksums.txt` (the template's `checksum.name_template`,
-  `{{ .ProjectName }}_{{ .Version }}_SHA256SUMS`, is replaced by `checksums.txt`). Signing was requested (D-27), so the
-  template's `signs` block (`.goreleaser.yml`, `artifacts: checksum`, `--detach-sign`) is kept, and
-  GoReleaser's default signature name makes it `checksums.txt.sig`. The key reaches it through the
-  release action's `pgp-private-key` input (`action.yml` at `a86fcdf`), fed from the `PGP_PRIVATE_KEY`
-  secret, which is documented by name and never by value as the bootstrap guide requires. The secret
-  holds a passphrase-less ASCII-armoured key, because the action has no passphrase input. A release
-  without the key fails rather than publishing unsigned: the action's import step pipes the input into
-  `gpg --batch --import` under `bash -eo pipefail`, and empty input exits non-zero before GoReleaser
-  runs. The public key is committed at the repository root as `release-signing-key.asc`, and the README
-  prints its full primary fingerprint (D-27) with the verification steps: import that file, compare
-  `gpg --fingerprint` with the printed fingerprint, `gpg --verify checksums.txt.sig checksums.txt`, then
-  `sha256sum --check --ignore-missing checksums.txt` over the downloaded asset. The signature is made by
-  the key's signing subkey, so `gpg --verify` names the subkey; the fingerprint to compare is the
-  primary one. The template's container step is removed: there is no service image.
+  `{{ .ProjectName }}_{{ .Version }}_SHA256SUMS`, is replaced by `checksums.txt`). Signing was
+  requested (D-27), so the template's `signs` block (`.goreleaser.yml`, `artifacts: checksum`,
+  `--detach-sign`) is kept, and GoReleaser's default signature name makes it `checksums.txt.sig`. The
+  key reaches it through the release action's `pgp-private-key` input (`action.yml` at `a86fcdf`), fed
+  from the `PGP_PRIVATE_KEY` secret, which is documented by name and never by value as the bootstrap
+  guide requires. The secret holds a passphrase-less ASCII-armoured key, because the action has no
+  passphrase input. A release without the key fails rather than publishing unsigned: the action's
+  import step pipes the input into `gpg --batch --import` under `bash -eo pipefail`, and empty input
+  exits non-zero before GoReleaser runs. The public key is committed at the repository root as
+  `release-signing-key.asc`, and the README prints its full primary fingerprint (D-27) with the
+  verification steps: import that file, compare `gpg --fingerprint release@vhco.pro` with the printed
+  fingerprint, `gpg --verify checksums.txt.sig checksums.txt`, then check the downloaded asset with
+  `sha256sum --check --ignore-missing checksums.txt` on Linux or
+  `shasum -a 256 --check --ignore-missing checksums.txt` on macOS. The signature is made by the key's
+  signing subkey, so `gpg --verify` names the subkey; the fingerprint to compare is the primary one.
+  The template's container step is removed: there is no service image.
 - The binary ignore is anchored at the root (`/vh-adlc`), as the Go convention requires, so it cannot hide
   `cmd/vh-adlc/` or `plugins/vh-adlc/`.
 - The release workflow runs only when binary paths change (`cmd/`, `internal/`, `go.mod`, `go.sum`, the
@@ -996,7 +999,7 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 | AC-24 | B rules-block fixtures; S3 |
 | AC-25 | S15; C lock shape |
 | AC-26 | S14 |
-| AC-27 | B; CI configuration review; on the first release, in an empty keyring, import `release-signing-key.asc`, compare `gpg --fingerprint` with the D-27 fingerprint and the README, `gpg --verify checksums.txt.sig checksums.txt`, then `sha256sum --check --ignore-missing checksums.txt` over at least one downloaded asset; a plugin-only commit on the default branch produces no release |
+| AC-27 | B; CI configuration review; on the first release, in an empty keyring, import `release-signing-key.asc`, confirm `gpg --show-keys release-signing-key.asc` lists `VHCO Pro (Release Signing Key) <release@vhco.pro>` as the first uid, compare `gpg --fingerprint` with the D-27 fingerprint and the README, `gpg --verify checksums.txt.sig checksums.txt`, then `sha256sum --check --ignore-missing checksums.txt` over at least one downloaded asset; a plugin-only commit on the default branch produces no release |
 | AC-28 | Recorded audit; S1 install of both plugins from the public repository in a profile with no GitHub credential |
 | AC-29 | S9; S10 worktree/handoff variants |
 | AC-30 | S9 claim commit; S13 docs-only/mixed commits and CI reports |
@@ -1087,8 +1090,8 @@ numbers within a phase are in dependency order; a partial checker run never mark
 - [ ] T12 `docs/specs/vh-adlc-binary.spec.md` - child feature document drafted from the binary sections of
       this spec, reviewed and accepted through the same steps; its own tasks deliver the seven commands,
       golden tests, baseline/record/dirty-tree and blocking-review/resume fixtures, CI gates, the
-      committed public key and README fingerprint, and the first signed path-filtered release (AC-09,
-      AC-16, AC-23, AC-24, AC-27)
+      committed public key, the README fingerprint and verification steps, and the first signed
+      path-filtered release (AC-09, AC-16, AC-23, AC-24, AC-27)
 
 ### Phase 4: Spec loop
 
