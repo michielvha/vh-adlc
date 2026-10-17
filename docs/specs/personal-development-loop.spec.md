@@ -672,9 +672,10 @@ Who changes status:
 ### Operations
 
 Each operation starts with `vh-adlc knowledge` and the target feature, and ends by reporting what it
-changed, what it verified, every binary result it acted on, and what is left. Before it commits, posts or reports
-prose a reader will see, it edits that prose with the humanize prose guide at the resolved pin and names
-the guide and revision in its report (D-28). Records the reviewer returns are stored exactly as returned.
+changed, what it verified, every binary result it acted on, and what is left. Before it commits, posts
+or reports prose a reader will see, it edits that prose with the humanize prose guide at the resolved
+pin and names the guide and revision in its report (D-28). Records the reviewer returns are stored
+exactly as returned.
 
 **investigate.** Input: an issue, failure, question or document. Measure rather than remember; separate
 measured facts, source observations, hypotheses and decisions. Substantial findings go into an analysis
@@ -927,12 +928,12 @@ stated.
 ## Test Plan
 
 The checker (`bun test`) enforces, besides the per-criterion checks: one manifest and no root
-`plugin.json`; skill `name` equals its directory and starts with `vh-adlc-`; the agent sets `name` and has
-no `model:`; the reviewer's `tools:` is the agreed union with no editing tool; every referenced path exists
-in the package; each status-changing skill names its `vh-adlc gate` command; no skill mentions
+`plugin.json`; skill `name` equals its directory and starts with `vh-adlc-`; the agent sets `name` and
+has no `model:`; the reviewer's `tools:` is the agreed union with no editing tool; every referenced path
+exists in the package; each status-changing skill names its `vh-adlc gate` command; no skill mentions
 `--docs-source`; the version-bump rule; no em or en dash; every skill names the humanize prose guide.
-For AC-03 it scans the package for canary sentences
-drawn from the pages at the plugin pin, and any match fails.
+For AC-03 it scans the package for canary sentences drawn from the pages at the plugin pin, and any
+match fails.
 
 The binary's own tests (`go test ./...`) cover every finding code, every gate row, both freshness rules,
 normative baseline normalisation, complete and exact criterion record sets, malformed/missing spec
@@ -940,23 +941,24 @@ records, blocking versus clean spec reviews, dirty covered paths, pin parsing (f
 several SHAs, none) and determinism (golden files, run twice).
 
 Scenarios run against fixtures, never a real project: a small repository with a test suite, an existing
-feature document, a deliberate failing test, unrelated staged and untracked edits, secret canaries, and prose canary tells in issue bodies and
-scripted owner turns; a
-fixture docs repository with two commits that differ in one convention and one rules-block value; and an
-owned throwaway GitHub repository for S13. Claude Code and Copilot CLI run headless (`--plugin-dir` or the
-host's equivalent, isolated profiles), with the owner's turns scripted as follow-up prompts in the same
-session. For operation/gate assertions, the harness first verifies the real binary with the unmodified
-release lock. It then prepares a fixture-only plugin copy whose lock pins the logging wrapper's own
-asset and executable digests, and pre-seeds an isolated cache with that verified wrapper. The wrapper
-forwards to the verified real binary and records each call, JSON result and exit code. The installer
-still enforces the fixture lock: no version-only interception or production bypass flag exists.
-Unmodified-package installation checks and S15 use the real installer and release lock, apart from
-explicit bad-lock fixtures. Reports identify fixture instrumentation; fixture locks and wrappers are
-never published or written into an installed plugin cache.
-AC-22 is asserted from that log and the gate line in each status-change commit, never from the model's
-own summary. VS Code runs by hand in the Local harness from the same scripts. Results go to
-`tests/vh-adlc/evidence/<host>/` as summaries recording host and version, plugin version and revision, binary
-version, OS, date, model and limitations.
+feature document, a deliberate failing test, unrelated staged and untracked edits, secret canaries, and
+prose canary tells in issue bodies and scripted owner turns (D-28); a fixture docs repository with two
+commits that differ in one convention and one rules-block value; and an owned throwaway GitHub
+repository for S13. Claude Code and Copilot CLI run headless (`--plugin-dir` or the host's equivalent,
+isolated profiles), with the owner's turns scripted as follow-up prompts in the same session. For
+operation/gate assertions, the harness first verifies the real binary with the unmodified release lock.
+It then prepares a fixture-only plugin copy whose lock pins the logging wrapper's own asset and
+executable digests, and pre-seeds an isolated cache with that verified wrapper. The wrapper forwards to
+the verified real binary and records each call, JSON result and exit code. The installer still enforces
+the fixture lock: no version-only interception or production bypass flag exists. Unmodified-package
+installation checks and S15 use the real installer and release lock, apart from explicit bad-lock
+fixtures. Reports identify fixture instrumentation; fixture locks and wrappers are never published or
+written into an installed plugin cache. For AC-32 the harness also captures each operation's final
+report, scans it, and discards it; `evidence/` keeps summaries only. AC-22 is asserted from the wrapper's log and
+the gate line in each status-change commit, never from the model's own summary. VS Code runs by hand in
+the Local harness from the same scripts. Results go to `tests/vh-adlc/evidence/<host>/` as summaries
+recording host and version, plugin version and revision, binary version, OS, date, model and
+limitations.
 
 Phase-scoped runs are explicit, not a relaxation of v1. In phase 4, the checker and S1/S5/S14 exercise
 only `investigate`, `spec` (both modes) and `resume` reporting, plus the reviewer; S7 exercises spec only.
@@ -1017,7 +1019,7 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 | AC-29 | S9; S10 worktree/handoff variants |
 | AC-30 | S9 claim commit; S13 docs-only/mixed commits and CI reports |
 | AC-31 | C checker/CI commands; phase 1 coding-convention review at the plugin pin |
-| AC-32 | C guide reference in every skill; S6, S9, S11 and S13 with fixture inputs (issue body, scripted owner turns) seeded with canary tells from §1, §2, §6 and §8 of the guide at the pin, then a scan of their commits, PR and issue text, changed feature documents, Review Log Outcome cells and captured run reports that fails on any surviving canary, em dash, en dash or ` -- ` dash; the reports cite the guide and revision |
+| AC-32 | C guide reference in every skill; S6, S9, S11 and S13 with their scripted owner turns, and the S6 and S13 issue bodies, seeded with canary tells from §1, §2, §6 and §8 of the guide at the pin, then a scan of their commits, PR and issue text, the feature-document prose sections the loop wrote, Review Log Outcome cells and captured run reports that fails on any surviving canary, em dash, en dash or ` -- ` dash; verbatim `### R-<n>` records are excluded from the scan; the reports cite the guide and revision |
 
 ## Implementation Phases
 
