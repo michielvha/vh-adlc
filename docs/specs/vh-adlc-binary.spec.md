@@ -74,14 +74,23 @@ parent's seven.
 ### Toolchain and module
 
 `go.mod` declares `module github.com/michielvha/vh-adlc` and `go 1.27.2`. The only dependency is
-`go.yaml.in/yaml/v3` v3.0.5, for the frontmatter and the rules block; `gopkg.in/yaml.v3` is
-unmaintained. Command-line parsing uses the standard `flag` package with one `flag.FlagSet` per
-command. Git is read by running `git` with `LC_ALL=C` and `--no-pager`, never through a library.
+`go.yaml.in/yaml/v3` v3.0.5, for the frontmatter and the rules block; `gopkg.in/yaml.v3` is archived
+and marked unmaintained. Command-line parsing uses the standard `flag` package with one `flag.FlagSet`
+per command (see Invocation for argument order).
 
 Packages under `internal/`: the parent's seven (`knowledge`, `doc`, `rules`, `gate`, `fresh`, `next`,
 `review`) plus `gitcmd`, which runs Git and parses its output, `report`, which owns the JSON contract
-and exit codes, and `testrepo`, a test helper that builds fixture repositories. `cmd/vh-adlc/main.go`
-parses flags, calls one package function and writes its report.
+and exit codes, and `testrepo`, a test helper that builds fixture repositories. `cmd/vh-adlc` holds
+only `main.go` and its tests; `main.go` imports only the standard library and `internal/` packages,
+parses flags, creates a `context.Context` with `signal.NotifyContext`, calls one package function and
+writes its report. `knowledge` and `gitcmd` take that context, so an interrupt cancels a fetch or a
+Git call.
+
+`gitcmd` runs `git --no-pager` with `LC_ALL=C` and `GIT_OPTIONAL_LOCKS=0`, so `git status` never
+rewrites the index. It fixes every setting that changes output shape on the command line: `-z` on every
+command that lists paths, `--no-renames` on `git diff` and `git status`, and `-c core.quotePath=false`.
+The user's other Git configuration still applies, because it does not change these outputs. Git is
+never read through a library.
 
 The lint configuration adapts the template's `.golangci.yml` as it is, because it already uses
 version 2 with `linters` and `formatters` sections. The root `.gitignore` gains `/vh-adlc` and `/dist/`.
@@ -89,8 +98,13 @@ version 2 with `linters` and `formatters` sections. The root `.gitignore` gains 
 ### Invocation
 
 Every command except `--version` takes `--repo <dir>` (default `.`), `--plugin-pin <sha>` (required,
-40 hexadecimal characters), `--offline`, and the test-only `--docs-source <path>`. Document paths are
-relative to `--repo`. The parent's signatures are otherwise unchanged:
+40 hexadecimal characters), `--offline`, and the test-only `--docs-source <path>`. `--repo` is resolved
+to `git rev-parse --show-toplevel` before any path is read, and document paths are relative to that
+root. The parent's table shows `--plugin-pin` only on `knowledge`; this is a deliberate extension,
+because every document command resolves knowledge itself, so the phase-4 skills pass the pin on every
+call. Flags may come before or after the positional arguments: each command parses its flag set, moves
+the first remaining argument to its positional list, and parses again until no arguments remain, so
+the parent's `review check <doc> --review R-<n> --returned <file>` order works as written.
 
 ```text
 vh-adlc knowledge [--page <path>]...
@@ -111,11 +125,12 @@ with the locked version.
 
 Every command except `--version` prints one JSON object and a newline, with keys in this order:
 `schema_version` (1), `command`, `result`, `knowledge`, `data`, `findings`. `knowledge` holds
-`revision`, `source` (`repository` or `plugin`), `override`, `rules_schema`, `feature_root` and
-`local_format`, or `null` when resolution did not get that far. `data` is the command's answer.
-`findings` is an array of objects with `code`, `message`, `path` and `line`, sorted by path, line and
-code; `path` is `""` and `line` is `0` when they do not apply. Structs fix the key order, and no map is
-serialised or iterated unsorted.
+`revision`, `source` (`repository` or `plugin`), `pin_files` (the bridge files the pin was found in,
+sorted; empty for the plugin pin), `override`, `rules_schema`, `feature_root` and `local_format`, or
+`null` when resolution did not get that far. `data` is the command's answer. `findings` is an array of
+objects with `code`, `message`, `path` and `line`, sorted by path, line and code; `path` is `""` and
+`line` is `0` when they do not apply. Structs fix the key order, and no map is serialised or iterated
+unsorted.
 
 | `result` | Exit | Meaning |
 | --- | --- | --- |
@@ -129,8 +144,10 @@ serialised or iterated unsorted.
 | `invalid-pin`, `missing-page`, `unreachable` | 5 | Knowledge not usable |
 
 A document is `malformed` when its frontmatter, a required section, the Test Plan header or the Review
-Log header cannot be found, or its status is not in the rules. Any other rule violation is a `fail`
-finding. `gate`, `fresh` and `next` on a malformed document stop with `malformed`.
+Log header cannot be found, or its status is not in the rules; these are the document-shape codes
+below. Any other rule violation is a `fail` finding. `lint` reports every shape and lint finding it can
+still compute, and its `result` is `malformed` when any shape finding is present, else `fail` or
+`pass`. `gate`, `fresh` and `next` on a malformed document stop with `malformed`.
 
 The `data` of each command:
 
@@ -144,25 +161,26 @@ The `data` of each command:
 | `next` | `action`, `rule` (its 1-based index in the block's `next` list) and `reason` |
 | `review check` | `review`, `equal` |
 
-`gate`'s `line` is the parent's status-commit line, for example
-`vh-adlc gate planned: pass (rules 1, docs e4d58d2)`, so an operation copies it rather than composing
-it. `schema/vh-adlc.schema.json` (JSON Schema 2020-12) describes this object and enumerates every
-`result` and finding code.
+`gate`'s `line` is the parent's status-commit line, so an operation copies it rather than composing it.
+It reads `vh-adlc gate <target>: pass (rules <schema>, docs <sha7>)` or
+`vh-adlc gate <target>: fail (<failing conditions, comma separated>; rules <schema>, docs <sha7>)`,
+where `<sha7>` is the first seven characters of the resolved revision. `schema/vh-adlc.schema.json`
+(JSON Schema 2020-12) describes this object and enumerates every `result` and finding code.
 
 ### Finding codes
 
 The codes are API and are added only by a minor release. Knowledge: `invalid-pin`, `missing-page`,
 `unreachable`, `rules-block-missing`, `rules-block-ambiguous`, `rules-schema-unknown`,
-`rules-condition-unknown`, `rules-pattern-invalid`, `local-format`. Document shape: `frontmatter-missing`,
-`frontmatter-field-missing`, `status-unknown`, `section-missing`, `section-order`,
-`test-plan-header`, `review-log-header`. Lint: `id-malformed`, `id-duplicate`, `id-recycled`,
-`test-plan-row-missing`, `test-plan-cell`, `task-criterion-unknown`, `review-row-malformed`,
-`review-subsection-missing`, `review-records-malformed`, `review-records-mixed`,
+`rules-condition-unknown`, `rules-pattern-invalid`, `local-format`. Document shape:
+`frontmatter-missing`, `frontmatter-field-missing`, `status-unknown`, `section-missing`,
+`section-order`, `test-plan-header`, `review-log-header`. Lint: `id-malformed`, `id-duplicate`,
+`id-recycled`, `test-plan-row-missing`, `test-plan-cell`, `task-criterion-unknown`,
+`review-row-malformed`, `review-subsection-missing`, `review-records-malformed`, `review-records-mixed`,
 `acceptance-review-unknown`, `covers-pattern-unsupported`. Freshness: `no-review`, `dirty-target`,
 `commit-unreachable`, `baseline-changed`, `covered-drift`, `covered-changed`, `feature-tree-dirty`,
 `default-branch-unknown`. Gate: `transition-not-allowed`, and one finding per failing condition whose
-code is the condition's name (`no_open_questions`, `accepted` and so on). Review check: `review-not-found`,
-`records-differ`. Usage: `usage`.
+code is the condition's name (`no_open_questions`, `accepted` and so on). Review check:
+`review-not-found`, `records-differ`. Usage: `usage`.
 
 ### Knowledge
 
@@ -193,6 +211,13 @@ condition named in `gates` and `next` is in the binary's vocabulary: the parent'
 A `next` rule's `status` is one status or a list, and its optional `when` is `<condition>` or
 `not <condition>`. Nothing about statuses, sections, IDs, columns or verdicts is compiled in.
 
+The capture groups the binary reads are part of schema 1, like the condition vocabulary: in
+`criterion_line` and `task_line`, group 1 is the tick and group 2 the ID; in `record_criterion`, group 1
+is the ID; in `feature_root.declaration`, group 1 is the path; in `residual_line`, group 1 is the
+tracker. A pattern with fewer groups than this is `rules-pattern-invalid`. The standard does not yet
+state this contract, which is a docs gap under the parent's hard rule 5; the proposed fix is one
+sentence under the standard's Rules section, delivered with the next `vhco-pro/docs` change.
+
 Record completeness uses only the patterns the block provides. A spec-review subsection is well formed
 when every line matching `record_finding` is followed, before the next such line, by exactly one line
 matching `record_severity`, or when its only non-blank line matches `record_no_findings`. The other
@@ -207,11 +232,13 @@ the Test Plan table whose header equals `test_plan.columns`, Review Log rows, an
 subsection: the lines after the heading up to the next heading of any level, without leading and
 trailing blank lines.
 
-The normative baseline is the text of each `normative_sections` section and the YAML value of each
-`normative_frontmatter` field, after two edits inside Acceptance Criteria: every criterion checkbox is
-written as `[ ]`, and every line matching `evidence_line` or `residual_line` is dropped. Two commits
-have the same baseline when these bytes are equal. The document at a reviewed commit is read with
-`git show <commit>:<path>`; if it is absent there, the review is stale with `baseline-changed`.
+An annotation is a line matching `evidence_line` or `residual_line` plus every following line that
+matches `criterion_continuation`, up to the next list item or annotation, so wrapped evidence is one
+annotation. The normative baseline is the text of each `normative_sections` section and the YAML value
+of each `normative_frontmatter` field, after two edits inside Acceptance Criteria: every criterion
+checkbox is written as `[ ]`, and every annotation is dropped. Two commits have the same baseline when
+these bytes are equal. The document at a reviewed commit is read with `git show <commit>:<path>`; if
+it is absent there, the review is stale with `baseline-changed`.
 
 `id-recycled`: the binary reads every version of the document from `git log --format=%H -- <doc>`,
 oldest first. An ID present now that was present in one version and absent in a later one has been
@@ -221,15 +248,26 @@ recycled. Review IDs and criterion and task IDs are checked alike; acceptance ro
 `*`, `?` or `[` matches with `path.Match`, and any other entry matches that exact path. An entry
 containing `**` is `covers-pattern-unsupported`.
 
+`find --slug <s>` matches a document whose file name, up to its first `.`, equals `<s>`, so
+`vh-adlc-binary` finds `vh-adlc-binary.spec.md` as well as `vh-adlc-binary.md`. `find --issue <n>`
+matches a document whose `issue` is a URL ending in `/issues/<n>` or the string `#<n>`.
+
 ### Freshness and gates
 
-`internal/fresh` implements the parent's freshness rules. The default branch is the target of
-`git symbolic-ref refs/remotes/origin/HEAD`. With no `origin` remote, the local default branch is the
-one named by `git config init.defaultBranch` if that branch exists, else `main`, else `master`, else
-`default-branch-unknown`. Covered changes are `git diff --name-only <reviewed>...<remote default>` for
-spec reviews and `git diff --name-only <reviewed> HEAD` for implementation reviews, filtered by `covers`
-in the binary. The feature tree is `git status --porcelain=v1 -z --untracked-files=all`, filtered the
-same way, without the document itself. Ignored files never appear.
+`internal/fresh` implements the parent's freshness rules. A repository has a remote when `git remote`
+prints anything. With a remote, the default branch is the target of
+`git symbolic-ref refs/remotes/origin/HEAD`, and its absence is `default-branch-unknown`, whatever the
+remote is called. With no remote, the local default branch is the one `git var GIT_DEFAULT_BRANCH` prints, which is
+`init.defaultBranch` or the installed Git's built-in default; if that branch does not exist, the result
+is `default-branch-unknown`. Nothing else is tried.
+
+A reviewed commit is reachable when it exists and is an ancestor of `HEAD` in the worktree where
+`fresh` runs (`git merge-base --is-ancestor`). A missing object or a non-ancestor, such as the commits
+of a squash-merged branch, is `commit-unreachable`. Covered changes are
+`git diff --name-only -z --no-renames <reviewed>...<remote default>` for spec reviews and
+`git diff --name-only -z --no-renames <reviewed> HEAD` for implementation reviews, filtered by `covers`
+in the binary. The feature tree is `git status --porcelain=v1 -z --no-renames --untracked-files=all`,
+filtered the same way, without the document itself. Ignored files never appear.
 
 `internal/gate` evaluates the conditions the block's `gates` map names for the target, plus the
 transition, except when the target equals the current status. A target absent from `gates` checks the
@@ -241,18 +279,25 @@ trailing blank lines from both; every other byte must match.
 
 ### Tests
 
-Fixture repositories are built in `t.TempDir()` by `internal/testrepo` with fixed author and committer
-names, emails and dates, so their commit SHAs are stable and golden files can contain them. A fixture
-with a remote gets a bare repository as `origin` and `git remote set-head origin main`. A fixture docs
-repository with two commits, A and B, differing in the default document location and one gate rule,
-serves `--docs-source`.
+Fixture repositories are built in `t.TempDir()` by `internal/testrepo`. It runs Git with
+`GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`, every inherited `GIT_*` variable removed,
+`git init -b main --object-format=sha1`, `-c commit.gpgsign=false`, and fixed author and committer
+names, emails and dates, so their commit SHAs are stable on any machine and golden files can contain
+them. A fixture with a remote gets a bare repository as `origin` and `git remote set-head origin main`.
+A fixture docs repository with two commits, A and B, differing in the default document location and
+one gate rule, serves `--docs-source`.
 
-`cmd/vh-adlc/golden_test.go` builds the binary once, runs every command twice per fixture, compares
-both runs byte for byte and with `testdata/golden/<case>.json`, and checks the exit code; `-update`
-rewrites the golden files. A boundary test hashes the fixture tree and `git status --ignored` before
-and after running every command, with `XDG_CACHE_HOME` and `HOME` pointed at a temporary directory,
-and fails on any change outside that cache. A `knowledge` test serves pages from `httptest` and fails
-on any request whose path is not `/vhco-pro/docs/<40 hex>/<page>`.
+`cmd/vh-adlc/golden_test.go` builds the binary once, runs every command twice per fixture with the same
+cleaned Git environment, compares both runs byte for byte and with `testdata/golden/<case>.json`, and
+checks the exit code; `-update` rewrites the golden files. A boundary test hashes every file in the
+fixture, including `.git`, before and after running every command, with `XDG_CACHE_HOME` and `HOME`
+pointed at a temporary directory, and fails on any change outside that cache. A `knowledge` test serves
+pages from `httptest` and fails on any request whose path is not `/vhco-pro/docs/<40 hex>/<page>`.
+
+The schema test uses `encoding/json` only: it checks that every golden output has exactly the
+schema's required top-level keys and that every `result` value and finding code the binary defines
+appears in the schema's `enum` lists. It does not claim full JSON Schema 2020-12 validation, so no
+validator dependency is added.
 
 ### Delivery
 
@@ -260,26 +305,36 @@ on any request whose path is not `/vhco-pro/docs/<40 hex>/<page>`.
 nothing, then `go vet ./...`, `go test ./...`, `go build ./cmd/vh-adlc`, `golangci-lint config verify`
 and `golangci-lint run` with golangci-lint v2.15.0. `.github/workflows/release.yml` runs on pushes to
 `main` whose paths include `cmd/**`, `internal/**`, `go.mod`, `go.sum`, `.goreleaser.yml` or
-`.github/workflows/release.yml`, and on `workflow_dispatch`. It repeats the CI gates, then runs
-`michielvha/gitversion-tag-action` at `8cf5869816cf71437052ac97d086e00526bf2d89` with its bundled
+`.github/workflows/release.yml`, and on `workflow_dispatch`. It checks out with `fetch-depth: 0` and
+`persist-credentials: true`, which GitVersion and its tag push need, and repeats the CI gates. It then
+runs `michielvha/gitversion-tag-action` at `8cf5869816cf71437052ac97d086e00526bf2d89` with its bundled
 configuration (the bootstrap guide prefers bundled configuration; no `gitversion.yml` is committed) and
-`prefix: v`, so tags such as `v0.1.0` are also Go module versions. It then runs
-`michielvha/goreleaser-action` at `a86fcdf453812a9d69b85208c0cb6a1e73f136b8` with `go-version: 1.27.2`,
-the `PGP_PRIVATE_KEY` secret and the workflow token, with `permissions: contents: write`. Every other
-action is pinned to a full SHA with its release as a trailing comment.
+`prefix: v`, so tags such as `v0.1.0` are also Go module versions. The GoReleaser step runs only when
+that step's `tagged` output is `true`. A binary-path push whose commits carry no version bump computes
+an existing tag, which the action skips with `skip-reason=tag-exists`; that run then ends green with no
+release and logs the skip reason. The GoReleaser step is `michielvha/goreleaser-action` at
+`a86fcdf453812a9d69b85208c0cb6a1e73f136b8` with `go-version: 1.27.2`, the `PGP_PRIVATE_KEY` secret and
+the workflow token, under `permissions: contents: write`. Every other action is pinned to a full SHA
+with its release as a trailing comment.
 
 `.goreleaser.yml` keeps the template's `CGO_ENABLED=0`, `-trimpath`, `mod_timestamp` and `signs` block,
 builds darwin and linux on amd64 and arm64, sets `ldflags` to `-s -w -X main.version={{.Version}}`
-(GoReleaser's `.Version` drops the tag's `v`, so tag `v0.1.0` prints `vh-adlc 0.1.0`),
-archives each build as `vh-adlc_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz` holding the `vh-adlc`
-binary, and names the checksum file `checksums.txt`. The parent's signing design (D-27) applies as
-written. `release-signing-key.asc` is the public export whose primary fingerprint is
+(GoReleaser's `.Version` strips the tag's `v`, so tag `v0.1.0` prints `vh-adlc 0.1.0`), archives each
+build as `vh-adlc_{{ .Version }}_{{ .Os }}_{{ .Arch }}.tar.gz` holding the `vh-adlc` binary, and names
+the checksum file `checksums.txt`. The parent's signing design (D-27) applies as written.
+`release-signing-key.asc` is the public export whose primary fingerprint is
 `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, and the README gains a section with that fingerprint and the
 parent's verification steps.
 
-After the first release, its version and, per platform, the asset name, the asset's SHA-256 and the
-extracted binary's SHA-256 are recorded in this document's evidence, computed from the downloaded
-assets rather than copied from `checksums.txt`. Parent T17 copies them into the lock.
+The release can only happen after the feature PR merges, so completion takes one step after the merge.
+The PR ships the document `in-progress` with AC-13 and AC-15 unticked. After the release, on the
+feature branch fast-forwarded to the default branch, the loop records the version and, per platform,
+the asset name, the asset's SHA-256 and the extracted binary's SHA-256, computed from the downloaded
+assets rather than copied from `checksums.txt`. It then runs an implementation review against that
+commit, which observes the published release. The released `vh-adlc gate complete` decides the flip,
+and the docs-only completion commit is pushed to the default branch as a fast-forward under D-23. This
+is the one exception to "the document returns to the default branch with the PR", and it exists
+because a release cannot precede its own merge. Parent T17 copies the recorded values into the lock.
 
 ## Acceptance Criteria
 
@@ -303,12 +358,13 @@ assets rather than copied from `checksums.txt`. Parent T17 copies them into the 
 - [ ] AC-05: For each gate target, a fixture failing each listed condition alone yields `fail` with
       exactly that condition, a fixture failing several lists all of them, a disallowed transition adds
       `transition-not-allowed`, a gate to the current status re-checks conditions only, and a passing
-      gate's `line` matches the parent's status-commit format.
+      gate's `line` and a failing gate's `line` each match the forms under Output.
 - [ ] AC-06: A spec review is stale after a normative-baseline change or covered drift on the remote
       default branch, an implementation review is stale after a baseline change or a covered commit on
-      the feature branch, and a missing row, a `+dirty` target or an unreachable reviewed commit is stale
-      with its own code. Checkbox, evidence, residual, task, status and Review Log edits alone leave both
-      fresh. Staged, unstaged and untracked covered changes fail `feature_tree_clean` with their paths,
+      the feature branch, and a missing row, a `+dirty` target, a missing reviewed commit or one that is
+      not an ancestor of `HEAD` is stale with its own code. Checkbox, evidence (single-line or wrapped),
+      residual, task, status and Review Log edits alone leave both fresh. A renamed covered path counts as
+      changed under any Git configuration. Staged, unstaged and untracked covered changes fail `feature_tree_clean` with their paths,
       while the document itself and uncovered changes do not.
 - [ ] AC-07: A spec review with a `blocking` finding is not clean and one with only `should-fix` or
       `nit` findings, or exactly `NO FINDINGS`, is; malformed or mixed records are not clean. An
@@ -321,9 +377,10 @@ assets rather than copied from `checksums.txt`. Parent T17 copies them into the 
       `in-progress` fixture whose latest spec review is fresh and blocking, or whose Open Questions are
       non-empty, returns `spec` or `owner decision` rather than `implement` or `ship`.
 - [ ] AC-10: `find` returns every document under the feature root whose `issue` names the given issue
-      number, or whose file name is the given slug, and an empty list otherwise.
-- [ ] AC-11: Every golden output validates against `schema/vh-adlc.schema.json`, and the schema
-      enumerates every `result` value and finding code the binary can emit.
+      number, or whose file name up to its first `.` is the given slug (including `<slug>.spec.md`), and
+      an empty list otherwise.
+- [ ] AC-11: Every golden output has exactly the top-level keys `schema/vh-adlc.schema.json` requires,
+      and the schema enumerates every `result` value and finding code the binary can emit.
 - [ ] AC-12: The repository follows the Go conventions at the parent pin: `cmd/vh-adlc` holds wiring
       only, logic is under `internal/`, the binary ignore is `/vh-adlc`, and CI runs the format, vet,
       test, build and both lint gates on every pull request and before every release, with every action
@@ -333,7 +390,8 @@ assets rather than copied from `checksums.txt`. Parent T17 copies them into the 
       committed `release-signing-key.asc`, whose primary fingerprint is
       `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, by the README's steps.
 - [ ] AC-14: The release workflow is triggered by pushes that change a binary path and by manual
-      dispatch only, so a commit touching no binary path cuts no release.
+      dispatch only, so a commit touching no binary path cuts no release, and a run whose computed
+      version is already tagged ends without running GoReleaser.
 - [ ] AC-15: The released linux/amd64 binary's `--version` prints exactly `vh-adlc <version>`, every
       released binary's build information names module `github.com/michielvha/vh-adlc` at `v<version>`
       with `vcs.modified=false`, and the version and both digests per platform are recorded for the
@@ -348,15 +406,15 @@ assets rather than copied from `checksums.txt`. Parent T17 copies them into the 
 | AC-03 | `go test ./internal/knowledge`: the pin variants, `httptest` 200 and 404 and a closed server, cold and warm cache with `--offline`, `--docs-source` |
 | AC-04 | `go test ./cmd/vh-adlc -run Boundary` and the `httptest` request-path assertion |
 | AC-05 | `go test ./internal/gate`: one fixture per condition per target, a multi-failure fixture, transition and re-check cases, the `line` format |
-| AC-06 | `go test ./internal/fresh`: one fixture per stale reason, each annotation-only edit, staged, unstaged and untracked covered and uncovered paths |
+| AC-06 | `go test ./internal/fresh`: one fixture per stale reason (including a squash-merged reviewed commit and a missing object), each annotation-only edit (including wrapped evidence), a covered rename under `diff.renames` true and false, staged, unstaged and untracked covered and uncovered paths |
 | AC-07 | `go test ./internal/gate ./internal/review`: record fixtures for each clean and unclean case, `review check` equal and differing files |
 | AC-08 | `go test ./internal/doc`: a conforming fixture and one fixture per lint code |
 | AC-09 | `go test ./internal/next`: one fixture per `next` rule, and the blocking-review and open-question resume fixtures |
-| AC-10 | `go test ./internal/doc -run Find`: issue, slug and no-match fixtures |
-| AC-11 | `go test ./cmd/vh-adlc -run Schema`: each golden file against the schema, and the code and result lists against the schema's enums |
-| AC-12 | `go test ./cmd/vh-adlc -run Layout` (no non-wiring code in `cmd/`, the `.gitignore` line), a Go test parsing both workflows for the gate steps and full-SHA `uses:` lines, and the first PR's CI run |
-| AC-13 | On the first release, in an empty keyring: import `release-signing-key.asc`, confirm the fingerprint, `gpg --verify checksums.txt.sig checksums.txt`, `sha256sum --check --ignore-missing checksums.txt` over all four archives |
-| AC-14 | A Go test parsing `release.yml`: its only triggers are `push` to `main` with exactly the binary paths listed under Delivery, and `workflow_dispatch` |
+| AC-10 | `go test ./internal/doc -run Find`: issue URL, `#<n>`, `<slug>.md`, `<slug>.spec.md` and no-match fixtures |
+| AC-11 | `go test ./cmd/vh-adlc -run Schema`: each golden file's top-level keys against the schema's `required`, and the binary's code and result lists against the schema's `enum` lists |
+| AC-12 | `go test ./cmd/vh-adlc -run Layout` (`cmd/vh-adlc` holds only `main.go` and `*_test.go`, `main.go` imports only the standard library and `internal/`, the `.gitignore` line), a Go test parsing both workflows for the gate steps and full-SHA `uses:` lines, and the first PR's CI run |
+| AC-13 | On the first release, in an empty keyring: import `release-signing-key.asc`, confirm `gpg --show-keys release-signing-key.asc` lists `VHCO Pro (Release Signing Key) <release@vhco.pro>` as the first uid, confirm the fingerprint, `gpg --verify checksums.txt.sig checksums.txt`, `sha256sum --check --ignore-missing checksums.txt` over all four archives |
+| AC-14 | A Go test parsing `release.yml`: its only triggers are `push` to `main` with exactly the binary paths listed under Delivery, and `workflow_dispatch`, and the GoReleaser step's `if:` requires the GitVersion step's `tagged` output to be `true`. The observed half (a plugin-only commit on the default branch produces no release run) is the parent's AC-27 proof, because every non-binary commit this feature pushes is docs-only and carries `[skip ci]` |
 | AC-15 | Extract each archive of the first release; run the linux/amd64 binary with `--version`; `go version -m` on all four binaries; compute both digests per platform and record them in the T24 evidence line |
 
 ## Tasks
@@ -401,9 +459,10 @@ assets rather than copied from `checksums.txt`. Parent T17 copies them into the 
       AC-14)
 - [ ] T23 `release-signing-key.asc`, `README.md` - the public key and the verification section; the key's
       fingerprint matches (AC-13)
-- [ ] T24 First release - the PR merged by merge commit under its own approval, the release workflow run,
-      the AC-13 and AC-15 checks run on the published assets, version and digests recorded here (AC-13,
-      AC-15)
+- [ ] T24 `docs/specs/vh-adlc-binary.spec.md` - first release: the PR merged by merge commit under its
+      own approval, the release workflow run, the AC-13 and AC-15 checks run on the published assets,
+      version and digests recorded here, the post-release implementation review and the completion
+      commit described under Delivery (AC-13, AC-15)
 
 ## Open Questions
 
@@ -574,4 +633,9 @@ PROPOSAL: State that `knowledge` and `gitcmd` take a `context.Context` from `mai
 - [GoReleaser checksums](https://goreleaser.com/customization/checksum/): `checksum.name_template` names the checksum file.
 - [GoReleaser archives](https://goreleaser.com/customization/archive/): `formats` and `name_template` per archive.
 - [Go 1.24 release notes](https://go.dev/doc/go1.24#go-command): `go build` stamps the main module's version from the version control tag; measured on 2026-10-17 with a tagged `-trimpath` darwin/arm64 build, `go version -m` printed `mod <module> v0.1.0` and `vcs.modified=false`, and no `-ldflags` line.
+- [GoReleaser templates](https://goreleaser.com/customization/templates/): `.Version` is the version being released with the `v` prefix stripped.
+- [go-yaml/yaml](https://github.com/go-yaml/yaml): archived, and its README opens with "THIS PROJECT IS UNMAINTAINED".
+- [git(1) environment variables](https://git-scm.com/docs/git#_environment_variables): `GIT_OPTIONAL_LOCKS=0` stops optional sub-operations that take a lock, such as the index refresh `git status` performs; `GIT_CONFIG_NOSYSTEM` skips the system configuration.
+- [git-config(1) environment](https://git-scm.com/docs/git-config#ENVIRONMENT): `GIT_CONFIG_GLOBAL` replaces the global configuration file.
+- [git-var(1)](https://git-scm.com/docs/git-var): `GIT_DEFAULT_BRANCH` is the branch `git init` would create, from `init.defaultBranch` or Git's built-in default.
 - [GoReleaser signing](https://goreleaser.com/customization/sign/): `artifacts: checksum` signs the checksum file as `${artifact}.sig`.
