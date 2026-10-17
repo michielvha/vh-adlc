@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-10-17 against review R-15 at 4cf3f92. Phases 1 and 2 done; the repository is public as michielvha/vh-adlc. Next: phase 3, the binary as a child feature."
+status: draft
+status_description: "Revision D-27 in progress: releases sign checksums.txt with the owner's key. Accepted earlier against review R-15 at 4cf3f92; phases 1 and 2 done. Needs a clean independent review and re-acceptance before phase 3."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
