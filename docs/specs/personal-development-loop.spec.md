@@ -1168,6 +1168,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-15 | spec | `4cf3f92` | n/a | n/a | accepted by owner |
 | 2026-10-17 | R-16 | spec | `5c0330f` | fable | procedural | Diff-only review of the D-27 signing revision. Two should-fix findings (no published public key to verify against; action and template claims uncited) and two nits. Nothing blocking. |
 | 2026-10-17 | R-17 | spec | `9f1494d` | fable | procedural | Diff-only review of the R-16 fixes. Three should-fix findings (key identity, the fingerprint anchor, verification stopping at the checksum file) and two nits. Nothing blocking. One local path in F-01's evidence is redacted as `[redacted]`; the records are otherwise verbatim. |
+| 2026-10-17 | R-18 | spec | `0546d25` | fable | procedural | Review of the whole D-27 change against the last acceptance. One should-fix finding (README verification steps fail on macOS, unscoped fingerprint check) and three nits. Nothing blocking. |
 
 ### R-14
 
@@ -1281,6 +1282,36 @@ SEVERITY: nit
 WHERE: Design, The binary in the repository (release bullet); Sources
 EVIDENCE: R-16 F-02, F-03 and F-04 are resolved: the action is cited at `a86fcdf` (the scratchpad `action.yml` is byte-identical to upstream at that SHA, which is also current `main`), the mechanism (`action.yml:60,66`, `echo "" | gpg --batch --import` exits 2, confirmed locally) is stated, the `signs` block wording and the passphrase-less clause are present, and `checksum.name_template` is said to be replaced. Two loose ends: the bullet says the template's `name_template` "is replaced" without saying by what (`checksums.txt` is only implied by the surrounding literals and D-27), and "under `bash -eo pipefail`" is an external fact (GitHub's workflow syntax: `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`) with no Sources entry, while the GoReleaser `.sig` default did get one.
 PROPOSAL: Write "is replaced by `checksums.txt`", and add the GitHub Actions workflow-syntax page (`jobs.<job_id>.steps[*].shell`) to Sources for the `-eo pipefail` claim.
+
+### R-18
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The binary in the repository (release bullet); Acceptance Criteria AC-27
+EVIDENCE: Every R-16 and R-17 finding is resolved and every factual claim in the diff holds (action.yml at `a86fcdf` lines 16-18, 59-69 and 76; template `.goreleaser.yml:31` and `33-44` at `9a9321c`; `echo "" | gpg --batch --import` exits 2 in an empty keyring; GoReleaser documents the default `${artifact}.sig`; the GitHub syntax page gives `bash --noprofile --norc -eo pipefail {0}`; `gh secret list -R michielvha/vh-adlc` shows `PGP_PRIVATE_KEY 2026-10-17T19:17:25Z`; `gpg --show-keys` on the current export prints fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, uid `VHCO Pro (Release Signing Key) <release@vhco.pro>` first with the primary flag, self-signed 2026-10-17T19:16:08Z, the Terraform uid kept, subkey `929B7A7AF19CB3E67EEEEC0272E691932274AE79`; no em or en dash in the diff). What remains is in the end-to-end path the Design now fixes as README content: "import that file, compare `gpg --fingerprint` with the printed fingerprint, `gpg --verify checksums.txt.sig checksums.txt`, then `sha256sum --check --ignore-missing checksums.txt`" (spec line 426-428), repeated in AC-27 as "the verification steps". Darwin is half of the released platforms (same bullet), and stock macOS ships no `sha256sum` (only `shasum`), so a Mac user following the README as the Design words it stops at the last step; and a bare `gpg --fingerprint` lists every key in a populated keyring, so only the proof's empty keyring makes it unambiguous. The AC-27 proof still passes, because it is run once in an empty keyring on a machine with coreutils.
+PROPOSAL: In the release bullet, have the README give the final step for both released OSes (`sha256sum --check --ignore-missing checksums.txt` on Linux, `shasum -a 256 --check --ignore-missing checksums.txt` on macOS) and scope the fingerprint check to the key (`gpg --fingerprint release@vhco.pro`); the Test Plan proof can stay as written.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Owner decisions D-27; Acceptance Criteria AC-27; Test Plan AC-27
+EVIDENCE: D-27 states the key's identity and that `release-signing-key.asc` "is exported from the key as held in the secret, so the file, the README and every signature agree". The secret cannot be read back, so the only observable form of that sentence is the committed file's content, yet AC-27 and the proof observe only the fingerprint and the signature; nothing checks that the file carries `VHCO Pro (Release Signing Key) <release@vhco.pro>` as primary uid, which is exactly what R-17 F-01 found wrong in the previous export. The current export does carry it (uid self-signature 2026-10-17T19:16:08Z, 77 seconds before the secret's recorded update), so the claim is true today but unproven at acceptance time.
+PROPOSAL: Add to the AC-27 proof: "`gpg --show-keys release-signing-key.asc` lists `VHCO Pro (Release Signing Key) <release@vhco.pro>` as the first uid", so the identity D-27 names is observed alongside the fingerprint.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope (README bullet); Tasks T12 and T31
+EVIDENCE: Scope line 108 lists the README's content as "Install, update and uninstall instructions and a support matrix", AC-20 says the same, and T31 is "install, update, uninstall per claimed host and the support matrix; T14 README check". Design (line 425-428) and AC-27 now also require the README to print the fingerprint "with the verification steps", but T12 says only "the committed public key and README fingerprint" and the Scope bullet is unchanged, so the README's normative content is split across two places that do not mention each other.
+PROPOSAL: Extend the Scope bullet with "and the release key's fingerprint with its verification steps", and write T12 as "the committed public key and the README fingerprint and verification steps".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, The binary in the repository (release bullet)
+EVIDENCE: Spec line 417, "`{{ .ProjectName }}_{{ .Version }}_SHA256SUMS`, is replaced by `checksums.txt`). Signing was requested (D-27), so the", is 120 columns wide in a paragraph wrapped at about 100 (the same class as R-15's wrap nit on the Operation names paragraph, which this revision rewrapped).
+PROPOSAL: Rewrap the sentence at the paragraph's width.
 
 ## Sources
 
