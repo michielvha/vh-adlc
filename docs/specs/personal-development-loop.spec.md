@@ -92,6 +92,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-25 | Host-created isolated worktrees are supported, with concurrent work on separate features and one writer per feature branch. Another session resumes the same feature only through an explicit owner-confirmed handoff. The plugin discovers existing worktrees but does not create, remove or force-move them, and claims are not distributed locks. |
 | D-26 | Completion certifies a committed implementation reviewed at an exact commit, not an uncommitted snapshot. Relevant changes are committed before review; relevant dirty changes prevent completion. Unrelated staged, unstaged and untracked work is left untouched. |
 | D-27 | Binary releases are signed with the owner's one general release key, VHCO Pro (Release Signing Key) <release@vhco.pro>, fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`: `checksums.txt` carries a detached signature. The passphrase-less ASCII-armoured secret key is the `PGP_PRIVATE_KEY` repository secret (set on 2026-10-17); the public key is committed as `release-signing-key.asc` and its fingerprint printed in the README. The key's original identity, VHCO Pro (Terraform Provider Signing Key), stays; the general identity was added on 2026-10-17 and is primary, and `release-signing-key.asc` is exported from the key as held in the secret, so the file, the README and every signature agree. The plugin installer's trust root stays the digests pinned in its lock; it does not verify the signature. |
+| D-28 | The loop edits every piece of prose it writes for a reader with the humanize prose guide in `vhco-pro/docs` (`guides/humanize-prose.md`, adapted from `blader/humanizer`) before committing or posting it: feature-document prose, commit messages, PR and issue bodies, review summaries and run reports. Stored review records and other verbatim text are not rewritten. The guide is a docs page, not plugin text, and the plugin pin moves to `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`, the merge that added it. |
 
 ## Scope
 
@@ -667,7 +668,9 @@ Who changes status:
 ### Operations
 
 Each operation starts with `vh-adlc knowledge` and the target feature, and ends by reporting what it
-changed, what it verified, every binary result it acted on, and what is left.
+changed, what it verified, every binary result it acted on, and what is left. Before it commits or posts
+prose a reader will see, it edits that prose with the humanize prose guide at the resolved pin and names
+the guide and revision in its report (D-28). Records the reviewer returns are stored exactly as returned.
 
 **investigate.** Input: an issue, failure, question or document. Measure rather than remember; separate
 measured facts, source observations, hypotheses and decisions. Substantial findings go into an analysis
@@ -912,6 +915,10 @@ stated.
       reports distinguish skipped CI from a passing verification run.
 - [ ] AC-31: The checker and its CI run on Bun, and the plugin's resolved docs pin names Bun as the
       default for JavaScript tooling and tests without the conflicting Node 24 requirement.
+- [ ] AC-32: Every commit message, PR body, issue update and feature-document prose section the loop
+      writes is edited with the humanize prose guide at its resolved docs revision, and the run report
+      names that guide and revision. None of that text contains an em or en dash, and stored review
+      records stay exactly as the reviewer returned them.
 
 ## Test Plan
 
@@ -919,7 +926,8 @@ The checker (`bun test`) enforces, besides the per-criterion checks: one manifes
 `plugin.json`; skill `name` equals its directory and starts with `vh-adlc-`; the agent sets `name` and has
 no `model:`; the reviewer's `tools:` is the agreed union with no editing tool; every referenced path exists
 in the package; each status-changing skill names its `vh-adlc gate` command; no skill mentions
-`--docs-source`; the version-bump rule; no em dash. For AC-03 it scans the package for canary sentences
+`--docs-source`; the version-bump rule; no em dash; each skill that commits or posts prose names the
+humanize prose guide. For AC-03 it scans the package for canary sentences
 drawn from the pages at the plugin pin, and any match fails.
 
 The binary's own tests (`go test ./...`) cover every finding code, every gate row, both freshness rules,
@@ -1004,6 +1012,7 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 | AC-29 | S9; S10 worktree/handoff variants |
 | AC-30 | S9 claim commit; S13 docs-only/mixed commits and CI reports |
 | AC-31 | C checker/CI commands; phase 1 coding-convention review at the plugin pin |
+| AC-32 | C guide reference per prose-writing skill; dash scan over the commits, PR and issue text and changed feature documents of S6, S9 and S13; those run reports name the guide and revision; `vh-adlc review check` in S11 |
 
 ## Implementation Phases
 
@@ -1012,7 +1021,8 @@ not a PR. Phase 3 is the binary, a child feature with its own feature document a
 before the plugin can pin it. Phases 4 to 7 are this feature and its one PR. All but phase 1 happen in `michielvha/vh-adlc`. Each phase ends usable, so the owner may ship phase 4 early as a child
 feature at acceptance.
 
-1. **Docs.** Everything under [Docs changes](#docs-changes-phase-1). The merged SHA becomes the plugin pin.
+1. **Docs.** Everything under [Docs changes](#docs-changes-phase-1). The merged SHA becomes the plugin pin;
+   D-28 later moves it to `e4d58d2`.
 2. **One repository.** The audit, the owner's confirmation, and publishing the repository as public, in the
    order under [One repository](#one-repository).
 3. **Binary.** Adapt the template files at the root; all seven commands with their tests and golden files;
@@ -1095,12 +1105,12 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Phase 4: Spec loop
 
-- [ ] T13 `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` - onboard this repository with the T8
-      pin and `Feature documents: docs/specs/`; `vh-adlc knowledge` resolves `repository` (AC-04)
+- [ ] T13 `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` - onboard this repository with the
+      D-28 pin (`e4d58d2`) and `Feature documents: docs/specs/`; `vh-adlc knowledge` resolves `repository` (AC-04)
 - [ ] T14 `tests/vh-adlc/check.test.ts` - the package checker (manifest, names, agent frontmatter, tools
       union, root `plugin.json`, references, gate commands, `--docs-source`, version rule, em dash, Bun
-      commands); explicit test-only phase selection reports unscheduled operations pending, defaults to
-      full v1; fails because the package does not exist (AC-02, AC-22, AC-31)
+      commands, prose guide reference); explicit test-only phase selection reports unscheduled operations
+      pending, defaults to full v1; fails because the package does not exist (AC-02, AC-22, AC-31, AC-32)
 - [ ] T15 `plugins/vh-adlc/.claude-plugin/plugin.json`, `knowledge.md`, `.claude-plugin/marketplace.json` -
       manifest and marketplace checks in T14 pass; `github-app-registration` entry unchanged (AC-01, AC-02)
 - [ ] T16 `tests/vh-adlc/ensure.test.ts` - S15's valid and invalid PATH/cache/download cases, including
@@ -1109,7 +1119,7 @@ numbers within a phase are in dependency order; a partial checker run never mark
 - [ ] T17 `plugins/vh-adlc/vh-adlc.lock.json`, `scripts/ensure-vh-adlc.sh` - T16 passes against the phase 3
       release (AC-25, AC-26)
 - [ ] T18 `plugins/vh-adlc/references/` - loop, authority and review protocol; the canary scan against the
-      T8 pages finds nothing (AC-03)
+      pages at the D-28 pin finds nothing (AC-03)
 - [ ] T19 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - T14 agent checks pass (AC-02, AC-14)
 - [ ] T20 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - author and review modes; T14 gate-command check
       passes (AC-08, AC-09, AC-10, AC-22)
@@ -1150,7 +1160,8 @@ numbers within a phase are in dependency order; a partial checker run never mark
       passes (AC-20)
 - [ ] T32 `tests/vh-adlc/evidence/` - full S1 to S15 evidence on every claimed host, including all seven
       operations in S1/S5/S7/S14 and both public plugins installing without credentials; all pending phase
-      checks resolved, full-v1 checker passes, canary grep finds nothing (AC-02, AC-19, AC-28, AC-29)
+      checks resolved, full-v1 checker passes, canary grep finds nothing (AC-02, AC-19, AC-28, AC-29,
+      AC-32)
 - [ ] T33 `plugins/vh-adlc/.claude-plugin/plugin.json` - release version set; T14 version rule passes
       (AC-01)
 
@@ -1341,4 +1352,5 @@ Read on 2026-10-17. Repository facts are cited inline.
 - [github/copilot-sdk](https://github.com/github/copilot-sdk): drives the Copilot CLI engine; plugins kept in `copilot-cli` mode.
 - [GoReleaser signing](https://goreleaser.com/customization/sign/): `artifacts: checksum` signs the checksum files only; the default signature name is `${artifact}.sig`.
 - [GitHub Actions workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsshell): `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`.
+- [blader/humanizer](https://github.com/blader/humanizer/blob/8c307f367c91bd974002f10f2be2965d642c13df/SKILL.md): the source of the humanize prose guide, MIT licensed.
 - [Agent Plugins specification](https://github.com/agentplugins/agent-plugins-spec): only skills and MCP are portable; not adopted in v1.
