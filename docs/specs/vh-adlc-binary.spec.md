@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "In implementation on feat/vh-adlc-binary; accepted against review R-8. Tasks T1 to T23, T25 and T26 built; T24 (the first release) follows the merge."
+status_description: "v0.1.0 released from merge commit 595e6fb; post-release reviews and the completion commit follow under parent D-29."
 issue: null
 branch: feat/vh-adlc-binary
 goal: "A released, signed vh-adlc binary that answers every mechanical question of the development loop from the files and Git alone, byte-identically for identical inputs."
@@ -441,29 +441,37 @@ fast-forward. Parent T17 copies the recorded values into the lock.
       Evidence: `go test ./cmd/vh-adlc -run Schema`, `24bbdfb`, the schema lists exactly the binary's
       results and codes and every golden file has exactly the required keys, not a full JSON Schema
       validation
-- [ ] AC-12: The repository follows the Go conventions at the parent pin: `cmd/vh-adlc` holds wiring
+- [x] AC-12: The repository follows the Go conventions at the parent pin: `cmd/vh-adlc` holds wiring
       only, logic is under `internal/`, the binary ignore is `/vh-adlc`, and CI runs the format, vet,
       test, build and both lint gates on every pull request and before every release, with every action
       pinned to a full SHA.
-      Evidence: R-9 not verified: every check passed locally at `b985ccc`, but the pull request's CI run
-      has not happened yet.
-- [ ] AC-13: The first release publishes `vh-adlc_<version>_<os>_<arch>.tar.gz` for darwin and linux on
+      Evidence: Layout and workflow tests plus the six gates and `go mod tidy -diff` at `b985ccc` to
+      `b79614d`; GitHub CI on PR #1 (run 39077138242, head `b79614d`) and the release run 39079446431 on
+      merge commit `595e6fb` ran every gate step successfully, every `uses:` is a full SHA, none
+- [x] AC-13: The first release publishes `vh-adlc_<version>_<os>_<arch>.tar.gz` for darwin and linux on
       amd64 and arm64, `checksums.txt` and `checksums.txt.sig`, and the signature verifies against the
       committed `release-signing-key.asc`, whose primary fingerprint is
       `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, by the README's steps.
-      Evidence: R-9 not verified: the key file and a locally signed snapshot check out, but no release
-      exists yet.
+      Evidence: in an empty keyring after the v0.1.0 release (run 39079446431): the release has the four
+      `vh-adlc_0.1.0_<os>_<arch>.tar.gz` archives, `checksums.txt` and `checksums.txt.sig`;
+      `release-signing-key.asc` at v0.1.0 lists `VHCO Pro (Release Signing Key) <release@vhco.pro>`
+      first with primary fingerprint 9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6; `gpg --verify` reports a
+      good signature by subkey 929B7A7AF19CB3E67EEEEC0272E691932274AE79; `sha256sum --check
+      --ignore-missing` passes for all four; `shasum` on macOS not run
 - [x] AC-14: The release workflow is triggered by pushes that change a binary path and by manual
       dispatch only, so a commit touching no binary path cuts no release, and a run whose computed
       version is already tagged ends without running GoReleaser.
       Evidence: `go test ./cmd/vh-adlc -run Release`, `24bbdfb`, release.yml triggers only on push to
       main with exactly the six binary paths and on dispatch, and GoReleaser runs only when the tag step
       pushed a tag; the observed non-release stays with the parent's AC-27 proof
-- [ ] AC-15: The released linux/amd64 binary's `--version` prints exactly `vh-adlc <version>`, every
+- [x] AC-15: The released linux/amd64 binary's `--version` prints exactly `vh-adlc <version>`, every
       released binary's build information names module `github.com/michielvha/vh-adlc` at `v<version>`
       with `vcs.modified=false`, and the version and both digests per platform are recorded for the
       parent's lock.
-      Evidence: R-9 not verified: the version wiring works in a snapshot, but no release exists yet.
+      Evidence: from the downloaded v0.1.0 assets: linux/amd64 `--version` prints `vh-adlc 0.1.0`; `go
+      version -m` on all four binaries shows `mod github.com/michielvha/vh-adlc v0.1.0` and
+      `vcs.modified=false`; asset and binary SHA-256 per platform are in T24's evidence; darwin binaries
+      inspected, not run
 
 ## Test Plan
 
@@ -555,6 +563,20 @@ fast-forward. Parent T17 copies the recorded values into the lock.
       version and digests recorded here, the post-merge drift-only spec review, the post-release
       implementation review, and the evidence commit E and the completion commit C pushed to the default
       branch, as Delivery describes (AC-13, AC-15)
+      Evidence: PR #1 merged by merge commit `595e6fb`; release run 39079446431 tagged and published v0.1.0.
+      Recorded for parent T17 (asset SHA-256, then extracted binary SHA-256):
+      darwin_amd64 `vh-adlc_0.1.0_darwin_amd64.tar.gz`
+      2b8dae984dea2ea460c4a1582e9f5cc930c0132bc58e3d7202394e5ee3aff1a2,
+      1bd10ef872024ab254fac5fab182a0f7fe4beec0c22a13789ba9cdd80297c6e9;
+      darwin_arm64 `vh-adlc_0.1.0_darwin_arm64.tar.gz`
+      55a0b79f1d5d6e1aec6954f762fcac5a942dfd1936695588e054001f72a47374,
+      20883b4736802b39a90864570cd5092580bc59b3708943335bac531e1aa41d8c;
+      linux_amd64 `vh-adlc_0.1.0_linux_amd64.tar.gz`
+      b6400a2ed433e3c85f9077d1cb4344f37f8a56205e47b33f0ecaa0a196cca847,
+      575cd17d060c64c88f4d1d8d5275c90ece404b5c4fcd7a18bb7a160552f152a3;
+      linux_arm64 `vh-adlc_0.1.0_linux_arm64.tar.gz`
+      057c34357e8b98e2b0eb5019c67d00c469ff7d4fe73cd945ecd12094c4c51475,
+      ef5b2073fc487fe4e4111268354f65c6c9d2e408720514c21109b444a842ae3a.
 - [x] T25 `internal/doc/doc.go`, `internal/doc/doc_test.go` - open questions are read only from the Open
       Questions section, as R-6 F-01 required; the new test fails first, then passes (AC-05)
       Evidence: test commit `8ec105c` failed ("a question heading outside Open Questions counted"), fix
