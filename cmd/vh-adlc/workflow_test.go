@@ -132,3 +132,66 @@ func TestLayout(t *testing.T) {
 		t.Error(".gitignore must ignore the binary as /vh-adlc, anchored at the root")
 	}
 }
+
+// binaryPaths are the paths whose change cuts a release.
+var binaryPaths = []string{"cmd/**", "internal/**", "go.mod", "go.sum", ".goreleaser.yml", ".github/workflows/release.yml"}
+
+func TestReleaseWorkflow(t *testing.T) {
+	w, _ := readWorkflow(t, "release.yml")
+	checkPins(t, "release.yml", w)
+	var on struct {
+		Push *struct {
+			Branches []string `yaml:"branches"`
+			Paths    []string `yaml:"paths"`
+		} `yaml:"push"`
+		WorkflowDispatch *yaml.Node `yaml:"workflow_dispatch"`
+	}
+	if err := w.On.Decode(&on); err != nil {
+		t.Fatal(err)
+	}
+	var triggers map[string]yaml.Node
+	if err := w.On.Decode(&triggers); err != nil {
+		t.Fatal(err)
+	}
+	for name := range triggers {
+		if name != "push" && name != "workflow_dispatch" {
+			t.Errorf("release.yml has trigger %q; only push and workflow_dispatch are allowed", name)
+		}
+	}
+	if on.Push == nil || !slices.Equal(on.Push.Branches, []string{"main"}) || !sameSet(on.Push.Paths, binaryPaths) {
+		t.Errorf("release.yml push trigger = %+v, want main with exactly %q", on.Push, binaryPaths)
+	}
+	if _, ok := triggers["workflow_dispatch"]; !ok {
+		t.Error("release.yml cannot be dispatched by hand")
+	}
+	got := runs(w)
+	for _, c := range gateCommands {
+		if !slices.Contains(got, c) {
+			t.Errorf("release.yml does not run %q before releasing", c)
+		}
+	}
+	var tagStep, releaseStep *step
+	for _, j := range w.Jobs {
+		for i := range j.Steps {
+			s := &j.Steps[i]
+			switch {
+			case strings.HasPrefix(s.Uses, "michielvha/gitversion-tag-action@"):
+				tagStep = s
+			case strings.HasPrefix(s.Uses, "michielvha/goreleaser-action@"):
+				releaseStep = s
+			}
+		}
+	}
+	if tagStep == nil || releaseStep == nil {
+		t.Fatal("release.yml lacks the GitVersion or GoReleaser step")
+	}
+	if want := "steps." + tagStep.ID + ".outputs.tagged == 'true'"; tagStep.ID == "" || releaseStep.If != want {
+		t.Errorf("GoReleaser step if = %q, want %q", releaseStep.If, want)
+	}
+	if tagStep.With["prefix"] != "v" || tagStep.With["configFilePath"] != "" {
+		t.Errorf("GitVersion step with = %v; want prefix v and the bundled configuration", tagStep.With)
+	}
+	if releaseStep.With["go-version"] != "1.27.2" || releaseStep.With["pgp-private-key"] != "${{ secrets.PGP_PRIVATE_KEY }}" {
+		t.Errorf("GoReleaser step with = %v", releaseStep.With)
+	}
+}

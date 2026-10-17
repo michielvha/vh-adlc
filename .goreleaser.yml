@@ -1,0 +1,66 @@
+# Adapted from michielvha/template-go-app at 9a9321c: darwin and linux only,
+# tar.gz archives holding just the binary, a checksums.txt signed with the
+# release key, and no container image.
+version: 2
+project_name: vh-adlc
+
+builds:
+  - main: ./cmd/vh-adlc
+    binary: vh-adlc
+    env:
+      - CGO_ENABLED=0
+    mod_timestamp: '{{ .CommitTimestamp }}'
+    flags:
+      - -trimpath
+    ldflags:
+      - '-s -w -X main.version={{.Version}}'
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats:
+      - tar.gz
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - none*
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+release:
+  draft: false
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    include:
+      - '^feat(\([^)]*\))?:'
+      - '^fix(\([^)]*\))?:'
+      - '^perf(\([^)]*\))?:'
+      - '^refactor(\([^)]*\))?:'
+  groups:
+    - title: New features
+      regexp: '^feat(\([^)]*\))?:'
+      order: 100
+    - title: Bug fixes
+      regexp: '^fix(\([^)]*\))?:'
+      order: 200
+    - title: Other changes
+      order: 999
