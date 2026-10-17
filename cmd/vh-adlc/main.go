@@ -17,6 +17,7 @@ import (
 	"github.com/michielvha/vh-adlc/internal/fresh"
 	"github.com/michielvha/vh-adlc/internal/gate"
 	"github.com/michielvha/vh-adlc/internal/knowledge"
+	"github.com/michielvha/vh-adlc/internal/next"
 	"github.com/michielvha/vh-adlc/internal/report"
 )
 
@@ -90,7 +91,9 @@ func commands() []command {
 		{name: "fresh", positionals: []string{"doc"}, run: func(ctx context.Context, o *options, args []string) *report.Report {
 			return fresh.Command(ctx, o.knowledge(), args[0])
 		}},
-		{name: "next", positionals: []string{"doc"}},
+		{name: "next", positionals: []string{"doc"}, run: func(ctx context.Context, o *options, args []string) *report.Report {
+			return next.Command(ctx, o.knowledge(), args[0])
+		}},
 		{name: "review check", positionals: []string{"doc"}, flags: func(fs *flag.FlagSet, o *options) {
 			fs.StringVar(&o.review, "review", "", "review ID, for example R-3")
 			fs.StringVar(&o.returned, "returned", "", "file holding the records the reviewer returned")
