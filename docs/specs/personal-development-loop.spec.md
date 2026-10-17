@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Back to draft on 2026-10-17: references to private earlier tooling removed and the repository history reset to one commit, so every earlier review is unreachable. Needs a clean review of this revision and the owner's acceptance. Phase 1 (vhco-pro/docs#4, pin 25c463c) is done."
+status_description: "Draft since 2026-10-17: references to private earlier tooling removed and the repository recreated public with a single commit, so every earlier review is unreachable. Phases 1 and 2 done. Needs a clean review of this revision and the owner's acceptance before phase 3."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
@@ -1046,13 +1046,16 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Phase 2: One repository (owner actions)
 
-- [ ] T9 History audit on every ref at the commit going public, SHA and result recorded under
+- [x] T9 History audit on every ref at the commit going public, SHA and result recorded under
       [One repository](#one-repository) (AC-28)
-- [ ] T10 Owner confirms the audit; owner renames `michielvha/claude-plugins` to `michielvha/vh-adlc` and
+      Evidence: audit of the single-commit history at `25529ab` on 2026-10-17 (refs: `main` only; one commit): no credentials, the only key-shaped strings are the fake `github-app-registration` test fixtures (`secret-key`, `client-secret-value`); one identity, `michielvha <michielvh@outlook.com>`; no employer, work-account or earlier private-tool identifiers.
+- [x] T10 Owner confirms the audit; owner renames `michielvha/claude-plugins` to `michielvha/vh-adlc` and
       makes it public (AC-28)
-- [ ] T11 Marketplace refresh in disposable host profiles resolves the renamed public repository;
+      Evidence: owner confirmed on 2026-10-17 and chose a full history reset over keeping the old history. The repository was renamed to `michielvha/vh-adlc`, reset to the single commit, then deleted and recreated as public so no earlier commit stays reachable by SHA; every earlier SHA tested returns 422 and the old `claude-plugins` URL returns 404.
+- [x] T11 Marketplace refresh in disposable host profiles resolves the renamed public repository;
       `github-app-registration` installs without a credential, unchanged. Dual-plugin proof waits for T32;
       the owner's profiles are untouched (advances AC-28, does not complete it)
+      Evidence: disposable profiles with a fresh `HOME`, no token and no credential helper: Claude Code 2.1.289 `plugin marketplace add michielvha/vh-adlc` then `plugin install github-app-registration@vhco-tools` succeeded; Copilot CLI 1.0.98 the same; installed files identical to `plugins/github-app-registration/` at `25529ab` (Claude Code adds only its `.in_use` marker). VS Code and the owner's own profiles not touched. Because the old URL no longer redirects, a host that added the marketplace as `michielvha/claude-plugins` re-adds it as `michielvha/vh-adlc`.
 
 ### Phase 3: Binary (child feature)
 
