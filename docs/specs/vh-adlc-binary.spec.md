@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Claimed on 2026-10-18 for implementation on feat/vh-adlc-binary; accepted against review R-5 at 9453719."
+status: draft
+status_description: "Revision during implementation on feat/vh-adlc-binary: state the schema-1 vocabulary the binary reads and the generic error code. Accepted earlier against R-5 at 9453719."
 issue: null
 branch: feat/vh-adlc-binary
 goal: "A released, signed vh-adlc binary that answers every mechanical question of the development loop from the files and Git alone, byte-identically for identical inputs."
