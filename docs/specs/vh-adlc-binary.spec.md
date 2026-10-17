@@ -25,20 +25,19 @@ signed from this repository.
 
 ## Context
 
-The parent feature document is the requirement. Its
-[Deterministic core](personal-development-loop.spec.md#deterministic-core-the-vh-adlc-binary) section
-defines the seven commands, the gate conditions, the freshness rules, the output contract and the
-binary's place in the repository. Its [Docs changes](personal-development-loop.spec.md#docs-changes-phase-1)
-section and the pinned standard define the rules block the binary reads. This document does not repeat
-those sections. It adds the implementation decisions they leave open, the binary's own criteria, its
-Test Plan and its tasks. Where this document and the parent disagree, the parent wins and the
-disagreement is a finding.
+The parent feature document is the requirement. Its [Deterministic
+core](personal-development-loop.spec.md#deterministic-core-the-vh-adlc-binary) section defines the seven
+commands, the gate conditions, the freshness rules, the output contract and the binary's place in the
+repository. Its [Docs changes](personal-development-loop.spec.md#docs-changes-phase-1) section and the
+pinned standard define the rules block the binary reads. This document does not repeat those sections.
+It adds the implementation decisions they leave open, the binary's own criteria, its Test Plan and its
+tasks. Where this document and the parent disagree, the parent wins and the disagreement is a finding.
 
 The parent's task T12 makes this a child feature with its own document and PR. Its criteria AC-23 and
 AC-24, the binary and release halves of AC-27, and the binary halves of AC-04, AC-09 and AC-16 are
-proven here; AC-27's observed non-release of a plugin-only commit stays with the parent's proof row. The parent pins
-`vhco-pro/docs` at `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a` (parent D-28), and the conventions below
-are read at that revision.
+proven here; AC-27's observed non-release of a plugin-only commit stays with the parent's proof row. The
+parent pins `vhco-pro/docs` at `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a` (parent D-28), and the
+conventions below are read at that revision.
 
 Measured on 2026-10-17:
 
@@ -83,18 +82,19 @@ per command (see Invocation for argument order).
 
 Packages under `internal/`: the parent's seven (`knowledge`, `doc`, `rules`, `gate`, `fresh`, `next`,
 `review`) plus `gitcmd`, which runs Git and parses its output, `report`, which owns the JSON contract
-and exit codes, and `testrepo`, a test helper that builds fixture repositories. `cmd/vh-adlc` holds
-only `main.go`, its `*_test.go` files and `testdata/`; `main.go` imports only the standard library and `internal/` packages,
-parses flags, creates a `context.Context` with `signal.NotifyContext`, calls one package function and
-writes its report. `knowledge` and `gitcmd` take that context, so an interrupt cancels a fetch or a
-Git call.
+and exit codes, and `testrepo`, a test helper that builds fixture repositories. `cmd/vh-adlc` holds only
+`main.go`, its `*_test.go` files and `testdata/`; `main.go` imports only the standard library and
+`internal/` packages, parses flags, creates a `context.Context` with `signal.NotifyContext`, calls one
+package function and writes its report. `knowledge` and `gitcmd` take that context, so an interrupt
+cancels a fetch or a Git call.
 
 `gitcmd` runs `git --no-pager` with `LC_ALL=C` and `GIT_OPTIONAL_LOCKS=0`, so `git status` never
 rewrites the index. It fixes these output-shaping settings on the command line: `-z` on every command
 that lists paths, `--no-renames` on `git diff` and `git status`, `--no-follow` and
 `--no-show-signature` on `git log`, and `-c core.quotePath=false`. Git is never read through a library.
 The binary needs Git 2.35 or later (`git var GIT_DEFAULT_BRANCH` arrived in 2.35); `gitcmd` checks
-`git --version` once and reports an older Git as `error` with the version it found.
+`git --version` once and reports an older Git as `error` with finding `git-too-old`, naming the version
+it found.
 
 The lint configuration adapts the template's `.golangci.yml` as it is, because it already uses
 version 2 with `linters` and `formatters` sections. The root `.gitignore` gains `/vh-adlc` and `/dist/`.
@@ -167,12 +167,12 @@ The `data` of each command:
 | `review check` | `review`, `equal` |
 
 `gate`'s `line` is the parent's status-commit line, so an operation copies it rather than composing it.
-It reads `vh-adlc gate <target>: pass (rules <schema>, docs <sha7>)` or
-`vh-adlc gate <target>: fail (<failures, comma separated>; rules <schema>, docs <sha7>)`, where
-`<sha7>` is the first seven characters of the resolved revision and the failures are
-`transition-not-allowed` first, when it applies, then the failing conditions in gate order, for example
-`vh-adlc gate archived: fail (transition-not-allowed; rules 1, docs e4d58d2)`. `schema/vh-adlc.schema.json`
-(JSON Schema 2020-12) describes this object and enumerates every `result` and finding code.
+It reads `vh-adlc gate <target>: pass (rules <schema>, docs <sha7>)` or `vh-adlc gate <target>: fail
+(<failures, comma separated>; rules <schema>, docs <sha7>)`, where `<sha7>` is the first seven
+characters of the resolved revision and the failures are `transition-not-allowed` first, when it
+applies, then the failing conditions in gate order, for example `vh-adlc gate archived: fail
+(transition-not-allowed; rules 1, docs e4d58d2)`. `schema/vh-adlc.schema.json` (JSON Schema 2020-12)
+describes this object and enumerates every `result` and finding code.
 
 ### Finding codes
 
@@ -185,9 +185,9 @@ The codes are API and are added only by a minor release. Knowledge: `invalid-pin
 `review-row-malformed`, `review-subsection-missing`, `review-records-malformed`, `review-records-mixed`,
 `acceptance-review-unknown`, `covers-pattern-unsupported`. Freshness: `no-review`, `dirty-target`,
 `commit-unreachable`, `baseline-changed`, `covered-drift`, `covered-changed`, `feature-tree-dirty`,
-`default-branch-unknown`. Gate: `transition-not-allowed`, and one finding per failing condition whose
-code is the condition's name (`no_open_questions`, `accepted` and so on). Review check:
-`review-not-found`, `records-differ`. Usage: `usage`.
+`default-branch-unknown`. Git: `git-too-old`. Gate: `transition-not-allowed`, and one finding per
+failing condition whose code is the condition's name (`no_open_questions`, `accepted` and so on). Review
+check: `review-not-found`, `records-differ`. Usage: `usage`.
 
 ### Knowledge
 
@@ -268,14 +268,14 @@ With no remote, the local default branch is the one `git var GIT_DEFAULT_BRANCH`
 `init.defaultBranch` or the installed Git's built-in default; if that branch does not exist, the result
 is `default-branch-unknown`. Nothing else is tried.
 
-A reviewed commit is reachable when it exists and is an ancestor of `HEAD` in the worktree where
-`fresh` runs. The binary first runs `git cat-file -e <sha>^{commit}`, and an absent commit is
+A reviewed commit is reachable when it exists and is an ancestor of `HEAD` in the worktree where `fresh`
+runs. The binary first runs `git cat-file -e <sha>^{commit}`, and an absent commit is
 `commit-unreachable`; it then runs `git merge-base --is-ancestor <sha> HEAD`, where exit 1, such as for
-the commits of a squash-merged branch, is `commit-unreachable` and any other non-zero exit is `error`. Covered changes are
-`git diff --name-only -z --no-renames <reviewed>...<remote default>` for spec reviews and
-`git diff --name-only -z --no-renames <reviewed> HEAD` for implementation reviews, filtered by `covers`
-in the binary. The feature tree is `git status --porcelain=v1 -z --no-renames --untracked-files=all`,
-filtered the same way, without the document itself. Ignored files never appear.
+the commits of a squash-merged branch, is `commit-unreachable` and any other non-zero exit is `error`.
+Covered changes are `git diff --name-only -z --no-renames <reviewed>...<remote default>` for spec
+reviews and `git diff --name-only -z --no-renames <reviewed> HEAD` for implementation reviews, filtered
+by `covers` in the binary. The feature tree is `git status --porcelain=v1 -z --no-renames
+--untracked-files=all`, filtered the same way, without the document itself. Ignored files never appear.
 
 `internal/gate` evaluates the conditions the block's `gates` map names for the target, plus the
 transition, except when the target equals the current status. A target absent from `gates` checks the
@@ -288,14 +288,13 @@ trailing blank lines from both; every other byte must match.
 ### Tests
 
 Fixture repositories are built in `t.TempDir()` by `internal/testrepo`. It runs Git with
-`GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`, every inherited `GIT_*` variable removed,
-`git init -b main --object-format=sha1`, `init.defaultBranch main` in each fixture's local
-configuration (so a fixture without a remote resolves `main`), `-c commit.gpgsign=false`, and fixed
-author and committer
+`GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`, every inherited `GIT_*` variable removed, `git
+init -b main --object-format=sha1`, `init.defaultBranch main` in each fixture's local configuration (so
+a fixture without a remote resolves `main`), `-c commit.gpgsign=false`, and fixed author and committer
 names, emails and dates, so their commit SHAs are stable on any machine and golden files can contain
 them. A fixture with a remote gets a bare repository as `origin` and `git remote set-head origin main`.
-A fixture docs repository with two commits, A and B, differing in the default document location and
-one gate rule, serves `--docs-source`.
+A fixture docs repository with two commits, A and B, differing in the default document location and one
+gate rule, serves `--docs-source`.
 
 `cmd/vh-adlc/golden_test.go` builds the binary once, runs every command twice per fixture with the same
 cleaned Git environment, compares both runs byte for byte and with `testdata/golden/<case>.json`, and
@@ -336,21 +335,26 @@ the checksum file `checksums.txt`. The parent's signing design (D-27) applies as
 `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, and the README gains a section with that fingerprint and the
 parent's verification steps.
 
-The release can only happen after the feature PR merges, so completion takes one step after the
-merge. The owner chose this path on 2026-10-17, in answer to R-2 F-01, as a recorded exception to
-parent D-20 ("once it has a `branch`, its commits stay on the feature branch and are pushed only on
-ship") and to the document returning to the default branch with its PR. The PR ships the document
+The release can only happen after the feature PR merges, so completion takes two commits after the
+merge, under parent D-29: the owner's one exception to D-20 and to the document returning to the
+default branch with its PR, chosen on 2026-10-17 in answer to R-2 F-01. The PR ships the document
 `in-progress` with AC-13 and AC-15 unticked. After the release, the owner's session works by hand with
-the downloaded, verified release binary, because the loop's skills do not exist until phase 4. On the
-feature branch, fast-forwarded to the default branch, it records the version and, per platform, the
-asset name, the asset's SHA-256 and the extracted binary's SHA-256, computed from the downloaded
-assets rather than copied from `checksums.txt`. The merge makes the feature's own covered files drift
-against the reviewed spec commit, so a drift-only spec review at that commit comes first; it keeps the
-acceptance because the baseline is unchanged. An implementation review then observes the published
-release. The released `vh-adlc gate complete` decides the flip, its line goes into the completion
-commit, and the Review Log rows say the steps were run by hand. That docs-only commit is pushed to the
-default branch as a fast-forward with the skip-CI marker (D-23). Parent T17 copies the recorded values
-into the lock.
+the downloaded, verified release binary, because the loop's review and ship skills do not exist until
+parent phases 6 and 7. It passes `--plugin-pin e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`, and knowledge
+resolves `source: plugin`, because the repository has no `AGENTS.md` pin until parent T13.
+
+On the feature branch, fast-forwarded to the default branch's merge commit M, commit E records the
+version and, per platform, the asset name, the asset's SHA-256 and the extracted binary's SHA-256,
+computed from the downloaded assets rather than copied from `checksums.txt`. The values go into the
+AC-13 and AC-15 evidence lines and T24's line only, never into a normative section, which is what keeps
+the acceptance. The merge makes the feature's own covered files drift against the earlier spec review
+(the parent's "cannot cause it" holds only until the merge, a gap D-29 records), so a drift-only spec
+review at E comes first; `E...M` is empty, so it is fresh, and the unchanged baseline keeps the
+acceptance. An implementation review at E then observes the published release and the committed
+values. Commit C holds both Review Log rows, the ticks, the flip to `complete` and the line from the
+released `vh-adlc gate complete`, and the rows say the steps ran by hand. E and C, both docs-only and
+each with the skip-CI marker (D-23), are pushed to the default branch as a fast-forward. Parent T17
+copies the recorded values into the lock.
 
 ## Acceptance Criteria
 
