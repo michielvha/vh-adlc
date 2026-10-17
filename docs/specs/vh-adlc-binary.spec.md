@@ -413,6 +413,156 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-17 | R-1 | spec | `af55148` | fable | procedural | Full review of the draft. Thirteen should-fix findings (argument order, schema validation, Git index writes, rename and config sensitivity, fixture isolation, default branch, reachability, slug matching, wrapped annotations, completion path, parent proofs, untagged releases, capture groups) and eight nits. Nothing blocking. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Toolchain and module; Design, Invocation
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:78-79 chooses "the standard `flag` package with one `flag.FlagSet` per command" and :102 keeps the parent's signature `vh-adlc review check <doc> --review R-<n> --returned <file>` with flags after the positional argument. Go's `flag` stops at the first non-flag argument: a scratch program with `fs.String("review", ...)` run as `doc.md --review R-1 --returned f` printed `review="" args=["doc.md" "--review" "R-1" "--returned" "f"]`, and only the flags-first order parsed. The same applies to `--repo` and `--plugin-pin` placed after `<target-status> <doc>`.
+PROPOSAL: State the argument order the binary accepts (flags before positionals, matching `flag`), or state that the command splits positionals out before parsing so flags may follow them; the parent's signature row is then a disagreement to record.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Toolchain and module; Acceptance Criteria AC-11; Test Plan AC-11
+EVIDENCE: :76-77 "The only dependency is `go.yaml.in/yaml/v3` v3.0.5"; :149 declares `schema/vh-adlc.schema.json` as JSON Schema 2020-12; AC-11 (:325-326) and its proof (:356) validate every golden file against it in `go test`. The Go standard library has no JSON Schema validator, so the proof needs either a second module dependency (test-only dependencies still appear in `go.mod`) or a hand-written validator for the 2020-12 subset the schema uses.
+PROPOSAL: Either name the validator module as a second, test-only dependency and amend the "only dependency" sentence, or state that the test checks the schema's `enum` lists and the required keys with `encoding/json` alone and does not claim full 2020-12 validation.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Freshness and gates; Design, Tests; Acceptance Criteria AC-04
+EVIDENCE: :231 reads the feature tree with `git status --porcelain=v1 -z --untracked-files=all`, :252-254 hashes "the fixture tree and `git status --ignored` before and after running every command", and AC-04 requires the fixture's "Git state unchanged". In a scratch repository, after an mtime change `git status --porcelain` rewrote `.git/index` (sha1 c7180e7c to b8faa181), while `GIT_OPTIONAL_LOCKS=0 git status --porcelain` left it unchanged. The commit-to-commit `git diff` forms at :229-230 do not touch the index, but the status call does, so a strict hash over `.git` fails on a run that did nothing wrong, and the parent's "never writes to the repository" is violated in `.git/index`.
+PROPOSAL: Run Git with `GIT_OPTIONAL_LOCKS=0` (or `--no-optional-locks`) alongside `LC_ALL=C` and `--no-pager`, and say whether the boundary hash covers `.git` (it should, once the index is no longer rewritten).
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Freshness and gates
+EVIDENCE: :229-230 compute covered changes with `git diff --name-only <reviewed>...<remote default>` and `git diff --name-only <reviewed> HEAD`, "filtered by `covers` in the binary". Rename detection is on by default (`diff.renames`), and the output then depends on the user's configuration: in a scratch repository a rename of `f` to `g` printed only `g` by default and `f` and `g` with `--no-renames` or `-c diff.renames=false`. A covered old path that was renamed away is therefore invisible on one machine and visible on another, which breaks AC-01's byte-identical output across environments and can hide covered drift. `git status --porcelain=v1 -z` likewise emits `R  k\0g\0` (two path records) for a staged rename, which the parser must handle or disable.
+PROPOSAL: Pass `--no-renames` to both diff forms and to `git status`, and state that the binary runs Git with a fixed configuration (`GIT_CONFIG_GLOBAL`, `GIT_CONFIG_NOSYSTEM`, or explicit `-c` values) for every setting that changes output shape.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Tests
+EVIDENCE: :244-247 make fixture SHAs stable with "fixed author and committer names, emails and dates" and then run `git remote set-head origin main`. Commit SHAs also depend on `init.defaultBranch` (the branch may be `master`), `init.defaultObjectFormat` (a sha256 repository), `commit.gpgsign` and `user.signingkey` from the developer's global or system Git configuration, and on `GIT_DIR`/`GIT_WORK_TREE` inherited from a hook environment. None is isolated in the design, so golden files containing SHAs pass on one machine and fail on another.
+PROPOSAL: State that `internal/testrepo` runs Git with `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1`, `git init -b main`, `-c commit.gpgsign=false`, and `GIT_AUTHOR_DATE`/`GIT_COMMITTER_DATE` fixed, and that the golden test clears inherited `GIT_*` variables before invoking the binary.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Freshness and gates (default branch)
+EVIDENCE: :226-229 "The default branch is the target of `git symbolic-ref refs/remotes/origin/HEAD`. With no `origin` remote, the local default branch is ... `init.defaultBranch` if that branch exists, else `main`, else `master`, else `default-branch-unknown`." The parent (personal-development-loop.spec.md:353-355) says "A repository with no remote uses its local default branch" and "A clone that has a remote but no `refs/remotes/origin/HEAD` is an error (`default-branch-unknown`, exit `4`), never a guess." A repository whose only remote is `upstream` has a remote but no `origin`: the parent makes it an error, the child falls through to the local chain, and that chain (`main`, then `master`) is itself a guess.
+PROPOSAL: Define "no remote" as `git remote` printing nothing, so any remote without `refs/remotes/origin/HEAD` is `default-branch-unknown` as the parent requires, and either drop the `main`/`master` fallback or record it as a deliberate extension of the parent's no-remote case.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Finding codes; Design, Freshness and gates
+EVIDENCE: :162 lists `commit-unreachable`, and the parent (:365-366) says "a reviewed commit no longer reachable (for example after a squash merge): stale". The child never says reachable from what: existing in the object database (`git cat-file -e`), an ancestor of `HEAD` (`git merge-base --is-ancestor`), or an ancestor of the remote default branch. After a squash merge the commit usually still exists locally on the old feature branch, so the first reading never fires in the parent's own example, and the second and third disagree for a spec review on a feature branch.
+PROPOSAL: Define `commit-unreachable` as "not an ancestor of `HEAD` in the worktree where `fresh` runs" (and say what happens when the object is absent altogether), and add that case to the AC-06 fixtures.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Output (`find`); Acceptance Criteria AC-10
+EVIDENCE: :140 and :323-324 define `find --slug <s>` as documents "whose file name is the given slug". The standard's default location is `docs/internal/plans/<slug>.md`, but this repository's documents are `docs/specs/personal-development-loop.spec.md` and `docs/specs/vh-adlc-binary.spec.md`, so neither `vh-adlc-binary`, `vh-adlc-binary.spec` nor `vh-adlc-binary.spec.md` is unambiguously "the file name". The parent's `spec` and `resume` operations rely on `find` to avoid a second document (parent AC-08), so a miss here creates the duplicate the parent forbids.
+PROPOSAL: Define the match as the file name with its `.md` extension removed and, if present, a trailing `.spec` removed (or state that the slug must be given with the extension), and add a `.spec.md` fixture to the AC-10 proof.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Document model (normative baseline)
+EVIDENCE: :211-213 "every line matching `evidence_line` or `residual_line` is dropped" is the only edit to Acceptance Criteria before comparison. The parent's own evidence lines (personal-development-loop.spec.md:1066, 1070) are long single lines, and the parent's fixtures expect wrapped criterion text; a wrapped evidence line's second, indented line matches `criterion_continuation`, is not dropped, and therefore changes the baseline. Ticking a criterion with two-line evidence then marks the spec review and the acceptance stale, which contradicts the parent's "Checkbox, evidence/residual and Review Log annotation changes alone cause no staleness" (AC-16) and the child's AC-06.
+PROPOSAL: Define an annotation as the `evidence_line` or `residual_line` plus every following line matching `criterion_continuation` up to the next list item or annotation, drop the whole annotation from the baseline, and add a wrapped-evidence fixture to AC-06.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Delivery; Tasks T24; Acceptance Criteria AC-13, AC-15
+EVIDENCE: :280-282 and T24 (:404-406) record the first release's version and digests "in this document's evidence" after "the PR merged by merge commit". The release workflow runs only on pushes to `main` (:261-263), so AC-13 and AC-15 cannot be ticked before the merge, `all_met` fails, `gate complete` cannot pass, and the PR ships the document `in-progress` with a `branch` field. The delivery convention (conventions/delivery.md:36-42) and parent D-20 then say the document is edited only on its feature branch and returns to the default branch with the one PR; nothing in the child says how the post-merge evidence and the `complete` flip reach `main`.
+PROPOSAL: State the path: for example, after the release the owner authorises a docs-only completion commit on the default branch carrying the `vh-adlc gate complete` line (procedural, since the binary that would decide it is the one being released), or a second docs-only PR, and record which as a deliberate exception to one-PR-per-feature.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-13, AC-14 (versus parent AC-27's proof)
+EVIDENCE: The child claims AC-27 (:37-38). The parent's proof row (personal-development-loop.spec.md:1017) requires "confirm `gpg --show-keys release-signing-key.asc` lists `VHCO Pro (Release Signing Key) <release@vhco.pro>` as the first uid" and "a plugin-only commit on the default branch produces no release". The child's AC-13 proof (:358) checks the fingerprint, the signature and the digests but not the uid, and AC-14's proof (:359) is a Go test parsing `release.yml` triggers, an inference about GitHub's path filter rather than the observed non-release the parent asks for. Both are what R-17 F-01 and R-18 F-02 on the parent were about.
+PROPOSAL: Add the `gpg --show-keys` uid check to AC-13's proof, and have AC-14's proof also observe that the docs-only evidence commit of T24 (which touches only `docs/specs/`) triggers no release run.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Delivery (release workflow)
+EVIDENCE: :261-268 run `gitversion-tag-action` then `goreleaser-action` unconditionally on every push to `main` touching a binary path. In gitversion-tag-action at 8cf5869, `scripts/tag.sh` exits 0 with `tagged=false` and `skip-reason=tag-exists` when the computed tag already exists on the remote, which happens for any binary-path push whose commits carry no bump (a `docs(cmd):` or `test:` commit, or a Renovate PR squashed under a non-bumping subject). GoReleaser then runs `release --clean` on an untagged `HEAD` and fails ("git tag ... was not made against commit"), and before the first tag exists it fails for lack of any tag. The delivery convention asks to "surface failures instead of treating them as an absent release", but the document does not say which outcome is intended, and AC-14 only covers the trigger side.
+PROPOSAL: Decide and state it: either guard the GoReleaser step on `steps.gitversion.outputs.tagged == 'true'` (no release when no version change) or accept the failed run as the signal; add the no-bump push to the Test Plan either way.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Rules
+EVIDENCE: :190-194 say the binary compiles every `^` value and "Nothing about statuses, sections, IDs, columns or verdicts is compiled in", yet every extraction depends on capture-group positions the block does not document: `criterion_line` and `task_line` group 2 is the ID and group 1 the tick, `record_criterion` group 1 the ID, `feature_root.declaration` group 1 the path, `residual_line` group 1 the tracker (conventions/feature-documents.md:219-238). A future block revision that reorders or adds a group would silently change behaviour under the same `schema: 1`, and the standard names no group contract.
+PROPOSAL: State the capture-group contract for schema 1 in Design (which group carries the ID, tick, path and tracker for each pattern), and report the missing statement to `vhco-pro/docs` as a docs gap per the parent's hard rule 5.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Output (malformed versus fail)
+EVIDENCE: :131-133 "Any other rule violation is a `fail` finding. `gate`, `fresh` and `next` on a malformed document stop with `malformed`." `lint` is not in that list, so a document with both a missing section and a duplicate ID has no stated `result` or exit code, and it is unstated whether `lint` keeps reporting after the first shape finding.
+PROPOSAL: Add one sentence: `lint` reports every shape and lint finding it can still compute, and its `result` is `malformed` (exit 3) when any shape finding is present, else `fail` or `pass`.
+
+FINDING: F-15
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-12; Tasks T21
+EVIDENCE: :357 proves "no non-wiring code in `cmd/`" with `go test ./cmd/vh-adlc -run Layout`, but "wiring" is not something a test can decide without a rule.
+PROPOSAL: Give the test a rule, for example: `cmd/vh-adlc` contains only `main.go` and `*_test.go`, and `main.go` imports nothing from outside the standard library and `internal/`.
+
+FINDING: F-16
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Invocation (versus parent Commands table)
+EVIDENCE: :91-92 make `--plugin-pin <sha>` required on every command, while the parent's table (personal-development-loop.spec.md:316-322) shows it only on `knowledge` and gives `lint <doc>`, `gate <target-status> <doc>` and the others without it. The child's own rule (:34-35) is that a disagreement with the parent is a finding, and this one is not recorded as such.
+PROPOSAL: Say explicitly that the pin flag is an extension of the parent's signatures because every command resolves knowledge itself, so the phase-4 skills pass it on every call.
+
+FINDING: F-17
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Output (`knowledge`)
+EVIDENCE: :113-115 give `knowledge` the fields `revision`, `source`, `override`, `rules_schema`, `feature_root`, `local_format`. The parent's required one-line report (:149-150) is `Conventions: vhco-pro/docs@8b14a69 (repository pin, AGENTS.md)`, naming the file the pin came from, which no field carries.
+PROPOSAL: Add a `pin_files` array (the bridge files in which the pin was found, sorted) to the `knowledge` object.
+
+FINDING: F-18
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Output (`gate` line)
+EVIDENCE: :147-148 give the passing line `vh-adlc gate planned: pass (rules 1, docs e4d58d2)` but not the failing line, and the 7-character docs SHA is not fixed to a length (`git rev-parse --short` grows with repository size, which would break AC-01 across fixtures).
+PROPOSAL: Give both forms (`pass` and `fail (<conditions>)`) and say the docs SHA is the first seven characters of the resolved revision.
+
+FINDING: F-19
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Delivery; Sources
+EVIDENCE: :273 "GoReleaser's `.Version` drops the tag's `v`" and :76-77 "`gopkg.in/yaml.v3` is unmaintained" are Design claims with no Sources entry; Sources (:419-427) covers checksums, archives and signing but not the templates page or the yaml repository's archive notice. Release checkout details the workflow needs (`fetch-depth: 0` and `persist-credentials` for GitVersion and the tag push, which the template's workflow sets) are also not stated.
+PROPOSAL: Add the GoReleaser templates page and the go-yaml archive notice to Sources, and name the checkout settings in the Delivery paragraph.
+
+FINDING: F-20
+KIND: judgement
+SEVERITY: nit
+WHERE: Tasks T24
+EVIDENCE: :404 "T24 First release - the PR merged..." names no file, while the standard (conventions/feature-documents.md:113-114) says each task "names the file it touches"; the file is this document.
+PROPOSAL: Write "T24 `docs/specs/vh-adlc-binary.spec.md` - first release: ...".
+
+FINDING: F-21
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Toolchain and module; Design, Knowledge
+EVIDENCE: The Go convention (conventions/go.md:39-41) asks to pass context through operations that can block or time out; the child names a 10-second HTTP timeout (:172) but no `context.Context` on the fetch or on `gitcmd`, and `--repo <dir>` (:91-93) is not defined as the worktree root, although `git show <commit>:<path>` (:214) needs root-relative paths.
+PROPOSAL: State that `knowledge` and `gitcmd` take a `context.Context` from `main` (`signal.NotifyContext`), and that `--repo` is resolved to `git rev-parse --show-toplevel` before paths are interpreted.
 
 ## Sources
 
