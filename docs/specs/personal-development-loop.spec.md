@@ -1192,6 +1192,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-19 | spec | `d5d1ab0` | fable | procedural | Diff-only check of the R-18 fixes. No findings. |
 | 2026-10-17 | R-19 | spec | `d5d1ab0` | n/a | n/a | accepted by owner |
 | 2026-10-17 | R-20 | spec | `031b595` | fable | procedural | Diff-only review of the D-28 prose guide revision. Four should-fix findings (proof only checks dashes and the report's own claim, run reports uncovered, checker rule needs judgement, older pins now stop) and four nits. Nothing blocking. |
+| 2026-10-17 | R-21 | spec | `0b0f42b` | fable | procedural | Diff-only check of the R-20 fixes. One should-fix finding (the canary scan would fail on verbatim review records; S11's seeded input unstated) and two nits. Nothing blocking. |
 
 ### R-14
 
@@ -1397,6 +1398,29 @@ SEVERITY: nit
 WHERE: Acceptance Criteria AC-32 versus AC-14
 EVIDENCE: AC-32's last clause, "stored review records stay exactly as the reviewer returned them" with proof "`vh-adlc review check` in S11" (line 920-921, 1015), restates AC-14's "stores them verbatim (confirmed by `vh-adlc review check`)" with the same proof (line 862-864, 997). One fact now needs two implementation-review records that must agree.
 PROPOSAL: Drop the verbatim clause and the `review check` proof from AC-32 and keep the exclusion in D-28 and the Operations sentence, where it already lives.
+
+### R-21
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-32 row versus AC-14 and the Review Log format; Test Plan S11
+EVIDENCE: The new proof row (docs/specs/personal-development-loop.spec.md:1020) seeds "S6, S9, S11 and S13" with canary tells and then scans their "changed feature documents" and fails "on any surviving canary". A feature document also holds the reviewer's records "stored verbatim under `### R-<n>`" (line 763; AC-14 line 866-868; S11 passes when "Four distinct verdicts stored verbatim"), which D-28 and the Operations sentence (line 95, 677) forbid the loop to edit. A reviewer that quotes a seeded tell as EVIDENCE (the R-20 F-01 record in this very document quotes "Let that sink in." and ` -- `) puts a canary into the changed feature document that the loop may not remove, so the scan fails a correct run. The row also names S11 among the scenarios "with fixture inputs (issue body, scripted owner turns)", but S11's setup (line 981) has neither, so it is unstated what S11 seeds.
+PROPOSAL: Scope the scan to what AC-32 itself names, "the feature-document prose section the loop writes" plus the Outcome cells, explicitly excluding the verbatim `### R-<n>` records, and state what S11's seeded input is (for example a canary in the fixture criterion text) or drop S11 from the seeded set and keep it only for the Outcome-cell and report scan.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-32 row versus Design, package layout comment
+EVIDENCE: The proof row scans "captured run reports" (line 1020), while the layout says `evidence/<host>/  # recorded summaries, never raw transcripts` (line 563) and the Test Plan stores results "as summaries" (line 957-959). Nothing says where or how a run report is captured for the scan without a transcript.
+PROPOSAL: Add a clause to the Test Plan harness paragraph saying the harness captures each operation's final report for the AC-32 scan and discards it, keeping `evidence/` as summaries only.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Operations (intro); Test Plan fixtures paragraph; Test Plan checker paragraph
+EVIDENCE: `git -C /home/m/code/vh-adlc diff 471d4e6 0b0f42b` adds lines far from the surrounding 100-column wrap: line 675 ("...Before it commits, posts or reports") is 113 characters; line 943 ("feature document, a deliberate failing test, ... prose canary tells in issue bodies and") is 142 characters followed by a 23-character line "scripted owner turns; a" (line 944); line 934 "For AC-03 it scans the package for canary sentences" is 51 characters mid-paragraph. No em or en dash appears in the added lines.
+PROPOSAL: Rewrap the three paragraphs at the document's 100-column width.
 
 ## Sources
 
