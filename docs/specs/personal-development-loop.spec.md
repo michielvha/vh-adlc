@@ -91,7 +91,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-24 | Bun is the default for JavaScript tooling and tests going forward, including this repository's checker (`tests/vh-adlc` in `michielvha/vh-adlc`); `vhco-pro/docs` keeps its Node checker under the keep-the-runtime clause. Phase 1 removes the conflicting Node 24 requirement for that tooling. Migrating unrelated existing projects or changing `github-app-registration` is not part of this feature. |
 | D-25 | Host-created isolated worktrees are supported, with concurrent work on separate features and one writer per feature branch. Another session resumes the same feature only through an explicit owner-confirmed handoff. The plugin discovers existing worktrees but does not create, remove or force-move them, and claims are not distributed locks. |
 | D-26 | Completion certifies a committed implementation reviewed at an exact commit, not an uncommitted snapshot. Relevant changes are committed before review; relevant dirty changes prevent completion. Unrelated staged, unstaged and untracked work is left untouched. |
-| D-27 | Binary releases are signed with the owner's one general release key, VHCO Pro (Release Signing Key) <release@vhco.pro>, fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`: `checksums.txt` carries a detached signature. The passphrase-less ASCII-armoured secret key is the `PGP_PRIVATE_KEY` repository secret (set on 2026-10-17); the public key is committed as `release-signing-key.asc` and its fingerprint printed in the README. The plugin installer's trust root stays the digests pinned in its lock; it does not verify the signature. |
+| D-27 | Binary releases are signed with the owner's one general release key, VHCO Pro (Release Signing Key) <release@vhco.pro>, fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`: `checksums.txt` carries a detached signature. The passphrase-less ASCII-armoured secret key is the `PGP_PRIVATE_KEY` repository secret (set on 2026-10-17); the public key is committed as `release-signing-key.asc` and its fingerprint printed in the README. The key's original identity, VHCO Pro (Terraform Provider Signing Key), stays; the general identity was added on 2026-10-17 and is primary, and `release-signing-key.asc` is exported from the key as held in the secret, so the file, the README and every signature agree. The plugin installer's trust root stays the digests pinned in its lock; it does not verify the signature. |
 
 ## Scope
 
@@ -414,7 +414,7 @@ and bootstrap guide at the resolved docs pin require:
 - Released with `michielvha/gitversion-tag-action` and `michielvha/goreleaser-action`, pinned to full
   commit SHAs (the template's `@main` pins are replaced), with `CGO_ENABLED=0`, `-trimpath`, darwin and
   linux on amd64 and arm64, and a published `checksums.txt` (the template's `checksum.name_template`,
-  `{{ .ProjectName }}_{{ .Version }}_SHA256SUMS`, is replaced). Signing was requested (D-27), so the
+  `{{ .ProjectName }}_{{ .Version }}_SHA256SUMS`, is replaced by `checksums.txt`). Signing was requested (D-27), so the
   template's `signs` block (`.goreleaser.yml`, `artifacts: checksum`, `--detach-sign`) is kept, and
   GoReleaser's default signature name makes it `checksums.txt.sig`. The key reaches it through the
   release action's `pgp-private-key` input (`action.yml` at `a86fcdf`), fed from the `PGP_PRIVATE_KEY`
@@ -422,9 +422,12 @@ and bootstrap guide at the resolved docs pin require:
   holds a passphrase-less ASCII-armoured key, because the action has no passphrase input. A release
   without the key fails rather than publishing unsigned: the action's import step pipes the input into
   `gpg --batch --import` under `bash -eo pipefail`, and empty input exits non-zero before GoReleaser
-  runs. The public key is committed at the repository root as `release-signing-key.asc` and the README
-  prints its full fingerprint, so anyone can verify a release. The template's container step is
-  removed: there is no service image.
+  runs. The public key is committed at the repository root as `release-signing-key.asc`, and the README
+  prints its full primary fingerprint (D-27) with the verification steps: import that file, compare
+  `gpg --fingerprint` with the printed fingerprint, `gpg --verify checksums.txt.sig checksums.txt`, then
+  `sha256sum --check --ignore-missing checksums.txt` over the downloaded asset. The signature is made by
+  the key's signing subkey, so `gpg --verify` names the subkey; the fingerprint to compare is the
+  primary one. The template's container step is removed: there is no service image.
 - The binary ignore is anchored at the root (`/vh-adlc`), as the Go convention requires, so it cannot hide
   `cmd/vh-adlc/` or `plugins/vh-adlc/`.
 - The release workflow runs only when binary paths change (`cmd/`, `internal/`, `go.mod`, `go.sum`, the
@@ -890,8 +893,9 @@ stated.
 - [ ] AC-27: The binary in `michielvha/vh-adlc` follows the Go conventions at its pinned docs revision:
       `cmd`/`internal` layout, anchored binary ignore, test, vet and lint gates before release, actions
       pinned to full SHAs, released platforms equal to the lock's, `checksums.txt` published with a
-      detached `checksums.txt.sig` that verifies against the committed `release-signing-key.asc` whose
-      fingerprint is the one the README prints, and no release from a commit that touches no binary
+      detached `checksums.txt.sig` that verifies against the committed `release-signing-key.asc`, whose
+      primary fingerprint is `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6` (D-27) and is the one the
+      README prints with its verification steps, and no release from a commit that touches no binary
       path.
 - [ ] AC-28: `michielvha/vh-adlc` is the public successor of `michielvha/claude-plugins`, public only after a
       recorded history audit the owner confirmed; `vh-adlc@vhco-tools` and `github-app-registration@vhco-tools`
@@ -992,7 +996,7 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 | AC-24 | B rules-block fixtures; S3 |
 | AC-25 | S15; C lock shape |
 | AC-26 | S14 |
-| AC-27 | B; CI configuration review; on the first release, in an empty keyring, import `release-signing-key.asc`, compare `gpg --fingerprint` with the README, then `gpg --verify checksums.txt.sig checksums.txt`; a plugin-only commit on the default branch produces no release |
+| AC-27 | B; CI configuration review; on the first release, in an empty keyring, import `release-signing-key.asc`, compare `gpg --fingerprint` with the D-27 fingerprint and the README, `gpg --verify checksums.txt.sig checksums.txt`, then `sha256sum --check --ignore-missing checksums.txt` over at least one downloaded asset; a plugin-only commit on the default branch produces no release |
 | AC-28 | Recorded audit; S1 install of both plugins from the public repository in a profile with no GitHub credential |
 | AC-29 | S9; S10 worktree/handoff variants |
 | AC-30 | S9 claim commit; S13 docs-only/mixed commits and CI reports |
@@ -1296,4 +1300,5 @@ Read on 2026-10-17. Repository facts are cited inline.
 - [Copilot CLI command reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference): built-in slash commands including `/resume`, `/review`, `/tasks`, `/plan`; agent frontmatter fields.
 - [github/copilot-sdk](https://github.com/github/copilot-sdk): drives the Copilot CLI engine; plugins kept in `copilot-cli` mode.
 - [GoReleaser signing](https://goreleaser.com/customization/sign/): `artifacts: checksum` signs the checksum files only; the default signature name is `${artifact}.sig`.
+- [GitHub Actions workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idstepsshell): `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`.
 - [Agent Plugins specification](https://github.com/agentplugins/agent-plugins-spec): only skills and MCP are portable; not adopted in v1.
