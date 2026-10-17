@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft. Reviews R-1 and R-2 applied; the owner chose the post-release completion path. Awaiting the next independent review."
+status_description: "Draft. Reviews R-1 to R-4 applied; the owner chose the post-release completion path (parent D-29). Awaiting the next independent review."
 issue: null
 goal: "A released, signed vh-adlc binary that answers every mechanical question of the development loop from the files and Git alone, byte-identically for identical inputs."
 covers:
@@ -105,7 +105,7 @@ Every command except `--version` takes `--repo <dir>` (default `.`), `--plugin-p
 40 hexadecimal characters), `--offline`, and the test-only `--docs-source <path>`. `--repo` is resolved
 to `git rev-parse --show-toplevel` before any path is read, and document paths are relative to that
 root. The parent's table shows `--plugin-pin` only on `knowledge`; this is a deliberate extension,
-because every document command resolves knowledge itself, so the phase-4 skills pass the pin on every
+because every document command resolves knowledge itself, so the plugin's skills pass the pin on every
 call. Flags may come before or after the positional arguments: each command parses its flag set, moves
 the first remaining argument to its positional list, and parses again until no arguments remain, so
 the parent's `review check <doc> --review R-<n> --returned <file>` order works as written. A positional
@@ -350,11 +350,11 @@ AC-13 and AC-15 evidence lines and T24's line only, never into a normative secti
 the acceptance. The merge makes the feature's own covered files drift against the earlier spec review
 (the parent's "cannot cause it" holds only until the merge, a gap D-29 records), so a drift-only spec
 review at E comes first; `E...M` is empty, so it is fresh, and the unchanged baseline keeps the
-acceptance. An implementation review at E then observes the published release and the committed
-values. Commit C holds both Review Log rows, the ticks, the flip to `complete` and the line from the
-released `vh-adlc gate complete`, and the rows say the steps ran by hand. E and C, both docs-only and
-each with the skip-CI marker (D-23), are pushed to the default branch as a fast-forward. Parent T17
-copies the recorded values into the lock.
+acceptance. An implementation review at E then observes the published release and the committed values.
+Commit C holds both Review Log rows with their record subsections, the ticks, the flip to `complete` and
+the line from the released `vh-adlc gate complete`, and the rows say the steps ran by hand. E and C,
+both docs-only and each with the skip-CI marker (D-23), are pushed to the default branch as a
+fast-forward. Parent T17 copies the recorded values into the lock.
 
 ## Acceptance Criteria
 
@@ -482,8 +482,8 @@ copies the recorded values into the lock.
 - [ ] T24 `docs/specs/vh-adlc-binary.spec.md` - first release: the PR merged by merge commit under its
       own approval, the release workflow run, the AC-13 and AC-15 checks run on the published assets,
       version and digests recorded here, the post-merge drift-only spec review, the post-release
-      implementation review and the completion commit pushed to the default branch, as Delivery
-      describes (AC-13, AC-15)
+      implementation review, and the evidence commit E and the completion commit C pushed to the default
+      branch, as Delivery describes (AC-13, AC-15)
 
 ## Open Questions
 
