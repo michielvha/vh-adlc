@@ -1185,6 +1185,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-18 | spec | `0546d25` | fable | procedural | Review of the whole D-27 change against the last acceptance. One should-fix finding (README verification steps fail on macOS, unscoped fingerprint check) and three nits. Nothing blocking. |
 | 2026-10-17 | R-19 | spec | `d5d1ab0` | fable | procedural | Diff-only check of the R-18 fixes. No findings. |
 | 2026-10-17 | R-19 | spec | `d5d1ab0` | n/a | n/a | accepted by owner |
+| 2026-10-17 | R-20 | spec | `031b595` | fable | procedural | Diff-only review of the D-28 prose guide revision. Four should-fix findings (proof only checks dashes and the report's own claim, run reports uncovered, checker rule needs judgement, older pins now stop) and four nits. Nothing blocking. |
 
 ### R-14
 
@@ -1332,6 +1333,64 @@ PROPOSAL: Rewrap the sentence at the paragraph's width.
 ### R-19
 
 NO FINDINGS
+
+### R-20
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-32; Test Plan AC-32 row
+EVIDENCE: AC-32 (docs/specs/personal-development-loop.spec.md:918-921) requires that the prose "is edited with the humanize prose guide", but its proof row (line 1015) observes only a static guide reference in skill text, a dash scan, the run report naming the guide and revision, and `vh-adlc review check`. The guide at the pin lists 24 numbered patterns and the scan covers one rule (§8, `guides/humanize-prose.md:160-162`); "names the guide" is the model's own summary, which the spec itself rejects as evidence for AC-22 ("never from the model's own summary", line 951-952). A run that writes "not just X but Y" prose with a closer after every section and prints "edited with guides/humanize-prose.md@e4d58d2" ticks every box.
+PROPOSAL: Make the end state observable the way AC-19 does: seed the S6, S9 and S13 fixture inputs (issue body, scripted owner turns) with canary tells from §1, §2, §6 and §8 of the guide at the pin (for example a "not just X, but Y" sentence, "Let that sink in.", a ` -- ` dash), fail the scan if any survives in the loop's committed or posted text, and treat "names the guide and revision" as the AC-03-style citation requirement rather than as proof of editing.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Owner decisions D-28; Operations (intro); Acceptance Criteria AC-32; Test Plan AC-32 row
+EVIDENCE: D-28 (line 95) covers "feature-document prose, commit messages, PR and issue bodies, review summaries and run reports". The Operations trigger (line 671-673) is "Before it commits or posts prose a reader will see", which excludes run reports (reported, neither committed nor posted). AC-32 (line 918-919) lists "commit message, PR body, issue update and feature-document prose section" and omits review summaries and run reports, and the proof row (line 1015) scans only "the commits, PR and issue text and changed feature documents". Two of the six kinds the owner decided on have no requirement and no proof.
+PROPOSAL: Widen the Operations trigger to "before it commits, posts or reports prose a reader will see", add review summaries and run reports to AC-32, and extend the scan to the captured run reports and Review Log Outcome cells of S6, S9, S11 and S13.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan (checker paragraph); Tasks T14
+EVIDENCE: The new checker rule reads "each skill that commits or posts prose names the humanize prose guide" (line 929-930), which asks a deterministic `bun test` to decide which skills commit or post prose. By the Operations section every operation ends with a report (line 670-671), `investigate` posts issue summaries (line 677), `spec`, `tasks`, `implement`, `review` and `ship` commit, and `resume` continues the next step, so the set is all seven, but the sentence leaves the checker to infer it, and T14 (line 1112) inherits the ambiguity as "prose guide reference".
+PROPOSAL: Write "every skill names the humanize prose guide" in the checker paragraph and T14, so the rule is a fixed list rather than a judgement.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Knowledge boundary, Resolution procedure; Operations (intro); Test Plan S2
+EVIDENCE: Every operation now edits prose "with the humanize prose guide at the resolved pin" (line 672), and `vh-adlc knowledge` returns `missing-page` for any requested page absent at the pin, "Every operation, first, passing the pages it will read" (line 312), with D-18 forbidding mixed reads. `git -C /home/m/code/vhco-pro-docs ls-tree 25c463c guides/` has no `humanize-prose.md`, so a repository pinned at the phase 1 SHA or earlier stops every operation, including read-only `investigate`, with `missing-page` until its pin is bumped. The diff does not state this consequence, S2 (line 967) tests only "pin lacking the standard", and nothing says whether the guide is in every operation's page list.
+PROPOSAL: State under Resolution procedure or Operations that `guides/humanize-prose.md` is a required page for every operation, so a repository pin older than `e4d58d2` stops with the pin-bump recommendation (D-18), and add "pin lacking the guide" to S2's variants (or state that the standard-lacking variant stands for it).
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T8 (evidence) versus T13 and Implementation Phases item 1
+EVIDENCE: T8's ticked evidence (line 1083) still reads "That SHA [`25c463c...`] is the plugin pin for `plugins/vh-adlc/knowledge.md` (T13)", while T13 (line 1108-1109) now onboards with "the D-28 pin (`e4d58d2`)" and phase 1 (line 1024-1025) says the pin moved. The historical tick may stay, but its evidence asserts a current fact the document contradicts.
+PROPOSAL: Append "(moved to `e4d58d2` by D-28)" to T8's evidence line.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope; Design, Docs changes (phase 1)
+EVIDENCE: Scope lists "The `vhco-pro/docs` changes the loop depends on (see Docs changes)" (line 106), and the Docs changes table (line 174-183) is the only inventory of those changes. The loop now depends on `guides/humanize-prose.md` and the "Prose a reader sees" section of `conventions/documentation.md`, both delivered by vhco-pro/docs#5 (`git -C /home/m/code/vhco-pro-docs diff 25c463c e4d58d2 --stat`: `conventions/documentation.md | 7 +`, `guides/humanize-prose.md | 432 +`), which no row, task or evidence line in the spec records.
+PROPOSAL: Add one row to the Docs changes table (or a sentence under it) naming the guide and the documentation-convention section as delivered by vhco-pro/docs#5 after phase 1, merged at `e4d58d2`.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan (checker paragraph); Acceptance Criteria AC-32
+EVIDENCE: The checker list says "no em dash" (line 929) and T14 says "em dash" (line 1111), while AC-32 forbids "an em or en dash" (line 920) and the guide's §8 at the pin also bans en dashes and ` -- ` used as a dash (`guides/humanize-prose.md:162`). The package check and the output check therefore enforce different dash rules under one guide.
+PROPOSAL: Write "no em or en dash" in the checker paragraph and T14, and let the AC-32 scan also match ` -- ` so it follows §8 as pinned.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria AC-32 versus AC-14
+EVIDENCE: AC-32's last clause, "stored review records stay exactly as the reviewer returned them" with proof "`vh-adlc review check` in S11" (line 920-921, 1015), restates AC-14's "stores them verbatim (confirmed by `vh-adlc review check`)" with the same proof (line 862-864, 997). One fact now needs two implementation-review records that must agree.
+PROPOSAL: Drop the verbatim clause and the `review check` proof from AC-32 and keep the exclusion in D-28 and the Operations sentence, where it already lives.
 
 ## Sources
 
