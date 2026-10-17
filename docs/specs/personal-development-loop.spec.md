@@ -85,7 +85,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-19 | Docs unreachable means stop and report, as the docs `AGENTS.md` requires. |
 | D-20 | Feature documents are committed and pushed to the default branch until implementation starts; code is built on a feature branch. While the document has no `branch` field, invoking `spec` or `tasks`, and `implement`'s claim commit, carry that docs-only push; once it has a `branch`, its commits stay on the feature branch and are pushed only on ship. |
 | D-21 | `michielvha/vh-adlc` is public, so the marketplace and the release assets install without a credential, and v1 ships all seven commands. |
-| D-22 | One repository for everything: `michielvha/claude-plugins` is renamed to `michielvha/vh-adlc` and made public. It holds the `vhco-tools` marketplace, every plugin in it (`vh-adlc` and `github-app-registration`), the binary and this spec. |
+| D-22 | One repository for everything: the public `michielvha/vh-adlc`, the successor of `michielvha/claude-plugins`, recreated on 2026-10-17 with a single-commit history at the owner's request. It holds the `vhco-tools` marketplace, every plugin in it (`vh-adlc` and `github-app-registration`), the binary and this spec. |
 | D-23 | Docs-only feature-document deliveries, including the claim and first-run Markdown onboarding files, use the delivery convention's skip-CI marker. The commit, outgoing push range and feature PR diff must all be documentation-only; a docs-only final commit must not suppress CI for code, tests, workflows or other non-documentation changes shipped with it. |
 | D-24 | Bun is the default for JavaScript tooling and tests going forward, including this repository's checker (`tests/vh-adlc` in `michielvha/vh-adlc`); `vhco-pro/docs` keeps its Node checker under the keep-the-runtime clause. Phase 1 removes the conflicting Node 24 requirement for that tooling. Migrating unrelated existing projects or changing `github-app-registration` is not part of this feature. |
 | D-25 | Host-created isolated worktrees are supported, with concurrent work on separate features and one writer per feature branch. Another session resumes the same feature only through an explicit owner-confirmed handoff. The plugin discovers existing worktrees but does not create, remove or force-move them, and claims are not distributed locks. |
@@ -95,7 +95,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 
 In scope:
 
-- Renaming `michielvha/claude-plugins` to `michielvha/vh-adlc` and making it public (see
+- Replacing `michielvha/claude-plugins` with the public `michielvha/vh-adlc` (see
   [One repository](#one-repository)).
 - `plugins/vh-adlc/`: seven operations, one reviewer agent, the binary lock and installer.
 - The binary at the repository root (`cmd/`, `internal/`, `go.mod`), its tests and its release.
@@ -109,7 +109,8 @@ Out of scope, by name:
 
 - VS Code's Claude harness as a separately evidenced surface.
 - Windows builds of the binary (v1: darwin and linux, amd64 and arm64).
-- Any change to `plugins/github-app-registration/`, or to any other repository's own agents, commands or documents.
+- Any change to `plugins/github-app-registration/`, or to the agents, commands or documents of any repository other than `vhco-pro/docs` and
+  `michielvha/vh-adlc`.
 - Hooks, approval automation, a tracker, a database, a workflow runtime, a knowledge mapper, a scaffolder,
   worktree creation or removal, distributed locks, container management, and any language-specific rule.
   Reading existing host-managed worktrees and resuming in the owning worktree are in scope.
@@ -446,34 +447,38 @@ and bootstrap guide at the resolved docs pin require:
 .claude-plugin/marketplace.json   # marketplace "vhco-tools", unchanged name
 plugins/
   vh-adlc/                         # this plugin
-  github-app-registration/        # unchanged, moved with the rename
+  github-app-registration/        # unchanged, carried over
 cmd/vh-adlc/  internal/  go.mod    # the binary
 tests/vh-adlc/                     # checker, fixtures, scenarios, evidence
 docs/specs/                       # feature documents, declared in AGENTS.md
 AGENTS.md  CLAUDE.md  .github/
 ```
 
-The move is a rename, not a new repository: GitHub keeps the history, issues and PRs and redirects the
-old URL, and the marketplace name `vhco-tools` stays, so `vh-adlc@vhco-tools` and
-`github-app-registration@vhco-tools` keep their install identifiers. No root `plugin.json` exists (see
+`michielvha/vh-adlc` is a new public repository whose history starts at one commit; `michielvha/claude-plugins`
+no longer exists and its URL does not redirect. The marketplace name `vhco-tools` stays, so
+`vh-adlc@vhco-tools` and `github-app-registration@vhco-tools` keep their install identifiers; a host that
+added the marketplace by the old repository name adds it again as `michielvha/vh-adlc`. No root `plugin.json` exists (see
 [Hosts](#hosts)). The root `go.mod` does not affect plugin loading, because each marketplace entry's
 `source` points at its own `plugins/<name>` directory.
 
 Going public, in this order:
 
 1. Audit the full history (every commit on every ref) for credentials and private content, at the commit
-   that goes public, and record that SHA with the result.
+   that goes public, and record that SHA with the result. Recorded on 2026-10-17 at `25529ab` (refs:
+   `main` only; one commit): no credentials, the only key-shaped strings are the fake
+   `github-app-registration` test fixtures; one identity, `michielvha`; no employer, work-account or
+   earlier private-tool identifiers.
 2. The owner confirms the audit result. A history rewrite is a destructive action needing its own
    approval.
-3. Rename the repository, then change its visibility. Both are owner-authorised actions outside any
-   feature's scope.
-4. In disposable profiles for each claimed host, refresh the marketplace so it resolves the new URL,
-   and verify the existing `github-app-registration` plugin installs without credentials. The redirect
-   makes this a refresh, not a reinstall. Dual-plugin installation is verified in phase 7, after
+3. Publish the audited history as the public `michielvha/vh-adlc`. On 2026-10-17 the owner chose to reset
+   the history to one commit and to delete and recreate the repository, so no earlier commit stays
+   reachable by SHA. Each of these is an owner-authorised action outside any feature's scope.
+4. In disposable profiles for each claimed host, add the marketplace as `michielvha/vh-adlc` and verify
+   the existing `github-app-registration` plugin installs without credentials. Dual-plugin installation is verified in phase 7, after
    `vh-adlc` exists; updating the owner's own profiles remains a separate owner action.
 
 Making the marketplace public also removes the credential every host and remote session needed to read
-the private `claude-plugins`.
+the former private `claude-plugins`.
 
 ### Hosts
 
@@ -554,8 +559,8 @@ tests/vh-adlc/                     # at the repository root, so hosts never inst
 | ship | `vh-adlc-ship` | `/vh-adlc-ship` |
 | resume | `vh-adlc-resume` | `/vh-adlc-resume` |
 
-On 2026-10-17 none of these is a Claude Code or Copilot CLI built-in, and none matches a skill in the
-other plugins the owner uses. Hosts that need the namespaced form (`/vh-adlc:vh-adlc-spec`) get
+On 2026-10-17 none of these is a Claude Code or Copilot CLI built-in, and no plugin installed on the owner's machine on 2026-10-17 provides a `vh-adlc-*`
+skill. Hosts that need the namespaced form (`/vh-adlc:vh-adlc-spec`) get
 it documented in the README from the tested run.
 
 ### Activation
@@ -873,7 +878,7 @@ stated.
       `cmd`/`internal` layout, anchored binary ignore, test, vet and lint gates before release, actions
       pinned to full SHAs, released platforms equal to the lock's, and no release from a commit that
       touches no binary path.
-- [ ] AC-28: `michielvha/vh-adlc` is the renamed former `michielvha/claude-plugins`, public only after a
+- [ ] AC-28: `michielvha/vh-adlc` is the public successor of `michielvha/claude-plugins`, public only after a
       recorded history audit the owner confirmed; `vh-adlc@vhco-tools` and `github-app-registration@vhco-tools`
       install from it on every claimed host without a credential.
 - [ ] AC-29: Different features progress concurrently in separate host-managed worktrees; same-feature
@@ -1002,7 +1007,8 @@ feature at acceptance.
 
 Guardrails: work only in `vhco-pro/docs` and `michielvha/vh-adlc`; never
 install, update or disable a plugin in the owner's own profiles (use isolated profiles and
-`--plugin-dir`); do not touch any other repository's own agents or commands, and change nothing in `plugins/github-app-registration/` beyond what the rename moves; resolve the docs pin before
+`--plugin-dir`); do not touch the agents, commands or documents of any repository other than `vhco-pro/docs` and
+`michielvha/vh-adlc`, and change nothing in `plugins/github-app-registration/` beyond what the rename moves; resolve the docs pin before
 writing any skill text, and treat any convention you are tempted to write into a skill or the binary as a
 missing docs page.
 
@@ -1137,6 +1143,37 @@ them is current. Review IDs continue from R-14.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-17 | R-14 | spec | `b016cf5` | fable | procedural | Review of the scrub against the last clean version. One blocking finding (Design still described a rename with a redirect after the repository was recreated) and three further findings. Applied. |
+
+### R-14
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, One repository (and AC-28), versus the T10 and T11 evidence recorded by this diff
+EVIDENCE: Design still says "The move is a rename, not a new repository: GitHub keeps the history, issues and PRs and redirects the old URL" and in step 4 "The redirect makes this a refresh, not a reinstall." The T10 evidence added by the diff says the repository was "deleted and recreated as public so no earlier commit stays reachable by SHA; every earlier SHA tested returns 422 and the old `claude-plugins` URL returns 404", and the T11 evidence says "Because the old URL no longer redirects, a host that added the marketplace as `michielvha/claude-plugins` re-adds it as `michielvha/vh-adlc`." Live check: `gh api repos/michielvha/claude-plugins` returns 404. AC-28 ("is the renamed former `michielvha/claude-plugins`") rests on the same continuity. A normative mechanism the spec relies on (the redirect, which phase 7's install/update instructions build on) is contradicted by the ticked tasks' own evidence, so accepting this revision would accept a Design statement known to be false.
+PROPOSAL: Rewrite the One repository paragraph and step 4 to state what is true: a recreated public repository, no history, no redirect, hosts re-add the marketplace under the new name; reword AC-28 to "the public successor of" (or similar) rather than "the renamed former", and add step 3b for the delete-and-recreate the owner approved.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope, out-of-scope bullet 3
+EVIDENCE: The scrub changed "or to <one repository>'s agents, commands or documents" to "or to any other repository's own agents, commands or documents". Scope's in-scope list says "The `vhco-pro/docs` changes the loop depends on", and phase 1 (T1 to T8) edits that repository's documents including its `AGENTS.md` and `README.md`. Read literally the out-of-scope bullet now excludes work the same section puts in scope; this is a normative change beyond wording, since the original named one repository and the new text names every other repository.
+PROPOSAL: Write "or to the agents, commands or documents of any repository other than `vhco-pro/docs` and `michielvha/vh-adlc`"; apply the same qualifier to the Guardrails sentence ("do not touch any other repository's own agents or commands"), which T7's `AGENTS.md` edit otherwise contradicts.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, One repository step 1, and Tasks T9
+EVIDENCE: Step 1 says "record that SHA with the result", and T9's done condition reads "SHA and result recorded under [One repository](#one-repository) (AC-28)". The diff removed the earlier inline record from One repository (the "A first measurement on 2026-10-17 ..." sentences) and did not put the `25529ab` record there; the audit result now exists only in T9's `Evidence:` line under Tasks. T9 is ticked against a done condition the tree does not satisfy, and AC-28's "recorded history audit" has no record in the section it points at.
+PROPOSAL: Add the one-sentence audit record (`25529ab`, refs, result) under One repository step 1, or change T9's done condition to say the record lives in its evidence line.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Operation names
+EVIDENCE: "none matches a skill in the other plugins the owner uses" replaced a claim scoped to one named plugin on the owner's work machine. The claim is now wider and was not re-verified in this run (the paragraph is dated 2026-10-17 and lists no plugin). It holds for the plugin set loaded on this workstation today (no `vh-adlc-*` skill in any installed plugin; plugin names redacted at the owner's request), but it is a Design-section fact with a broader reach than its evidence.
+PROPOSAL: Either keep the claim to hosts' built-ins only, or say "no plugin installed on the owner's machine on 2026-10-17 provides a `vh-adlc-*` skill" so the reach matches what was checked.
 
 ## Sources
 
