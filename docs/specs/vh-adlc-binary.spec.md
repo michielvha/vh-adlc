@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "In implementation on feat/vh-adlc-binary; accepted against review R-8. Tasks T1 to T23 built; T24 (the first release) follows the merge."
+status_description: "In implementation on feat/vh-adlc-binary; accepted against review R-8. Tasks T1 to T23, T25 and T26 built; T24 (the first release) follows the merge."
 issue: null
 branch: feat/vh-adlc-binary
 goal: "A released, signed vh-adlc binary that answers every mechanical question of the development loop from the files and Git alone, byte-identically for identical inputs."
@@ -396,7 +396,8 @@ fast-forward. Parent T17 copies the recorded values into the lock.
       `vhco-pro/docs` pages at a full SHA.
       Evidence: `go test ./cmd/vh-adlc -run Boundary` and `./internal/knowledge`, `24bbdfb`, no file in
       the fixture (including .git) or HOME changes and every request path matches
-      /vhco-pro/docs/<sha>/<page>, the live cache location is covered by the knowledge tests only
+      /vhco-pro/docs/<sha>/<page>; the live cache path under XDG_CACHE_HOME is covered by
+      TestUserCacheDir from `8a44c96`
 - [x] AC-05: For each gate target, a fixture failing each listed condition alone yields `fail` with
       exactly that condition, a fixture failing several lists all of them, a disallowed transition adds
       `transition-not-allowed`, a gate to the current status re-checks conditions only, and a passing
@@ -444,10 +445,14 @@ fast-forward. Parent T17 copies the recorded values into the lock.
       only, logic is under `internal/`, the binary ignore is `/vh-adlc`, and CI runs the format, vet,
       test, build and both lint gates on every pull request and before every release, with every action
       pinned to a full SHA.
+      Evidence: R-9 not verified: every check passed locally at `b985ccc`, but the pull request's CI run
+      has not happened yet.
 - [ ] AC-13: The first release publishes `vh-adlc_<version>_<os>_<arch>.tar.gz` for darwin and linux on
       amd64 and arm64, `checksums.txt` and `checksums.txt.sig`, and the signature verifies against the
       committed `release-signing-key.asc`, whose primary fingerprint is
       `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, by the README's steps.
+      Evidence: R-9 not verified: the key file and a locally signed snapshot check out, but no release
+      exists yet.
 - [x] AC-14: The release workflow is triggered by pushes that change a binary path and by manual
       dispatch only, so a commit touching no binary path cuts no release, and a run whose computed
       version is already tagged ends without running GoReleaser.
@@ -458,6 +463,7 @@ fast-forward. Parent T17 copies the recorded values into the lock.
       released binary's build information names module `github.com/michielvha/vh-adlc` at `v<version>`
       with `vcs.modified=false`, and the version and both digests per platform are recorded for the
       parent's lock.
+      Evidence: R-9 not verified: the version wiring works in a snapshot, but no release exists yet.
 
 ## Test Plan
 
@@ -553,6 +559,13 @@ fast-forward. Parent T17 copies the recorded values into the lock.
       Questions section, as R-6 F-01 required; the new test fails first, then passes (AC-05)
       Evidence: test commit `8ec105c` failed ("a question heading outside Open Questions counted"), fix
       commit `8201374` passes with the full suite.
+- [x] T26 `internal/doc/`, `cmd/vh-adlc/`, `internal/knowledge/knowledge_test.go`, `internal/gate/gate_test.go`,
+      `go.mod`, `.github/workflows/` - the R-9 findings: lint errors on an unreadable Git history, find
+      honours local-format, go.mod is tidy and CI checks it, the live cache path, the literal exit table
+      and the shared gate conditions on every target are tested (AC-01, AC-02, AC-04, AC-05, AC-08,
+      AC-12)
+      Evidence: test commit `8a44c96` failed to compile against the old Lint; fix commit `a4f2452` passes the full
+      suite, golangci-lint and actionlint, and go mod tidy -diff is clean.
 
 ## Open Questions
 
