@@ -188,7 +188,7 @@ The codes are API and are added only by a minor release. Knowledge: `invalid-pin
 `commit-unreachable`, `baseline-changed`, `covered-drift`, `covered-changed`, `feature-tree-dirty`,
 `default-branch-unknown`. Git: `git-too-old`. Gate: `transition-not-allowed`, and one finding per
 failing condition whose code is the condition's name (`no_open_questions`, `accepted` and so on). Review
-check: `review-not-found`, `records-differ`. Usage: `usage`.
+check: `review-not-found`, `records-differ`. Usage: `usage`. Any other internal or IO failure: `error`.
 
 ### Knowledge
 
@@ -222,9 +222,13 @@ A `next` rule's `status` is one status or a list, and its optional `when` is `<c
 The capture groups the binary reads are part of schema 1, like the condition vocabulary: in
 `criterion_line` and `task_line`, group 1 is the tick and group 2 the ID; in `record_criterion`, group 1
 is the ID; in `feature_root.declaration`, group 1 is the path; in `residual_line`, group 1 is the
-tracker. A pattern with fewer groups than this is `rules-pattern-invalid`. The standard does not yet
+tracker. A pattern with fewer groups than this is `rules-pattern-invalid`. Schema 1 also fixes the
+meaning of a few values the binary reads by name: the review kinds `spec` and `implementation`, the
+severity `blocking` (the only one that makes a spec review unclean), the verdict `met`, and the Review
+Log columns `Review`, `Kind`, `Commit`, `Model`, `Isolation` and `Outcome`, which it finds by name in
+`review_log_columns`. The Test Plan's criterion cell is its first column. The standard does not yet
 state this contract, which is a docs gap under the parent's hard rule 5; the proposed fix is one
-sentence under the standard's Rules section, delivered with the next `vhco-pro/docs` change.
+paragraph under the standard's Rules section, delivered with the next `vhco-pro/docs` change.
 
 Record completeness uses only the patterns the block provides. A spec-review subsection is well formed
 when every line matching `record_finding` is followed, before the next such line, by exactly one line
@@ -235,10 +239,12 @@ whose next line matches `record_verdict`.
 ### Document model
 
 `internal/doc` splits the frontmatter from the body and splits the body at `## ` headings outside
-fenced code blocks. It extracts criteria with their folded text (the parent's folding rule), tasks,
-the Test Plan table whose header equals `test_plan.columns`, Review Log rows, and each `### R-<n>`
-subsection: the lines after the heading up to the next heading of any level, without leading and
-trailing blank lines.
+fenced code blocks. Section names are used only for `required_sections` and `normative_sections`; the
+rest is found by pattern anywhere in the body outside fenced code blocks: criteria with their folded
+text (the parent's folding rule), tasks, open questions, the first table whose header equals
+`test_plan.columns`, the first whose header equals `review_log_columns`, and each `### R-<n>`
+subsection, which is the lines after the heading up to the next heading of any level, without leading
+and trailing blank lines.
 
 An annotation is a line matching `evidence_line` or `residual_line` plus every following line that
 matches `criterion_continuation`, up to the next list item or annotation, so wrapped evidence is one
