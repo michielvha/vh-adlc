@@ -12,99 +12,48 @@ import (
 	"github.com/michielvha/vh-adlc/internal/testrepo"
 )
 
+const revision = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a"
+
 const (
-	docPath   = "docs/f.md"
-	logHeader = "| Date | Review | Kind | Commit | Model | Isolation | Outcome |\n| --- | --- | --- | --- | --- | --- | --- |\n"
-	revision  = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a"
-	ac1       = "The first end state, wrapped onto a second line."
-	ac2       = "The second end state."
+	ac1 = testrepo.AC1
+	ac2 = testrepo.AC2
 )
 
 func implRecords(lines ...string) string { return strings.Join(lines, "\n") }
 
-func rec(id, text, verdict string) string {
-	return "CRITERION: " + id + " " + text + "\nVERDICT: " + verdict + "\nEVIDENCE: observed\n"
-}
-
-var allMet = implRecords(rec("AC-01", ac1, "met"), rec("AC-02", ac2, "met"))
+var (
+	rec    = testrepo.Record
+	allMet = testrepo.AllMet
+)
 
 type fixture struct {
-	t    *testing.T
-	repo *testrepo.Repo
-	r    *rules.Rules
-	text string
-	x    string // the reviewed commit
+	*testrepo.Feature
+	t *testing.T
+	r *rules.Rules
 }
 
-// planned builds a draft document with a clean spec review and an acceptance
-// at commit x, pushed to origin.
-func planned(t *testing.T) *fixture {
-	t.Helper()
-	return plannedFrom(t, testrepo.File("docs/conforming.md"))
-}
-
-// plannedFrom is planned with the given document text as the reviewed one.
-func plannedFrom(t *testing.T, text string) *fixture {
+func wrap(t *testing.T, f *testrepo.Feature) *fixture {
 	t.Helper()
 	r, err := rules.Parse([]byte(testrepo.Standard()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &fixture{t: t, repo: testrepo.New(t), r: r, text: text}
-	f.repo.Write(docPath, f.text)
-	f.repo.Write("src/a.go", "package a\n")
-	f.x = f.repo.Commit("fixture")[:7]
-	f.row("R-1", rules.KindSpec, f.x, "fable", "procedural", "Review.", "NO FINDINGS")
-	f.row("R-1", rules.KindSpec, f.x, "n/a", "n/a", "accepted by owner", "")
-	f.repo.Commit("accept")
-	f.repo.AddRemote()
-	return f
+	return &fixture{Feature: f, t: t, r: r}
 }
 
-// complete extends planned to an in-progress document on branch feat with
-// every criterion met and a clean implementation review.
-func complete(t *testing.T) *fixture {
+func planned(t *testing.T) *fixture {
 	t.Helper()
-	f := planned(t)
-	f.repo.Git("switch", "-q", "-c", "feat")
-	f.edit("status: draft", "status: in-progress\nbranch: feat")
-	f.repo.Write("src/a.go", "package a // built\n")
-	built := f.repo.Commit("build")[:7]
-	f.edit("- [ ] AC-01: ", "- [x] AC-01: ")
-	f.edit("      wrapped onto a second line.\n", "      wrapped onto a second line.\n      Evidence: go test, abc1234, passed, none\n")
-	f.edit("- [ ] AC-02: The second end state.\n", "- [x] AC-02: The second end state.\n      Evidence: manual, abc1234, passed, none\n")
-	f.row("R-2", rules.KindImplementation, built, "fable", "procedural", "Review.", allMet)
-	f.repo.Commit("record")
-	return f
+	return plannedFrom(t, testrepo.File("docs/conforming.md"))
 }
 
-func (f *fixture) edit(from, to string) {
-	f.t.Helper()
-	if !strings.Contains(f.text, from) {
-		f.t.Fatalf("document has no %q", from)
-	}
-	f.text = strings.Replace(f.text, from, to, 1)
-	f.repo.Write(docPath, f.text)
-}
+func plannedFrom(t *testing.T, text string) *fixture { return wrap(t, testrepo.Planned(t, text)) }
 
-func (f *fixture) row(id, kind, commit, model, isolation, outcome, records string) {
-	f.t.Helper()
-	line := "| 2026-01-01 | " + id + " | " + kind + " | `" + commit + "` | " + model + " | " + isolation + " | " + outcome + " |\n"
-	i := strings.Index(f.text, logHeader) + len(logHeader)
-	for strings.HasPrefix(f.text[i:], "|") {
-		i += strings.Index(f.text[i:], "\n") + 1
-	}
-	f.text = f.text[:i] + line + f.text[i:]
-	if records != "" {
-		f.text += "\n### " + id + "\n\n" + records + "\n"
-	}
-	f.repo.Write(docPath, f.text)
-}
+func complete(t *testing.T) *fixture { return wrap(t, testrepo.Complete(t)) }
 
 func (f *fixture) gate(target string) (*Data, []report.Finding, report.Result) {
 	f.t.Helper()
-	g := gitcmd.Git{Dir: f.repo.Dir, Env: testrepo.Env(f.repo.Home)}
-	d := doc.Parse(docPath, []byte(f.text), f.r)
+	g := gitcmd.Git{Dir: f.Dir, Env: testrepo.Env(f.Home)}
+	d := doc.Parse(testrepo.FeaturePath, []byte(f.Text), f.r)
 	if len(d.Shape) > 0 {
 		f.t.Fatalf("fixture is malformed: %+v", d.Shape)
 	}
@@ -139,20 +88,20 @@ func TestPlannedGate(t *testing.T) {
 		t.Fatalf("data = %+v", data)
 	}
 	cases := map[string]func(f *fixture){
-		"no_open_questions": func(f *fixture) { f.edit("## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Which?\n") },
+		"no_open_questions": func(f *fixture) { f.Edit("## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Which?\n") },
 		"spec_review_fresh": func(f *fixture) {
-			f.repo.Write("src/drift.go", "package a\n")
-			f.repo.Commit("drift")
-			f.repo.Git("push", "-q", "origin", "main")
-			f.repo.Git("reset", "-q", "--hard", "HEAD~1")
+			f.Write("src/drift.go", "package a\n")
+			f.Commit("drift")
+			f.Git("push", "-q", "origin", "main")
+			f.Git("reset", "-q", "--hard", "HEAD~1")
 		},
 		"spec_review_clean": func(f *fixture) {
-			f.row("R-2", rules.KindSpec, f.x, "fable", "procedural", "Review.", "FINDING: F-01\nKIND: factual\nSEVERITY: blocking\nWHERE: Design\nEVIDENCE: x\nPROPOSAL: y")
+			f.Row("R-2", rules.KindSpec, f.X, "fable", "procedural", "Review.", "FINDING: F-01\nKIND: factual\nSEVERITY: blocking\nWHERE: Design\nEVIDENCE: x\nPROPOSAL: y")
 		},
 		"accepted": func(f *fixture) {
-			f.edit("| 2026-01-01 | R-1 | spec | `"+f.x+"` | n/a | n/a | accepted by owner |\n", "")
+			f.Edit("| 2026-01-01 | R-1 | spec | `"+f.X+"` | n/a | n/a | accepted by owner |\n", "")
 		},
-		"on_feature_branch_if_set": func(f *fixture) { f.edit("status: draft", "status: draft\nbranch: feat") },
+		"on_feature_branch_if_set": func(f *fixture) { f.Edit("status: draft", "status: draft\nbranch: feat") },
 	}
 	for cond, mutate := range cases {
 		t.Run(cond, func(t *testing.T) {
@@ -176,21 +125,21 @@ func TestPlannedGate(t *testing.T) {
 	})
 	t.Run("a changed baseline breaks freshness and acceptance", func(t *testing.T) {
 		f := planned(t)
-		f.edit(ac2, "The second, revised end state.")
-		f.repo.Commit("revise")
+		f.Edit(ac2, "The second, revised end state.")
+		f.Commit("revise")
 		expect(t, f, "planned", "spec_review_fresh", "accepted")
 	})
 }
 
 func TestInProgressGate(t *testing.T) {
 	f := planned(t)
-	f.edit("status: draft", "status: planned")
+	f.Edit("status: draft", "status: planned")
 	expect(t, f, "in-progress")
 	t.Run("tasks_populated", func(t *testing.T) {
 		f := planned(t)
-		f.edit("status: draft", "status: planned")
-		f.edit("- [ ] T1 `src/a_test.go` - the failing test; fails because there is no code (AC-01)\n", "")
-		f.edit("- [ ] T2 `src/a.go` - the change; T1 passes (AC-01,\n      AC-02)\n", "")
+		f.Edit("status: draft", "status: planned")
+		f.Edit("- [ ] T1 `src/a_test.go` - the failing test; fails because there is no code (AC-01)\n", "")
+		f.Edit("- [ ] T2 `src/a.go` - the change; T1 passes (AC-01,\n      AC-02)\n", "")
 		expect(t, f, "in-progress", "tasks_populated")
 	})
 }
@@ -199,16 +148,16 @@ func TestCompleteGate(t *testing.T) {
 	expect(t, complete(t), "complete")
 	cases := map[string]func(f *fixture){
 		"all_met": func(f *fixture) {
-			f.edit("- [x] AC-02: The second end state.\n      Evidence: manual, abc1234, passed, none\n", "- [ ] AC-02: The second end state.\n")
+			f.Edit("- [x] AC-02: The second end state.\n      Evidence: manual, abc1234, passed, none\n", "- [ ] AC-02: The second end state.\n")
 		},
 		"impl_review_fresh": func(f *fixture) {
-			f.repo.Write("src/a.go", "package a // after review\n")
-			f.repo.Commit("late change")
+			f.Write("src/a.go", "package a // after review\n")
+			f.Commit("late change")
 		},
 		"impl_review_clean": func(f *fixture) {
-			f.row("R-3", rules.KindImplementation, f.repo.Git("rev-parse", "--short=7", "HEAD"), "fable", "procedural", "Review.", implRecords(rec("AC-01", ac1, "met")))
+			f.Row("R-3", rules.KindImplementation, f.Git("rev-parse", "--short=7", "HEAD"), "fable", "procedural", "Review.", implRecords(rec("AC-01", ac1, "met")))
 		},
-		"feature_tree_clean": func(f *fixture) { f.repo.Write("src/wip.go", "package a\n") },
+		"feature_tree_clean": func(f *fixture) { f.Write("src/wip.go", "package a\n") },
 	}
 	for cond, mutate := range cases {
 		t.Run(cond, func(t *testing.T) {
@@ -220,7 +169,7 @@ func TestCompleteGate(t *testing.T) {
 }
 
 func TestImplReviewClean(t *testing.T) {
-	head := func(f *fixture) string { return f.repo.Git("rev-parse", "--short=7", "HEAD") }
+	head := func(f *fixture) string { return f.Head() }
 	tests := []struct {
 		name    string
 		records string
@@ -235,7 +184,7 @@ func TestImplReviewClean(t *testing.T) {
 		{"text folds", implRecords(rec("AC-01", "The   first end state,  wrapped onto a second line.", "met"), rec("AC-02", ac2, "met")), nil, true},
 		{"not met", implRecords(rec("AC-01", ac1, "met"), rec("AC-02", ac2, "not met")), nil, false},
 		{"not verified with a residual", implRecords(rec("AC-01", ac1, "met"), rec("AC-02", ac2, "not verified")), func(f *fixture) {
-			f.edit("- [x] AC-02: The second end state.\n      Evidence: manual, abc1234, passed, none\n", "- [ ] AC-02: The second end state.\n      Residual: #12\n")
+			f.Edit("- [x] AC-02: The second end state.\n      Evidence: manual, abc1234, passed, none\n", "- [ ] AC-02: The second end state.\n      Residual: #12\n")
 		}, true},
 	}
 	for _, tt := range tests {
@@ -244,7 +193,7 @@ func TestImplReviewClean(t *testing.T) {
 			if tt.mutate != nil {
 				tt.mutate(f)
 			}
-			f.row("R-3", rules.KindImplementation, head(f), "fable", "procedural", "Review.", tt.records)
+			f.Row("R-3", rules.KindImplementation, head(f), "fable", "procedural", "Review.", tt.records)
 			data, _, _ := f.gate("complete")
 			if got := !slices.Contains(data.Failing, "impl_review_clean"); got != tt.clean {
 				t.Fatalf("impl_review_clean holds = %v, want %v; failing %q", got, tt.clean, data.Failing)
@@ -268,7 +217,7 @@ func TestSpecReviewClean(t *testing.T) {
 		finding("nit") + "\n" + "SEVERITY: nit": false,
 	} {
 		f := planned(t)
-		f.row("R-2", rules.KindSpec, f.x, "fable", "procedural", "Review.", records)
+		f.Row("R-2", rules.KindSpec, f.X, "fable", "procedural", "Review.", records)
 		data, _, _ := f.gate("planned")
 		if got := !slices.Contains(data.Failing, "spec_review_clean"); got != clean {
 			t.Errorf("records %q: clean = %v, want %v", records, got, clean)
@@ -300,7 +249,7 @@ func TestTransitions(t *testing.T) {
 	})
 	t.Run("re-check", func(t *testing.T) {
 		f := complete(t)
-		f.edit("status: in-progress", "status: complete")
+		f.Edit("status: in-progress", "status: complete")
 		data := expect(t, f, "complete")
 		if data.Transition != "re-check" {
 			t.Fatalf("transition = %q", data.Transition)
