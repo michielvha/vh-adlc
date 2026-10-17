@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Draft. Reviews R-1 to R-4 applied; the owner chose the post-release completion path (parent D-29). Awaiting the next independent review."
+status: planned
+status_description: "Accepted by the owner on 2026-10-17 against review R-5 at 9453719. Next: implementation on feat/vh-adlc-binary after the claim commit."
 issue: null
 goal: "A released, signed vh-adlc binary that answers every mechanical question of the development loop from the files and Git alone, byte-identically for identical inputs."
 covers:
@@ -497,6 +497,8 @@ None.
 | 2026-10-17 | R-2 | spec | `4673680` | fable | procedural | Review of the R-1 fixes. One blocking finding (the post-merge completion path is an exception to owner decision D-20 and needs the owner), four should-fix findings (post-merge drift, `git log` settings, fixture default branch, layout rule) and ten nits. |
 | 2026-10-17 | R-3 | spec | `cec987e` | fable | procedural | Review of the R-2 fixes and the owner's completion choice. Two should-fix findings (record the exception in the parent; name the two completion commits) and six nits. Nothing blocking. |
 | 2026-10-17 | R-4 | spec | `6c6c512` | fable | procedural | Diff-only check of the R-3 fixes and parent D-29. Four nits. Nothing blocking. |
+| 2026-10-17 | R-5 | spec | `9453719` | fable | procedural | Diff-only check of the R-4 fixes. No findings. |
+| 2026-10-17 | R-5 | spec | `9453719` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -841,6 +843,10 @@ SEVERITY: nit
 WHERE: Design, Invocation
 EVIDENCE: docs/specs/vh-adlc-binary.spec.md:107-109 "every document command resolves knowledge itself, so the phase-4 skills pass the pin on every call". R-3 F-05 corrected the same label in Delivery (:342-343 now says the review and ship skills arrive in "parent phases 6 and 7"), but the skills that call `gate`, `fresh` and `review check` span parent phases 4 to 7 (`vh-adlc-spec` T20 in phase 4, `vh-adlc-review` T28 in phase 6, `vh-adlc-ship` T30 in phase 7), so "phase-4 skills" is the same inaccuracy one section earlier. Not introduced by this diff, but it now sits beside the corrected sentence.
 PROPOSAL: Write "the plugin's skills pass the pin on every call" or "the skills of parent phases 4 to 7".
+
+### R-5
+
+NO FINDINGS
 
 ## Sources
 
