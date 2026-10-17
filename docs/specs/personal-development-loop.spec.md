@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revision D-28 in progress: the loop edits all reader-facing prose with the pinned humanize prose guide, and the plugin pin moves to e4d58d2. Accepted earlier against R-19 at d5d1ab0."
+status: planned
+status_description: "Re-accepted by the owner on 2026-10-17 against review R-22 at 6d7bb6c, after revisions D-27 (signed releases) and D-28 (humanize prose guide, plugin pin e4d58d2). Phases 1 and 2 done. Next: phase 3, the binary as a child feature."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
@@ -1195,6 +1195,8 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-19 | spec | `d5d1ab0` | n/a | n/a | accepted by owner |
 | 2026-10-17 | R-20 | spec | `031b595` | fable | procedural | Diff-only review of the D-28 prose guide revision. Four should-fix findings (proof only checks dashes and the report's own claim, run reports uncovered, checker rule needs judgement, older pins now stop) and four nits. Nothing blocking. |
 | 2026-10-17 | R-21 | spec | `0b0f42b` | fable | procedural | Diff-only check of the R-20 fixes. One should-fix finding (the canary scan would fail on verbatim review records; S11's seeded input unstated) and two nits. Nothing blocking. |
+| 2026-10-17 | R-22 | spec | `6d7bb6c` | fable | procedural | Diff-only check of the R-21 fixes. One nit (a long line in the Test Plan), left for the next revision because it sits in the normative baseline. Nothing blocking. |
+| 2026-10-17 | R-22 | spec | `6d7bb6c` | n/a | n/a | accepted by owner |
 
 ### R-14
 
@@ -1423,6 +1425,15 @@ SEVERITY: nit
 WHERE: Operations (intro); Test Plan fixtures paragraph; Test Plan checker paragraph
 EVIDENCE: `git -C /home/m/code/vh-adlc diff 471d4e6 0b0f42b` adds lines far from the surrounding 100-column wrap: line 675 ("...Before it commits, posts or reports") is 113 characters; line 943 ("feature document, a deliberate failing test, ... prose canary tells in issue bodies and") is 142 characters followed by a 23-character line "scripted owner turns; a" (line 944); line 934 "For AC-03 it scans the package for canary sentences" is 51 characters mid-paragraph. No em or en dash appears in the added lines.
 PROPOSAL: Rewrap the three paragraphs at the document's 100-column width.
+
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan fixtures/harness paragraph (fix for R-21 F-03)
+EVIDENCE: `git -C /home/m/code/vh-adlc show 6d7bb6c:docs/specs/personal-development-loop.spec.md | awk 'NR==957{print length($0)}'` prints 113 for "report, scans it, and discards it; `evidence/` keeps summaries only. AC-22 is asserted from the wrapper's log and", while every other line of the rewrapped paragraph (lines 943-961) is 92 to 103 characters. R-21 F-03 flagged a 113-character line in the Operations intro as "far from the surrounding 100-column wrap"; the fix removes that one and adds an equal-width line here. The three other rewrapped paragraphs are clean, the word diff shows no change beyond the intended additions ("(D-28)", the AC-32 capture sentence, "the wrapper's log"), and no em or en dash appears in the diff.
+PROPOSAL: Rewrap lines 956-961 so the AC-32 sentence and the AC-22 sentence break near 100 columns like the rest of the paragraph.
 
 ## Sources
 
