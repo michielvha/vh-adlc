@@ -1,7 +1,8 @@
 // Package doc parses a feature document with the patterns of the rules block.
-// Criteria, tasks, open questions, tables and review subsections are found by
-// those patterns anywhere outside fenced code blocks; section names come only
-// from the block's required and normative section lists.
+// Criteria, tasks, tables and review subsections are found by those patterns
+// anywhere outside fenced code blocks, and open questions inside the Open
+// Questions section. Other section names come only from the block's required
+// and normative section lists.
 package doc
 
 import (
@@ -15,6 +16,10 @@ import (
 	"github.com/michielvha/vh-adlc/internal/rules"
 	"go.yaml.in/yaml/v3"
 )
+
+// sectionOpenQuestions is the schema-1 section the no_open_questions
+// condition reads.
+const sectionOpenQuestions = "Open Questions"
 
 // Schema-1 names of the Review Log columns the binary reads.
 const (
@@ -341,8 +346,14 @@ func (d *Doc) parseTasks() {
 	}
 }
 
+// parseOpenQuestions finds open_question lines inside the Open Questions
+// section, as the standard's no_open_questions condition reads.
 func (d *Doc) parseOpenQuestions() {
-	for i := d.body; i < len(d.lines); i++ {
+	s := d.Section(sectionOpenQuestions)
+	if s == nil {
+		return
+	}
+	for i := s.start; i < s.end; i++ {
 		if d.open(i) && d.rules.Re.OpenQuestion.MatchString(d.lines[i]) {
 			d.OpenQuestions = append(d.OpenQuestions, i+1)
 		}
