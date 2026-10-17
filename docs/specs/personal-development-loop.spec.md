@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revision D-27 in progress: releases sign checksums.txt with the owner's key. Accepted earlier against review R-15 at 4cf3f92; phases 1 and 2 done. Needs a clean independent review and re-acceptance before phase 3."
+status: planned
+status_description: "Re-accepted by the owner on 2026-10-17 against review R-19 at d5d1ab0, after revision D-27 (signed releases). Phases 1 and 2 done; the release secret is set. Next: phase 3, the binary as a child feature."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
@@ -1172,6 +1172,8 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-16 | spec | `5c0330f` | fable | procedural | Diff-only review of the D-27 signing revision. Two should-fix findings (no published public key to verify against; action and template claims uncited) and two nits. Nothing blocking. |
 | 2026-10-17 | R-17 | spec | `9f1494d` | fable | procedural | Diff-only review of the R-16 fixes. Three should-fix findings (key identity, the fingerprint anchor, verification stopping at the checksum file) and two nits. Nothing blocking. One local path in F-01's evidence is redacted as `[redacted]`; the records are otherwise verbatim. |
 | 2026-10-17 | R-18 | spec | `0546d25` | fable | procedural | Review of the whole D-27 change against the last acceptance. One should-fix finding (README verification steps fail on macOS, unscoped fingerprint check) and three nits. Nothing blocking. |
+| 2026-10-17 | R-19 | spec | `d5d1ab0` | fable | procedural | Diff-only check of the R-18 fixes. No findings. |
+| 2026-10-17 | R-19 | spec | `d5d1ab0` | n/a | n/a | accepted by owner |
 
 ### R-14
 
@@ -1315,6 +1317,10 @@ SEVERITY: nit
 WHERE: Design, The binary in the repository (release bullet)
 EVIDENCE: Spec line 417, "`{{ .ProjectName }}_{{ .Version }}_SHA256SUMS`, is replaced by `checksums.txt`). Signing was requested (D-27), so the", is 120 columns wide in a paragraph wrapped at about 100 (the same class as R-15's wrap nit on the Operation names paragraph, which this revision rewrapped).
 PROPOSAL: Rewrap the sentence at the paragraph's width.
+
+### R-19
+
+NO FINDINGS
 
 ## Sources
 
