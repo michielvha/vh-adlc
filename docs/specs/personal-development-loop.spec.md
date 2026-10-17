@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Re-accepted by the owner on 2026-10-17 against review R-19 at d5d1ab0, after revision D-27 (signed releases). Phases 1 and 2 done; the release secret is set. Next: phase 3, the binary as a child feature."
+status: draft
+status_description: "Revision D-28 in progress: the loop edits all reader-facing prose with the pinned humanize prose guide, and the plugin pin moves to e4d58d2. Accepted earlier against R-19 at d5d1ab0."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
