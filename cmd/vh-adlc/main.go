@@ -15,6 +15,7 @@ import (
 
 	"github.com/michielvha/vh-adlc/internal/doc"
 	"github.com/michielvha/vh-adlc/internal/fresh"
+	"github.com/michielvha/vh-adlc/internal/gate"
 	"github.com/michielvha/vh-adlc/internal/knowledge"
 	"github.com/michielvha/vh-adlc/internal/report"
 )
@@ -83,7 +84,9 @@ func commands() []command {
 		{name: "lint", positionals: []string{"doc"}, run: func(ctx context.Context, o *options, args []string) *report.Report {
 			return doc.LintCommand(ctx, o.knowledge(), args[0])
 		}},
-		{name: "gate", positionals: []string{"target-status", "doc"}},
+		{name: "gate", positionals: []string{"target-status", "doc"}, run: func(ctx context.Context, o *options, args []string) *report.Report {
+			return gate.Command(ctx, o.knowledge(), args[0], args[1])
+		}},
 		{name: "fresh", positionals: []string{"doc"}, run: func(ctx context.Context, o *options, args []string) *report.Report {
 			return fresh.Command(ctx, o.knowledge(), args[0])
 		}},

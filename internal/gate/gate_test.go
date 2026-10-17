@@ -40,11 +40,17 @@ type fixture struct {
 // at commit x, pushed to origin.
 func planned(t *testing.T) *fixture {
 	t.Helper()
+	return plannedFrom(t, testrepo.File("docs/conforming.md"))
+}
+
+// plannedFrom is planned with the given document text as the reviewed one.
+func plannedFrom(t *testing.T, text string) *fixture {
+	t.Helper()
 	r, err := rules.Parse([]byte(testrepo.Standard()))
 	if err != nil {
 		t.Fatal(err)
 	}
-	f := &fixture{t: t, repo: testrepo.New(t), r: r, text: testrepo.File("docs/conforming.md")}
+	f := &fixture{t: t, repo: testrepo.New(t), r: r, text: text}
 	f.repo.Write(docPath, f.text)
 	f.repo.Write("src/a.go", "package a\n")
 	f.x = f.repo.Commit("fixture")[:7]
@@ -134,9 +140,6 @@ func TestPlannedGate(t *testing.T) {
 	}
 	cases := map[string]func(f *fixture){
 		"no_open_questions": func(f *fixture) { f.edit("## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Which?\n") },
-		"test_plan_complete": func(f *fixture) {
-			f.edit("| AC-02 | A written manual procedure |\n", "")
-		},
 		"spec_review_fresh": func(f *fixture) {
 			f.repo.Write("src/drift.go", "package a\n")
 			f.repo.Commit("drift")
@@ -158,6 +161,10 @@ func TestPlannedGate(t *testing.T) {
 			expect(t, f, "planned", cond)
 		})
 	}
+	t.Run("test_plan_complete", func(t *testing.T) {
+		text := strings.Replace(testrepo.File("docs/conforming.md"), "| AC-02 | A written manual procedure |\n", "", 1)
+		expect(t, plannedFrom(t, text), "planned", "test_plan_complete")
+	})
 	t.Run("several failures, in gate order", func(t *testing.T) {
 		f := planned(t)
 		cases["accepted"](f)
