@@ -473,6 +473,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-17 | R-1 | spec | `af55148` | fable | procedural | Full review of the draft. Thirteen should-fix findings (argument order, schema validation, Git index writes, rename and config sensitivity, fixture isolation, default branch, reachability, slug matching, wrapped annotations, completion path, parent proofs, untagged releases, capture groups) and eight nits. Nothing blocking. |
+| 2026-10-17 | R-2 | spec | `4673680` | fable | procedural | Review of the R-1 fixes. One blocking finding (the post-merge completion path is an exception to owner decision D-20 and needs the owner), four should-fix findings (post-merge drift, `git log` settings, fixture default branch, layout rule) and ten nits. |
 
 ### R-1
 
@@ -622,6 +623,113 @@ SEVERITY: nit
 WHERE: Design, Toolchain and module; Design, Knowledge
 EVIDENCE: The Go convention (conventions/go.md:39-41) asks to pass context through operations that can block or time out; the child names a 10-second HTTP timeout (:172) but no `context.Context` on the fetch or on `gitcmd`, and `--repo <dir>` (:91-93) is not defined as the worktree root, although `git show <commit>:<path>` (:214) needs root-relative paths.
 PROPOSAL: State that `knowledge` and `gitcmd` take a `context.Context` from `main` (`signal.NotifyContext`), and that `--repo` is resolved to `git rev-parse --show-toplevel` before paths are interpreted.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design, Delivery (post-merge completion path); Tasks T24
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:329-337 has the loop, after the PR has merged and the document carries a `branch`, commit evidence and the `complete` flip on the feature branch and push them "to the default branch as a fast-forward under D-23", calling this "the one exception to 'the document returns to the default branch with the PR'". The parent is not open to amendment here: D-20 (personal-development-loop.spec.md:87) says "once it has a `branch`, its commits stay on the feature branch and are pushed only on ship"; :608 "The document returns to the default branch with the PR"; the ship operation (:742) "Never merges"; D-23 governs only the skip-CI marker and grants no push. The delivery convention at e4d58d2 (conventions/delivery.md:12, 41, 42) requires changes to be reviewed through PRs, the document to return with the PR, and one PR per feature. The child's own rule (:34-35) is that a disagreement with the parent is a finding, and R-1 F-10's proposal asked for the owner to authorise whichever path is chosen; the revision instead settles an exception to an owner decision in Design, with no Open Question and no recorded owner authority.
+PROPOSAL: Move the completion path into an Open Question for the owner with the options and costs: (A) a docs-only direct push to the default branch after the release, as a recorded exception to D-20 and the PR rule; (B) a second docs-only PR, as an exception to one PR per feature; (C) residualise AC-13 and AC-15 to a durable tracker (the parent's T17/T24) so the child completes inside its one PR with `Refs` and the release is observed under the parent's AC-27 proof. Fold the answer into Delivery and T24.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Delivery (post-merge completion path) versus Design, Freshness and gates
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:333-334 says the post-release steps are an implementation review "then" `gate complete`. By :266-267, spec-review drift is `git diff --name-only -z --no-renames <reviewed>...<remote default>` filtered by `covers`. After the merge commit M lands, the remote default is M, and the latest spec review commit X predates the feature's code, so `X...M` is `diff(merge-base(X, M), M) = diff(X, M)`, which contains every covered path the feature added (`cmd/`, `internal/`, `go.mod`, ...). `spec_review_fresh` therefore fails with `covered-drift` and `gate complete` fails; the parent's "The feature's own commits cannot cause it" (:359-360) holds only before the merge. A drift-only spec review at the post-merge commit E would be fresh (`E...M` is empty since M is an ancestor of E) and keeps acceptance, but the paragraph never asks for one.
+PROPOSAL: State that after the fast-forward a drift-only spec review at the evidence commit precedes the implementation review (or that `next` returns `spec review` there), and that acceptance survives because the baseline is unchanged; add this post-merge case to the AC-06 fixtures if the path survives F-01.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Toolchain and module (`gitcmd`); Design, Document model (`id-recycled`); AC-01, AC-06
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:89-92 claims `gitcmd` "fixes every setting that changes output shape on the command line" and lists only `-z`, `--no-renames` and `core.quotePath`. `id-recycled` (:243-244) reads `git log --format=%H -- <doc>`, whose output depends on two user settings the design does not fix. In a scratch repository with Git 2.55.0 where a file was renamed twice, `git log --format=%H -- h` printed 1 commit and `git -c log.follow=true log --format=%H -- h` printed 3; on an SSH-signed commit, `git -c log.showSignature=true log --format=%H -- doc.md` printed `Good "git" signature for a@x with ED25519 key ...` before the SHA. Both change `id-recycled`'s input per machine, which breaks AC-01 across environments, and the AC-06 proof only varies `diff.renames`.
+PROPOSAL: Add `-c log.follow=false -c log.showSignature=false` (or `--no-follow --no-show-signature`, both verified to restore the default output) to the `git log` call, soften "every setting" to the named list, and add a `log.follow`/`log.showSignature` fixture to the AC-08 or AC-01 proof.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Freshness and gates (no-remote default branch); Design, Tests (`internal/testrepo`)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:260-262 derives the no-remote default branch from `git var GIT_DEFAULT_BRANCH` and nothing else; :282-284 builds fixtures with `GIT_CONFIG_GLOBAL=/dev/null`, `GIT_CONFIG_NOSYSTEM=1` and `git init -b main`, and :290-291 runs the binary "with the same cleaned Git environment". `-b main` does not write `init.defaultBranch`, so in such a repository Git 2.55.0 printed `master` for `git var GIT_DEFAULT_BRANCH` (and `main` only with `-c init.defaultBranch=main`). Every fixture without a bare `origin` therefore resolves `default-branch-unknown` (exit 4) for `fresh`, and for every `gate` target that names `spec_review_fresh`, instead of the behaviour the fixtures are meant to prove; the built-in default is also a property of the installed Git, so golden files would depend on it.
+PROPOSAL: Have `testrepo` set `init.defaultBranch main` in each fixture's local configuration (or build no-remote fixtures on the branch `git var GIT_DEFAULT_BRANCH` names), and say so in Tests.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Toolchain and module; Test Plan AC-12; Tasks T19
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:83-84 "`cmd/vh-adlc` holds only `main.go` and its tests" and the AC-12 proof (:415) "`cmd/vh-adlc` holds only `main.go` and `*_test.go`" contradict T19 (:452), which places `cmd/vh-adlc/testdata/golden/` in that directory, and T19's golden files are neither `main.go` nor `*_test.go`. The Layout test as specified fails on the document's own layout.
+PROPOSAL: Extend the rule to "`main.go`, `*_test.go` and `testdata/`" in both places, or move the golden fixtures under `internal/testrepo/testdata/`.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Context versus Test Plan AC-14
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:37-38 says parent AC-27 is "proven here", while the AC-14 row (:417) hands "the observed half (a plugin-only commit on the default branch produces no release run)" back to "the parent's AC-27 proof". The delegation itself is sound (plugin commits in phase 4 are not docs-only, so they run CI and are path-filtered out of `release.yml`), but the two sentences disagree about where the proof lives.
+PROPOSAL: In Context, say the binary and release halves of AC-27 are proven here and the observed non-release stays with the parent's proof row.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Freshness and gates (reachability)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:264-266 makes "a missing object or a non-ancestor" both `commit-unreachable` via `git merge-base --is-ancestor`. In a scratch repository the command exited 0 for an ancestor, 1 for a non-ancestor and 128 with `fatal: Not a valid commit name ...` for a missing object; 128 is also Git's exit for a corrupt or inaccessible repository, so the binary cannot tell the missing-object case from an internal error without a prior existence check.
+PROPOSAL: Say the binary first runs `git cat-file -e <sha>^{commit}` (absent is `commit-unreachable`), then `merge-base --is-ancestor` (exit 1 is `commit-unreachable`, any other non-zero exit is `error`).
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Invocation (argument order)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:105-107 describes a parse, move-first-positional, re-parse loop. A scratch Go program (go1.25.5, `flag.ContinueOnError`) confirmed `doc.md --review R-1 --returned f` and `--review R-1 doc.md --returned f --offline` both parse, so R-1 F-01 is resolved. The loop cannot express a positional that starts with `-`, and `--` only partially terminates flags: for `doc.md -- --review R-1`, `--review` and `R-1` became positionals, so a later `--returned f` after `--` would be parsed as a flag again.
+PROPOSAL: Add one sentence that positional arguments may not begin with `-` and that `--` is not supported, so the limit is documented rather than discovered.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T20 versus Design, Tests (schema test)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:454-455 T20 still reads "every golden file validates and every code is enumerated", while :297-300 and AC-11 (:382-383) now say the test checks top-level keys and `enum` lists with `encoding/json` and "does not claim full JSON Schema 2020-12 validation".
+PROPOSAL: Reword T20 to "every golden file has the schema's required top-level keys and every code is enumerated".
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:3 `status_description: "Drafted from the parent spec's Deterministic core; not yet reviewed."` while the Review Log (:475) records R-1 and commit 4673680 applies it.
+PROPOSAL: Update the line to say R-1 ran at `af55148` and its findings were applied, awaiting the next review.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Freshness and gates; Acceptance Criteria AC-06
+EVIDENCE: `awk 'length($0)>104' docs/specs/vh-adlc-binary.spec.md` over the prose: line 260 is 115 characters ("With no remote, the local default branch is the one `git var GIT_DEFAULT_BRANCH` prints, which is") and line 367 is 133 ("changed under any Git configuration. Staged, unstaged and untracked covered changes fail `feature_tree_clean` with their paths,"); both are new in this diff, in paragraphs otherwise wrapped at about 100, the same class the parent's R-21 F-03 and R-22 F-01 flagged.
+PROPOSAL: Rewrap the two paragraphs.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: nit
+WHERE: Context (Measured); Design, Delivery; Sources
+EVIDENCE: Design (docs/specs/vh-adlc-binary.spec.md:312-315) relies on gitversion-tag-action's `tagged` and `skip-reason` outputs and its `tag-exists` skip; both are correct at 8cf5869 (`action.yml` declares `tagged` and `skip-reason`, `scripts/tag.sh` writes `skip-reason=tag-exists` and exits 0 when `git ls-remote --tags origin` finds the tag), but the Measured bullet (:53-55) cites only the action's inputs and Sources has no entry, so the claim is uncited under the standard's "Context and Design cite their claims" (conventions/feature-documents.md:75-76). The AC-14 row's reliance on `[skip ci]` suppressing a push run (:417) is likewise uncited.
+PROPOSAL: Extend the Measured bullet with the outputs and `scripts/tag.sh` behaviour at 8cf5869, and add the GitHub "skipping workflow runs" page to Sources.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Toolchain and module
+EVIDENCE: The design now depends on `git var GIT_DEFAULT_BRANCH` (added in Git 2.35.0, Documentation/RelNotes/2.35.0 in git/git), `git status --no-renames` (2.18), `git init --object-format` (2.29) and `GIT_CONFIG_GLOBAL` (2.32), yet docs/specs/vh-adlc-binary.spec.md names no minimum Git version, and an older Git fails these calls with a usage error that the binary would report as `error` without saying why.
+PROPOSAL: State a minimum Git version (2.35 or later) in Toolchain and module and have `gitcmd` check `git --version` once, reporting a clear `error` below it.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Output (`gate` line)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:165-166 gives the failing line as `fail (<failing conditions, comma separated>; rules ..., docs ...)`, and `data.failing` (:159) holds condition names only, while `transition-not-allowed` (:181) is a finding, not a condition. For a target absent from `gates` whose transition is disallowed, the line would read `fail (; rules 1, docs ...)` and name nothing.
+PROPOSAL: Say whether `transition-not-allowed` is listed in the line's parenthesis (recommended, first), and give that case as a second example.
+
+FINDING: F-15
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Delivery (post-merge completion path); Tasks T24
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:331-334 attributes the post-release recording, review and gate to "the loop", but this is parent phase 3 and the phase-4 skills that constitute the loop (personal-development-loop.spec.md:1113 onward) do not exist until this feature has shipped; the standard (conventions/feature-documents.md:15-16) expects such steps to be run by hand with a report that says so, and the plugin lock that would install the binary is written only by parent T17 from this feature's recorded values.
+PROPOSAL: Say the owner's session performs these steps by hand with the downloaded release binary and records that in the Review Log row and the completion commit, whatever path F-01 settles on.
 
 ## Sources
 
