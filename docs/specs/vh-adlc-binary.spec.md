@@ -368,49 +368,78 @@ fast-forward. Parent T17 copies the recorded values into the lock.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Every command, run twice on the same fixture, prints byte-identical output and exits
+- [x] AC-01: Every command, run twice on the same fixture, prints byte-identical output and exits
       with the code the output table gives for its `result`; output carries no timestamp, random value
       or unsorted collection.
-- [ ] AC-02: Every status, transition, section, ID, column, record and verdict rule the binary applies
+      Evidence: `go test ./cmd/vh-adlc -run Golden`, `24bbdfb`, all 23 cases print the same bytes on two
+      runs, match their golden files and exit with the documented code, fixture SHAs are fixed by
+      `internal/testrepo`
+- [x] AC-02: Every status, transition, section, ID, column, record and verdict rule the binary applies
       comes from the rules block at the resolved revision: with docs revisions A and B the same document
       gets different gate results and feature roots without a binary change. A missing, ambiguous or
       unknown-schema block, an unknown condition and an invalid pattern each exit `3` with their own
       code, and a repository declaring a local format gets `local-format`, exit `3`, from every document
       command.
-- [ ] AC-03: `knowledge` resolves a single full-SHA repository pin as `repository`, no pin as `plugin`,
+      Evidence: `go test ./internal/rules ./internal/knowledge ./cmd/vh-adlc`, `24bbdfb`, revisions A
+      and B give feature roots `docs/internal/plans` and `plans` and planned gates pass and fail
+      (all_met), the block-variant and local-format cases pass, none
+- [x] AC-03: `knowledge` resolves a single full-SHA repository pin as `repository`, no pin as `plugin`,
       and a short SHA, a branch name or two distinct SHAs as `invalid-pin`; a page absent at the pin is
       `missing-page` naming it; an unreachable host, or `--offline` with a cold cache, is `unreachable`;
       all three exit `5`. `--offline` with a warm cache answers, and `--docs-source` answers with
       `override: true`.
-- [ ] AC-04: Running every command against a fixture leaves the fixture's files and Git state
+      Evidence: `go test ./internal/knowledge`, `24bbdfb`, every pin variant, 200, 404, closed server,
+      cold and warm offline cache and --docs-source cases pass; a live run at e4d58d2 answers and one at
+      25c463c reports missing-page, none
+- [x] AC-04: Running every command against a fixture leaves the fixture's files and Git state
       unchanged and writes only below the user cache directory, and the binary requests nothing but
       `vhco-pro/docs` pages at a full SHA.
-- [ ] AC-05: For each gate target, a fixture failing each listed condition alone yields `fail` with
+      Evidence: `go test ./cmd/vh-adlc -run Boundary` and `./internal/knowledge`, `24bbdfb`, no file in
+      the fixture (including .git) or HOME changes and every request path matches
+      /vhco-pro/docs/<sha>/<page>, the live cache location is covered by the knowledge tests only
+- [x] AC-05: For each gate target, a fixture failing each listed condition alone yields `fail` with
       exactly that condition, a fixture failing several lists all of them, a disallowed transition adds
       `transition-not-allowed`, a gate to the current status re-checks conditions only, and a passing
       gate's `line` and a failing gate's `line` each match the forms under Output.
-- [ ] AC-06: A spec review is stale after a normative-baseline change or covered drift on the remote
+      Evidence: `go test ./internal/gate`, `24bbdfb`, each condition of the planned, in-progress and
+      complete gates fails alone, several fail in gate order, transitions and re-check behave, both line
+      forms match, none
+- [x] AC-06: A spec review is stale after a normative-baseline change or covered drift on the remote
       default branch, an implementation review is stale after a baseline change or a covered commit on
       the feature branch, and a missing row, a `+dirty` target, a missing reviewed commit or one that is
       not an ancestor of `HEAD` is stale with its own code. Checkbox, evidence (single-line or wrapped),
       residual, task, status and Review Log edits alone leave both fresh. A renamed covered path counts
       as changed under any Git configuration. Staged, unstaged and untracked covered changes fail
       `feature_tree_clean` with their paths, while the document itself and uncovered changes do not.
-- [ ] AC-07: A spec review with a `blocking` finding is not clean and one with only `should-fix` or
+      Evidence: `go test ./internal/fresh`, `24bbdfb`, every stale reason, annotation-only edits,
+      renames under both diff.renames settings, the merged-feature drift and the feature tree pass, and
+      the index is not rewritten, none
+- [x] AC-07: A spec review with a `blocking` finding is not clean and one with only `should-fix` or
       `nit` findings, or exactly `NO FINDINGS`, is; malformed or mixed records are not clean. An
       implementation review is clean only with exactly one record per current criterion, each with the
       exact folded text and a `met` verdict or a residualised criterion; a missing, extra or changed
       record is not. `review check` passes only when the stored records equal the returned file.
-- [ ] AC-08: `lint` passes a conforming document and reports each lint finding code on a fixture made
+      Evidence: `go test ./internal/gate ./internal/review ./internal/rules`, `24bbdfb`, every clean and
+      unclean record case and both review check outcomes pass, none
+- [x] AC-08: `lint` passes a conforming document and reports each lint finding code on a fixture made
       to trigger it, including an ID that was removed in one commit and reused in a later one.
-- [ ] AC-09: `next` returns each rule's action on a fixture that first matches that rule, and an
+      Evidence: `go test ./internal/doc`, `24bbdfb`, the conforming fixture lints clean and each lint
+      code fires on its fixture, id-recycled also under log.follow and log.showSignature, none
+- [x] AC-09: `next` returns each rule's action on a fixture that first matches that rule, and an
       `in-progress` fixture whose latest spec review is fresh and blocking, or whose Open Questions are
       non-empty, returns `spec` or `owner decision` rather than `implement` or `ship`.
-- [ ] AC-10: `find` returns every document under the feature root whose `issue` names the given issue
+      Evidence: `go test ./internal/next`, `24bbdfb`, all seventeen rules and both resume fixtures pass,
+      none
+- [x] AC-10: `find` returns every document under the feature root whose `issue` names the given issue
       number, or whose file name up to its first `.` is the given slug (including `<slug>.spec.md`), and
       an empty list otherwise.
-- [ ] AC-11: Every golden output has exactly the top-level keys `schema/vh-adlc.schema.json` requires,
+      Evidence: `go test ./internal/doc -run Find`, `24bbdfb`, issue URL, #<n>, <slug>.md,
+      <slug>.spec.md and no-match cases pass, none
+- [x] AC-11: Every golden output has exactly the top-level keys `schema/vh-adlc.schema.json` requires,
       and the schema enumerates every `result` value and finding code the binary can emit.
+      Evidence: `go test ./cmd/vh-adlc -run Schema`, `24bbdfb`, the schema lists exactly the binary's
+      results and codes and every golden file has exactly the required keys, not a full JSON Schema
+      validation
 - [ ] AC-12: The repository follows the Go conventions at the parent pin: `cmd/vh-adlc` holds wiring
       only, logic is under `internal/`, the binary ignore is `/vh-adlc`, and CI runs the format, vet,
       test, build and both lint gates on every pull request and before every release, with every action
@@ -419,9 +448,12 @@ fast-forward. Parent T17 copies the recorded values into the lock.
       amd64 and arm64, `checksums.txt` and `checksums.txt.sig`, and the signature verifies against the
       committed `release-signing-key.asc`, whose primary fingerprint is
       `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, by the README's steps.
-- [ ] AC-14: The release workflow is triggered by pushes that change a binary path and by manual
+- [x] AC-14: The release workflow is triggered by pushes that change a binary path and by manual
       dispatch only, so a commit touching no binary path cuts no release, and a run whose computed
       version is already tagged ends without running GoReleaser.
+      Evidence: `go test ./cmd/vh-adlc -run Release`, `24bbdfb`, release.yml triggers only on push to
+      main with exactly the six binary paths and on dispatch, and GoReleaser runs only when the tag step
+      pushed a tag; the observed non-release stays with the parent's AC-27 proof
 - [ ] AC-15: The released linux/amd64 binary's `--version` prints exactly `vh-adlc <version>`, every
       released binary's build information names module `github.com/michielvha/vh-adlc` at `v<version>`
       with `vcs.modified=false`, and the version and both digests per platform are recorded for the
@@ -449,51 +481,78 @@ fast-forward. Parent T17 copies the recorded values into the lock.
 
 ## Tasks
 
-- [ ] T1 `go.mod`, `.gitignore`, `.golangci.yml` - module and `go 1.27.2`, `/vh-adlc` and `/dist/`
+- [x] T1 `go.mod`, `.gitignore`, `.golangci.yml` - module and `go 1.27.2`, `/vh-adlc` and `/dist/`
       ignores, the adapted lint configuration; `golangci-lint config verify` passes (AC-12)
-- [ ] T2 `cmd/vh-adlc/main_test.go` - usage and `--version` cases; fails because there is no main
+      Evidence: commit `8c0e1b2`; golangci-lint v2.15.0 config verify passes.
+- [x] T2 `cmd/vh-adlc/main_test.go` - usage and `--version` cases; fails because there is no main
       package (AC-01, AC-15)
-- [ ] T3 `cmd/vh-adlc/main.go`, `internal/report/` - flag sets, the output object, result and exit
+      Evidence: commit `d9198b8`; go test failed to build: run and parseInterleaved undefined.
+- [x] T3 `cmd/vh-adlc/main.go`, `internal/report/` - flag sets, the output object, result and exit
       code mapping; T2 passes (AC-01, AC-15)
-- [ ] T4 `internal/rules/rules_test.go` - block extraction, schema, condition vocabulary, pattern
+      Evidence: commit `786526f`; usage, --version and flag-order tests pass.
+- [x] T4 `internal/rules/rules_test.go` - block extraction, schema, condition vocabulary, pattern
       compilation, record completeness; fails because the package does not exist (AC-02, AC-07)
-- [ ] T5 `internal/rules/rules.go` - T4 passes (AC-02, AC-07)
-- [ ] T6 `internal/gitcmd/`, `internal/testrepo/` - Git runner and deterministic fixture builder, with
+      Evidence: commit `72a6648`; go test failed to build: Parse undefined.
+- [x] T5 `internal/rules/rules.go` - T4 passes (AC-02, AC-07)
+      Evidence: commit `0f7b813`; rules tests pass.
+- [x] T6 `internal/gitcmd/`, `internal/testrepo/` - Git runner and deterministic fixture builder, with
       a test that two builds of one fixture have the same commit SHAs (AC-01)
-- [ ] T7 `internal/knowledge/knowledge_test.go` - pin variants, fetch, cache, offline, override, request
+      Evidence: commit `1a03f61`; one fixture built twice has the same SHAs.
+- [x] T7 `internal/knowledge/knowledge_test.go` - pin variants, fetch, cache, offline, override, request
       paths; fails because the package does not exist (AC-03, AC-04)
-- [ ] T8 `internal/knowledge/`, `cmd/vh-adlc/main.go` - T7 passes; `knowledge` wired (AC-03, AC-04)
-- [ ] T9 `internal/doc/doc_test.go` - frontmatter, sections, criterion folding, tasks, Test Plan, Review
+      Evidence: commit `d982253`; go test failed to build: BaseURL undefined.
+- [x] T8 `internal/knowledge/`, `cmd/vh-adlc/main.go` - T7 passes; `knowledge` wired (AC-03, AC-04)
+      Evidence: commit `d4ed9bf`; knowledge tests pass; a live run at e4d58d2 answers and at 25c463c reports guides/humanize-prose.md missing.
+- [x] T9 `internal/doc/doc_test.go` - frontmatter, sections, criterion folding, tasks, Test Plan, Review
       Log, subsections, baseline normalisation, covers matching, every lint code, `find`; fails because
       the package does not exist (AC-08, AC-10)
-- [ ] T10 `internal/doc/`, `cmd/vh-adlc/main.go` - T9 passes; `lint` and `find` wired (AC-08, AC-10)
-- [ ] T11 `internal/fresh/fresh_test.go` - every stale reason, annotation-only edits, the feature tree,
+      Evidence: commit `28d61b8`; go vet failed: Parse undefined.
+- [x] T10 `internal/doc/`, `cmd/vh-adlc/main.go` - T9 passes; `lint` and `find` wired (AC-08, AC-10)
+      Evidence: commit `6b53f60`; doc tests pass; lint passes on both specs in this repository.
+- [x] T11 `internal/fresh/fresh_test.go` - every stale reason, annotation-only edits, the feature tree,
       default-branch cases; fails because the package does not exist (AC-06)
-- [ ] T12 `internal/fresh/`, `cmd/vh-adlc/main.go` - T11 passes; `fresh` wired (AC-06)
-- [ ] T13 `internal/gate/gate_test.go` - every gate row, multi-failure, transitions, re-check, `line`,
+      Evidence: commit `5f20109`; go vet failed: package has no non-test files.
+- [x] T12 `internal/fresh/`, `cmd/vh-adlc/main.go` - T11 passes; `fresh` wired (AC-06)
+      Evidence: commit `64d1018`; freshness tests pass.
+- [x] T13 `internal/gate/gate_test.go` - every gate row, multi-failure, transitions, re-check, `line`,
       review cleanliness; fails because the package does not exist (AC-05, AC-07)
-- [ ] T14 `internal/gate/`, `cmd/vh-adlc/main.go` - T13 passes; `gate` wired (AC-05, AC-07)
-- [ ] T15 `internal/next/next_test.go` - one fixture per rule and the resume fixtures; fails because the
+      Evidence: commit `0ed60be`; go vet failed: package has no non-test files.
+- [x] T14 `internal/gate/`, `cmd/vh-adlc/main.go` - T13 passes; `gate` wired (AC-05, AC-07)
+      Evidence: commit `fb07741`; gate tests pass; the binary passes planned for the loop spec and in-progress for this spec.
+- [x] T15 `internal/next/next_test.go` - one fixture per rule and the resume fixtures; fails because the
       package does not exist (AC-09)
-- [ ] T16 `internal/next/`, `cmd/vh-adlc/main.go` - T15 passes; `next` wired (AC-09)
-- [ ] T17 `internal/review/review_test.go` - equal and differing records, missing review; fails because
+      Evidence: commit `3a15b8f`; go vet failed: package has no non-test files.
+- [x] T16 `internal/next/`, `cmd/vh-adlc/main.go` - T15 passes; `next` wired (AC-09)
+      Evidence: commit `1577090`; next tests pass.
+- [x] T17 `internal/review/review_test.go` - equal and differing records, missing review; fails because
       the package does not exist (AC-07)
-- [ ] T18 `internal/review/`, `cmd/vh-adlc/main.go` - T17 passes; `review check` wired (AC-07)
-- [ ] T19 `cmd/vh-adlc/golden_test.go`, `cmd/vh-adlc/testdata/golden/` - golden, boundary, local-format
+      Evidence: commit `08d6a38`; go vet failed: package has no non-test files.
+- [x] T18 `internal/review/`, `cmd/vh-adlc/main.go` - T17 passes; `review check` wired (AC-07)
+      Evidence: commit `564bc4f`; review check tests pass; stored R-1 equals the returned copy.
+- [x] T19 `cmd/vh-adlc/golden_test.go`, `cmd/vh-adlc/testdata/golden/` - golden, boundary, local-format
       and revision A/B cases pass (AC-01, AC-02, AC-04)
-- [ ] T20 `schema/vh-adlc.schema.json` and its test - every golden file has the schema's required
+      Evidence: commit `d605604`; 23 golden cases and the boundary test pass.
+- [x] T20 `schema/vh-adlc.schema.json` and its test - every golden file has the schema's required
       top-level keys and every code is enumerated (AC-11)
-- [ ] T21 `.github/workflows/ci.yml` and its parsing test - the CI gates pass on the feature PR (AC-12)
-- [ ] T22 `.goreleaser.yml`, `.github/workflows/release.yml` and the trigger test -
+      Evidence: commit `9726b73`; schema test passes.
+- [x] T21 `.github/workflows/ci.yml` and its parsing test - the CI gates pass on the feature PR (AC-12)
+      Evidence: commit `440905e`; workflow and layout tests pass; actionlint passes.
+- [x] T22 `.goreleaser.yml`, `.github/workflows/release.yml` and the trigger test -
       `goreleaser release --snapshot --clean` builds four archives and `checksums.txt` locally (AC-13,
       AC-14)
-- [ ] T23 `release-signing-key.asc`, `README.md` - the public key and the verification section; the key's
+      Evidence: commit `59cf201`; release trigger test passes; a snapshot signed with a throwaway key built four archives whose checksums and signature verify.
+- [x] T23 `release-signing-key.asc`, `README.md` - the public key and the verification section; the key's
       fingerprint matches (AC-13)
+      Evidence: commit `4b27fdd`; the key file shows the general identity as its first uid and the expected fingerprint.
 - [ ] T24 `docs/specs/vh-adlc-binary.spec.md` - first release: the PR merged by merge commit under its
       own approval, the release workflow run, the AC-13 and AC-15 checks run on the published assets,
       version and digests recorded here, the post-merge drift-only spec review, the post-release
       implementation review, and the evidence commit E and the completion commit C pushed to the default
       branch, as Delivery describes (AC-13, AC-15)
+- [x] T25 `internal/doc/doc.go`, `internal/doc/doc_test.go` - open questions are read only from the Open
+      Questions section, as R-6 F-01 required; the new test fails first, then passes (AC-05)
+      Evidence: test commit `8ec105c` failed ("a question heading outside Open Questions counted"), fix
+      commit `8201374` passes with the full suite.
 
 ## Open Questions
 
