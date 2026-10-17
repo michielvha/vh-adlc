@@ -1163,6 +1163,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-15 | spec | `4cf3f92` | fable | procedural | Diff-only check of the R-14 fixes. Two nits, nothing blocking; one nit applied outside the normative baseline. |
 | 2026-10-17 | R-15 | spec | `4cf3f92` | n/a | n/a | accepted by owner |
 | 2026-10-17 | R-16 | spec | `5c0330f` | fable | procedural | Diff-only review of the D-27 signing revision. Two should-fix findings (no published public key to verify against; action and template claims uncited) and two nits. Nothing blocking. |
+| 2026-10-17 | R-17 | spec | `9f1494d` | fable | procedural | Diff-only review of the R-16 fixes. Three should-fix findings (key identity, the fingerprint anchor, verification stopping at the checksum file) and two nits. Nothing blocking. One local path in F-01's evidence is redacted as `[redacted]`; the records are otherwise verbatim. |
 
 ### R-14
 
@@ -1239,6 +1240,43 @@ SEVERITY: nit
 WHERE: Design, The binary in the repository (release bullet); Acceptance Criteria AC-27; Test Plan AC-27
 EVIDENCE: The revision turns `checksums.txt` and `checksums.txt.sig` into literals in AC-27 and in the proof command, but the template names its checksum file `{{ .ProjectName }}_{{ .Version }}_SHA256SUMS` (`.goreleaser.yml:31`) and GoReleaser's own default is `{{ .ProjectName }}_{{ .Version }}_checksums.txt`, so neither produces a file called `checksums.txt`. The Design says the template's signing configuration "is kept" without saying that `checksum.name_template` is changed.
 PROPOSAL: Either state in the release bullet that `checksum.name_template` is set to `checksums.txt` (so the literals in AC-27 and the Test Plan are reachable), or write AC-27 and the proof against "the release's checksum file and its `.sig`".
+
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Owner decisions D-27 (and the README fingerprint/uid it feeds via Design, The binary in the repository)
+EVIDENCE: D-27 names the key "VHCO Pro (Release Signing Key) <release@vhco.pro>". The owner's own export of the key with that fingerprint says otherwise: `gpg --show-keys [redacted]/.gpg/public-key.asc` prints `pub rsa4096/D61B8A7F2C06BAB6 2026-04-12 [SCEAR]`, fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, `uid VHCO Pro (Terraform Provider Signing Key) <release@vhco.pro>`, `sub rsa4096/72E691932274AE79 [SEA]`; `.gpg/KEY-INFO.txt` line 4 records the same identity. No other public copy exists to contradict it (keys.openpgp.org and keyserver.ubuntu.com return 404 for the fingerprint; WKD for `release@vhco.pro` returns no data). The fingerprint, key ID and the secret are correct (`gh secret list -R michielvha/vh-adlc` shows `PGP_PRIVATE_KEY 2026-10-17T19:17:25Z`), but the uid the document states is not the uid the committed `release-signing-key.asc` and every `gpg --verify` will print, so a verifier comparing the README name to gpg output sees a mismatch.
+PROPOSAL: Either write the uid as the key carries it ("VHCO Pro (Terraform Provider Signing Key) <release@vhco.pro>"), or, if the owner has added a "Release Signing Key" uid since the 2026-08-07 export, say so in D-27 and require that `release-signing-key.asc` is exported from the key as held in the `PGP_PRIVATE_KEY` secret so file, README and signature agree.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-27; Test Plan AC-27
+EVIDENCE: R-16 F-01 is resolved as to location (Design names `release-signing-key.asc` and the README fingerprint; the proof imports the file and checks `gpg --fingerprint`), but AC-27 anchors the check to "the one the README prints" and the proof row compares "with the README". The key file and the README land in the same commit (T12), so a key exported by mistake from another keyring passes AC-27 as written: both sides are produced by the implementer. The only owner-held anchor is the literal in D-27, and neither AC-27 nor the proof mentions it. `conventions/feature-documents.md:84-86` requires the end state to be observable, and the end state the owner decided is "signed with this fingerprint", not "signed with whatever fingerprint the README says".
+PROPOSAL: AC-27: "...verifies against the committed `release-signing-key.asc`, whose primary fingerprint is `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6` (D-27) and is the one the README prints"; Test Plan: "compare `gpg --fingerprint` with the D-27 fingerprint and the README".
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, The binary in the repository (release bullet); Test Plan AC-27
+EVIDENCE: Design claims "the README prints its full fingerprint, so anyone can verify a release", and the proof stops at `gpg --verify checksums.txt.sig checksums.txt`. That verifies the checksum file's provenance only; a release asset is verified only after `sha256sum --check --ignore-missing checksums.txt` over the downloaded archive, and the document never mentions that step, nor requires the README to name the key file or the procedure (AC-20's README content is install, update, uninstall and the support matrix; `grep -n 'sha256sum\|--check' spec` has no hit). With every box ticked a third party has a fingerprint and no stated path from signature to binary.
+PROPOSAL: Have the release bullet require the README to document the verification steps (import `release-signing-key.asc`, compare the fingerprint, `gpg --verify`, then `sha256sum --check` of the downloaded asset against `checksums.txt`), and end the AC-27 proof with that `sha256sum --check` over at least one downloaded asset of the first release.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, The binary in the repository (release bullet); Test Plan AC-27
+EVIDENCE: The action derives `GPG_FINGERPRINT` from `gpg --list-secret-keys ... | grep sec | awk` (`action.yml:76`), which yields the primary long ID `D61B8A7F2C06BAB6`; with `--local-user <primary id>` gpg signs with the signing-capable subkey (`sub rsa4096/72E691932274AE79 [SEA]`, fingerprint `929B7A7AF19CB3E67EEEEC0272E691932274AE79`). Reproduced in a scratch keyring: `gpg --verify` prints "using RSA key <subkey fingerprint>" and only `gpg --fingerprint` prints the primary. A verifier who reads the fingerprint out of `gpg --verify` output, which is the natural place, finds a value that matches neither the README nor D-27.
+PROPOSAL: Add one clause: the signature is made by the key's signing subkey, so the fingerprint to compare is the primary one that `gpg --fingerprint` (or the "Primary key fingerprint" line of `gpg --verify` in an untrusted keyring) prints.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, The binary in the repository (release bullet); Sources
+EVIDENCE: R-16 F-02, F-03 and F-04 are resolved: the action is cited at `a86fcdf` (the scratchpad `action.yml` is byte-identical to upstream at that SHA, which is also current `main`), the mechanism (`action.yml:60,66`, `echo "" | gpg --batch --import` exits 2, confirmed locally) is stated, the `signs` block wording and the passphrase-less clause are present, and `checksum.name_template` is said to be replaced. Two loose ends: the bullet says the template's `name_template` "is replaced" without saying by what (`checksums.txt` is only implied by the surrounding literals and D-27), and "under `bash -eo pipefail`" is an external fact (GitHub's workflow syntax: `shell: bash` runs `bash --noprofile --norc -eo pipefail {0}`) with no Sources entry, while the GoReleaser `.sig` default did get one.
+PROPOSAL: Write "is replaced by `checksums.txt`", and add the GitHub Actions workflow-syntax page (`jobs.<job_id>.steps[*].shell`) to Sources for the `-eo pipefail` claim.
 
 ## Sources
 
