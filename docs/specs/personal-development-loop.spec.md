@@ -1,6 +1,6 @@
 ---
 status: planned
-status_description: "Re-accepted by the owner on 2026-10-17 against review R-22 at 6d7bb6c, after revisions D-27 (signed releases) and D-28 (humanize prose guide, plugin pin e4d58d2). Phases 1 and 2 done. Next: phase 3, the binary as a child feature."
+status_description: "Accepted against review R-22 at 6d7bb6c. Phases 1 to 3 done: the vh-adlc binary is released as signed v0.1.0. Next: phase 4, the spec loop, starting with T13."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
@@ -1105,11 +1105,15 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Phase 3: Binary (child feature)
 
-- [ ] T12 `docs/specs/vh-adlc-binary.spec.md` - child feature document drafted from the binary sections of
+- [x] T12 `docs/specs/vh-adlc-binary.spec.md` - child feature document drafted from the binary sections of
       this spec, reviewed and accepted through the same steps; its own tasks deliver the seven commands,
       golden tests, baseline/record/dirty-tree and blocking-review/resume fixtures, CI gates, the
       committed public key, the README fingerprint and verification steps, and the first signed
       path-filtered release (AC-09, AC-16, AC-23, AC-24, AC-27)
+      Evidence: `docs/specs/vh-adlc-binary.spec.md` accepted against R-8 and complete at `4c3762d` after
+      implementation review R-11 found all fifteen criteria met; PR #1 merged as `595e6fb`, which
+      released signed v0.1.0 (release run 39079446431). The version and both SHA-256 digests per
+      platform are in the child's T24 evidence for T17.
 
 ### Phase 4: Spec loop
 
