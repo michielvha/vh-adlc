@@ -71,7 +71,11 @@ func LintCommand(ctx context.Context, ko knowledge.Options, docPath string) *rep
 		return rep
 	}
 	d := env.Doc
-	findings := slices.Concat(d.Shape, Lint(ctx, env.K.Git, d, env.K.Rules))
+	lint, err := Lint(ctx, env.K.Git, d, env.K.Rules)
+	if err != nil {
+		return env.Report("lint", report.Error, report.Finding{Code: report.CodeError, Message: err.Error(), Path: d.Path})
+	}
+	findings := slices.Concat(d.Shape, lint)
 	result := report.Pass
 	switch {
 	case len(d.Shape) > 0:
@@ -101,6 +105,11 @@ func FindCommand(ctx context.Context, ko knowledge.Options, issue, slug string) 
 	k, result, findings := knowledge.Resolve(ctx, ko)
 	if k == nil {
 		return report.New("find", result, findings...)
+	}
+	if k.LocalFormat {
+		rep := report.New("find", report.LocalFormat, report.Finding{Code: report.CodeLocalFormat, Message: "the repository declares its own feature-document format; the binary does not read its documents", Path: "AGENTS.md"})
+		rep.Knowledge = &k.Knowledge
+		return rep
 	}
 	docs, err := Find(k.Root, k.FeatureRoot, issue, slug)
 	if err != nil {

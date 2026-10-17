@@ -2,11 +2,11 @@ package knowledge
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
-	"net/http/httptest"
 	"regexp"
+	"runtime"
 	"slices"
 	"strings"
 	"sync"

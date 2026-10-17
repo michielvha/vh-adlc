@@ -16,8 +16,9 @@ func (d *Doc) finding(line int, code, format string, a ...any) report.Finding {
 }
 
 // Lint checks the rules a well-shaped document can still break. With a Git
-// directory it also checks that no ID was removed and later reused.
-func Lint(ctx context.Context, g gitcmd.Git, d *Doc, r *rules.Rules) []report.Finding {
+// directory it also checks that no ID was removed and later reused; failing
+// to read that history is an error, never a pass.
+func Lint(ctx context.Context, g gitcmd.Git, d *Doc, r *rules.Rules) ([]report.Finding, error) {
 	var out []report.Finding
 	add := func(f report.Finding) { out = append(out, f) }
 
@@ -69,9 +70,13 @@ func Lint(ctx context.Context, g gitcmd.Git, d *Doc, r *rules.Rules) []report.Fi
 		}
 	}
 	if g.Dir != "" && d.Path != "" {
-		out = append(out, d.recycled(ctx, g, r)...)
+		recycled, err := d.recycled(ctx, g, r)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, recycled...)
 	}
-	return out
+	return out, nil
 }
 
 func first(cs []string) string {
@@ -184,10 +189,10 @@ func (d *Doc) ids() map[string]int {
 
 // recycled reports IDs that were present in one committed version of the
 // document, absent from a later one, and present again now.
-func (d *Doc) recycled(ctx context.Context, g gitcmd.Git, r *rules.Rules) []report.Finding {
+func (d *Doc) recycled(ctx context.Context, g gitcmd.Git, r *rules.Rules) ([]report.Finding, error) {
 	out, err := g.Run(ctx, "log", "--format=%H", "--no-follow", "--no-show-signature", "--", d.Path)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("reading the history of %s: %w", d.Path, err)
 	}
 	shas := strings.Fields(string(out))
 	slices.Reverse(shas)
@@ -196,7 +201,7 @@ func (d *Doc) recycled(ctx context.Context, g gitcmd.Git, r *rules.Rules) []repo
 	for _, sha := range shas {
 		raw, err := g.Run(ctx, "show", sha+":"+d.Path)
 		if err != nil {
-			continue
+			return nil, fmt.Errorf("reading %s at %s: %w", d.Path, sha, err)
 		}
 		version := Parse(d.Path, raw, r).ids()
 		for id := range seen {
@@ -220,5 +225,5 @@ func (d *Doc) recycled(ctx context.Context, g gitcmd.Git, r *rules.Rules) []repo
 	for _, id := range ids {
 		findings = append(findings, d.finding(current[id], report.CodeIDRecycled, "%s was removed in an earlier commit and is used again; IDs are never reused", id))
 	}
-	return findings
+	return findings, nil
 }

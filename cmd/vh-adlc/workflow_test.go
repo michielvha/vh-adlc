@@ -17,6 +17,7 @@ import (
 // runs before publishing.
 var gateCommands = []string{
 	`test -z "$(gofmt -l .)"`,
+	"go mod tidy -diff",
 	"go vet ./...",
 	"go test ./...",
 	"go build ./cmd/vh-adlc",

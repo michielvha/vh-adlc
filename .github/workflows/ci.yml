@@ -23,6 +23,8 @@ jobs:
           install-only: true
       - name: Format
         run: test -z "$(gofmt -l .)"
+      - name: Tidy modules
+        run: go mod tidy -diff
       - name: Vet
         run: go vet ./...
       - name: Test
