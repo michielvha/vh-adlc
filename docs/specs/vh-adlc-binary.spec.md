@@ -496,6 +496,7 @@ None.
 | 2026-10-17 | R-1 | spec | `af55148` | fable | procedural | Full review of the draft. Thirteen should-fix findings (argument order, schema validation, Git index writes, rename and config sensitivity, fixture isolation, default branch, reachability, slug matching, wrapped annotations, completion path, parent proofs, untagged releases, capture groups) and eight nits. Nothing blocking. |
 | 2026-10-17 | R-2 | spec | `4673680` | fable | procedural | Review of the R-1 fixes. One blocking finding (the post-merge completion path is an exception to owner decision D-20 and needs the owner), four should-fix findings (post-merge drift, `git log` settings, fixture default branch, layout rule) and ten nits. |
 | 2026-10-17 | R-3 | spec | `cec987e` | fable | procedural | Review of the R-2 fixes and the owner's completion choice. Two should-fix findings (record the exception in the parent; name the two completion commits) and six nits. Nothing blocking. |
+| 2026-10-17 | R-4 | spec | `6c6c512` | fable | procedural | Diff-only check of the R-3 fixes and parent D-29. Four nits. Nothing blocking. |
 
 ### R-1
 
@@ -810,6 +811,36 @@ SEVERITY: nit
 WHERE: Context; Design, Toolchain and module; Design, Freshness and gates; Design, Tests
 EVIDENCE: Lines new in the diff exceed the document's wrap of about 100 columns: docs/specs/vh-adlc-binary.spec.md:39 is 116 characters ("proven here; AC-27's observed non-release ... The parent pins"), :87 is 124 ("only `main.go`, its `*_test.go` files and `testdata/`; `main.go` imports only ..."), :274 is 122 ("the commits of a squash-merged branch, is `commit-unreachable` and any other non-zero exit is `error`. Covered changes are"), and :294 is a 20-character orphan line ("author and committer") left by an unwrapped insertion at :292-293. R-2 F-11's two lines are fixed; these are the same class. The document contains no em dash or en dash.
 PROPOSAL: Rewrap the four paragraphs.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter (`status_description`)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:3 at 6c6c512 still reads "Draft. Reviews R-1 and R-2 applied; the owner chose the post-release completion path. Awaiting the next independent review.", while 6c6c512 applies R-3 (all eight findings are addressed in the diff: D-29 cited at :338-340, E and C named at :346-356, the evidence-line placement at :348-350, `--plugin-pin` and `source: plugin` at :343-344, "parent phases 6 and 7" at :342-343, the D-29 gap at :350-351, `git-too-old` at :96 and :188, and the four paragraphs rewrapped to the document's existing 101 to 105 column envelope with no word changes beyond those edits, per `git diff --word-diff f2395c5 6c6c512`). The one-line state is a review behind.
+PROPOSAL: Change the line to "Reviews R-1 to R-3 applied" so the frontmatter matches the Review Log and the diff.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T24 versus Design, Delivery
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:482-486 (T24) ends "the post-merge drift-only spec review, the post-release implementation review and the completion commit pushed to the default branch, as Delivery describes", but Delivery now describes two commits: :338 "completion takes two commits after the merge" and :355-356 "E and C, both docs-only and each with the skip-CI marker (D-23), are pushed to the default branch as a fast-forward". R-3 F-02 named T24 in its WHERE and the diff left T24 unchanged, so the task's done condition still speaks of one commit. Tasks are outside the normative baseline, so the fix costs nothing.
+PROPOSAL: Write T24's tail as "the evidence commit E and the completion commit C pushed to the default branch, as Delivery describes".
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Delivery (commit C)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:354-355 "Commit C holds both Review Log rows, the ticks, the flip to `complete` and the line from the released `vh-adlc gate complete`". The gate line in C comes from a run that already needed the reviews to be clean: `spec_review_clean` and `impl_review_clean` (conventions/feature-documents.md:284 and :291) read the `### R-<n>` records, and a row without its subsection is the lint finding `review-subsection-missing` (:185). The gate therefore ran on a working tree holding the rows and their record subsections, and C must contain both; the sentence names only the rows. The rest of the sequence does pass: at gate time HEAD is E, `E...M` is empty, `git diff E HEAD -- <covers>` is empty, the document's own dirtiness is exempt from `feature_tree_clean`, the evidence lines are dropped from the baseline, and the acceptance row's commit keeps the current baseline.
+PROPOSAL: Say "Commit C holds both Review Log rows with their record subsections, the ticks, ..." so the described commit is the one the gate requires.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Invocation
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:107-109 "every document command resolves knowledge itself, so the phase-4 skills pass the pin on every call". R-3 F-05 corrected the same label in Delivery (:342-343 now says the review and ship skills arrive in "parent phases 6 and 7"), but the skills that call `gate`, `fresh` and `review check` span parent phases 4 to 7 (`vh-adlc-spec` T20 in phase 4, `vh-adlc-review` T28 in phase 6, `vh-adlc-ship` T30 in phase 7), so "phase-4 skills" is the same inaccuracy one section earlier. Not introduced by this diff, but it now sits beside the corrected sentence.
+PROPOSAL: Write "the plugin's skills pass the pin on every call" or "the skills of parent phases 4 to 7".
 
 ## Sources
 
