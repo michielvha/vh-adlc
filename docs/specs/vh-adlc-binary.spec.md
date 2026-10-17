@@ -506,6 +506,7 @@ None.
 | 2026-10-17 | R-4 | spec | `6c6c512` | fable | procedural | Diff-only check of the R-3 fixes and parent D-29. Four nits. Nothing blocking. |
 | 2026-10-17 | R-5 | spec | `9453719` | fable | procedural | Diff-only check of the R-4 fixes. No findings. |
 | 2026-10-17 | R-5 | spec | `9453719` | n/a | n/a | accepted by owner |
+| 2026-10-18 | R-6 | spec | `4e2f18f` | fable | procedural | Review of the schema-1 vocabulary revision. One blocking finding (open questions matched outside their section, against the parent and the standard) and one should-fix (the by-name list is incomplete). |
 
 ### R-1
 
@@ -854,6 +855,22 @@ PROPOSAL: Write "the plugin's skills pass the pin on every call" or "the skills 
 ### R-5
 
 NO FINDINGS
+
+### R-6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design, Document model (and Rules)
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:242-244 at 4e2f18f: "the rest is found by pattern anywhere in the body outside fenced code blocks: criteria ..., tasks, open questions, ...". The code does exactly that: internal/doc/doc.go:344-350 appends every open line matching `open_question` with no section test, and internal/gate/gate.go:70-71 makes `no_open_questions` fail on `len(d.OpenQuestions) > 0` while its reason reads "Open Questions holds %d unanswered question(s)". The parent's condition table (docs/specs/personal-development-loop.spec.md:284) and the standard's (conventions/feature-documents.md:281 at e4d58d2) both say "No line in Open Questions matches `open_question`", and the block comment on the pattern (personal-development-loop.spec.md:220) says "Open Questions is empty when none match". A `### Q1: ` heading in Context, Design or Tasks therefore fails the gate under the binary and passes under the standard; the child's own rule (vh-adlc-binary.spec.md:34-35) is that the parent wins and a disagreement is a finding, and D-10 and D-17 make the condition's meaning the standard's, not the binary's. Nothing in the revision records that this widening was chosen or by whom.
+PROPOSAL: Do not accept the sentence as written. Either scope the match to the Open Questions section (the section is in `required_sections`, so it always exists on a well-shaped document) and state `Open Questions` as a section name read by name beside the column names, adjusting "Section names are used only for ..." accordingly; or put the choice to the owner, since the alternative is a normative change to the parent's table and to the standard's ("No line in the body outside fenced code blocks matches `open_question`"). An implementer should not pick between these alone.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Rules
+EVIDENCE: docs/specs/vh-adlc-binary.spec.md:225-229 lists "a few values the binary reads by name" as the two kinds, `blocking`, `met` and six column names, and :230-231 proposes that list as the paragraph for the standard. The code reads more by name: the frontmatter fields `status`, `branch`, `issue` and `covers` (internal/doc/doc.go:174-180, the first three outside any block list except `required_frontmatter`), and the `+dirty` suffix of a review commit, which it strips and turns into `Dirty` (internal/doc/doc.go:425-429); the standard defines `+dirty` in prose (conventions/feature-documents.md:150-151) and the block only embeds it inside the `review_commit` pattern. The child mentions `+dirty` only in AC-06 (:391). The listed items themselves check out: `blocking` is the only severity that sets `Blocking` and `Clean()` is `WellFormed && !Blocking` (internal/rules/rules.go:273-274, 307-308); the columns are located by name in `review_log_columns` with a missing one reported as `review-log-header` (internal/doc/doc.go:407-415); the Test Plan cell is `row.Cells[0]` (internal/doc/doc.go:484, internal/doc/lint.go:52); `error` exists and is in the schema (internal/report/codes.go:56, schema/vh-adlc.schema.json:31,145).
+PROPOSAL: Add the frontmatter field names and the `+dirty` suffix to the by-name list so the paragraph, and the one proposed for the standard, is complete; if F-01 resolves by scoping, add `Open Questions` there too.
 
 ## Sources
 
