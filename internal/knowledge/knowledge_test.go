@@ -2,6 +2,9 @@ package knowledge
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
+	"runtime"
 	"net/http/httptest"
 	"regexp"
 	"slices"
@@ -246,5 +249,23 @@ func TestRulesProblem(t *testing.T) {
 	_, result, findings := resolve(t, repo, Options{PluginPin: shas[0], DocsSource: dir})
 	if result != report.Malformed || !slices.Equal(codes(findings), []string{report.CodeRulesSchemaUnknown}) {
 		t.Fatalf("result %q, findings %+v", result, findings)
+	}
+}
+
+func TestUserCacheDir(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("XDG_CACHE_HOME sets the user cache directory on Linux only")
+	}
+	newDocsServer(t, nil)
+	repo := testrepo.New(t)
+	cache := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", cache)
+	_, result, findings := Resolve(t.Context(), Options{Repo: repo.Dir, PluginPin: pluginPin})
+	if result != report.Answered {
+		t.Fatalf("result %q, findings %+v", result, findings)
+	}
+	want := filepath.Join(cache, "vh-adlc", "docs", pluginPin, "conventions", "feature-documents.md")
+	if _, err := os.Stat(want); err != nil {
+		t.Fatalf("the page was not cached at %s: %v", want, err)
 	}
 }

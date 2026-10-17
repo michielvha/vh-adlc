@@ -54,7 +54,13 @@ func Planned(t testing.TB, text string) *Feature {
 // every criterion ticked with evidence and a clean implementation review R-2.
 func Complete(t testing.TB) *Feature {
 	t.Helper()
-	f := Planned(t, File("docs/conforming.md"))
+	return CompleteFrom(t, File("docs/conforming.md"))
+}
+
+// CompleteFrom is Complete starting from the given reviewed document text.
+func CompleteFrom(t testing.TB, text string) *Feature {
+	t.Helper()
+	f := Planned(t, text)
 	f.Git("switch", "-q", "-c", "feat")
 	f.Edit("status: draft", "status: in-progress\nbranch: feat")
 	f.Write("src/a.go", "package a // built\n")

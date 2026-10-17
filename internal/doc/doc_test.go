@@ -69,7 +69,7 @@ func TestParseConforming(t *testing.T) {
 	if got := d.TestPlanIDs(); !slices.Equal(got, []string{"AC-01", "AC-02"}) {
 		t.Fatalf("test plan IDs = %v", got)
 	}
-	if got := Lint(t.Context(), gitcmd.Git{}, d, r); len(got) != 0 {
+	if got, err := Lint(t.Context(), gitcmd.Git{}, d, r); err != nil || len(got) != 0 {
 		t.Fatalf("lint findings on a conforming document: %+v", got)
 	}
 }
@@ -132,8 +132,8 @@ func TestLintCodes(t *testing.T) {
 			if len(d.Shape) != 0 {
 				t.Fatalf("unexpected shape findings %+v", d.Shape)
 			}
-			got := Lint(t.Context(), gitcmd.Git{}, d, r)
-			if !slices.Contains(codes(got), tt.code) {
+			got, err := Lint(t.Context(), gitcmd.Git{}, d, r)
+			if err != nil || !slices.Contains(codes(got), tt.code) {
 				t.Fatalf("lint = %+v, want %s", got, tt.code)
 			}
 		})
@@ -147,7 +147,7 @@ func TestIDMalformed(t *testing.T) {
 		t.Fatal(err)
 	}
 	d := Parse("docs/f.md", []byte(edit(t, conforming(), "- [ ] AC-02:", "- [ ] AC-2:")), r)
-	if got := Lint(t.Context(), gitcmd.Git{}, d, r); !slices.Contains(codes(got), report.CodeIDMalformed) {
+	if got, err := Lint(t.Context(), gitcmd.Git{}, d, r); err != nil || !slices.Contains(codes(got), report.CodeIDMalformed) {
 		t.Fatalf("lint = %+v", got)
 	}
 }
@@ -167,8 +167,8 @@ func TestIDRecycled(t *testing.T) {
 	repo.Git("config", "log.showSignature", "true")
 	g := gitcmd.Git{Dir: repo.Dir, Env: testrepo.Env(repo.Home)}
 	d := Parse("docs/f.md", []byte(c), r)
-	got := Lint(t.Context(), g, d, r)
-	if !slices.Contains(codes(got), report.CodeIDRecycled) {
+	got, err := Lint(t.Context(), g, d, r)
+	if err != nil || !slices.Contains(codes(got), report.CodeIDRecycled) {
 		t.Fatalf("lint = %+v, want id-recycled", got)
 	}
 	for _, f := range got {
@@ -273,5 +273,13 @@ func TestOpenQuestionsSection(t *testing.T) {
 	c = edit(t, c, "## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Which one?\n")
 	if d := Parse("docs/f.md", []byte(c), r); len(d.OpenQuestions) != 1 {
 		t.Fatalf("open questions = %v, want the one in Open Questions", d.OpenQuestions)
+	}
+}
+
+func TestLintGitFailure(t *testing.T) {
+	r := standardRules(t)
+	d := Parse("docs/f.md", []byte(conforming()), r)
+	if _, err := Lint(t.Context(), gitcmd.Git{Dir: t.TempDir() + "/absent"}, d, r); err == nil {
+		t.Fatal("a failing git history read passed lint")
 	}
 }

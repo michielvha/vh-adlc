@@ -262,3 +262,68 @@ func TestTransitions(t *testing.T) {
 		}
 	})
 }
+
+// TestSharedConditionsOnEveryTarget fails each condition the planned gate
+// shares with the in-progress and complete gates alone on those targets too.
+func TestSharedConditionsOnEveryTarget(t *testing.T) {
+	noRow := strings.Replace(testrepo.File("docs/conforming.md"), "| AC-02 | A written manual procedure |\n", "", 1)
+	question := func(f *fixture) { f.Edit("## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Which?\n") }
+	blocking := func(f *fixture) {
+		f.Row("R-3", rules.KindSpec, f.Head(), "fable", "procedural", "Review.", testrepo.Blocking)
+	}
+	unaccept := func(f *fixture) {
+		f.Edit("| 2026-01-01 | R-1 | spec | `"+f.X+"` | n/a | n/a | accepted by owner |\n", "")
+	}
+	inProgress := func(t *testing.T, text string) *fixture {
+		f := plannedFrom(t, text)
+		f.Edit("status: draft", "status: planned")
+		return f
+	}
+	targets := []struct {
+		target string
+		build  func(t *testing.T, text string) *fixture
+		cases  map[string]func(f *fixture)
+	}{
+		{"in-progress", inProgress, map[string]func(f *fixture){
+			"no_open_questions":  question,
+			"spec_review_clean":  blocking,
+			"accepted":           unaccept,
+			"test_plan_complete": nil,
+			"spec_review_fresh": func(f *fixture) {
+				f.Write("src/drift.go", "package a\n")
+				f.Commit("drift")
+				f.Git("push", "-q", "origin", "main")
+				f.Git("reset", "-q", "--hard", "HEAD~1")
+			},
+			"on_feature_branch_if_set": func(f *fixture) { f.Edit("status: planned", "status: planned\nbranch: feat") },
+		}},
+		{"complete", func(t *testing.T, text string) *fixture { return wrap(t, testrepo.CompleteFrom(t, text)) }, map[string]func(f *fixture){
+			"no_open_questions":  question,
+			"spec_review_clean":  blocking,
+			"accepted":           unaccept,
+			"test_plan_complete": nil,
+			"spec_review_fresh": func(f *fixture) {
+				f.Git("switch", "-q", "main")
+				f.Write("src/drift.go", "package a\n")
+				f.Commit("drift")
+				f.Git("push", "-q", "origin", "main")
+				f.Git("switch", "-q", "feat")
+			},
+			"on_feature_branch_if_set": func(f *fixture) { f.Git("switch", "-q", "-c", "other") },
+		}},
+	}
+	for _, tg := range targets {
+		for cond, mutate := range tg.cases {
+			t.Run(tg.target+"/"+cond, func(t *testing.T) {
+				var f *fixture
+				if mutate == nil {
+					f = tg.build(t, noRow)
+				} else {
+					f = tg.build(t, testrepo.File("docs/conforming.md"))
+					mutate(f)
+				}
+				expect(t, f, tg.target, cond)
+			})
+		}
+	}
+}

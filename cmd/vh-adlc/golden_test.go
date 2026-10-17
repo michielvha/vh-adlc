@@ -88,6 +88,13 @@ func runBinary(t *testing.T, home string, args ...string) outcome {
 	}
 }
 
+// documentedExit is the spec's Output table, written out so the test does
+// not trust the binary's own mapping.
+var documentedExit = map[report.Result]int{
+	"answered": 0, "pass": 0, "fail": 1, "usage": 2, "malformed": 3, "local-format": 3,
+	"error": 4, "invalid-pin": 5, "missing-page": 5, "unreachable": 5,
+}
+
 type goldenCase struct {
 	name string
 	args []string
@@ -109,8 +116,8 @@ func checkGolden(t *testing.T, home string, c goldenCase) {
 	if result.Result == report.Usage && c.name != "usage" {
 		t.Fatalf("%s: usage error, so the case tests nothing: %s", c.name, first.stdout)
 	}
-	if want := result.Result.ExitCode(); first.exit != want {
-		t.Fatalf("%s: exit %d, but result %q documents %d", c.name, first.exit, result.Result, want)
+	if want, ok := documentedExit[result.Result]; !ok || first.exit != want {
+		t.Fatalf("%s: exit %d, but the Output table gives %d for result %q", c.name, first.exit, want, result.Result)
 	}
 	path := filepath.Join("testdata", "golden", c.name+".json")
 	if *update {
@@ -188,7 +195,7 @@ func TestGolden(t *testing.T) {
 		{"review-check-differs", cmdline(common(p, a), "review", "check", doc, "--review", "R-1", "--returned", differs)},
 		{"usage", []string{"lint", doc}},
 	}
-	for _, cmd := range [][]string{{"lint", doc}, {"gate", "planned", doc}, {"fresh", doc}, {"next", doc}, {"review", "check", doc, "--review", "R-1", "--returned", returned}} {
+	for _, cmd := range [][]string{{"find", "--slug", "f"}, {"lint", doc}, {"gate", "planned", doc}, {"fresh", doc}, {"next", doc}, {"review", "check", doc, "--review", "R-1", "--returned", returned}} {
 		cases = append(cases, goldenCase{"local-format-" + cmd[0], cmdline(common(local.Dir, a), cmd...)})
 	}
 	home := t.TempDir()
