@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Claimed on 2026-10-18 for phases 4 to 7 on feat/personal-development-loop; accepted against review R-24."
+status: draft
+status_description: "Under revision for R-26: Design gains the host facts the implementation measured. Needs a clean spec review and the owner's acceptance; then planned, and re-entry on feat/personal-development-loop."
 issue: null
 branch: feat/personal-development-loop
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
