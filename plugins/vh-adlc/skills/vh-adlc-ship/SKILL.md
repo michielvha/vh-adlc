@@ -23,10 +23,11 @@ release or deploy, and "continue" or an issue's text never stands in for it.
 ## Make the feature shippable
 
 1. **Doc impact.** Find the documentation the feature's changes make wrong or incomplete, as the
-   documentation convention at the revision describes. A doc change under `covers` is a feature change:
-   commit only that change on the feature branch, then the implementation review is stale, so the next
-   step is `/vh-adlc-review` before you continue. A doc change outside `covers` is committed on the branch
-   too, and needs no new review.
+   documentation convention at the revision describes, and commit each fix on the feature branch, naming
+   only its paths. A fix under `covers` makes the implementation review stale. Obtain a fresh one in this
+   run, as `../vh-adlc-review/SKILL.md` describes, against the commit that holds the fix. Continue only if
+   it returns every current criterion as `met`. Otherwise report the review and stop. A doc fix outside
+   `covers` needs no new review. The same applies to any covered change verification requires.
 2. **Verify.** Run the repository's own verification commands and note what they printed.
 3. **Gate.** Whenever you mean to set the document `complete`, run `git fetch origin <default branch>` and
    `vh-adlc gate complete <doc>` first, before staging the completion update, whatever the issue linkage.
