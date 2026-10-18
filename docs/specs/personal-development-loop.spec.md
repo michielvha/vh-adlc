@@ -1190,11 +1190,30 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Phase 5: Build loop
 
-- [ ] T25 `plugins/vh-adlc/skills/vh-adlc-tasks/SKILL.md` - S8 passes on every claimed host (AC-11)
-- [ ] T26 `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md` - S9, and the `implement` half of S7, pass
+- [x] T25 `plugins/vh-adlc/skills/vh-adlc-tasks/SKILL.md` - S8 passes on every claimed host (AC-11)
+      Evidence: S8 passes on Claude Code 2.1.284 at `7aa2472` (2026-10-18). Two runs kept T1 and its evidence
+      line byte for byte. They dropped the out-of-scope `greet.py` task and added T3 for `greet.sh`,
+      reusing no ID. They ticked nothing, left the normative sections unchanged, and committed on the
+      feature branch without pushing. Copilot CLI is unsupported for this phase, as in T23.
+- [x] T26 `plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md` - S9, and the `implement` half of S7, pass
       including committed targets, claim interruption and docs-only CI policy (AC-09, AC-12, AC-30)
-- [ ] T27 `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md` (continuation) - S10 passes (AC-13, AC-17)
+      Evidence: S9.1 to S9.3 and S7.1 to S7.6, S7.8 and S7.9 with their implement half pass on Claude
+      Code 2.1.284 (`7aa2472`; S9.1 at `a29b83d`, a test-only change). S9.1 made one docs-only claim on
+      the default branch, with the gate line and the skip-CI marker, and pushed it. It created the branch
+      at the claim and committed greet.sh there without the marker or a push. The transcript shows
+      `./test.sh` printing FAIL and then PASS. S9.2 created no branch after a rejected claim push, and its
+      retry pushed the same single claim. S9.3 created the branch at the exact published claim. Each
+      invalid variant refused entry naming its condition. S7.8 refused re-entry naming
+      `no_open_questions` and `spec_review_clean` and kept the acceptance. S7.9 committed the move to
+      draft on its own on the feature branch before revising the baseline.
+- [x] T27 `plugins/vh-adlc/skills/vh-adlc-resume/SKILL.md` (continuation) - S10 passes (AC-13, AC-17)
       including isolated worktrees, explicit handoff and missing-state blockers (AC-29)
+      Evidence: S10.1 and S10.2 pass on Claude Code 2.1.284 (`7aa2472`; S10.2 at `a29b83d`, a test-only
+      change). A new session reconstructed status, branch and owning worktree, wrote nothing before the
+      owner's handoff, then progressed the next task on the feature branch. It pushed, merged and tagged
+      nothing, although the issue said to merge when green, and left the other feature's worktree
+      untouched. With the earlier commits lost, it reported a blocker and created no branch. S10.1's first
+      run found the missing handoff rule, now in `references/authority.md`.
 
 ### Phase 6: Review loop
 
