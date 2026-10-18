@@ -1128,35 +1128,63 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Phase 4: Spec loop
 
-- [ ] T13 `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` - onboard this repository with the
+- [x] T13 `AGENTS.md`, `CLAUDE.md`, `.github/copilot-instructions.md` - onboard this repository with the
       D-28 pin (`e4d58d2`) and `Feature documents: docs/specs/`; `vh-adlc knowledge` resolves `repository` (AC-04)
-- [ ] T14 `tests/vh-adlc/check.test.ts` - the package checker (manifest, names, agent frontmatter, tools
+      Evidence: on 2026-10-18 `vh-adlc knowledge --repo . --plugin-pin e4d58d2…` answers with source
+      `repository`, revision `e4d58d2` and feature root `docs/specs/` (onboarded in `9ec22e0`).
+- [x] T14 `tests/vh-adlc/check.test.ts` - the package checker (manifest, names, agent frontmatter, tools
       union, root `plugin.json`, references, gate commands, `--docs-source`, version rule, Bun commands,
       the humanize prose guide named in every skill, no em or en dash); explicit test-only phase
       selection reports unscheduled operations pending, defaults to full v1; fails because the package
       does not exist (AC-02, AC-22, AC-31, AC-32)
-- [ ] T15 `plugins/vh-adlc/.claude-plugin/plugin.json`, `knowledge.md`, `.claude-plugin/marketplace.json` -
+      Evidence: `VH_ADLC_PHASE=4 bun test tests/vh-adlc/check.test.ts` at `ecc3a5d`: 25 pass and 5 pending,
+      the operations scheduled for phases 5 to 7. Without a phase it fails on exactly those. The checker
+      landed in `493bc2b`, before the package existed.
+- [x] T15 `plugins/vh-adlc/.claude-plugin/plugin.json`, `knowledge.md`, `.claude-plugin/marketplace.json` -
       manifest and marketplace checks in T14 pass; `github-app-registration` entry unchanged (AC-01, AC-02)
-- [ ] T16 `tests/vh-adlc/ensure.test.ts` - S15's valid and invalid PATH/cache/download cases, including
+      Evidence: the T14 manifest and marketplace checks pass, and
+      `git diff main -- .claude-plugin/marketplace.json` adds only the `vh-adlc` entry.
+- [x] T16 `tests/vh-adlc/ensure.test.ts` - S15's valid and invalid PATH/cache/download cases, including
       same-version wrong executables and cache tampering; assert digests checked before downloaded
       execution and writes only to user cache; fails because the installer does not exist (AC-25)
-- [ ] T17 `plugins/vh-adlc/vh-adlc.lock.json`, `scripts/ensure-vh-adlc.sh` - T16 passes against the phase 3
+      Evidence: `bun test tests/vh-adlc/ensure.test.ts` at `ecc3a5d`: 15 pass. The tests landed in `af2e8a9`,
+      before the installer existed.
+- [x] T17 `plugins/vh-adlc/vh-adlc.lock.json`, `scripts/ensure-vh-adlc.sh` - T16 passes against the phase 3
       release (AC-25, AC-26)
-- [ ] T18 `plugins/vh-adlc/references/` - loop, authority and review protocol; the canary scan against the
+      Evidence: T16 passes against the v0.1.0 lock, including the case that downloads and installs the real
+      release; S1 installed v0.1.0 into an isolated cache through the plugin's own installer.
+- [x] T18 `plugins/vh-adlc/references/` - loop, authority and review protocol; the canary scan against the
       pages at the D-28 pin finds nothing (AC-03)
-- [ ] T19 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - T14 agent checks pass (AC-02, AC-14)
-- [ ] T20 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - author and review modes; T14 gate-command check
+      Evidence: the T14 canary scan against the pages at `e4d58d2` finds nothing at `ecc3a5d`.
+- [x] T19 `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md` - T14 agent checks pass (AC-02, AC-14)
+      Evidence: the T14 agent checks pass, and S1 dispatched the reviewer as `vh-adlc:vh-adlc-reviewer`.
+- [x] T20 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` - author and review modes; T14 gate-command check
       passes (AC-08, AC-09, AC-10, AC-22)
-- [ ] T21 `plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md`, `skills/vh-adlc-resume/SKILL.md` (reporting) -
+      Evidence: the T14 gate-command check passes; S2, S3, S4, S6 and S7 pass on Claude Code (T23).
+- [x] T21 `plugins/vh-adlc/skills/vh-adlc-investigate/SKILL.md`, `skills/vh-adlc-resume/SKILL.md` (reporting) -
       T14 passes (AC-03, AC-13)
-- [ ] T22 `tests/vh-adlc/fixtures/`, `tests/vh-adlc/shim/vh-adlc` - fixture repository, fixture docs repository
+      Evidence: T14 passes; S1, S5 and S14 run both skills on Claude Code (T23).
+- [x] T22 `tests/vh-adlc/fixtures/`, `tests/vh-adlc/shim/vh-adlc` - fixture repository, fixture docs repository
       with two revisions, fixture plugin exposing `spec`, `implement`, `review`, host-managed worktrees,
       and logging wrapper with its own fixture lock; release installer verification is never bypassed
       (AC-05, AC-07, AC-22)
-- [ ] T23 `tests/vh-adlc/scenarios/` - phase-4 S1/S5/S7/S14 subsets, S2 to S4, S6 and full S15 run
+      Evidence: `bun test tests/vh-adlc/fixtures.test.ts`: 10 pass; the fixture lock installs the logging
+      wrapper through the unmodified installer, and the real lock stays untouched.
+- [x] T23 `tests/vh-adlc/scenarios/` - phase-4 S1/S5/S7/S14 subsets, S2 to S4, S6 and full S15 run
       headless on Claude Code; Copilot CLI outcomes recorded, unsupported if unproven. Summaries name
       pending operations; S1 records the three unestablished host facts; no full-v1 pass claimed
       (advances AC-01 to AC-10, AC-25, AC-26)
+      Evidence: on 2026-10-18, Claude Code 2.1.284 headless with isolated profiles ran the 29 phase-4
+      scenarios, and each passed: S1, S2.1 to S2.8, S3.A, S3.B, S4, S5, S6, S7.1 to S7.7, S14 for
+      investigate, spec and resume, and S15. Summaries are in `tests/vh-adlc/evidence/claude-code/` and
+      name the phase selection. Most ran at `58577f2`. S3.B and S7.7 re-ran at `42d6914` after harness-only
+      fixes, and S14 re-ran at `ecc3a5d` after a loop.md change to the unavailable-binary line, the only
+      plugin change since `58577f2`. The recorded runs cost 16.06 USD. S1 records the three host facts.
+      Skills read `references/`, `knowledge.md` and `scripts/` outside their own directory. All five
+      installer calls used a literal plugin path, none `CLAUDE_PLUGIN_ROOT`. The reviewer loads with
+      `read, search, execute` in its list and ran Bash and Read without an error. Copilot CLI is
+      unsupported for phase 4, by the owner's choice (`tests/vh-adlc/evidence/copilot-cli/README.md`). No
+      full-v1 pass is claimed.
 - [ ] T24 VS Code Local harness - the same phase-scoped selection as T23 runs by hand and is recorded;
       pending operations remain pending (advances AC-02)
 
