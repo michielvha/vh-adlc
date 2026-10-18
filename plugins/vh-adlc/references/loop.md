@@ -17,8 +17,9 @@ VH_ADLC=$("<plugin directory>/scripts/ensure-vh-adlc.sh")
 The installer verifies the binary against `vh-adlc.lock.json` and fails closed on any mismatch; never
 work around a failure.
 
-When the installer fails, say `deterministic checks unavailable` in the report and carry on only with
-read-only work: investigating, drafting and reporting. Every status change stops, unless the owner
+When the installer fails, open the report with a line that reads exactly
+`deterministic checks unavailable`, so a reader can search for it, and carry on only with read-only work:
+investigating, drafting and reporting. Every status change stops, unless the owner
 explicitly allows a procedural gate for this run. Record that permission in the feature document and
 write the gate line as `vh-adlc gate <target>: procedural (owner allowed: <reason>)`.
 
