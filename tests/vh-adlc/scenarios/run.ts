@@ -1289,7 +1289,8 @@ const S13_CASES: S13[] = [
     setup: (f) => {
       // Other work already landed the behaviour, so this feature's delivery is its document alone.
       writeFileSync(join(f.project, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n');
-      git(f.home, f.project, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh");
+      writeFileSync(join(f.project, "test.sh"), readFileSync(join(f.project, "test.sh"), "utf8").replace("# The deliberate failing test: greet.sh does not take a name yet.\n", "# Checks the greeting for a name and for no argument.\n"));
+      git(f.home, f.project, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", "test.sh");
       git(f.home, f.project, "push", "-q", "origin", "main");
       return { owning: reviewedFeature(f) };
     },
