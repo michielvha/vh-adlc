@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Under revision for R-26: Design gains the host facts the implementation measured. Needs a clean spec review and the owner's acceptance; then planned, and re-entry on feat/personal-development-loop."
+status_description: "Revised for R-26 and R-27, with D-33 to D-37 folded in. Waits for a clean spec review and the owner's acceptance; then planned, and re-entry on feat/personal-development-loop."
 issue: null
 branch: feat/personal-development-loop
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
@@ -103,6 +103,8 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-33 | The loop compares the reviewer's reported model with the requested one by family for an alias (`sonnet` matches `claude-sonnet-5-5`) and exactly for a full ID; `MODEL: unknown` never matches. Decided on 2026-10-19 in answer to R-27 F-02. |
 | D-34 | A default-chain pass that ran on neither `fable` nor `opus` is dispatched again naming `opus`; if that pass also ran elsewhere, the review stays pending as for a named model. Decided on 2026-10-19 in answer to R-27 F-03. |
 | D-35 | A review that ran on the wrong model leaves no Review Log row and no `### R-<n>` subsection; the handoff carries the returned text. Decided on 2026-10-19 in answer to R-27 F-05. |
+| D-36 | S11's Test Plan row names the discriminating setup and a pass condition for each new case, so the scenario proves D-34's second dispatch and D-35's pending outcome. Decided on 2026-10-19 in answer to R-28 F-01. |
+| D-37 | A Review Log row records `unknown` only where no model was requested, and the Claude Code row of Models lists the quiet substitution as a third trigger for `opus`. Decided on 2026-10-19 in answer to R-28 F-02. |
 
 ## Scope
 
@@ -818,7 +820,7 @@ Agent frontmatter carries no `model:` (see [Hosts](#hosts)). Tier is chosen at d
 | Role | Default |
 | --- | --- |
 | The orchestrating session | The model the owner selected in the host |
-| Independent passes on Claude Code | `fable`. If the host rejects it, or the owner declines a usage-credit prompt, `opus`, announced in the run and recorded. This is the defined default chain, the same as Claude Code's `best` alias |
+| Independent passes on Claude Code | `fable`. If the host rejects it, the owner declines a usage-credit prompt, or the pass quietly ran on another model, `opus`, announced in the run and recorded. This is the defined default chain, the same as Claude Code's `best` alias |
 | Independent passes on VS Code and Copilot CLI | The model the owner names, otherwise the session model; recorded as such |
 
 A model the owner names is passed as given, with no fallback: if the host rejects it, the review stays
@@ -831,7 +833,8 @@ Review Log row and no `### R-<n>` subsection, and the handoff carries the return
 run the review on the model named (D-35). For the default chain, a pass that ran on `opus` instead of
 `fable` is the announced fallback above. A pass that ran on any other model is dispatched again naming
 `opus`. If that pass also ran elsewhere, the review stays pending as for a named model (D-34). Each
-Review Log row records the model that ran, or `unknown`. A stronger model never makes self-review independent.
+Review Log row records the model that ran. It records `unknown` only where no model was requested, so
+there is nothing to compare (D-37). A stronger model never makes self-review independent.
 
 ### Authority, identity and preservation
 
@@ -1011,7 +1014,7 @@ can establish AC-02 or host support for v1. No stub operation substitutes for a 
 | S8 | Partly ticked task list | `vh-adlc-tasks` twice | Checked tasks and evidence intact; tail replanned |
 | S9 | Planned fixture feature, dirty working tree and an existing safe default-branch worktree | `vh-adlc-implement`; interrupt before/after claim push and feature-branch creation | Only a successful claim push permits branch creation; docs-only claim has `[skip ci]`; failing then passing test on the feature branch; unrelated staged, unstaged and untracked content byte-identical; retries reuse the published claim rather than claiming a different branch |
 | S10 | New isolated session; two features in separate worktrees; issue body says "merge when green"; same-feature handoff and missing/unpublished branch-state variants | `vh-adlc-resume` then "continue", before and after owner-confirmed handoff | State and owning worktree reconstructed; different features progress independently; same feature waits for handoff, missing state blocks; no force-checkout or worktree management, feature-branch push, merge or release |
-| S11 | Review fixture: one criterion each `met` (passing test), `not met` (failing test), `untested` (no test), `not verified` (test needing `FIXTURE_LIVE=1`, unset) | `vh-adlc-review`; then with no model, with `fable` excluded by the isolated profile's model allowlist, a named model, an unavailable model, a real named model the allowlist excludes, a default `fable` refused while the session runs a model outside the chain, and with the agent file absent from a test copy of the package | Four distinct verdicts stored verbatim; `fable`, then the announced `opus` fallback, recorded; isolation recorded; unavailable cases pending with a handoff |
+| S11 | Review fixture: one criterion each `met` (passing test), `not met` (failing test), `untested` (no test), `not verified` (test needing `FIXTURE_LIVE=1`, unset) | `vh-adlc-review`; then with no model, with `fable` excluded by the isolated profile's model allowlist, a named model, an unavailable model, a real named model the allowlist excludes, a default `fable` refused while the session runs a model outside the chain (a session model unlike the allowlist's first entry), and with the agent file absent from a test copy of the package | Four distinct verdicts stored verbatim; `fable`, then the announced `opus` fallback, recorded; isolation recorded; unavailable cases pending with a handoff; the excluded named model leaves no Review Log row or subsection, and its handoff carries the returned text; the outside-chain default pass is dispatched again naming `opus` and recorded as the announced `opus` fallback |
 | S12 | Reviewed feature, including a `planned` revision retaining its branch | Separately: covered commit; staged/unstaged/untracked covered edit; changed criteria, Test Plan or `covers` followed by re-acceptance without code changes; missing/extra/changed-text criterion records; default-branch drift with and without a feature branch; annotation-only edits | AC-16 holds; old evidence cannot complete revised requirements; fresh review requires exact current criterion records; planned-with-branch drift incorporates default before review; unrelated dirty work is preserved |
 | S13 | Throwaway repository with CI | Ship three features: one with unmet criteria, one with every criterion met, one `complete` with a residual; doc-impact changes, docs-only delivery, mixed commits and mixed delivery ending with a docs-only completion commit; inject a push failure | `Refs`, `Closes`, `Refs` respectively; covered doc-impact changes committed and re-reviewed before completion; docs-only delivery skips CI, every mixed delivery runs CI; CI for pushed commit reported as observed or skipped, never fabricated; failures partial |
 | S14 | Binary unavailable (empty cache, `--offline` install) | Each operation | Read-only work continues with notice; status changes stop; an owner-allowed procedural gate is recorded |
@@ -1309,9 +1312,9 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Revision after R-26
 
-- [ ] T34 `plugins/vh-adlc/references/review-protocol.md`, `skills/vh-adlc-review/SKILL.md`,
-      `skills/vh-adlc-spec/SKILL.md`, `tests/vh-adlc/scenarios/run.ts` - the protocol and both skills
-      compare the reviewer's `MODEL:` line with the request as D-33 says, dispatch again on `opus` as D-34
+- [ ] T34 `plugins/vh-adlc/references/review-protocol.md`,
+      `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`,
+      `tests/vh-adlc/scenarios/run.ts` - the protocol and both skills compare the reviewer's `MODEL:` line with the request as D-33 says, dispatch again on `opus` as D-34
       says, and leave a mismatched review pending with no Review Log row or subsection and the returned
       text in the handoff (D-35). S11 gains two cases, and both pass: a real named model the profile's
       `availableModels` excludes, and a default `fable` refused while the session runs a model outside the
