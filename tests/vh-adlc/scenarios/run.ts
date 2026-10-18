@@ -10,7 +10,7 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { accept, AGENT_NAME, agentHome, build, claim, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
+import { accept, AGENT_NAME, agentHome, build, claim, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
 import { claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
 
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
@@ -1035,6 +1035,7 @@ const PHASE6: Scenario[] = S11_CASES.map(
             { name: "the reviewer ran in a separate context", ok: uses.some((u) => u.subagent) },
             { name: `the review row targets the reviewed commit and records ${k.expect}`, ok: !!row && target.startsWith(row[3].replaceAll("`", "")) && row[4].toLowerCase().includes(k.expect) },
             { name: "isolation is recorded", ok: !!row && ["structural", "procedural", "unknown"].includes(row[5]) },
+            { name: `the session's model usage shows ${k.expect} ran`, ok: turns.some((t) => t.model.includes(k.expect)), detail: turns.map((t) => t.model).join("; ") },
             { name: "the four verdicts came back distinctly, one per criterion", ok: Object.keys(got).length === 4 && Object.entries(EXPECTED_VERDICTS).every(([id, v]) => got[id] === v), detail: JSON.stringify(got) },
             { name: "review check confirmed the stored records", ok: c.log().some((x) => words(x.args).slice(0, 2).join(" ") === "review check" && x.json?.result === "pass") },
             { name: "only the met criterion stays ticked; the others name the review", ok: ticked(doc, "AC-01") && ["AC-02", "AC-03", "AC-04"].every((id) => !ticked(doc, id) && new RegExp(`^- \\[ \\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: [^\\n]*${row?.[1]}`, "m").test(doc)) },
@@ -1049,6 +1050,128 @@ const PHASE6: Scenario[] = S11_CASES.map(
   }),
 );
 SCENARIOS.push(...PHASE6);
+
+// ---- Phase 6: freshness (S12) ----
+
+const FINISH = `/vh-adlc-implement greeting-name. ${HANDOFF} If it is finished, mark it complete.`;
+
+// treeState is everything the feature's own dirty work consists of, to prove it was left as it was.
+function treeState(f: Fixtures, cwd: string): string {
+  return [gitIn(f, cwd, "diff", "--cached"), gitIn(f, cwd, "diff"), gitIn(f, cwd, "status", "--porcelain", "--untracked-files=all")].join("\n--\n");
+}
+
+function amend(f: Fixtures, cwd: string, file: string, change: (s: string) => string, message: string, commit = true) {
+  const p = join(cwd, file);
+  writeFileSync(p, change(existsSync(p) ? readFileSync(p, "utf8") : ""));
+  if (commit) git(f.home, cwd, "commit", "-q", "-m", message, "--", file);
+}
+
+type S12 = { id: string; title: string; records?: string; setup: (f: Fixtures, owning: string) => void; refuse?: string };
+
+const S12_COMPLETION: S12[] = [
+  { id: "S12.1", title: "A fresh, clean review completes the feature", setup: () => {} },
+  { id: "S12.2", title: "Annotation-only edits cause no staleness", setup: (f, w) => amend(f, w, FEATURE_PATH, (s) => s.replace("Evidence: `./test.sh` printed `PASS`.", "Evidence: `./test.sh` printed `PASS` on a second run."), "docs: annotate an evidence line") },
+  { id: "S12.3", title: "A covered commit after the review blocks completion", refuse: "impl_review_fresh", setup: (f, w) => amend(f, w, "greet.sh", (s) => s.replace("#!/bin/sh\n", "#!/bin/sh\n# Greets the name it is given.\n"), "chore: comment greet.sh") },
+  { id: "S12.4", title: "A staged covered edit blocks completion", refuse: "feature_tree_clean", setup: (f, w) => { amend(f, w, "greet.sh", (s) => `${s}# staged\n`, "", false); git(f.home, w, "add", "greet.sh"); } },
+  { id: "S12.5", title: "An unstaged covered edit blocks completion", refuse: "feature_tree_clean", setup: (f, w) => amend(f, w, "greet.sh", (s) => `${s}# unstaged\n`, "", false) },
+  { id: "S12.6", title: "An untracked covered file blocks completion", refuse: "feature_tree_clean", setup: (f, w) => { mkdirSync(join(w, "lib"), { recursive: true }); writeFileSync(join(w, "lib", "extra.sh"), "echo extra\n"); } },
+  {
+    id: "S12.7",
+    title: "A changed Test Plan, re-accepted without code changes, needs a new implementation review",
+    refuse: "impl_review_fresh",
+    setup: (f, w) => {
+      amend(f, w, FEATURE_PATH, (s) => s.replace("| AC-01 | `./test.sh` |", "| AC-01 | `./test.sh` and `sh -n greet.sh` |"), "docs: prove AC-01 with a syntax check too");
+      const at = rev(f, "HEAD", w)!.slice(0, 7);
+      amend(f, w, FEATURE_PATH, (s) => s.replace(/(\| R-2 \| implementation \|[^\n]*\n)/, `$1| 2026-01-03 | R-3 | spec | \`${at}\` | fable | procedural | Clean. |\n| 2026-01-03 | R-3 | spec | \`${at}\` | n/a | n/a | accepted by owner |\n`) + "\n### R-3\n\nNO FINDINGS\n", "docs: record spec review R-3 and its acceptance");
+    },
+  },
+  { id: "S12.8", title: "A missing criterion record is not a clean review", refuse: "impl_review_clean", records: criterionRecords(["AC-01", "AC-03"]), setup: () => {} },
+  { id: "S12.9", title: "An extra criterion record is not a clean review", refuse: "impl_review_clean", records: criterionRecords(["AC-01", "AC-02", "AC-03", "AC-09"]), setup: () => {} },
+  {
+    id: "S12.10",
+    title: "A criterion record with changed text is not a clean review",
+    refuse: "impl_review_clean",
+    records: criterionRecords(undefined, { "AC-01": "`./greet.sh Ada` prints `Hi, Ada.`", "AC-02": "`./greet.sh Grace` prints `Hello, Grace.`", "AC-03": "`./greet.sh` with no argument prints `Hello, world.`" }),
+    setup: () => {},
+  },
+  { id: "S12.11", title: "Covered default-branch drift blocks completion", refuse: "spec_review_fresh", setup: (f) => pushFromElsewhere(f, "test.sh", `${readFileSync(join(f.project, "test.sh"), "utf8")}# Drift from other work.\n`, "chore: drift on test.sh") },
+];
+
+const PHASE6_S12: Scenario[] = [
+  ...S12_COMPLETION.map(
+    (k): Scenario => ({
+      id: k.id,
+      title: k.title,
+      phase: 6,
+      run: async (f) => {
+        const owning = reviewedFeature(f, k.records);
+        k.setup(f, owning);
+        const tip = rev(f, FEATURE_BRANCH)!;
+        const tree = treeState(f, owning);
+        const turns = session(f, [f.pluginA], [FINISH], { cwd: owning });
+        return {
+          turns,
+          checks: (c) => {
+            const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
+            const done = agentLog(f, f.project, `${tip}..${FEATURE_BRANCH}`).filter((x) => x.body.includes("vh-adlc gate complete: pass"));
+            const unpushed = gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "";
+            if (!k.refuse) {
+              return [
+                { name: "gate complete passed and the document is complete", ok: gateCalls(c, "complete").some((g) => g.json?.result === "pass") && statusOf(doc) === "complete" && done.length === 1 },
+                { name: "nothing was pushed", ok: unpushed },
+                unrelatedIntact(c),
+              ];
+            }
+            return [
+              { name: `gate complete failed naming ${k.refuse}`, ok: gateCalls(c, "complete").some((g) => g.json?.result === "fail" && g.json?.data?.failing?.includes(k.refuse)) },
+              { name: "the feature was not completed", ok: statusOf(doc) === "in-progress" && done.length === 0 && unpushed },
+              ...(k.refuse === "feature_tree_clean" ? [{ name: "the dirty covered change was left exactly as it was", ok: treeState(f, owning) === tree }] : []),
+              unrelatedIntact(c),
+            ];
+          },
+        };
+      },
+    }),
+  ),
+  ...(["with a branch, at planned", "without a branch"] as const).map(
+    (variant, i): Scenario => ({
+      id: `S12.${12 + i}`,
+      title: `Clearing covered default-branch drift ${variant}`,
+      phase: 6,
+      run: async (f) => {
+        plan(f);
+        let owning = f.project;
+        if (i === 0) {
+          // A planned revision that keeps its branch.
+          owning = claim(f);
+          amend(f, owning, FEATURE_PATH, (s) => s.replace("status: in-progress\n", "status: planned\n"), "docs: back to planned after a revision");
+        }
+        pushFromElsewhere(f, "test.sh", `${readFileSync(join(f.project, "test.sh"), "utf8")}# Drift from other work.\n`, "chore: drift on test.sh");
+        gitIn(f, f.project, "fetch", "-q", "origin", "main");
+        const drift = rev(f, "origin/main")!;
+        const turns = session(f, [f.pluginA], [`/vh-adlc-resume greeting-name. ${i === 0 ? HANDOFF : ""} Continue until the spec review is stored, then stop.`.replace(/\s+/g, " ")], { cwd: owning });
+        return {
+          turns,
+          checks: (c) => {
+            const ref = i === 0 ? FEATURE_BRANCH : "main";
+            const doc = show(f, ref, FEATURE_PATH) ?? "";
+            const specRows = doc.split("\n").filter((l) => /^\| \d{4}-\d{2}-\d{2} \| R-\d+ \| spec \|/.test(l) && !l.includes("accepted by owner"));
+            const latest = specRows.at(-1)?.split("|")[4]?.trim().replaceAll("`", "");
+            const at = latest ? rev(f, latest) : null;
+            return [
+              { name: `the default branch was ${i === 0 ? "merged into the feature branch" : "brought up to date"} before the review`, ok: ancestor(f, drift, ref) && !!at && ancestor(f, drift, at) },
+              { name: "a new spec review was stored at that commit", ok: specRows.length >= 2 && !!at },
+              { name: "drift alone kept the acceptance", ok: doc.split("\n").filter((l) => l.includes("| accepted by owner |")).length === 1 && statusOf(doc) === "planned" },
+              ...(i === 0 ? [{ name: "the default branch got no feature commits", ok: agentLog(f, f.project, `${drift}..origin/main`).length === 0 && agentLog(f, f.project, "main").length === 0 }] : []),
+              unrelatedIntact(c),
+            ];
+          },
+        };
+      },
+    }),
+  ),
+];
+SCENARIOS.push(...PHASE6_S12);
 
 function scanSecrets(text: string): string[] {
   return SECRET_CANARIES.filter((c) => text.includes(c));

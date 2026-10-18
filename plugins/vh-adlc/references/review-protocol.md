@@ -19,8 +19,13 @@ Choose the model when dispatching; agent files name none. On Claude Code an inde
 named runs on `fable`; if the host rejects it, or the owner declines a usage-credit prompt, run it on `opus`
 and say so in the run. On other hosts use the model the owner names, or the session's model, and record
 which. A model the owner names is passed as given with no fallback: if the host rejects it, the review stays
-pending and the report lists what the host offers. The Review Log row records the model that ran, or
-`unknown`.
+pending and the report lists what the host offers.
+
+A host may run a subagent on another model than the one asked for, without saying so: Claude Code does
+this when its settings refuse the requested model. So the Review Log row records the model the reviewer's
+first line, `MODEL: <id>`, names, or `unknown`, never the model you asked for. When it differs from the one
+you asked for, say so in the run: a refused `fable` that ran on `opus` is the fallback above, and any other
+difference is reported as it is.
 
 ## Isolation
 
@@ -31,10 +36,11 @@ honest default. If the owner requires structural isolation and the host cannot g
 ## Records
 
 The reviewer returns records in the formats the feature-document standard defines in its Review log
-section, at the resolved revision: complete finding records or the single `NO FINDINGS` for a spec review,
-and one criterion record per current criterion for an implementation review. Store what it returned,
-byte for byte, under `### R-<n>` before acting on any of it, then confirm with `review check`. Review IDs
-continue from the highest one in the document.
+section, at the resolved revision, after its `MODEL:` line: complete finding records or the single
+`NO FINDINGS` for a spec review, and one criterion record per current criterion for an implementation
+review. Store what it returned after that line, byte for byte, under `### R-<n>` before acting on any of
+it, then confirm with `review check` against the same text. Review IDs continue from the highest one in
+the document.
 
 After a spec review, apply factual findings, turn judgement findings into Open Questions for the owner
 without answering them, and never relabel a blocking pass as clean: only a new independent pass clears it.

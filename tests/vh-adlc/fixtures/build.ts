@@ -442,7 +442,7 @@ In scope: one name argument for \`greet.sh\`, a \`--shout\` flag, macOS support,
 | --- | --- |
 | AC-01 | \`./test.sh\` |
 | AC-02 | \`./test-shout.sh\` |
-| AC-03 | A run on a macOS machine; this repository has none |
+| AC-03 | No check exists yet: nothing here runs on macOS |
 | AC-04 | \`FIXTURE_LIVE=1 ./test-live.sh\`, run only by the release job |
 
 ## Tasks
@@ -495,4 +495,47 @@ export function reviewFeature(f: Fixtures): string {
   writeFileSync(path, doc);
   git(f.home, owning, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", FEATURE_PATH);
   return owning;
+}
+
+const CRITERIA_TEXT: Record<string, string> = {
+  "AC-01": "`./greet.sh Ada` prints `Hello, Ada.`",
+  "AC-02": "`./greet.sh Grace` prints `Hello, Grace.`",
+  "AC-03": "`./greet.sh` with no argument prints `Hello, world.`",
+};
+
+// criterionRecords gives the implementation review records for the fixture criteria, all met.
+export function criterionRecords(ids = Object.keys(CRITERIA_TEXT), text = CRITERIA_TEXT): string {
+  return ids
+    .map((id) => `CRITERION: ${id} ${text[id] ?? "`./greet.sh` prints a farewell"}\nVERDICT: met\nEVIDENCE: ./test.sh, the reviewed commit, printed PASS, none`)
+    .join("\n\n");
+}
+
+// reviewedFeature builds the S12 feature: implemented on its branch, every criterion ticked, and an
+// implementation review R-2 at that commit with the records given (all met by default). Its covers
+// also take lib/, so an untracked covered file is possible. It returns the owning worktree.
+export function reviewedFeature(f: Fixtures, records = criterionRecords()): string {
+  editDoc(f, f.project, "covers:\n  - greet.sh\n  - test.sh\n", "covers:\n  - greet.sh\n  - test.sh\n  - lib/\n", "fixture: covers lib", true);
+  plan(f, "- [x] T1 `greet.sh` - `./test.sh` passes (AC-01, AC-02, AC-03)\n      Evidence: `./test.sh` printed `PASS`.\n");
+  const owning = claim(f);
+  write(join(owning, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n', 0o755);
+  const path = join(owning, FEATURE_PATH);
+  let doc = readFileSync(path, "utf8");
+  for (const id of Object.keys(CRITERIA_TEXT)) doc = doc.replace(new RegExp(`^- \\[ \\] ${id}: (.*)$`, "m"), `- [x] ${id}: $1\n      Evidence: \`./test.sh\` printed \`PASS\`.`);
+  writeFileSync(path, doc);
+  git(f.home, owning, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", FEATURE_PATH);
+  const x = git(f.home, owning, "rev-parse", "--short=7", "HEAD");
+  doc = readFileSync(path, "utf8").replace(/(\| accepted by owner \|\n)/, `$1| 2026-01-02 | R-2 | implementation | \`${x}\` | fable | procedural | Every criterion met. |\n`) + `\n### R-2\n\n${records}\n`;
+  writeFileSync(path, doc);
+  git(f.home, owning, "commit", "-q", "-m", "docs: record implementation review R-2", "--", FEATURE_PATH);
+  return owning;
+}
+
+// pushFromElsewhere lands a commit on the remote default branch from another clone, as other work would.
+export function pushFromElsewhere(f: Fixtures, file: string, content: string, message: string) {
+  const other = join(f.dir, "other-clone");
+  if (!existsSync(other)) git(f.home, f.dir, "clone", "-q", f.origin, other);
+  git(f.home, other, "pull", "-q", "--ff-only", "origin", "main");
+  write(join(other, file), content, 0o755);
+  git(f.home, other, "commit", "-q", "-m", message, "--", file);
+  git(f.home, other, "push", "-q", "origin", "main");
 }

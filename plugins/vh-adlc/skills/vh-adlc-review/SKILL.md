@@ -44,10 +44,12 @@ commit X, the repository directory, the document, the docs revision, the binary 
 
 ## Store and apply
 
-1. Store the returned text byte for byte under the next `### R-<n>`, with a Review Log row at X recording
-   the kind, the model that ran (or `unknown`) and the isolation (`procedural` unless the host is verified
-   to enforce the reviewer's restrictions). Save the returned text to a scratch file outside the repository
-   and run `vh-adlc review check <doc> --review R-<n> --returned <file>`. Quote its result.
+1. Store the returned text after its `MODEL:` line, byte for byte, under the next `### R-<n>`, with a
+   Review Log row at X recording the kind, the model that line names (or `unknown`) and the isolation
+   (`procedural` unless the host is verified to enforce the reviewer's restrictions). If that model is
+   not the one you asked for, say so, as `references/review-protocol.md` describes. Save the stored text
+   to a scratch file outside the repository and run
+   `vh-adlc review check <doc> --review R-<n> --returned <file>`. Quote its result.
 2. For every criterion the review did not return as `met`, untick it and add an evidence line naming
    `R-<n>` and the verdict. Leave a criterion it returned as `met` as it is, with its own evidence line.
 3. Run `vh-adlc lint <doc>`, edit the commit message and the Review Log outcome with

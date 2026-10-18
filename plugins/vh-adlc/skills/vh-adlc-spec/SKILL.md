@@ -35,12 +35,18 @@ without asking, and `references/review-protocol.md` for the review mode.
 
 ## Review mode
 
-1. Commit the document first; a review targets an exact commit. Call it X.
+1. Commit the document first; a review targets an exact commit. Call it X. When `vh-adlc fresh` shows the
+   spec review stale from drift alone (covered changes on the default branch, an unchanged baseline),
+   first bring that work in: with a `branch` field, merge `origin/<default branch>` into the feature
+   branch in its owning worktree; without one, fast-forward the default branch. Stop if that would
+   overwrite work you did not make. If the merge changes the normative baseline, revise instead, as below.
+   X is then the resulting commit.
 2. Dispatch `vh-adlc-reviewer` as `references/review-protocol.md` describes, with the document, X, kind
    `spec`, the docs revision, the binary path and the plugin pin. If dispatch is impossible, write the handoff and leave
    the review pending.
-3. Store the returned records under the next `### R-<n>` with a Review Log row at X, before changing
-   anything, then run `vh-adlc review check` against the returned text.
+3. Store the records the reviewer returned after its `MODEL:` line under the next `### R-<n>`, with a
+   Review Log row at X naming that model, before changing anything. Then run `vh-adlc review check`
+   against the same text.
 4. Apply factual findings. Turn judgement findings into Open Questions for the owner. Commit. A blocking
    pass is cleared only by a new independent pass at the new commit.
 5. When a clean review at X exists and Open Questions is empty, ask the owner to accept. On acceptance in

@@ -49,6 +49,8 @@ Then add finding records for any defect you found.
 
 ## Output
 
-Return only records, in the standard's formats and nothing else. Write their text plainly, as
-`guides/humanize-prose.md` at the revision asks, with no em dashes or en dashes; your records are stored
-exactly as you return them.
+Start with one line, `MODEL: <id>`, giving the exact model ID your system prompt says you run on, or
+`MODEL: unknown` if it names none. The dispatching session cannot see which model ran, so it records this
+line. After it, return only records, in the standard's formats and nothing else. Write their text plainly,
+as `guides/humanize-prose.md` at the revision asks, with no em dashes or en dashes; your records are
+stored exactly as you return them.
