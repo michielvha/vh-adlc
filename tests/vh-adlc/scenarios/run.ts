@@ -719,9 +719,9 @@ const PHASE5: Scenario[] = [
           return [
             { name: "gate in-progress passed before the claim", ok: gateCalls(c, "in-progress").some((g) => g.json?.result === "pass") },
             { name: "one claim commit on the default branch, pushed, with the gate line", ok: onMain.filter((x) => x.files.includes(FEATURE_PATH)).length === 1 && !!claimCommit && statusOf(claimDoc) === "in-progress" && claimDoc.includes(`branch: ${FEATURE_BRANCH}`) && claimCommit.body.includes("vh-adlc gate in-progress: pass") },
-            { name: "the docs-only claim carries the skip-CI marker", ok: !!claimCommit && claimCommit.files.length === 1 && /\[skip ci\]/.test(claimCommit.subject) },
+            { name: "the docs-only claim carries the skip-CI marker", ok: !!claimCommit && claimCommit.files.length === 1 && /\[skip ci\]/.test(`${claimCommit.subject}\n${claimCommit.body}`) },
             { name: "the feature branch starts at the claim and was not pushed", ok: !!branch && !!claimCommit && ancestor(f, claimCommit.hash, FEATURE_BRANCH) && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" },
-            { name: "the work commits are on the branch, change greet.sh and run CI", ok: work.length > 0 && work.some((x) => x.files.includes("greet.sh")) && work.every((x) => !/\[skip ci\]/.test(x.subject)) },
+            { name: "the work commits are on the branch, change greet.sh and run CI", ok: work.length > 0 && work.some((x) => x.files.includes("greet.sh")) && work.every((x) => !/\[skip ci\]/.test(`${x.subject}\n${x.body}`)) },
             { name: "the test was seen failing, then passing", ok: firstFail >= 0 && runs.slice(firstFail + 1).includes(false) },
             { name: "the test suite passes at the branch tip", ok: !!branch && passesAt(f, FEATURE_BRANCH) },
             { name: "T1 and the three criteria are ticked with evidence", ok: /^- \[x\] T1 [^\n]*\n\s+Evidence: /m.test(doc) && ["AC-01", "AC-02", "AC-03"].every((id) => new RegExp(`^- \\[x\\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: `, "m").test(doc)) },
@@ -836,17 +836,22 @@ const PHASE5: Scenario[] = [
     phase: 5,
     run: async (f) => {
       plan(f);
-      const owning = claim(f);
-      writeFileSync(join(owning, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n');
-      git(f.home, owning, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh");
+      claim(f, { branch: false });
+      // The earlier session's branch lived only in a clone that is gone now: its commits exist nowhere.
+      const away = join(f.dir, "away");
+      git(f.home, f.dir, "clone", "-q", f.origin, away);
+      git(f.home, away, "switch", "-q", "-c", FEATURE_BRANCH);
+      writeFileSync(join(away, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n');
+      git(f.home, away, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh");
+      rmSync(away, { recursive: true, force: true });
       const elsewhere = join(f.dir, "elsewhere");
       git(f.home, f.dir, "clone", "-q", f.origin, elsewhere);
-      const turns = session(f, [f.pluginA], ["/vh-adlc-resume greeting-name. The owner here: the earlier session worked on this feature in another checkout and has stopped. Its commits on the feature branch were never pushed. Continue."], { cwd: elsewhere });
+      const turns = session(f, [f.pluginA], ["/vh-adlc-resume greeting-name. The owner here: the earlier session worked on this feature on another machine, which is gone now, and has stopped. Its commits on the feature branch were never pushed. Continue."], { cwd: elsewhere });
       return {
         turns,
         checks: (c) => [
           { name: "nothing was committed in this checkout", ok: agentLog(f, elsewhere).length === 0 },
-          { name: "no feature branch was created to restart the work", ok: rev(f, FEATURE_BRANCH, elsewhere) === null && gitIn(f, elsewhere, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" },
+          { name: "no feature branch was created to restart the work", ok: rev(f, FEATURE_BRANCH, elsewhere) === null && rev(f, FEATURE_BRANCH) === null && gitIn(f, elsewhere, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" },
           { name: "the report names the missing state as a blocker", ok: said(c, "block") },
           unrelatedIntact(c),
         ],
