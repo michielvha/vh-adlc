@@ -1217,10 +1217,30 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Phase 6: Review loop
 
-- [ ] T28 `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md` - S11 passes, including the refused-`fable` and
+- [x] T28 `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md` - S11 passes, including the refused-`fable` and
       unavailable cases; completion reviews require clean relevant content and exact current criterion
       records against the accepted baseline (AC-14, AC-15, AC-16, AC-21)
-- [ ] T29 `tests/vh-adlc/scenarios/` S12 - every freshness case behaves as AC-16 (AC-16)
+      Evidence: S11.1 to S11.5 pass on Claude Code 2.1.284 at `ea78b15` (2026-10-18). With no model named,
+      the reviewer ran on `claude-fable-5-1` and returned `met`, `not met`, `untested` and
+      `not verified` for the four fixture criteria. They were stored verbatim (`review check` pass),
+      isolation `procedural`, and the three not met were unticked naming the review. With `fable` kept
+      out by the profile's `availableModels`, Claude Code ran the reviewer on opus without saying so. The
+      first run recorded `fable`, so the reviewer now opens with a `MODEL:` line, and the re-run recorded
+      and announced the opus fallback. A named `sonnet` ran as given. An unavailable named model and a
+      missing agent file each left the review pending, with a handoff. The model the session's usage
+      shows is checked against the row in every case.
+- [x] T29 `tests/vh-adlc/scenarios/` S12 - every freshness case behaves as AC-16 (AC-16)
+      Evidence: S12.1 to S12.13 pass on Claude Code 2.1.284 (S12.1 to S12.11 at `ea78b15`, S12.12 and
+      S12.13 at `cdd603c`). Two changes left `complete` reachable: a fresh clean review, and
+      annotation-only edits. Every other case refused it, naming its condition:
+      - a covered commit, and a Test Plan change re-accepted without code (`impl_review_fresh`);
+      - staged, unstaged and untracked covered changes (`feature_tree_clean`), each left byte for byte;
+      - missing, extra and changed-text criterion records (`impl_review_clean`);
+      - covered default-branch drift (`spec_review_fresh`).
+      With a branch at `planned`, drift was merged into the feature branch before a new spec review.
+      Without one, the default branch was fast-forwarded first. Acceptance was kept both times. The
+      runs found two plugin gaps, now fixed: the merge commands are named, and commits name their
+      paths so other staged work stays out.
 
 ### Phase 7: Ship and release
 
