@@ -949,10 +949,16 @@ stated.
       README prints with its verification steps, and no release from a commit that touches no binary
       path.
       Evidence: R-25 at `8d62bb1` returned met: the layout and gates, SHA-pinned actions, four released platforms equal to the lock's, and `gpg --verify` with the D-27 fingerprint in an empty keyring.
-- [ ] AC-28: `michielvha/vh-adlc` is the public successor of `michielvha/claude-plugins`, public only after a
+- [x] AC-28: `michielvha/vh-adlc` is the public successor of `michielvha/claude-plugins`, public only after a
       recorded history audit the owner confirmed; `vh-adlc@vhco-tools` and `github-app-registration@vhco-tools`
       install from it on every claimed host without a credential.
-      Evidence: R-25 at `8d62bb1` returned not met.
+      Evidence: R-25 at `8d62bb1` returned not met: `vh-adlc` was not yet on the public `main`.
+      Evidence: after the merge at `49c76b1`, on 2026-10-18, a Claude Code 2.1.302 profile had a fresh
+      `HOME`, no GitHub token and no credential helper. In it, `claude plugin marketplace add
+      michielvha/vh-adlc` and both installs exited 0, `plugin details` listed the seven skills and the
+      reviewer, and the installed plugin's installer downloaded and verified v0.1.0 (`vh-adlc 0.1.0`).
+      Both uninstalls and the marketplace removal exited 0. The audit and the owner's confirmation are
+      under One repository (T9, T10).
 - [ ] AC-29: Different features progress concurrently in separate host-managed worktrees; same-feature
       re-entry requires an owner-confirmed handoff and uses the owning worktree. The loop neither
       force-moves branches nor creates, deletes or resets worktrees, and preserves unrelated work.
@@ -1301,7 +1307,7 @@ numbers within a phase are in dependency order; a partial checker run never mark
       profile against this checkout as a local marketplace, recorded in
       `tests/vh-adlc/evidence/claude-code/update-by-hand.md`. No newer version existed to update to. Its support matrix lists
       only the Claude Code CLI on Linux as supported. The T14 README check passes in the full selection.
-- [ ] T32 `tests/vh-adlc/evidence/` - full S1 to S15 evidence on every claimed host, including all seven
+- [x] T32 `tests/vh-adlc/evidence/` - full S1 to S15 evidence on every claimed host, including all seven
       operations in S1/S5/S7/S14 and both public plugins installing without credentials; all pending phase
       checks resolved, full-v1 checker passes, canary grep finds nothing (AC-02, AC-19, AC-28, AC-29,
       AC-32)
@@ -1311,10 +1317,10 @@ numbers within a phase are in dependency order; a partial checker run never mark
       two narrow skill fixes on those paths. The recorded runs cost 53.14 USD. The full-v1 checker passes, and a
       grep of `tests/vh-adlc/evidence/` finds no secret canary, no token and no dash. S1.host (D-30) passes
       at no cost, comparing github-app-registration's entry and six installed files before and after
-      installing and uninstalling vh-adlc. Still open: both
-      public plugins installing from `michielvha/vh-adlc` without a credential, which needs this branch
-      merged; the VS Code Local run (T24); and discovery in the desktop app, the VS Code extension and a
-      remote session.
+      installing and uninstalling vh-adlc. After the merge,
+      both public plugins installed from `michielvha/vh-adlc` without a credential (AC-28). The only
+      claimed host is the Claude Code CLI, as the README's support matrix says. The VS Code Local run
+      (T24) and discovery on the other Claude Code surfaces belong to AC-02 and are not claimed.
 - [x] T33 `plugins/vh-adlc/.claude-plugin/plugin.json` - release version set; T14 version rule passes
       (AC-01)
       Evidence: `plugins/vh-adlc/.claude-plugin/plugin.json` keeps `0.1.0` as the first published version,
