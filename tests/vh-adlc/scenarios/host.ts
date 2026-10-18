@@ -1,8 +1,13 @@
 // Runs Claude Code headless in an isolated profile for the vh-adlc scenarios.
 //
-// Each profile is a throwaway CLAUDE_CONFIG_DIR. The owner chose, on 2026-10-18,
-// to authenticate it by copying their Claude Code login into that directory for
-// the run; the copy is deleted when the run ends. Nothing of the owner's own
+// Each profile is a throwaway CLAUDE_CONFIG_DIR. It authenticates with a
+// long-lived token from `claude setup-token`, read from the file
+// VH_ADLC_CLAUDE_TOKEN_FILE names (default ~/.config/vh-adlc/claude-token) and
+// passed as CLAUDE_CODE_OAUTH_TOKEN, so no session refreshes a login. Without
+// that file it falls back to copying the owner's Claude Code login into the
+// profile, as the owner chose on 2026-10-18. A long run then fails once that
+// login expires, and a refresh inside a copy can leave the owner's own login
+// stale. The copy is deleted when the run ends. Nothing of the owner's own
 // profile (plugins, settings, memory) is read or changed.
 
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -11,14 +16,19 @@ import { join, sep } from "node:path";
 
 export const CLAUDE = process.env.VH_ADLC_CLAUDE ?? join(homedir(), ".local", "bin", "claude");
 const OWNER_CREDENTIALS = join(homedir(), ".claude", ".credentials.json");
+const TOKEN_FILE = process.env.VH_ADLC_CLAUDE_TOKEN_FILE ?? join(homedir(), ".config", "vh-adlc", "claude-token");
+export const CLAUDE_TOKEN = existsSync(TOKEN_FILE) ? readFileSync(TOKEN_FILE, "utf8").trim() : "";
+if (!CLAUDE_TOKEN) console.warn(`vh-adlc scenarios: no token at ${TOKEN_FILE}; copying the Claude Code login into each profile instead`);
 
 export type Profile = { config: string; home: string; dispose: () => void };
 
 // profile creates an isolated Claude Code profile whose HOME is the fixture home.
 export function profile(home: string, settings: Record<string, unknown> = {}): Profile {
   const config = mkdtempSync(join(tmpdir(), "vh-adlc-claude-"));
-  if (!existsSync(OWNER_CREDENTIALS)) throw new Error("no Claude Code login to copy into the isolated profile");
-  copyFileSync(OWNER_CREDENTIALS, join(config, ".credentials.json"));
+  if (!CLAUDE_TOKEN) {
+    if (!existsSync(OWNER_CREDENTIALS)) throw new Error("no token file and no Claude Code login to copy into the isolated profile");
+    copyFileSync(OWNER_CREDENTIALS, join(config, ".credentials.json"));
+  }
   writeFileSync(join(config, "settings.json"), `${JSON.stringify({ includeCoAuthoredBy: false, ...settings }, null, 2)}\n`);
   mkdirSync(join(config, "projects"), { recursive: true });
   return {
@@ -38,6 +48,7 @@ function env(p: Profile): Record<string, string> {
     GIT_CONFIG_NOSYSTEM: "1",
     LANG: "C.UTF-8",
     TERM: "dumb",
+    ...(CLAUDE_TOKEN ? { CLAUDE_CODE_OAUTH_TOKEN: CLAUDE_TOKEN } : {}),
   };
 }
 

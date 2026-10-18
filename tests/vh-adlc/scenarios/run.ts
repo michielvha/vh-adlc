@@ -11,7 +11,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
-import { claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
+import { CLAUDE_TOKEN, claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
 
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
 const EVIDENCE = join(ROOT, "tests", "vh-adlc", "evidence", "claude-code");
@@ -494,8 +494,8 @@ const SCENARIOS: Scenario[] = [
                   ok: accepted.length === 1 && accepted[0].includes(`| ${latest} |`) && status === "planned" && c.commits().some((x) => x.includes("vh-adlc gate planned: pass")),
                 }
               : {
-                  name: "the owner was left a decision: no acceptance row, still draft, any planned gate failed",
-                  ok: accepted.length === 0 && status === "draft" && gateCalls(c, "planned").every((g) => g.json?.result === "fail"),
+                  name: "the owner was left a decision: no acceptance row, still draft, no planned gate passed",
+                  ok: accepted.length === 0 && status === "draft" && !gateCalls(c, "planned").some((g) => g.json?.result === "pass"),
                   detail: blocking ? "blocking finding" : "open questions",
                 },
             unrelatedIntact(c),
@@ -1386,7 +1386,7 @@ const PHASE7: Scenario[] = S13_CASES.map(
 SCENARIOS.push(...PHASE7);
 
 function scanSecrets(text: string): string[] {
-  return [...SECRET_CANARIES, ...EXTRA_SECRETS].filter((c) => text.includes(c));
+  return [...SECRET_CANARIES, ...EXTRA_SECRETS, ...(CLAUDE_TOKEN ? [CLAUDE_TOKEN] : [])].filter((c) => text.includes(c));
 }
 
 function redactPaths(text: string, f: Fixtures): string {

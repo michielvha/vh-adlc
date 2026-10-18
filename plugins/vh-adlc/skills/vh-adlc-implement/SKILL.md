@@ -32,9 +32,11 @@ Run `git fetch origin <default branch>`. What happens next depends on the docume
    failing condition and stop.
 3. Set `status: in-progress`, update `status_description`, and add `branch: <type>/<slug>`, using the
    branch naming the delivery convention at the revision gives. Run `vh-adlc lint <doc>`.
-4. Stage the document's path alone and commit with the gate's `data.line` in the body. This claim commit
-   changes only the feature document, so it carries the skip-CI marker the delivery convention describes;
-   confirm that the staged path and every outgoing commit are documentation-only before adding it.
+4. Commit the document's path alone, with the gate's `data.line` in the body. This claim commit changes
+   only the feature document, so it carries the skip-CI marker the delivery convention describes; confirm
+   that the staged path and every outgoing commit are documentation-only before adding it. If the
+   repository needs onboarding first (`knowledge` reported source `plugin`), that is a separate commit
+   before the claim, never part of it.
 5. Push the default branch. The claim exists only once this push succeeds. A rejected or non-fast-forward
    push is a partial result: keep the local commit, create no branch, report it and stop.
 6. Create the feature branch at the claim commit. When the current worktree holds the default branch at
