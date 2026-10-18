@@ -363,3 +363,39 @@ export function editFeature(f: Fixtures, from: string, to: string, message = "fi
   git(f.home, f.project, "commit", "-q", "-m", message, "--", FEATURE_PATH);
   git(f.home, f.project, "push", "-q", "origin", "main");
 }
+
+export const FEATURE_BRANCH = "feat/greeting-name";
+
+// One task that makes the fixture's failing test pass.
+export const FIXTURE_TASKS =
+  "- [ ] T1 `greet.sh` - `./test.sh` passes: the script greets the name it is given, and prints `Hello, world.` without one (AC-01, AC-02, AC-03)\n";
+
+// editDoc replaces text in the feature document in the checkout at cwd and commits it there; push sends
+// the current branch to origin.
+export function editDoc(f: Fixtures, cwd: string, from: string, to: string, message: string, push = false) {
+  const path = join(cwd, FEATURE_PATH);
+  const text = readFileSync(path, "utf8");
+  if (!text.includes(from)) throw new Error(`the feature has no ${from}`);
+  writeFileSync(path, text.replace(from, to));
+  git(f.home, cwd, "commit", "-q", "-m", message, "--", FEATURE_PATH);
+  if (push) git(f.home, cwd, "push", "-q", "origin", "HEAD");
+}
+
+// plan accepts the fixture feature, moves it to planned and writes its tasks, all on the default branch.
+export function plan(f: Fixtures, tasks = FIXTURE_TASKS) {
+  accept(f);
+  editDoc(f, f.project, "status: draft\n", "status: planned\n", "fixture: planned", true);
+  editDoc(f, f.project, "## Tasks\n\nNone yet.\n", `## Tasks\n\n${tasks}`, "fixture: tasks", true);
+}
+
+// claim publishes the in-progress claim on the default branch and, unless told otherwise, creates the
+// feature branch at it, checked out in its own host-managed worktree, whose path it returns.
+export function claim(f: Fixtures, opts: { branch?: boolean; worktree?: boolean } = {}): string {
+  editDoc(f, f.project, "status: planned\n", `status: in-progress\nbranch: ${FEATURE_BRANCH}\n`, "docs: claim greeting-name [skip ci]", true);
+  const owning = join(f.dir, "project-greeting-name");
+  if (opts.branch === false) return f.project;
+  git(f.home, f.project, "branch", FEATURE_BRANCH);
+  if (opts.worktree === false) return f.project;
+  git(f.home, f.project, "worktree", "add", "-q", owning, FEATURE_BRANCH);
+  return owning;
+}

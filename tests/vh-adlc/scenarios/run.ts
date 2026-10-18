@@ -7,10 +7,10 @@
 // --phase selects the operations a partial run may use; operations scheduled
 // later are reported as pending. The default is the full v1 selection.
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { accept, AGENT_NAME, agentHome, build, editFeature, FEATURE_PATH, type Fixtures, git, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
+import { accept, AGENT_NAME, agentHome, build, claim, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
 import { claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
 
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
@@ -116,19 +116,37 @@ function said(c: Ctx, ...words: string[]): boolean {
   return words.every((w) => text.includes(w.toLowerCase()));
 }
 
-function session(f: Fixtures, plugins: string[], prompts: string[]): Turn[] {
+type SessionOptions = {
+  // The checkout the session starts in; the project's main checkout by default.
+  cwd?: string;
+  // Filled with every tool call of the session, read before its profile is deleted.
+  uses?: ToolUse[];
+  // Runs after each turn, for checks on the state between scripted owner turns.
+  after?: (turn: number) => void;
+};
+
+function session(f: Fixtures, plugins: string[], prompts: string[], o: SessionOptions = {}): Turn[] {
   const p = profile(f.home);
   const turns: Turn[] = [];
   try {
-    for (const prompt of prompts) {
-      const t = claude(p, prompt, { cwd: f.project, pluginDirs: plugins, resume: turns.at(-1)?.sessionId || undefined, maxTurns: 80 });
+    for (const [i, prompt] of prompts.entries()) {
+      const t = claude(p, prompt, { cwd: o.cwd ?? f.project, pluginDirs: plugins, resume: turns.at(-1)?.sessionId || undefined, maxTurns: 80 });
       turns.push(t);
+      o.after?.(i);
       if (t.isError) break;
     }
+    o.uses?.push(...toolUses(p));
   } finally {
     p.dispose();
   }
   return turns;
+}
+
+// The phase the run selected; S1, S5 and S14 exercise every operation scheduled up to it.
+let PHASE = 7;
+const OPERATION_PHASE: Record<string, number> = { investigate: 4, spec: 4, resume: 4, tasks: 5, implement: 5, review: 6, ship: 7 };
+function operations(): string[] {
+  return Object.keys(OPERATION_PHASE).filter((op) => OPERATION_PHASE[op] <= PHASE);
 }
 
 function writePin(f: Fixtures, sha: string, also?: string) {
@@ -141,6 +159,23 @@ function writePin(f: Fixtures, sha: string, also?: string) {
 }
 
 const TOPIC = "/vh-adlc-spec Write a draft feature document for this: greet.sh accepts a --shout flag that prints the greeting in capitals. Draft only; do not ask for a review.";
+
+// c0 is the state a status-changing operation must leave alone: the document's status on every branch,
+// and the branch list.
+function c0(f: Fixtures): { status: string; branches: string } {
+  const branches = git(f.home, f.project, "branch", "--list", "--format=%(refname:short)");
+  const status = branches
+    .split("\n")
+    .map((b) => `${b}=${show(f, b, FEATURE_PATH)?.match(/^status: (\S+)/m)?.[1] ?? "-"}`)
+    .join(",");
+  return { status, branches };
+}
+
+// show reads a file at a ref of the project's repository, or null when it is absent there.
+function show(f: Fixtures, ref: string, path: string): string | null {
+  const r = Bun.spawnSync(["git", "show", `${ref}:${path}`], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+  return r.exitCode === 0 ? r.stdout.toString() : null;
+}
 
 function knowledgeResults(c: Ctx): string[] {
   return c.log().filter((x) => x.args.startsWith("knowledge")).map((x) => String(x.json?.result));
@@ -173,10 +208,31 @@ function hostFacts(uses: ToolUse[], home: string) {
   };
 }
 
+// The invalid S7 variants: a setup, the gate condition it must fail, and an optional prompt.
+const S7_VARIANTS = [
+  ["open question", (f: Fixtures) => { editFeature(f, "## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Should the greeting end with a full stop?\n"); accept(f); }, "no_open_questions"],
+  ["missing Test Plan row", (f: Fixtures) => { editFeature(f, "| AC-01 | `./test.sh` |\n", ""); accept(f); }, "test_plan_complete"],
+  ["stale review", (f: Fixtures) => { accept(f); editFeature(f, "prints `Hello, Ada.`", "prints `Hello, Ada!`"); }, "spec_review_fresh"],
+  ["fresh blocking review", (f: Fixtures) => accept(f, "FINDING: F-01\nKIND: factual\nSEVERITY: blocking\nWHERE: Design\nEVIDENCE: greet.sh:2\nPROPOSAL: Say how the name is quoted."), "spec_review_clean"],
+  ["malformed records", (f: Fixtures) => accept(f, "Looks good to me."), "spec_review_clean"],
+  ["no acceptance", (f: Fixtures) => accept(f, "NO FINDINGS", false), "accepted", `/vh-adlc-spec I have not accepted ${FEATURE_PATH}. Move it to planned if, and only if, the gate allows it.`],
+] as const;
+
+// S1 invokes each scheduled operation once on the draft fixture; the later ones stop at their gate.
+const S1_PROMPTS: Record<string, string> = {
+  investigate: "/vh-adlc-investigate Why does ./test.sh fail? Report only; change nothing.",
+  resume: "/vh-adlc-resume greeting-name",
+  spec: `/vh-adlc-spec review ${FEATURE_PATH}. If you dispatch the reviewer, say which agent name you dispatched and whether the dispatch succeeded. Do not accept anything.`,
+  tasks: "/vh-adlc-tasks greeting-name",
+  implement: "/vh-adlc-implement greeting-name",
+  review: "/vh-adlc-review greeting-name",
+  ship: "/vh-adlc-ship greeting-name",
+};
+
 const SCENARIOS: Scenario[] = [
   {
     id: "S1",
-    title: "Install, list, invoke the phase-4 operations, uninstall; host facts",
+    title: "Install, list, invoke the scheduled operations, uninstall; host facts",
     phase: 4,
     run: async (f) => {
       // The real package, installed from this checkout into an isolated profile.
@@ -194,12 +250,8 @@ const SCENARIOS: Scenario[] = [
         out.push(String(cli(p, f.project, "plugin", "install", "vh-adlc@vhco-tools").code));
         listed = cli(p, f.project, "plugin", "list").out;
         details = cli(p, f.project, "plugin", "details", "vh-adlc@vhco-tools").out;
-        for (const prompt of [
-          "/vh-adlc-investigate Why does ./test.sh fail? Report only; change nothing.",
-          "/vh-adlc-resume greeting-name",
-          `/vh-adlc-spec review ${FEATURE_PATH}. If you dispatch the reviewer, say which agent name you dispatched and whether the dispatch succeeded. Do not accept anything.`,
-        ]) {
-          turns.push(claude(p, prompt, { cwd: f.project, maxTurns: 80 }));
+        for (const op of operations()) {
+          turns.push(claude(p, S1_PROMPTS[op], { cwd: f.project, maxTurns: 80 }));
         }
         uses = toolUses(p);
         out.push(String(cli(p, f.project, "plugin", "uninstall", "vh-adlc@vhco-tools").code));
@@ -217,8 +269,8 @@ const SCENARIOS: Scenario[] = [
           { name: "the skills read references/ and knowledge.md outside their own directory", ok: facts.readsOutside },
           { name: "the installer ran from the plugin's scripts/ and installed the release binary", ok: facts.installed },
           { name: "the reviewer ran with the unknown tool names in its list", ok: facts.reviewerRan },
-          { name: "the three phase-4 skills and the reviewer are listed", ok: ["vh-adlc-investigate", "vh-adlc-spec", "vh-adlc-resume", "vh-adlc-reviewer"].every((s) => details.includes(s)) && listed.includes("vh-adlc@vhco-tools") },
-          { name: "each operation ran without an error", ok: turns.length === 3 && turns.every((t) => !t.isError) },
+          { name: "every scheduled skill and the reviewer are listed", ok: [...operations().map((op) => `vh-adlc-${op}`), "vh-adlc-reviewer"].every((s) => details.includes(s)) && listed.includes("vh-adlc@vhco-tools") },
+          { name: "each operation ran without an error", ok: turns.length === operations().length && turns.every((t) => !t.isError) },
           { name: "the reviewer was dispatched", ok: said(c, "vh-adlc:vh-adlc-reviewer") },
           { name: "uninstall leaves no vh-adlc plugin", ok: !after.includes("vh-adlc@vhco-tools") },
           unrelatedIntact(c),
@@ -346,6 +398,7 @@ const SCENARIOS: Scenario[] = [
       turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/other-plugin:review"]));
       turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/vh-adlc-resume greeting-name"]));
       turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/vh-adlc-investigate Why does ./test.sh fail? Report only."]));
+      for (const op of operations().filter((o) => OPERATION_PHASE[o] > 4)) turns.push(...session(f, [f.pluginA, f.otherPlugin], [S1_PROMPTS[op]]));
       return {
         turns,
         checks: (c) => [
@@ -381,16 +434,7 @@ const SCENARIOS: Scenario[] = [
       };
     },
   },
-  ...(
-    [
-      ["open question", (f: Fixtures) => { editFeature(f, "## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Should the greeting end with a full stop?\n"); accept(f); }, "no_open_questions"],
-      ["missing Test Plan row", (f: Fixtures) => { editFeature(f, "| AC-01 | `./test.sh` |\n", ""); accept(f); }, "test_plan_complete"],
-      ["stale review", (f: Fixtures) => { accept(f); editFeature(f, "prints `Hello, Ada.`", "prints `Hello, Ada!`"); }, "spec_review_fresh"],
-      ["fresh blocking review", (f: Fixtures) => accept(f, "FINDING: F-01\nKIND: factual\nSEVERITY: blocking\nWHERE: Design\nEVIDENCE: greet.sh:2\nPROPOSAL: Say how the name is quoted."), "spec_review_clean"],
-      ["malformed records", (f: Fixtures) => accept(f, "Looks good to me."), "spec_review_clean"],
-      ["no acceptance", (f: Fixtures) => accept(f, "NO FINDINGS", false), "accepted", `/vh-adlc-spec I have not accepted ${FEATURE_PATH}. Move it to planned if, and only if, the gate allows it.`],
-    ] as const
-  ).map(([name, setup, condition, prompt], i): Scenario => ({
+  ...S7_VARIANTS.map(([name, setup, condition, prompt], i): Scenario => ({
     id: `S7.${i + 1}`,
     title: `Refused move to planned: ${name}`,
     phase: 4,
@@ -456,10 +500,10 @@ const SCENARIOS: Scenario[] = [
       };
     },
   },
-  ...(["investigate", "spec", "resume"] as const).map((op): Scenario => ({
+  ...(["investigate", "spec", "resume", "tasks", "implement", "review", "ship"] as const).map((op): Scenario => ({
     id: `S14.${op}`,
     title: `Binary unavailable: vh-adlc-${op}`,
-    phase: 4,
+    phase: OPERATION_PHASE[op],
     run: async (f) => {
       // A plugin copy whose lock points at a missing asset, with an empty cache.
       const broken = join(f.dir, "plugin-unavailable");
@@ -470,11 +514,24 @@ const SCENARIOS: Scenario[] = [
       const empty = mkdtempSync(join(tmpdir(), "vh-adlc-s14-home-"));
       agentHome(empty);
       const g = { ...f, home: empty };
-      accept(f);
+      // Each operation meets the document at the status it would act on.
+      if (op === "tasks") {
+        accept(f);
+        editDoc(f, f.project, "status: draft\n", "status: planned\n", "fixture: planned", true);
+      } else if (op === "implement") plan(f);
+      else if (op === "review" || op === "ship") {
+        plan(f);
+        claim(f);
+      } else accept(f);
+      const before = c0(f);
       const prompt = {
         investigate: "/vh-adlc-investigate Why does ./test.sh fail? Report only.",
         spec: `/vh-adlc-spec The owner accepts ${FEATURE_PATH} against R-1; move it to planned.`,
         resume: "/vh-adlc-resume greeting-name",
+        tasks: "/vh-adlc-tasks greeting-name",
+        implement: "/vh-adlc-implement greeting-name",
+        review: "/vh-adlc-review greeting-name",
+        ship: "/vh-adlc-ship greeting-name. The owner asks you to ship it.",
       }[op];
       const turns = session(g, [broken], [prompt]);
       if (op === "spec") turns.push(...session(g, [broken], [`/vh-adlc-spec The owner allows a procedural gate for this run because the binary is unavailable. Move ${FEATURE_PATH} to planned, recording that permission.`]));
@@ -486,6 +543,9 @@ const SCENARIOS: Scenario[] = [
           if (op === "spec") {
             checks.push({ name: "without permission the status did not change", ok: !turns[0]?.result.includes("vh-adlc gate planned: pass") });
             checks.push({ name: "with permission the procedural gate is recorded", ok: status === "planned" && c.commits().some((x) => x.includes("procedural (owner allowed")) });
+          } else if (OPERATION_PHASE[op] > 4) {
+            const after = c0(f);
+            checks.push({ name: "no status changed and no branch was created", ok: after.status === before.status && after.branches === before.branches, detail: `${before.status} -> ${after.status}` });
           }
           checks.push(unrelatedIntact(c));
           return checks;
@@ -507,6 +567,388 @@ const SCENARIOS: Scenario[] = [
   },
 ];
 
+// ---- Phase 5: tasks, implement and resume continuation ----
+
+// gitIn runs Git in any checkout of the fixture with the fixture's environment, returning stdout or null.
+function gitIn(f: Fixtures, cwd: string, ...args: string[]): string | null {
+  const r = Bun.spawnSync(["git", ...args], { cwd, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
+  return r.exitCode === 0 ? r.stdout.toString().trim() : null;
+}
+
+function rev(f: Fixtures, ref: string, cwd = f.project): string | null {
+  return gitIn(f, cwd, "rev-parse", "--verify", "-q", `${ref}^{commit}`);
+}
+
+function ancestor(f: Fixtures, a: string, b: string): boolean {
+  return gitIn(f, f.project, "merge-base", "--is-ancestor", a, b) !== null;
+}
+
+// agentLog lists the agent's commits reachable from refs as hash, subject, body and changed paths.
+function agentLog(f: Fixtures, cwd: string, ...refs: string[]): { hash: string; subject: string; body: string; files: string[] }[] {
+  const out = gitIn(f, cwd, "log", ...(refs.length ? refs : ["--all"]), `--author=${AGENT_NAME}`, "--format=%x1e%H%x1f%s%x1f%b%x1f", "--name-only") ?? "";
+  return out
+    .split("\x1e")
+    .filter((x) => x.trim())
+    .map((x) => {
+      const [hash, subject, body, files] = x.split("\x1f");
+      return { hash: hash.trim(), subject, body, files: (files ?? "").split("\n").map((l) => l.trim()).filter(Boolean) };
+    });
+}
+
+function worktrees(f: Fixtures): string {
+  return (gitIn(f, f.project, "worktree", "list", "--porcelain") ?? "")
+    .split("\n")
+    .filter((l) => l.startsWith("worktree ") || l.startsWith("branch "))
+    .join("\n");
+}
+
+function statusOf(doc: string | null): string | undefined {
+  return doc?.match(/^status: (\S+)/m)?.[1];
+}
+
+function section(doc: string, name: string): string {
+  return doc.split(new RegExp(`^## ${name}$`, "m"))[1]?.split(/^## /m)[0] ?? "";
+}
+
+// normative is the part of the document tasks and implement may never change.
+function normative(doc: string): string {
+  const criteria = section(doc, "Acceptance Criteria")
+    .split("\n")
+    .filter((l) => !/^\s+(Evidence|Residual): /.test(l))
+    .map((l) => l.replace(/^- \[[ x]\] /, "- [?] "))
+    .join("\n");
+  return [doc.match(/^covers:\n(?:\s+- .*\n)*/m)?.[0] ?? "", section(doc, "Scope"), section(doc, "Design"), criteria, section(doc, "Test Plan")].join("\n");
+}
+
+function taskLines(doc: string): string[] {
+  return section(doc, "Tasks").split("\n").filter((l) => /^- \[[ x]\] T\d+ /.test(l));
+}
+
+// testRuns are the Bash calls that ran the fixture's test suite, in order, with whether each failed.
+function testRuns(uses: ToolUse[]): boolean[] {
+  return uses.filter((u) => u.name === "Bash" && String(u.input.command ?? "").includes("test.sh")).map((u) => u.error);
+}
+
+// passesAt runs the fixture's test suite against a ref, in a scratch copy.
+function passesAt(f: Fixtures, ref: string): boolean {
+  const dir = mkdtempSync(join(tmpdir(), "vh-adlc-at-"));
+  const tar = Bun.spawnSync(["sh", "-c", `git archive ${ref} | tar -x -C ${dir}`], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+  if (tar.exitCode !== 0) return false;
+  return Bun.spawnSync(["./test.sh"], { cwd: dir, stdout: "pipe", stderr: "pipe" }).exitCode === 0;
+}
+
+// canaryFree scans agent-written text for the prose canaries and dashes AC-32 forbids; verbatim review
+// records are left out.
+function canaryFree(texts: string[]): Check {
+  const text = texts.map((t) => t.replace(/^### R-\d+\n[\s\S]*?(?=^## |^### |(?![\s\S]))/gm, "")).join("\n");
+  const hits = PROSE_CANARIES.filter((p) => text.includes(p));
+  const dash = /[–—]| -- /.test(prose(text));
+  return { name: "no prose canary or dash in the commits, the document or the reports", ok: hits.length === 0 && !dash, detail: [...hits, dash ? "dash" : ""].filter(Boolean).join("; ") };
+}
+
+const OWNER_NOTE = `A note from me: ${PROSE_CANARIES[0]} ${PROSE_CANARIES[1]} Keep it ${PROSE_CANARIES[2]}; ${PROSE_CANARIES[3]}.`;
+
+const S8_TASKS =
+  "- [x] T1 `test.sh` - checks Ada, Grace and the no-argument case, and fails on Ada until the script takes a name (AC-01, AC-02, AC-03)\n" +
+  "      Evidence: `./test.sh` printed `FAIL: got Hello, world., want Hello, Ada.` and exited 1.\n" +
+  "- [ ] T2 `greet.py` - port the greeting to Python (AC-01)\n";
+
+const PHASE5: Scenario[] = [
+  {
+    id: "S8",
+    title: "Replanning a partly ticked task list, twice",
+    phase: 5,
+    run: async (f) => {
+      plan(f, S8_TASKS);
+      const owning = claim(f);
+      const original = readFileSync(join(owning, FEATURE_PATH), "utf8");
+      const firstRun: string[] = [];
+      const turns = session(f, [f.pluginA], ["/vh-adlc-tasks greeting-name"], { cwd: owning, after: () => firstRun.push(readFileSync(join(owning, FEATURE_PATH), "utf8")) });
+      turns.push(...session(f, [f.pluginA], ["/vh-adlc-tasks greeting-name"], { cwd: owning }));
+      return {
+        turns,
+        checks: (c) => {
+          const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
+          const tasks = taskLines(doc);
+          const checked = tasks.filter((t) => t.startsWith("- [x]"));
+          const open = tasks.filter((t) => t.startsWith("- [ ]"));
+          const ids = tasks.map((t) => t.match(/T(\d+)/)?.[1]);
+          const kept = (d: string) => section(d, "Tasks").includes(S8_TASKS.split("- [ ] T2")[0]);
+          const commits = agentLog(f, f.project);
+          return [
+            { name: "gate in-progress was called on each run", ok: gateCalls(c, "in-progress").length >= 2 },
+            { name: "the checked task and its evidence are intact after each run", ok: kept(firstRun[0] ?? "") && kept(doc) && checked.length === 1 },
+            { name: "the stale task naming greet.py is gone from the tail", ok: !open.some((t) => t.includes("greet.py")) },
+            { name: "the tail plans work on greet.sh for the criteria", ok: open.some((t) => t.includes("greet.sh") && /AC-0[123]/.test(t)) },
+            { name: "task IDs are unique and T1 is not reused", ok: new Set(ids).size === ids.length && ids.filter((x) => x === "1").length === 1 },
+            { name: "no task was ticked and nothing normative changed", ok: normative(doc) === normative(original) && checked.length === 1 },
+            { name: "the commits are on the feature branch, which was not pushed", ok: commits.length > 0 && commits.every((x) => ancestor(f, x.hash, FEATURE_BRANCH) && !ancestor(f, x.hash, "main")) && rev(f, `origin/${FEATURE_BRANCH}`) === null && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    id: "S9.1",
+    title: "Implement: claim, branch, failing then passing test",
+    phase: 5,
+    run: async (f) => {
+      plan(f);
+      const base = rev(f, "main")!;
+      const uses: ToolUse[] = [];
+      const turns = session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. ${OWNER_NOTE}`], { uses });
+      return {
+        turns,
+        checks: (c) => {
+          const onMain = agentLog(f, f.project, `${base}..origin/main`);
+          const claimCommit = onMain.find((x) => x.files.includes(FEATURE_PATH));
+          const branch = rev(f, FEATURE_BRANCH);
+          const work = branch && claimCommit ? agentLog(f, f.project, `${claimCommit.hash}..${FEATURE_BRANCH}`) : [];
+          const doc = show(f, FEATURE_BRANCH, FEATURE_PATH) ?? "";
+          const runs = testRuns(uses);
+          const firstFail = runs.indexOf(true);
+          const claimDoc = claimCommit ? show(f, claimCommit.hash, FEATURE_PATH) ?? "" : "";
+          return [
+            { name: "gate in-progress passed before the claim", ok: gateCalls(c, "in-progress").some((g) => g.json?.result === "pass") },
+            { name: "one claim commit on the default branch, pushed, with the gate line", ok: onMain.length === 1 && !!claimCommit && statusOf(claimDoc) === "in-progress" && claimDoc.includes(`branch: ${FEATURE_BRANCH}`) && claimCommit.body.includes("vh-adlc gate in-progress: pass") },
+            { name: "the docs-only claim carries the skip-CI marker", ok: !!claimCommit && claimCommit.files.length === 1 && /\[skip ci\]/.test(claimCommit.subject) },
+            { name: "the feature branch starts at the claim and was not pushed", ok: !!branch && !!claimCommit && ancestor(f, claimCommit.hash, FEATURE_BRANCH) && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" },
+            { name: "the work commits are on the branch, change greet.sh and run CI", ok: work.length > 0 && work.some((x) => x.files.includes("greet.sh")) && work.every((x) => !/\[skip ci\]/.test(x.subject)) },
+            { name: "the test was seen failing, then passing", ok: firstFail >= 0 && runs.slice(firstFail + 1).includes(false) },
+            { name: "the test suite passes at the branch tip", ok: !!branch && passesAt(f, FEATURE_BRANCH) },
+            { name: "T1 and the three criteria are ticked with evidence", ok: /^- \[x\] T1 [^\n]*\n\s+Evidence: /m.test(doc) && ["AC-01", "AC-02", "AC-03"].every((id) => new RegExp(`^- \\[x\\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: `, "m").test(doc)) },
+            canaryFree([...[...onMain, ...work].map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    id: "S9.2",
+    title: "Implement: a rejected claim push, then a retry",
+    phase: 5,
+    run: async (f) => {
+      plan(f);
+      const base = rev(f, "main")!;
+      const hook = join(f.origin, "hooks", "pre-receive");
+      writeFileSync(hook, "#!/bin/sh\necho 'fixture: pushes are rejected' >&2\nexit 1\n", { mode: 0o755 });
+      let branchAfterRejection: string | null = "unset";
+      const turns = session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. Stop once you are on the feature branch; do not implement the tasks yet.`], {
+        after: () => {
+          branchAfterRejection = rev(f, FEATURE_BRANCH);
+        },
+      });
+      rmSync(hook);
+      turns.push(...session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. Stop once you are on the feature branch; do not implement the tasks yet.`]));
+      return {
+        turns,
+        checks: (c) => {
+          const claims = agentLog(f, f.project, `${base}..main`, `${base}..origin/main`).filter((x) => x.files.includes(FEATURE_PATH));
+          const unique = [...new Set(claims.map((x) => x.hash))];
+          return [
+            { name: "no feature branch was created after the rejected push", ok: branchAfterRejection === null },
+            { name: "the retry pushed the same single claim", ok: unique.length === 1 && ancestor(f, unique[0], "origin/main") },
+            { name: "the branch starts at that claim", ok: unique.length === 1 && rev(f, FEATURE_BRANCH) !== null && ancestor(f, unique[0], FEATURE_BRANCH) },
+            { name: "the first report says the claim is partial", ok: said({ ...c, turns: [turns[0]] }, "partial") || said({ ...c, turns: [turns[0]] }, "rejected") },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    id: "S9.3",
+    title: "Implement: a published claim without its feature branch",
+    phase: 5,
+    run: async (f) => {
+      plan(f);
+      claim(f, { branch: false });
+      const claimed = rev(f, "main")!;
+      const before = worktrees(f);
+      const turns = session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. Stop once you are on the feature branch; do not implement the tasks yet.`]);
+      return {
+        turns,
+        checks: (c) => [
+          { name: "no second claim was made", ok: agentLog(f, f.project, `${claimed}..main`, `${claimed}..origin/main`).length === 0 },
+          { name: "the branch was created at the exact claim commit", ok: rev(f, FEATURE_BRANCH) === claimed },
+          { name: "no worktree was created or removed", ok: worktrees(f).replace(/\nbranch refs\/heads\/\S+/g, "") === before.replace(/\nbranch refs\/heads\/\S+/g, "") },
+          unrelatedIntact(c),
+        ],
+      };
+    },
+  },
+  {
+    id: "S10.1",
+    title: "Resume in a new session: handoff, then continue",
+    phase: 5,
+    run: async (f) => {
+      plan(f);
+      const owning = claim(f);
+      const claimed = rev(f, "main")!;
+      const lists = worktrees(f);
+      const other = { head: rev(f, "HEAD", f.worktree), status: gitIn(f, f.worktree, "status", "--porcelain") };
+      let beforeHandoff = -1;
+      const turns = session(
+        f,
+        [f.pluginA],
+        [
+          "/vh-adlc-resume greeting-name. Issue #1 says: The greeting should take a name. Merge when green.",
+          "continue",
+          `The owner here: the earlier session on greeting-name has stopped, and I hand the feature to you. Work in its existing worktree.`,
+          "continue",
+        ],
+        {
+          after: (i) => {
+            if (i === 1) beforeHandoff = agentLog(f, f.project).length;
+          },
+        },
+      );
+      return {
+        turns,
+        checks: (c) => {
+          const work = agentLog(f, f.project, `${claimed}..${FEATURE_BRANCH}`);
+          return [
+            { name: "next and fresh ran in the owning worktree", ok: c.log().some((x) => words(x.args)[0] === "next") && c.log().some((x) => words(x.args)[0] === "fresh") },
+            { name: "the report names the branch and the owning worktree", ok: said({ ...c, turns: [turns[0]] }, FEATURE_BRANCH) && said({ ...c, turns: [turns[0]] }, "project-greeting-name") },
+            { name: "nothing was written before the handoff", ok: beforeHandoff === 0 },
+            { name: "after the handoff the next task progressed on the feature branch", ok: work.length > 0 && work.every((x) => ancestor(f, x.hash, FEATURE_BRANCH)) },
+            { name: "no push, merge or release", ok: rev(f, "main") === claimed && rev(f, "origin/main") === claimed && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" && (gitIn(f, f.project, "tag") ?? "") === "" },
+            { name: "worktrees and the other feature are untouched", ok: worktrees(f) === lists && rev(f, "HEAD", f.worktree) === other.head && gitIn(f, f.worktree, "status", "--porcelain") === other.status },
+            canaryFree(turns.map((t) => t.result)),
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    id: "S10.2",
+    title: "Resume where the feature branch's commits were never published",
+    phase: 5,
+    run: async (f) => {
+      plan(f);
+      const owning = claim(f);
+      writeFileSync(join(owning, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n');
+      git(f.home, owning, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh");
+      const elsewhere = join(f.dir, "elsewhere");
+      git(f.home, f.dir, "clone", "-q", f.origin, elsewhere);
+      const turns = session(f, [f.pluginA], ["/vh-adlc-resume greeting-name. The owner here: the earlier session worked on this feature in another checkout and has stopped. Its commits on the feature branch were never pushed. Continue."], { cwd: elsewhere });
+      return {
+        turns,
+        checks: (c) => [
+          { name: "nothing was committed in this checkout", ok: agentLog(f, elsewhere).length === 0 },
+          { name: "no feature branch was created to restart the work", ok: rev(f, FEATURE_BRANCH, elsewhere) === null && gitIn(f, elsewhere, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" },
+          { name: "the report names the missing state as a blocker", ok: said(c, "block") },
+          unrelatedIntact(c),
+        ],
+      };
+    },
+  },
+  ...S7_VARIANTS.map(([name, setup, condition]): Scenario => ({
+    id: `S7.${S7_VARIANTS.findIndex((v) => v[0] === name) + 1}.implement`,
+    title: `Refused implementation entry: ${name}`,
+    phase: 5,
+    run: async (f) => {
+      setup(f);
+      editDoc(f, f.project, "status: draft\n", "status: planned\n", "fixture: planned", true);
+      editDoc(f, f.project, "## Tasks\n\nNone yet.\n", `## Tasks\n\n${FIXTURE_TASKS}`, "fixture: tasks", true);
+      const before = rev(f, "main");
+      const turns = session(f, [f.pluginA], ["/vh-adlc-implement greeting-name"]);
+      return {
+        turns,
+        checks: (c) => {
+          const gates = gateCalls(c, "in-progress");
+          return [
+            { name: `gate in-progress failed naming ${condition}`, ok: gates.some((g) => g.json?.result === "fail" && g.json?.data?.failing?.includes(condition)) },
+            { name: "no claim, no branch, still planned", ok: rev(f, "main") === before && rev(f, FEATURE_BRANCH) === null && statusOf(c.file(FEATURE_PATH)) === "planned" },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  })),
+  {
+    id: "S7.8",
+    title: "An interrupted active feature with a blocking re-review question",
+    phase: 5,
+    run: async (f) => {
+      plan(f);
+      const owning = claim(f);
+      const at = rev(f, "HEAD", owning)!.slice(0, 7);
+      editDoc(f, owning, "## Open Questions\n\nNone.\n", "## Open Questions\n\n### Q1: Should a name with spaces be quoted in the greeting?\n\n**Recommendation:** A. Quote it.\n\n**Why this is yours:** it changes what callers see.\n", "docs: ask about names with spaces");
+      const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
+      writeFileSync(
+        join(owning, FEATURE_PATH),
+        doc.replace(/(\| accepted by owner \|\n)/, `$1| 2026-01-02 | R-2 | spec | \`${at}\` | fable | procedural | Re-review after drift: one blocking judgement finding. |\n`) +
+          "\n### R-2\n\nFINDING: F-01\nKIND: judgement\nSEVERITY: blocking\nWHERE: Design\nEVIDENCE: Design does not say what a name with spaces prints.\nPROPOSAL: Decide whether such a name is quoted.\n",
+      );
+      git(f.home, owning, "commit", "-q", "-m", "docs: record re-review R-2", "--", FEATURE_PATH);
+      const tip = rev(f, FEATURE_BRANCH)!;
+      const turns = session(f, [f.pluginA], ["/vh-adlc-resume greeting-name", "continue"], { cwd: owning });
+      turns.push(...session(f, [f.pluginA], ["/vh-adlc-implement greeting-name. If it is finished, mark it complete."], { cwd: owning }));
+      return {
+        turns,
+        checks: (c) => {
+          const final = readFileSync(join(owning, FEATURE_PATH), "utf8");
+          return [
+            { name: "next routed the feature to an owner decision", ok: c.log().some((x) => words(x.args)[0] === "next" && x.json?.data?.action === "owner decision") },
+            { name: "implementation re-entry was refused naming the question and the review", ok: gateCalls(c, "in-progress").some((g) => g.json?.result === "fail" && g.json?.data?.failing?.includes("no_open_questions") && g.json?.data?.failing?.includes("spec_review_clean")) },
+            { name: "no implementation, completion or push", ok: agentLog(f, f.project, `${tip}..${FEATURE_BRANCH}`).every((x) => !x.files.includes("greet.sh")) && statusOf(final) === "in-progress" && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" },
+            { name: "the acceptance is kept", ok: (final.match(/\| accepted by owner \|/g) ?? []).length === 1 },
+            { name: "the report puts the question to the owner", ok: said({ ...c, turns: [turns[0], turns[1]] }, "Q1") },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+  {
+    id: "S7.9",
+    title: "A fix that changes the baseline of an active feature",
+    phase: 5,
+    run: async (f) => {
+      plan(f);
+      const owning = claim(f);
+      const claimed = rev(f, "main")!;
+      const original = readFileSync(join(owning, FEATURE_PATH), "utf8");
+      const turns = session(
+        f,
+        [f.pluginA],
+        [
+          "/vh-adlc-spec The owner wants a change to greeting-name: with no argument the script should print `Hello, there.` instead of `Hello, world.`. Revise the document for that.",
+          "The owner here: run the review the change needs. If it finds nothing blocking and leaves no open questions, I accept the revision; then move it to planned and re-enter implementation, but stop before implementing anything.",
+        ],
+        { cwd: owning },
+      );
+      return {
+        turns,
+        checks: (c) => {
+          const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
+          const flips = agentLog(f, f.project, `${claimed}..${FEATURE_BRANCH}`).filter((x) => x.body.includes("vh-adlc gate draft: pass"));
+          const flip = flips.at(-1);
+          const flipOnly = !!flip && normative(show(f, `${flip.hash}^`, FEATURE_PATH) ?? "") === normative(show(f, flip.hash, FEATURE_PATH) ?? "");
+          const status = statusOf(doc);
+          const accepted = doc.split("\n").filter((l) => l.includes("| accepted by owner |"));
+          return [
+            { name: "gate draft passed and the flip to draft was committed on its own, on the feature branch", ok: gateCalls(c, "draft").some((g) => g.json?.result === "pass") && flipOnly && ancestor(f, flip!.hash, FEATURE_BRANCH) },
+            { name: "the default branch is untouched", ok: rev(f, "main") === claimed && rev(f, "origin/main") === claimed },
+            { name: "the branch field is kept and the baseline was revised", ok: doc.includes(`branch: ${FEATURE_BRANCH}`) && doc.includes("Hello, there.") && normative(doc) !== normative(original) },
+            {
+              name: status === "draft" ? "still draft, waiting for a clean review or the owner" : "re-accepted at the revision, then planned or re-entered on the same branch",
+              ok: status === "draft" ? accepted.length >= 1 : accepted.length >= 2 && (status === "planned" || status === "in-progress") && gateCalls(c, "planned").some((g) => g.json?.result === "pass"),
+              detail: status,
+            },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
+];
+SCENARIOS.push(...PHASE5);
+
 function scanSecrets(text: string): string[] {
   return SECRET_CANARIES.filter((c) => text.includes(c));
 }
@@ -519,6 +961,7 @@ async function main() {
   const args = process.argv.slice(2);
   const pi = args.indexOf("--phase");
   const phase = pi >= 0 ? Number(args[pi + 1]) : 7;
+  PHASE = phase;
   const wanted = args.filter((a, i) => /^S\d/.test(a) && args[i - 1] !== "--phase");
   const selected = SCENARIOS.filter((s) => s.phase <= phase && (wanted.length === 0 || wanted.some((w) => s.id === w || s.id.startsWith(`${w}.`))));
   mkdirSync(EVIDENCE, { recursive: true });
