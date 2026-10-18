@@ -15,7 +15,9 @@ covers:
   - go.mod
   - go.sum
   - .goreleaser.yml
-  - gitversion.yml
+  - .golangci.yml
+  - .gitignore
+  - schema/
   - .github/workflows/
   - tests/vh-adlc/
   - release-signing-key.asc
@@ -93,7 +95,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-26 | Completion certifies a committed implementation reviewed at an exact commit, not an uncommitted snapshot. Relevant changes are committed before review; relevant dirty changes prevent completion. Unrelated staged, unstaged and untracked work is left untouched. |
 | D-27 | Binary releases are signed with the owner's one general release key, VHCO Pro (Release Signing Key) <release@vhco.pro>, fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`: `checksums.txt` carries a detached signature. The passphrase-less ASCII-armoured secret key is the `PGP_PRIVATE_KEY` repository secret (set on 2026-10-17); the public key is committed as `release-signing-key.asc` and its fingerprint printed in the README. The key's original identity, VHCO Pro (Terraform Provider Signing Key), stays; the general identity was added on 2026-10-17 and is primary, and `release-signing-key.asc` is exported from the key as held in the secret, so the file, the README and every signature agree. The plugin installer's trust root stays the digests pinned in its lock; it does not verify the signature. |
 | D-28 | The loop edits every piece of prose it writes for a reader with the humanize prose guide in `vhco-pro/docs` (`guides/humanize-prose.md`, adapted from `blader/humanizer`) before committing or posting it: feature-document prose, commit messages, PR and issue bodies, review summaries and run reports. Stored review records and other verbatim text are not rewritten. The guide is a docs page, not plugin text, and the plugin pin moves to `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`, the merge that added it. |
-| D-29 | One exception to D-20, for the binary child feature (`docs/specs/vh-adlc-binary.spec.md`) only, because its release cannot happen before its own merge. After the release, two docs-only commits made on its feature branch, fast-forwarded to the default branch, are pushed straight to the default branch with the skip-CI marker: one records the release evidence, the other flips the child to `complete`. A known gap for this document's next normative revision: Design's "The feature's own commits cannot cause it" holds only until the feature merges. Decided on 2026-10-17 in answer to the child's review R-2 F-01. |
+| D-29 | One exception to D-20, for the binary child feature (`docs/specs/vh-adlc-binary.spec.md`) only, because its release cannot happen before its own merge. After the release, two docs-only commits made on its feature branch, fast-forwarded to the default branch, are pushed straight to the default branch with the skip-CI marker: one records the release evidence, the other flips the child to `complete`. Design's "The feature's own commits cannot cause it" was qualified to hold only until the feature merges in the revision after R-23. Decided on 2026-10-17 in answer to the child's review R-2 F-01. |
 
 ## Scope
 
@@ -312,15 +314,20 @@ a defect that the checker and the scenarios catch (AC-22).
 The model does judgement: is a criterion observable, is a design sound, what does a finding mean. The
 binary does everything that has one right answer from the files.
 
+Every command takes `--repo <dir>` (default `.`), the required `--plugin-pin <sha>` and `--offline`,
+because each one resolves knowledge itself; flags may come before or after positional arguments. The
+binary child's Invocation section (`docs/specs/vh-adlc-binary.spec.md`) has the full grammar, and
+`vh-adlc --version` prints `vh-adlc <version>` for the installer.
+
 | Command | Answers | Called by |
 | --- | --- | --- |
 | `vh-adlc knowledge --repo <dir> --plugin-pin <sha> --page <path>...` | Resolved docs revision; source `repository` or `plugin`; or `invalid-pin`, `missing-page` (naming each requested page absent at the pin), `unreachable`; the rules schema version; the repository's feature-document root | Every operation, first, passing the pages it will read |
-| `vh-adlc find --repo <dir> (--issue <n> \| --slug <s>)` | Existing feature documents whose frontmatter matches | `spec`, `resume` |
-| `vh-adlc lint <doc>` | Frontmatter, status, sections, IDs (unique, never recycled against the document's Git history), a Test Plan row per criterion, task-to-criterion references, Review Log shape and vocabulary | `spec`, `tasks`, `implement`, `review` |
-| `vh-adlc gate <target-status> <doc>` | Whether the move is allowed now, listing every failing condition (below) | Before every status change |
-| `vh-adlc fresh <doc>` | Spec-review and implementation-review staleness (below) | `implement`, `review`, `gate complete` |
-| `vh-adlc next <doc>` | Exactly one next operation and its reason, from the `next` rules in the rules block | `resume` |
-| `vh-adlc review check <doc> --review R-<n> --returned <file>` | Whether the stored records equal the returned ones byte for byte | `review` |
+| `vh-adlc find (--issue <n> \| --slug <s>) --repo <dir> --plugin-pin <sha>` | Existing feature documents whose frontmatter matches | `spec`, `resume` |
+| `vh-adlc lint <doc> --repo <dir> --plugin-pin <sha>` | Frontmatter, status, sections, IDs (unique, never recycled against the document's Git history), a Test Plan row per criterion, task-to-criterion references, Review Log shape and vocabulary | `spec`, `tasks`, `implement`, `review` |
+| `vh-adlc gate <target-status> <doc> --repo <dir> --plugin-pin <sha>` | Whether the move is allowed now, listing every failing condition (below) | Before every status change |
+| `vh-adlc fresh <doc> --repo <dir> --plugin-pin <sha>` | Spec-review and implementation-review staleness (below) | `implement`, `review`, `gate complete` |
+| `vh-adlc next <doc> --repo <dir> --plugin-pin <sha>` | Exactly one next operation and its reason, from the `next` rules in the rules block | `resume` |
+| `vh-adlc review check <doc> --review R-<n> --returned <file> --repo <dir> --plugin-pin <sha>` | Whether the stored records equal the returned ones byte for byte | `review` |
 
 `gate` conditions:
 
@@ -358,7 +365,8 @@ reports `remote: none`. A clone that has a remote but no `refs/remotes/origin/HE
 - **Spec review stale** if the normative baseline differs between the reviewed commit and now, or if
   `git diff --name-only <reviewed>...<remote default> -- <covers>` is non-empty. That is drift from
   other work on the default branch since the reviewed commit's merge base. The feature's own commits
-  cannot cause it.
+  cannot cause it before the feature merges; after the merge they appear as drift, which a drift-only
+  spec review at a commit after the merge clears while the baseline is unchanged.
 - **Implementation review stale** if the normative baseline differs between the reviewed commit and now,
   or if `git diff --name-only <reviewed> HEAD -- <covers>` on the feature branch is non-empty. This includes
   covered files brought in by merging the default branch. Changed requirements or Test Plan therefore
@@ -386,8 +394,9 @@ gate passes, then re-runs `lint`), never calls GitHub, and decides nothing outsi
 
 #### Contract
 
-- One JSON object on stdout: `schema_version`, `command`, `result`, and `findings[]` with stable `code`,
-  `message`, `path` and `line`. Finding codes are API.
+- One JSON object on stdout: `schema_version`, `command`, `result`, `knowledge`, `data`, and
+  `findings[]` with stable `code`, `message`, `path` and `line`. Finding codes are API.
+  `schema/vh-adlc.schema.json` describes the object and lists every result and code.
 - Identical inputs give byte-identical output: no timestamps, random values or unordered iteration.
 - Exit codes: `0` answered or passed; `1` gate or lint failed; `2` usage; `3` document malformed, or rules
   block missing or of an unknown schema; `4` internal or IO error; `5` knowledge not usable (invalid pin,
@@ -416,8 +425,8 @@ and bootstrap guide at the resolved docs pin require:
   `fresh`, `next`, `review`). Table-driven tests beside the code; golden-file tests run every command twice
   per fixture and assert byte-identical output and the documented exit code.
 - Standard library first. A YAML parser is a concrete need. Git is read by invoking `git`.
-- `go test ./...`, `go vet ./...`, `golangci-lint config verify` and `golangci-lint run` (v2) gate the
-  release in CI.
+- `gofmt -l`, `go mod tidy -diff`, `go vet ./...`, `go test ./...`, `go build ./cmd/vh-adlc`,
+  `golangci-lint config verify` and `golangci-lint run` (v2) gate every pull request and the release in CI.
 - Released with `michielvha/gitversion-tag-action` and `michielvha/goreleaser-action`, pinned to full
   commit SHAs (the template's `@main` pins are replaced), with `CGO_ENABLED=0`, `-trimpath`, darwin and
   linux on amd64 and arm64, and a published `checksums.txt` (the template's `checksum.name_template`,
@@ -439,8 +448,9 @@ and bootstrap guide at the resolved docs pin require:
   The template's container step is removed: there is no service image.
 - The binary ignore is anchored at the root (`/vh-adlc`), as the Go convention requires, so it cannot hide
   `cmd/vh-adlc/` or `plugins/vh-adlc/`.
-- The release workflow runs only when binary paths change (`cmd/`, `internal/`, `go.mod`, `go.sum`, the
-  GoReleaser and GitVersion configuration). Plugin-only and docs-only commits never cut a binary release.
+- The release workflow runs only when binary paths change (`cmd/`, `internal/`, `go.mod`, `go.sum`,
+  `.goreleaser.yml` and the release workflow itself); GitVersion uses the action's bundled configuration,
+  so the repository has no GitVersion file. Plugin-only and docs-only commits never cut a binary release.
   GitVersion still reads the whole repository's history, so a binary version can rise because of a plugin
   commit; that is accepted, because plugins version through their own `plugin.json`, not through tags.
 - A path-filtered workflow does not run on a force-push that rewrites history; dispatch it by hand then.
@@ -955,11 +965,11 @@ the fixture lock: no version-only interception or production bypass flag exists.
 installation checks and S15 use the real installer and release lock, apart from explicit bad-lock
 fixtures. Reports identify fixture instrumentation; fixture locks and wrappers are never published or
 written into an installed plugin cache. For AC-32 the harness also captures each operation's final
-report, scans it, and discards it; `evidence/` keeps summaries only. AC-22 is asserted from the wrapper's log and
-the gate line in each status-change commit, never from the model's own summary. VS Code runs by hand in
-the Local harness from the same scripts. Results go to `tests/vh-adlc/evidence/<host>/` as summaries
-recording host and version, plugin version and revision, binary version, OS, date, model and
-limitations.
+report, scans it, and discards it; `evidence/` keeps summaries only. AC-22 is asserted from the
+wrapper's log and the gate line in each status-change commit, never from the model's own summary. VS
+Code runs by hand in the Local harness from the same scripts. Results go to
+`tests/vh-adlc/evidence/<host>/` as summaries recording host and version, plugin version and revision,
+binary version, OS, date, model and limitations.
 
 Phase-scoped runs are explicit, not a relaxation of v1. In phase 4, the checker and S1/S5/S14 exercise
 only `investigate`, `spec` (both modes) and `resume` reporting, plus the reviewer; S7 exercises spec only.
