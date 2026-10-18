@@ -1079,12 +1079,18 @@ const PHASE6: Scenario[] = S11_CASES.map(
       }
       const uses: ToolUse[] = [];
       const turns = session(f, [plugin], [`/vh-adlc-review greeting-name. ${HANDOFF} ${k.prompt} ${OWNER_NOTE}`.replace(/\s+/g, " ").trim()], { cwd: owning, uses, settings: k.settings, model: k.model });
-      // D-38: the model the first pass actually ran on is the Hosts row's measurement.
-      const ran = [...new Set(uses.filter((u) => u.subagent).map((u) => u.model).filter(Boolean))];
+      // D-38: the model each reviewer pass ran on, in the order the passes started, by transcript timestamp.
+      const passes = new Map<string, { at: string; model: string }>();
+      for (const u of uses.filter((x) => x.subagent && x.model)) {
+        const seen = passes.get(u.file);
+        if (!seen || u.at < seen.at) passes.set(u.file, { at: u.at, model: u.model });
+      }
+      const ran = [...passes.values()].sort((a, b) => a.at.localeCompare(b.at)).map((x) => x.model);
+      const dispatches = uses.filter((u) => !u.subagent && u.name === "Agent").length;
       return {
         turns,
         notes: [
-          ...(ran.length ? [`Reviewer passes ran on, in order: ${ran.join(", ")}`] : []),
+          ...(ran.length ? [`Reviewer passes ran on, in the order they started: ${ran.join(", ")}; the main session dispatched the reviewer ${dispatches} time(s)`] : []),
           ...(k.id === "S11.7" && ran[0]?.includes("opus") ? ["D-41: the first pass ran on opus, so D-34's second dispatch is unproven on Claude Code; this needs an Open Question"] : []),
         ],
         checks: (c) => {
@@ -1116,7 +1122,7 @@ const PHASE6: Scenario[] = S11_CASES.map(
             ...(k.id === "S11.7"
               ? ran[0]?.includes("opus")
                 ? [{ name: "first pass ran on opus: recorded as the host rule, one review stored (D-41)", ok: rows.length === 1 }]
-                : [{ name: "exactly one review was stored, after a second dispatch naming opus", ok: rows.length === 1 && uses.filter((u) => !u.subagent && u.name === "Agent").length >= 2 }]
+                : [{ name: "exactly one review was stored, after a second dispatch naming opus", ok: rows.length === 1 && dispatches >= 2 && ran.at(-1)?.includes("opus") === true }]
               : []),
             { name: "committed on the feature branch, not pushed", ok: commits.length > 0 && unpushed },
             canaryFree([...commits.map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
