@@ -117,7 +117,7 @@ export function version(): string {
   return r.stdout.toString().trim();
 }
 
-export type ToolUse = { name: string; input: Record<string, unknown>; error: boolean; output: string; subagent: boolean };
+export type ToolUse = { name: string; input: Record<string, unknown>; error: boolean; output: string; subagent: boolean; model: string };
 
 // toolUses reads every tool call from the profile's session transcripts, subagents included, with
 // whether its result was an error. Call it before the profile is disposed.
@@ -137,7 +137,7 @@ export function toolUses(p: Profile): ToolUse[] {
     const byId = new Map<string, ToolUse>();
     for (const line of readFileSync(file, "utf8").split("\n")) {
       if (!line.trim()) continue;
-      let entry: { message?: { content?: unknown } };
+      let entry: { message?: { content?: unknown; model?: string } };
       try {
         entry = JSON.parse(line);
       } catch {
@@ -147,7 +147,7 @@ export function toolUses(p: Profile): ToolUse[] {
       if (!Array.isArray(content)) continue;
       for (const block of content as Record<string, unknown>[]) {
         if (block.type === "tool_use") {
-          const use = { name: String(block.name), input: (block.input ?? {}) as Record<string, unknown>, error: false, output: "", subagent };
+          const use = { name: String(block.name), input: (block.input ?? {}) as Record<string, unknown>, error: false, output: "", subagent, model: String(entry.message?.model ?? "") };
           byId.set(String(block.id), use);
           uses.push(use);
         } else if (block.type === "tool_result") {

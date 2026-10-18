@@ -44,18 +44,20 @@ commit X, the repository directory, the document, the docs revision, the binary 
 
 ## Store and apply
 
-1. Store the returned text after its `MODEL:` line, byte for byte, under the next `### R-<n>`, with a
-   Review Log row at X recording the kind, the model that line names (or `unknown`) and the isolation
-   (`procedural` unless the host is verified to enforce the reviewer's restrictions). If that model is
-   not the one you asked for, say so, as `references/review-protocol.md` describes. Save the stored text
-   to a scratch file outside the repository and run
+1. Compare the `MODEL:` line with the model you asked for, as `references/review-protocol.md`
+   describes. When it does not match and the protocol leaves the review pending, store nothing: report
+   it as pending with the handoff and stop.
+2. Otherwise store the returned text after its `MODEL:` line, byte for byte, under the next `### R-<n>`,
+   with a Review Log row at X recording the kind, the model that line names (or `unknown`) and the
+   isolation (`procedural` unless the host is verified to enforce the reviewer's restrictions). Save the
+   stored text to a scratch file outside the repository and run
    `vh-adlc review check <doc> --review R-<n> --returned <file>`. Quote its result.
-2. For every criterion the review did not return as `met`, untick it and add an evidence line naming
+3. For every criterion the review did not return as `met`, untick it and add an evidence line naming
    `R-<n>` and the verdict. Leave a criterion it returned as `met` as it is, with its own evidence line.
-3. Run `vh-adlc lint <doc>`, edit the commit message and the Review Log outcome with
+4. Run `vh-adlc lint <doc>`, edit the commit message and the Review Log outcome with
    `guides/humanize-prose.md` at the resolved revision, stage the document alone and commit on the feature
    branch. Do not push.
-4. Run `vh-adlc next` and report where it routes the feature: usually `/vh-adlc-tasks` for the criteria
+5. Run `vh-adlc next` and report where it routes the feature: usually `/vh-adlc-tasks` for the criteria
    that are not met, or `/vh-adlc-ship` when everything is met.
 
 Never edit a returned record, never change a verdict, and never tick a criterion the review did not return

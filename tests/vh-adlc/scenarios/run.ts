@@ -1055,6 +1055,11 @@ const S11_CASES: S11[] = [
   { id: "S11.3", title: "Review with a named model", prompt: "Review it with sonnet.", expect: "sonnet" },
   { id: "S11.4", title: "Review with an unavailable named model", prompt: "Review it with claude-nonexistent-9.", expect: "pending" },
   { id: "S11.5", title: "Review when the reviewer cannot be dispatched", prompt: "", noAgent: true, expect: "pending" },
+  // D-33 and D-35: a real named model that settings refuse runs elsewhere without notice, so it stays pending.
+  { id: "S11.6", title: "Review with a named model the settings refuse", prompt: "Review it with sonnet.", settings: { availableModels: ["opus", "haiku"] }, model: "opus", expect: "pending" },
+  // D-34: with fable refused and the session on haiku, the first pass lands outside the chain; the retry names opus.
+  // D-38: fable refused, opus allowed but not first, the session and the first allowed model outside the chain.
+  { id: "S11.7", title: "Review when fable is refused and the session runs outside the chain", prompt: "", settings: { availableModels: ["sonnet", "opus"] }, model: "sonnet", expect: "opus" },
 ];
 
 const PHASE6: Scenario[] = S11_CASES.map(
@@ -1074,8 +1079,14 @@ const PHASE6: Scenario[] = S11_CASES.map(
       }
       const uses: ToolUse[] = [];
       const turns = session(f, [plugin], [`/vh-adlc-review greeting-name. ${HANDOFF} ${k.prompt} ${OWNER_NOTE}`.replace(/\s+/g, " ").trim()], { cwd: owning, uses, settings: k.settings, model: k.model });
+      // D-38: the model the first pass actually ran on is the Hosts row's measurement.
+      const ran = [...new Set(uses.filter((u) => u.subagent).map((u) => u.model).filter(Boolean))];
       return {
         turns,
+        notes: [
+          ...(ran.length ? [`Reviewer passes ran on, in order: ${ran.join(", ")}`] : []),
+          ...(k.id === "S11.7" && ran[0]?.includes("opus") ? ["D-41: the first pass ran on opus, so D-34's second dispatch is unproven on Claude Code; this needs an Open Question"] : []),
+        ],
         checks: (c) => {
           const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
           const rows = implementationRows(doc);
@@ -1084,7 +1095,7 @@ const PHASE6: Scenario[] = S11_CASES.map(
           const unpushed = gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "";
           if (k.expect === "pending") {
             return [
-              { name: "no implementation review was recorded as done", ok: rows.length === 0 },
+              { name: "no implementation review row or subsection was written", ok: rows.length === 0 && !/^### R-[2-9]\d*$/m.test(doc) },
               { name: "the criteria were left as they were", ok: ["AC-01", "AC-02", "AC-03", "AC-04"].every((id) => ticked(doc, id) === ticked(before, id)) },
               { name: "the report says the review is pending and gives a handoff", ok: said(c, "pending") && said(c, "handoff") },
               { name: "nothing was pushed", ok: unpushed },
@@ -1101,6 +1112,12 @@ const PHASE6: Scenario[] = S11_CASES.map(
             { name: "review check confirmed the stored records", ok: c.log().some((x) => words(x.args).slice(0, 2).join(" ") === "review check" && x.json?.result === "pass") },
             { name: "only the met criterion stays ticked; the others name the review", ok: ticked(doc, "AC-01") && ["AC-02", "AC-03", "AC-04"].every((id) => !ticked(doc, id) && new RegExp(`^- \\[ \\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: [^\\n]*${row?.[1]}`, "m").test(doc)) },
             ...(k.expect === "opus" ? [{ name: "the opus fallback was announced", ok: said(c, "opus") && said(c, "fable") }] : []),
+            // D-41: a first pass on opus is the fallback itself; the case then records the host rule instead.
+            ...(k.id === "S11.7"
+              ? ran[0]?.includes("opus")
+                ? [{ name: "first pass ran on opus: recorded as the host rule, one review stored (D-41)", ok: rows.length === 1 }]
+                : [{ name: "exactly one review was stored, after a second dispatch naming opus", ok: rows.length === 1 && uses.filter((u) => !u.subagent && u.name === "Agent").length >= 2 }]
+              : []),
             { name: "committed on the feature branch, not pushed", ok: commits.length > 0 && unpushed },
             canaryFree([...commits.map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
             unrelatedIntact(c),
