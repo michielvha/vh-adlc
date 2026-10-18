@@ -2,9 +2,9 @@
 // copies the real installer into a throwaway plugin directory with its own lock,
 // so no production flag or URL override exists to bypass verification.
 
-import { describe, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -13,6 +13,18 @@ const INSTALLER = join(ROOT, "plugins", "vh-adlc", "scripts", "ensure-vh-adlc.sh
 const REAL_LOCK = join(ROOT, "plugins", "vh-adlc", "vh-adlc.lock.json");
 const VERSION = "9.9.9";
 const PLATFORMS = ["darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"];
+
+// Every throwaway directory a case makes, removed when the file's tests end.
+const made: string[] = [];
+afterAll(() => {
+  for (const dir of made) rmSync(dir, { recursive: true, force: true });
+});
+
+function scratch(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  made.push(dir);
+  return dir;
+}
 
 function sha256(data: Buffer | string): string {
   return createHash("sha256").update(data).digest("hex");
@@ -44,7 +56,7 @@ type Fixture = {
 };
 
 function fixture(opts: { assetSha?: string; binarySha?: string | null; binaryVersion?: string } = {}): Fixture {
-  const dir = mkdtempSync(join(tmpdir(), "vh-adlc-ensure-"));
+  const dir = scratch("vh-adlc-ensure-");
   const home = join(dir, "home");
   const marker = join(dir, "executed");
   mkdirSync(home);
@@ -254,7 +266,7 @@ test("writes nothing outside the user cache", () => {
 
 test("installs the released binary from the real lock", () => {
   const lock = JSON.parse(readFileSync(REAL_LOCK, "utf8"));
-  const dir = mkdtempSync(join(tmpdir(), "vh-adlc-real-"));
+  const dir = scratch("vh-adlc-real-");
   const home = join(dir, "home");
   mkdirSync(home);
   const r = Bun.spawnSync(["bash", INSTALLER], {
