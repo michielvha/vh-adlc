@@ -1338,6 +1338,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-18 | R-24 | spec | `d733074` | n/a | n/a | accepted by owner |
 | 2026-10-18 | R-25 | implementation | `8d62bb1` | claude-fable-5-1 | procedural | Five criteria met, AC-28 not met, 26 not verified because the reviewer ran no scenarios. Six findings: four should-fix or nit facts, two judgements. |
 | 2026-10-19 | R-26 | spec | `abf85ce` | claude-fable-5-1 | procedural | Drift-only re-review after the merges. Two factual findings in Design, one should-fix and one nit; nothing blocking. |
+| 2026-10-19 | R-27 | spec | `2e3ad39` | claude-fable-5-1 | procedural | Review of the R-26 revision. One blocking factual finding (evidence lines left as AC-28 text), two factual nits and three judgement findings. |
 
 ### R-14
 
@@ -1823,6 +1824,50 @@ SEVERITY: nit
 WHERE: Design, Hosts (the "Not yet established" paragraph)
 EVIDENCE: The baseline states "how a skill locates the plugin root (Claude Code sets `CLAUDE_PLUGIN_ROOT`)". Commit 44563b7 (merged in PR #2): "A headless probe on Claude Code 2.1.284 found CLAUDE_PLUGIN_ROOT empty in a skill's Bash environment." `tests/vh-adlc/evidence/claude-code/S1.md`, Notes: "Host fact, plugin root: 10 installer call(s), 0 through CLAUDE_PLUGIN_ROOT and 10 through a literal plugin path". `plugins/vh-adlc/references/loop.md`, section 1, now leads with "two levels above the skill's own directory" and uses `$CLAUDE_PLUGIN_ROOT` "only when the environment sets it".
 PROPOSAL: Replace the parenthetical with the measured result (the variable is empty in a skill's shell on Claude Code 2.1.284; the plugin root is the directory two levels above the skill), or drop the parenthetical, since the three facts the paragraph lists are now settled by S1.
+
+### R-27
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria, AC-28
+EVIDENCE: `git diff abf85ce 2e3ad39` removes AC-28's two `Evidence:` header lines (R-25's "not met" line and "Evidence: after the merge at `49c76b1`, on 2026-10-18, a Claude Code 2.1.302 profile had a fresh") but keeps the five continuation lines beneath them. `docs/specs/personal-development-loop.spec.md:934-939` at `2e3ad39` now read "`HOME`, no GitHub token and no credential helper. In it, `claude plugin marketplace add michielvha/vh-adlc` and both installs exited 0 ... under One repository (T9, T10)." directly under the criterion, with no `Evidence:` prefix. The standard defines criterion text as the text after `AC-NN: ` "plus each following indented line, up to the next list item, `Evidence:` line or `Residual:` line" (`conventions/feature-documents.md`, Review log; rule `criterion_continuation: '^\s+\S'`), so these lines are now part of AC-28's accepted text. `vh-adlc lint` passes at `2e3ad39`, confirming the binary reads them as criterion text, and the next implementation review would have to reproduce them verbatim in its `CRITERION: AC-28` record. This both breaks the reset rule (the evidence was not removed, only decapitated) and changes the normative baseline in a way the revision did not intend.
+PROPOSAL: Delete lines 934 to 939 so AC-28 ends at "install from it on every claimed host without a credential."; the install check stays in Git history, in the R-25 subsection and in T32's evidence.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Models (the sentence "the loop compares it with the one requested" and "any difference counts as a rejection"); Test Plan row S11
+EVIDENCE: The models the loop requests are aliases (`fable`, `opus`, and S11.3's "Review it with sonnet.", `tests/vh-adlc/scenarios/run.ts:1055`), while the reviewer's `MODEL:` line gives a full ID: `tests/vh-adlc/evidence/claude-code/S11.2.md` records `claude-opus-5-5`, `S1.md` records `claude-opus-5-5` and `claude-fable-5-1`. Read literally, "any difference counts as a rejection" rejects every alias-named review, including S11.3, which the S11 row still expects to be stored and recorded as `sonnet`. The checker compares by substring (`run.ts:1091`, `row[4].toLowerCase().includes(k.expect)`), and `plugins/vh-adlc/references/review-protocol.md:26-27` says only "When it differs from the one you asked for", so nothing in the tree or the document defines the comparison T34 must implement.
+PROPOSAL: Say how the two are compared: an alias matches an ID whose family it names (the host's alias table, or the alias as a substring of the ID), a full ID must match exactly, and `MODEL: unknown` for a named model counts as a difference. One sentence in Models, then T34 writes the same rule into review-protocol.md.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Models (default chain), against the new Hosts row and AC-21
+EVIDENCE: The new Hosts row says the host runs the subagent "on the session's model" when settings refuse the requested one. The revised Models paragraph covers two outcomes: a named model that ran elsewhere (rejection, pending) and the default `fable` that ran on `opus` (the announced fallback). It leaves the third undefined: the default `fable` refused while the session runs `sonnet` or `haiku`, so the reviewer silently ran on neither `fable` nor `opus`. AC-21 allows only `fable`, or `opus` announced and recorded. The tree today stores and counts that review (`review-protocol.md:27-28`, "any other difference is reported as it is"; `skills/vh-adlc-review/SKILL.md:47-50` stores the row with the model the line names), which contradicts AC-21, and S11 has no case for it (S11.2 runs with `model: "opus"`, `run.ts:1054`).
+PROPOSAL: Add one sentence to Models: when the default chain's pass ran on a model other than `fable` or `opus`, the loop re-dispatches naming `opus` explicitly, and if that pass too ran elsewhere the review stays pending as for a named model. Extend T34 or add T35 so the protocol and S11 cover it, or state in Design that a session model outside the chain is out of scope for v1.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Hosts (new table row)
+EVIDENCE: The row states the subagent "runs on the session's model". The only measurement behind it is S11.2: `run.ts:1054` sets both `model: "opus"` and `availableModels: ["opus", "sonnet", "haiku"]`, and `S11.2.md` records "Model | claude-opus-5-5" and "the session's model usage shows opus ran". With the session model and the first allowed model both `opus`, the run cannot tell "the session's model" from "the first model the allowlist permits". Commit `ea78b15` asserts "the session's model" in its message but ran the same case.
+PROPOSAL: Write the row as what was observed ("runs on another model the settings allow; in the probe, the session's model `opus`"), or have T34's new S11 case set a session model that differs from the allowlist's first entry, so the row's claim is measured.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Models; Tasks T34
+EVIDENCE: Models says of a rejected named model that "its records are not stored as a current review", which reads as stored but not current. T34 says "with its records unstored". The two differ on whether the records land anywhere (Review Log history, the handoff, a scratch file) or are dropped. The S11 expected column ("unavailable cases pending with a handoff") and the checker's pending branch (`run.ts:1082-1088`, no review row, criteria untouched, "pending" and "handoff" said) settle only that no row is recorded.
+PROPOSAL: Say it once in Models and reuse the words in T34: "no Review Log row or `### R-<n>` subsection is written; the handoff carries the returned text so the owner can run the review on the model named".
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Hosts (the "S1 settles three more facts" paragraph)
+EVIDENCE: The paragraph states measured facts ("On Claude Code 2.1.284 a skill reads all three, the reviewer loads and runs with the unknown names in its list, and `CLAUDE_PLUGIN_ROOT` is empty in a skill's shell") with no citation, where the standard asks Design to cite "a `file:line`, or a command and its output" and the table beside it cites "(probe ...)". The facts match `tests/vh-adlc/evidence/claude-code/S1.md`, Notes, and commit `44563b7`, but S1's note also reads "references/review-protocol.md failed" next to the ok reads, which "reads all three" passes over.
+PROPOSAL: Cite `tests/vh-adlc/evidence/claude-code/S1.md` (Notes) and `44563b7` in the paragraph, and either say what the failed read of `review-protocol.md` was (a wrong path, not a host restriction) or qualify "reads all three" to the files S1 recorded as ok.
 
 ## Sources
 
