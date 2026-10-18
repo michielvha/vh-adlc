@@ -1347,6 +1347,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-18 | R-25 | implementation | `8d62bb1` | claude-fable-5-1 | procedural | Five criteria met, AC-28 not met, 26 not verified because the reviewer ran no scenarios. Six findings: four should-fix or nit facts, two judgements. |
 | 2026-10-19 | R-26 | spec | `abf85ce` | claude-fable-5-1 | procedural | Drift-only re-review after the merges. Two factual findings in Design, one should-fix and one nit; nothing blocking. |
 | 2026-10-19 | R-27 | spec | `2e3ad39` | claude-fable-5-1 | procedural | Review of the R-26 revision. One blocking factual finding (evidence lines left as AC-28 text), two factual nits and three judgement findings. |
+| 2026-10-19 | R-28 | spec | `f4b882e` | claude-fable-5-1 | procedural | New pass after R-27's blocking finding. Nothing blocking: two judgement findings and two factual nits. |
 
 ### R-14
 
@@ -1876,6 +1877,36 @@ SEVERITY: nit
 WHERE: Design, Hosts (the "S1 settles three more facts" paragraph)
 EVIDENCE: The paragraph states measured facts ("On Claude Code 2.1.284 a skill reads all three, the reviewer loads and runs with the unknown names in its list, and `CLAUDE_PLUGIN_ROOT` is empty in a skill's shell") with no citation, where the standard asks Design to cite "a `file:line`, or a command and its output" and the table beside it cites "(probe ...)". The facts match `tests/vh-adlc/evidence/claude-code/S1.md`, Notes, and commit `44563b7`, but S1's note also reads "references/review-protocol.md failed" next to the ok reads, which "reads all three" passes over.
 PROPOSAL: Cite `tests/vh-adlc/evidence/claude-code/S1.md` (Notes) and `44563b7` in the paragraph, and either say what the failed read of `review-protocol.md` was (a wrong path, not a host restriction) or qualify "reads all three" to the files S1 recorded as ok.
+
+### R-28
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, row S11 (Setup and Passes when), against Design Models (D-34) and Tasks T34
+EVIDENCE: The row's new setups are "a real named model the allowlist excludes" and "a default `fable` refused while the session runs a model outside the chain", but the pass column is unchanged: "`fable`, then the announced `opus` fallback, recorded; isolation recorded; unavailable cases pending with a handoff". The condition that makes the second case decide anything, "with the session's model unlike the allowlist's first entry", appears only in T34 (`docs/specs/personal-development-loop.spec.md:1318`), which is outside the normative baseline. The checker's recorded-model check is a substring match on the row and on the session's model usage (`tests/vh-adlc/scenarios/run.ts:1091-1093`); with `availableModels: ["opus", "sonnet", "haiku"]` (`run.ts:1054`) a host that runs the refused pass on the first allowed model passes that check without any second dispatch, so the D-34 re-dispatch is not what the scenario proves. The first new case is a silent substitution the loop treats as a rejection, which "unavailable cases" does not name.
+PROPOSAL: Put the discriminating condition in the row's Setup and give each new case its own pass condition: the excluded named model leaves no Review Log row or subsection and a handoff carrying the returned text; the outside-chain default pass is reported as run on the session's model, dispatched again naming `opus`, and recorded as the announced `opus` fallback.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Models (the sentence "Each Review Log row records the model that ran, or `unknown`" and the default-chain table row)
+EVIDENCE: The paragraph now says "`MODEL: unknown` never matches (D-33)": for a named model that leaves the review pending with no row, and for the default chain it causes a second dispatch naming `opus` and then pending. On Claude Code a row can therefore never record `unknown`, yet the sentence kept from the baseline says it can, and the agent file still instructs `MODEL: unknown` when the system prompt names no model (`plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md:52-53`). The table row for independent passes on Claude Code lists two triggers for `opus` ("If the host rejects it, or the owner declines a usage-credit prompt") while the paragraph adds a third, a default pass that silently ran outside the chain (D-34); "a mismatch counts as a rejection" is stated for a named model only.
+PROPOSAL: Say where `unknown` can still be recorded (a host where no model was requested, so there is nothing to compare), or drop the clause; add the silent-substitution trigger to the default-chain table row so the table and the paragraph agree.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T34
+EVIDENCE: T34 names `plugins/vh-adlc/references/review-protocol.md`, then `skills/vh-adlc-review/SKILL.md` and `skills/vh-adlc-spec/SKILL.md`. The latter two do not exist at those paths from the repository root; the files are `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md` and `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md` (`ls plugins/vh-adlc/skills`). T33 and the first T34 path use root-relative form, and the standard asks each task to name the file it touches.
+PROPOSAL: Write the two skill paths root-relative.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter, status_description
+EVIDENCE: `docs/specs/personal-development-loop.spec.md:3` reads "Under revision for R-26: Design gains the host facts the implementation measured." At `f4b882e` the revision also applies R-27 (commit subject "apply R-27 and fold in the owner's answers as D-33 to D-35") and is complete; `vh-adlc next --repo . --plugin-pin e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a docs/specs/personal-development-loop.spec.md` answers "spec review" with reason "status draft and spec_review_fresh does not hold: the latest spec review is stale: baseline-changed". The standard wants one line on the current state and what it waits for.
+PROPOSAL: State the revision as made (R-26 and R-27 applied, D-33 to D-35 folded) and that it waits for a clean spec review and acceptance.
 
 ## Sources
 
