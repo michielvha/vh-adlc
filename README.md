@@ -90,6 +90,26 @@ Run a plugin's tests with `bun test --cwd plugins/<plugin>/skills/<skill>/script
 
 ## Verifying a vh-adlc release
 
+The [shared release design](https://github.com/vhco-pro/docs) composes
+`michielvha/go-ci-action`, `michielvha/gitversion-tag-action`, and the isolated
+release-only next major of `michielvha/goreleaser-action`.
+
+PR CI and tagged releases use the same Go CI action. The **Version** workflow
+calls the GitVersion action directly. PRs calculate a version without pushing
+tags. A manual run defaults to dry-run; disabling it on a trusted feature branch
+creates its prerelease tag. A main-branch run selects a stable version.
+Exact tag pushes start the shared Go CI and release workflow.
+
+Automated tagging requires the release App's `RELEASE_APP_CLIENT_ID` repository
+variable and `RELEASE_APP_PRIVATE_KEY` secret, with the App installed on this
+repository and allowed to write contents. `PGP_PRIVATE_KEY` signs artifacts.
+PR preview jobs receive none of these credentials.
+
+No cleanup is enabled. Re-run the original tag workflow for a transient failure;
+inspect a partial release before retrying. GoReleaser's configuration forbids
+replacing existing drafts or artifacts. Source fixes need a new version, never a
+moved tag. Current external action consumers are not migrated by this pilot.
+
 Each release of the `vh-adlc` binary publishes a `checksums.txt` and a detached signature,
 `checksums.txt.sig`, made with the VHCO Pro release signing key. The public key is
 [`release-signing-key.asc`](release-signing-key.asc) in this repository, and its primary fingerprint
