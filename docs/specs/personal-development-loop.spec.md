@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised for R-26 to R-30, with D-33 to D-41 folded in, and accepted by the owner against R-30."
+status: planned
+status_description: "Accepted by the owner against R-30 after the revision for R-26 to R-30; T34 is next, on feat/personal-development-loop."
 issue: null
 branch: feat/personal-development-loop
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
