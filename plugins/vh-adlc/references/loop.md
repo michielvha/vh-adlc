@@ -33,8 +33,9 @@ Call `knowledge` first, with every docs page the operation will read:
 
 State the result in one line, for example
 `Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md)`. Every call below passes the same
-`--repo` and `--plugin-pin`, written out on each call: the binary needs each flag and its value as
-separate arguments, so a quoted variable holding both flags arrives as one unknown flag.
+`--repo` and `--plugin-pin`, written out on each call. The binary needs every word as its own argument:
+the command, each path, each flag and each value. A quoted variable that holds several of them arrives as
+one unknown command or flag.
 
 The binary caches each page it resolved. Read them from that cache rather than from memory:
 `${XDG_CACHE_HOME:-$HOME/.cache}/vh-adlc/docs/<sha>/<page>` on Linux and
@@ -42,10 +43,12 @@ The binary caches each page it resolved. Read them from that cache rather than f
 
 Stop and report when the result is `invalid-pin`, `missing-page` (recommend the pin bump it names) or
 `unreachable`. Each finding already names the page or pin at fault, so do not re-run `knowledge` with
-fewer pages to see which ones resolve, and do not read any page from that revision. When `source` is `plugin`, the repository has no pin yet: the operation's first change
-there adds the pinned `AGENTS.md` and its bridges as the onboarding guide at that revision describes,
-merged into any local instructions, in its own commit. Local instructions win over the central pages;
-report every conflict between them.
+fewer pages to see which ones resolve, and do not read any page from that revision.
+
+When `source` is `plugin`, the repository has no pin yet. Call `knowledge` again with the same pages plus
+`guides/onboard-a-repository.md`, and read it. The operation's first change there then adds the pinned
+`AGENTS.md` and its bridges as that guide describes, merged into any local instructions, in its own
+commit. Local instructions win over the central pages; report every conflict between them.
 
 Every page the loop needs is requested on every call, so a pin older than the plugin's pages stops with
 `missing-page`: always include `conventions/feature-documents.md` and `guides/humanize-prose.md`.

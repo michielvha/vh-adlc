@@ -1,8 +1,8 @@
 // Checks the scenario fixtures that tests/vh-adlc/fixtures/build.ts produces.
 
-import { beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { build, type Fixtures, gitEnv, SECRET_CANARIES } from "./fixtures/build";
@@ -13,6 +13,8 @@ let f: Fixtures;
 beforeAll(() => {
   f = build(mkdtempSync(join(tmpdir(), "vh-adlc-fixtures-")));
 }, 180_000);
+
+afterAll(() => rmSync(f.dir, { recursive: true, force: true }));
 
 function sh(cwd: string, ...cmd: string[]) {
   const r = Bun.spawnSync(cmd, { cwd, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
