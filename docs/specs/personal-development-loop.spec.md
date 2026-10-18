@@ -1202,6 +1202,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-21 | spec | `0b0f42b` | fable | procedural | Diff-only check of the R-20 fixes. One should-fix finding (the canary scan would fail on verbatim review records; S11's seeded input unstated) and two nits. Nothing blocking. |
 | 2026-10-17 | R-22 | spec | `6d7bb6c` | fable | procedural | Diff-only check of the R-21 fixes. One nit (a long line in the Test Plan), left for the next revision because it sits in the normative baseline. Nothing blocking. |
 | 2026-10-17 | R-22 | spec | `6d7bb6c` | n/a | n/a | accepted by owner |
+| 2026-10-18 | R-23 | spec | `5f44a40` | fable | procedural | Drift-only review after phase 3. The baseline is unchanged, but one blocking finding: the Commands table gives --plugin-pin only to knowledge, while the released binary requires it on every command. Two should-fix findings (covers names a missing gitversion.yml and omits schema/, .gitignore and .golangci.yml) and two nits. |
 
 ### R-14
 
@@ -1439,6 +1440,43 @@ SEVERITY: nit
 WHERE: Test Plan fixtures/harness paragraph (fix for R-21 F-03)
 EVIDENCE: `git -C /home/m/code/vh-adlc show 6d7bb6c:docs/specs/personal-development-loop.spec.md | awk 'NR==957{print length($0)}'` prints 113 for "report, scans it, and discards it; `evidence/` keeps summaries only. AC-22 is asserted from the wrapper's log and", while every other line of the rewrapped paragraph (lines 943-961) is 92 to 103 characters. R-21 F-03 flagged a 113-character line in the Operations intro as "far from the surrounding 100-column wrap"; the fix removes that one and adds an equal-width line here. The three other rewrapped paragraphs are clean, the word diff shows no change beyond the intended additions ("(D-28)", the AC-32 capture sentence, "the wrapper's log"), and no em or en dash appears in the diff.
 PROPOSAL: Rewrap lines 956-961 so the AC-32 sentence and the AC-22 sentence break near 100 columns like the rest of the paragraph.
+
+### R-23
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Deterministic core, Commands table (lines 317 to 323)
+EVIDENCE: The table gives `--repo <dir> --plugin-pin <sha>` only to `knowledge` (line 317) and writes the other six as `vh-adlc lint <doc>`, `vh-adlc gate <target-status> <doc>`, `vh-adlc fresh <doc>`, `vh-adlc next <doc>`, `vh-adlc find --repo <dir> (--issue <n> | --slug <s>)` and `vh-adlc review check <doc> --review R-<n> --returned <file>` (lines 318 to 323). The released v0.1.0 binary requires the pin on every command: `cmd/vh-adlc/main.go:145` registers `--plugin-pin` on every command's flag set and `main.go:159` returns a usage report when it is missing. Running the table's gate line as written, `vh-adlc gate planned docs/specs/personal-development-loop.spec.md --repo /home/m/code/vh-adlc`, prints `{"schema_version":1,"command":"gate","result":"usage",...,"findings":[{"code":"usage","message":"--plugin-pin must be a full 40-character lowercase SHA",...}]}` and exits 2. The child records this as "a deliberate extension" (docs/specs/vh-adlc-binary.spec.md, Invocation, "The parent's table shows `--plugin-pin` only on `knowledge`...so the plugin's skills pass the pin on every call") while its Context says "Where this document and the parent disagree, the parent wins and the disagreement is a finding." The parent's Test Plan (line 934) makes the checker verify that "each status-changing skill names its `vh-adlc gate` command", so phase 4 skills and the T14 checker take the invocation from this table, and the literal form fails.
+PROPOSAL: Revise the Commands table so every command carries `--repo <dir> --plugin-pin <sha>` (and `--offline`), matching the released binary; until that revision lands, phase 4 skill text must follow the child's Invocation section, not this table.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers` (line 18); Design, "The binary in the repository" (lines 442 to 443)
+EVIDENCE: `covers` lists `gitversion.yml`, and Design says the release workflow runs "only when binary paths change (`cmd/`, `internal/`, `go.mod`, `go.sum`, the GoReleaser and GitVersion configuration)". `git ls-files | grep -i gitversion` in /home/m/code/vh-adlc prints nothing: no GitVersion configuration file exists. The merged `.github/workflows/release.yml` filters on `cmd/**`, `internal/**`, `go.mod`, `go.sum`, `.goreleaser.yml` and `.github/workflows/release.yml`, and runs `michielvha/gitversion-tag-action` with its bundled configuration; the child's Delivery states "no `gitversion.yml` is committed". The `covers` entry therefore matches nothing and the named release trigger does not exist, while the real sixth trigger (the workflow file itself) is unnamed.
+PROPOSAL: At the next normative revision, drop `gitversion.yml` from `covers` and reword the path-filter sentence to name `.goreleaser.yml` and `.github/workflows/release.yml`, with GitVersion configured by the action's bundled file.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter `covers` (lines 6 to 20); Design, Contract (line 405); Design, "The binary in the repository" (lines 419 and 439 to 440)
+EVIDENCE: Contract says "A JSON Schema for the output lives in the binary's repository"; phase 3 landed it at `schema/vh-adlc.schema.json` (listed by `git ls-files`) and the child covers `schema/`, `.gitignore` and `.golangci.yml`. The parent's `covers` names none of the three, although Design makes normative statements about each: the schema and `schema_version` (line 405), the anchored `/vh-adlc` ignore (lines 439 to 440) and the `golangci-lint config verify` and `run` gates (line 419). A later change to the output schema, which the phase 4 installer and skills parse, or to the ignore or lint configuration, would not stale this document's spec review, and the merged `release.yml` path filter also omits `schema/`.
+PROPOSAL: Add `schema/`, `.gitignore` and `.golangci.yml` to `covers` at the next normative revision, and have the phase 4 checker read the output contract from `schema/vh-adlc.schema.json` rather than from the Contract bullet.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Deterministic core, freshness bullets (lines 358 to 361); Owner decisions D-29 (line 96)
+EVIDENCE: Line 361 states of spec-review drift "The feature's own commits cannot cause it." The released binary's `fresh docs/specs/personal-development-loop.spec.md --repo /home/m/code/vh-adlc --plugin-pin e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a` reports `spec_review: R-22 at 6d7bb6c, stale, reasons: ["covered-drift"]` with 63 `covered-drift` findings, every one a file the child feature itself merged at `595e6fb`, and no `baseline-changed`. D-29 already records this as "A known gap for this document's next normative revision". Nothing to decide now; the acceptance is kept by drift alone because the baseline is byte-identical between `6d7bb6c` and `5f44a40` (the diff touches only `status`, `status_description`, the D-29 row, T12's tick and evidence, Review Log rows and the R-22 record).
+PROPOSAL: At the revision D-29 queues, reword the bullet to "cannot cause it before the feature merges" and name the post-merge drift-only review as the clearing path.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Contract (line 389); Design, "The binary in the repository" (lines 419 to 420)
+EVIDENCE: Contract lists the output object as "`schema_version`, `command`, `result`, and `findings[]`", while the released schema requires `knowledge` and `data` as well (`schema/vh-adlc.schema.json` `required` array; `internal/report/report.go` `Report` struct). Line 419 names four release gates, while the merged `ci.yml` and `release.yml` also run `gofmt -l`, `go mod tidy -diff` and `go build ./cmd/vh-adlc`. Neither is a contradiction, both lists are subsets of what shipped, but a phase 4 reader building the checker from the Contract bullet alone would miss two required members.
+PROPOSAL: Fold the two extra members and the three extra gates into the text at the next normative revision; no action before then.
 
 ## Sources
 
