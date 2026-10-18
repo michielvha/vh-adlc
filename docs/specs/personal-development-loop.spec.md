@@ -1352,6 +1352,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-19 | R-26 | spec | `abf85ce` | claude-fable-5-1 | procedural | Drift-only re-review after the merges. Two factual findings in Design, one should-fix and one nit; nothing blocking. |
 | 2026-10-19 | R-27 | spec | `2e3ad39` | claude-fable-5-1 | procedural | Review of the R-26 revision. One blocking factual finding (evidence lines left as AC-28 text), two factual nits and three judgement findings. |
 | 2026-10-19 | R-28 | spec | `f4b882e` | claude-fable-5-1 | procedural | New pass after R-27's blocking finding. Nothing blocking: two judgement findings and two factual nits. |
+| 2026-10-19 | R-29 | spec | `4c40ea7` | claude-fable-5-1 | procedural | Nothing blocking: two factual findings and two judgement findings. |
 
 ### R-14
 
@@ -1911,6 +1912,36 @@ SEVERITY: nit
 WHERE: Frontmatter, status_description
 EVIDENCE: `docs/specs/personal-development-loop.spec.md:3` reads "Under revision for R-26: Design gains the host facts the implementation measured." At `f4b882e` the revision also applies R-27 (commit subject "apply R-27 and fold in the owner's answers as D-33 to D-35") and is complete; `vh-adlc next --repo . --plugin-pin e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a docs/specs/personal-development-loop.spec.md` answers "spec review" with reason "status draft and spec_review_fresh does not hold: the latest spec review is stale: baseline-changed". The standard wants one line on the current state and what it waits for.
 PROPOSAL: State the revision as made (R-26 and R-27 applied, D-33 to D-35 folded) and that it waits for a clean spec review and acceptance.
+
+### R-29
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, row S11 (the outside-chain default case), against Design Hosts (new row) and Models (D-34)
+EVIDENCE: The S11 Setup at `docs/specs/personal-development-loop.spec.md:1017` reads "a default `fable` refused while the session runs a model outside the chain (a session model unlike the allowlist's first entry)", and its pass condition is "the outside-chain default pass is dispatched again naming `opus` and recorded as the announced `opus` fallback". Which model the host picks when settings refuse the request is unmeasured: the Hosts row at line 552 says "another model the settings allow ... there the session's model, `opus`", and the only probe, `tests/vh-adlc/scenarios/run.ts:1054`, sets both `model: "opus"` and `availableModels: ["opus", "sonnet", "haiku"]`, so the session's model and the first allowed model coincide (R-27 F-04, stored at lines 1860-1866). If the host runs the first allowed model and the allowlist keeps `opus` first, the refused pass runs on `opus`, which Models at lines 833-834 defines as the announced fallback with no second dispatch, so the case fails although the loop obeys D-34. If the first entry is outside the chain but `opus` is not allowed, the second dispatch also runs elsewhere and D-34's pending outcome follows, not the recorded fallback. The Setup names neither the first entry's family nor that `opus` is allowed, so T34's "both pass" (line 1320) depends on an unmeasured host rule and an unstated allowlist.
+PROPOSAL: Write the Setup so the second dispatch is forced under either host rule: `fable` excluded, `opus` allowed but not first, the first entry and the session model both outside the chain (for example `["sonnet", "opus"]` with the session on `sonnet`). Keep the pass condition as it is, and record the model the first pass ran on as the measurement of the Hosts row, separate from the pass condition.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks, T34, against Acceptance Criteria AC-20 and the `covers` frontmatter
+EVIDENCE: `README.md:85`, in the support matrix AC-20 requires ("a support matrix listing every unproven host, harness or capability as unsupported", line 918), reads "Choosing the reviewer's model on Claude Code | Supported, with a caveat | When settings refuse the requested model, Claude Code runs the reviewer on the session's model without saying so. The reviewer names the model it ran on, and the Review Log records that model". That describes the pre-revision behaviour in `plugins/vh-adlc/references/review-protocol.md:24-28`. Under D-33 to D-35 (Models, lines 826-837) a named model that settings refuse leaves no Review Log row and the review stays pending, and a default pass outside the chain is dispatched again naming `opus`. `README.md` is listed in `covers` (frontmatter), yet T34 (lines 1315-1322) names only the protocol, the two skills and `run.ts`, so after T34 the README row would state behaviour the loop no longer has, and the standard asks each task to name the file it touches.
+PROPOSAL: Add `README.md` to T34 (or a T35) with the done condition that the matrix row states the D-33 to D-35 behaviour: a refused named model leaves the review pending with a handoff, a default pass outside the chain is dispatched again on `opus`, and the Review Log records the model that ran.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Hosts (new table row)
+EVIDENCE: The table's legend at `docs/specs/personal-development-loop.spec.md:539-540` defines "probe" as "a test plugin on Claude Code 2.1.289 and Copilot CLI 1.0.91 on 2026-10-17", and the new row at line 552 cites "(probe, 2.1.284, `availableModels`; there the session's model, `opus`)". The measurement behind the row is not that probe: it is scenario S11.2 on 2026-10-18, `tests/vh-adlc/evidence/claude-code/S11.2.md` ("Host | 2.1.284", "Model | claude-opus-5-5", "the session's model usage shows opus ran") and commit `ea78b15` ("Claude Code then ran the reviewer on the session's model, opus, without any notice in the Agent result"). The paragraph beneath the table cites its sources by file and commit (line 562), as the standard asks of Design.
+PROPOSAL: Replace "probe, 2.1.284" with the source: "(S11.2 on 2.1.284, `tests/vh-adlc/evidence/claude-code/S11.2.md`, commit `ea78b15`; `availableModels` excluded `fable`; there the session's model, `opus`)".
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Hosts (the "S1 settles three more facts" paragraph, last sentence)
+EVIDENCE: The rewritten paragraph at `docs/specs/personal-development-loop.spec.md:559-567` now reports the three facts as measured on Claude Code 2.1.284 and ends with the baseline's sentence "A failure on a required host becomes an Open Question before phase 5, never a silently duplicated file." Phase 5 is complete: T25 to T27 are ticked at lines 1207-1215, and Open Questions reads "None." (line 1326). The other required host, VS Code Copilot Chat Local, has none of the three facts measured; its run is the residual in D-32 and michielvha/vh-adlc#3. The sentence therefore names a deadline that has passed and leaves the one host where a failure is still possible unmentioned.
+PROPOSAL: Replace the sentence with the current state: on VS Code Local the three facts are unmeasured until the D-32 run in #3, and a failure there becomes an Open Question, never a silently duplicated file.
 
 ## Sources
 
