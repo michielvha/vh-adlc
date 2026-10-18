@@ -10,7 +10,7 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { accept, AGENT_NAME, agentHome, build, claim, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
+import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
 import { claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
 
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
@@ -126,6 +126,7 @@ type SessionOptions = {
   // Extra settings for the isolated profile, and the main session's model.
   settings?: Record<string, unknown>;
   model?: string;
+  env?: Record<string, string>;
 };
 
 function session(f: Fixtures, plugins: string[], prompts: string[], o: SessionOptions = {}): Turn[] {
@@ -133,7 +134,7 @@ function session(f: Fixtures, plugins: string[], prompts: string[], o: SessionOp
   const turns: Turn[] = [];
   try {
     for (const [i, prompt] of prompts.entries()) {
-      const t = claude(p, prompt, { cwd: o.cwd ?? f.project, pluginDirs: plugins, resume: turns.at(-1)?.sessionId || undefined, maxTurns: 80, model: o.model });
+      const t = claude(p, prompt, { cwd: o.cwd ?? f.project, pluginDirs: plugins, resume: turns.at(-1)?.sessionId || undefined, maxTurns: 80, model: o.model, env: o.env });
       turns.push(t);
       o.after?.(i);
       if (t.isError) break;
@@ -1173,8 +1174,205 @@ const PHASE6_S12: Scenario[] = [
 ];
 SCENARIOS.push(...PHASE6_S12);
 
+// ---- Phase 7: ship (S13), against the throwaway GitHub repository ----
+
+// The owner's GitHub token, read once when S13 runs; it reaches only S13's sessions, and every output is
+// scanned for it.
+let GH_TOKEN = "";
+const EXTRA_SECRETS: string[] = [];
+function token(): string {
+  if (!GH_TOKEN) {
+    GH_TOKEN = Bun.spawnSync(["gh", "auth", "token"], { stdout: "pipe" }).stdout.toString().trim();
+    if (!GH_TOKEN) throw new Error("S13 needs a gh login");
+    EXTRA_SECRETS.push(GH_TOKEN);
+  }
+  return GH_TOKEN;
+}
+
+function issueNumber(url: string): string {
+  return url.match(/\/issues\/(\d+)$/)?.[1] ?? "";
+}
+
+function openPRs(): { number: number; body: string; headRefOid: string; url: string }[] {
+  return JSON.parse(gh(token(), "pr", "list", "-R", SHIP_REPO, "--head", FEATURE_BRANCH, "--state", "open", "--json", "number,body,headRefOid,url"));
+}
+
+function issueComments(url: string): string {
+  return gh(token(), "issue", "view", url, "--json", "comments", "--jq", "[.comments[].body] | join(\"\\n---\\n\")");
+}
+
+// runsFor counts the workflow runs GitHub has for a commit, waiting for one to appear when one is expected.
+function runsFor(sha: string, expectRun: boolean): number {
+  const deadline = Date.now() + (expectRun ? 180_000 : 60_000);
+  for (;;) {
+    const n = Number(gh(token(), "api", `repos/${SHIP_REPO}/actions/runs?head_sha=${sha}`, "--jq", ".total_count"));
+    if ((expectRun && n > 0) || Date.now() > deadline) return n;
+    Bun.sleepSync(10_000);
+  }
+}
+
+function remoteTip(f: Fixtures): string | null {
+  const line = gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH);
+  return line ? line.split("\t")[0] : null;
+}
+
+function withVerdict(records: string, id: string, verdict: string): string {
+  return records.replace(new RegExp(`(CRITERION: ${id} [^\\n]*\\nVERDICT: )met`), `$1${verdict}`);
+}
+
+function untick(f: Fixtures, owning: string, id: string, extra: string, message: string) {
+  const p = join(owning, FEATURE_PATH);
+  writeFileSync(p, readFileSync(p, "utf8").replace(new RegExp(`^- \\[x\\] ${id}: (.*)$`, "m"), `- [ ] ${id}: $1`).replace(new RegExp(`(^- \\[ \\] ${id}: .*\\n\\s+Evidence: [^\\n]*)`, "m"), `$1\n${extra}`));
+  git(f.home, owning, "commit", "-q", "-m", message, "--", FEATURE_PATH);
+}
+
+type S13 = {
+  id: string;
+  title: string;
+  prompt: string;
+  setup: (f: Fixtures, issue: string) => { owning: string; keep?: string[] };
+  expect: { complete: boolean; link: "Closes" | "Refs" | "none"; ci: "run" | "skipped" | "none"; partial?: boolean; docImpact?: boolean };
+};
+
+const SHIP = (extra = "") => `/vh-adlc-ship greeting-name. ${HANDOFF} ${extra}`.trim();
+
+const S13_CASES: S13[] = [
+  {
+    id: "S13.1",
+    title: "Shipping a feature with an unmet criterion",
+    prompt: SHIP("Ship it as it stands, although it is not finished: I want the PR open."),
+    setup: (f) => {
+      const owning = reviewedFeature(f, withVerdict(criterionRecords(), "AC-02", "not met"));
+      untick(f, owning, "AC-02", "      Evidence: R-2 returned not met.", "docs: untick AC-02 after R-2");
+      return { owning };
+    },
+    expect: { complete: false, link: "Refs", ci: "run" },
+  },
+  {
+    id: "S13.2",
+    title: "Shipping a feature with every criterion met",
+    prompt: SHIP("Ship it."),
+    setup: (f) => ({ owning: reviewedFeature(f) }),
+    expect: { complete: true, link: "Closes", ci: "run" },
+  },
+  {
+    id: "S13.3",
+    title: "Shipping a complete feature with a residual",
+    prompt: SHIP("Ship it."),
+    setup: (f) => {
+      const residual = shipIssue(token(), "Residual: the empty-string argument");
+      const owning = reviewedFeature(f, withVerdict(criterionRecords(), "AC-03", "untested"));
+      untick(f, owning, "AC-03", `      Residual: ${residual}`, "docs: record AC-03's residual");
+      return { owning, keep: [residual] };
+    },
+    expect: { complete: true, link: "Refs", ci: "run" },
+  },
+  {
+    id: "S13.4",
+    title: "Shipping with a covered doc made wrong by the feature",
+    prompt: SHIP("Ship it."),
+    setup: (f) => {
+      mkdirSync(join(f.project, "docs"), { recursive: true });
+      writeFileSync(join(f.project, "docs", "usage.md"), "# Usage\n\n`./greet.sh` always prints `Hello, world.` and ignores its arguments.\n");
+      git(f.home, f.project, "add", "--", "docs/usage.md");
+      git(f.home, f.project, "commit", "-q", "-m", "docs: describe usage", "--", "docs/usage.md");
+      git(f.home, f.project, "push", "-q", "origin", "main");
+      editFeature(f, "covers:\n  - greet.sh\n  - test.sh\n", "covers:\n  - greet.sh\n  - test.sh\n  - docs/usage.md\n", "fixture: cover the usage doc");
+      return { owning: reviewedFeature(f) };
+    },
+    expect: { complete: true, link: "Closes", ci: "run", docImpact: true },
+  },
+  {
+    id: "S13.5",
+    title: "A docs-only delivery skips CI",
+    prompt: SHIP("Ship it."),
+    setup: (f) => {
+      // Other work already landed the behaviour, so this feature's delivery is its document alone.
+      writeFileSync(join(f.project, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n');
+      git(f.home, f.project, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh");
+      git(f.home, f.project, "push", "-q", "origin", "main");
+      return { owning: reviewedFeature(f) };
+    },
+    expect: { complete: true, link: "Closes", ci: "skipped" },
+  },
+  {
+    id: "S13.6",
+    title: "A failed push is reported as partial",
+    prompt: SHIP("Ship it."),
+    setup: (f) => ({ owning: reviewedFeature(f) }),
+    expect: { complete: true, link: "none", ci: "none", partial: true },
+  },
+];
+
+const PHASE7: Scenario[] = S13_CASES.map(
+  (k): Scenario => ({
+    id: k.id,
+    title: k.title,
+    phase: 7,
+    run: async (f) => {
+      const issue = shipIssue(token(), "Greeting should take a name");
+      editFeature(f, 'issue: "#1"\n', `issue: ${issue}\n`, "fixture: link the issue");
+      addCI(f);
+      const { owning, keep = [] } = k.setup(f, issue);
+      const tip = rev(f, FEATURE_BRANCH)!;
+      toGitHub(f, token(), [issue, ...keep]);
+      const mainBefore = gh(token(), "api", `repos/${SHIP_REPO}/commits/main`, "--jq", ".sha");
+      if (k.expect.partial) git(f.home, f.project, "config", "remote.origin.pushurl", `https://github.com/${SHIP_REPO}-missing.git`);
+      const turns = session(f, [f.pluginA], [k.prompt], { cwd: owning, env: { GH_TOKEN: token() } });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
+          const local = rev(f, FEATURE_BRANCH)!;
+          const outgoing = agentLog(f, f.project, `${tip}..${FEATURE_BRANCH}`);
+          const completion = outgoing.find((x) => x.body.includes("vh-adlc gate complete: pass"));
+          const remote = remoteTip(f);
+          const prs = k.expect.partial ? [] : openPRs();
+          const n = issueNumber(issue);
+          const checks: Check[] = [];
+          if (k.expect.complete) checks.push({ name: "gate complete passed before the completion commit", ok: gateCalls(c, "complete").some((g) => g.json?.result === "pass") && !!completion && statusOf(doc) === "complete" });
+          else checks.push({ name: "the feature was not completed", ok: !completion && statusOf(doc) === "in-progress" });
+          if (k.expect.docImpact) {
+            const docCommit = outgoing.find((x) => x.files.includes("docs/usage.md"));
+            const rows = implementationRows(doc);
+            const latest = rows.at(-1);
+            const reviewed = latest ? rev(f, latest[3].replaceAll("`", "")) : null;
+            checks.push({ name: "the covered doc change was committed and re-reviewed before completion", ok: !!docCommit && rows.length >= 2 && !!reviewed && ancestor(f, docCommit.hash, reviewed) && !!completion && ancestor(f, reviewed, completion.hash) });
+          }
+          if (k.expect.partial) {
+            checks.push({ name: "nothing reached GitHub and no PR was opened", ok: remote === null && openPRs().length === 0 });
+            checks.push({ name: "the report says the delivery is partial", ok: said(c, "partial") });
+            checks.push({ name: "the push URL was left as it was", ok: gitIn(f, f.project, "config", "remote.origin.pushurl") === `https://github.com/${SHIP_REPO}-missing.git` });
+          } else {
+            checks.push({ name: "the feature branch was pushed as it is locally", ok: remote === local });
+            checks.push({ name: "one PR from the feature branch", ok: prs.length === 1 && prs[0].headRefOid === local });
+            const body = prs[0]?.body ?? "";
+            const closes = new RegExp(`\\b(Closes|Fixes|Resolves) #${n}\\b`, "i").test(body);
+            const refs = new RegExp(`\\bRefs #${n}\\b`).test(body);
+            checks.push({ name: `the PR says ${k.expect.link} #${n}`, ok: k.expect.link === "Closes" ? closes : refs && !closes, detail: body.slice(0, 200) });
+            checks.push({ name: "the issue was updated with the PR", ok: !!prs[0] && issueComments(issue).includes(String(prs[0].number)) });
+            const marker = /\[skip ci\]/.test(outgoing.map((x) => `${x.subject}\n${x.body}`).join("\n")) || /\[skip ci\]/.test(gitIn(f, f.project, "log", "-1", "--format=%B", local) ?? "");
+            if (k.expect.ci === "run") {
+              checks.push({ name: "the mixed delivery carries no skip-CI marker, and CI ran for the pushed commit", ok: !marker && runsFor(local, true) > 0 });
+              checks.push({ name: "the report gives CI as observed", ok: said(c, "CI") });
+            } else {
+              checks.push({ name: "the docs-only delivery skipped CI, and the report says skipped", ok: marker && runsFor(local, false) === 0 && said(c, "skipped") });
+            }
+            checks.push(canaryFree([body, issueComments(issue), ...outgoing.map((x) => `${x.subject}\n${x.body}`), ...turns.map((t) => t.result)]));
+          }
+          checks.push({ name: "nothing was merged into GitHub's main", ok: gh(token(), "api", `repos/${SHIP_REPO}/commits/main`, "--jq", ".sha") === mainBefore });
+          checks.push({ name: "the token appears in no output", ok: !turns.some((t) => t.raw.includes(token())) });
+          checks.push(unrelatedIntact(c));
+          return checks;
+        },
+      };
+    },
+  }),
+);
+SCENARIOS.push(...PHASE7);
+
 function scanSecrets(text: string): string[] {
-  return SECRET_CANARIES.filter((c) => text.includes(c));
+  return [...SECRET_CANARIES, ...EXTRA_SECRETS].filter((c) => text.includes(c));
 }
 
 function redactPaths(text: string, f: Fixtures): string {

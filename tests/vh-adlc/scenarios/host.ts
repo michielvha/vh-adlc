@@ -58,6 +58,8 @@ export type RunOptions = {
   model?: string;
   maxTurns?: number;
   timeoutMs?: number;
+  // Extra environment, such as a token for a scenario that writes to GitHub.
+  env?: Record<string, string>;
 };
 
 // claude runs one headless turn and returns its JSON result.
@@ -69,7 +71,7 @@ export function claude(p: Profile, prompt: string, o: RunOptions): Turn {
   if (o.maxTurns) args.push("--max-turns", String(o.maxTurns));
   const r = Bun.spawnSync(args, {
     cwd: o.cwd,
-    env: env(p),
+    env: { ...env(p), ...o.env },
     stdout: "pipe",
     stderr: "pipe",
     timeout: o.timeoutMs ?? 1_200_000,

@@ -539,3 +539,74 @@ export function pushFromElsewhere(f: Fixtures, file: string, content: string, me
   git(f.home, other, "commit", "-q", "-m", message, "--", file);
   git(f.home, other, "push", "-q", "origin", "main");
 }
+
+// ---- S13: the throwaway GitHub repository ----
+
+export const SHIP_REPO = "michielvha/vh-adlc-ship-fixture";
+
+const CI_WORKFLOW = `name: CI
+on:
+  push:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: ./test.sh
+`;
+
+// gh runs the GitHub CLI as the harness, with the owner's token, and returns stdout.
+export function gh(token: string, ...args: string[]): string {
+  const r = Bun.spawnSync(["gh", ...args], { env: { ...process.env, GH_TOKEN: token }, stdout: "pipe", stderr: "pipe" });
+  if (r.exitCode !== 0) throw new Error(`gh ${args.join(" ")}: ${r.stderr.toString()}`);
+  return r.stdout.toString().trim();
+}
+
+// githubGit runs Git in a fixture checkout with the token available to the gh credential helper.
+export function githubGit(f: Fixtures, token: string, cwd: string, ...args: string[]): string {
+  const r = Bun.spawnSync(["git", "-c", "credential.helper=", "-c", "credential.helper=!/usr/bin/gh auth git-credential", ...args], {
+    cwd,
+    env: { ...gitEnv(f.home), GH_TOKEN: token },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (r.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${r.stderr.toString()}`);
+  return r.stdout.toString().trim();
+}
+
+// shipIssue opens a fresh issue in the throwaway repository and returns its URL. Its body carries the
+// prose canaries (AC-32).
+export function shipIssue(token: string, title: string): string {
+  const body = `The greeting should take a name. ${PROSE_CANARIES[0]} ${PROSE_CANARIES[1]} Make it ${PROSE_CANARIES[2]}; ${PROSE_CANARIES[3]}.`;
+  return gh(token, "issue", "create", "-R", SHIP_REPO, "--title", title, "--body", body);
+}
+
+// addCI commits the CI workflow on the fixture's main. GitHub runs the workflow from the pushed commit's
+// own tree, so call it before any feature branch is cut.
+export function addCI(f: Fixtures) {
+  write(join(f.project, ".github", "workflows", "ci.yml"), CI_WORKFLOW);
+  git(f.home, f.project, "add", "--", ".github/workflows/ci.yml");
+  git(f.home, f.project, "commit", "-q", "-m", "ci: run the tests", "--", ".github/workflows/ci.yml");
+  git(f.home, f.project, "push", "-q", "origin", "main");
+}
+
+// toGitHub points the fixture project at the throwaway repository: it resets the repository's main to the
+// fixture's, removes every other branch, closes the PRs and issues earlier runs left open, and lets the
+// agent's Git use the token through gh. Call it after the local setup, just before the session.
+export function toGitHub(f: Fixtures, token: string, keepIssues: string[] = []) {
+  for (const n of gh(token, "pr", "list", "-R", SHIP_REPO, "--state", "open", "--json", "number", "--jq", ".[].number").split("\n").filter(Boolean)) gh(token, "pr", "close", n, "-R", SHIP_REPO);
+  for (const url of gh(token, "issue", "list", "-R", SHIP_REPO, "--state", "open", "--json", "url", "--jq", ".[].url").split("\n").filter(Boolean)) {
+    if (!keepIssues.includes(url)) gh(token, "issue", "close", url);
+  }
+  git(f.home, f.project, "remote", "set-url", "origin", `https://github.com/${SHIP_REPO}.git`);
+  githubGit(f, token, f.project, "push", "-q", "--force", "origin", "main");
+  for (const line of githubGit(f, token, f.project, "ls-remote", "--heads", "origin").split("\n").filter(Boolean)) {
+    const ref = line.split("\t")[1].replace("refs/heads/", "");
+    if (ref !== "main") githubGit(f, token, f.project, "push", "-q", "origin", "--delete", ref);
+  }
+  githubGit(f, token, f.project, "fetch", "-q", "--prune", "origin");
+  git(f.home, f.project, "remote", "set-head", "origin", "main");
+  writeFileSync(join(f.home, ".gitconfig"), `${readFileSync(join(f.home, ".gitconfig"), "utf8")}[credential "https://github.com"]\n\thelper =\n\thelper = !/usr/bin/gh auth git-credential\n`);
+}
