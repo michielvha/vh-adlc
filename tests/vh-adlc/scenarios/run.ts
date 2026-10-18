@@ -511,6 +511,10 @@ function scanSecrets(text: string): string[] {
   return SECRET_CANARIES.filter((c) => text.includes(c));
 }
 
+function redactPaths(text: string, f: Fixtures): string {
+  return text.replaceAll(f.dir, "<fixture>").replace(/\/tmp\/[^\s`'")\]]+/g, "<tmp>");
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const pi = args.indexOf("--phase");
@@ -565,6 +569,10 @@ async function main() {
       "",
       ...(calls(f).length ? calls(f).map((x) => `- \`${x.args.replace(/--(repo|plugin-pin|docs-source) \S+/g, "--$1 <...>").slice(0, 120)}\`: ${x.json?.result ?? `exit ${x.code}`}`) : ["None."]),
       ...(result.notes?.length ? ["", "## Notes", "", ...result.notes.map((n) => `- ${n}`)] : []),
+      // A failing run keeps each turn's final report, so the failure can be read without a re-run.
+      ...(pass
+        ? []
+        : ["", "## Reports", ...result.turns.flatMap((t, i) => ["", `Turn ${i + 1}:`, "", ...redactPaths(t.result, f).slice(0, 2000).split("\n").map((l) => `> ${l}`)])]),
       "",
     ];
     const text = lines.join("\n");
