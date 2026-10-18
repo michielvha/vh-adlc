@@ -1357,6 +1357,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-19 | R-27 | spec | `2e3ad39` | claude-fable-5-1 | procedural | Review of the R-26 revision. One blocking factual finding (evidence lines left as AC-28 text), two factual nits and three judgement findings. |
 | 2026-10-19 | R-28 | spec | `f4b882e` | claude-fable-5-1 | procedural | New pass after R-27's blocking finding. Nothing blocking: two judgement findings and two factual nits. |
 | 2026-10-19 | R-29 | spec | `4c40ea7` | claude-fable-5-1 | procedural | Nothing blocking: two factual findings and two judgement findings. |
+| 2026-10-19 | R-30 | spec | `0c369b2` | claude-fable-5-1 | procedural | Nothing blocking: one factual nit and two judgement findings on where S11's model measurement lands. |
 
 ### R-14
 
@@ -1946,6 +1947,29 @@ SEVERITY: nit
 WHERE: Design, Hosts (the "S1 settles three more facts" paragraph, last sentence)
 EVIDENCE: The rewritten paragraph at `docs/specs/personal-development-loop.spec.md:559-567` now reports the three facts as measured on Claude Code 2.1.284 and ends with the baseline's sentence "A failure on a required host becomes an Open Question before phase 5, never a silently duplicated file." Phase 5 is complete: T25 to T27 are ticked at lines 1207-1215, and Open Questions reads "None." (line 1326). The other required host, VS Code Copilot Chat Local, has none of the three facts measured; its run is the residual in D-32 and michielvha/vh-adlc#3. The sentence therefore names a deadline that has passed and leaves the one host where a failure is still possible unmentioned.
 PROPOSAL: Replace the sentence with the current state: on VS Code Local the three facts are unmeasured until the D-32 run in #3, and a failure there becomes an Open Question, never a silently duplicated file.
+
+### R-30
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter, status_description
+EVIDENCE: `docs/specs/personal-development-loop.spec.md:3` at `0c369b2` reads "Revised for R-26 and R-27, with D-33 to D-37 folded in. Waits for a clean spec review and the owner's acceptance". The same commit's subject is "apply R-29 and fold in the owner's answers as D-38 and D-39", the Owner decisions table holds D-38 and D-39 (lines 108-109), and the Review Log table records R-28 and R-29 as applied. R-28 F-04 raised the same lag one round earlier and was accepted; the standard asks for one line on the current state and what it waits for.
+PROPOSAL: State the revision as made (R-26 to R-29 applied, D-33 to D-39 folded) and keep the second sentence.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Hosts (table row at line 554) and Test Plan, row S11 (line 1020), with D-38 (line 108)
+EVIDENCE: The S11 Setup and D-38 say "the model the first pass ran on is recorded as the Hosts row's measurement". The Hosts row is in Design, which the rules block lists under `normative_sections`, and the released binary compares that text byte for byte: `fresh` at `0c369b2` reports `spec_review: R-29 at 4c40ea7, stale, reasons: ["baseline-changed"]` for this revision, which is itself the result of writing measured host facts into Design after R-26, and the standard says "On a normative revision, every criterion tick, evidence line and residual is reset" (`conventions/feature-documents.md`, Acceptance criteria). So a T34 run that writes the measurement into the row as the words say moves the document back to `draft` during implementation and clears every tick, including the five criteria R-25 found met. Nothing in the row, the S11 row or T34 names the evidence file where the measurement lands instead.
+PROPOSAL: Name the place now: the S11 case records the first pass's model in its evidence file under `tests/vh-adlc/evidence/claude-code/`, the Hosts row cites that file alongside S11.2 in this revision, and no Design text changes when the measurement arrives; or state in Design that the row is updated only at the next normative revision.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan, row S11 (the outside-chain default case), with D-38
+EVIDENCE: D-38 says the setup "forces the second dispatch whichever model the host picks", and the S11 pass condition is "the outside-chain default pass is dispatched again naming `opus` and recorded as the announced `opus` fallback". The setup (`["sonnet", "opus"]`, session on `sonnet`) forces it under the two rules R-29 F-01 named, the session's model and the first allowed model. The only measurement, S11.2 (`run.ts:1054`, `S11.2.md`), ran with `opus` as session model, first allowed model and strongest allowed model at once, so a host that picks the strongest allowed model is not ruled out; under that rule the first pass runs on `opus`, Models (lines 826-828) makes that the announced fallback with no second dispatch, and the case fails although the loop obeys D-34. T34's done condition "both pass" (line 1323) then depends on an unmeasured host rule, the gap R-29 F-01 set out to close.
+PROPOSAL: Say in the row what the case proves when the first pass ran on `opus`: the host rule is measured and recorded, the pass is the fallback with no second dispatch, and D-34's second dispatch is then unproven on Claude Code and becomes an Open Question; keep the current pass condition for a first pass on `sonnet`.
 
 ## Sources
 
