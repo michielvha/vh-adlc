@@ -75,7 +75,7 @@ unsupported until its own run passes.
 
 | Host or capability | Status | Evidence |
 | --- | --- | --- |
-| Claude Code CLI 2.1.284, Linux | Supported | `tests/vh-adlc/evidence/claude-code/` |
+| Claude Code CLI 2.1.284, with re-runs on 2.1.302, Linux | Supported | `tests/vh-adlc/evidence/claude-code/` |
 | Claude Code desktop app, VS Code extension, remote sessions | Unsupported: discovery not yet run | Same runtime as the CLI; not yet checked on each surface |
 | VS Code Copilot Chat, Local harness | Unsupported: the hand run is pending | None yet |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
