@@ -432,13 +432,24 @@ const SCENARIOS: Scenario[] = [
           const reviewRows = rows.filter((l) => !l.includes("accepted by owner"));
           const status = doc.match(/^status: (\S+)/m)?.[1];
           const blocking = /SEVERITY: blocking/.test(doc);
+          const questions = /^### Q\d+/m.test(doc.split(/^## Open Questions$/m)[1]?.split(/^## /m)[0] ?? "");
+          const latest = reviewRows.at(-1)?.split("|")[2]?.trim();
+          // A reviewer may return judgement findings even on a sound draft; the spec turns them into Open
+          // Questions for the owner, so either path is the acceptance order as long as nothing skips a step.
+          const path = blocking || questions ? "the owner was left a decision" : "accepted";
           return [
             { name: "a review row and its records were stored", ok: reviewRows.length >= 1 && /### R-\d+/.test(doc) },
             { name: "review check confirmed the stored records", ok: c.log().some((x) => words(x.args).slice(0, 2).join(" ") === "review check" && x.json?.result === "pass") },
-            {
-              name: blocking ? "a blocking review stopped acceptance" : "exactly one acceptance row, then planned with the gate line",
-              ok: blocking ? accepted.length === 0 && status === "draft" : accepted.length === 1 && status === "planned" && c.commits().some((x) => x.includes("vh-adlc gate planned: pass")),
-            },
+            path === "accepted"
+              ? {
+                  name: "accepted: one acceptance row naming the latest review, then planned with the gate line",
+                  ok: accepted.length === 1 && accepted[0].includes(`| ${latest} |`) && status === "planned" && c.commits().some((x) => x.includes("vh-adlc gate planned: pass")),
+                }
+              : {
+                  name: "the owner was left a decision: no acceptance row, still draft, any planned gate failed",
+                  ok: accepted.length === 0 && status === "draft" && gateCalls(c, "planned").every((g) => g.json?.result === "fail"),
+                  detail: blocking ? "blocking finding" : "open questions",
+                },
             unrelatedIntact(c),
           ];
         },
