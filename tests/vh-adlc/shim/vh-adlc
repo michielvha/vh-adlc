@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Fixture-only logging wrapper for the vh-adlc binary. tests/vh-adlc/fixtures/build.ts
+# fills in the three paths, packs the result as a release asset for a fixture
+# plugin copy's own lock, and installs it into an isolated cache with the
+# unmodified installer. It is never published or written into an installed
+# plugin cache.
+#
+# It forwards every call to the verified real binary, points it at the fixture
+# docs repository, copies each resolved page into the isolated cache as the
+# binary would, and logs the exit code, the arguments and the JSON result.
+set -uo pipefail
+real=@REAL@
+docs=@DOCS@
+log=@LOG@
+if [[ "${1:-}" == "--version" ]]; then exec "$real" --version; fi
+out=$("$real" "$@" --docs-source "$docs")
+code=$?
+if [[ "${1:-}" == "knowledge" && $code -eq 0 ]]; then
+  rev=$(printf '%s' "$out" | sed -n 's/.*"revision":"\([0-9a-f]\{40\}\)".*/\1/p')
+  if [[ "$(uname -s)" == Darwin ]]; then base="$HOME/Library/Caches"; else base="${XDG_CACHE_HOME:-$HOME/.cache}"; fi
+  pages=$(printf '%s' "$out" | sed -n 's/.*"pages":\[\([^]]*\)\].*/\1/p' | tr -d '"' | tr ',' ' ')
+  for p in conventions/feature-documents.md $pages; do
+    mkdir -p "$base/vh-adlc/docs/$rev/$(dirname "$p")"
+    git -C "$docs" show "$rev:$p" > "$base/vh-adlc/docs/$rev/$p" 2>/dev/null || true
+  done
+fi
+printf '%s\t%s\t%s\n' "$code" "$*" "$out" >> "$log"
+printf '%s\n' "$out"
+exit $code

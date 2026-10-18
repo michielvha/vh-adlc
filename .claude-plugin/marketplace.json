@@ -6,6 +6,11 @@
       "name": "github-app-registration",
       "source": "./plugins/github-app-registration",
       "description": "Register GitHub Apps through the manifest flow and keep their credentials out of chat and Git."
+    },
+    {
+      "name": "vh-adlc",
+      "source": "./plugins/vh-adlc",
+      "description": "A spec-driven development loop whose status changes are decided by the deterministic vh-adlc binary."
     }
   ]
 }
