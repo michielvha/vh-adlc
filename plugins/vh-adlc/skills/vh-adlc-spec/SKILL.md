@@ -37,10 +37,11 @@ without asking, and `references/review-protocol.md` for the review mode.
 
 1. Commit the document first; a review targets an exact commit. Call it X. When `vh-adlc fresh` shows the
    spec review stale from drift alone (covered changes on the default branch, an unchanged baseline),
-   first bring that work in: with a `branch` field, merge `origin/<default branch>` into the feature
-   branch in its owning worktree; without one, fast-forward the default branch. Stop if that would
-   overwrite work you did not make. If the merge changes the normative baseline, revise instead, as below.
-   X is then the resulting commit.
+   first bring that work in. With a `branch` field, run `git merge origin/<default branch>` on the feature
+   branch in its owning worktree; without one, run `git merge --ff-only origin/<default branch>` on the
+   default branch. Git keeps unrelated uncommitted work through either. Let Git decide whether it can: if
+   it refuses, report its message and stop, never stash or discard anything to get past it. If the merge
+   changes the normative baseline, revise instead, as below. X is then the resulting commit.
 2. Dispatch `vh-adlc-reviewer` as `references/review-protocol.md` describes, with the document, X, kind
    `spec`, the docs revision, the binary path and the plugin pin. If dispatch is impossible, write the handoff and leave
    the review pending.
