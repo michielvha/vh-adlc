@@ -518,11 +518,14 @@ export function reviewedFeature(f: Fixtures, records = criterionRecords()): stri
   plan(f, "- [x] T1 `greet.sh` - `./test.sh` passes (AC-01, AC-02, AC-03)\n      Evidence: `./test.sh` printed `PASS`.\n");
   const owning = claim(f);
   write(join(owning, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n', 0o755);
+  // The implementation also retires the test's comment that calls it a deliberate failure.
+  const test = join(owning, "test.sh");
+  writeFileSync(test, readFileSync(test, "utf8").replace("# The deliberate failing test: greet.sh does not take a name yet.\n", "# Checks the greeting for a name and for no argument.\n"));
   const path = join(owning, FEATURE_PATH);
   let doc = readFileSync(path, "utf8");
   for (const id of Object.keys(CRITERIA_TEXT)) doc = doc.replace(new RegExp(`^- \\[ \\] ${id}: (.*)$`, "m"), `- [x] ${id}: $1\n      Evidence: \`./test.sh\` printed \`PASS\`.`);
   writeFileSync(path, doc);
-  git(f.home, owning, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", FEATURE_PATH);
+  git(f.home, owning, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", "test.sh", FEATURE_PATH);
   const x = git(f.home, owning, "rev-parse", "--short=7", "HEAD");
   doc = readFileSync(path, "utf8").replace(/(\| accepted by owner \|\n)/, `$1| 2026-01-02 | R-2 | implementation | \`${x}\` | fable | procedural | Every criterion met. |\n`) + `\n### R-2\n\n${records}\n`;
   writeFileSync(path, doc);
