@@ -2,7 +2,8 @@
 //
 //   docs/       a fixture vhco-pro/docs repository: revision A is the real docs at
 //               the plugin pin, revision B changes the default document location
-//               and adds all_met to the planned gate
+//               and adds all_met to the planned gate, C lacks the standard and D
+//               lacks the humanize prose guide
 //   project/    a small repository with a test suite, a feature document, a
 //               deliberate failing test, unrelated staged and untracked edits,
 //               secret canaries, and a host-managed worktree for its feature branch
@@ -41,6 +42,8 @@ export type Fixtures = {
   docs: string;
   revisionA: string;
   revisionB: string;
+  revisionC: string;
+  revisionD: string;
   project: string;
   origin: string;
   worktree: string;
@@ -106,7 +109,7 @@ function initRepo(home: string, dir: string) {
 }
 
 // The docs fixture: revision A is the real vhco-pro/docs tree at the plugin pin.
-function buildDocs(home: string, dir: string): { a: string; b: string } {
+function buildDocs(home: string, dir: string): { a: string; b: string; c: string; d: string } {
   initRepo(home, dir);
   git(home, dir, "fetch", "-q", "--depth", "1", "https://github.com/vhco-pro/docs", pin());
   git(home, dir, "read-tree", "-u", "--reset", "FETCH_HEAD");
@@ -123,7 +126,18 @@ function buildDocs(home: string, dir: string): { a: string; b: string } {
   if (text === before) throw new Error("revision B changed nothing");
   writeFileSync(standard, text);
   git(home, dir, "commit", "-q", "-am", "docs revision B (plans root, all_met on the planned gate)");
-  return { a, b: git(home, dir, "rev-parse", "HEAD") };
+  const b = git(home, dir, "rev-parse", "HEAD");
+  // C and D branch from A: C lacks the standard, D lacks the humanize prose guide.
+  git(home, dir, "checkout", "-q", "-b", "without-standard", a);
+  git(home, dir, "rm", "-q", "conventions/feature-documents.md");
+  git(home, dir, "commit", "-q", "-m", "docs revision C (no feature-document standard)");
+  const c = git(home, dir, "rev-parse", "HEAD");
+  git(home, dir, "checkout", "-q", "-b", "without-guide", a);
+  git(home, dir, "rm", "-q", "guides/humanize-prose.md");
+  git(home, dir, "commit", "-q", "-m", "docs revision D (no humanize prose guide)");
+  const d = git(home, dir, "rev-parse", "HEAD");
+  git(home, dir, "checkout", "-q", "main");
+  return { a, b, c, d };
 }
 
 const FEATURE = `---
@@ -270,15 +284,22 @@ export function realBinary(home: string): string {
   return r.stdout.toString().trim();
 }
 
+// agentHome gives a scenario's HOME the Git identity the agent commits with.
+export const AGENT_NAME = "Scenario Agent";
+export function agentHome(home: string) {
+  mkdirSync(home, { recursive: true });
+  writeFileSync(join(home, ".gitconfig"), `[user]\n\tname = ${AGENT_NAME}\n\temail = agent@example.com\n[commit]\n\tgpgsign = false\n[init]\n\tdefaultBranch = main\n`);
+}
+
 export function build(dir: string): Fixtures {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   const home = join(dir, "home");
-  mkdirSync(home);
+  agentHome(home);
   const work = join(dir, "work");
   mkdirSync(work);
   const docs = join(dir, "docs");
-  const { a, b } = buildDocs(home, docs);
+  const { a, b, c, d } = buildDocs(home, docs);
   const project = join(dir, "project");
   const origin = join(dir, "origin.git");
   const worktree = join(dir, "project-other-work");
@@ -294,7 +315,7 @@ export function build(dir: string): Fixtures {
   const pluginB = join(dir, "plugin-b");
   fixturePlugin(pluginA, a, wrapper, home, version, work);
   fixturePlugin(pluginB, b, wrapper, home, version, work);
-  return { dir, docs, revisionA: a, revisionB: b, project, origin, worktree, otherPlugin, pluginA, pluginB, home, log, wrapper };
+  return { dir, docs, revisionA: a, revisionB: b, revisionC: c, revisionD: d, project, origin, worktree, otherPlugin, pluginA, pluginB, home, log, wrapper };
 }
 
 if (import.meta.main) {
@@ -304,4 +325,33 @@ if (import.meta.main) {
     process.exit(2);
   }
   console.log(JSON.stringify(build(resolve(dir)), null, 2));
+}
+
+export const FEATURE_PATH = "docs/internal/plans/greeting-name.md";
+
+// accept records a clean spec review R-1 and the owner's acceptance of it at the
+// project's HEAD, commits the rows and pushes, so the feature is ready for planned.
+export function accept(f: Fixtures, records = "NO FINDINGS", withAcceptance = true): string {
+  const home = f.home;
+  const x = git(home, f.project, "rev-parse", "--short=7", "HEAD");
+  const path = join(f.project, FEATURE_PATH);
+  let text = readFileSync(path, "utf8");
+  const header = "| --- | --- | --- | --- | --- | --- | --- |\n";
+  let rows = `| 2026-01-01 | R-1 | spec | \`${x}\` | fable | procedural | Fixture review. |\n`;
+  if (withAcceptance) rows += `| 2026-01-01 | R-1 | spec | \`${x}\` | n/a | n/a | accepted by owner |\n`;
+  text = text.replace(header, header + rows) + `\n### R-1\n\n${records}\n`;
+  writeFileSync(path, text);
+  git(home, f.project, "commit", "-q", "-m", "fixture: review R-1", "--", FEATURE_PATH);
+  git(home, f.project, "push", "-q", "origin", "main");
+  return x;
+}
+
+// editFeature replaces text in the feature document, commits and pushes it.
+export function editFeature(f: Fixtures, from: string, to: string, message = "fixture: edit the feature") {
+  const path = join(f.project, FEATURE_PATH);
+  const text = readFileSync(path, "utf8");
+  if (!text.includes(from)) throw new Error(`the feature has no ${from}`);
+  writeFileSync(path, text.replace(from, to));
+  git(f.home, f.project, "commit", "-q", "-m", message, "--", FEATURE_PATH);
+  git(f.home, f.project, "push", "-q", "origin", "main");
 }

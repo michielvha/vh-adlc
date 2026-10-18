@@ -39,7 +39,8 @@ The binary caches each page it resolved. Read them from that cache rather than f
 `$HOME/Library/Caches/vh-adlc/docs/<sha>/<page>` on macOS.
 
 Stop and report when the result is `invalid-pin`, `missing-page` (recommend the pin bump it names) or
-`unreachable`. When `source` is `plugin`, the repository has no pin yet: the operation's first change
+`unreachable`. Each finding already names the page or pin at fault, so do not re-run `knowledge` with
+fewer pages to see which ones resolve, and do not read any page from that revision. When `source` is `plugin`, the repository has no pin yet: the operation's first change
 there adds the pinned `AGENTS.md` and its bridges as the onboarding guide at that revision describes,
 merged into any local instructions, in its own commit. Local instructions win over the central pages;
 report every conflict between them.
