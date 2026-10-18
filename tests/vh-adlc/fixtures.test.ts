@@ -36,8 +36,9 @@ function vh(plugin: string, cwd: string, ...args: string[]) {
 }
 
 describe("docs fixture", () => {
-  test("revision B differs from A only in the standard", () => {
-    expect(sh(f.docs, "git", "diff", "--name-only", f.revisionA, f.revisionB).out.trim()).toBe("conventions/feature-documents.md");
+  test("revision B differs from A only in the default root and the planned gate", () => {
+    expect(sh(f.docs, "git", "diff", "--name-only", f.revisionA, f.revisionB).out.trim()).toBe("conventions/feature-documents.md\nguides/onboard-a-repository.md");
+    expect(sh(f.docs, "git", "grep", "-c", "docs/internal/plans", f.revisionB, "--", "conventions/feature-documents.md", "guides/onboard-a-repository.md").out).toBe("");
     const b = sh(f.docs, "git", "show", `${f.revisionB}:conventions/feature-documents.md`).out;
     expect(b).toContain("default: plans");
     expect(b).toContain("accepted, all_met, on_feature_branch_if_set]");

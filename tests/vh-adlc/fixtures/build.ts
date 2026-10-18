@@ -123,8 +123,12 @@ function buildDocs(home: string, dir: string): { a: string; b: string; c: string
     "planned: [no_open_questions, test_plan_complete, spec_review_fresh, spec_review_clean, accepted, on_feature_branch_if_set]",
     "planned: [no_open_questions, test_plan_complete, spec_review_fresh, spec_review_clean, accepted, all_met, on_feature_branch_if_set]",
   );
+  // Every sentence that names the default root follows it, so revision B agrees with itself.
+  text = text.replaceAll("docs/internal/plans", "plans");
   if (text === before) throw new Error("revision B changed nothing");
   writeFileSync(standard, text);
+  const onboarding = join(dir, "guides", "onboard-a-repository.md");
+  writeFileSync(onboarding, readFileSync(onboarding, "utf8").replaceAll("docs/internal/plans", "plans"));
   git(home, dir, "commit", "-q", "-am", "docs revision B (plans root, all_met on the planned gate)");
   const b = git(home, dir, "rev-parse", "HEAD");
   // C and D branch from A: C lacks the standard, D lacks the humanize prose guide.

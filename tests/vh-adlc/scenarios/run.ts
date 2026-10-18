@@ -274,17 +274,25 @@ const SCENARIOS: Scenario[] = [
     phase: 4,
     run: async (f) => {
       accept(f);
+      // Under revision B the accepted document moves to B's root, so no document lives outside it.
+      const doc = rev === "A" ? FEATURE_PATH : "plans/greeting-name.md";
+      if (rev === "B") {
+        mkdirSync(join(f.project, "plans"), { recursive: true });
+        git(f.home, f.project, "mv", FEATURE_PATH, doc);
+        git(f.home, f.project, "commit", "-q", "-m", "fixture: plans root", "--", FEATURE_PATH, doc);
+        git(f.home, f.project, "push", "-q", "origin", "main");
+      }
       const plugin = rev === "A" ? f.pluginA : f.pluginB;
       const turns = session(f, [plugin], [
         TOPIC,
-        `/vh-adlc-spec The owner accepted ${FEATURE_PATH} against review R-1 in this session. It is already recorded; move the document to planned if the gate allows it, and report the gate result.`,
+        `/vh-adlc-spec The owner accepted ${doc} against review R-1 in this session. It is already recorded; move the document to planned if the gate allows it, and report the gate result.`,
       ]);
       return {
         turns,
         checks: (c) => {
           const created = agentAdded(f).filter((p) => p.endsWith(".md") && !p.endsWith("AGENTS.md") && !p.endsWith("CLAUDE.md"));
           const gates = gateCalls(c, "planned").filter((g) => g.args.includes("greeting-name"));
-          const status = c.file(FEATURE_PATH)?.match(/^status: (\S+)/m)?.[1];
+          const status = c.file(doc)?.match(/^status: (\S+)/m)?.[1];
           const checks: Check[] = [
             { name: `the new document lives under ${root}`, ok: created.some((p) => p.startsWith(root)), detail: created.join(", ") },
             { name: "gate planned was called", ok: gates.length > 0 },
