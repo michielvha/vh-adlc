@@ -1244,17 +1244,41 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Phase 7: Ship and release
 
-- [ ] T30 `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - S13 against the throwaway repository passes
+- [x] T30 `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md` - S13 against the throwaway repository passes
       including doc-impact commit/re-review before completion and docs-only versus mixed delivery CI
       (AC-18, AC-30)
-- [ ] T31 `README.md` - install, update, uninstall per claimed host and the support matrix; T14 README check
+      Evidence: S13.1 to S13.6 pass on Claude Code 2.1.284 against the throwaway public repository
+      `michielvha/vh-adlc-ship-fixture` (2026-10-18; `de32c19`, S13.6 at `d9d4a50`). GitHub itself was
+      checked for each outcome:
+      - an unfinished feature, a complete one with a residual, and every-criterion-met gave `Refs`,
+        `Refs` and `Closes`;
+      - a covered doc the feature made wrong was fixed, committed and re-reviewed before completion;
+      - mixed deliveries, including one ending in a docs-only completion commit, carried no marker, and
+        CI ran for the pushed commit;
+      - a docs-only delivery carried it, no run started, and the report said skipped;
+      - a push refused by a repository ruleset was reported as partial, naming the local commit.
+      Nothing was merged, and the token reached no output.
+- [x] T31 `README.md` - install, update, uninstall per claimed host and the support matrix; T14 README check
       passes (AC-20)
+      Evidence: `README.md` documents the seven operations and the install, update and uninstall
+      commands, as they ran in an isolated Claude Code profile on 2026-10-18. Its support matrix lists
+      only the Claude Code CLI on Linux as supported. The T14 README check passes in the full selection.
 - [ ] T32 `tests/vh-adlc/evidence/` - full S1 to S15 evidence on every claimed host, including all seven
       operations in S1/S5/S7/S14 and both public plugins installing without credentials; all pending phase
       checks resolved, full-v1 checker passes, canary grep finds nothing (AC-02, AC-19, AC-28, AC-29,
       AC-32)
-- [ ] T33 `plugins/vh-adlc/.claude-plugin/plugin.json` - release version set; T14 version rule passes
+      Evidence: on 2026-10-18 the full selection, all 67 scenarios of S1 to S15, passed headless on Claude
+      Code 2.1.284. S1, S5 and S14 cover all seven operations. 57 ran at `6a8cb22`. S7.7, S9.1, S9.2,
+      S12.13 and S13 re-ran at `de32c19`, and S13.6 at `d9d4a50`, after an expired login and two narrow
+      skill fixes on those paths. The recorded runs cost 53.14 USD. The full-v1 checker passes, and a
+      grep of `tests/vh-adlc/evidence/` finds no secret canary, no token and no dash. Still open: both
+      public plugins installing from `michielvha/vh-adlc` without a credential, which needs this branch
+      merged; the VS Code Local run (T24); and discovery in the desktop app, the VS Code extension and a
+      remote session.
+- [x] T33 `plugins/vh-adlc/.claude-plugin/plugin.json` - release version set; T14 version rule passes
       (AC-01)
+      Evidence: `plugins/vh-adlc/.claude-plugin/plugin.json` keeps `0.1.0` as the first published version,
+      matching the binary's `0.1.0`. The package is new on this branch, and the T14 version rule passes.
 
 ## Open Questions
 
