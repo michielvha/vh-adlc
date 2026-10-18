@@ -29,8 +29,10 @@ signed URLs or keys.
 ## Preservation
 
 Inspect staged and unstaged state before any branch or commit operation. Never stash, reset, clean,
-check out over or overwrite changes the loop did not make, and stage explicit paths only. A conflicting
-concurrent edit to the same file stops the run with a question.
+check out over or overwrite changes the loop did not make, and stage explicit paths only. The index may
+already hold someone else's staged work, and a plain `git commit` would take it too, so always name what
+you commit: `git commit -m <message> -- <path>...`. That commits only those paths and leaves the rest
+staged as it was. A conflicting concurrent edit to the same file stops the run with a question.
 
 Work on a feature only in its owning worktree, found with `git worktree list --porcelain`; run branch
 checks, `fresh` and `gate` there. Never create, remove, prune, reset or force-move a worktree, and never
