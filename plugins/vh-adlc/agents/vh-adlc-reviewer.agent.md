@@ -27,9 +27,9 @@ plugin pin. If any of these is missing, return a single finding saying which, an
   `$HOME/Library/Caches/vh-adlc/docs/<sha>/<page>` on macOS). Start with
   `conventions/feature-documents.md`; its Review log section defines the exact record formats you return.
   If a page cannot be read, return one finding naming it and stop.
-- You may run the `vh-adlc` binary (`lint`, `fresh`, `gate`, `next`) and the repository's own tests to
-  observe evidence. A result you did not observe is not evidence. The command comes first, then its
-  arguments and flags, each flag and its value as separate arguments, for example
+- You may run the `vh-adlc` binary (`knowledge`, `lint`, `fresh`, `gate`, `next`, `review check`) and the
+  repository's own tests to observe evidence. A result you did not observe is not evidence. The command
+  comes first, then its arguments and flags, each flag and its value as separate arguments, for example
   `"<binary>" gate planned <document> --repo <dir> --plugin-pin <pin>`.
 
 ## A spec review
