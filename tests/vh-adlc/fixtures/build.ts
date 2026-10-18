@@ -399,3 +399,100 @@ export function claim(f: Fixtures, opts: { branch?: boolean; worktree?: boolean 
   git(f.home, f.project, "worktree", "add", "-q", owning, FEATURE_BRANCH);
   return owning;
 }
+
+// The S11 review fixture: four criteria, each built to draw a different verdict from an honest reviewer.
+// AC-01 has a passing test, AC-02 a failing one, AC-03 no check that can run here, and AC-04 a test that
+// only runs with FIXTURE_LIVE=1, which nothing sets.
+const REVIEW_FEATURE = `---
+status: draft
+status_description: "Fixture feature: the greeting takes a name and can shout."
+issue: null
+goal: "greet prints a greeting for the name it is given, and shouts it on request."
+covers:
+  - greet.sh
+  - test.sh
+  - test-shout.sh
+  - test-live.sh
+---
+
+# Plan: Greeting with a name
+
+## Context
+
+\`greet.sh\` prints a fixed greeting (greet.sh:2).
+
+## Scope
+
+In scope: one name argument for \`greet.sh\`, a \`--shout\` flag, macOS support, and the live greeting service.
+
+## Design
+
+\`greet.sh <name>\` prints \`Hello, <name>.\`; \`greet.sh --shout <name>\` prints the same greeting in capitals.
+
+## Acceptance Criteria
+
+- [ ] AC-01: \`./greet.sh Ada\` prints \`Hello, Ada.\`
+- [ ] AC-02: \`./greet.sh --shout Ada\` prints \`HELLO, ADA.\`
+- [ ] AC-03: \`./greet.sh Ada\` prints \`Hello, Ada.\` on macOS
+- [ ] AC-04: \`./test-live.sh\` passes against the live greeting service
+
+## Test Plan
+
+| Criterion | Proof |
+| --- | --- |
+| AC-01 | \`./test.sh\` |
+| AC-02 | \`./test-shout.sh\` |
+| AC-03 | A run on a macOS machine; this repository has none |
+| AC-04 | \`FIXTURE_LIVE=1 ./test-live.sh\`, run only by the release job |
+
+## Tasks
+
+None yet.
+
+## Open Questions
+
+None.
+
+## Review Log
+
+| Date | Review | Kind | Commit | Model | Isolation | Outcome |
+| --- | --- | --- | --- | --- | --- | --- |
+`;
+
+const REVIEW_TASKS =
+  "- [x] T1 `greet.sh` - `./test.sh` passes (AC-01)\n" +
+  "      Evidence: `./test.sh` printed `PASS`.\n" +
+  "- [x] T2 `test-shout.sh` - the shout check exists (AC-02)\n" +
+  "      Evidence: `./test-shout.sh` is committed.\n";
+
+// reviewFeature builds the S11 feature, implemented and claimed, with every task and criterion ticked by
+// its author, and returns the owning worktree whose HEAD is the review target.
+export function reviewFeature(f: Fixtures): string {
+  write(join(f.project, FEATURE_PATH), REVIEW_FEATURE);
+  write(join(f.project, "test.sh"), '#!/bin/sh\nout=$(./greet.sh Ada)\n[ "$out" = "Hello, Ada." ] || { echo "FAIL: got $out"; exit 1; }\necho PASS\n', 0o755);
+  write(join(f.project, "test-shout.sh"), '#!/bin/sh\nout=$(./greet.sh --shout Ada)\n[ "$out" = "HELLO, ADA." ] || { echo "FAIL: got $out"; exit 1; }\necho PASS\n', 0o755);
+  write(
+    join(f.project, "test-live.sh"),
+    '#!/bin/sh\n# Needs the live greeting service. Only the release job has its credentials and sets FIXTURE_LIVE=1.\nif [ "$FIXTURE_LIVE" != 1 ]; then echo "SKIP: FIXTURE_LIVE is not set"; exit 0; fi\ncurl -fsS "$FIXTURE_LIVE_URL/greet?name=Ada" | grep -qx "Hello, Ada." && echo PASS\n',
+    0o755,
+  );
+  git(f.home, f.project, "add", "--", FEATURE_PATH, "test.sh", "test-shout.sh", "test-live.sh");
+  git(f.home, f.project, "commit", "-q", "-m", "fixture: the review feature", "--", FEATURE_PATH, "test.sh", "test-shout.sh", "test-live.sh");
+  git(f.home, f.project, "push", "-q", "origin", "main");
+  plan(f, REVIEW_TASKS);
+  const owning = claim(f);
+  write(join(owning, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n', 0o755);
+  const path = join(owning, FEATURE_PATH);
+  let doc = readFileSync(path, "utf8");
+  for (const [id, ev] of [
+    ["AC-01", "`./test.sh` printed `PASS`."],
+    ["AC-02", "`./test-shout.sh` is committed."],
+    ["AC-03", "Expected to work on macOS."],
+    ["AC-04", "`./test-live.sh` exits 0."],
+  ]) {
+    doc = doc.replace(new RegExp(`^- \\[ \\] ${id}: (.*)$`, "m"), `- [x] ${id}: $1\n      Evidence: ${ev}`);
+  }
+  writeFileSync(path, doc);
+  git(f.home, owning, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", FEATURE_PATH);
+  return owning;
+}

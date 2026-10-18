@@ -15,11 +15,11 @@ const OWNER_CREDENTIALS = join(homedir(), ".claude", ".credentials.json");
 export type Profile = { config: string; home: string; dispose: () => void };
 
 // profile creates an isolated Claude Code profile whose HOME is the fixture home.
-export function profile(home: string): Profile {
+export function profile(home: string, settings: Record<string, unknown> = {}): Profile {
   const config = mkdtempSync(join(tmpdir(), "vh-adlc-claude-"));
   if (!existsSync(OWNER_CREDENTIALS)) throw new Error("no Claude Code login to copy into the isolated profile");
   copyFileSync(OWNER_CREDENTIALS, join(config, ".credentials.json"));
-  writeFileSync(join(config, "settings.json"), `${JSON.stringify({ includeCoAuthoredBy: false }, null, 2)}\n`);
+  writeFileSync(join(config, "settings.json"), `${JSON.stringify({ includeCoAuthoredBy: false, ...settings }, null, 2)}\n`);
   mkdirSync(join(config, "projects"), { recursive: true });
   return {
     config,

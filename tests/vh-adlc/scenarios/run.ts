@@ -7,10 +7,10 @@
 // --phase selects the operations a partial run may use; operations scheduled
 // later are reported as pending. The default is the full v1 selection.
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { accept, AGENT_NAME, agentHome, build, claim, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
+import { accept, AGENT_NAME, agentHome, build, claim, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
 import { claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
 
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
@@ -123,14 +123,17 @@ type SessionOptions = {
   uses?: ToolUse[];
   // Runs after each turn, for checks on the state between scripted owner turns.
   after?: (turn: number) => void;
+  // Extra settings for the isolated profile, and the main session's model.
+  settings?: Record<string, unknown>;
+  model?: string;
 };
 
 function session(f: Fixtures, plugins: string[], prompts: string[], o: SessionOptions = {}): Turn[] {
-  const p = profile(f.home);
+  const p = profile(f.home, o.settings);
   const turns: Turn[] = [];
   try {
     for (const [i, prompt] of prompts.entries()) {
-      const t = claude(p, prompt, { cwd: o.cwd ?? f.project, pluginDirs: plugins, resume: turns.at(-1)?.sessionId || undefined, maxTurns: 80 });
+      const t = claude(p, prompt, { cwd: o.cwd ?? f.project, pluginDirs: plugins, resume: turns.at(-1)?.sessionId || undefined, maxTurns: 80, model: o.model });
       turns.push(t);
       o.after?.(i);
       if (t.isError) break;
@@ -507,7 +510,6 @@ const SCENARIOS: Scenario[] = [
     run: async (f) => {
       // A plugin copy whose lock points at a missing asset, with an empty cache.
       const broken = join(f.dir, "plugin-unavailable");
-      const { cpSync } = await import("node:fs");
       cpSync(f.pluginA, broken, { recursive: true });
       const lockPath = join(broken, "vh-adlc.lock.json");
       writeFileSync(lockPath, readFileSync(lockPath, "utf8").replaceAll(/file:\/\/[^"]+/g, `file://${join(f.dir, "missing.tar.gz")}`));
@@ -960,6 +962,93 @@ const PHASE5: Scenario[] = [
   },
 ];
 SCENARIOS.push(...PHASE5);
+
+// ---- Phase 6: review ----
+
+const EXPECTED_VERDICTS: Record<string, string> = { "AC-01": "met", "AC-02": "not met", "AC-03": "untested", "AC-04": "not verified" };
+
+// implementationRows are the Review Log rows of kind implementation, split into their cells.
+function implementationRows(doc: string): string[][] {
+  return doc
+    .split("\n")
+    .filter((l) => /^\| \d{4}-\d{2}-\d{2} \| R-\d+ \| implementation \|/.test(l))
+    .map((l) => l.split("|").slice(1, -1).map((c) => c.trim()));
+}
+
+function records(doc: string, id: string): Record<string, string> {
+  const body = doc.split(new RegExp(`^### ${id}$`, "m"))[1]?.split(/^### R-\d+$|^## /m)[0] ?? "";
+  const out: Record<string, string> = {};
+  for (const m of body.matchAll(/^CRITERION: (AC-\d+) .*\nVERDICT: (.+)$/gm)) out[m[1]] = m[2].trim();
+  return out;
+}
+
+function ticked(doc: string, id: string): boolean {
+  return new RegExp(`^- \\[x\\] ${id}:`, "m").test(doc);
+}
+
+type S11 = { id: string; title: string; prompt: string; settings?: Record<string, unknown>; model?: string; noAgent?: boolean; expect: "fable" | "opus" | "sonnet" | "pending" };
+
+const S11_CASES: S11[] = [
+  { id: "S11.1", title: "Review with no model named", prompt: "", expect: "fable" },
+  { id: "S11.2", title: "Review when fable is refused", prompt: "", settings: { availableModels: ["opus", "sonnet", "haiku"] }, model: "opus", expect: "opus" },
+  { id: "S11.3", title: "Review with a named model", prompt: "Review it with sonnet.", expect: "sonnet" },
+  { id: "S11.4", title: "Review with an unavailable named model", prompt: "Review it with claude-nonexistent-9.", expect: "pending" },
+  { id: "S11.5", title: "Review when the reviewer cannot be dispatched", prompt: "", noAgent: true, expect: "pending" },
+];
+
+const PHASE6: Scenario[] = S11_CASES.map(
+  (k): Scenario => ({
+    id: k.id,
+    title: k.title,
+    phase: 6,
+    run: async (f) => {
+      const owning = reviewFeature(f);
+      const target = rev(f, "HEAD", owning)!;
+      const before = readFileSync(join(owning, FEATURE_PATH), "utf8");
+      let plugin = f.pluginA;
+      if (k.noAgent) {
+        plugin = join(f.dir, "plugin-no-agent");
+        cpSync(f.pluginA, plugin, { recursive: true });
+        rmSync(join(plugin, "agents"), { recursive: true, force: true });
+      }
+      const uses: ToolUse[] = [];
+      const turns = session(f, [plugin], [`/vh-adlc-review greeting-name. ${HANDOFF} ${k.prompt} ${OWNER_NOTE}`.replace(/\s+/g, " ").trim()], { cwd: owning, uses, settings: k.settings, model: k.model });
+      return {
+        turns,
+        checks: (c) => {
+          const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
+          const rows = implementationRows(doc);
+          const row = rows.at(-1);
+          const commits = agentLog(f, f.project, `${target}..${FEATURE_BRANCH}`);
+          const unpushed = gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "";
+          if (k.expect === "pending") {
+            return [
+              { name: "no implementation review was recorded as done", ok: rows.length === 0 },
+              { name: "the criteria were left as they were", ok: ["AC-01", "AC-02", "AC-03", "AC-04"].every((id) => ticked(doc, id) === ticked(before, id)) },
+              { name: "the report says the review is pending and gives a handoff", ok: said(c, "pending") && said(c, "handoff") },
+              { name: "nothing was pushed", ok: unpushed },
+              unrelatedIntact(c),
+            ];
+          }
+          const got = row ? records(doc, row[1]) : {};
+          return [
+            { name: "the reviewer ran in a separate context", ok: uses.some((u) => u.subagent) },
+            { name: `the review row targets the reviewed commit and records ${k.expect}`, ok: !!row && target.startsWith(row[3].replaceAll("`", "")) && row[4].toLowerCase().includes(k.expect) },
+            { name: "isolation is recorded", ok: !!row && ["structural", "procedural", "unknown"].includes(row[5]) },
+            { name: "the four verdicts came back distinctly, one per criterion", ok: Object.keys(got).length === 4 && Object.entries(EXPECTED_VERDICTS).every(([id, v]) => got[id] === v), detail: JSON.stringify(got) },
+            { name: "review check confirmed the stored records", ok: c.log().some((x) => words(x.args).slice(0, 2).join(" ") === "review check" && x.json?.result === "pass") },
+            { name: "only the met criterion stays ticked; the others name the review", ok: ticked(doc, "AC-01") && ["AC-02", "AC-03", "AC-04"].every((id) => !ticked(doc, id) && new RegExp(`^- \\[ \\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: [^\\n]*${row?.[1]}`, "m").test(doc)) },
+            ...(k.expect === "opus" ? [{ name: "the opus fallback was announced", ok: said(c, "opus") && said(c, "fable") }] : []),
+            { name: "committed on the feature branch, not pushed", ok: commits.length > 0 && unpushed },
+            canaryFree([...commits.map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  }),
+);
+SCENARIOS.push(...PHASE6);
 
 function scanSecrets(text: string): string[] {
   return SECRET_CANARIES.filter((c) => text.includes(c));
