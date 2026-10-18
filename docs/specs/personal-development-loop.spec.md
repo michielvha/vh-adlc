@@ -99,6 +99,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-29 | One exception to D-20, for the binary child feature (`docs/specs/vh-adlc-binary.spec.md`) only, because its release cannot happen before its own merge. After the release, two docs-only commits made on its feature branch, fast-forwarded to the default branch, are pushed straight to the default branch with the skip-CI marker: one records the release evidence, the other flips the child to `complete`. Design's "The feature's own commits cannot cause it" was qualified, in the revision after R-23, to hold only until the feature merges. Decided on 2026-10-17 in answer to the child's review R-2 F-01. |
 | D-30 | AC-01's host half is proven by S1.host, a CLI-only scenario with no model calls. It installs `github-app-registration@vhco-tools`, snapshots the isolated profile's plugin list and that plugin's installed files, installs and uninstalls `vh-adlc@vhco-tools`, and compares the snapshot. S1 keeps its agent runs unchanged. Decided on 2026-10-18 in answer to R-25 F-01. |
 | D-31 | D-29's exception extends to this document, because AC-28's credential-free install from the public `main` cannot happen before this feature merges. After the merge, one docs-only commit on the default branch with the skip-CI marker records that install check, ticks AC-28 and T32 when they hold, and moves the document to `complete` only if `vh-adlc gate complete` passes. Decided on 2026-10-18 in answer to R-25 F-04. |
+| D-32 | AC-02 completes as a residual tracked in michielvha/vh-adlc#3: the Claude Code desktop app, the VS Code extension and the VS Code Local run (T24) need the owner at a GUI, and stay unsupported in the README until they pass. Decided on 2026-10-18. |
 
 ## Scope
 
@@ -852,6 +853,7 @@ stated.
 - [ ] AC-02: One manifest, no generated mirror, no build step; the same tree loads on every claimed host
       with all seven operations and the reviewer discoverable under the documented invocation.
       Evidence: R-25 at `8d62bb1` returned not verified.
+      Residual: https://github.com/michielvha/vh-adlc/issues/3
 - [ ] AC-03: The package contains no convention text and no template; every operation reports the docs
       revision and page it took each convention from.
       Evidence: R-25 at `8d62bb1` returned not verified.
@@ -1229,6 +1231,7 @@ numbers within a phase are in dependency order; a partial checker run never mark
       full-v1 pass is claimed.
 - [ ] T24 VS Code Local harness - the same phase-scoped selection as T23 runs by hand and is recorded;
       pending operations remain pending (advances AC-02)
+      Evidence: deferred to #3 under D-32. Until it is recorded, the VS Code Local harness is unsupported.
 
 ### Phase 5: Build loop
 
@@ -1325,6 +1328,7 @@ numbers within a phase are in dependency order; a partial checker run never mark
       (AC-01)
       Evidence: `plugins/vh-adlc/.claude-plugin/plugin.json` keeps `0.1.0` as the first published version,
       matching the binary's `0.1.0`. The package is new on this branch, and the T14 version rule passes.
+      The follow-up fixes after the merge raised it to `0.1.1`, as the version rule asks.
 
 ## Open Questions
 
