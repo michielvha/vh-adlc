@@ -12,9 +12,9 @@ Input: an issue, a feature document, a branch, or "continue". Follow `references
    `conventions/delivery.md` and `guides/humanize-prose.md`. Report the one-line result.
 2. Run `vh-adlc find` to locate the document. Reconcile it with Git (`git worktree list --porcelain`, the
    document's `branch`, unpushed or unpublished commits), the issue and any PR.
-3. Establish the owning worktree. If the branch is checked out in a worktree you cannot use, or another
-   session may still be writing, report the owner action needed (a handoff) and stop; never resolve against
-   an unrelated branch or worktree.
+3. Establish the owning worktree. If the branch is checked out in a worktree you cannot use, report the
+   owner action needed and stop; never resolve against an unrelated branch or worktree. Before any write
+   to a claimed feature, the handoff rule in `references/authority.md` applies.
 4. In the owning worktree, run `git fetch origin <default branch>`, then `vh-adlc fresh` and `vh-adlc next`.
    Quote both results.
 5. Report: status, remaining tasks, the review targets and whether they are fresh, the owning worktree, any

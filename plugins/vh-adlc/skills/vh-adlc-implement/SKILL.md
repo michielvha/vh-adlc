@@ -44,9 +44,8 @@ Run `git fetch origin <default branch>`. What happens next depends on the docume
 
 **`in-progress` with a `branch`: re-enter.**
 
-1. Find the worktree that has the branch checked out. If it is another worktree than yours, or another
-   session may still be writing, stop and ask the owner to confirm a handoff. Continue only in the owning
-   worktree.
+1. Find the worktree that has the branch checked out, and continue only there. Unless this session made
+   the claim, apply the handoff rule in `references/authority.md` before the first write.
 2. Recover rather than restart:
    - a claim commit that is local but not on `origin`: retry its push before anything else;
    - a published claim with no feature branch: create the branch at that exact claim commit;

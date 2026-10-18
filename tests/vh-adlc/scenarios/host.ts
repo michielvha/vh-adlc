@@ -104,7 +104,7 @@ export function version(): string {
   return r.stdout.toString().trim();
 }
 
-export type ToolUse = { name: string; input: Record<string, unknown>; error: boolean; subagent: boolean };
+export type ToolUse = { name: string; input: Record<string, unknown>; error: boolean; output: string; subagent: boolean };
 
 // toolUses reads every tool call from the profile's session transcripts, subagents included, with
 // whether its result was an error. Call it before the profile is disposed.
@@ -134,12 +134,15 @@ export function toolUses(p: Profile): ToolUse[] {
       if (!Array.isArray(content)) continue;
       for (const block of content as Record<string, unknown>[]) {
         if (block.type === "tool_use") {
-          const use = { name: String(block.name), input: (block.input ?? {}) as Record<string, unknown>, error: false, subagent };
+          const use = { name: String(block.name), input: (block.input ?? {}) as Record<string, unknown>, error: false, output: "", subagent };
           byId.set(String(block.id), use);
           uses.push(use);
-        } else if (block.type === "tool_result" && block.is_error) {
+        } else if (block.type === "tool_result") {
           const use = byId.get(String(block.tool_use_id));
-          if (use) use.error = true;
+          if (!use) continue;
+          use.error = Boolean(block.is_error);
+          const c = block.content;
+          use.output = (typeof c === "string" ? c : Array.isArray(c) ? c.map((x: Record<string, unknown>) => String(x.text ?? "")).join("\n") : "").slice(0, 4000);
         }
       }
     }

@@ -17,7 +17,8 @@ and `references/authority.md` for what you may do without asking.
    and the next step is `/vh-adlc-spec`.
 3. Work where the document lives. With a `branch` field, that is the branch's owning worktree from
    `git worktree list --porcelain`; without one, a worktree on the default branch. If you cannot use that
-   worktree without disturbing someone's changes, report the owner action needed and stop.
+   worktree without disturbing someone's changes, report the owner action needed and stop. With a
+   `branch` field, the handoff rule in `references/authority.md` applies before you write.
 
 ## Check that the document is ready for tasks
 

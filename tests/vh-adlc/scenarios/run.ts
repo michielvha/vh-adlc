@@ -624,9 +624,12 @@ function taskLines(doc: string): string[] {
   return section(doc, "Tasks").split("\n").filter((l) => /^- \[[ x]\] T\d+ /.test(l));
 }
 
-// testRuns are the Bash calls that ran the fixture's test suite, in order, with whether each failed.
+// testRuns are the Bash calls that ran the fixture's test suite, in order, with whether each failed, judged
+// from the suite's own FAIL and PASS lines rather than from the agent's summary.
 function testRuns(uses: ToolUse[]): boolean[] {
-  return uses.filter((u) => u.name === "Bash" && String(u.input.command ?? "").includes("test.sh")).map((u) => u.error);
+  return uses
+    .filter((u) => u.name === "Bash" && String(u.input.command ?? "").includes("test.sh") && /^(FAIL|PASS)\b/m.test(u.output))
+    .map((u) => /^FAIL\b/m.test(u.output));
 }
 
 // passesAt runs the fixture's test suite against a ref, in a scratch copy.
@@ -646,6 +649,10 @@ function canaryFree(texts: string[]): Check {
   return { name: "no prose canary or dash in the commits, the document or the reports", ok: hits.length === 0 && !dash, detail: [...hits, dash ? "dash" : ""].filter(Boolean).join("; ") };
 }
 
+// The owner's handoff (references/authority.md): a session writes to a feature another session claimed
+// only after this.
+const HANDOFF = "The earlier session on greeting-name has stopped, and I hand the feature to you.";
+
 const OWNER_NOTE = `A note from me: ${PROSE_CANARIES[0]} ${PROSE_CANARIES[1]} Keep it ${PROSE_CANARIES[2]}; ${PROSE_CANARIES[3]}.`;
 
 const S8_TASKS =
@@ -663,8 +670,8 @@ const PHASE5: Scenario[] = [
       const owning = claim(f);
       const original = readFileSync(join(owning, FEATURE_PATH), "utf8");
       const firstRun: string[] = [];
-      const turns = session(f, [f.pluginA], ["/vh-adlc-tasks greeting-name"], { cwd: owning, after: () => firstRun.push(readFileSync(join(owning, FEATURE_PATH), "utf8")) });
-      turns.push(...session(f, [f.pluginA], ["/vh-adlc-tasks greeting-name"], { cwd: owning }));
+      const turns = session(f, [f.pluginA], [`/vh-adlc-tasks greeting-name. ${HANDOFF}`], { cwd: owning, after: () => firstRun.push(readFileSync(join(owning, FEATURE_PATH), "utf8")) });
+      turns.push(...session(f, [f.pluginA], [`/vh-adlc-tasks greeting-name. ${HANDOFF}`], { cwd: owning }));
       return {
         turns,
         checks: (c) => {
@@ -711,7 +718,7 @@ const PHASE5: Scenario[] = [
           const claimDoc = claimCommit ? show(f, claimCommit.hash, FEATURE_PATH) ?? "" : "";
           return [
             { name: "gate in-progress passed before the claim", ok: gateCalls(c, "in-progress").some((g) => g.json?.result === "pass") },
-            { name: "one claim commit on the default branch, pushed, with the gate line", ok: onMain.length === 1 && !!claimCommit && statusOf(claimDoc) === "in-progress" && claimDoc.includes(`branch: ${FEATURE_BRANCH}`) && claimCommit.body.includes("vh-adlc gate in-progress: pass") },
+            { name: "one claim commit on the default branch, pushed, with the gate line", ok: onMain.filter((x) => x.files.includes(FEATURE_PATH)).length === 1 && !!claimCommit && statusOf(claimDoc) === "in-progress" && claimDoc.includes(`branch: ${FEATURE_BRANCH}`) && claimCommit.body.includes("vh-adlc gate in-progress: pass") },
             { name: "the docs-only claim carries the skip-CI marker", ok: !!claimCommit && claimCommit.files.length === 1 && /\[skip ci\]/.test(claimCommit.subject) },
             { name: "the feature branch starts at the claim and was not pushed", ok: !!branch && !!claimCommit && ancestor(f, claimCommit.hash, FEATURE_BRANCH) && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" },
             { name: "the work commits are on the branch, change greet.sh and run CI", ok: work.length > 0 && work.some((x) => x.files.includes("greet.sh")) && work.every((x) => !/\[skip ci\]/.test(x.subject)) },
@@ -741,7 +748,7 @@ const PHASE5: Scenario[] = [
         },
       });
       rmSync(hook);
-      turns.push(...session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. Stop once you are on the feature branch; do not implement the tasks yet.`]));
+      turns.push(...session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. ${HANDOFF} Stop once you are on the feature branch; do not implement the tasks yet.`]));
       return {
         turns,
         checks: (c) => {
@@ -767,7 +774,7 @@ const PHASE5: Scenario[] = [
       claim(f, { branch: false });
       const claimed = rev(f, "main")!;
       const before = worktrees(f);
-      const turns = session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. Stop once you are on the feature branch; do not implement the tasks yet.`]);
+      const turns = session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. ${HANDOFF} Stop once you are on the feature branch; do not implement the tasks yet.`]);
       return {
         turns,
         checks: (c) => [
@@ -887,7 +894,7 @@ const PHASE5: Scenario[] = [
       git(f.home, owning, "commit", "-q", "-m", "docs: record re-review R-2", "--", FEATURE_PATH);
       const tip = rev(f, FEATURE_BRANCH)!;
       const turns = session(f, [f.pluginA], ["/vh-adlc-resume greeting-name", "continue"], { cwd: owning });
-      turns.push(...session(f, [f.pluginA], ["/vh-adlc-implement greeting-name. If it is finished, mark it complete."], { cwd: owning }));
+      turns.push(...session(f, [f.pluginA], [`/vh-adlc-implement greeting-name. ${HANDOFF} If it is finished, mark it complete.`], { cwd: owning }));
       return {
         turns,
         checks: (c) => {
@@ -917,7 +924,7 @@ const PHASE5: Scenario[] = [
         f,
         [f.pluginA],
         [
-          "/vh-adlc-spec The owner wants a change to greeting-name: with no argument the script should print `Hello, there.` instead of `Hello, world.`. Revise the document for that.",
+          `/vh-adlc-spec ${HANDOFF} The owner wants a change to greeting-name: with no argument the script should print \`Hello, there.\` instead of \`Hello, world.\`. Revise the document for that.`,
           "The owner here: run the review the change needs. If it finds nothing blocking and leaves no open questions, I accept the revision; then move it to planned and re-enter implementation, but stop before implementing anything.",
         ],
         { cwd: owning },

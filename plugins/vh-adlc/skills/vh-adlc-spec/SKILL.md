@@ -16,8 +16,9 @@ without asking, and `references/review-protocol.md` for the review mode.
    `guides/humanize-prose.md`. Report the one-line result. Read those pages from the cache before writing.
 2. Run `vh-adlc find` with the issue number or the slug. If a document exists, extend it; never create a
    second document or a second issue for the same feature.
-3. If the document has a `branch` field, work only on that branch in its owning worktree. Otherwise work
-   on the default branch in a worktree that holds it, without disturbing anyone's changes.
+3. If the document has a `branch` field, work only on that branch in its owning worktree, and apply the
+   handoff rule in `references/authority.md` before the first write. Otherwise work on the default branch
+   in a worktree that holds it, without disturbing anyone's changes.
 
 ## Author mode
 
