@@ -6,15 +6,16 @@ rule from.
 
 ## 1. Get the binary
 
-Run the installer and use the path it prints for every later call:
+The plugin directory is the one that holds `skills/`: two levels above the skill's own directory, which
+the host names when it loads the skill. Use `$CLAUDE_PLUGIN_ROOT` instead only when the environment sets
+it. Run the installer from there and use the path it prints for every later call:
 
 ```sh
-VH_ADLC=$("${CLAUDE_PLUGIN_ROOT}/scripts/ensure-vh-adlc.sh")
+VH_ADLC=$("<plugin directory>/scripts/ensure-vh-adlc.sh")
 ```
 
-`CLAUDE_PLUGIN_ROOT` is the plugin's directory on Claude Code. On a host that does not set it, the
-plugin directory is two levels above the skill's `SKILL.md`. The installer verifies the binary against
-`vh-adlc.lock.json` and fails closed on any mismatch; never work around a failure.
+The installer verifies the binary against `vh-adlc.lock.json` and fails closed on any mismatch; never
+work around a failure.
 
 When the installer fails, say `deterministic checks unavailable` in the report and carry on only with
 read-only work: investigating, drafting and reporting. Every status change stops, unless the owner
