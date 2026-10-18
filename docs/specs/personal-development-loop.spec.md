@@ -1317,7 +1317,7 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ### Revision after R-26
 
-- [ ] T34 `plugins/vh-adlc/references/review-protocol.md`, `README.md`,
+- [x] T34 `plugins/vh-adlc/references/review-protocol.md`, `README.md`,
       `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`,
       `tests/vh-adlc/scenarios/run.ts` - the protocol and both skills compare the reviewer's `MODEL:` line
       with the request as D-33 says, dispatch again on `opus` as D-34 says, and leave a mismatched review
@@ -1328,6 +1328,12 @@ numbers within a phase are in dependency order; a partial checker run never mark
       as D-41 says.
       `README.md`'s support matrix row on choosing the reviewer's model states the D-33 to D-35
       behaviour (AC-15, AC-20, AC-21)
+      Evidence: S11.1 to S11.7 pass on Claude Code 2.1.302 at `26b2233` (S11.7 re-ran at the following
+      harness-only commit). In S11.6 settings refused the named `sonnet`, and the host ran the reviewer
+      on `claude-opus-5-5` without saying so. The review stayed pending with a handoff and wrote no row.
+      In S11.7, with `fable` refused, the first pass ran on the session's `claude-sonnet-5-5`, and the
+      loop dispatched again naming `opus`. It stored one review and announced the fallback. So D-41's
+      Open Question is not needed. The README's matrix row states the D-33 to D-35 behaviour.
 
 ## Open Questions
 
