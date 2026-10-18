@@ -1358,6 +1358,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-18 | R-24 | spec | `d733074` | fable | procedural | Review of the revision after R-23. Three nits, nothing blocking. F-02 applied outside the normative baseline; F-01 concerns the completed child and is left; F-03 declined, because the checker checks the plugin package and the schema pointer in the Contract is the whole fold of R-23 F-03. |
 | 2026-10-18 | R-24 | spec | `d733074` | n/a | n/a | accepted by owner |
 | 2026-10-18 | R-25 | implementation | `8d62bb1` | claude-fable-5-1 | procedural | Five criteria met, AC-28 not met, 26 not verified because the reviewer ran no scenarios. Six findings: four should-fix or nit facts, two judgements. |
+| 2026-10-19 | R-26 | spec | `abf85ce` | claude-fable-5-1 | procedural | Drift-only re-review after the merges. Two factual findings in Design, one should-fix and one nit; nothing blocking. |
 
 ### R-14
 
@@ -1827,6 +1828,22 @@ SEVERITY: nit
 WHERE: plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md, Rules
 EVIDENCE: The agent file allows "the `vh-adlc` binary (`lint`, `fresh`, `gate`, `next`)", while `references/review-protocol.md` and the review skill expect the reviewer to be able to run `knowledge` (to resolve the pages it reads) and the dispatch text in use adds `review check`. A reviewer that follows the file as written would not run either, and the two texts disagree on the reviewer's permitted commands.
 PROPOSAL: List `knowledge` and `review check` alongside the four in the agent file, so the file and the dispatch agree.
+
+### R-26
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Models (and the Hosts table of host facts)
+EVIDENCE: Design says of a named model: "passed as given, with no fallback: if the host rejects it, the review stays pending and lists what the host offers". Commit ea78b15 (merged in PR #2) records a host fact the Hosts table lacks: with `fable` excluded through the profile's `availableModels`, Claude Code 2.1.284 ran the reviewer on the session's model with no notice in the Agent result. The covered tree now handles it in `plugins/vh-adlc/references/review-protocol.md`, Models: "A host may run a subagent on another model than the one asked for, without saying so ... a refused `fable` that ran on `opus` is the fallback above, and any other difference is reported as it is", and `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md`, Store and apply, step 1 stores the row with the model the `MODEL:` line names "if that model is not the one you asked for, say so". So a named model that settings refuse yields a stored, counted review on another model, where the baseline says no fallback and pending. S11 does not exercise this path: `tests/vh-adlc/scenarios/run.ts:1057` makes S11.4's named model `claude-nonexistent-9`, which the host rejects outright; S11.2 restricts `availableModels` only for the unnamed case.
+PROPOSAL: Add the silent-substitution fact to the Hosts table, and in Models say what the loop does when the host runs a named model on another one without rejecting it (treat the stored review as pending and not current, or accept it with the recorded model), then align review-protocol.md and add an S11 case that names a real model excluded by `availableModels`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Hosts (the "Not yet established" paragraph)
+EVIDENCE: The baseline states "how a skill locates the plugin root (Claude Code sets `CLAUDE_PLUGIN_ROOT`)". Commit 44563b7 (merged in PR #2): "A headless probe on Claude Code 2.1.284 found CLAUDE_PLUGIN_ROOT empty in a skill's Bash environment." `tests/vh-adlc/evidence/claude-code/S1.md`, Notes: "Host fact, plugin root: 10 installer call(s), 0 through CLAUDE_PLUGIN_ROOT and 10 through a literal plugin path". `plugins/vh-adlc/references/loop.md`, section 1, now leads with "two levels above the skill's own directory" and uses `$CLAUDE_PLUGIN_ROOT` "only when the environment sets it".
+PROPOSAL: Replace the parenthetical with the measured result (the variable is empty in a skill's shell on Claude Code 2.1.284; the plugin root is the directory two levels above the skill), or drop the parenthetical, since the three facts the paragraph lists are now settled by S1.
 
 ## Sources
 
