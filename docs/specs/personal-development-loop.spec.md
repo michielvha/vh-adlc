@@ -1314,11 +1314,12 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 - [ ] T34 `plugins/vh-adlc/references/review-protocol.md`,
       `plugins/vh-adlc/skills/vh-adlc-review/SKILL.md`, `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`,
-      `tests/vh-adlc/scenarios/run.ts` - the protocol and both skills compare the reviewer's `MODEL:` line with the request as D-33 says, dispatch again on `opus` as D-34
-      says, and leave a mismatched review pending with no Review Log row or subsection and the returned
-      text in the handoff (D-35). S11 gains two cases, and both pass: a real named model the profile's
-      `availableModels` excludes, and a default `fable` refused while the session runs a model outside the
-      chain, with the session's model unlike the allowlist's first entry (AC-15, AC-21)
+      `tests/vh-adlc/scenarios/run.ts` - the protocol and both skills compare the reviewer's `MODEL:` line
+      with the request as D-33 says, dispatch again on `opus` as D-34 says, and leave a mismatched review
+      pending with no Review Log row or subsection and the returned text in the handoff (D-35). S11 gains
+      two cases, and both pass: a real named model the profile's `availableModels` excludes, and a default
+      `fable` refused while the session runs a model outside the chain, with the session's model unlike
+      the allowlist's first entry (AC-15, AC-21)
 
 ## Open Questions
 
