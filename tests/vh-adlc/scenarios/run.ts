@@ -8,6 +8,7 @@
 // later are reported as pending. The default is the full v1 selection.
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
@@ -222,6 +223,27 @@ const S7_VARIANTS = [
   ["no acceptance", (f: Fixtures) => accept(f, "NO FINDINGS", false), "accepted", `/vh-adlc-spec I have not accepted ${FEATURE_PATH}. Move it to planned if, and only if, the gate allows it.`],
 ] as const;
 
+// pluginState is what installing vh-adlc must leave alone in a profile: github-app-registration's entry and
+// the SHA-256 of each of its installed files, and the marketplace's entry.
+function pluginState(config: string) {
+  const json = (name: string) => {
+    const path = join(config, "plugins", name);
+    return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : {};
+  };
+  const installed = json("installed_plugins.json").plugins ?? {};
+  const files: Record<string, string> = {};
+  const walk = (dir: string) => {
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, e.name);
+      if (e.isDirectory()) walk(path);
+      else if (path.includes(`${"/"}github-app-registration${"/"}`)) files[path.slice(config.length)] = createHash("sha256").update(readFileSync(path)).digest("hex");
+    }
+  };
+  walk(join(config, "plugins"));
+  return { app: { entry: installed["github-app-registration@vhco-tools"] ?? null, files }, files, vhAdlc: !!installed["vh-adlc@vhco-tools"], marketplace: json("known_marketplaces.json")["vhco-tools"] ?? null };
+}
+
 // S1 invokes each scheduled operation once on the draft fixture; the later ones stop at their gate.
 const S1_PROMPTS: Record<string, string> = {
   investigate: "/vh-adlc-investigate Why does ./test.sh fail? Report only; change nothing.",
@@ -277,6 +299,44 @@ const SCENARIOS: Scenario[] = [
           { name: "each operation ran without an error", ok: turns.length === operations().length && turns.every((t) => !t.isError) },
           { name: "the reviewer was dispatched", ok: said(c, "vh-adlc:vh-adlc-reviewer") },
           { name: "uninstall leaves no vh-adlc plugin", ok: !after.includes("vh-adlc@vhco-tools") },
+          unrelatedIntact(c),
+        ],
+      };
+    },
+  },
+  {
+    id: "S1.host",
+    title: "Installing and uninstalling vh-adlc leaves github-app-registration as it was (CLI only)",
+    phase: 4,
+    run: async (f) => {
+      // D-30: no model runs here, only the host's plugin commands in an isolated profile.
+      const home = mkdtempSync(join(tmpdir(), "vh-adlc-s1-home-"));
+      agentHome(home);
+      const p = profile(home);
+      const steps: { args: string; code: number }[] = [];
+      const shots: Record<string, ReturnType<typeof pluginState>> = {};
+      try {
+        const run = (...a: string[]) => steps.push({ args: a.join(" "), code: cli(p, f.project, ...a).code });
+        run("plugin", "marketplace", "add", ROOT);
+        run("plugin", "install", "github-app-registration@vhco-tools");
+        shots.before = pluginState(p.config);
+        run("plugin", "install", "vh-adlc@vhco-tools");
+        shots.during = pluginState(p.config);
+        run("plugin", "uninstall", "vh-adlc@vhco-tools");
+        shots.after = pluginState(p.config);
+        run("plugin", "uninstall", "github-app-registration@vhco-tools");
+        run("plugin", "marketplace", "remove", "vhco-tools");
+      } finally {
+        p.dispose();
+      }
+      return {
+        turns: [],
+        notes: [...steps.map((x) => `\`claude ${x.args.replace(ROOT, "<checkout>")}\`: exit ${x.code}`), `github-app-registration files hashed: ${Object.keys(shots.before?.files ?? {}).length}`],
+        checks: (c) => [
+          { name: "every plugin command succeeded", ok: steps.length === 6 && steps.every((x) => x.code === 0) },
+          { name: "vh-adlc was installed, then removed", ok: !!shots.during?.vhAdlc && !shots.after?.vhAdlc },
+          { name: "github-app-registration's entry and files are unchanged by the install", ok: JSON.stringify(shots.during?.app) === JSON.stringify(shots.before?.app) },
+          { name: "uninstalling leaves github-app-registration and the marketplace as before", ok: JSON.stringify(shots.after?.app) === JSON.stringify(shots.before?.app) && JSON.stringify(shots.after?.marketplace) === JSON.stringify(shots.before?.marketplace) },
           unrelatedIntact(c),
         ],
       };

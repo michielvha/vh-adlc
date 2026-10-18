@@ -97,6 +97,8 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-27 | Binary releases are signed with the owner's one general release key, VHCO Pro (Release Signing Key) <release@vhco.pro>, fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`: `checksums.txt` carries a detached signature. The passphrase-less ASCII-armoured secret key is the `PGP_PRIVATE_KEY` repository secret (set on 2026-10-17); the public key is committed as `release-signing-key.asc` and its fingerprint printed in the README. The key's original identity, VHCO Pro (Terraform Provider Signing Key), stays; the general identity was added on 2026-10-17 and is primary, and `release-signing-key.asc` is exported from the key as held in the secret, so the file, the README and every signature agree. The plugin installer's trust root stays the digests pinned in its lock; it does not verify the signature. |
 | D-28 | The loop edits every piece of prose it writes for a reader with the humanize prose guide in `vhco-pro/docs` (`guides/humanize-prose.md`, adapted from `blader/humanizer`) before committing or posting it: feature-document prose, commit messages, PR and issue bodies, review summaries and run reports. Stored review records and other verbatim text are not rewritten. The guide is a docs page, not plugin text, and the plugin pin moves to `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`, the merge that added it. |
 | D-29 | One exception to D-20, for the binary child feature (`docs/specs/vh-adlc-binary.spec.md`) only, because its release cannot happen before its own merge. After the release, two docs-only commits made on its feature branch, fast-forwarded to the default branch, are pushed straight to the default branch with the skip-CI marker: one records the release evidence, the other flips the child to `complete`. Design's "The feature's own commits cannot cause it" was qualified, in the revision after R-23, to hold only until the feature merges. Decided on 2026-10-17 in answer to the child's review R-2 F-01. |
+| D-30 | AC-01's host half is proven by S1.host, a CLI-only scenario with no model calls. It installs `github-app-registration@vhco-tools`, snapshots the isolated profile's plugin list and that plugin's installed files, installs and uninstalls `vh-adlc@vhco-tools`, and compares the snapshot. S1 keeps its agent runs unchanged. Decided on 2026-10-18 in answer to R-25 F-01. |
+| D-31 | D-29's exception extends to this document, because AC-28's credential-free install from the public `main` cannot happen before this feature merges. After the merge, one docs-only commit on the default branch with the skip-CI marker records that install check, ticks AC-28 and T32 when they hold, and moves the document to `complete` only if `vh-adlc gate complete` passes. Decided on 2026-10-18 in answer to R-25 F-04. |
 
 ## Scope
 
@@ -1307,7 +1309,9 @@ numbers within a phase are in dependency order; a partial checker run never mark
       Code. S1, S5 and S14 cover all seven operations. 57 ran on 2.1.284 at `6a8cb22`. S7.7, S9.1, S9.2,
       S12.13 and S13 re-ran on 2.1.302 at `de32c19`, and S13.6 at `d9d4a50`, after an expired login and
       two narrow skill fixes on those paths. The recorded runs cost 53.14 USD. The full-v1 checker passes, and a
-      grep of `tests/vh-adlc/evidence/` finds no secret canary, no token and no dash. Still open: both
+      grep of `tests/vh-adlc/evidence/` finds no secret canary, no token and no dash. S1.host (D-30) passes
+      at no cost, comparing github-app-registration's entry and six installed files before and after
+      installing and uninstalling vh-adlc. Still open: both
       public plugins installing from `michielvha/vh-adlc` without a credential, which needs this branch
       merged; the VS Code Local run (T24); and discovery in the desktop app, the VS Code extension and a
       remote session.
@@ -1318,34 +1322,7 @@ numbers within a phase are in dependency order; a partial checker run never mark
 
 ## Open Questions
 
-### Q1: How should S1 prove that installing vh-adlc leaves github-app-registration unchanged?
-
-**Recommendation:** A. It proves AC-01 on the host, where the criterion lives, at the cost of one install.
-
-R-25 F-01: S1 never installs or inspects `github-app-registration`, so AC-01's "unchanged" rests only on the
-checker's repository diff.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Snapshot in S1** | S1 installs `github-app-registration` first, snapshots the profile's plugin list and installed files, installs and uninstalls `vh-adlc`, and compares | One more install per S1 run and a re-run of S1 |
-| **B. Repository diff only** | AC-01 stays proven by the checker's diff and the marketplace check | AC-01 says the host state is unchanged, and nothing observes the host |
-
-**Why this is yours:** it decides how much proof AC-01 needs.
-
-### Q2: How should this feature record the public install check that only the merge makes possible?
-
-**Recommendation:** A. It mirrors D-29, which settled the same shape for the binary child.
-
-R-25 F-04: AC-28 and T32 need `vh-adlc@vhco-tools` to install from the public `main` without a credential,
-which can only happen after this branch merges. D-29 covers the child feature only.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Extend D-29** | After the merge, one docs-only commit on the default branch records the install check, ticks AC-28 and T32, and flips the document to `complete` | A second exception to D-20 |
-| **B. Residual on AC-28** | The feature completes before the merge with AC-28 unticked under a tracked residual | An issue to track, and a `Refs` PR instead of `Closes` |
-| **C. Leave in-progress** | The feature merges unfinished and completes in a later change | The document stays `in-progress` on the default branch after the merge |
-
-**Why this is yours:** it is an exception to the delivery decisions you made.
+None. Every decision raised so far is recorded under [Owner decisions](#owner-decisions).
 
 ## Review Log
 
