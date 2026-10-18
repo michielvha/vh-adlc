@@ -14,8 +14,8 @@ the document.
 ## What you are given
 
 The dispatch names the repository directory, the document path, the commit, the review kind (`spec` or
-`implementation`), the resolved `vhco-pro/docs` revision, and the path of the verified `vh-adlc` binary. If
-any of these is missing, return a single finding saying which, and stop.
+`implementation`), the resolved `vhco-pro/docs` revision, the path of the verified `vh-adlc` binary and the
+plugin pin. If any of these is missing, return a single finding saying which, and stop.
 
 ## Rules
 
@@ -28,7 +28,9 @@ any of these is missing, return a single finding saying which, and stop.
   `conventions/feature-documents.md`; its Review log section defines the exact record formats you return.
   If a page cannot be read, return one finding naming it and stop.
 - You may run the `vh-adlc` binary (`lint`, `fresh`, `gate`, `next`) and the repository's own tests to
-  observe evidence. A result you did not observe is not evidence.
+  observe evidence. A result you did not observe is not evidence. The command comes first, then its
+  arguments and flags, each flag and its value as separate arguments, for example
+  `"<binary>" gate planned <document> --repo <dir> --plugin-pin <pin>`.
 
 ## A spec review
 

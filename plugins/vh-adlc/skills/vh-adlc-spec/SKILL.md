@@ -36,7 +36,7 @@ without asking, and `references/review-protocol.md` for the review mode.
 
 1. Commit the document first; a review targets an exact commit. Call it X.
 2. Dispatch `vh-adlc-reviewer` as `references/review-protocol.md` describes, with the document, X, kind
-   `spec`, the docs revision and the binary path. If dispatch is impossible, write the handoff and leave
+   `spec`, the docs revision, the binary path and the plugin pin. If dispatch is impossible, write the handoff and leave
    the review pending.
 3. Store the returned records under the next `### R-<n>` with a Review Log row at X, before changing
    anything, then run `vh-adlc review check` against the returned text.

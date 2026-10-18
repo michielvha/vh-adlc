@@ -5,9 +5,9 @@
 // the run; the copy is deleted when the run ends. Nothing of the owner's own
 // profile (plugins, settings, memory) is read or changed.
 
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, sep } from "node:path";
 
 export const CLAUDE = process.env.VH_ADLC_CLAUDE ?? join(homedir(), ".local", "bin", "claude");
 const OWNER_CREDENTIALS = join(homedir(), ".claude", ".credentials.json");
@@ -102,4 +102,47 @@ export function cli(p: Profile, cwd: string, ...args: string[]) {
 export function version(): string {
   const r = Bun.spawnSync([CLAUDE, "--version"], { stdout: "pipe" });
   return r.stdout.toString().trim();
+}
+
+export type ToolUse = { name: string; input: Record<string, unknown>; error: boolean; subagent: boolean };
+
+// toolUses reads every tool call from the profile's session transcripts, subagents included, with
+// whether its result was an error. Call it before the profile is disposed.
+export function toolUses(p: Profile): ToolUse[] {
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const path = join(dir, e.name);
+      if (e.isDirectory()) walk(path);
+      else if (e.name.endsWith(".jsonl")) files.push(path);
+    }
+  };
+  walk(join(p.config, "projects"));
+  const uses: ToolUse[] = [];
+  for (const file of files) {
+    const subagent = file.includes(`${sep}subagents${sep}`) || /agent-[^/]*\.jsonl$/.test(file);
+    const byId = new Map<string, ToolUse>();
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      if (!line.trim()) continue;
+      let entry: { message?: { content?: unknown } };
+      try {
+        entry = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      const content = entry.message?.content;
+      if (!Array.isArray(content)) continue;
+      for (const block of content as Record<string, unknown>[]) {
+        if (block.type === "tool_use") {
+          const use = { name: String(block.name), input: (block.input ?? {}) as Record<string, unknown>, error: false, subagent };
+          byId.set(String(block.id), use);
+          uses.push(use);
+        } else if (block.type === "tool_result" && block.is_error) {
+          const use = byId.get(String(block.tool_use_id));
+          if (use) use.error = true;
+        }
+      }
+    }
+  }
+  return uses;
 }

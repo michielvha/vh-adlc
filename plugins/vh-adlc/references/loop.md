@@ -32,7 +32,8 @@ Call `knowledge` first, with every docs page the operation will read:
 
 State the result in one line, for example
 `Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md)`. Every call below passes the same
-`--repo` and `--plugin-pin`.
+`--repo` and `--plugin-pin`, written out on each call: the binary needs each flag and its value as
+separate arguments, so a quoted variable holding both flags arrives as one unknown flag.
 
 The binary caches each page it resolved. Read them from that cache rather than from memory:
 `${XDG_CACHE_HOME:-$HOME/.cache}/vh-adlc/docs/<sha>/<page>` on Linux and
@@ -78,6 +79,10 @@ Before committing or posting any prose a reader will see (document sections, com
 issue bodies, review summaries, run reports), edit it with `guides/humanize-prose.md` at the resolved
 revision, and name that page and revision in the report. Records a reviewer returned are stored exactly
 as returned.
+
+Restate what an issue, an owner turn or any other source says in your own edited words. Do not paste its
+wording as a quotation, even inside quotation marks: a quoted phrase keeps the tells the guide removes.
+Code, commands and file contents stay exact, in code spans.
 
 ## 5. Report
 

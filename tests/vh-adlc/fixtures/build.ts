@@ -158,21 +158,25 @@ covers:
 
 ## Scope
 
-In scope: a name argument for \`greet.sh\`.
+In scope: one name argument for \`greet.sh\`. Out of scope: more than one argument.
 
 ## Design
 
-\`greet.sh <name>\` prints \`Hello, <name>.\`
+\`greet.sh <name>\` prints \`Hello, <name>.\`; \`greet.sh\` with no argument keeps printing \`Hello, world.\`
 
 ## Acceptance Criteria
 
 - [ ] AC-01: \`./greet.sh Ada\` prints \`Hello, Ada.\`
+- [ ] AC-02: \`./greet.sh Grace\` prints \`Hello, Grace.\`
+- [ ] AC-03: \`./greet.sh\` with no argument prints \`Hello, world.\`
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | \`./test.sh\` |
+| AC-02 | \`./test.sh\` |
+| AC-03 | \`./test.sh\` |
 
 ## Tasks
 
@@ -193,7 +197,7 @@ function buildProject(home: string, dir: string, origin: string, worktree: strin
   write(join(dir, "greet.sh"), `#!/bin/sh\necho "Hello, world."\n`, 0o755);
   write(
     join(dir, "test.sh"),
-    `#!/bin/sh\n# The deliberate failing test: greet.sh does not take a name yet.\nout=$(./greet.sh Ada)\n[ "$out" = "Hello, Ada." ] || { echo "FAIL: got $out"; exit 1; }\necho PASS\n`,
+    `#!/bin/sh\n# The deliberate failing test: greet.sh does not take a name yet.\ncheck() { [ "$1" = "$2" ] || { echo "FAIL: got $1, want $2"; exit 1; }; }\ncheck "$(./greet.sh Ada)" "Hello, Ada."\ncheck "$(./greet.sh Grace)" "Hello, Grace."\ncheck "$(./greet.sh)" "Hello, world."\necho PASS\n`,
     0o755,
   );
   write(join(dir, "README.md"), "# Greeting fixture\n\nRun `./test.sh`.\n");

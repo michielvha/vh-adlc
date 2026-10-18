@@ -11,7 +11,7 @@ import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFil
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { accept, AGENT_NAME, agentHome, build, editFeature, FEATURE_PATH, type Fixtures, git, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
-import { claude, cli, profile, type Turn, version } from "./host";
+import { claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
 
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
 const EVIDENCE = join(ROOT, "tests", "vh-adlc", "evidence", "claude-code");
@@ -78,14 +78,37 @@ function ctx(f: Fixtures, turns: Turn[]): Ctx {
 
 const UNRELATED = ["A  NOTES.md", " M README.md", "?? scratch.txt"];
 
+// prose drops fenced blocks and code spans, where " -- " is shell syntax rather than a dash.
+function prose(text: string): string {
+  return text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
+}
+
 function unrelatedIntact(c: Ctx): Check {
   const s = c.status();
   const ok = UNRELATED.every((u) => s.includes(u)) && c.file("NOTES.md") === "Unrelated staged note.\n" && c.file("scratch.txt") === "Unrelated untracked file.\n";
   return { name: "unrelated staged, unstaged and untracked work is byte-identical", ok, detail: ok ? undefined : s };
 }
 
+// words returns a call's command and positional arguments; flags may come anywhere after the command.
+function words(args: string): string[] {
+  const out: string[] = [];
+  const parts = args.split(" ");
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i] === "--offline") continue;
+    if (parts[i].startsWith("--")) {
+      if (!parts[i].includes("=")) i++;
+      continue;
+    }
+    out.push(parts[i]);
+  }
+  return out;
+}
+
 function gateCalls(c: Ctx, target?: string): Call[] {
-  return c.log().filter((x) => x.args.startsWith("gate ") && (!target || x.args.startsWith(`gate ${target} `)));
+  return c.log().filter((x) => {
+    const w = words(x.args);
+    return w[0] === "gate" && (!target || w[1] === target);
+  });
 }
 
 function said(c: Ctx, ...words: string[]): boolean {
@@ -123,6 +146,33 @@ function knowledgeResults(c: Ctx): string[] {
   return c.log().filter((x) => x.args.startsWith("knowledge")).map((x) => String(x.json?.result));
 }
 
+// hostFacts settles, from the transcripts of S1, the three host facts the spec leaves open (Hosts).
+function hostFacts(uses: ToolUse[], home: string) {
+  const text = (u: ToolUse) => String(u.input.file_path ?? u.input.command ?? u.input.path ?? u.input.pattern ?? "");
+  const pluginFile = /(?:references\/[\w.-]+\.md|knowledge\.md|scripts\/ensure-vh-adlc\.sh)/g;
+  const seen = new Map<string, boolean>();
+  for (const u of uses.filter((x) => !x.subagent)) {
+    for (const m of text(u).matchAll(pluginFile)) seen.set(m[0], (seen.get(m[0]) ?? false) || !u.error);
+  }
+  const installs = uses.filter((u) => !u.subagent && u.name === "Bash" && text(u).includes("ensure-vh-adlc.sh"));
+  const viaEnv = installs.filter((u) => text(u).includes("CLAUDE_PLUGIN_ROOT")).length;
+  const bin = join(home, ".cache", "vh-adlc", "bin");
+  const cached = existsSync(bin) ? readdirSync(bin) : [];
+  const reviewer = uses.filter((u) => u.subagent);
+  const reviewerTools = [...new Set(reviewer.map((u) => u.name))].sort();
+  const reads = [...seen].map(([k, ok]) => `${k} ${ok ? "ok" : "failed"}`).join(", ") || "none";
+  return {
+    readsOutside: [...seen].some(([k, ok]) => ok && k.startsWith("references/")) && seen.get("knowledge.md") === true,
+    installed: installs.some((u) => !u.error) && cached.length > 0,
+    reviewerRan: reviewer.length > 0 && reviewerTools.some((t) => t === "Read" || t === "Bash"),
+    notes: [
+      `Host fact, files outside the skill directory: ${reads}`,
+      `Host fact, plugin root: ${installs.length} installer call(s), ${viaEnv} through CLAUDE_PLUGIN_ROOT and ${installs.length - viaEnv} through a literal plugin path; cached binary versions: ${cached.join(", ") || "none"}`,
+      `Host fact, unknown tool names (read, search, execute): the reviewer loaded and made ${reviewer.length} tool call(s) with ${reviewerTools.join(", ") || "no tools"}, ${reviewer.filter((u) => u.error).length} of them errors`,
+    ],
+  };
+}
+
 const SCENARIOS: Scenario[] = [
   {
     id: "S1",
@@ -138,6 +188,7 @@ const SCENARIOS: Scenario[] = [
       let listed = "";
       let details = "";
       let after = "";
+      let uses: ToolUse[] = [];
       try {
         out.push(String(cli(p, f.project, "plugin", "marketplace", "add", ROOT).code));
         out.push(String(cli(p, f.project, "plugin", "install", "vh-adlc@vhco-tools").code));
@@ -150,17 +201,22 @@ const SCENARIOS: Scenario[] = [
         ]) {
           turns.push(claude(p, prompt, { cwd: f.project, maxTurns: 80 }));
         }
+        uses = toolUses(p);
         out.push(String(cli(p, f.project, "plugin", "uninstall", "vh-adlc@vhco-tools").code));
         out.push(String(cli(p, f.project, "plugin", "marketplace", "remove", "vhco-tools").code));
         after = cli(p, f.project, "plugin", "list").out;
       } finally {
         p.dispose();
       }
+      const facts = hostFacts(uses, home);
       return {
         turns,
-        notes: [`CLI exit codes (marketplace add, install, uninstall, marketplace remove): ${out.join(", ")}`],
+        notes: [`CLI exit codes (marketplace add, install, uninstall, marketplace remove): ${out.join(", ")}`, ...facts.notes],
         checks: (c) => [
           { name: "install and marketplace commands succeed", ok: out.every((x) => x === "0"), detail: out.join(",") },
+          { name: "the skills read references/ and knowledge.md outside their own directory", ok: facts.readsOutside },
+          { name: "the installer ran from the plugin's scripts/ and installed the release binary", ok: facts.installed },
+          { name: "the reviewer ran with the unknown tool names in its list", ok: facts.reviewerRan },
           { name: "the three phase-4 skills and the reviewer are listed", ok: ["vh-adlc-investigate", "vh-adlc-spec", "vh-adlc-resume", "vh-adlc-reviewer"].every((s) => details.includes(s)) && listed.includes("vh-adlc@vhco-tools") },
           { name: "each operation ran without an error", ok: turns.length === 3 && turns.every((t) => !t.isError) },
           { name: "the reviewer was dispatched", ok: said(c, "vh-adlc:vh-adlc-reviewer") },
@@ -278,7 +334,8 @@ const SCENARIOS: Scenario[] = [
       const loopCallsAfterUnrelated = calls(f).length;
       turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/spec"]));
       turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/implement"]));
-      turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/review"]));
+      // Claude Code's built-in owns bare /review (Hosts), so the other plugin's review is reached by its qualified name.
+      turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/other-plugin:review"]));
       turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/vh-adlc-resume greeting-name"]));
       turns.push(...session(f, [f.pluginA, f.otherPlugin], ["/vh-adlc-investigate Why does ./test.sh fail? Report only."]));
       return {
@@ -309,7 +366,7 @@ const SCENARIOS: Scenario[] = [
           return [
             { name: "one document for the issue", ok: docs.length === 1 && plans.length === 0, detail: docs.join(", ") },
             { name: "find was used", ok: c.log().some((x) => x.args.startsWith("find ")) },
-            { name: "no prose canary or dash reached the document or commits", ok: !PROSE_CANARIES.some((p) => text.includes(p)) && !/[–—]| -- /.test(text) },
+            { name: "no prose canary or dash reached the document or commits", ok: !PROSE_CANARIES.some((p) => text.includes(p)) && !/[–—]| -- /.test(prose(text)) },
             unrelatedIntact(c),
           ];
         },
@@ -323,15 +380,15 @@ const SCENARIOS: Scenario[] = [
       ["stale review", (f: Fixtures) => { accept(f); editFeature(f, "prints `Hello, Ada.`", "prints `Hello, Ada!`"); }, "spec_review_fresh"],
       ["fresh blocking review", (f: Fixtures) => accept(f, "FINDING: F-01\nKIND: factual\nSEVERITY: blocking\nWHERE: Design\nEVIDENCE: greet.sh:2\nPROPOSAL: Say how the name is quoted."), "spec_review_clean"],
       ["malformed records", (f: Fixtures) => accept(f, "Looks good to me."), "spec_review_clean"],
-      ["no acceptance", (f: Fixtures) => accept(f, "NO FINDINGS", false), "accepted"],
+      ["no acceptance", (f: Fixtures) => accept(f, "NO FINDINGS", false), "accepted", `/vh-adlc-spec I have not accepted ${FEATURE_PATH}. Move it to planned if, and only if, the gate allows it.`],
     ] as const
-  ).map(([name, setup, condition], i): Scenario => ({
+  ).map(([name, setup, condition, prompt], i): Scenario => ({
     id: `S7.${i + 1}`,
     title: `Refused move to planned: ${name}`,
     phase: 4,
     run: async (f) => {
       setup(f);
-      const turns = session(f, [f.pluginA], [`/vh-adlc-spec The owner accepts ${FEATURE_PATH} as it stands. Record whatever is needed and move it to planned if, and only if, the gate allows it.`]);
+      const turns = session(f, [f.pluginA], [prompt ?? `/vh-adlc-spec The owner accepts ${FEATURE_PATH} as it stands. Record whatever is needed and move it to planned if, and only if, the gate allows it.`]);
       return {
         turns,
         checks: (c) => {
@@ -352,6 +409,8 @@ const SCENARIOS: Scenario[] = [
     title: "A sound draft follows the acceptance order",
     phase: 4,
     run: async (f) => {
+      // The fixture's issue reference is a bare #1 for S6; the standard wants a link or null.
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
       const turns = session(f, [f.pluginA], [
         `/vh-adlc-spec review ${FEATURE_PATH}`,
         "The owner here: I accept the document as reviewed, if the review found nothing blocking. Finish the acceptance.",
@@ -367,7 +426,7 @@ const SCENARIOS: Scenario[] = [
           const blocking = /SEVERITY: blocking/.test(doc);
           return [
             { name: "a review row and its records were stored", ok: reviewRows.length >= 1 && /### R-\d+/.test(doc) },
-            { name: "review check confirmed the stored records", ok: c.log().some((x) => x.args.startsWith("review check") && x.json?.result === "pass") },
+            { name: "review check confirmed the stored records", ok: c.log().some((x) => words(x.args).slice(0, 2).join(" ") === "review check" && x.json?.result === "pass") },
             {
               name: blocking ? "a blocking review stopped acceptance" : "exactly one acceptance row, then planned with the gate line",
               ok: blocking ? accepted.length === 0 && status === "draft" : accepted.length === 1 && status === "planned" && c.commits().some((x) => x.includes("vh-adlc gate planned: pass")),

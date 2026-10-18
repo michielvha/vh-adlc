@@ -3,9 +3,10 @@
 ## Independence
 
 A review runs in a separate context: dispatch the `vh-adlc-reviewer` agent where the host can, read-only,
-with the document path, the exact commit and the resolved docs revision. Where the host cannot dispatch it,
-write a self-contained handoff the owner runs elsewhere and leave the review visibly pending. Self-review is
-never labelled independent, whatever the model.
+with the repository directory, the document path, the exact commit, the review kind, the resolved docs
+revision, the binary path and the plugin pin. Where the host cannot dispatch it, write a self-contained
+handoff the owner runs elsewhere and leave the review visibly pending. Self-review is never labelled
+independent, whatever the model.
 
 The target is an exact commit. A completion-eligible implementation review runs against committed state in
 the feature's owning worktree with `feature_tree_clean` true. An uncommitted diagnostic review is recorded
