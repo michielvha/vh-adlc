@@ -1318,8 +1318,20 @@ const PHASE7: Scenario[] = S13_CASES.map(
       const tip = rev(f, FEATURE_BRANCH)!;
       toGitHub(f, token(), [issue, ...keep]);
       const mainBefore = gh(token(), "api", `repos/${SHIP_REPO}/commits/main`, "--jq", ".sha");
-      if (k.expect.partial) git(f.home, f.project, "config", "remote.origin.pushurl", `https://github.com/${SHIP_REPO}-missing.git`);
-      const turns = session(f, [f.pluginA], [k.prompt], { cwd: owning, env: { GH_TOKEN: token() } });
+      // The push failure comes from GitHub itself: a temporary ruleset that refuses new feat/ branches.
+      let ruleset = "";
+      if (k.expect.partial) {
+        const spec = JSON.stringify({ name: "s13-refuse-feature-branches", target: "branch", enforcement: "active", conditions: { ref_name: { include: ["refs/heads/feat/**"], exclude: [] } }, rules: [{ type: "creation" }] });
+        const r = Bun.spawnSync(["gh", "api", "-X", "POST", `repos/${SHIP_REPO}/rulesets`, "--input", "-", "--jq", ".id"], { stdin: new TextEncoder().encode(spec), env: { ...process.env, GH_TOKEN: token() }, stdout: "pipe", stderr: "pipe" });
+        if (r.exitCode !== 0) throw new Error(`creating the ruleset: ${r.stderr.toString()}`);
+        ruleset = r.stdout.toString().trim();
+      }
+      let turns: Turn[];
+      try {
+        turns = session(f, [f.pluginA], [k.prompt], { cwd: owning, env: { GH_TOKEN: token() } });
+      } finally {
+        if (ruleset) gh(token(), "api", "-X", "DELETE", `repos/${SHIP_REPO}/rulesets/${ruleset}`);
+      }
       return {
         turns,
         checks: (c) => {
@@ -1343,7 +1355,7 @@ const PHASE7: Scenario[] = S13_CASES.map(
           if (k.expect.partial) {
             checks.push({ name: "nothing reached GitHub and no PR was opened", ok: remote === null && openPRs().length === 0 });
             checks.push({ name: "the report says the delivery is partial", ok: said(c, "partial") });
-            checks.push({ name: "the push URL was left as it was", ok: gitIn(f, f.project, "config", "remote.origin.pushurl") === `https://github.com/${SHIP_REPO}-missing.git` });
+            checks.push({ name: "the remote configuration was left as it was", ok: gitIn(f, f.project, "config", "remote.origin.pushurl") === null && gitIn(f, f.project, "config", "remote.origin.url") === `https://github.com/${SHIP_REPO}.git` });
           } else {
             checks.push({ name: "the feature branch was pushed as it is locally", ok: remote === local });
             checks.push({ name: "one PR from the feature branch", ok: prs.length === 1 && prs[0].headRefOid === local });
