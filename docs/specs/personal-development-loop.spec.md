@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for R-26 and R-27, with D-33 to D-37 folded in. Waits for a clean spec review and the owner's acceptance; then planned, and re-entry on feat/personal-development-loop."
+status_description: "Revised for R-26 to R-30, with D-33 to D-41 folded in, and accepted by the owner against R-30."
 issue: null
 branch: feat/personal-development-loop
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
@@ -107,6 +107,8 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-37 | A Review Log row records `unknown` only where no model was requested, and the Claude Code row of Models lists the quiet substitution as a third trigger for `opus`. Decided on 2026-10-19 in answer to R-28 F-02. |
 | D-38 | S11's third-model case forces the second dispatch whichever model the host picks: `fable` excluded, `opus` allowed but not first, the session and the first allowed model outside the chain. The first pass's model is recorded as the Hosts row's measurement. Decided on 2026-10-19 in answer to R-29 F-01. |
 | D-39 | The Hosts paragraph states that VS Code Local's three facts are unmeasured until the D-32 run in #3. Decided on 2026-10-19 in answer to R-29 F-04. |
+| D-40 | S11.7 records the model its first pass ran on in its evidence file under `tests/vh-adlc/evidence/claude-code/`, and no Design text changes when that measurement arrives; the Hosts row is updated at the next normative revision. Decided on 2026-10-19 in answer to R-30 F-02. |
+| D-41 | If S11.7's first pass runs on `opus`, the case records that host rule in its evidence, counts the pass as the announced fallback with no second dispatch, and raises an Open Question that D-34's second dispatch is unproven on Claude Code. Decided on 2026-10-19 in answer to R-30 F-03. |
 
 ## Scope
 
@@ -1321,7 +1323,9 @@ numbers within a phase are in dependency order; a partial checker run never mark
       with the request as D-33 says, dispatch again on `opus` as D-34 says, and leave a mismatched review
       pending with no Review Log row or subsection and the returned text in the handoff (D-35). S11 gains
       two cases, and both pass: a real named model the profile's `availableModels` excludes, and a default
-      `fable` refused while the session runs a model outside the chain, set up as S11's row says.
+      `fable` refused while the session runs a model outside the chain, set up as S11's row says. S11.7
+      records its first pass's model in its evidence file (D-40), and a first pass on `opus` is handled
+      as D-41 says.
       `README.md`'s support matrix row on choosing the reviewer's model states the D-33 to D-35
       behaviour (AC-15, AC-20, AC-21)
 
@@ -1358,6 +1362,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-19 | R-28 | spec | `f4b882e` | claude-fable-5-1 | procedural | New pass after R-27's blocking finding. Nothing blocking: two judgement findings and two factual nits. |
 | 2026-10-19 | R-29 | spec | `4c40ea7` | claude-fable-5-1 | procedural | Nothing blocking: two factual findings and two judgement findings. |
 | 2026-10-19 | R-30 | spec | `0c369b2` | claude-fable-5-1 | procedural | Nothing blocking: one factual nit and two judgement findings on where S11's model measurement lands. |
+| 2026-10-19 | R-30 | spec | `0c369b2` | n/a | n/a | accepted by owner |
 
 ### R-14
 
