@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revision after phase 3 (review R-23): the Commands table, covers and Contract follow the released binary; the queued drift and wrapping gaps are folded. Accepted earlier against R-22 at 6d7bb6c."
+status: planned
+status_description: "Re-accepted on 2026-10-18 against review R-24 after aligning with the released v0.1.0 binary. Phases 1 to 3 done. Next: phase 4, the spec loop, starting with T13."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
@@ -95,7 +95,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-26 | Completion certifies a committed implementation reviewed at an exact commit, not an uncommitted snapshot. Relevant changes are committed before review; relevant dirty changes prevent completion. Unrelated staged, unstaged and untracked work is left untouched. |
 | D-27 | Binary releases are signed with the owner's one general release key, VHCO Pro (Release Signing Key) <release@vhco.pro>, fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`: `checksums.txt` carries a detached signature. The passphrase-less ASCII-armoured secret key is the `PGP_PRIVATE_KEY` repository secret (set on 2026-10-17); the public key is committed as `release-signing-key.asc` and its fingerprint printed in the README. The key's original identity, VHCO Pro (Terraform Provider Signing Key), stays; the general identity was added on 2026-10-17 and is primary, and `release-signing-key.asc` is exported from the key as held in the secret, so the file, the README and every signature agree. The plugin installer's trust root stays the digests pinned in its lock; it does not verify the signature. |
 | D-28 | The loop edits every piece of prose it writes for a reader with the humanize prose guide in `vhco-pro/docs` (`guides/humanize-prose.md`, adapted from `blader/humanizer`) before committing or posting it: feature-document prose, commit messages, PR and issue bodies, review summaries and run reports. Stored review records and other verbatim text are not rewritten. The guide is a docs page, not plugin text, and the plugin pin moves to `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`, the merge that added it. |
-| D-29 | One exception to D-20, for the binary child feature (`docs/specs/vh-adlc-binary.spec.md`) only, because its release cannot happen before its own merge. After the release, two docs-only commits made on its feature branch, fast-forwarded to the default branch, are pushed straight to the default branch with the skip-CI marker: one records the release evidence, the other flips the child to `complete`. Design's "The feature's own commits cannot cause it" was qualified to hold only until the feature merges in the revision after R-23. Decided on 2026-10-17 in answer to the child's review R-2 F-01. |
+| D-29 | One exception to D-20, for the binary child feature (`docs/specs/vh-adlc-binary.spec.md`) only, because its release cannot happen before its own merge. After the release, two docs-only commits made on its feature branch, fast-forwarded to the default branch, are pushed straight to the default branch with the skip-CI marker: one records the release evidence, the other flips the child to `complete`. Design's "The feature's own commits cannot cause it" was qualified, in the revision after R-23, to hold only until the feature merges. Decided on 2026-10-17 in answer to the child's review R-2 F-01. |
 
 ## Scope
 
@@ -1213,6 +1213,8 @@ them is current. Review IDs continue from R-14.
 | 2026-10-17 | R-22 | spec | `6d7bb6c` | fable | procedural | Diff-only check of the R-21 fixes. One nit (a long line in the Test Plan), left for the next revision because it sits in the normative baseline. Nothing blocking. |
 | 2026-10-17 | R-22 | spec | `6d7bb6c` | n/a | n/a | accepted by owner |
 | 2026-10-18 | R-23 | spec | `5f44a40` | fable | procedural | Drift-only review after phase 3. The baseline is unchanged, but one blocking finding: the Commands table gives --plugin-pin only to knowledge, while the released binary requires it on every command. Two should-fix findings (covers names a missing gitversion.yml and omits schema/, .gitignore and .golangci.yml) and two nits. |
+| 2026-10-18 | R-24 | spec | `d733074` | fable | procedural | Review of the revision after R-23. Three nits, nothing blocking. F-02 applied outside the normative baseline; F-01 concerns the completed child and is left; F-03 declined, because the checker checks the plugin package and the schema pointer in the Contract is the whole fold of R-23 F-03. |
+| 2026-10-18 | R-24 | spec | `d733074` | n/a | n/a | accepted by owner |
 
 ### R-14
 
@@ -1487,6 +1489,29 @@ SEVERITY: nit
 WHERE: Design, Contract (line 389); Design, "The binary in the repository" (lines 419 to 420)
 EVIDENCE: Contract lists the output object as "`schema_version`, `command`, `result`, and `findings[]`", while the released schema requires `knowledge` and `data` as well (`schema/vh-adlc.schema.json` `required` array; `internal/report/report.go` `Report` struct). Line 419 names four release gates, while the merged `ci.yml` and `release.yml` also run `gofmt -l`, `go mod tidy -diff` and `go build ./cmd/vh-adlc`. Neither is a contradiction, both lists are subsets of what shipped, but a phase 4 reader building the checker from the Contract bullet alone would miss two required members.
 PROPOSAL: Fold the two extra members and the three extra gates into the text at the next normative revision; no action before then.
+
+### R-24
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Deterministic core, invocation paragraph (lines 317 to 320) and its pointer to the child's Invocation section
+EVIDENCE: The new paragraph sends the reader to `docs/specs/vh-adlc-binary.spec.md` for "the full grammar". That section (lines 108 to 110) still says "The parent's table shows `--plugin-pin` only on `knowledge`; this is a deliberate extension", which was true at `6d7bb6c` and is false at `d733074`, where every row of the Commands table carries `--repo <dir> --plugin-pin <sha>`. The child's Context rule makes any parent-child disagreement a finding, so a reader following the pointer meets a sentence the revision itself made stale. The parent's own text is correct; the child's `--version` and flag-order statements match the released binary (`vh-adlc --version` prints `vh-adlc 0.1.0`; `vh-adlc lint --repo . --plugin-pin <sha> <doc>` and `vh-adlc gate --repo . planned --plugin-pin <sha> <doc>` both run).
+PROPOSAL: No change to this document. In the child's next docs-only commit, replace the "deliberate extension" sentence with one stating that the parent's table carries the pin on every command, so the two documents agree again.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Owner decisions, D-29 (line 98)
+EVIDENCE: The reworded clause reads "Design's 'The feature's own commits cannot cause it' was qualified to hold only until the feature merges in the revision after R-23." The adverbial "in the revision after R-23" sits next to "merges", so the sentence can be read as the feature merging in that revision rather than the qualification being made in it. The freshness bullet it refers to (lines 367 to 369) is unambiguous and matches the released binary's behaviour recorded in R-23 F-04.
+PROPOSAL: Reorder to "was qualified, in the revision after R-23, to hold only until the feature merges."
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Contract (lines 397 to 399); Test Plan, checker paragraph (lines 941 to 947); Tasks, T14 (lines 1132 to 1136)
+EVIDENCE: R-23 F-03 proposed two things: add `schema/`, `.gitignore` and `.golangci.yml` to `covers` (done, lines 18 to 20) and "have the phase 4 checker read the output contract from `schema/vh-adlc.schema.json` rather than from the Contract bullet". The revision adds the sentence "`schema/vh-adlc.schema.json` describes the object and lists every result and code" to the Contract (true: the schema's `required` array is the six members named, its `result` enum has 10 values and its finding `code` enum has 54, covering every code used under `internal/` and `cmd/`), but neither the checker paragraph nor T14 names the schema as what the checker or scenarios validate gate output against, and nothing records that this half of the proposal was declined. The commit message of `d733074` lists the Contract pointer only.
+PROPOSAL: Either add "validates every captured `vh-adlc` JSON result against `schema/vh-adlc.schema.json`" to the checker paragraph and T14, or note in the R-23 disposition that the checker checks the package, not the binary, so the pointer in the Contract is the whole fold.
 
 ## Sources
 
