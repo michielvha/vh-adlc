@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted against review R-22 at 6d7bb6c. Phases 1 to 3 done: the vh-adlc binary is released as signed v0.1.0. Next: phase 4, the spec loop, starting with T13."
+status: draft
+status_description: "Revision after phase 3 (review R-23): the Commands table, covers and Contract follow the released binary; the queued drift and wrapping gaps are folded. Accepted earlier against R-22 at 6d7bb6c."
 issue: null
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
 covers:
