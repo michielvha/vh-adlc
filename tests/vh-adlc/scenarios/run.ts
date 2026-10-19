@@ -1402,7 +1402,12 @@ const S13_CASES: S13[] = [
       // Other work already landed the behaviour, so this feature's delivery is its document alone.
       writeFileSync(join(f.project, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n');
       writeFileSync(join(f.project, "test.sh"), readFileSync(join(f.project, "test.sh"), "utf8").replace("# The deliberate failing test: greet.sh does not take a name yet.\n", "# Checks the greeting for a name and for no argument.\n"));
-      git(f.home, f.project, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", "test.sh");
+      // It documented the usage too, so the doc-impact check has nothing left to add. The owner's unstaged
+      // README edit stays on top of the committed text.
+      const readme = "# Greeting fixture\n\nRun `./test.sh`.\n\nRun `./greet.sh <name>` to greet someone, or `./greet.sh` for `Hello, world.`\n";
+      writeFileSync(join(f.project, "README.md"), readme);
+      git(f.home, f.project, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", "test.sh", "README.md");
+      writeFileSync(join(f.project, "README.md"), readme.replace("Run `./test.sh`.", "Run `./test.sh`. Unstaged unrelated edit."));
       git(f.home, f.project, "push", "-q", "origin", "main");
       return { owning: reviewedFeature(f) };
     },
