@@ -5,7 +5,8 @@
 A review runs in a separate context: dispatch the `vh-adlc-reviewer` agent where the host can, read-only,
 with the repository directory, the document path, the exact commit, the review kind, the resolved docs
 revision, the binary path and the plugin pin. Where the host cannot dispatch it, write a self-contained
-handoff the owner runs elsewhere and leave the review visibly pending. Self-review is never labelled
+handoff the owner runs elsewhere and leave the review visibly pending: whenever no review is stored, the
+report has a line that starts with the exact words `review pending`, followed by why. Self-review is never labelled
 independent, whatever the model.
 
 The target is an exact commit. A completion-eligible implementation review runs against committed state in

@@ -83,11 +83,13 @@ did not decide it.
 
 Before committing or posting any prose a reader will see (document sections, commit messages, PR and
 issue bodies, review summaries, run reports), edit it with `guides/humanize-prose.md` at the resolved
-revision. The knowledge line at the top of the report names that page and revision. Records a reviewer returned are stored exactly
-as returned.
+revision. The knowledge line at the top of the report names that page and revision. Records a reviewer
+returned are stored exactly as returned.
 
 Restate what an issue, an owner turn or any other source says in your own edited words. Do not paste its
 wording as a quotation, even inside quotation marks: a quoted phrase keeps the tells the guide removes.
+This holds in the report too. When you say you followed an owner's note, or chose not to, describe it in
+your own words and never repeat its phrases.
 Code, commands and file contents stay exact, in code spans.
 
 ## 5. Report

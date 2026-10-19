@@ -69,5 +69,5 @@ as `met`.
 ## Report
 
 The knowledge line; `fresh` and `review check`, quoted; the target commit; the model that ran and the
-isolation, or why the review is pending; each criterion's verdict; what was unticked; the commit; the page
+isolation, or the `review pending` line the review protocol describes; each criterion's verdict; what was unticked; the commit; the page
 and revision used to edit the prose; and the next step.
