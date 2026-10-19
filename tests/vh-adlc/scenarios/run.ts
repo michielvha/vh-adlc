@@ -726,7 +726,9 @@ function canaryFree(texts: string[]): Check {
 // citesGuide checks that every report names the prose guide and the docs revision knowledge resolved
 // (AC-32).
 function citesGuide(c: Ctx): Check {
-  const rev = String(c.log().find((x) => words(x.args)[0] === "knowledge" && x.json?.knowledge?.revision)?.json?.knowledge?.revision ?? "");
+  // S1 installs the real package without the logging wrapper; its fixture onboards to the plugin pin.
+  const logged = c.log().find((x) => words(x.args)[0] === "knowledge" && x.json?.knowledge?.revision)?.json?.knowledge?.revision;
+  const rev = String(logged ?? /[0-9a-f]{40}/.exec(readFileSync(join(ROOT, "plugins", "vh-adlc", "knowledge.md"), "utf8"))?.[0] ?? "");
   const missing = c.turns.map((t, i) => (rev && t.result.includes("humanize-prose") && t.result.includes(rev.slice(0, 7)) ? 0 : i + 1)).filter(Boolean);
   return { name: "every report cites the prose guide and the docs revision", ok: missing.length === 0, detail: rev ? `turns ${missing.join(", ")}` : "no knowledge revision" };
 }
