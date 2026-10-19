@@ -73,4 +73,5 @@ deliveries. A rejected push is a partial result: keep the commit and ask whether
 ## Report
 
 What changed, the knowledge line, every `vh-adlc` result you acted on (quote its JSON `result` and `line`),
-what was verified, and what is left, including any review that is pending.
+what was verified, what is left, including any review that is pending, and the page and revision used to
+edit the prose.
