@@ -284,7 +284,7 @@ function fixturePlugin(dest: string, revision: string, wrapper: string, home: st
 
 export function realBinary(home: string): string {
   const r = Bun.spawnSync(["bash", join(PLUGIN, "scripts", "ensure-vh-adlc.sh")], {
-    env: { HOME: home, XDG_CACHE_HOME: join(home, ".real-cache"), PATH: "/usr/local/bin:/usr/bin:/bin", LC_ALL: "C" },
+    env: { HOME: join(home, ".real-home"), XDG_CACHE_HOME: join(home, ".real-cache"), PATH: "/usr/local/bin:/usr/bin:/bin", LC_ALL: "C" },
     stdout: "pipe",
     stderr: "pipe",
   });
