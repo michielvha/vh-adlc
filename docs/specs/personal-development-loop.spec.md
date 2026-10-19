@@ -109,6 +109,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-39 | The Hosts paragraph states that VS Code Local's three facts are unmeasured until the D-32 run in #3. Decided on 2026-10-19 in answer to R-29 F-04. |
 | D-40 | S11.7 records the model its first pass ran on in its evidence file under `tests/vh-adlc/evidence/claude-code/`, and no Design text changes when that measurement arrives; the Hosts row is updated at the next normative revision. Decided on 2026-10-19 in answer to R-30 F-02. |
 | D-41 | If S11.7's first pass runs on `opus`, the case records that host rule in its evidence, counts the pass as the announced fallback with no second dispatch, and raises an Open Question that D-34's second dispatch is unproven on Claude Code. Decided on 2026-10-19 in answer to R-30 F-03. |
+| D-42 | R-31 F-02 waits for the next normative revision, tracked in michielvha/vh-adlc#7: the Hosts row on agent files and the package tree in Design either rename the reviewer to `agents/vh-adlc-reviewer.md` or say that Claude Code lists it by file name. This completion keeps the current baseline. Decided on 2026-10-19. |
 
 ## Scope
 
