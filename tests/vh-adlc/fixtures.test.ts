@@ -5,16 +5,17 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { build, type Fixtures, gitEnv, SECRET_CANARIES } from "./fixtures/build";
+import { build, type Fixtures, gitEnv, realBinary, SECRET_CANARIES } from "./fixtures/build";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
+const dir = mkdtempSync(join(tmpdir(), "vh-adlc-fixtures-"));
 let f: Fixtures;
 
 beforeAll(() => {
-  f = build(mkdtempSync(join(tmpdir(), "vh-adlc-fixtures-")));
+  f = build(dir);
 }, 180_000);
 
-afterAll(() => rmSync(f.dir, { recursive: true, force: true }));
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 function sh(cwd: string, ...cmd: string[]) {
   const r = Bun.spawnSync(cmd, { cwd, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
@@ -83,6 +84,12 @@ describe("other plugin", () => {
 });
 
 describe("fixture plugins and the logging wrapper", () => {
+  test("the released binary and fixture wrapper use separate verified caches", () => {
+    const wrapper = wrapperPath(f.pluginA);
+    expect(realBinary(f.home)).not.toBe(wrapper);
+    expect(wrapperPath(f.pluginB)).toBe(wrapper);
+  });
+
   test("the unmodified installer installs the wrapper from the fixture lock", () => {
     const path = wrapperPath(f.pluginA);
     const digest = (p: string) => createHash("sha256").update(readFileSync(p)).digest("hex");
