@@ -1368,6 +1368,15 @@ numbers within a phase are in dependency order; a partial checker run never mark
       In S11.7, with `fable` refused, the first pass ran on the session's `claude-sonnet-5-5`, and the
       loop dispatched again naming `opus`. It stored one review and announced the fallback. So D-41's
       Open Question is not needed. The README's matrix row states the D-33 to D-35 behaviour.
+- [x] T35 `plugins/vh-adlc/references/loop.md`, `plugins/vh-adlc/references/review-protocol.md`,
+      `plugins/vh-adlc/skills/*/SKILL.md`, `tests/vh-adlc/scenarios/run.ts` - apply R-31 F-01 and F-03:
+      every report opens with a knowledge line that names `guides/humanize-prose.md` and the revision,
+      and S1, S6, S9.1, S10.1, S11 and S13 check it; a passing scenario removes its scratch
+      directories. The runs that check it also need each skill to say where its plugin paths start, an
+      exact `review pending` line for a review that is not stored, and S13.5's earlier work to document
+      the usage (AC-32)
+      Evidence: all 70 scenarios pass on Claude Code 2.1.302 at `b901210`, S13.5 again at `c780ef8`
+      after its setup change. The summaries are under `tests/vh-adlc/evidence/claude-code/`.
 
 ## Open Questions
 
