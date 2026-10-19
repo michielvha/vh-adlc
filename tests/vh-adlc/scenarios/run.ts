@@ -262,7 +262,7 @@ const SCENARIOS: Scenario[] = [
     phase: 4,
     run: async (f) => {
       // The real package, installed from this checkout into an isolated profile.
-      const home = mkdtempSync(join(tmpdir(), "vh-adlc-s1-home-"));
+      const home = scratch("vh-adlc-s1-home-");
       agentHome(home);
       const p = profile(home);
       const out: string[] = [];
@@ -299,6 +299,7 @@ const SCENARIOS: Scenario[] = [
           { name: "each operation ran without an error", ok: turns.length === operations().length && turns.every((t) => !t.isError) },
           { name: "the reviewer was dispatched", ok: said(c, "vh-adlc:vh-adlc-reviewer") },
           { name: "uninstall leaves no vh-adlc plugin", ok: !after.includes("vh-adlc@vhco-tools") },
+          citesGuide(c),
           unrelatedIntact(c),
         ],
       };
@@ -310,7 +311,7 @@ const SCENARIOS: Scenario[] = [
     phase: 4,
     run: async (f) => {
       // D-30: no model runs here, only the host's plugin commands in an isolated profile.
-      const home = mkdtempSync(join(tmpdir(), "vh-adlc-s1-home-"));
+      const home = scratch("vh-adlc-s1-home-");
       agentHome(home);
       const p = profile(home);
       const steps: { args: string; code: number }[] = [];
@@ -492,6 +493,7 @@ const SCENARIOS: Scenario[] = [
             { name: "one document for the issue", ok: docs.length === 1 && plans.length === 0, detail: docs.join(", ") },
             { name: "find was used", ok: c.log().some((x) => x.args.startsWith("find ")) },
             { name: "no prose canary or dash reached the document or commits", ok: !PROSE_CANARIES.some((p) => text.includes(p)) && !/[–—]| -- /.test(prose(text)) },
+            citesGuide(c),
             unrelatedIntact(c),
           ];
         },
@@ -574,7 +576,7 @@ const SCENARIOS: Scenario[] = [
       cpSync(f.pluginA, broken, { recursive: true });
       const lockPath = join(broken, "vh-adlc.lock.json");
       writeFileSync(lockPath, readFileSync(lockPath, "utf8").replaceAll(/file:\/\/[^"]+/g, `file://${join(f.dir, "missing.tar.gz")}`));
-      const empty = mkdtempSync(join(tmpdir(), "vh-adlc-s14-home-"));
+      const empty = scratch("vh-adlc-s14-home-");
       agentHome(empty);
       const g = { ...f, home: empty };
       // Each operation meets the document at the status it would act on.
@@ -695,9 +697,18 @@ function testRuns(uses: ToolUse[]): boolean[] {
     .map((u) => /^FAIL\b/m.test(u.output));
 }
 
+// scratch makes a temporary directory that main removes after a passing scenario's summary is written.
+// A failing scenario keeps its directories, as does any run with VH_ADLC_KEEP set.
+const SCRATCH: string[] = [];
+function scratch(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  SCRATCH.push(dir);
+  return dir;
+}
+
 // passesAt runs the fixture's test suite against a ref, in a scratch copy.
 function passesAt(f: Fixtures, ref: string): boolean {
-  const dir = mkdtempSync(join(tmpdir(), "vh-adlc-at-"));
+  const dir = scratch("vh-adlc-at-");
   const tar = Bun.spawnSync(["sh", "-c", `git archive ${ref} | tar -x -C ${dir}`], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
   if (tar.exitCode !== 0) return false;
   return Bun.spawnSync(["./test.sh"], { cwd: dir, stdout: "pipe", stderr: "pipe" }).exitCode === 0;
@@ -710,6 +721,14 @@ function canaryFree(texts: string[]): Check {
   const hits = PROSE_CANARIES.filter((p) => text.includes(p));
   const dash = /[–—]| -- /.test(prose(text));
   return { name: "no prose canary or dash in the commits, the document or the reports", ok: hits.length === 0 && !dash, detail: [...hits, dash ? "dash" : ""].filter(Boolean).join("; ") };
+}
+
+// citesGuide checks that every report names the prose guide and the docs revision knowledge resolved
+// (AC-32).
+function citesGuide(c: Ctx): Check {
+  const rev = String(c.log().find((x) => words(x.args)[0] === "knowledge" && x.json?.knowledge?.revision)?.json?.knowledge?.revision ?? "");
+  const missing = c.turns.map((t, i) => (rev && t.result.includes("humanize-prose") && t.result.includes(rev.slice(0, 7)) ? 0 : i + 1)).filter(Boolean);
+  return { name: "every report cites the prose guide and the docs revision", ok: missing.length === 0, detail: rev ? `turns ${missing.join(", ")}` : "no knowledge revision" };
 }
 
 // The owner's handoff (references/authority.md): a session writes to a feature another session claimed
@@ -789,6 +808,7 @@ const PHASE5: Scenario[] = [
             { name: "the test suite passes at the branch tip", ok: !!branch && passesAt(f, FEATURE_BRANCH) },
             { name: "T1 and the three criteria are ticked with evidence", ok: /^- \[x\] T1 [^\n]*\n\s+Evidence: /m.test(doc) && ["AC-01", "AC-02", "AC-03"].every((id) => new RegExp(`^- \\[x\\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: `, "m").test(doc)) },
             canaryFree([...[...onMain, ...work].map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
+            citesGuide(c),
             unrelatedIntact(c),
           ];
         },
@@ -887,6 +907,7 @@ const PHASE5: Scenario[] = [
             { name: "no push, merge or release", ok: rev(f, "main") === claimed && rev(f, "origin/main") === claimed && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" && (gitIn(f, f.project, "tag") ?? "") === "" },
             { name: "worktrees and the other feature are untouched", ok: worktrees(f) === lists && rev(f, "HEAD", f.worktree) === other.head && gitIn(f, f.worktree, "status", "--porcelain") === other.status },
             canaryFree(turns.map((t) => t.result)),
+            citesGuide(c),
             unrelatedIntact(c),
           ];
         },
@@ -1126,6 +1147,7 @@ const PHASE6: Scenario[] = S11_CASES.map(
               : []),
             { name: "committed on the feature branch, not pushed", ok: commits.length > 0 && unpushed },
             canaryFree([...commits.map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
+            citesGuide(c),
             unrelatedIntact(c),
           ];
         },
@@ -1456,6 +1478,7 @@ const PHASE7: Scenario[] = S13_CASES.map(
               checks.push({ name: "the docs-only delivery skipped CI, and the report says skipped", ok: marker && runsFor(local, false) === 0 && said(c, "skipped") });
             }
             checks.push(canaryFree([body, issueComments(issue), ...outgoing.map((x) => `${x.subject}\n${x.body}`), ...turns.map((t) => t.result)]));
+            checks.push(citesGuide(c));
           }
           checks.push({ name: "nothing was merged into GitHub's main", ok: gh(token(), "api", `repos/${SHIP_REPO}/commits/main`, "--jq", ".sha") === mainBefore });
           checks.push({ name: "the token appears in no output", ok: !turns.some((t) => t.raw.includes(token())) });
@@ -1490,7 +1513,7 @@ async function main() {
   const binary = JSON.parse(readFileSync(join(ROOT, "plugins", "vh-adlc", "vh-adlc.lock.json"), "utf8")).version;
   const date = new Date().toISOString().slice(0, 10);
   for (const s of selected) {
-    const f = build(mkdtempSync(join(tmpdir(), `vh-adlc-${s.id}-`)));
+    const f = build(scratch(`vh-adlc-${s.id}-`));
     const started = Date.now();
     let result: Awaited<ReturnType<Scenario["run"]>>;
     try {
@@ -1541,6 +1564,9 @@ async function main() {
     if (scanSecrets(text).length) throw new Error(`${s.id}: a secret canary reached the evidence summary`);
     writeFileSync(join(EVIDENCE, `${s.id}.md`), text);
     console.log(`${s.id} ${pass ? "PASS" : "FAIL"} (${cost.toFixed(2)} USD) ${checks.filter((c) => !c.ok).map((c) => c.name).join("; ")}`);
+    const kept = SCRATCH.splice(0);
+    if (pass && !process.env.VH_ADLC_KEEP) for (const dir of kept) rmSync(dir, { recursive: true, force: true });
+    else console.log(`${s.id} kept ${kept.join(" ")}`);
   }
 }
 
