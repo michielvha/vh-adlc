@@ -110,6 +110,8 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-40 | S11.7 records the model its first pass ran on in its evidence file under `tests/vh-adlc/evidence/claude-code/`, and no Design text changes when that measurement arrives; the Hosts row is updated at the next normative revision. Decided on 2026-10-19 in answer to R-30 F-02. |
 | D-41 | If S11.7's first pass runs on `opus`, the case records that host rule in its evidence, counts the pass as the announced fallback with no second dispatch, and raises an Open Question that D-34's second dispatch is unproven on Claude Code. Decided on 2026-10-19 in answer to R-30 F-03. |
 | D-42 | R-31 F-02 waits for the next normative revision, tracked in michielvha/vh-adlc#7: the Hosts row on agent files and the package tree in Design either rename the reviewer to `agents/vh-adlc-reviewer.md` or say that Claude Code lists it by file name. This completion keeps the current baseline. Decided on 2026-10-19. |
+| D-43 | The feature completes with AC-29 met as R-34 judged it. The stronger S10, which also moves the second feature a step, is tracked in michielvha/vh-adlc#8. Decided on 2026-10-19 in answer to R-34 F-01. |
+| D-44 | Right after this feature merges, one run installs vh-adlc 0.1.1 in a fresh profile, updates it to 0.1.2 from the public marketplace, and replaces `tests/vh-adlc/evidence/claude-code/update-by-hand.md` with that run in a docs-only commit on `main`. Decided on 2026-10-19 in answer to R-34 F-02. |
 
 ## Scope
 
