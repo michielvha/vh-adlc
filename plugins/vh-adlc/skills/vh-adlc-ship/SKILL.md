@@ -48,8 +48,9 @@ the completion update, and say in the PR what remains.
    code, a test, a workflow or any other non-documentation file, the delivery runs normal CI: no commit of
    it carries the skip-CI marker, the completion commit included. Only a delivery of feature documents and
    Markdown onboarding files alone carries the marker, as the delivery convention describes.
-2. **Push** the feature branch. A rejected push makes the delivery partial: say so in those words, report
-   exactly what succeeded, including the local commit the branch stopped at, and stop.
+2. **Push** the feature branch. A rejected push makes the delivery partial: open the report with a line that
+   starts with the exact words `partial delivery`, report exactly what succeeded, including the local
+   commit the branch stopped at, and stop.
 3. **PR.** Create the feature's one PR, or update the existing one. The PR body says `Closes #N` only when
    every criterion is met and the feature is complete without a residual; otherwise `Refs #N`, naming what
    remains. A complete feature with a residual says `Refs`. Edit the body with `guides/humanize-prose.md`
