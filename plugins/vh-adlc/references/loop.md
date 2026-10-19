@@ -47,8 +47,11 @@ Stop and report when the result is `invalid-pin`, `missing-page` (recommend the 
 `unreachable`. Each finding already names the page or pin at fault, so do not re-run `knowledge` with
 fewer pages to see which ones resolve, and do not read any page from that revision.
 
-When `source` is `plugin`, the repository has no pin yet. Call `knowledge` again with the same pages plus
-`guides/onboard-a-repository.md`, and read it. The operation's first change there then adds the pinned
+When `source` is `plugin`, the repository has no pin yet. `vh-adlc-investigate`, `vh-adlc-resume` and
+`vh-adlc-review` add none: they work with the plugin pin and report the missing pin, and onboarding waits
+for the next operation that writes. A review that committed onboarding first would move its own target.
+`vh-adlc-spec`, `vh-adlc-tasks`, `vh-adlc-implement` and `vh-adlc-ship` call `knowledge` again with the
+same pages plus `guides/onboard-a-repository.md`, and read it. Their first change then adds the pinned
 `AGENTS.md` and its bridges as that guide describes, merged into any local instructions, in its own
 commit. Local instructions win over the central pages; report every conflict between them.
 
