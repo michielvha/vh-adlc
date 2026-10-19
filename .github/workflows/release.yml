@@ -10,6 +10,6 @@ jobs:
   release:
     permissions:
       contents: write
-    uses: vhco-pro/.github/.github/workflows/reusable-go-release.yml@d2a39034357f1acb92b421a1766301422a05b582 # unreleased pilot
+    uses: vhco-pro/.github/.github/workflows/reusable-go-release.yml@faef6a26f213886dc7ef6abd675c760d27288092 # unreleased pilot
     secrets:
       pgp-private-key: ${{ secrets.PGP_PRIVATE_KEY }}

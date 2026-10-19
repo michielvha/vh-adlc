@@ -100,6 +100,12 @@ tags. A manual run defaults to dry-run; disabling it on a trusted feature branch
 creates its prerelease tag. A main-branch run selects a stable version.
 Exact tag pushes start the shared Go CI and release workflow.
 
+This repository is the first binary-only live-canary candidate. Activation is
+still separate from code review: the release App must be installed and configured,
+and the first publishing run must be explicitly approved. Merging the current
+Version workflow enables automatic main-branch tagging once those credentials
+exist; it is not a dry-run-only merge.
+
 Automated tagging requires the release App's `RELEASE_APP_CLIENT_ID` repository
 variable and `RELEASE_APP_PRIVATE_KEY` secret, with the App installed on this
 repository and allowed to write contents. `PGP_PRIVATE_KEY` signs artifacts.
