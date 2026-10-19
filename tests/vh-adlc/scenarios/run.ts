@@ -720,7 +720,12 @@ function canaryFree(texts: string[]): Check {
   const text = texts.map((t) => t.replace(/^### R-\d+\n[\s\S]*?(?=^## |^### |(?![\s\S]))/gm, "")).join("\n");
   const hits = PROSE_CANARIES.filter((p) => text.includes(p));
   const dash = /[–—]| -- /.test(prose(text));
-  return { name: "no prose canary or dash in the commits, the document or the reports", ok: hits.length === 0 && !dash, detail: [...hits, dash ? "dash" : ""].filter(Boolean).join("; ") };
+  // The detail shows each hit in its context, so a failure says which text kept it.
+  const context = (p: string) => {
+    const i = text.indexOf(p);
+    return `${p} in "${text.slice(Math.max(0, i - 80), i + p.length + 40).replace(/\s+/g, " ")}"`;
+  };
+  return { name: "no prose canary or dash in the commits, the document or the reports", ok: hits.length === 0 && !dash, detail: [...hits.map(context), dash ? "dash" : ""].filter(Boolean).join("; ") };
 }
 
 // citesGuide checks that every report names the prose guide and the docs revision knowledge resolved
@@ -1550,7 +1555,7 @@ async function main() {
       "",
       "## Checks",
       "",
-      ...checks.map((c) => `- [${c.ok ? "x" : " "}] ${c.name}${c.detail && !c.ok ? `: ${c.detail.replace(/\s+/g, " ").slice(0, 200)}` : ""}`),
+      ...checks.map((c) => `- [${c.ok ? "x" : " "}] ${c.name}${c.detail && !c.ok ? `: ${c.detail.replace(/\s+/g, " ").slice(0, 600)}` : ""}`),
       "",
       "## Binary calls",
       "",
