@@ -1131,7 +1131,7 @@ const PHASE6: Scenario[] = S11_CASES.map(
             return [
               { name: "no implementation review row or subsection was written", ok: rows.length === 0 && !/^### R-[2-9]\d*$/m.test(doc) },
               { name: "the criteria were left as they were", ok: ["AC-01", "AC-02", "AC-03", "AC-04"].every((id) => ticked(doc, id) === ticked(before, id)) },
-              { name: "the report says the review is pending and gives a handoff", ok: said(c, "pending") && said(c, "handoff") },
+              { name: "the report says the review is pending and gives a handoff", ok: said(c, "review pending") && said(c, "handoff") },
               { name: "nothing was pushed", ok: unpushed },
               unrelatedIntact(c),
             ];
