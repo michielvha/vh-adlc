@@ -566,6 +566,38 @@ const SCENARIOS: Scenario[] = [
       };
     },
   },
+  {
+    // R-32 F-01: S7.7's own review may raise questions, so this case starts from a clean stored review and
+    // proves that spec appends the acceptance row itself and only then moves the document to planned.
+    id: "S7.7.accept",
+    title: "The owner accepts a draft whose review is clean",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      const reviewed = accept(f, "NO FINDINGS", false);
+      const turns = session(f, [f.pluginA], [
+        `/vh-adlc-spec ${FEATURE_PATH}. The owner here: I accept the document as reviewed in R-1. Record my acceptance and move it to planned.`,
+      ]);
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const rows = doc.split("\n").filter((l) => /^\| \d{4}-\d{2}-\d{2} \| R-\d+ \|/.test(l));
+          const accepted = rows.filter((l) => l.includes("accepted by owner"));
+          const status = doc.match(/^status: (\S+)/m)?.[1];
+          const planned = gateCalls(c, "planned");
+          return [
+            { name: "one acceptance row, naming R-1 at the reviewed commit", ok: accepted.length === 1 && accepted[0].includes("| R-1 |") && accepted[0].includes(`\`${reviewed}\``) },
+            { name: "no second review was stored", ok: rows.length === 2 },
+            // The gate reads the acceptance row from the document, so a pass means the row came first.
+            { name: "gate planned passed after the acceptance row was written", ok: planned.some((g) => g.json?.result === "pass") },
+            { name: "planned, committed with the gate line", ok: status === "planned" && c.commits().some((x) => x.includes("vh-adlc gate planned: pass")) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
   ...(["investigate", "spec", "resume", "tasks", "implement", "review", "ship"] as const).map((op): Scenario => ({
     id: `S14.${op}`,
     title: `Binary unavailable: vh-adlc-${op}`,
