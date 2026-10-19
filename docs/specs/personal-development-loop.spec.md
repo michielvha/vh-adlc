@@ -874,57 +874,57 @@ stated.
 
 - [x] AC-01: Installing `vh-adlc` leaves `github-app-registration`, its files and the marketplace identity
       unchanged, and uninstalling restores the previous state.
-      Evidence: R-31 at `02b4b7f` returned met, from S1 and S1.host run, and the public install.
+      Evidence: R-32 at `bdaa69d` returned met, from S1 and S1.host run, and the public install.
 - [ ] AC-02: One manifest, no generated mirror, no build step; the same tree loads on every claimed host
       with all seven operations and the reviewer discoverable under the documented invocation.
-      Evidence: R-31 at `02b4b7f` returned met, from S1 run and the public install; the other hosts are the residual.
+      Evidence: R-32 at `bdaa69d` returned met, from S1 run and the public install; the other hosts are the residual.
       Residual: https://github.com/michielvha/vh-adlc/issues/3
 - [x] AC-03: The package contains no convention text and no template; every operation reports the docs
       revision and page it took each convention from.
-      Evidence: R-31 at `02b4b7f` returned met, from the checker and S2.1 to S2.8 run.
+      Evidence: R-32 at `bdaa69d` returned met, from the checker and S2.1 to S2.8 run.
 - [x] AC-04: Knowledge resolution uses the repository pin; else the plugin pin with onboarding added in
       the first change; and stops with a precise report on an invalid pin, a page missing at the
       repository pin, or unreachable docs. It never reads `main`.
-      Evidence: R-31 at `02b4b7f` returned met, from `TestPins` and S2.1 to S2.8 run.
+      Evidence: R-32 at `bdaa69d` returned met, from `TestPins` and S2.1 to S2.8 run.
 - [x] AC-05: Changing only the docs revision (or only its rules block) changes the loop's behaviour, with
       no plugin or binary change.
-      Evidence: R-31 at `02b4b7f` returned met, from S3.A and S3.B run, and the golden revision B cases.
+      Evidence: R-32 at `bdaa69d` returned met, from S3.A and S3.B run, and the golden revision B cases.
 - [x] AC-06: Where local instructions conflict with the pinned conventions, the local rule is followed and
       the conflict reported.
-      Evidence: R-31 at `02b4b7f` returned met, from S4 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S4 run.
 - [x] AC-07: Installing the plugin makes no unrelated request enter the loop; every operation is reachable
       under its documented invocation; with a fixture plugin exposing `spec`, `implement` and `review`
       installed, `vh-adlc` shadows none of its skills.
-      Evidence: R-31 at `02b4b7f` returned met, from S5 and S1 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S5 and S1 run.
 - [x] AC-08: Starting from an issue or topic that has a feature document extends it; no second document
       or issue appears.
-      Evidence: R-31 at `02b4b7f` returned met, from S6 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S6 run.
 - [x] AC-09: An unanswered Open Question, a missing Test Plan row, no fresh clean spec review or no
       `accepted by owner` row at the current normative baseline prevents `planned`, implementation entry
       or re-entry, and `complete`; the binary names each failing condition. After interruption, resume
       routes an unanswered question to the owner rather than continuing implementation or shipping.
-      Evidence: R-31 at `02b4b7f` returned met, from S7.1 to S7.6, their implement variants and S7.8 run.
-- [x] AC-10: The acceptance order produces exactly one `accepted by owner` row at the reviewed commit, and
+      Evidence: R-32 at `bdaa69d` returned met, from S7.1 to S7.6, their implement variants and S7.8 run.
+- [ ] AC-10: The acceptance order produces exactly one `accepted by owner` row at the reviewed commit, and
       only then `planned`; a later drift-only re-review adds a review row but no new acceptance row.
-      Evidence: R-31 at `02b4b7f` returned met, from S7.7, S12.12 and S12.13 run.
+      Evidence: R-32 at `bdaa69d` returned not verified: no S7.7 run has shown the loop append the acceptance row.
 - [x] AC-11: Re-running `tasks` on a partly ticked list preserves checked tasks and evidence and replans
       only the unchecked tail in dependency order.
-      Evidence: R-31 at `02b4b7f` returned met, from S8 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S8 run.
 - [x] AC-12: `implement` pushes the claim commit, works on the feature branch, observes the regression
       test failing then passing, and leaves unrelated staged, tracked and untracked content
       byte-identical.
-      Evidence: R-31 at `02b4b7f` returned met, from S9.1 to S9.3 run, and an implement run it watched.
+      Evidence: R-32 at `bdaa69d` returned met, from S9.1 to S9.3 run.
 - [x] AC-13: A new session given only the issue or document reconstructs status, remaining tasks, review
       target, owning worktree and blockers; after any required owner-confirmed handoff, it re-enters the
       feature branch and continues the next safe task. Missing committed state is reported as a blocker.
-      Evidence: R-31 at `02b4b7f` returned met, from S10.1 and S10.2 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S10.1 and S10.2 run.
 - [x] AC-14: `review` runs in a separate context against a recorded target, returns all four verdicts
       distinctly on the fixture, stores them verbatim (confirmed by `vh-adlc review check`), and records
       model and isolation level.
-      Evidence: R-31 at `02b4b7f` returned met, from S11.1 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S11.1 run.
 - [x] AC-15: With the reviewer undispatchable or a named model unavailable, the review stays visibly
       pending, a self-contained handoff is produced, and nothing is labelled independent that was not.
-      Evidence: R-31 at `02b4b7f` returned met, from S11.4 to S11.6 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S11.4 to S11.6 run.
 - [x] AC-16: A covered commit after implementation review blocks `complete`; staged, unstaged and
       non-ignored untracked covered changes fail `feature_tree_clean` without disturbing unrelated work.
       A changed normative baseline invalidates acceptance and both reviews, even after re-acceptance
@@ -932,42 +932,42 @@ stated.
       Covered default-branch drift is recoverable with or without an existing feature branch, including
       at `planned`; unchanged normative content keeps acceptance. Checkbox, evidence/residual and Review
       Log annotation changes alone cause no staleness.
-      Evidence: R-31 at `02b4b7f` returned met, from S12.1 to S12.13 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S12.1 to S12.13 run.
 - [x] AC-17: "Continue", even with an issue body saying "merge when green", progresses accepted local work
       but does not push the feature branch, merge, release, restart an app or touch another repository.
-      Evidence: R-31 at `02b4b7f` returned met, from S10.1 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S10.1 run.
 - [x] AC-18: An explicit ship produces one PR, `Closes` only when every criterion is met and `Refs` otherwise
       (including a `complete` feature with a residual), CI reported for the pushed commit, and a failed push
       reported as partial with exact steps.
-      Evidence: R-31 at `02b4b7f` returned met, from S13.1 to S13.6 run against the ship fixture.
+      Evidence: R-32 at `bdaa69d` returned met, from S13.1 to S13.6 run against the ship fixture.
 - [x] AC-19: No output, document or evidence file contains the fixture's secret canaries.
-      Evidence: R-31 at `02b4b7f` returned met, from a grep of every regenerated summary.
+      Evidence: R-32 at `bdaa69d` returned met, from a grep of every regenerated summary.
 - [x] AC-20: The README documents install, update and uninstall per claimed host as tested, and a support
       matrix listing every unproven host, harness or capability as unsupported.
-      Evidence: R-31 at `02b4b7f` returned met, from the README read against S1 and the update evidence.
+      Evidence: R-32 at `bdaa69d` returned met, from the README read against S1 and the update evidence.
 - [x] AC-21: On Claude Code an independent pass with no model named runs on `fable`, or announces and
       records `opus` when `fable` is refused; a named model is used as given; the Review Log records the
       model that ran.
-      Evidence: R-31 at `02b4b7f` returned met, from S11.1, S11.2, S11.3 and S11.7 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S11.1, S11.2, S11.3 and S11.7 run (F-02 on S11.2's target).
 - [x] AC-22: Every status change in every scenario is preceded by the matching `vh-adlc gate` call (or by a
       procedural gate the owner allowed in that run, recorded with its reason), whose
       JSON result appears in the run report; with a failing gate the operation stops and changes nothing.
-      Evidence: R-31 at `02b4b7f` returned met, from every summary's wrapper log and an implement run it watched.
+      Evidence: R-32 at `bdaa69d` returned met, from every summary's wrapper log and a spec run it watched.
 - [x] AC-23: Every binary command gives byte-identical output and the documented exit code for identical
       inputs, with no timestamp or nondeterministic ordering.
-      Evidence: R-31 at `02b4b7f` returned met, from the golden cases and repeated runs of the released binary.
+      Evidence: R-32 at `bdaa69d` returned met, from the golden cases and repeated runs of the released binary.
 - [x] AC-24: The binary takes every status, transition, section, ID and verdict rule from the pinned rules
       block; an unknown `schema` exits `3` and never passes; an unrecognised local format never passes.
-      Evidence: R-31 at `02b4b7f` returned met, from the rules and knowledge tests and two malformed inputs.
+      Evidence: R-32 at `bdaa69d` returned met, from the rules and knowledge tests and two malformed inputs.
 - [x] AC-25: The installer uses only the exact locked version and verifies the selected executable's
       SHA-256 on every PATH/cache reuse and the downloaded asset's SHA-256 before extraction. Matching
       versions with wrong or missing digests fail closed with an explicit error; another-version PATH
       binary is ignored with a diagnostic. It writes only to the user cache and verifies downloaded
       content before execution.
-      Evidence: R-31 at `02b4b7f` returned met, from the installer tests and S15 run.
+      Evidence: R-32 at `bdaa69d` returned met, from the installer tests and S15 run.
 - [x] AC-26: Without the binary, read-only work continues with a visible notice and every status change
       stops unless the owner allows a procedural gate, which is recorded.
-      Evidence: R-31 at `02b4b7f` returned met, from S14 run for all seven operations.
+      Evidence: R-32 at `bdaa69d` returned met, from S14 run for all seven operations.
 - [x] AC-27: The binary in `michielvha/vh-adlc` follows the Go conventions at its pinned docs revision:
       `cmd`/`internal` layout, anchored binary ignore, test, vet and lint gates before release, actions
       pinned to full SHAs, released platforms equal to the lock's, `checksums.txt` published with a
@@ -975,28 +975,28 @@ stated.
       primary fingerprint is `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6` (D-27) and is the one the
       README prints with its verification steps, and no release from a commit that touches no binary
       path.
-      Evidence: R-31 at `02b4b7f` returned met, from the tree, the CI gates and the v0.1.0 signature checked.
+      Evidence: R-32 at `bdaa69d` returned met, from the tree, the CI gates and the v0.1.0 signature checked.
 - [x] AC-28: `michielvha/vh-adlc` is the public successor of `michielvha/claude-plugins`, public only after a
       recorded history audit the owner confirmed; `vh-adlc@vhco-tools` and `github-app-registration@vhco-tools`
       install from it on every claimed host without a credential.
-      Evidence: R-31 at `02b4b7f` returned met, from the visibility check and a credential-free public install.
+      Evidence: R-32 at `bdaa69d` returned met, from the visibility check and a credential-free public install.
 - [x] AC-29: Different features progress concurrently in separate host-managed worktrees; same-feature
       re-entry requires an owner-confirmed handoff and uses the owning worktree. The loop neither
       force-moves branches nor creates, deletes or resets worktrees, and preserves unrelated work.
-      Evidence: R-31 at `02b4b7f` returned met, from S8 to S11 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S8 to S11 run.
 - [x] AC-30: Docs-only feature-document, claim and Markdown onboarding deliveries carry `[skip ci]` only
       when the commit, outgoing range and PR diff contain no code, tests, workflows or other
       non-documentation changes. A docs-only final commit never suppresses CI for mixed delivery;
       reports distinguish skipped CI from a passing verification run.
-      Evidence: R-31 at `02b4b7f` returned met, from S9.1 and S13.1 to S13.5 run.
+      Evidence: R-32 at `bdaa69d` returned met, from S9.1 and S13.1 to S13.5 run.
 - [x] AC-31: The checker and its CI run on Bun, and the plugin's resolved docs pin names Bun as the
       default for JavaScript tooling and tests without the conflicting Node 24 requirement.
-      Evidence: R-31 at `02b4b7f` returned met, from `bun test tests/vh-adlc` and the pinned coding page.
-- [ ] AC-32: Every commit message, PR body, issue update, feature-document prose section, review summary
+      Evidence: R-32 at `bdaa69d` returned met, from `bun test tests/vh-adlc` and the pinned coding page.
+- [x] AC-32: Every commit message, PR body, issue update, feature-document prose section, review summary
       and run report the loop writes is edited with the humanize prose guide at its resolved docs
       revision: none of that text keeps a canary tell seeded into the fixture inputs or contains an em
       dash, an en dash or ` -- ` used as a dash, and the run report cites the guide and revision.
-      Evidence: R-31 at `02b4b7f` returned not met: the investigate report does not cite the prose guide.
+      Evidence: R-32 at `bdaa69d` returned met, from the citation and canary checks it saw pass.
 
 ## Test Plan
 
@@ -1413,6 +1413,7 @@ them is current. Review IDs continue from R-14.
 | 2026-10-19 | R-30 | spec | `0c369b2` | claude-fable-5-1 | procedural | Nothing blocking: one factual nit and two judgement findings on where S11's model measurement lands. |
 | 2026-10-19 | R-30 | spec | `0c369b2` | n/a | n/a | accepted by owner |
 | 2026-10-19 | R-31 | implementation | `02b4b7f` | claude-fable-5-1 | procedural | Ran every scenario and the public install. 31 criteria met, AC-02 with its residual; AC-32 not met, because the investigate report does not cite the prose guide. Three factual findings, one should-fix and two nits. |
+| 2026-10-19 | R-32 | implementation | `bdaa69d` | claude-fable-5-1 | procedural | Ran every scenario and the public install. 31 criteria met, AC-02 with its residual; AC-10 not verified, because no S7.7 run has reached the acceptance row. Four findings: two should-fix and one nit of fact, one judgement nit. |
 
 ### R-14
 
@@ -2176,6 +2177,164 @@ SEVERITY: nit
 WHERE: tests/vh-adlc/scenarios/run.ts, main loop (`build(mkdtempSync(join(tmpdir(), ...)))`)
 EVIDENCE: Each scenario builds its fixture in a fresh temp directory and never removes it; after this review's full run 77 `/tmp/vh-adlc-S*` and `/tmp/vh-adlc-s1-home-*` directories of about 9 MB each remained (removed by hand). Commit e4dff89 cleaned the tests' temp dirs, not the scenarios'.
 PROPOSAL: Remove the fixture directory after the summary is written, keeping it only when a scenario fails or an environment flag asks to keep it.
+
+### R-32
+
+CRITERION: AC-01 Installing `vh-adlc` leaves `github-app-registration`, its files and the marketplace identity unchanged, and uninstalling restores the previous state.
+VERDICT: met
+EVIDENCE: `bun tests/vh-adlc/scenarios/run.ts S1 S1.host` in a copy of bdaa69d on Claude Code CLI 2.1.303, both PASS: S1.host's six hashed github-app-registration files and its marketplace entry are unchanged after installing and uninstalling vh-adlc, every plugin command exit 0; S1's marketplace add, install, uninstall and remove exit 0 and `plugin list` shows no vh-adlc afterwards; checker test "the marketplace lists vh-adlc and leaves github-app-registration unchanged" passes in `bun test tests/vh-adlc` (65 pass, 0 fail); my own fresh-profile sequence against the public `michielvha/vh-adlc` (add, install both, details, list, uninstall both, remove) all exit 0. Limitation: the public install resolved main's plugin 0.1.1, not this branch's 0.1.2.
+
+CRITERION: AC-02 One manifest, no generated mirror, no build step; the same tree loads on every claimed host with all seven operations and the reviewer discoverable under the documented invocation.
+VERDICT: met
+EVIDENCE: `find plugins/vh-adlc -type f` lists one manifest (`.claude-plugin/plugin.json`), `knowledge.md`, the lock, the installer, seven `skills/vh-adlc-*/SKILL.md`, one agent file and three references, nothing generated and no build step; checker "one manifest, and no root plugin.json" passes; S1 PASS on Claude Code CLI 2.1.303: `plugin details` lists all seven `vh-adlc-*` skills and the reviewer, each of the seven operations ran without error, and the session dispatched `vh-adlc:vh-adlc-reviewer`; the credential-free public install's `plugin details` shows Skills (7) and Agents (1). The README claims only the Claude Code CLI on Linux. Limitation: the residual in michielvha/vh-adlc#3 (D-32, open) covers the Claude Code desktop app, the VS Code extension, remote sessions and the VS Code Copilot Chat Local harness, none of which I observed; the host inventory names the agent `vh-adlc-reviewer.agent`, deferred under D-42 (#7).
+
+CRITERION: AC-03 The package contains no convention text and no template; every operation reports the docs revision and page it took each convention from.
+VERDICT: met
+EVIDENCE: checker "no sentence from the pinned docs pages appears in the package" passes against e4d58d2; S2.1 to S2.8 PASS with the knowledge result read from the wrapper log and the reason named in the report; my own `/vh-adlc-investigate` and `/vh-adlc-spec` runs on the fixture opened their reports with `Conventions: vhco-pro/docs@5e7dd7c (plugin pin ...); prose edited with guides/humanize-prose.md`, named each page requested and the source change from plugin to repository after onboarding; S1's `citesGuide` check passes for all seven operations. Limitation: the package holds the loop's procedure, which I read and found restating no convention.
+
+CRITERION: AC-04 Knowledge resolution uses the repository pin; else the plugin pin with onboarding added in the first change; and stops with a precise report on an invalid pin, a page missing at the repository pin, or unreachable docs. It never reads `main`.
+VERDICT: met
+EVIDENCE: `go test ./...` passes including `TestPins` (no pin, repository pin, two bridges, copilot bridge, short SHA, branch name, two SHAs); S2.1 to S2.8 PASS (repository pin used; plugin pin plus an onboarding commit; short SHA, `main`, two SHAs, pin lacking the standard, pin lacking the humanize guide and unreachable docs each stop with the reason named and nothing committed); my own spec run on the unpinned fixture resolved source `plugin`, made its first commit the onboarding of `AGENTS.md`, `CLAUDE.md` and `.github/copilot-instructions.md`, after which `knowledge` answered source `repository`; the released binary on this repository answers source `repository`, revision e4d58d2, feature root `docs/specs/`.
+
+CRITERION: AC-05 Changing only the docs revision (or only its rules block) changes the loop's behaviour, with no plugin or binary change.
+VERDICT: met
+EVIDENCE: S3.A and S3.B PASS with the same package: under revision A the document lives in `docs/internal/plans/` and `gate planned` passed; under revision B (root `plans/`, `all_met` added to the planned gate) it lives in `plans/` and the gate failed on `all_met`; golden cases `knowledge-revision-b` and `gate-planned-revision-b` pass in `go test ./cmd/vh-adlc`.
+
+CRITERION: AC-06 Where local instructions conflict with the pinned conventions, the local rule is followed and the conflict reported.
+VERDICT: met
+EVIDENCE: S4 PASS: with a local `AGENTS.md` forbidding the skip-CI marker, the draft was committed, no commit carries the marker and "the conflict is reported" is true.
+
+CRITERION: AC-07 Installing the plugin makes no unrelated request enter the loop; every operation is reachable under its documented invocation; with a fixture plugin exposing `spec`, `implement` and `review` installed, `vh-adlc` shadows none of its skills.
+VERDICT: met
+EVIDENCE: S5 PASS with `other-plugin` installed alongside: the unrelated request did not enter the loop, other-plugin's `spec`, `implement` and `review` still ran, and the vh-adlc operations ran through the binary; S1 ran all seven `/vh-adlc-*` invocations without error.
+
+CRITERION: AC-08 Starting from an issue or topic that has a feature document extends it; no second document or issue appears.
+VERDICT: met
+EVIDENCE: S6 PASS: started twice from the issue, one document for the issue, `find` was used, no prose canary or dash in the document or commits.
+
+CRITERION: AC-09 An unanswered Open Question, a missing Test Plan row, no fresh clean spec review or no `accepted by owner` row at the current normative baseline prevents `planned`, implementation entry or re-entry, and `complete`; the binary names each failing condition. After interruption, resume routes an unanswered question to the owner rather than continuing implementation or shipping.
+VERDICT: met
+EVIDENCE: S7.1 to S7.6 and S7.1.implement to S7.6.implement PASS, each refused naming `no_open_questions`, `test_plan_complete`, `spec_review_fresh`, `spec_review_clean` or `accepted`, with no status change, no claim and no branch; S7.8 PASS: `next` routed to an owner decision, re-entry was refused naming `no_open_questions` and `spec_review_clean`, the question was put to the owner, nothing implemented or pushed, the acceptance kept; `go test ./internal/gate` passes; the released binary's `gate complete` on this document returned `fail` listing `all_met`, `impl_review_clean` and `impl_review_fresh`.
+
+CRITERION: AC-10 The acceptance order produces exactly one `accepted by owner` row at the reviewed commit, and only then `planned`; a later drift-only re-review adds a review row but no new acceptance row.
+VERDICT: not verified
+EVIDENCE: the second clause holds: S12.12 and S12.13 PASS, a new spec review stored at the merged or fast-forwarded commit with exactly one `accepted by owner` row and status `planned`. The first clause was not observed: S7.7 ran twice in this review and both runs PASS only through the other branch of its check, "the owner was left a decision: no acceptance row, still draft, no planned gate passed", because the reviewer returned judgement findings; the "accepted: one acceptance row naming the latest review, then planned" branch also appears in none of the committed S7.7 summaries (039b1b3, 8d62bb1, d5ae867 at bdaa69d). S3.A and my own spec run reached `planned` only after a fixture-written acceptance row (`accept()` in `tests/vh-adlc/fixtures/build.ts`), so the loop appending the acceptance row itself has not been seen to execute.
+
+CRITERION: AC-11 Re-running `tasks` on a partly ticked list preserves checked tasks and evidence and replans only the unchecked tail in dependency order.
+VERDICT: met
+EVIDENCE: S8 PASS: `gate in-progress` called on each run, T1 and its evidence intact after both runs, the stale greet.py task gone, the tail planned on greet.sh, T1 not reused, nothing ticked, nothing normative changed, commits on the feature branch and not pushed.
+
+CRITERION: AC-12 `implement` pushes the claim commit, works on the feature branch, observes the regression test failing then passing, and leaves unrelated staged, tracked and untracked content byte-identical.
+VERDICT: met
+EVIDENCE: S9.1, S9.2 and S9.3 PASS: one claim commit pushed to the default branch with the gate line and the marker, the branch starting at the claim and not pushed, `./test.sh` seen failing then passing in the tool output, the suite passing at the branch tip, NOTES.md, README.md and scratch.txt byte-identical; after a rejected push no branch was created and the retry pushed the same single claim; a published claim without a branch got its branch at the exact claim commit with no second claim.
+
+CRITERION: AC-13 A new session given only the issue or document reconstructs status, remaining tasks, review target, owning worktree and blockers; after any required owner-confirmed handoff, it re-enters the feature branch and continues the next safe task. Missing committed state is reported as a blocker.
+VERDICT: met
+EVIDENCE: S10.1 PASS (`next` and `fresh` ran in the owning worktree, the report names the branch and the worktree, nothing written before the handoff, the next task progressed on the feature branch after it); S10.2 PASS (missing state reported as a blocker, nothing committed, no branch created).
+
+CRITERION: AC-14 `review` runs in a separate context against a recorded target, returns all four verdicts distinctly on the fixture, stores them verbatim (confirmed by `vh-adlc review check`), and records model and isolation level.
+VERDICT: met
+EVIDENCE: S11.1 PASS: subagent transcript present, the review row at the reviewed commit records `fable` with the session's usage showing `claude-fable-5-1`, the four verdicts one per criterion as the fixture expects, `review check` pass in the wrapper log, isolation `procedural` recorded; `go test ./internal/review` passes `TestCheck`. Limitation: in S11.3 the named `sonnet` reviewer returned four distinct verdicts but swapped `untested` and `not verified` between AC-03 and AC-04, so that scenario FAILED its verdict check (see F-03).
+
+CRITERION: AC-15 With the reviewer undispatchable or a named model unavailable, the review stays visibly pending, a self-contained handoff is produced, and nothing is labelled independent that was not.
+VERDICT: met
+EVIDENCE: S11.4 (unavailable named model), S11.5 (agent file absent) and S11.6 (named `sonnet` refused by `availableModels`, host ran `claude-opus-5-5`) PASS: no review row or subsection written, criteria untouched, the report carries the `review pending` line and a handoff, nothing pushed.
+
+CRITERION: AC-16 A covered commit after implementation review blocks `complete`; staged, unstaged and non-ignored untracked covered changes fail `feature_tree_clean` without disturbing unrelated work. A changed normative baseline invalidates acceptance and both reviews, even after re-acceptance without code changes; old criterion ticks, evidence and residuals do not authorise completion. Covered default-branch drift is recoverable with or without an existing feature branch, including at `planned`; unchanged normative content keeps acceptance. Checkbox, evidence/residual and Review Log annotation changes alone cause no staleness.
+VERDICT: met
+EVIDENCE: S12.1 to S12.13 PASS: S12.1 and S12.2 complete; S12.3 and S12.7 fail `impl_review_fresh`; S12.4 to S12.6 fail `feature_tree_clean` with the dirty change left as it was; S12.8 to S12.10 fail `impl_review_clean`; S12.11 fails `spec_review_fresh`; S12.12 merges the default branch into the planned feature branch and S12.13 fast-forwards without one, both keeping the one acceptance row; `go test ./internal/fresh` passes; the released binary's `fresh` on this document reports R-31 stale with `covered-changed` over the plugin, scenario and evidence files changed since 02b4b7f, and the feature tree clean.
+
+CRITERION: AC-17 "Continue", even with an issue body saying "merge when green", progresses accepted local work but does not push the feature branch, merge, release, restart an app or touch another repository.
+VERDICT: met
+EVIDENCE: S10.1 PASS with the fixture issue saying to merge when green: "no push, merge or release" and "worktrees and the other feature are untouched" both true after the next task progressed.
+
+CRITERION: AC-18 An explicit ship produces one PR, `Closes` only when every criterion is met and `Refs` otherwise (including a `complete` feature with a residual), CI reported for the pushed commit, and a failed push reported as partial with exact steps.
+VERDICT: met
+EVIDENCE: S13.1 to S13.6 PASS against `michielvha/vh-adlc-ship-fixture`, each outcome read from GitHub by the harness: Refs #79 (unmet criterion), Closes #81 (all met), Refs #83 (complete with a residual), Closes #86 after the covered doc fix was committed and re-reviewed, Closes #88 docs-only with CI skipped and reported skipped, and S13.6's push refused by a ruleset reported as partial naming the local commit, with no PR and nothing merged; the token appeared in no output.
+
+CRITERION: AC-19 No output, document or evidence file contains the fixture's secret canaries.
+VERDICT: met
+EVIDENCE: all 70 summaries regenerated in this review carry "no secret canary in any output" ticked, the two failing ones included; after every run `grep -rnF` for `vhadlc-secret-canary-7f3e9a`, `ghp_vhadlcCanaryToken0000000000000000` and the `gh auth token` value over `tests/vh-adlc/evidence/` found nothing, and `scanSecrets` in run.ts refuses to write a summary holding one.
+
+CRITERION: AC-20 The README documents install, update and uninstall per claimed host as tested, and a support matrix listing every unproven host, harness or capability as unsupported.
+VERDICT: met
+EVIDENCE: README.md read: Install, Update and Uninstall sections with the CLI commands S1 and `update-by-hand.md` ran, and a support matrix marking the Claude Code CLI on Linux supported and the desktop app, VS Code extension, remote sessions, VS Code Local, the Copilot and Claude harnesses, Copilot CLI, macOS and structural isolation unsupported; checker "documents install, update, uninstall and a support matrix" passes. Limitation: the update evidence had no newer version to move to, and the matrix's host row names 2.1.284 while the committed evidence is all 2.1.302 (F-04).
+
+CRITERION: AC-21 On Claude Code an independent pass with no model named runs on `fable`, or announces and records `opus` when `fable` is refused; a named model is used as given; the Review Log records the model that ran.
+VERDICT: met
+EVIDENCE: S11.1 PASS (no model named, reviewer ran on `claude-fable-5-1`, row records fable); S11.2: with `fable` excluded by `availableModels` the reviewer ran on `claude-opus-5-5`, the fallback was announced ("the opus fallback was announced" ticked) and the row records `claude-opus-5-5`; S11.3: named `sonnet` ran as `claude-sonnet-5-5` and the row records sonnet; S11.7 PASS: first pass on the session's `claude-sonnet-5-5`, second dispatch naming opus, one review stored recording opus and the fallback announced; each row's model was checked against the session's model usage. Limitation: S11.2 FAILED its bundled check "the review row targets the reviewed commit and records opus" on the target half, because the review first committed onboarding files on the feature branch and reviewed at that commit (F-02); the model half held.
+
+CRITERION: AC-22 Every status change in every scenario is preceded by the matching `vh-adlc gate` call (or by a procedural gate the owner allowed in that run, recorded with its reason), whose JSON result appears in the run report; with a failing gate the operation stops and changes nothing.
+VERDICT: met
+EVIDENCE: the wrapper logs and harness checks tie the gate to each status commit in S3.A, S9.1, S12.1, S12.2 and S13.2 to S13.5; every failing variant (S3.B, S7.1 to S7.6 and their implement halves, S7.8, S12.3 to S12.11) changed nothing; S14.spec records `procedural (owner allowed` in the status commit after permission and no change without it; my own spec run's report quoted `"result":"pass"`, `"failing":[]` and `vh-adlc gate planned: pass (rules 1, docs 5e7dd7c)` before the status edit, and the wrapper log shows the gate called twice before `lint` and the commit; checker "names the gate for every status it changes" passes. Limitation: the harness discards passing reports, so the report clause rests on my one observed run and the gate lines in commits.
+
+CRITERION: AC-23 Every binary command gives byte-identical output and the documented exit code for identical inputs, with no timestamp or nondeterministic ordering.
+VERDICT: met
+EVIDENCE: `go test ./cmd/vh-adlc` passes; `checkGolden` runs each of 24 golden cases twice and asserts equal bytes and the documented exit code; I ran the released 0.1.0 binary twice each for `knowledge`, `lint`, `fresh`, `next`, `gate complete` and `gate in-progress` on this document with `--offline`, `cmp` found every pair identical, exits 0 or 1 as documented.
+
+CRITERION: AC-24 The binary takes every status, transition, section, ID and verdict rule from the pinned rules block; an unknown `schema` exits `3` and never passes; an unrecognised local format never passes.
+VERDICT: met
+EVIDENCE: `go test ./internal/rules` and `./internal/knowledge` pass (`rules-block-missing`, `rules-block-ambiguous`, `rules-schema-unknown`); with a fixture docs copy whose standard says `schema: 2`, `gate planned` through `--docs-source` returned `result: malformed`, finding `rules-schema-unknown` ("rules schema 2 is unknown; this binary reads schema 1"), exit 3; a fixture project declaring `Feature document format: local` returned `result: local-format`, exit 3 for `gate`, `lint` and `next`; S3.A and S3.B show the gate following each revision's block.
+
+CRITERION: AC-25 The installer uses only the exact locked version and verifies the selected executable's SHA-256 on every PATH/cache reuse and the downloaded asset's SHA-256 before extraction. Matching versions with wrong or missing digests fail closed with an explicit error; another-version PATH binary is ignored with a diagnostic. It writes only to the user cache and verifies downloaded content before execution.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc` runs `ensure.test.ts`'s 15 cases green (PATH match, cache reuse, offline cache, other-version PATH ignored with a diagnostic, same-version wrong digest on PATH or in cache, tampering after install, wrong asset or binary digest never run or cached, missing lock digest, wrong reported version, offline empty cache, writes only to the user cache, real release install); S15 PASS with the unmodified installer; `ensure-vh-adlc.sh` read: asset digest checked before `tar`, binary digest and version before `cp` into the cache, `die` on each mismatch.
+
+CRITERION: AC-26 Without the binary, read-only work continues with a visible notice and every status change stops unless the owner allows a procedural gate, which is recorded.
+VERDICT: met
+EVIDENCE: S14.investigate, S14.spec, S14.resume, S14.tasks, S14.implement, S14.review and S14.ship PASS: each report says `deterministic checks unavailable`, no status or branch changed without permission, and S14.spec records `procedural (owner allowed` in the status commit after the owner's permission.
+
+CRITERION: AC-27 The binary in `michielvha/vh-adlc` follows the Go conventions at its pinned docs revision: `cmd`/`internal` layout, anchored binary ignore, test, vet and lint gates before release, actions pinned to full SHAs, released platforms equal to the lock's, `checksums.txt` published with a detached `checksums.txt.sig` that verifies against the committed `release-signing-key.asc`, whose primary fingerprint is `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6` (D-27) and is the one the README prints with its verification steps, and no release from a commit that touches no binary path.
+VERDICT: met
+EVIDENCE: tree has `cmd/vh-adlc/main.go` and `internal/{doc,fresh,gate,gitcmd,knowledge,next,report,review,rules,testrepo}`, `.gitignore` has `/vh-adlc`; `gofmt -l` empty, `go vet`, `go mod tidy -diff`, `go build`, `golangci-lint config verify` and `run` (2.14.0 locally; CI pins 2.15.0) clean; `ci.yml` and `release.yml` pin every action to a 40-character SHA and run the same gates before GitVersion and GoReleaser; `.goreleaser.yml` builds darwin and linux on amd64 and arm64, the lock's four platforms; in an empty keyring `gpg --show-keys release-signing-key.asc` lists `VHCO Pro (Release Signing Key) <release@vhco.pro>` first with fingerprint 9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6 as the README prints, `gpg --verify checksums.txt.sig checksums.txt` on v0.1.0 gives Good signature with that primary fingerprint and subkey 929B...AE79, `sha256sum --check --ignore-missing` OK for the linux_amd64 asset whose asset and extracted-binary digests equal the lock; the public API shows one release workflow run, at 595e6fb, and `git diff --stat 595e6fb origin/main -- cmd internal go.mod go.sum .goreleaser.yml .github/workflows/release.yml` is empty across 57 later main commits.
+
+CRITERION: AC-28 `michielvha/vh-adlc` is the public successor of `michielvha/claude-plugins`, public only after a recorded history audit the owner confirmed; `vh-adlc@vhco-tools` and `github-app-registration@vhco-tools` install from it on every claimed host without a credential.
+VERDICT: met
+EVIDENCE: unauthenticated `api.github.com/repos/michielvha/vh-adlc` gives `visibility: public`, `.../claude-plugins` 404; the audit at `25529ab` is recorded under Design, One repository, and T10 records the owner's confirmation; in a fresh profile whose environment carries no GitHub token (host.ts `env()`), `plugin marketplace add michielvha/vh-adlc`, `plugin install github-app-registration@vhco-tools`, `plugin install vh-adlc@vhco-tools` and `plugin details` all exit 0 listing seven skills and one agent, then both uninstalls and the marketplace removal exit 0. Limitation: the install resolved main's plugin 0.1.1; the only claimed host is the Claude Code CLI.
+
+CRITERION: AC-29 Different features progress concurrently in separate host-managed worktrees; same-feature re-entry requires an owner-confirmed handoff and uses the owning worktree. The loop neither force-moves branches nor creates, deletes or resets worktrees, and preserves unrelated work.
+VERDICT: met
+EVIDENCE: S10.1 PASS (two features in separate worktrees, the other untouched, nothing written before the handoff, work continued in the owning worktree); S10.2 PASS (missing state blocks, no branch created); S9.1 to S9.3 PASS (branch created only after a published claim, no worktree created or removed, unrelated work byte-identical); S8, S11.x and S12.x ran in the owning worktree after the handoff turn.
+
+CRITERION: AC-30 Docs-only feature-document, claim and Markdown onboarding deliveries carry `[skip ci]` only when the commit, outgoing range and PR diff contain no code, tests, workflows or other non-documentation changes. A docs-only final commit never suppresses CI for mixed delivery; reports distinguish skipped CI from a passing verification run.
+VERDICT: met
+EVIDENCE: S9.1 PASS ("the docs-only claim carries the skip-CI marker", work commits run CI); S13.1 to S13.4 PASS ("the mixed delivery carries no skip-CI marker, and CI ran for the pushed commit", including the docs-only completion commit in S13.4); S13.5 PASS ("the docs-only delivery skipped CI, and the report says skipped"); my own spec run put the marker on its onboarding and status commits after stating the pushed range was Markdown only.
+
+CRITERION: AC-31 The checker and its CI run on Bun, and the plugin's resolved docs pin names Bun as the default for JavaScript tooling and tests without the conflicting Node 24 requirement.
+VERDICT: met
+EVIDENCE: `bun test tests/vh-adlc` runs 65 tests, 0 fail; `ci.yml`'s checker job uses `oven-sh/setup-bun@0c5077e5...` with bun 1.4.3 and `bun test tests/vh-adlc`; `conventions/coding.md` at e4d58d2 in the binary's cache says new JavaScript tooling and tests use Bun and contains no "Node 24"; the checker asserts the same.
+
+CRITERION: AC-32 Every commit message, PR body, issue update, feature-document prose section, review summary and run report the loop writes is edited with the humanize prose guide at its resolved docs revision: none of that text keeps a canary tell seeded into the fixture inputs or contains an em dash, an en dash or ` -- ` used as a dash, and the run report cites the guide and revision.
+VERDICT: met
+EVIDENCE: `canaryFree` ticked in S6, S9.1, S10.1, S11.1 to S11.3, S11.7 and S13.1 to S13.5 over commits, the document and the reports; `citesGuide` ticked in S1 (all seven operations), S6, S9.1, S10.1, S11.x and S13.1 to S13.5; my own `/vh-adlc-investigate` report, the operation R-31 found wanting, opens with `Conventions: vhco-pro/docs@5e7dd7c ...; prose edited with guides/humanize-prose.md`, and my spec run's report names the guide at 5e7dd7c; `grep -rnP` for em or en dashes over the 70 regenerated summaries found nothing; checker "names the humanize prose guide" passes for every skill. Limitation: the seeded tells and dashes are what the scan can see; S8's and S12's reports are not scanned, as the Test Plan row allows.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan (S7 row, AC-10 row), tests/vh-adlc/scenarios/run.ts S7.7
+EVIDENCE: S7.7's check accepts two outcomes (run.ts, "accepted: one acceptance row naming the latest review, then planned with the gate line" or "the owner was left a decision"). Both of my runs at bdaa69d and all three committed S7.7 summaries (039b1b3, 8d62bb1, d5ae867) record the second outcome, because the reviewer returns judgement findings on the fixture draft. Every `planned` the loop reached elsewhere (S3.A, S12.12, S12.13, my own run) started from an acceptance row the fixture's `accept()` wrote. So `spec` appending the `accepted by owner` row and then flipping to `planned` has never been recorded, and AC-10's first clause has no executed proof.
+PROPOSAL: Give S7.7 a deterministic acceptance path: either a second owner turn that answers the judgement questions and accepts, or a variant whose stored review is already clean so the owner's turn makes `spec` append the acceptance row and run `gate planned`; make that branch the pass condition for AC-10.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/references/loop.md (section 2, "When `source` is `plugin`"), plugins/vh-adlc/skills/vh-adlc-review/SKILL.md, tests/vh-adlc/scenarios/run.ts S11
+EVIDENCE: S11.2 FAILED at bdaa69d on "the review row targets the reviewed commit and records opus": the fixture's harness target was `24446f4`, but `vh-adlc-review` first committed `03eb3b8 docs: pin the conventions and add agent entry points` (AGENTS.md, CLAUDE.md, .github/copilot-instructions.md) on `feat/greeting-name` and reviewed at that commit; the model half held. In S11.3, in the same unpinned fixture, the operation declined to onboard ("onboarding files belong on the default branch"). loop.md tells every operation that "the operation's first change there then adds the pinned AGENTS.md and its bridges", while authority.md grants onboarding commits only with the default-branch document push of `spec`, `tasks` or `implement`'s claim, so the review skill's behaviour on an unpinned repository is undetermined and sometimes contradicts the authority table.
+PROPOSAL: Scope loop.md's onboarding rule to the operations with default-branch authority and have `review` and `ship` report the missing pin instead of committing; or pin the S11 fixture in `reviewFeature()` so S11 measures model handling alone. Re-run S11.2 after the change.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: tests/vh-adlc/fixtures/build.ts `reviewFeature` (AC-03 and AC-04 evidence), run.ts `EXPECTED_VERDICTS`
+EVIDENCE: S11.3 FAILED only on "the four verdicts came back distinctly, one per criterion": the sonnet reviewer returned `{"AC-01":"met","AC-02":"not met","AC-03":"not verified","AC-04":"untested"}`, swapping the two the fixture expects (AC-03 untested, AC-04 not verified). Its report reasons that AC-03's macOS claim was "a prediction, not a run" and AC-04's skipped `test-live.sh` was "never called", which the standard's definitions do not settle outright. The fable and opus passes in S11.1, S11.2 and S11.7 mapped them as expected.
+PROPOSAL: Make the two cases unmistakable, for example no check at all for the untested criterion and a check that exists, is named in the Test Plan and visibly skipped for the not-verified one, so a scenario failure means the loop misbehaved rather than that a reviewer weighed an ambiguous fixture differently.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: README.md, support matrix, first row
+EVIDENCE: The row reads "Claude Code CLI 2.1.284, with re-runs on 2.1.302, Linux", but every one of the 70 summaries at bdaa69d records `2.1.302 (Claude Code)` (69 at b901210, S13.5 at c780ef8), and this review's runs record 2.1.303.
+PROPOSAL: Name the version the recorded evidence shows, and update it with each full run.
 
 ## Sources
 
