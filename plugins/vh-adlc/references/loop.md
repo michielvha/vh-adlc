@@ -31,8 +31,10 @@ Call `knowledge` first, with every docs page the operation will read:
 "$VH_ADLC" knowledge --repo <dir> --plugin-pin <pin from knowledge.md> --page <path> ...
 ```
 
-State the result in one line, for example
-`Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md)`. Every call below passes the same
+State the result in one line that also names the prose guide, for example
+`Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md`.
+Every report opens with this line, after the `deterministic checks unavailable` line when there is one,
+including a report that stops at a gate or waits for the owner. Every call below passes the same
 `--repo` and `--plugin-pin`, written out on each call. The binary needs every word as its own argument:
 the command, each path, each flag and each value. A quoted variable that holds several of them arrives as
 one unknown command or flag.
@@ -45,8 +47,11 @@ Stop and report when the result is `invalid-pin`, `missing-page` (recommend the 
 `unreachable`. Each finding already names the page or pin at fault, so do not re-run `knowledge` with
 fewer pages to see which ones resolve, and do not read any page from that revision.
 
-When `source` is `plugin`, the repository has no pin yet. Call `knowledge` again with the same pages plus
-`guides/onboard-a-repository.md`, and read it. The operation's first change there then adds the pinned
+When `source` is `plugin`, the repository has no pin yet. `vh-adlc-investigate`, `vh-adlc-resume` and
+`vh-adlc-review` add none: they work with the plugin pin and report the missing pin, and onboarding waits
+for the next operation that writes. A review that committed onboarding first would move its own target.
+`vh-adlc-spec`, `vh-adlc-tasks`, `vh-adlc-implement` and `vh-adlc-ship` call `knowledge` again with the
+same pages plus `guides/onboard-a-repository.md`, and read it. Their first change then adds the pinned
 `AGENTS.md` and its bridges as that guide describes, merged into any local instructions, in its own
 commit. Local instructions win over the central pages; report every conflict between them.
 
@@ -81,11 +86,13 @@ did not decide it.
 
 Before committing or posting any prose a reader will see (document sections, commit messages, PR and
 issue bodies, review summaries, run reports), edit it with `guides/humanize-prose.md` at the resolved
-revision, and name that page and revision in the report. Records a reviewer returned are stored exactly
-as returned.
+revision. The knowledge line at the top of the report names that page and revision. Records a reviewer
+returned are stored exactly as returned.
 
 Restate what an issue, an owner turn or any other source says in your own edited words. Do not paste its
 wording as a quotation, even inside quotation marks: a quoted phrase keeps the tells the guide removes.
+This holds in the report too. When you say you followed an owner's note, or chose not to, describe it in
+your own words and never repeat its phrases.
 Code, commands and file contents stay exact, in code spans.
 
 ## 5. Report

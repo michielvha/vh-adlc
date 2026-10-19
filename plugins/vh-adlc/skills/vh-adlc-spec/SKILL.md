@@ -5,6 +5,9 @@ description: Author or review a vh-adlc feature document, the single document th
 
 # vh-adlc-spec
 
+The plugin directory is two levels above this skill's own directory. Every path below that starts
+with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
+
 Two modes: author (`/vh-adlc-spec <issue, goal or document>`) and review (`/vh-adlc-spec review <path>`).
 Follow `references/loop.md` for every step it describes, `references/authority.md` for what you may do
 without asking, and `references/review-protocol.md` for the review mode.
@@ -45,9 +48,10 @@ without asking, and `references/review-protocol.md` for the review mode.
 2. Dispatch `vh-adlc-reviewer` as `references/review-protocol.md` describes, with the document, X, kind
    `spec`, the docs revision, the binary path and the plugin pin. If dispatch is impossible, write the handoff and leave
    the review pending.
-3. Store the records the reviewer returned after its `MODEL:` line under the next `### R-<n>`, with a
-   Review Log row at X naming that model, before changing anything. Then run `vh-adlc review check`
-   against the same text.
+3. Compare the reviewer's `MODEL:` line with the model you asked for, as
+   `references/review-protocol.md` describes; a mismatch it leaves pending stores nothing. Otherwise
+   store the records returned after that line under the next `### R-<n>`, with a Review Log row at X
+   naming that model, before changing anything. Then run `vh-adlc review check` against the same text.
 4. Apply factual findings. Turn judgement findings into Open Questions for the owner. Commit. A blocking
    pass is cleared only by a new independent pass at the new commit.
 5. When a clean review at X exists and Open Questions is empty, ask the owner to accept. On acceptance in
@@ -72,4 +76,5 @@ deliveries. A rejected push is a partial result: keep the commit and ask whether
 ## Report
 
 What changed, the knowledge line, every `vh-adlc` result you acted on (quote its JSON `result` and `line`),
-what was verified, and what is left, including any review that is pending.
+what was verified, what is left, including any review that is pending, and the page and revision used to
+edit the prose.

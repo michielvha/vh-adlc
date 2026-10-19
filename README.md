@@ -75,14 +75,14 @@ unsupported until its own run passes.
 
 | Host or capability | Status | Evidence |
 | --- | --- | --- |
-| Claude Code CLI 2.1.284, with re-runs on 2.1.302, Linux | Supported | `tests/vh-adlc/evidence/claude-code/` |
+| Claude Code CLI 2.1.303, Linux | Supported | `tests/vh-adlc/evidence/claude-code/` |
 | Claude Code desktop app, VS Code extension, remote sessions | Unsupported: discovery not yet run | Same runtime as the CLI; not yet checked on each surface |
 | VS Code Copilot Chat, Local harness | Unsupported: the hand run is pending | None yet |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
 | Copilot CLI | Unsupported | `tests/vh-adlc/evidence/copilot-cli/README.md` |
 | macOS | Unsupported for the loop; the binary ships for it | Every scenario ran on Linux |
 | Structural reviewer isolation | Unsupported: reviews record `procedural` | The reviewer has a shell, which can still write |
-| Choosing the reviewer's model on Claude Code | Supported, with a caveat | When settings refuse the requested model, Claude Code runs the reviewer on the session's model without saying so. The reviewer names the model it ran on, and the Review Log records that model |
+| Choosing the reviewer's model on Claude Code | Supported, with a caveat | When settings refuse the requested model, Claude Code runs the reviewer on another model without saying so. The reviewer names the model it ran on, and the loop compares it with the request. A named model that ran elsewhere leaves the review pending with a handoff. A default pass that ran on neither `fable` nor `opus` is dispatched again on `opus`. The Review Log records the model that ran |
 
 ## Developing
 

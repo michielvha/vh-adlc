@@ -5,7 +5,8 @@
 A review runs in a separate context: dispatch the `vh-adlc-reviewer` agent where the host can, read-only,
 with the repository directory, the document path, the exact commit, the review kind, the resolved docs
 revision, the binary path and the plugin pin. Where the host cannot dispatch it, write a self-contained
-handoff the owner runs elsewhere and leave the review visibly pending. Self-review is never labelled
+handoff the owner runs elsewhere and leave the review visibly pending: whenever no review is stored, the
+report has a line that starts with the exact words `review pending`, followed by why. Self-review is never labelled
 independent, whatever the model.
 
 The target is an exact commit. A completion-eligible implementation review runs against committed state in
@@ -22,10 +23,19 @@ which. A model the owner names is passed as given with no fallback: if the host 
 pending and the report lists what the host offers.
 
 A host may run a subagent on another model than the one asked for, without saying so: Claude Code does
-this when its settings refuse the requested model. So the Review Log row records the model the reviewer's
-first line, `MODEL: <id>`, names, or `unknown`, never the model you asked for. When it differs from the one
-you asked for, say so in the run: a refused `fable` that ran on `opus` is the fallback above, and any other
-difference is reported as it is.
+this when its settings refuse the requested model. So compare the model the reviewer's first line,
+`MODEL: <id>`, names with the one you asked for. An alias matches any ID of its family (`sonnet` matches
+`claude-sonnet-5-5`), a full ID must match exactly, and `MODEL: unknown` never matches.
+
+- A match: record that line's model on the Review Log row.
+- No model named, and the pass ran on `opus` instead of `fable`: that is the fallback above. Record `opus`
+  and say so in the run.
+- No model named, and the pass ran on any other model: dispatch again, naming `opus`. If that pass does
+  not match either, treat it as below.
+- A named model, or the second default pass, that does not match: the host refused it. The review stays
+  pending. Write no Review Log row and no `### R-<n>` subsection, and put the returned text in the
+  handoff, with the model that ran and the models the host offers, so the owner can run the review on
+  the model asked for.
 
 ## Isolation
 

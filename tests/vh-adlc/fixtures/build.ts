@@ -442,8 +442,8 @@ In scope: one name argument for \`greet.sh\`, a \`--shout\` flag, macOS support,
 | --- | --- |
 | AC-01 | \`./test.sh\` |
 | AC-02 | \`./test-shout.sh\` |
-| AC-03 | No check exists yet: nothing here runs on macOS |
-| AC-04 | \`FIXTURE_LIVE=1 ./test-live.sh\`, run only by the release job |
+| AC-03 | None. No check covers macOS: \`./test.sh\` runs on Linux only and is not a check for this criterion |
+| AC-04 | \`FIXTURE_LIVE=1 ./test-live.sh\` is the check. Only the release job can run it; anywhere else it prints SKIP |
 
 ## Tasks
 

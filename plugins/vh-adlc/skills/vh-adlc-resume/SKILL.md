@@ -5,6 +5,9 @@ description: Reconstruct where a vh-adlc feature stands from its issue, document
 
 # vh-adlc-resume
 
+The plugin directory is two levels above this skill's own directory. Every path below that starts
+with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
+
 Input: an issue, a feature document, a branch, or "continue". Follow `references/loop.md` and
 `references/authority.md`.
 
