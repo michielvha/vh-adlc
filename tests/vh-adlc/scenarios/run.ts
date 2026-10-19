@@ -1559,7 +1559,7 @@ async function main() {
       // A failing run keeps each turn's final report, so the failure can be read without a re-run.
       ...(pass
         ? []
-        : ["", "## Reports", ...result.turns.flatMap((t, i) => ["", `Turn ${i + 1}:`, "", ...redactPaths(t.result, f).slice(0, 2000).split("\n").map((l) => `> ${l}`)])]),
+        : ["", "## Reports", ...result.turns.flatMap((t, i) => ["", `Turn ${i + 1}:`, "", ...redactPaths(t.result, f).slice(0, 12000).split("\n").map((l) => `> ${l}`)])]),
       "",
     ];
     const text = lines.join("\n");
