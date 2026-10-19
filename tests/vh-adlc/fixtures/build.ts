@@ -25,6 +25,7 @@ import { join, resolve } from "node:path";
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
 const PLUGIN = join(ROOT, "plugins", "vh-adlc");
 const PLATFORMS = ["darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"];
+export const OTHER_FEATURE_BRANCH = "feat/other-work";
 
 // Secret canaries: no output, document or evidence may contain them (AC-19).
 export const SECRET_CANARIES = ["vhadlc-secret-canary-7f3e9a", "ghp_vhadlcCanaryToken0000000000000000"];
@@ -337,7 +338,6 @@ if (import.meta.main) {
 
 export const FEATURE_PATH = "docs/internal/plans/greeting-name.md";
 export const OTHER_FEATURE_PATH = "docs/internal/plans/farewell-name.md";
-export const OTHER_FEATURE_BRANCH = "feat/other-work";
 
 // accept records a clean spec review R-1 and the owner's acceptance of it at the
 // project's HEAD, commits the rows and pushes, so the feature is ready for planned.

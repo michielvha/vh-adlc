@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { build, claim, FEATURE_PATH, type Fixtures, git, gitEnv, OTHER_FEATURE_PATH, plan, prepareOtherFeature, realBinary, SECRET_CANARIES } from "./fixtures/build";
+import { build, claim, FEATURE_PATH, type Fixtures, git, gitEnv, OTHER_FEATURE_BRANCH, OTHER_FEATURE_PATH, plan, prepareOtherFeature, realBinary, SECRET_CANARIES } from "./fixtures/build";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
 const dir = mkdtempSync(join(tmpdir(), "vh-adlc-fixtures-"));
@@ -49,6 +49,20 @@ describe("docs fixture", () => {
 });
 
 describe("project fixture", () => {
+  test("the fixture builder runs through its standalone CLI", () => {
+    const cliDir = join(dir, "cli");
+    const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "fixtures", "build.ts"), cliDir], {
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 180_000,
+    });
+    if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+    const built = JSON.parse(result.stdout.toString());
+    expect(built.dir).toBe(cliDir);
+    expect(existsSync(built.worktree)).toBe(true);
+    expect(sh(built.worktree, "git", "branch", "--show-current").out.trim()).toBe(OTHER_FEATURE_BRANCH);
+  }, 180_000);
+
   test("its test suite fails on purpose", () => {
     const r = sh(f.project, "./test.sh");
     expect(r.code).not.toBe(0);
