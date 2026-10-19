@@ -11,7 +11,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
+import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, OTHER_FEATURE_BRANCH, OTHER_FEATURE_PATH, plan, prepareOtherFeature, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
 import { CLAUDE_TOKEN, claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
 
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
@@ -910,14 +910,19 @@ const PHASE5: Scenario[] = [
   },
   {
     id: "S10.1",
-    title: "Resume in a new session: handoff, then continue",
+    title: "Resume in separate worktrees: both features progress after handoff",
     phase: 5,
     run: async (f) => {
       plan(f);
       const owning = claim(f);
+      const primaryBase = rev(f, FEATURE_BRANCH)!;
+      const other = prepareOtherFeature(f);
       const claimed = rev(f, "main")!;
       const lists = worktrees(f);
-      const other = { head: rev(f, "HEAD", f.worktree), status: gitIn(f, f.worktree, "status", "--porcelain") };
+      const otherBase = rev(f, "HEAD", other)!;
+      const otherTurns: Turn[] = [];
+      let primaryPreserved = false;
+      let otherAfter: { head: string | null; status: string | null } | undefined;
       let beforeHandoff = -1;
       const turns = session(
         f,
@@ -930,22 +935,40 @@ const PHASE5: Scenario[] = [
         ],
         {
           after: (i) => {
-            if (i === 1) beforeHandoff = agentLog(f, f.project).length;
+            if (i !== 1) return;
+            beforeHandoff = agentLog(f, f.project, `${primaryBase}..${FEATURE_BRANCH}`).length;
+            const primary = { head: rev(f, "HEAD", owning), status: gitIn(f, owning, "status", "--porcelain") };
+            otherTurns.push(...session(
+              f,
+              [f.pluginA],
+              ["/vh-adlc-resume farewell-name. The owner here: the earlier session on farewell-name has stopped, and I hand it to you. Implement its first task in its existing worktree, then stop. Do not ship it or work on greeting-name."],
+              { cwd: other },
+            ));
+            primaryPreserved = rev(f, "HEAD", owning) === primary.head && gitIn(f, owning, "status", "--porcelain") === primary.status;
+            otherAfter = { head: rev(f, "HEAD", other), status: gitIn(f, other, "status", "--porcelain") };
           },
         },
       );
       return {
-        turns,
+        turns: [...turns.slice(0, 2), ...otherTurns, ...turns.slice(2)],
+        notes: ["The farewell session runs between the greeting session's second and third turns, before the greeting handoff."],
         checks: (c) => {
-          const work = agentLog(f, f.project, `${claimed}..${FEATURE_BRANCH}`);
+          const work = agentLog(f, f.project, `${primaryBase}..${FEATURE_BRANCH}`);
+          const otherWork = agentLog(f, other, `${otherBase}..${OTHER_FEATURE_BRANCH}`);
+          const primaryTest = Bun.spawnSync(["./test.sh"], { cwd: owning, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
+          const otherTest = Bun.spawnSync(["./test-farewell.sh"], { cwd: other, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
           return [
             { name: "next and fresh ran in the owning worktree", ok: c.log().some((x) => words(x.args)[0] === "next") && c.log().some((x) => words(x.args)[0] === "fresh") },
             { name: "the report names the branch and the owning worktree", ok: said({ ...c, turns: [turns[0]] }, FEATURE_BRANCH) && said({ ...c, turns: [turns[0]] }, "project-greeting-name") },
             { name: "nothing was written before the handoff", ok: beforeHandoff === 0 },
-            { name: "after the handoff the next task progressed on the feature branch", ok: work.length > 0 && work.every((x) => ancestor(f, x.hash, FEATURE_BRANCH)) },
-            { name: "no push, merge or release", ok: rev(f, "main") === claimed && rev(f, "origin/main") === claimed && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" && (gitIn(f, f.project, "tag") ?? "") === "" },
-            { name: "worktrees and the other feature are untouched", ok: worktrees(f) === lists && rev(f, "HEAD", f.worktree) === other.head && gitIn(f, f.worktree, "status", "--porcelain") === other.status },
-            canaryFree(turns.map((t) => t.result)),
+            { name: "after the handoff the first task progressed on the greeting feature branch", ok: work.some((x) => x.files.includes("greet.sh")) && primaryTest.exitCode === 0 && readFileSync(join(owning, FEATURE_PATH), "utf8").includes("- [x] T1 ") },
+            { name: "the farewell task progressed in its separate worktree", ok: otherWork.some((x) => x.files.includes("farewell.sh")) && otherTest.exitCode === 0 && readFileSync(join(other, OTHER_FEATURE_PATH), "utf8").includes("- [x] T1 ") },
+            { name: "neither feature's commits change the other feature's files", ok: work.every((x) => x.files.every((p) => ![OTHER_FEATURE_PATH, "farewell.sh", "test-farewell.sh"].includes(p))) && otherWork.every((x) => x.files.every((p) => ![FEATURE_PATH, "greet.sh", "test.sh"].includes(p))) },
+            { name: "the greeting worktree was untouched while farewell progressed", ok: primaryPreserved },
+            { name: "the farewell worktree was untouched while greeting progressed", ok: !!otherAfter && rev(f, "HEAD", other) === otherAfter.head && gitIn(f, other, "status", "--porcelain") === otherAfter.status },
+            { name: "no push, merge or release", ok: rev(f, "main") === claimed && rev(f, "origin/main") === claimed && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH, OTHER_FEATURE_BRANCH) === "" && (gitIn(f, f.project, "tag") ?? "") === "" },
+            { name: "no worktree was created or removed", ok: worktrees(f) === lists },
+            canaryFree([...turns, ...otherTurns].map((t) => t.result)),
             citesGuide(c),
             unrelatedIntact(c),
           ];
