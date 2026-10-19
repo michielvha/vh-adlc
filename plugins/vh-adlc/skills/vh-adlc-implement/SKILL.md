@@ -5,6 +5,9 @@ description: Implement an accepted vh-adlc feature task by task on its feature b
 
 # vh-adlc-implement
 
+The plugin directory is two levels above this skill's own directory. Every path below that starts
+with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
+
 Input: a feature document, its issue, or its slug. Follow `references/loop.md` for every step it describes
 and `references/authority.md` for what you may do without asking. Accepted scope is your authority to edit,
 test and commit on the feature branch; it is not authority to push that branch, open a PR or merge.

@@ -5,6 +5,9 @@ description: Investigate an issue, failure, question or document for the vh-adlc
 
 # vh-adlc-investigate
 
+The plugin directory is two levels above this skill's own directory. Every path below that starts
+with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
+
 Input: an issue, a failure, a question or a document. Follow `references/loop.md` and
 `references/authority.md`.
 

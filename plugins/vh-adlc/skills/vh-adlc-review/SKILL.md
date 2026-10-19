@@ -5,6 +5,9 @@ description: Run an independent implementation review of a vh-adlc feature at an
 
 # vh-adlc-review
 
+The plugin directory is two levels above this skill's own directory. Every path below that starts
+with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
+
 Input: a feature document, its issue, or its slug, and optionally the model to review with. Follow
 `references/loop.md`, `references/authority.md` and `references/review-protocol.md`.
 

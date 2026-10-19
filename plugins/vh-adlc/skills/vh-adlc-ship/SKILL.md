@@ -5,6 +5,9 @@ description: Ship a vh-adlc feature on the owner's explicit request - doc-impact
 
 # vh-adlc-ship
 
+The plugin directory is two levels above this skill's own directory. Every path below that starts
+with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
+
 Input: a feature document, its issue, or its slug, and the owner's explicit request to ship it. Follow
 `references/loop.md` and `references/authority.md`. The ship request is your authority to push the feature
 branch, create or update its one PR and update the linked issue. It is not authority to merge, tag,

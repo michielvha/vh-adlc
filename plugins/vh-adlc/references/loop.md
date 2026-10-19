@@ -31,8 +31,10 @@ Call `knowledge` first, with every docs page the operation will read:
 "$VH_ADLC" knowledge --repo <dir> --plugin-pin <pin from knowledge.md> --page <path> ...
 ```
 
-State the result in one line, for example
-`Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md)`. Every call below passes the same
+State the result in one line that also names the prose guide, for example
+`Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md`.
+Every report opens with this line, after the `deterministic checks unavailable` line when there is one,
+including a report that stops at a gate or waits for the owner. Every call below passes the same
 `--repo` and `--plugin-pin`, written out on each call. The binary needs every word as its own argument:
 the command, each path, each flag and each value. A quoted variable that holds several of them arrives as
 one unknown command or flag.
@@ -81,7 +83,7 @@ did not decide it.
 
 Before committing or posting any prose a reader will see (document sections, commit messages, PR and
 issue bodies, review summaries, run reports), edit it with `guides/humanize-prose.md` at the resolved
-revision, and name that page and revision in the report. Records a reviewer returned are stored exactly
+revision. The knowledge line at the top of the report names that page and revision. Records a reviewer returned are stored exactly
 as returned.
 
 Restate what an issue, an owner turn or any other source says in your own edited words. Do not paste its

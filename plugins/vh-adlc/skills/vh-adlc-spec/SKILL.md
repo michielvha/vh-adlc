@@ -5,6 +5,9 @@ description: Author or review a vh-adlc feature document, the single document th
 
 # vh-adlc-spec
 
+The plugin directory is two levels above this skill's own directory. Every path below that starts
+with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
+
 Two modes: author (`/vh-adlc-spec <issue, goal or document>`) and review (`/vh-adlc-spec review <path>`).
 Follow `references/loop.md` for every step it describes, `references/authority.md` for what you may do
 without asking, and `references/review-protocol.md` for the review mode.
