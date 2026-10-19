@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Complete against implementation review R-34. AC-02 keeps its residual in #3; #7 and #8 track the follow-ups D-42 and D-43."
+status_description: "Complete against historical implementation review R-34. AC-02 keeps its residual in #3; #8 tracks the stronger scenario proof. D-45 records the owner's authorisation to finish and merge the follow-ups."
 issue: null
 branch: feat/personal-development-loop
 goal: "A personal development-loop plugin, backed by a deterministic binary, that carries the owner's spec-driven way of working into every repository in Claude Code and VS Code Copilot Chat, and reads engineering knowledge from vhco-pro/docs instead of embedding it."
@@ -112,6 +112,7 @@ Decided by the owner on 2026-10-17. They are inputs, not open for re-litigation 
 | D-42 | R-31 F-02 waits for the next normative revision, tracked in michielvha/vh-adlc#7: the Hosts row on agent files and the package tree in Design either rename the reviewer to `agents/vh-adlc-reviewer.md` or say that Claude Code lists it by file name. This completion keeps the current baseline. Decided on 2026-10-19. |
 | D-43 | The feature completes with AC-29 met as R-34 judged it. The stronger S10, which also moves the second feature a step, is tracked in michielvha/vh-adlc#8. Decided on 2026-10-19 in answer to R-34 F-01. |
 | D-44 | Right after this feature merges, one run installs vh-adlc 0.1.1 in a fresh profile, updates it to 0.1.2 from the public marketplace, and replaces `tests/vh-adlc/evidence/claude-code/update-by-hand.md` with that run in a docs-only commit on `main`. Decided on 2026-10-19 in answer to R-34 F-02. |
+| D-45 | The owner authorised finishing and merging the ADLC follow-up PRs on 2026-10-20. The naming correction deferred in D-42 is applied in place without renaming the reviewer or changing dispatch. Earlier review records remain historical; no new independent review or feature-gate result is claimed. |
 
 ## Scope
 
@@ -551,7 +552,7 @@ Host facts the design relies on (probe: a test plugin on Claude Code 2.1.289 and
 | Root `plugin.json` with the Agent Plugins `$schema` | ignored | not checked | takes precedence and moves agents to a vendor namespace: never ship one |
 | Skill invocation | `/vh-adlc:<skill>`; bare `/<skill>` unless a built-in owns it | `/<plugin>:<skill>`; a skill whose `name` differs from its directory is skipped | `/<skill>` or `/<plugin>:<skill>`; built-ins and project skills win |
 | Built-ins `resume`, `review`, `tasks` | yes (probe) | none | yes (probe) |
-| Agent file in `agents/` | any `.md`; frontmatter `name`, else the file name including `.agent` | any `.md`; frontmatter `name` wins (src) | `.md` or `.agent.md`, suffix stripped |
+| Agent file in `agents/` | any `.md`; the component inventory lists this reviewer by filename as `vh-adlc-reviewer.agent`, distinct from its declared name `vh-adlc-reviewer` and the separately observed dispatch name `vh-adlc:vh-adlc-reviewer` (R-31 F-02) | any `.md`; frontmatter `name` wins (src) | `.md` or `.agent.md`, suffix stripped |
 | `model:` in agent frontmatter | aliases, full IDs, `inherit` | aliases not translated for plugin agents (src) | `opus` fails a dispatch outright (probe) |
 | `tools:` allow-list | enforced, Claude names | unknown names ignored (docs); Claude names not translated for plugin agents (src) | Claude names mapped (probe) |
 | `disallowedTools` | enforced | not enforced (src) | ignored (probe) |
@@ -583,7 +584,7 @@ plugins/vh-adlc/
   vh-adlc.lock.json                # version, asset and executable SHA-256 per platform
   scripts/ensure-vh-adlc.sh
   skills/vh-adlc-{investigate,spec,tasks,implement,review,ship,resume}/SKILL.md
-  agents/vh-adlc-reviewer.agent.md # name: vh-adlc-reviewer
+  agents/vh-adlc-reviewer.agent.md # inventory: vh-adlc-reviewer.agent; name: vh-adlc-reviewer
   references/
     loop.md                       # which binary command gates which step
     authority.md                  # authority matrix, identity, preservation
