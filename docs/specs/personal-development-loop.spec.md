@@ -1377,6 +1377,16 @@ numbers within a phase are in dependency order; a partial checker run never mark
       the usage (AC-32)
       Evidence: all 70 scenarios pass on Claude Code 2.1.302 at `b901210`, S13.5 again at `c780ef8`
       after its setup change. The summaries are under `tests/vh-adlc/evidence/claude-code/`.
+- [x] T36 `plugins/vh-adlc/references/loop.md`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md`, `README.md`,
+      `tests/vh-adlc/scenarios/run.ts`, `tests/vh-adlc/fixtures/build.ts` - apply R-32: S7.7.accept
+      starts from a clean stored review and proves that spec writes the acceptance row and then moves
+      to planned (F-01); investigate, resume and review leave onboarding to the operations that write
+      (F-02); the S11 fixture says which criterion has no check and which check cannot run here (F-03,
+      the owner's choice); the README names the version the evidence shows (F-04). A failed ship's
+      report opens with an exact `partial delivery` line (AC-10, AC-14, AC-18, AC-20)
+      Evidence: all 71 scenarios pass on Claude Code 2.1.303, 62 at `e0f01c2` and S1, S13 and S14.ship
+      again at `09f701b` after the ship skill's change. S7.7.accept stored one acceptance row at the
+      reviewed commit and then passed `gate planned`.
 
 ## Open Questions
 
