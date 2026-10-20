@@ -4,7 +4,8 @@ Date: 2026-10-20
 
 Result: installation, discovery and the read-only investigation passed. A real default-review blocker
 was reproduced in 0.1.2; the GUI-installed 0.1.3 update then passed the post-update review-storage check.
-The Local implementation and completion loop has not yet been verified.
+The subsequent local-source 0.2.0 run completed implementation, independent review and gated
+completion. Its permission-mode limitation is recorded below.
 
 | Field | Observed value |
 | --- | --- |
@@ -92,13 +93,58 @@ ref check confirmed the same commit there. Status remained draft, and the staged
 README edit and untracked scratch file were preserved. No acceptance, implementation or GitHub write
 was authorised in that turn.
 
-The named-model negative GUI case and the Local implementation loop remain unverified.
+## Version 0.2.0 core loop and explicit-model rejection
+
+The actual **Chat: Install Plugin from Source** prompt accepted the local development repository path.
+Only vh-adlc was selected. The GUI session read the local-source 0.2.0 manifests and shared references;
+its initial slash loader still referenced the previously installed public source. This run does not
+claim that installing another source automatically replaces the older source's registration.
+
+An explicitly unavailable reviewer model was requested as a negative test. The host rejected the exact
+request, no substitute reviewer ran, and the report started with `review pending`. No new Review Log
+row or subsection was stored. The test was repeated with **Default permissions** verified in the UI.
+The document, index and HEAD remained unchanged.
+
+Scripted fixture-owner acceptance then accepted the existing clean R-1. The GUI ran the real planned
+gate and resumed through tasks, claim, test-first implementation, independent review and completion:
+
+| Fixture commit | Observed outcome |
+| --- | --- |
+| `703fb60` | R-1 accepted and planned gate passed |
+| `0232324` | Tasks committed on the default branch |
+| `531c033` | Claim published only to the local bare origin |
+| `69a7366` | Test exposed both named-greeting failures before implementation |
+| `e0a2dc7` | Greeting implementation passed the tests |
+| `7a591e4` | Independent implementation R-2 stored; all three criteria `met` |
+| `b10c1a1` | Complete gate passed and status changed to complete |
+
+The completion commit contains `vh-adlc gate complete: pass (rules 1, docs e4d58d2)`. The independent
+post-run `./test.sh` printed `PASS`. Before/after snapshots matched for the unrelated staged/unstaged/
+untracked file contents, modes and index entries, and for the second worktree's HEAD, index, tracked
+and untracked contents and modes. The feature branch remained unpublished.
+
+R-2 recorded `unknown` and procedural isolation, with identity explicitly not attested. No model
+override was requested. Its three records include independently executed byte-exact output checks.
+
+### Permission-mode limitation
+
+During GUI automation the disposable session was observed in **Allow all** despite the intended normal
+permission path. The negative-model check was rerun under verified **Default permissions**. The core
+implementation result is real, but its completed-session UI again showed **Allow all**, so it is not
+evidence that the entire coding loop used normal per-command approval. The controller restored
+**Default permissions** and verified it repeatedly after completion.
+
+This is a limitation of this GUI run, not evidence that the ADLC package changes host permission modes.
+The automation controller was tightened to verify the actual control at a mouse click point. No
+unrelated file or second-worktree change was found. Raw UI captures are not published.
 
 ## Boundaries
 
 Native macOS accessibility and window-specific snapshots drove these tests. No headless CLI agent run
-was counted as GUI proof. Normal permission prompts were reviewed individually; no unrestricted mode
-was enabled. Only public plugin sources, the pinned public cache and disposable fixtures were approved.
+was counted as GUI proof. The earlier installation, investigation and default-review checks used
+individual scoped permission prompts. The later core-loop permission-mode limitation is recorded
+above; normal per-command approval for that whole run is not established. Default permissions was
+restored after completion, and independent checks verified the unrelated work and second worktree.
 
 This record does not prove the Copilot or Claude harnesses, the native Claude Code extension, remote
 sessions, structural isolation, or the full manual scenario selection. Raw UI dumps are not published.

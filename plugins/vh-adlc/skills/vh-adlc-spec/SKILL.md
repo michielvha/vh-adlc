@@ -49,7 +49,7 @@ without asking, and `references/review-protocol.md` for the review mode.
    `spec`, the docs revision, the binary path and the plugin pin. If dispatch is impossible, write the handoff and leave
    the review pending.
 3. Apply the model eligibility rules in `references/review-protocol.md` before storing anything.
-   A requested model must match; an unrequested non-Claude default may report `MODEL: unknown`,
+   A requested model must match; an unrequested default may report `MODEL: unknown`,
    recorded as `unknown` with model identity explicitly not attested. Never infer its ID from the main
    session. If the protocol leaves the review pending, store nothing. Otherwise store the records
    after the header under the next `### R-<n>`, with a Review Log row at X naming the reported model,

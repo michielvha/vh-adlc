@@ -159,19 +159,40 @@ describe(`phase selection (${PHASE === 7 ? "full v1" : `phase ${PHASE}`})`, () =
 });
 
 describe("manifest and marketplace", () => {
-  test("one manifest, and no root plugin.json", () => {
+  test("portable and Claude metadata describe one shared package", () => {
     const manifest = join(PKG, ".claude-plugin", "plugin.json");
     expect(existsSync(manifest)).toBe(true);
     const m = JSON.parse(read(manifest));
     expect(m.name).toBe("vh-adlc");
     expect(m.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(typeof m.description).toBe("string");
+    const portable = JSON.parse(read(join(PKG, "plugin.json")));
+    expect(portable).toEqual({
+      $schema: "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      ...m,
+    });
     const manifests = walk(ROOT)
       .filter((f) => !f.includes(`${join(ROOT, ".git")}/`) && !f.includes("/node_modules/"))
       .filter((f) => f.endsWith("/plugin.json"))
       .map((f) => relative(ROOT, f));
-    expect(manifests.filter((f) => f.startsWith("plugins/vh-adlc/"))).toEqual(["plugins/vh-adlc/.claude-plugin/plugin.json"]);
+    expect(manifests.filter((f) => f.startsWith("plugins/vh-adlc/"))).toEqual([
+      "plugins/vh-adlc/.claude-plugin/plugin.json",
+      "plugins/vh-adlc/plugin.json",
+    ]);
     expect(manifests.filter((f) => !f.startsWith("plugins/"))).toEqual([]);
+  });
+
+  test("native Codex marketplace points to the existing package", () => {
+    const marketplace = JSON.parse(read(join(ROOT, ".agents", "plugins", "marketplace.json")));
+    expect(marketplace.name).toBe("vhco-tools");
+    expect(marketplace.plugins).toEqual([{
+      name: "vh-adlc",
+      source: { source: "local", path: "./plugins/vh-adlc" },
+      policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },
+      category: "Productivity",
+    }]);
+    expect(existsSync(join(ROOT, ".agents", "skills"))).toBe(false);
+    expect(existsSync(join(PKG, ".codex-plugin"))).toBe(false);
   });
 
   test("the marketplace lists vh-adlc and leaves github-app-registration unchanged", () => {
@@ -255,18 +276,18 @@ describe("reviewer agent", () => {
 describe("review model eligibility", () => {
   const protocol = () => read(join(PKG, "references", "review-protocol.md"));
 
-  test("documents the unrequested non-Claude default without inventing model identity", () => {
+  test("uses the inherited default on every host without inventing model identity", () => {
     const text = protocol();
-    expect(text).toContain("### Default review outside Claude Code");
+    expect(text).toContain("### Default review on every host");
     expect(text).toContain("do not pass a model override");
     expect(text).toContain("record `unknown`");
     expect(text).toContain("model identity was not attested");
-    expect(text).toContain("Do not apply the Claude Code default chain");
+    expect(text).not.toMatch(/`(?:fable|opus)`/);
   });
 
-  test("keeps named models and Claude Code defaults subject to identity matching", () => {
+  test("keeps explicitly named models subject to identity matching", () => {
     const text = protocol();
-    expect(text).toContain("### Requested model, including Claude Code defaults");
+    expect(text).toContain("### Requested model");
     expect(text).toContain("`MODEL: unknown` never matches");
     expect(text).toContain("A named model that does not match");
     expect(text).toContain("Write no Review Log row");
@@ -280,8 +301,23 @@ describe("review model eligibility", () => {
     for (const op of ["spec", "review"]) {
       const text = read(skillPath(op));
       expect(text).toContain("model eligibility");
-      expect(text).toContain("unrequested non-Claude default");
+      expect(text).toContain("unrequested default");
+      expect(text).not.toMatch(/`(?:fable|opus)`/);
     }
+  });
+
+  test("generic independent dispatch loads the same canonical reviewer contract", () => {
+    const text = protocol();
+    expect(text).toContain("agents/vh-adlc-reviewer.agent.md");
+    expect(text).toContain("generic independent subagent");
+    expect(text).toContain("Do not copy or translate");
+    expect(text).toContain("leave the review visibly pending");
+  });
+
+  test("installer invocation does not depend on extracted executable bits", () => {
+    const text = read(join(PKG, "references", "loop.md"));
+    expect(text).toContain('VH_ADLC=$(bash "<plugin directory>/scripts/ensure-vh-adlc.sh")');
+    expect(text).toContain("checksum");
   });
 });
 

@@ -130,6 +130,17 @@ function snapshot(dir: string): Record<string, string> {
 }
 
 describe("valid sources", () => {
+  test("Bash invocation verifies a mode-0644 extracted installer", () => {
+    const f = fixture();
+    const script = join(f.plugin, "scripts", "ensure-vh-adlc.sh");
+    chmodSync(script, 0o644);
+    const r = run(f);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe(cached(f));
+    expect(sha256(readFileSync(cached(f)))).toBe(sha256(f.binary));
+    expect(statSync(script).mode & 0o111).toBe(0);
+  });
+
   test("downloads, verifies and caches the locked binary", () => {
     const f = fixture();
     const r = run(f);

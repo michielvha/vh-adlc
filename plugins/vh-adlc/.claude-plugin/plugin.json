@@ -1,6 +1,6 @@
 {
   "name": "vh-adlc",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "The vh-adlc development loop: specify, decompose, implement, review, ship and resume a feature, with every status change decided by the vh-adlc binary. Runs only when invoked.",
   "author": {
     "name": "Michiel VH"

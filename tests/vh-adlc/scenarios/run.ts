@@ -1130,19 +1130,17 @@ function ticked(doc: string, id: string): boolean {
   return new RegExp(`^- \\[x\\] ${id}:`, "m").test(doc);
 }
 
-type S11 = { id: string; title: string; prompt: string; settings?: Record<string, unknown>; model?: string; noAgent?: boolean; expect: "fable" | "opus" | "sonnet" | "pending" };
+type S11 = { id: string; title: string; prompt: string; settings?: Record<string, unknown>; model?: string; noAgent?: boolean; expect: "default" | "sonnet" | "pending" };
 
 const S11_CASES: S11[] = [
-  { id: "S11.1", title: "Review with no model named", prompt: "", expect: "fable" },
-  { id: "S11.2", title: "Review when fable is refused", prompt: "", settings: { availableModels: ["opus", "sonnet", "haiku"] }, model: "opus", expect: "opus" },
+  { id: "S11.1", title: "Review with the inherited default", prompt: "", model: "opus", expect: "default" },
+  { id: "S11.2", title: "Default review without the historical preferred alias", prompt: "", settings: { availableModels: ["opus", "sonnet", "haiku"] }, model: "opus", expect: "default" },
   { id: "S11.3", title: "Review with a named model", prompt: "Review it with sonnet.", expect: "sonnet" },
   { id: "S11.4", title: "Review with an unavailable named model", prompt: "Review it with claude-nonexistent-9.", expect: "pending" },
-  { id: "S11.5", title: "Review when the reviewer cannot be dispatched", prompt: "", noAgent: true, expect: "pending" },
+  { id: "S11.5", title: "Review when the canonical reviewer contract is unavailable", prompt: "", noAgent: true, expect: "pending" },
   // D-33 and D-35: a real named model that settings refuse runs elsewhere without notice, so it stays pending.
   { id: "S11.6", title: "Review with a named model the settings refuse", prompt: "Review it with sonnet.", settings: { availableModels: ["opus", "haiku"] }, model: "opus", expect: "pending" },
-  // D-34: with fable refused and the session on haiku, the first pass lands outside the chain; the retry names opus.
-  // D-38: fable refused, opus allowed but not first, the session and the first allowed model outside the chain.
-  { id: "S11.7", title: "Review when fable is refused and the session runs outside the chain", prompt: "", settings: { availableModels: ["sonnet", "opus"] }, model: "sonnet", expect: "opus" },
+  { id: "S11.7", title: "Default review inherits a different session family without a fallback chain", prompt: "", settings: { availableModels: ["sonnet", "opus"] }, model: "sonnet", expect: "default" },
 ];
 
 const PHASE6: Scenario[] = S11_CASES.map(
@@ -1162,24 +1160,23 @@ const PHASE6: Scenario[] = S11_CASES.map(
       }
       const uses: ToolUse[] = [];
       const turns = session(f, [plugin], [`/vh-adlc-review greeting-name. ${HANDOFF} ${k.prompt} ${OWNER_NOTE}`.replace(/\s+/g, " ").trim()], { cwd: owning, uses, settings: k.settings, model: k.model });
-      // D-38: the model each reviewer pass ran on, in the order the passes started, by transcript timestamp.
       const passes = new Map<string, { at: string; model: string }>();
       for (const u of uses.filter((x) => x.subagent && x.model)) {
         const seen = passes.get(u.file);
         if (!seen || u.at < seen.at) passes.set(u.file, { at: u.at, model: u.model });
       }
       const ran = [...passes.values()].sort((a, b) => a.at.localeCompare(b.at)).map((x) => x.model);
-      const dispatches = uses.filter((u) => !u.subagent && u.name === "Agent").length;
+      const dispatches = uses.filter((u) => !u.subagent && u.name === "Agent");
       return {
         turns,
         notes: [
-          ...(ran.length ? [`Reviewer passes ran on, in the order they started: ${ran.join(", ")}; the main session dispatched the reviewer ${dispatches} time(s)`] : []),
-          ...(k.id === "S11.7" && ran[0]?.includes("opus") ? ["D-41: the first pass ran on opus, so D-34's second dispatch is unproven on Claude Code; this needs an Open Question"] : []),
+          ...(ran.length ? [`Reviewer passes ran on, in the order they started: ${ran.join(", ")}; the main session dispatched the reviewer ${dispatches.length} time(s)`] : []),
         ],
         checks: (c) => {
           const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
           const rows = implementationRows(doc);
           const row = rows.at(-1);
+          const reportedModel = row?.[4]?.replaceAll("`", "").trim() ?? "";
           const commits = agentLog(f, f.project, `${target}..${FEATURE_BRANCH}`);
           const unpushed = gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "";
           if (k.expect === "pending") {
@@ -1194,18 +1191,14 @@ const PHASE6: Scenario[] = S11_CASES.map(
           const got = row ? records(doc, row[1]) : {};
           return [
             { name: "the reviewer ran in a separate context", ok: uses.some((u) => u.subagent) },
-            { name: `the review row targets the reviewed commit and records ${k.expect}`, ok: !!row && target.startsWith(row[3].replaceAll("`", "")) && row[4].toLowerCase().includes(k.expect) },
+            { name: "the review row targets the reviewed commit and records the actual reviewer identity", ok: !!row && target.startsWith(row[3].replaceAll("`", "")) && (k.expect === "default" ? ran.includes(reportedModel) || (reportedModel === "unknown" && said(c, "not attested")) : reportedModel.toLowerCase().includes(k.expect)) },
             { name: "isolation is recorded", ok: !!row && ["structural", "procedural", "unknown"].includes(row[5]) },
-            { name: `the session's model usage shows ${k.expect} ran`, ok: turns.some((t) => t.model.includes(k.expect)), detail: turns.map((t) => t.model).join("; ") },
+            { name: "the subagent trace shows the reviewer ran", ok: ran.length > 0 && (k.expect === "default" || ran.some((id) => id.includes(k.expect))), detail: ran.join("; ") },
             { name: "the four verdicts came back distinctly, one per criterion", ok: Object.keys(got).length === 4 && Object.entries(EXPECTED_VERDICTS).every(([id, v]) => got[id] === v), detail: JSON.stringify(got) },
             { name: "review check confirmed the stored records", ok: c.log().some((x) => words(x.args).slice(0, 2).join(" ") === "review check" && x.json?.result === "pass") },
             { name: "only the met criterion stays ticked; the others name the review", ok: ticked(doc, "AC-01") && ["AC-02", "AC-03", "AC-04"].every((id) => !ticked(doc, id) && new RegExp(`^- \\[ \\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: [^\\n]*${row?.[1]}`, "m").test(doc)) },
-            ...(k.expect === "opus" ? [{ name: "the opus fallback was announced", ok: said(c, "opus") && said(c, "fable") }] : []),
-            // D-41: a first pass on opus is the fallback itself; the case then records the host rule instead.
-            ...(k.id === "S11.7"
-              ? ran[0]?.includes("opus")
-                ? [{ name: "first pass ran on opus: recorded as the host rule, one review stored (D-41)", ok: rows.length === 1 }]
-                : [{ name: "exactly one review was stored, after a second dispatch naming opus", ok: rows.length === 1 && dispatches >= 2 && ran.at(-1)?.includes("opus") === true }]
+            ...(k.expect === "default"
+              ? [{ name: "default review passed no concrete model override and stored one review", ok: rows.length === 1 && dispatches.length > 0 && dispatches.every((u) => u.input.model === undefined || u.input.model === "inherit") }]
               : []),
             { name: "committed on the feature branch, not pushed", ok: commits.length > 0 && unpushed },
             canaryFree([...commits.map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
