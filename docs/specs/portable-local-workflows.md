@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Scope approved; awaiting independent spec review and acceptance."
+status: planned
+status_description: "Independently reviewed and accepted; ready for task decomposition."
 issue: null
 goal: "Run the same ADLC workflow in local Codex and existing GUI hosts without generated host implementations."
 covers:
@@ -107,6 +107,8 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-20 | R-1 | spec | `044b43685584208d7c3146289f423858baa0f2b7` | unknown | procedural | One factual should-fix; model identity not attested |
+| 2026-10-20 | R-2 | spec | `41fde3a096a0c55905167b3e4e8d14636ce8542f` | unknown | procedural | No findings; model identity not attested |
+| 2026-10-20 | R-2 | spec | `41fde3a096a0c55905167b3e4e8d14636ce8542f` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -116,6 +118,10 @@ SEVERITY: should-fix
 WHERE: Test Plan, AC-06
 EVIDENCE: docs/specs/portable-local-workflows.md:94 names comparison of “original dirty entries and other-worktree HEAD”. AC-06 requires not changing another worktree, but its HEAD remains unchanged when its files or index are modified.
 PROPOSAL: Capture and compare the second worktree's HEAD, index and working-file contents, including untracked files, before and after the GUI run. Require those snapshots to match.
+
+### R-2
+
+NO FINDINGS
 
 ## Sources
 
