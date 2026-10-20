@@ -23,6 +23,7 @@ jobs:
     steps:
       - name: Avoid duplicate feature-push checks when the PR owns them
         id: route
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

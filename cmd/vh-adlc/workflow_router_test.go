@@ -15,6 +15,9 @@ func runWorkflowGate(t *testing.T, file, id string, values map[string]string, pr
 	for _, job := range w.Jobs {
 		for _, s := range job.Steps {
 			if s.ID == id {
+				if s.Shell != "bash" {
+					t.Fatal("CLI pipelines require explicit Bash so runner pipefail matches the test")
+				}
 				script = s.Run
 			}
 		}
@@ -44,7 +47,7 @@ func runWorkflowGate(t *testing.T, file, id string, values map[string]string, pr
 	for key, value := range values {
 		env[key] = value
 	}
-	cmd := exec.Command("bash", "-euo", "pipefail", "-c", script)
+	cmd := exec.Command("bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", script)
 	cmd.Env = os.Environ()
 	for key, value := range env {
 		cmd.Env = append(cmd.Env, key+"="+value)

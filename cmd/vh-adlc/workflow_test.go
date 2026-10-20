@@ -14,12 +14,13 @@ import (
 )
 
 type step struct {
-	ID   string            `yaml:"id"`
-	If   string            `yaml:"if"`
-	Uses string            `yaml:"uses"`
-	Run  string            `yaml:"run"`
-	With map[string]string `yaml:"with"`
-	Env  map[string]string `yaml:"env"`
+	ID    string            `yaml:"id"`
+	If    string            `yaml:"if"`
+	Uses  string            `yaml:"uses"`
+	Run   string            `yaml:"run"`
+	Shell string            `yaml:"shell"`
+	With  map[string]string `yaml:"with"`
+	Env   map[string]string `yaml:"env"`
 }
 
 type workflow struct {

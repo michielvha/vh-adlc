@@ -24,6 +24,7 @@ jobs:
     steps:
       - name: Check main or an open label-enabled PR
         id: preview
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
