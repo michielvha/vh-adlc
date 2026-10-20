@@ -1,33 +1,58 @@
 name: Version
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
   workflow_dispatch:
     inputs:
       dry-run:
-        description: Calculate only; publication also requires eligible successful CI
+        description: Calculate only; disabling permits tagging for an eligible branch
         type: boolean
         default: true
-      checked-run-id:
-        description: Successful CI run; supplied automatically for eligible publication
+      expected-sha:
+        description: Checked commit; supplied automatically by PR CI
         type: string
         default: ''
 
 permissions: {}
 
 jobs:
+  eligibility:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      allowed: ${{ steps.preview.outputs.allowed }}
+    steps:
+      - name: Check main or an open label-enabled PR
+        id: preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          BRANCH: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EXPECTED_SHA: ${{ inputs.expected-sha || github.sha }}
+        run: |
+          allowed=true
+          if [[ "$DRY_RUN" != true && "$BRANCH" != "$DEFAULT_BRANCH" ]]; then
+            allowed=$(gh pr list --head "$BRANCH" --state open --json headRefOid,isCrossRepository,labels |
+              jq -r --arg sha "$EXPECTED_SHA" 'any(.[];
+                .headRefOid == $sha and .isCrossRepository == false and
+                any(.labels[]; .name == "release:preview"))')
+            if [[ "$allowed" != true ]]; then
+              echo "::notice::No current open label-enabled PR for this source; no tag requested."
+            fi
+          fi
+          printf 'allowed=%s\n' "$allowed" >> "$GITHUB_OUTPUT"
+
   version:
+    needs: eligibility
+    if: ${{ needs.eligibility.outputs.allowed == 'true' }}
     permissions:
       contents: read
-      actions: write
-      pull-requests: read
-    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@9c2a2c69f023173a619b4178691e2005fe2b9144 # PR preview implementation
+    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@247f021d7ddf9efde0e8e4c55fc829ce67168d30 # thin GitVersion wrapper under review
     with:
-      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
-      checked-run-id: ${{ inputs.checked-run-id || '' }}
-      required-jobs: verify / verify,checker,checker-macos
+      dry-run: ${{ inputs.dry-run }}
+      expected-sha: ${{ inputs.expected-sha || github.sha }}
       release-app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
     secrets:
       release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

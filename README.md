@@ -187,28 +187,27 @@ The [shared release design](https://github.com/vhco-pro/docs) composes
 `michielvha/go-ci-action`, `michielvha/gitversion-tag-action`, and the release-only
 `michielvha/goreleaser-action`, each pinned to its reviewed implementation.
 
-Branch CI, PR CI and tagged releases use the same Go CI action. Branch and PR
-checks also test snapshot packaging without publication or production signing
-keys. If an open PR owns a feature commit's checks, the duplicate push checks
-are skipped. Linux and macOS plugin checks remain part of CI.
+CI-only jobs call the Go CI action directly. PR and main checks also test
+snapshot packaging without publication or production signing keys. If an open
+PR owns a feature branch's checks, the duplicate push checks are skipped.
+Linux and macOS plugin checks remain part of CI.
 
 For an open PR in this repository, a writer can add `release:preview` once.
-After successful CI, the **Version** workflow requests branch-native GitVersion
-calculation. While that label stays present, each eligible PR update requests
-another prerelease automatically. Removing it or closing the PR stops future
-requests. Fork PRs get checks only.
+After those checks succeed, a native `needs:` job requests **Version** on the
+checked source branch. While the label stays present, each eligible PR update
+requests another prerelease automatically. Removing it or closing the PR stops
+future requests. Fork PRs get checks only.
 
 GitVersion's branch configuration, history and tags determine the version; the
-PR label only enables publication. The shared workflow calls the public
-GitVersion action directly for tagging. Main-branch CI requests stable
-versioning after all checks pass. Only the resulting exact tag starts the
-shared Go CI and release workflow.
+PR label only enables publication. The thin shared versioning workflow handles
+App authentication, checkout and the public GitVersion action call. Main's
+Version job calls it directly after the checks through `needs:`. Only the
+resulting exact tag starts the shared Go CI and release workflow.
 
 Manual Version runs default to read-only calculation on the selected branch.
-Disabling dry-run is insufficient by itself: publication requires the successful
-CI run for that exact source and, for previews, the current open label-enabled
-PR. The automation supplies the CI run ID; the usual PR workflow needs no
-manually entered SHA or per-commit approval.
+Feature-branch publication requires a current open label-enabled PR. Automatic
+requests follow CI through `needs:` and carry its source SHA; no CI run IDs,
+job-name parameters, manually copied SHAs or per-commit approvals are used.
 
 Automated tagging uses the reusable `michielvha-repo-write` GitHub App, installed
 on the owner's repositories. Each tagging job requests a short-lived token for
