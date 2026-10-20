@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Independently reviewed and accepted; ready for task decomposition."
+status: in-progress
+status_description: "Implementing the accepted local portability and GUI checks."
 issue: null
+branch: feat/portable-local-workflows
 goal: "Run the same ADLC workflow in local Codex and existing GUI hosts without generated host implementations."
 covers:
   - plugins/vh-adlc/
