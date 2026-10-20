@@ -1,7 +1,7 @@
 ---
 status: in-progress
 status_description: "Implementing the accepted local portability and GUI checks."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/16
 branch: feat/portable-local-workflows
 goal: "Run the same ADLC workflow in local Codex and existing GUI hosts without generated host implementations."
 covers:
@@ -35,6 +35,9 @@ installer passed its existing checksum verification and returned the locked 0.1.
 On 2026-10-20 the owner approved local GUI completion and native Codex support, one shared workflow
 with static discovery metadata, inherited default reviewer models on every host, GUI control of
 disposable windows, and shipping/merging this bounded work after verification.
+
+The owner separately authorised the repository's existing automatic tag/release workflow on the final
+verified merge. This does not authorise a manual release, deployment or changes to that workflow.
 
 ## Scope
 
@@ -101,6 +104,8 @@ tests use only the existing throwaway repository, never a real project.
       Evidence: `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/ensure.test.ts` exited 1 before implementation: absent portable metadata and outdated dispatch/default/invocation contracts failed. Bash already passed the mode-0644 runtime case; the missing production instruction is the regression.
 - [x] T2 `plugins/vh-adlc/`, `.agents/plugins/marketplace.json` - T1 passes with native metadata, one reviewer contract, inherited defaults and Bash installer invocation; existing package tests pass (AC-01, AC-02, AC-03, AC-04)
       Evidence: targeted Bun tests passed 63/63; full `bun test tests/vh-adlc` passed 76/76 with 280 assertions. `claude plugin validate --json plugins/vh-adlc` passed without errors or warnings. Binary lock and installer verification logic are unchanged.
+- [x] T5 `tests/vh-adlc/scenarios/run.ts`, `plugins/vh-adlc/references/review-protocol.md` - executable model scenarios assert inherited dispatch rather than the retired fallback chain; missing canonical instructions stay pending (AC-02, AC-03)
+      Evidence: old S11.1/S11.2/S11.7 explicitly required the retired model chain. They now check actual subagent traces and absence of concrete overrides. Full Bun checks passed 76/76 and the scenario entry point compiled. The authenticated headless scenario runner was not executed; compilation is not scenario proof.
 - [ ] T3 `tests/vh-adlc/evidence/codex/`, `tests/vh-adlc/evidence/vscode-local/` - real local GUI runs verify core loops and explicit-model rejection, with preservation snapshots (AC-03, AC-05, AC-06)
 - [ ] T4 `README.md`, `tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md` - native setup/update/removal instructions and bounded host/shipping outcomes match measured runs; package checks pass (AC-07)
 

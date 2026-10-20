@@ -7,6 +7,7 @@ register that agent but supports a generic independent subagent, dispatch one wi
 `agents/vh-adlc-reviewer.agent.md` as its instructions. Have it read that canonical file and follow its
 body; frontmatter tool names do not grant or restrict a generic subagent's tools. Request read-only
 access where the host supports it. Do not copy or translate the reviewer into a host-specific file.
+If that canonical file cannot be read, leave the review pending rather than invent its instructions.
 
 Both routes receive the repository directory, document path, exact commit, review kind, resolved docs
 revision, verified binary path and plugin pin. Neither route creates or switches a worktree. If the
