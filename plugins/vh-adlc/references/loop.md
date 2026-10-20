@@ -7,15 +7,16 @@ rule from.
 ## 1. Get the binary
 
 The plugin directory is the one that holds `skills/`: two levels above the skill's own directory, which
-the host names when it loads the skill. Use `$CLAUDE_PLUGIN_ROOT` instead only when the environment sets
-it. Run the installer from there and use the path it prints for every later call:
+the host names when it loads the skill. Resolve a symlinked skill directory to its real location first.
+Run the installer through Bash from there and use the path it prints for every later call:
 
 ```sh
-VH_ADLC=$("<plugin directory>/scripts/ensure-vh-adlc.sh")
+VH_ADLC=$(bash "<plugin directory>/scripts/ensure-vh-adlc.sh")
 ```
 
-The installer verifies the binary against `vh-adlc.lock.json` and fails closed on any mismatch; never
-work around a failure.
+Some native installers do not preserve executable bits. Bash invocation requires only a readable
+script; do not change installed permissions. The installer still performs checksum verification
+against `vh-adlc.lock.json` and fails closed on any mismatch; never work around a failure.
 
 When the installer fails, open the report with a line that reads exactly
 `deterministic checks unavailable`, so a reader can search for it, and carry on only with read-only work:

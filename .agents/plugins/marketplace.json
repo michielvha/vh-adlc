@@ -1,0 +1,17 @@
+{
+  "name": "vhco-tools",
+  "plugins": [
+    {
+      "name": "vh-adlc",
+      "source": {
+        "source": "local",
+        "path": "./plugins/vh-adlc"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
