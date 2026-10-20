@@ -45,6 +45,10 @@ signs:
 
 release:
   draft: false
+  prerelease: auto
+  use_existing_draft: true
+  replace_existing_draft: false
+  replace_existing_artifacts: false
 
 changelog:
   use: git

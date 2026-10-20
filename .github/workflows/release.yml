@@ -1,72 +1,15 @@
 name: Release
 
-# Runs only when a binary path changes. A path-filtered workflow does not run
-# on a force-push that rewrites history; dispatch it by hand then.
 on:
   push:
-    branches: [main]
-    paths:
-      - 'cmd/**'
-      - 'internal/**'
-      - 'go.mod'
-      - 'go.sum'
-      - '.goreleaser.yml'
-      - '.github/workflows/release.yml'
-  workflow_dispatch:
+    tags: ['v*.*.*']
 
-permissions:
-  contents: read
-
-concurrency:
-  group: release
-  cancel-in-progress: false
+permissions: {}
 
 jobs:
   release:
-    runs-on: ubuntu-latest
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: true
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: go.mod
-      - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
-        with:
-          version: v2.15.0
-          install-only: true
-      - name: Format
-        run: test -z "$(gofmt -l .)"
-      - name: Tidy modules
-        run: go mod tidy -diff
-      - name: Vet
-        run: go vet ./...
-      - name: Test
-        run: go test ./...
-      - name: Build
-        run: go build ./cmd/vh-adlc
-      - name: Verify lint configuration
-        run: golangci-lint config verify
-      - name: Lint
-        run: golangci-lint run
-      - name: Tag with GitVersion
-        id: gitversion
-        uses: michielvha/gitversion-tag-action@8cf5869816cf71437052ac97d086e00526bf2d89 # v7.0.4
-        with:
-          prefix: v
-      - name: Build, sign and release
-        if: steps.gitversion.outputs.tagged == 'true'
-        uses: michielvha/goreleaser-action@a86fcdf453812a9d69b85208c0cb6a1e73f136b8 # v1
-        with:
-          go-version: '1.27.2'
-          github-token: ${{ github.token }}
-          pgp-private-key: ${{ secrets.PGP_PRIVATE_KEY }}
-      - name: Report a run without a new version
-        if: steps.gitversion.outputs.tagged != 'true'
-        env:
-          SKIP_REASON: ${{ steps.gitversion.outputs.skip-reason }}
-        run: 'echo "No release, because the computed version is already tagged ($SKIP_REASON)."'
+    uses: vhco-pro/.github/.github/workflows/reusable-go-release.yml@2d945fd0b53029e67219264a40ee9034a0adcc18 # main
+    secrets:
+      pgp-private-key: ${{ secrets.PGP_PRIVATE_KEY }}

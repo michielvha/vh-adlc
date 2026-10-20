@@ -13,18 +13,6 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-// gateCommands are the checks CI runs on every pull request and the release
-// runs before publishing.
-var gateCommands = []string{
-	`test -z "$(gofmt -l .)"`,
-	"go mod tidy -diff",
-	"go vet ./...",
-	"go test ./...",
-	"go build ./cmd/vh-adlc",
-	"golangci-lint config verify",
-	"golangci-lint run",
-}
-
 type step struct {
 	ID   string            `yaml:"id"`
 	If   string            `yaml:"if"`
@@ -34,10 +22,15 @@ type step struct {
 }
 
 type workflow struct {
-	On   yaml.Node `yaml:"on"`
-	Jobs map[string]struct {
-		Needs any    `yaml:"needs"`
-		Steps []step `yaml:"steps"`
+	On          yaml.Node         `yaml:"on"`
+	Permissions map[string]string `yaml:"permissions"`
+	Jobs        map[string]struct {
+		Needs       any               `yaml:"needs"`
+		If          string            `yaml:"if"`
+		Uses        string            `yaml:"uses"`
+		Permissions map[string]string `yaml:"permissions"`
+		Secrets     map[string]string `yaml:"secrets"`
+		Steps       []step            `yaml:"steps"`
 	} `yaml:"jobs"`
 }
 
@@ -54,11 +47,14 @@ func readWorkflow(t *testing.T, name string) (workflow, string) {
 	return w, string(raw)
 }
 
-var pinned = regexp.MustCompile(`^[\w.-]+/[\w.-]+@[0-9a-f]{40}$`)
+var pinned = regexp.MustCompile(`^[\w.-]+/[\w.-]+(?:/[\w./-]+)?@[0-9a-f]{40}$`)
 
 func checkPins(t *testing.T, name string, w workflow) {
 	t.Helper()
 	for job, j := range w.Jobs {
+		if j.Uses != "" && !pinned.MatchString(j.Uses) {
+			t.Errorf("%s job %s: %q is not pinned to a full commit SHA", name, job, j.Uses)
+		}
 		for _, s := range j.Steps {
 			if s.Uses != "" && !pinned.MatchString(s.Uses) {
 				t.Errorf("%s job %s: %q is not pinned to a full commit SHA", name, job, s.Uses)
@@ -82,11 +78,19 @@ func runs(w workflow) []string {
 func TestCIWorkflow(t *testing.T) {
 	w, _ := readWorkflow(t, "ci.yml")
 	checkPins(t, "ci.yml", w)
-	got := runs(w)
-	for _, c := range gateCommands {
-		if !slices.Contains(got, c) {
-			t.Errorf("ci.yml does not run %q", c)
-		}
+	verify, ok := w.Jobs["verify"]
+	if !ok || len(verify.Steps) != 2 {
+		t.Fatal("CI verification must compose checkout and the shared Go CI action")
+	}
+	if !strings.HasPrefix(verify.Steps[0].Uses, "actions/checkout@") ||
+		verify.Steps[0].With["persist-credentials"] != "false" {
+		t.Error("CI must check out source without persisting credentials")
+	}
+	if !strings.HasPrefix(verify.Steps[1].Uses, "michielvha/go-ci-action@") {
+		t.Error("CI must use the shared Go CI action rather than duplicate its commands")
+	}
+	if !slices.Contains(runs(w), "bun test tests/vh-adlc") {
+		t.Error("CI must retain the existing plugin checker")
 	}
 	var on map[string]any
 	if err := w.On.Decode(&on); err != nil {
@@ -134,9 +138,6 @@ func TestLayout(t *testing.T) {
 	}
 }
 
-// binaryPaths are the paths whose change cuts a release.
-var binaryPaths = []string{"cmd/**", "internal/**", "go.mod", "go.sum", ".goreleaser.yml", ".github/workflows/release.yml"}
-
 func TestReleaseWorkflow(t *testing.T) {
 	w, _ := readWorkflow(t, "release.yml")
 	checkPins(t, "release.yml", w)
@@ -144,8 +145,8 @@ func TestReleaseWorkflow(t *testing.T) {
 		Push *struct {
 			Branches []string `yaml:"branches"`
 			Paths    []string `yaml:"paths"`
+			Tags     []string `yaml:"tags"`
 		} `yaml:"push"`
-		WorkflowDispatch *yaml.Node `yaml:"workflow_dispatch"`
 	}
 	if err := w.On.Decode(&on); err != nil {
 		t.Fatal(err)
@@ -154,45 +155,116 @@ func TestReleaseWorkflow(t *testing.T) {
 	if err := w.On.Decode(&triggers); err != nil {
 		t.Fatal(err)
 	}
-	for name := range triggers {
-		if name != "push" && name != "workflow_dispatch" {
-			t.Errorf("release.yml has trigger %q; only push and workflow_dispatch are allowed", name)
-		}
+	if len(triggers) != 1 {
+		t.Error("artifact publication must be triggered only by an exact-tag push")
 	}
-	if on.Push == nil || !slices.Equal(on.Push.Branches, []string{"main"}) || !sameSet(on.Push.Paths, binaryPaths) {
-		t.Errorf("release.yml push trigger = %+v, want main with exactly %q", on.Push, binaryPaths)
+	if on.Push == nil || !slices.Equal(on.Push.Tags, []string{"v*.*.*"}) ||
+		len(on.Push.Branches) != 0 || len(on.Push.Paths) != 0 {
+		t.Errorf("release.yml push trigger = %+v, want only three-component version tags", on.Push)
 	}
-	if _, ok := triggers["workflow_dispatch"]; !ok {
-		t.Error("release.yml cannot be dispatched by hand")
+	release, ok := w.Jobs["release"]
+	if !ok || !strings.HasPrefix(release.Uses, "vhco-pro/.github/.github/workflows/reusable-go-release.yml@") ||
+		len(release.Steps) != 0 {
+		t.Fatal("release.yml must be a thin caller of the shared Go release workflow")
 	}
-	got := runs(w)
-	for _, c := range gateCommands {
-		if !slices.Contains(got, c) {
-			t.Errorf("release.yml does not run %q before releasing", c)
-		}
+	if release.Permissions["contents"] != "write" ||
+		release.Secrets["pgp-private-key"] != "${{ secrets.PGP_PRIVATE_KEY }}" {
+		t.Error("the release caller must explicitly grant its required token permission and signing secret")
 	}
-	var tagStep, releaseStep *step
-	for _, j := range w.Jobs {
-		for i := range j.Steps {
-			s := &j.Steps[i]
-			switch {
-			case strings.HasPrefix(s.Uses, "michielvha/gitversion-tag-action@"):
-				tagStep = s
-			case strings.HasPrefix(s.Uses, "michielvha/goreleaser-action@"):
-				releaseStep = s
+}
+
+func TestVersionWorkflow(t *testing.T) {
+	w, _ := readWorkflow(t, "version.yml")
+	checkPins(t, "version.yml", w)
+	var on struct {
+		Push struct {
+			Branches []string `yaml:"branches"`
+		} `yaml:"push"`
+		WorkflowDispatch struct {
+			Inputs map[string]struct {
+				Default bool `yaml:"default"`
+			} `yaml:"inputs"`
+		} `yaml:"workflow_dispatch"`
+	}
+	if err := w.On.Decode(&on); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(on.Push.Branches, []string{"main"}) ||
+		!on.WorkflowDispatch.Inputs["dry-run"].Default {
+		t.Error("versioning must run on main, with manual requests defaulting to dry-run")
+	}
+	for name, job := range w.Jobs {
+		taggers := 0
+		for _, s := range job.Steps {
+			if s.Run != "" {
+				t.Errorf("%s: versioning must call shared actions, not custom commands", name)
+			}
+			if strings.HasPrefix(s.Uses, "michielvha/gitversion-tag-action@") {
+				taggers++
+				if s.With["prefix"] != "v" || s.With["configFilePath"] != "" {
+					t.Errorf("%s: versioning must use prefix v and the bundled configuration", name)
+				}
+				if name == "preview" && s.With["dry-run"] != "true" {
+					t.Error("PR version calculation must be a dry-run")
+				}
 			}
 		}
+		if taggers != 1 {
+			t.Errorf("%s must call the shared GitVersion action exactly once", name)
+		}
 	}
-	if tagStep == nil || releaseStep == nil {
-		t.Fatal("release.yml lacks the GitVersion or GoReleaser step")
+	preview, ok := w.Jobs["preview"]
+	if !ok || len(preview.Steps) != 2 ||
+		!strings.Contains(preview.If, "github.event_name == 'pull_request'") ||
+		preview.Permissions["contents"] != "read" ||
+		preview.Steps[0].With["persist-credentials"] != "false" {
+		t.Fatal("PR previews must be read-only checkout and version calculation")
 	}
-	if want := "steps." + tagStep.ID + ".outputs.tagged == 'true'"; tagStep.ID == "" || releaseStep.If != want {
-		t.Errorf("GoReleaser step if = %q, want %q", releaseStep.If, want)
+	tag, ok := w.Jobs["tag"]
+	if !ok || len(tag.Steps) != 3 {
+		t.Fatal("trusted tagging must compose App authentication, checkout, and GitVersion")
 	}
-	if tagStep.With["prefix"] != "v" || tagStep.With["configFilePath"] != "" {
-		t.Errorf("GitVersion step with = %v; want prefix v and the bundled configuration", tagStep.With)
+	if strings.Contains(tag.If, "pull_request") || !strings.Contains(tag.If, "refs/heads/main") ||
+		!strings.Contains(tag.If, "!inputs.dry-run") {
+		t.Error("tag creation must be limited to main pushes and authorized manual branch requests")
 	}
-	if releaseStep.With["go-version"] != "1.27.2" || releaseStep.With["pgp-private-key"] != "${{ secrets.PGP_PRIVATE_KEY }}" {
-		t.Errorf("GoReleaser step with = %v", releaseStep.With)
+	if !strings.HasPrefix(tag.Steps[0].Uses, "actions/create-github-app-token@") ||
+		tag.Steps[0].With["permission-contents"] != "write" ||
+		tag.Steps[0].With["owner"] != "${{ github.repository_owner }}" ||
+		tag.Steps[0].With["repositories"] != "${{ github.event.repository.name }}" ||
+		tag.Steps[1].With["token"] != "${{ steps.app.outputs.token }}" ||
+		tag.Steps[1].With["persist-credentials"] != "true" {
+		t.Error("the actual tag push must use the repository-scoped App identity")
+	}
+}
+
+func TestGoReleaserPublicationPolicy(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", ".goreleaser.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var config struct {
+		Release struct {
+			Draft                    *bool  `yaml:"draft"`
+			Prerelease               string `yaml:"prerelease"`
+			UseExistingDraft         bool   `yaml:"use_existing_draft"`
+			ReplaceExistingDraft     *bool  `yaml:"replace_existing_draft"`
+			ReplaceExistingArtifacts *bool  `yaml:"replace_existing_artifacts"`
+		} `yaml:"release"`
+	}
+	if err := yaml.Unmarshal(raw, &config); err != nil {
+		t.Fatal(err)
+	}
+	if config.Release.Prerelease != "auto" || !config.Release.UseExistingDraft {
+		t.Error("GoReleaser must classify prereleases and preserve the original draft")
+	}
+	for name, value := range map[string]*bool{
+		"draft":                      config.Release.Draft,
+		"replace_existing_draft":     config.Release.ReplaceExistingDraft,
+		"replace_existing_artifacts": config.Release.ReplaceExistingArtifacts,
+	} {
+		if value == nil || *value {
+			t.Errorf("GoReleaser release.%s must explicitly be false", name)
+		}
 	}
 }
