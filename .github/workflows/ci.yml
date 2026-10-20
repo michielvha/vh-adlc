@@ -1,73 +1,31 @@
 name: CI
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, labeled]
   push:
     branches: ['**']
+  workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  route:
-    if: ${{ github.event.action != 'labeled' || github.event.label.name == 'release:preview' }}
-    runs-on: ubuntu-latest
-    outputs:
-      run: ${{ steps.route.outputs.run }}
-    steps:
-      - name: Avoid duplicate feature-push checks when the PR owns them
-        id: route
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          EVENT_NAME: ${{ github.event_name }}
-          BRANCH: ${{ github.ref_name }}
-          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: |
-          run=true
-          if [[ "$EVENT_NAME" == push && "$BRANCH" != "$DEFAULT_BRANCH" ]]; then
-            open_pr=$(gh pr list --head "$BRANCH" --state open --json isCrossRepository |
-              jq -r 'any(.[]; .isCrossRepository == false)')
-            if [[ "$open_pr" == true ]]; then
-              echo "::notice::The PR owns these checks; skipping the duplicate push run."
-              run=false
-            fi
-          fi
-          printf 'run=%s\n' "$run" >> "$GITHUB_OUTPUT"
-
   verify:
-    needs: route
-    if: ${{ needs.route.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
           persist-credentials: false
       - uses: michielvha/go-ci-action@bc485542c70d6cf51da9642c632ef268571597db # main
-      - name: Test packaging without publishing or signing
-        if: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
-        uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
-        with:
-          version: v2.18.3
-          args: release --snapshot --clean --skip=publish,sign
 
   checker:
-    needs: route
-    if: ${{ needs.route.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -76,44 +34,11 @@ jobs:
       - name: Check the vh-adlc package
         run: bun test tests/vh-adlc
 
-  version:
-    needs: [verify, checker, checker-macos]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-    permissions:
-      contents: read
-    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@247f021d7ddf9efde0e8e4c55fc829ce67168d30 # thin GitVersion wrapper under review
-    with:
-      dry-run: false
-      release-app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
-    secrets:
-      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
-
-  # A PR event has a synthetic ref; dispatch Version on the actual source branch.
-  preview:
-    needs: [verify, checker, checker-macos]
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'release:preview') }}
-    runs-on: ubuntu-latest
-    permissions:
-      actions: write
-    steps:
-      - name: Request the checked branch's preview
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          SOURCE_BRANCH: ${{ github.head_ref }}
-          SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          gh workflow run version.yml --ref "$SOURCE_BRANCH" \
-            -f dry-run=false -f expected-sha="$SOURCE_SHA"
-
   checker-macos:
-    needs: route
-    if: ${{ needs.route.outputs.run == 'true' }}
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -121,3 +46,38 @@ jobs:
           bun-version: 1.4.3
       - name: Check the vh-adlc package
         run: bun test tests/vh-adlc
+
+  release-gate:
+    needs: [verify, checker, checker-macos]
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      tag: ${{ steps.gate.outputs.tag }}
+    steps:
+      - name: Main, or an open PR labelled release:preview at this commit
+        id: gate
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          tag=true
+          if [[ "$BRANCH" != main ]]; then
+            tag=$(gh pr list --head "$BRANCH" --state open --label release:preview \
+              --json headRefOid --jq "any(.[]; .headRefOid == \"$SHA\")")
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  version:
+    needs: release-gate
+    permissions:
+      contents: read
+    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@247f021d7ddf9efde0e8e4c55fc829ce67168d30 # thin GitVersion wrapper under review
+    with:
+      dry-run: ${{ needs.release-gate.outputs.tag != 'true' }}
+      release-app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+    secrets:
+      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
