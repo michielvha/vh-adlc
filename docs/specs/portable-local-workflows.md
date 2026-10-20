@@ -78,12 +78,18 @@ tests use only the existing throwaway repository, never a real project.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Native Codex discovers the same seven operations from the shared package, while Claude compatibility discovery still works and no generated workflow tree exists.
-- [ ] AC-02: Unnamed reviews on every host inherit its default without an override; registered and generic independent dispatch use the same reviewer instructions.
-- [ ] AC-03: An explicit unknown reviewer identity is eligible only without a requested model; missing headers and mismatched explicit requests store no eligible review.
-- [ ] AC-04: The skill installer works when extracted without its executable bit and still rejects a digest mismatch.
-- [ ] AC-05: A real Codex local GUI executes investigation, spec review, owner acceptance, tasks, test-first implementation, independent implementation review and gated completion in a disposable fixture.
-- [ ] AC-06: VS Code Local executes the remaining coding/review/completion flow and an explicit-model negative case, without including unrelated work or changing another worktree.
+- [x] AC-01: Native Codex discovers the same seven operations from the shared package, while Claude compatibility discovery still works and no generated workflow tree exists.
+      Evidence: native Codex GUI installed 0.2.0 and reported all seven operations. An isolated Claude-native install of the same tree listed seven skills and one agent. Metadata equality and shared-tree package tests pass.
+- [x] AC-02: Unnamed reviews on every host inherit its default without an override; registered and generic independent dispatch use the same reviewer instructions.
+      Evidence: shared-protocol and both-operation contract tests pass. Codex GUI used independent shared-contract reviewers; Local used the registered reviewer. Neither requested a model; both stored honest unknown identities. The new Claude default policy has not had a model-session rerun.
+- [x] AC-03: An explicit unknown reviewer identity is eligible only without a requested model; missing headers and mismatched explicit requests store no eligible review.
+      Evidence: contract tests retain malformed-header rejection and strict explicit matching. Codex and Local stored eligible unnamed unknown reviews. The repeated Local unavailable-model GUI request under verified Default permissions returned review pending, with no new row/subsection or fixture change.
+- [x] AC-04: The skill installer works when extracted without its executable bit and still rejects a digest mismatch.
+      Evidence: real installer tests ran a mode-0644 copy through Bash, verified its locked binary and preserved mode 0644. All digest-rejection cases passed; the production lock and verification code are unchanged.
+- [x] AC-05: A real Codex local GUI executes investigation, spec review, owner acceptance, tasks, test-first implementation, independent implementation review and gated completion in a disposable fixture.
+      Evidence: native app 26.1013.40934 completed fixture c20fb38 through five independently met criteria and the real completion gate. Independent post-run tests passed and complete preservation snapshots matched. See tests/vh-adlc/evidence/codex/gui-smoke.md.
+- [x] AC-06: VS Code Local executes the remaining coding/review/completion flow and an explicit-model negative case, without including unrelated work or changing another worktree.
+      Evidence: real Local GUI completed b10c1a1 after test-first implementation and independent R-2. The negative case left state unchanged; full unrelated/second-worktree snapshots matched. Core-loop permission UI showed Allow all unexpectedly, so normal per-command approval for that full run is not claimed; Default permissions was restored. See tests/vh-adlc/evidence/vscode-local/gui-smoke.md.
 - [ ] AC-07: GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
 
 ## Test Plan
@@ -106,7 +112,8 @@ tests use only the existing throwaway repository, never a real project.
       Evidence: targeted Bun tests passed 63/63; full `bun test tests/vh-adlc` passed 76/76 with 280 assertions. `claude plugin validate --json plugins/vh-adlc` passed without errors or warnings. Binary lock and installer verification logic are unchanged.
 - [x] T5 `tests/vh-adlc/scenarios/run.ts`, `plugins/vh-adlc/references/review-protocol.md` - executable model scenarios assert inherited dispatch rather than the retired fallback chain; missing canonical instructions stay pending (AC-02, AC-03)
       Evidence: old S11.1/S11.2/S11.7 explicitly required the retired model chain. They now check actual subagent traces and absence of concrete overrides. Full Bun checks passed 76/76 and the scenario entry point compiled. The authenticated headless scenario runner was not executed; compilation is not scenario proof.
-- [ ] T3 `tests/vh-adlc/evidence/codex/`, `tests/vh-adlc/evidence/vscode-local/` - real local GUI runs verify core loops and explicit-model rejection, with preservation snapshots (AC-03, AC-05, AC-06)
+- [x] T3 `tests/vh-adlc/evidence/codex/`, `tests/vh-adlc/evidence/vscode-local/` - real local GUI runs verify core loops and explicit-model rejection, with preservation snapshots (AC-03, AC-05, AC-06)
+      Evidence: Codex c20fb38 and Local b10c1a1 completed through independent review and actual gates; independent tests and complete preservation snapshots passed. Local negative-model rejection was rerun under Default permissions. The Local core-run permission caveat is recorded rather than hidden.
 - [ ] T4 `README.md`, `tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md` - native setup/update/removal instructions and bounded host/shipping outcomes match measured runs; package checks pass (AC-07)
 
 ## Open Questions
