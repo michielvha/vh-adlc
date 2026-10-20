@@ -72,3 +72,10 @@ permitted only to the fixture's existing local bare origin, and no GitHub writes
 This is not evidence for Copilot Chat's separate Claude harness, remote sessions, structural isolation,
 or the full scenario matrix. The implementation and completion phases are not yet claimed here.
 Raw UI dumps and unrelated editor notifications are not published.
+
+## Later continuation attempt
+
+The same disposable native-extension workspace was reopened on 2026-10-20. Its actual message UI still
+reported `You've hit your weekly limit`, with the reset shown as October 23 at midnight,
+Europe/Brussels. No further model request, billing change or app restart was used to continue it.
+The earlier R-3, acceptance and implementation checks remain unverified on this surface.

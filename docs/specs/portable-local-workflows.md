@@ -90,7 +90,8 @@ tests use only the existing throwaway repository, never a real project.
       Evidence: native app 26.1013.40934 completed fixture c20fb38 through five independently met criteria and the real completion gate. Independent post-run tests passed and complete preservation snapshots matched. See tests/vh-adlc/evidence/codex/gui-smoke.md.
 - [x] AC-06: VS Code Local executes the remaining coding/review/completion flow and an explicit-model negative case, without including unrelated work or changing another worktree.
       Evidence: real Local GUI completed b10c1a1 after test-first implementation and independent R-2. The negative case left state unchanged; full unrelated/second-worktree snapshots matched. Core-loop permission UI showed Allow all unexpectedly, so normal per-command approval for that full run is not claimed; Default permissions was restored. See tests/vh-adlc/evidence/vscode-local/gui-smoke.md.
-- [ ] AC-07: GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
+- [x] AC-07: GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
+      Evidence: README names observed Codex install, Refresh, seven skill controls and More actions/Uninstall, with native CLI equivalents. Evidence records the live Claude allowance blocker and actual Codex shipping preflight error on unrelated fixture history; no remote write followed. Root support rows distinguish surfaces and the Local mode caveat.
 
 ## Test Plan
 
@@ -114,7 +115,9 @@ tests use only the existing throwaway repository, never a real project.
       Evidence: old S11.1/S11.2/S11.7 explicitly required the retired model chain. They now check actual subagent traces and absence of concrete overrides. Full Bun checks passed 76/76 and the scenario entry point compiled. The authenticated headless scenario runner was not executed; compilation is not scenario proof.
 - [x] T3 `tests/vh-adlc/evidence/codex/`, `tests/vh-adlc/evidence/vscode-local/` - real local GUI runs verify core loops and explicit-model rejection, with preservation snapshots (AC-03, AC-05, AC-06)
       Evidence: Codex c20fb38 and Local b10c1a1 completed through independent review and actual gates; independent tests and complete preservation snapshots passed. Local negative-model rejection was rerun under Default permissions. The Local core-run permission caveat is recorded rather than hidden.
-- [ ] T4 `README.md`, `tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md` - native setup/update/removal instructions and bounded host/shipping outcomes match measured runs; package checks pass (AC-07)
+- [x] T4 `README.md`, `tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md` - native setup/update/removal instructions and bounded host/shipping outcomes match measured runs; package checks pass (AC-07)
+      Evidence: GUI-first Codex setup and observed lifecycle controls are documented. Claude allowance and shipping history blockers, historical CLI evidence, untested Codex surfaces and Local permission limits remain explicit. Targeted checker passed 47/47; full validation and independent implementation review follow before completion.
+      Final verification: full Bun suite passed 76/76 with 280 assertions; scenario entry point compiled; native Claude validator passed without warnings; feature lint passed; public evidence had no known fixture credential canary or token pattern.
 
 ## Open Questions
 

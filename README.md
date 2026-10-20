@@ -1,6 +1,7 @@
 # vhco-tools
 
-A Claude Code plugin marketplace with workstation tooling that is not tied to one project.
+A plugin marketplace with workstation tooling that is not tied to one project. ADLC uses one shared
+skill tree across native Codex, Claude Code and compatible agent-plugin clients.
 
 ## Install on a workstation
 
@@ -41,6 +42,24 @@ checks its SHA-256 digests before it runs anything. The installer writes only to
 skills read their pages from the binary's cache.
 
 ### Install
+
+#### Codex desktop app
+
+1. Open **Plugins** and select the **Local** environment.
+2. Choose **Add**, then **Add a marketplace**.
+3. Enter `michielvha/vh-adlc` in **Source** and add the marketplace.
+4. Open **Personal** and choose **Install vh-adlc** under **vhco-tools**.
+5. Start a new thread. Select your project on **This computer**; do not assume a previously selected
+   remote project is local.
+6. Type `@vh-adlc`, select the plugin, and name the operation in your message. For example:
+   `Invoke vh-adlc-spec for the feature I want to build`.
+
+The validation run used the same native dialog with a local checkout path while this version was
+being developed. It loaded all seven skills from the shared package, without an emitter, generated
+skill mirror or separate Codex reviewer implementation.
+
+The app bundle is named Codex; the tested version presents itself as ChatGPT in its native UI.
+The desktop result does not establish the separate VS Code Codex extension or Copilot's Codex harness.
 
 #### VS Code: Local chat
 
@@ -92,12 +111,32 @@ Inside a session, the same commands are `/plugin marketplace add michielvha/vh-a
 
 ### Update
 
+In Codex, open **Plugins** and choose **Refresh**, then inspect **Personal > vh-adlc** for the version.
+For a clean GUI reinstall, open the plugin's **More actions > Uninstall**, then install vh-adlc again
+from **Personal** and start a new thread. This uses native package management, not copied skill files.
+
+The optional Codex CLI equivalents for the Git marketplace are:
+
+```sh
+codex plugin marketplace upgrade vhco-tools
+codex plugin add vh-adlc@vhco-tools
+```
+
+In VS Code Local, use **Chat: Update Plugins**, then start a new Local chat.
+
+For Claude Code:
+
 ```sh
 claude plugin marketplace update vhco-tools
 claude plugin update vh-adlc@vhco-tools
 ```
 
 ### Uninstall
+
+In Codex, open **Plugins > Personal > vh-adlc**, then **More actions > Uninstall**. The optional CLI
+equivalent is `codex plugin remove vh-adlc@vhco-tools`.
+
+For Claude Code:
 
 ```sh
 claude plugin uninstall vh-adlc@vhco-tools
@@ -114,21 +153,29 @@ claiming that the whole scenario matrix passed.
 
 | Host or capability | Status | Evidence |
 | --- | --- | --- |
-| Claude Code CLI 2.1.303, Linux | Supported | `tests/vh-adlc/evidence/claude-code/` |
-| Claude Code desktop app 2.42304.2, macOS arm64 | Core GUI loop passed, from investigation through test-first implementation, independent review and gated completion; publishing withheld | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md) |
+| Claude Code CLI 2.1.303, Linux | Historical full scenario proof; the 0.2.0 model-policy changes have not had an authenticated scenario rerun | `tests/vh-adlc/evidence/claude-code/`; [0.2.0 compatibility discovery](tests/vh-adlc/evidence/codex/gui-smoke.md) |
+| Codex desktop app 26.1013.40934, macOS arm64 | Core GUI loop passed on plugin 0.2.0, through independent implementation review and gated completion; unsafe shipping preflight correctly stopped | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
+| Codex CLI 0.163.0 | Native package installation passed in an isolated, credential-free profile; no CLI agent-loop claim | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
+| Codex VS Code extension and Copilot's Codex harness | Not yet tested | Not inferred from the desktop app |
+| Claude Code desktop app 2.42304.2, macOS arm64 | Historical core GUI loop passed on plugin 0.1.2, through gated completion; the new inherited-default policy has not been rerun here | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md) |
 | Claude Code VS Code extension 2.1.301, macOS arm64 | Partial GUI validation: seven operations, investigation, independent spec review and structured owner questions passed | [Native extension GUI run](tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md) |
 | Claude Code remote sessions | Unsupported | Not inferred from another Claude Code surface |
-| VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Partial GUI validation: installation, seven operations, reviewer discovery, investigation and the default-review regression passed | [Local GUI run](tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
+| VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Core GUI loop and explicit-model rejection passed; permission-mode caveat recorded separately | [Local GUI run](tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
 | Copilot CLI | Unsupported | `tests/vh-adlc/evidence/copilot-cli/README.md` |
 | macOS arm64 | Core desktop GUI loop passed; other surfaces and full-matrix limits are listed separately | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md), [binary and fixture checks](tests/vh-adlc/evidence/claude-code/S1.host.macos.md) |
 | Structural reviewer isolation | Unsupported: reviews record `procedural` | The reviewer has a shell, which can still write |
-| Choosing the reviewer's model on Claude Code | Supported, with a caveat | When settings refuse the requested model, Claude Code runs the reviewer on another model without saying so. The reviewer names the model it ran on, and the loop compares it with the request. A named model that ran elsewhere leaves the review pending with a handoff. A default pass that ran on neither `fable` nor `opus` is dispatched again on `opus`. The Review Log records the model that ran |
+| Choosing a specific reviewer model | Capability-dependent; a mismatch remains pending | A host must be able to pass the requested model and return a matching identity. A silently substituted model or an unavailable selector never counts as a match |
 
-On non-Claude-Code hosts, a review with no named reviewer model uses the host's inherited default.
+On every host, a review with no named reviewer model uses the host's inherited default. Version 0.2.0
+removes the earlier Claude-specific preferred-model and fallback chain.
 Some hosts do not expose that model's identity: the Review Log records `unknown`, and the report says
 that identity was not attested. Asking for a specific model still requires a matching identity;
 `unknown` cannot satisfy that request.
+
+Hosts may register the reviewer agent directly or dispatch a generic independent subagent that reads
+the same reviewer file. If neither capability is available, the review stays pending with a handoff.
+The primary session never substitutes self-review for independence.
 
 ## Developing
 

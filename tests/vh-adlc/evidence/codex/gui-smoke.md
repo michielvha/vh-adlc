@@ -29,6 +29,11 @@ A separate credential-free Codex CLI 0.163.0 profile also accepted the same mark
 version 0.2.0 through `codex plugin marketplace add` and `codex plugin add`. That is native package
 validation, not a substitute for the GUI agent run.
 
+The installed plugin's native detail page exposed all seven skill controls; **See Vh Adlc Spec,
+Vh Adlc Tasks** expanded the last two. Its **More actions** menu offered **Uninstall**. The Plugins page
+also exposed **Refresh**. These controls were inspected after the agent runs finished; the normal
+installation was left available.
+
 ## Investigation and independent spec review
 
 The actual plugin mention and explicit investigate operation reported version 0.2.0 and all seven
@@ -71,7 +76,8 @@ entries, and for the second worktree's HEAD, index, tracked and untracked bytes 
 `fresh` check returned both reviews non-stale and the feature tree clean.
 
 Claude-native compatibility was also checked without a model session or credential copy: an isolated
-profile installed this same 0.2.0 tree from the local marketplace. `claude plugin details` listed seven
+Claude Code CLI 2.1.283 macOS profile installed this same 0.2.0 tree from the local marketplace.
+`claude plugin details` listed seven
 skills, one reviewer agent and zero hooks, MCP servers or LSP servers. This is compatibility discovery,
 not a new Claude GUI model-policy run.
 
