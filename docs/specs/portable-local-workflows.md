@@ -90,8 +90,8 @@ tests use only the existing throwaway repository, never a real project.
       Evidence: native app 26.1013.40934 completed fixture c20fb38 through five independently met criteria and the real completion gate. Independent post-run tests passed and complete preservation snapshots matched. See tests/vh-adlc/evidence/codex/gui-smoke.md.
 - [x] AC-06: VS Code Local executes the remaining coding/review/completion flow and an explicit-model negative case, without including unrelated work or changing another worktree.
       Evidence: real Local GUI completed b10c1a1 after test-first implementation and independent R-2. The negative case left state unchanged; full unrelated/second-worktree snapshots matched. Core-loop permission UI showed Allow all unexpectedly, so normal per-command approval for that full run is not claimed; Default permissions was restored. See tests/vh-adlc/evidence/vscode-local/gui-smoke.md.
-- [ ] AC-07: GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
-      Evidence: R-3 returned not met: an older Local Boundaries sentence contradicts the recorded Allow all caveat. The factual documentation correction needs a fresh implementation pass.
+- [x] AC-07: GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
+      Evidence: R-3 identified the contradictory Local Boundaries sentence. It was corrected in 86c3a79; fresh independent R-4 returned met after verifying the permission caveat, native routes, links and blocked attempts.
       Evidence: README names observed Codex install, Refresh, seven skill controls and More actions/Uninstall, with native CLI equivalents. Evidence records the live Claude allowance blocker and actual Codex shipping preflight error on unrelated fixture history; no remote write followed. Root support rows distinguish surfaces and the Local mode caveat.
 
 ## Test Plan
@@ -132,6 +132,7 @@ None.
 | 2026-10-20 | R-2 | spec | `41fde3a096a0c55905167b3e4e8d14636ce8542f` | unknown | procedural | No findings; model identity not attested |
 | 2026-10-20 | R-2 | spec | `41fde3a096a0c55905167b3e4e8d14636ce8542f` | n/a | n/a | accepted by owner |
 | 2026-10-20 | R-3 | implementation | `f1afe694eda460cd82cf9f30de83402c38ddbd6e` | unknown | procedural | Six criteria met; AC-07 not met, one factual documentation finding; model identity not attested |
+| 2026-10-20 | R-4 | implementation | `86c3a7918ce49524fb71a094a5327c730bea5b70` | unknown | procedural | All seven criteria met; model identity not attested |
 
 ### R-1
 
@@ -182,6 +183,36 @@ SEVERITY: should-fix
 WHERE: tests/vh-adlc/evidence/vscode-local/gui-smoke.md:143-145
 EVIDENCE: Lines 131-135 report Allow all during automation and again at core-loop completion, followed by restoration of Default permissions. The unqualified Boundaries statement at lines 144-145 says “no unrestricted mode was enabled,” contradicting that limitation.
 PROPOSAL: Scope the normal-permission statement to the earlier checks it describes, or replace it with the observed core-loop limitation and subsequent restoration. Preserve the distinction between successful implementation and unverified whole-loop per-command approval.
+
+### R-4
+
+CRITERION: AC-01 Native Codex discovers the same seven operations from the shared package, while Claude compatibility discovery still works and no generated workflow tree exists.
+VERDICT: met
+EVIDENCE: At 86c3a7918ce49524fb71a094a5327c730bea5b70, `bun test tests/vh-adlc/check.test.ts` passed 47 tests with 150 assertions. Inspected native Codex observations showing all seven skill controls on 0.2.0. `claude plugin validate --json plugins/vh-adlc` succeeded without warnings. Descriptor equality and package inspection establish one shared skill/reviewer tree with Claude compatibility metadata.
+
+CRITERION: AC-02 Unnamed reviews on every host inherit its default without an override; registered and generic independent dispatch use the same reviewer instructions.
+VERDICT: met
+EVIDENCE: Inspected the shared protocol, both review operations and canonical reviewer instructions. Passing contract tests establish inherited defaults without concrete overrides and registered/generic dispatch through the same reviewer contract. Inspected Codex and Local GUI evidence and fixture reviews recording unnamed independent reviews as unknown with procedural isolation. Authenticated model-policy reruns on other hosts are not claimed.
+
+CRITERION: AC-03 An explicit unknown reviewer identity is eligible only without a requested model; missing headers and mismatched explicit requests store no eligible review.
+VERDICT: met
+EVIDENCE: Missing/malformed-header rejection and explicit-model matching contract checks passed. Inspected the Local negative-case observation showing `review pending` under Default permissions, unchanged fixture state and no new review row/subsection. Negative-case preservation snapshots matched. Both completed fixtures retain eligible unnamed unknown reviews; executed `review check` on their stored R-2 records returned pass with equal=true, and both completion gates passed.
+
+CRITERION: AC-04 The skill installer works when extracted without its executable bit and still rejects a digest mismatch.
+VERDICT: met
+EVIDENCE: Executed the unchanged real installer through Bash from an external scratch copy with mode 0644. It verified and returned the locked 0.1.0 binary while preserving mode 0644. Changing only the scratch lock's binary digest caused rejection with empty stdout and left the cached binary unchanged. Scratch was removed. This pass exercised verified-cache reuse, not a fresh download.
+
+CRITERION: AC-05 A real Codex local GUI executes investigation, spec review, owner acceptance, tasks, test-first implementation, independent implementation review and gated completion in a disposable fixture.
+VERDICT: met
+EVIDENCE: Inspected native GUI observations, curated evidence and the committed fixture sequence through c20fb38be63eba111cf4bfb08233f4d4b62491ee. Independently executed all five accepted stdout-byte cases and a fresh mixed-case name successfully; historical pre-implementation source reproduced named-greeting failures. `fresh` returned no findings and `gate complete` passed. Original preservation snapshots matched live unrelated work and the second worktree. No new GUI session was run.
+
+CRITERION: AC-06 VS Code Local executes the remaining coding/review/completion flow and an explicit-model negative case, without including unrelated work or changing another worktree.
+VERDICT: met
+EVIDENCE: Inspected Local GUI completion and Default-permissions negative-case observations, plus fixture history through b10c1a101c1f37a402756025bc95e08c699ee193. Executed `./test.sh`: PASS; independent stdout-byte checks passed and historical source reproduced both named failures. Current freshness and completion-gate checks passed. Original unrelated-file and second-worktree snapshots matched live bytes, full modes, index, status and second-worktree HEAD. Normal per-command approval for the entire core run remains unestablished.
+
+CRITERION: AC-07 GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
+VERDICT: met
+EVIDENCE: Inspected README setup/lifecycle instructions, native Codex controls and CLI lifecycle help; all nine README relative links resolved. The new Local Boundaries text consistently distinguishes earlier scoped prompts from the later Allow all limitation and observed Default restoration. Native Claude observations confirm the weekly-limit blocker. Codex shipping observations confirm no-merge-base and skip-CI-history blockers with no subsequent shipping writes. Documentation preserves the authenticated-scenario, full-matrix, remote/cloud and untested-surface limits. The exact target remained unchanged and clean.
 
 ## Sources
 
