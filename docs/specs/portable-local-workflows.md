@@ -97,7 +97,8 @@ tests use only the existing throwaway repository, never a real project.
 
 ## Tasks
 
-- [ ] T1 `tests/vh-adlc/check.test.ts`, `tests/vh-adlc/ensure.test.ts` - portable manifest, shared dispatch/default policy and mode-0644 installer contracts fail before their implementation (AC-01, AC-02, AC-03, AC-04)
+- [x] T1 `tests/vh-adlc/check.test.ts`, `tests/vh-adlc/ensure.test.ts` - portable manifest, shared dispatch/default policy and mode-0644 installer contracts fail before their implementation (AC-01, AC-02, AC-03, AC-04)
+      Evidence: `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/ensure.test.ts` exited 1 before implementation: absent portable metadata and outdated dispatch/default/invocation contracts failed. Bash already passed the mode-0644 runtime case; the missing production instruction is the regression.
 - [ ] T2 `plugins/vh-adlc/`, `.agents/plugins/marketplace.json` - T1 passes with native metadata, one reviewer contract, inherited defaults and Bash installer invocation; existing package tests pass (AC-01, AC-02, AC-03, AC-04)
 - [ ] T3 `tests/vh-adlc/evidence/codex/`, `tests/vh-adlc/evidence/vscode-local/` - real local GUI runs verify core loops and explicit-model rejection, with preservation snapshots (AC-03, AC-05, AC-06)
 - [ ] T4 `README.md`, `tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md` - native setup/update/removal instructions and bounded host/shipping outcomes match measured runs; package checks pass (AC-07)
