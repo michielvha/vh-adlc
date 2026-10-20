@@ -75,7 +75,7 @@ jobs:
     needs: release-gate
     permissions:
       contents: read
-    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@247f021d7ddf9efde0e8e4c55fc829ce67168d30 # thin GitVersion wrapper under review
+    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@2c6c1f563937660d09c820988435f42872f8c0d5 # thin GitVersion wrapper under review
     with:
       dry-run: ${{ needs.release-gate.outputs.tag != 'true' }}
       release-app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
