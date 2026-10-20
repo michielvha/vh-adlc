@@ -23,9 +23,9 @@ jobs:
       contents: read
       actions: write
       pull-requests: read
-    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@d3c015f061def96e3524abf27c51a1c017011673 # PR preview implementation
+    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@9c2a2c69f023173a619b4178691e2005fe2b9144 # PR preview implementation
     with:
-      dry-run: ${{ github.event_name != 'workflow_dispatch' || inputs.dry-run }}
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}
       checked-run-id: ${{ inputs.checked-run-id || '' }}
       required-jobs: verify / verify,checker,checker-macos
       release-app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}

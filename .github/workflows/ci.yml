@@ -41,7 +41,7 @@ jobs:
   verify:
     needs: route
     if: ${{ needs.route.outputs.run == 'true' }}
-    uses: vhco-pro/.github/.github/workflows/reusable-go-ci.yml@d3c015f061def96e3524abf27c51a1c017011673 # PR preview implementation
+    uses: vhco-pro/.github/.github/workflows/reusable-go-ci.yml@9c2a2c69f023173a619b4178691e2005fe2b9144 # PR preview implementation
     with:
       test-release-packaging: ${{ github.event_name == 'pull_request' || github.ref == 'refs/heads/main' }}
 

@@ -240,6 +240,9 @@ func TestVersionWorkflow(t *testing.T) {
 		version.Secrets["release-app-private-key"] != "${{ secrets.RELEASE_APP_PRIVATE_KEY }}" {
 		t.Error("only versioning must receive the explicitly named App identity")
 	}
+	if version.With["dry-run"] != "${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}" {
+		t.Error("manual runs must preserve read-only mode; eligible completed CI opts into request routing")
+	}
 	for _, job := range []string{"verify / verify", "checker", "checker-macos"} {
 		if !slices.Contains(strings.Split(version.With["required-jobs"], ","), job) {
 			t.Errorf("version requests must require actual execution of %s", job)
