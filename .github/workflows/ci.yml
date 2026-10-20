@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: michielvha/go-ci-action@db3e067bb0e2d46613f06edf97873fa766594d45 # unreleased pilot
+      - uses: michielvha/go-ci-action@bc485542c70d6cf51da9642c632ef268571597db # main
 
   checker:
     runs-on: ubuntu-latest

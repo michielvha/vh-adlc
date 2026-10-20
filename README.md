@@ -137,8 +137,8 @@ Run a plugin's tests with `bun test --cwd plugins/<plugin>/skills/<skill>/script
 ## Verifying a vh-adlc release
 
 The [shared release design](https://github.com/vhco-pro/docs) composes
-`michielvha/go-ci-action`, `michielvha/gitversion-tag-action`, and the isolated
-release-only next major of `michielvha/goreleaser-action`.
+`michielvha/go-ci-action`, `michielvha/gitversion-tag-action`, and the release-only
+`michielvha/goreleaser-action`, each pinned to its reviewed implementation.
 
 PR CI and tagged releases use the same Go CI action. The **Version** workflow
 calls the GitVersion action directly. PRs calculate a version without pushing
@@ -146,16 +146,16 @@ tags. A manual run defaults to dry-run; disabling it on a trusted feature branch
 creates its prerelease tag. A main-branch run selects a stable version.
 Exact tag pushes start the shared Go CI and release workflow.
 
-This repository is the first binary-only live-canary candidate. Activation is
-still separate from code review: the release App must be installed and configured,
-and the first publishing run must be explicitly approved. Merging the current
-Version workflow enables automatic main-branch tagging once those credentials
-exist; it is not a dry-run-only merge.
+This repository is the first binary-only rollout pilot. The Version workflow
+automatically tags main-branch changes that select a new version; it is not a
+dry-run-only workflow. Artifact publication still starts from the tag event.
 
-Automated tagging requires the release App's `RELEASE_APP_CLIENT_ID` repository
-variable and `RELEASE_APP_PRIVATE_KEY` secret, with the App installed on this
-repository and allowed to write contents. `PGP_PRIVATE_KEY` signs artifacts.
-PR preview jobs receive none of these credentials.
+Automated tagging uses the reusable `michielvha-repo-write` GitHub App, installed
+on the owner's repositories. Each tagging job requests a short-lived token for
+this repository only, with Contents: write. Its `RELEASE_APP_CLIENT_ID` repository
+variable and `RELEASE_APP_PRIVATE_KEY` secret configure that identity;
+`PGP_PRIVATE_KEY` signs artifacts. PR preview jobs receive none of these
+credentials. Do not grant the App key to untrusted code.
 
 No cleanup is enabled. Re-run the original tag workflow for a transient failure;
 inspect a partial release before retrying. GoReleaser's configuration forbids

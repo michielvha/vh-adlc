@@ -230,6 +230,8 @@ func TestVersionWorkflow(t *testing.T) {
 	}
 	if !strings.HasPrefix(tag.Steps[0].Uses, "actions/create-github-app-token@") ||
 		tag.Steps[0].With["permission-contents"] != "write" ||
+		tag.Steps[0].With["owner"] != "${{ github.repository_owner }}" ||
+		tag.Steps[0].With["repositories"] != "${{ github.event.repository.name }}" ||
 		tag.Steps[1].With["token"] != "${{ steps.app.outputs.token }}" ||
 		tag.Steps[1].With["persist-credentials"] != "true" {
 		t.Error("the actual tag push must use the repository-scoped App identity")
