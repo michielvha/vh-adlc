@@ -40,6 +40,8 @@ commit X, the repository directory, the document, the docs revision, the binary 
   usage-credit prompt, dispatch on `opus`, say so in the run, and record `opus`.
 - With a model named, pass it as given. If the host refuses it, do not fall back: leave the review pending
   and list the models the host offers.
+- With no reviewer model named outside Claude Code, omit the model override and use the host's session
+  default, as the protocol describes. Do not request a Claude alias on another host.
 - If the reviewer cannot be dispatched at all, write a self-contained handoff (the document, X, the record
   format the standard gives at the revision, and the commands that establish each criterion) for the owner
   to run elsewhere, and leave the review visibly pending. Never review it yourself and call that
@@ -47,11 +49,12 @@ commit X, the repository directory, the document, the docs revision, the binary 
 
 ## Store and apply
 
-1. Compare the `MODEL:` line with the model you asked for, as `references/review-protocol.md`
-   describes. When it does not match and the protocol leaves the review pending, store nothing: report
-   it as pending with the handoff and stop.
+1. Apply the model eligibility rules in `references/review-protocol.md`. A requested model must match.
+   An unrequested non-Claude default may report `MODEL: unknown`; record `unknown` and report that
+   model identity was not attested, without claiming a match. Never infer it from the main session.
+   When the protocol leaves the review pending, store nothing: report the pending handoff and stop.
 2. Otherwise store the returned text after its `MODEL:` line, byte for byte, under the next `### R-<n>`,
-   with a Review Log row at X recording the kind, the model that line names (or `unknown`) and the
+   with a Review Log row at X recording the kind, the model that valid header names and the
    isolation (`procedural` unless the host is verified to enforce the reviewer's restrictions). Save the
    stored text to a scratch file outside the repository and run
    `vh-adlc review check <doc> --review R-<n> --returned <file>`. Quote its result.

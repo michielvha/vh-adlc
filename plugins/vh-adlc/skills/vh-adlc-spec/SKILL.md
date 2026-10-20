@@ -48,10 +48,12 @@ without asking, and `references/review-protocol.md` for the review mode.
 2. Dispatch `vh-adlc-reviewer` as `references/review-protocol.md` describes, with the document, X, kind
    `spec`, the docs revision, the binary path and the plugin pin. If dispatch is impossible, write the handoff and leave
    the review pending.
-3. Compare the reviewer's `MODEL:` line with the model you asked for, as
-   `references/review-protocol.md` describes; a mismatch it leaves pending stores nothing. Otherwise
-   store the records returned after that line under the next `### R-<n>`, with a Review Log row at X
-   naming that model, before changing anything. Then run `vh-adlc review check` against the same text.
+3. Apply the model eligibility rules in `references/review-protocol.md` before storing anything.
+   A requested model must match; an unrequested non-Claude default may report `MODEL: unknown`,
+   recorded as `unknown` with model identity explicitly not attested. Never infer its ID from the main
+   session. If the protocol leaves the review pending, store nothing. Otherwise store the records
+   after the header under the next `### R-<n>`, with a Review Log row at X naming the reported model,
+   before changing anything. Then run `vh-adlc review check` against the same text.
 4. Apply factual findings. Turn judgement findings into Open Questions for the owner. Commit. A blocking
    pass is cleared only by a new independent pass at the new commit.
 5. When a clean review at X exists and Open Questions is empty, ask the owner to accept. On acceptance in

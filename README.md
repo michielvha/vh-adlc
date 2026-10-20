@@ -42,7 +42,36 @@ skills read their pages from the binary's cache.
 
 ### Install
 
-In the Claude Code CLI:
+#### VS Code: Local chat
+
+1. Open your project and choose **Local** in the Chat harness selector.
+2. Run **Chat: Install Plugin from Source** from the Command Palette.
+3. Enter `michielvha/vh-adlc`, review and trust that source, then select **vh-adlc** from the plugin list.
+4. Start a new Local chat. Type `/vh-adlc` and choose an operation, such as **vh-adlc-spec**.
+
+The suggestion inserts the invocation for you. In VS Code 1.142, Local chat inserts
+`/vh-adlc vh-adlc-spec`; do not assume another client's slash syntax.
+
+If you configure `chat.plugins.marketplaces` yourself, put it in **User** settings. VS Code rejects
+that setting in Workspace settings. The other Chat harnesses have separate validation entries below;
+a Local installation is not proof that a Copilot or Claude harness has loaded the plugin.
+
+#### Claude Code desktop app
+
+1. Start a local Code session, choose **This computer**, and select your project folder.
+2. Type `/plugin`, select the plugin-manager command, and submit it.
+3. In Plugins, choose **Add plugin**, **Add marketplace**, then **Add from a repository**.
+4. Enter `https://github.com/michielvha/vh-adlc.git`, select that URL, and choose **Sync**.
+5. Choose **Add** beside **Vh adlc**, then close Settings.
+6. Type `/vh-adlc` and choose an operation. The desktop app offers names such as
+   `vh-adlc:vh-adlc-spec`.
+
+No terminal commands are needed for those GUI installs. The first operation can ask permission to
+read the installed plugin's references and its pinned public documentation cache.
+
+#### Claude Code CLI
+
+In a terminal:
 
 ```sh
 claude plugin marketplace add michielvha/vh-adlc
@@ -71,18 +100,25 @@ with `claude plugin marketplace remove vhco-tools` only if no other plugin from 
 ### Support matrix
 
 Supported means the scenario run in `tests/vh-adlc/evidence/` passed on that host. Everything else is
-unsupported until its own run passes.
+unsupported until its own run passes. Partial GUI entries name the checks actually run, rather than
+claiming that the whole scenario matrix passed.
 
 | Host or capability | Status | Evidence |
 | --- | --- | --- |
 | Claude Code CLI 2.1.303, Linux | Supported | `tests/vh-adlc/evidence/claude-code/` |
-| Claude Code desktop app, VS Code extension, remote sessions | Unsupported: discovery not yet run | Same runtime as the CLI; not yet checked on each surface |
-| VS Code Copilot Chat, Local harness | Unsupported: the hand run is pending | None yet |
+| Claude Code desktop app 2.42304.2, macOS arm64 | Partial GUI validation: installation, seven operations, investigation and independent spec review passed | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md) |
+| Claude Code VS Code extension, remote sessions | Unsupported: discovery not yet run | Not inferred from another Claude Code surface |
+| VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Partial GUI validation: installation, seven operations, reviewer discovery and investigation passed; default-review fix is being validated | [Local GUI run](tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
 | Copilot CLI | Unsupported | `tests/vh-adlc/evidence/copilot-cli/README.md` |
 | macOS | Unsupported for the loop; binary installation, fixture tests and Claude Code CLI discovery passed on arm64 | [Bounded macOS check](tests/vh-adlc/evidence/claude-code/S1.host.macos.md); no full scenario run |
 | Structural reviewer isolation | Unsupported: reviews record `procedural` | The reviewer has a shell, which can still write |
 | Choosing the reviewer's model on Claude Code | Supported, with a caveat | When settings refuse the requested model, Claude Code runs the reviewer on another model without saying so. The reviewer names the model it ran on, and the loop compares it with the request. A named model that ran elsewhere leaves the review pending with a handoff. A default pass that ran on neither `fable` nor `opus` is dispatched again on `opus`. The Review Log records the model that ran |
+
+On non-Claude-Code hosts, a review with no named reviewer model uses the host's inherited default.
+Some hosts do not expose that model's identity: the Review Log records `unknown`, and the report says
+that identity was not attested. Asking for a specific model still requires a matching identity;
+`unknown` cannot satisfy that request.
 
 ## Developing
 
