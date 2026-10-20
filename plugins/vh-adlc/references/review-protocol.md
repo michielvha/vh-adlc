@@ -5,7 +5,8 @@
 A review runs in a separate context: dispatch the `vh-adlc-reviewer` agent where the host can, read-only,
 with the repository directory, the document path, the exact commit, the review kind, the resolved docs
 revision, the binary path and the plugin pin. Where the host cannot dispatch it, write a self-contained
-handoff the owner runs elsewhere and leave the review visibly pending. Self-review is never labelled
+handoff the owner runs elsewhere and leave the review visibly pending: whenever no review is stored, the
+report has a line that starts with the exact words `review pending`, followed by why. Self-review is never labelled
 independent, whatever the model.
 
 The target is an exact commit. A completion-eligible implementation review runs against committed state in
@@ -15,17 +16,45 @@ not create one.
 
 ## Models
 
-Choose the model when dispatching; agent files name none. On Claude Code an independent pass with no model
-named runs on `fable`; if the host rejects it, or the owner declines a usage-credit prompt, run it on `opus`
-and say so in the run. On other hosts use the model the owner names, or the session's model, and record
-which. A model the owner names is passed as given with no fallback: if the host rejects it, the review stays
-pending and the report lists what the host offers.
+Agent files name no model. Decide whether this dispatch has a requested model before comparing identities.
+A missing or malformed `MODEL:` line leaves the review pending; never manufacture an `unknown` header.
 
-A host may run a subagent on another model than the one asked for, without saying so: Claude Code does
-this when its settings refuse the requested model. So the Review Log row records the model the reviewer's
-first line, `MODEL: <id>`, names, or `unknown`, never the model you asked for. When it differs from the one
-you asked for, say so in the run: a refused `fable` that ran on `opus` is the fallback above, and any other
-difference is reported as it is.
+### Default review outside Claude Code
+
+On non-Claude-Code hosts, such as VS Code Local and Copilot, when the owner names no reviewer model,
+do not pass a model override. Let the host inherit its configured session default. There is no
+requested identity to compare.
+
+The reviewer still returns a `MODEL:` header. Record the ID it reports, or record `unknown` when it
+returns `MODEL: unknown`. In the latter case, report that model identity was not attested. Do not infer
+the reviewer's ID from the main session's model picker or say that a model match was verified.
+
+That explicit `unknown` header alone does not make an otherwise valid independent review pending.
+Commit targeting, isolation, the returned records, `review check`, executed evidence and human
+acceptance still apply. Do not apply the Claude Code default chain to these hosts.
+
+If the host requires a concrete model override to dispatch, use the requested-model rules below.
+An owner-named model always uses those rules, on every host.
+
+### Requested model, including Claude Code defaults
+
+On Claude Code, with no owner-named model, request `fable`. If the host rejects it or the owner
+declines a usage-credit prompt, request `opus` and announce the fallback. Those are requested models
+even though the owner did not name one. A model the owner names is passed as given, without a fallback;
+if the host rejects it, leave the review pending and list what the host offers.
+
+A host may silently run a different model. Compare the reviewer's `MODEL: <id>` with the model requested
+for that dispatch. An alias matches any ID of its family (`sonnet` matches `claude-sonnet-5-5`), a full ID
+must match exactly, and `MODEL: unknown` never matches a requested model.
+
+- A match: record that line's model on the Review Log row.
+- Claude Code's default pass ran on `opus` instead of `fable`: record that announced fallback.
+- Claude Code's default pass ran on another model: dispatch again requesting `opus`. A mismatch on
+  that second pass leaves the review pending.
+- A named model that does not match, or an unverified Claude Code default pass: leave the review
+  pending. Write no Review Log row and no `### R-<n>` subsection. Put the returned text, the reported
+  identity and the available models in the handoff. An unknown identity never satisfies a named-model
+  requirement.
 
 ## Isolation
 

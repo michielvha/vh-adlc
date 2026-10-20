@@ -2,19 +2,37 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { build, type Fixtures, gitEnv, SECRET_CANARIES } from "./fixtures/build";
+import { build, claim, FEATURE_PATH, type Fixtures, git, gitEnv, OTHER_FEATURE_BRANCH, OTHER_FEATURE_PATH, plan, prepareOtherFeature, realBinary, SECRET_CANARIES } from "./fixtures/build";
 
 const ROOT = resolve(import.meta.dir, "..", "..");
+const dir = mkdtempSync(join(tmpdir(), "vh-adlc-fixtures-"));
 let f: Fixtures;
+let packageBefore: ReturnType<typeof packageState>;
 
 beforeAll(() => {
-  f = build(mkdtempSync(join(tmpdir(), "vh-adlc-fixtures-")));
+  packageBefore = packageState();
+  f = build(dir);
 }, 180_000);
 
-afterAll(() => rmSync(f.dir, { recursive: true, force: true }));
+afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+function packageState() {
+  const result = Bun.spawnSync(["git", "-C", ROOT, "status", "--porcelain", "--", "plugins/vh-adlc"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+  const root = join(ROOT, "plugins", "vh-adlc");
+  const files = [...new Bun.Glob("**/*").scanSync({ cwd: root, onlyFiles: true, dot: true })].sort().map((path) => ({
+    path,
+    digest: createHash("sha256").update(readFileSync(join(root, path))).digest("hex"),
+    mode: statSync(join(root, path)).mode,
+  }));
+  return { status: result.stdout.toString(), files };
+}
 
 function sh(cwd: string, ...cmd: string[]) {
   const r = Bun.spawnSync(cmd, { cwd, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
@@ -48,6 +66,20 @@ describe("docs fixture", () => {
 });
 
 describe("project fixture", () => {
+  test("the fixture builder runs through its standalone CLI", () => {
+    const cliDir = join(dir, "cli");
+    const result = Bun.spawnSync([process.execPath, join(import.meta.dir, "fixtures", "build.ts"), cliDir], {
+      stdout: "pipe",
+      stderr: "pipe",
+      timeout: 180_000,
+    });
+    if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+    const built = JSON.parse(result.stdout.toString());
+    expect(built.dir).toBe(cliDir);
+    expect(existsSync(built.worktree)).toBe(true);
+    expect(sh(built.worktree, "git", "branch", "--show-current").out.trim()).toBe(OTHER_FEATURE_BRANCH);
+  }, 180_000);
+
   test("its test suite fails on purpose", () => {
     const r = sh(f.project, "./test.sh");
     expect(r.code).not.toBe(0);
@@ -83,6 +115,12 @@ describe("other plugin", () => {
 });
 
 describe("fixture plugins and the logging wrapper", () => {
+  test("the released binary and fixture wrapper use separate verified caches", () => {
+    const wrapper = wrapperPath(f.pluginA);
+    expect(realBinary(f.home)).not.toBe(wrapper);
+    expect(wrapperPath(f.pluginB)).toBe(wrapper);
+  });
+
   test("the unmodified installer installs the wrapper from the fixture lock", () => {
     const path = wrapperPath(f.pluginA);
     const digest = (p: string) => createHash("sha256").update(readFileSync(p)).digest("hex");
@@ -93,8 +131,7 @@ describe("fixture plugins and the logging wrapper", () => {
   });
 
   test("the real lock and package are untouched", () => {
-    const r = Bun.spawnSync(["git", "-C", ROOT, "status", "--porcelain", "--", "plugins/vh-adlc"], { stdout: "pipe" });
-    expect(r.stdout.toString()).toBe("");
+    expect(packageState()).toEqual(packageBefore);
   });
 
   test("the wrapper forwards, logs and seeds the isolated cache", () => {
@@ -113,3 +150,40 @@ describe("fixture plugins and the logging wrapper", () => {
     expect(vh(f.pluginA, f.project, "lint", "docs/internal/plans/greeting-name.md").json.result).toBe("pass");
   });
 });
+
+test("both feature worktrees can progress without changing each other or the default branch", () => {
+  plan(f);
+  const owning = claim(f);
+  const other = prepareOtherFeature(f);
+  const main = git(f.home, f.project, "rev-parse", "main");
+  const unrelated = sh(f.project, "git", "status", "--porcelain").out;
+  const primaryBefore = git(f.home, owning, "rev-parse", "HEAD");
+  const otherBefore = git(f.home, other, "rev-parse", "HEAD");
+  const geometry = () => git(f.home, f.project, "worktree", "list", "--porcelain").replace(/^HEAD .+$/gm, "");
+  const before = geometry();
+
+  expect(vh(f.pluginA, owning, "gate", "in-progress", FEATURE_PATH).json.result).toBe("pass");
+  expect(vh(f.pluginA, other, "gate", "in-progress", OTHER_FEATURE_PATH).json.result).toBe("pass");
+  expect(sh(owning, "./test.sh").code).not.toBe(0);
+  expect(sh(other, "./test-farewell.sh").code).not.toBe(0);
+
+  writeFileSync(join(other, "farewell.sh"), '#!/bin/sh\necho "Goodbye, ${1:-world}."\n');
+  git(f.home, other, "commit", "-q", "-m", "fixture: implement farewell", "--", "farewell.sh");
+  const otherAfter = git(f.home, other, "rev-parse", "HEAD");
+  expect(otherAfter).not.toBe(otherBefore);
+  expect(git(f.home, owning, "rev-parse", "HEAD")).toBe(primaryBefore);
+  expect(sh(owning, "./test.sh").code).not.toBe(0);
+  expect(sh(other, "./test-farewell.sh").code).toBe(0);
+
+  writeFileSync(join(owning, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n');
+  git(f.home, owning, "commit", "-q", "-m", "fixture: implement greeting", "--", "greet.sh");
+  expect(git(f.home, owning, "rev-parse", "HEAD")).not.toBe(primaryBefore);
+  expect(git(f.home, other, "rev-parse", "HEAD")).toBe(otherAfter);
+  expect(sh(owning, "./test.sh").code).toBe(0);
+  expect(sh(other, "./test-farewell.sh").code).toBe(0);
+  expect(sh(other, "./test.sh").code).not.toBe(0);
+  expect(git(f.home, f.project, "rev-parse", "main")).toBe(main);
+  expect(git(f.home, f.project, "rev-parse", "origin/main")).toBe(main);
+  expect(sh(f.project, "git", "status", "--porcelain").out).toBe(unrelated);
+  expect(geometry()).toBe(before);
+}, 30_000);

@@ -252,6 +252,39 @@ describe("reviewer agent", () => {
   });
 });
 
+describe("review model eligibility", () => {
+  const protocol = () => read(join(PKG, "references", "review-protocol.md"));
+
+  test("documents the unrequested non-Claude default without inventing model identity", () => {
+    const text = protocol();
+    expect(text).toContain("### Default review outside Claude Code");
+    expect(text).toContain("do not pass a model override");
+    expect(text).toContain("record `unknown`");
+    expect(text).toContain("model identity was not attested");
+    expect(text).toContain("Do not apply the Claude Code default chain");
+  });
+
+  test("keeps named models and Claude Code defaults subject to identity matching", () => {
+    const text = protocol();
+    expect(text).toContain("### Requested model, including Claude Code defaults");
+    expect(text).toContain("`MODEL: unknown` never matches");
+    expect(text).toContain("A named model that does not match");
+    expect(text).toContain("Write no Review Log row");
+  });
+
+  test("does not turn a missing header into a successful unknown-model review", () => {
+    expect(protocol()).toContain("A missing or malformed `MODEL:` line leaves the review pending");
+  });
+
+  test("both review operations apply eligibility before storing records", () => {
+    for (const op of ["spec", "review"]) {
+      const text = read(skillPath(op));
+      expect(text).toContain("model eligibility");
+      expect(text).toContain("unrequested non-Claude default");
+    }
+  });
+});
+
 describe("package text", () => {
   test("every referenced package path exists", () => {
     const missing: string[] = [];
@@ -350,4 +383,3 @@ describe("README", () => {
     }
   });
 });
-

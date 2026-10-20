@@ -25,6 +25,7 @@ import { join, resolve } from "node:path";
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
 const PLUGIN = join(ROOT, "plugins", "vh-adlc");
 const PLATFORMS = ["darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"];
+export const OTHER_FEATURE_BRANCH = "feat/other-work";
 
 // Secret canaries: no output, document or evidence may contain them (AC-19).
 export const SECRET_CANARIES = ["vhadlc-secret-canary-7f3e9a", "ghp_vhadlcCanaryToken0000000000000000"];
@@ -214,8 +215,8 @@ function buildProject(home: string, dir: string, origin: string, worktree: strin
   git(home, dir, "remote", "add", "origin", origin);
   git(home, dir, "push", "-q", "origin", "main");
   git(home, dir, "remote", "set-head", "origin", "main");
-  git(home, dir, "branch", "feat/other-work");
-  git(home, dir, "worktree", "add", "-q", worktree, "feat/other-work");
+  git(home, dir, "branch", OTHER_FEATURE_BRANCH);
+  git(home, dir, "worktree", "add", "-q", worktree, OTHER_FEATURE_BRANCH);
   // Unrelated work in progress that every operation must leave byte-identical.
   write(join(dir, "NOTES.md"), "Unrelated staged note.\n");
   git(home, dir, "add", "NOTES.md");
@@ -284,7 +285,7 @@ function fixturePlugin(dest: string, revision: string, wrapper: string, home: st
 
 export function realBinary(home: string): string {
   const r = Bun.spawnSync(["bash", join(PLUGIN, "scripts", "ensure-vh-adlc.sh")], {
-    env: { HOME: home, XDG_CACHE_HOME: join(home, ".real-cache"), PATH: "/usr/local/bin:/usr/bin:/bin", LC_ALL: "C" },
+    env: { HOME: join(home, ".real-home"), XDG_CACHE_HOME: join(home, ".real-cache"), PATH: "/usr/local/bin:/usr/bin:/bin", LC_ALL: "C" },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -336,20 +337,21 @@ if (import.meta.main) {
 }
 
 export const FEATURE_PATH = "docs/internal/plans/greeting-name.md";
+export const OTHER_FEATURE_PATH = "docs/internal/plans/farewell-name.md";
 
 // accept records a clean spec review R-1 and the owner's acceptance of it at the
 // project's HEAD, commits the rows and pushes, so the feature is ready for planned.
-export function accept(f: Fixtures, records = "NO FINDINGS", withAcceptance = true): string {
+export function accept(f: Fixtures, records = "NO FINDINGS", withAcceptance = true, doc = FEATURE_PATH): string {
   const home = f.home;
   const x = git(home, f.project, "rev-parse", "--short=7", "HEAD");
-  const path = join(f.project, FEATURE_PATH);
+  const path = join(f.project, doc);
   let text = readFileSync(path, "utf8");
   const header = "| --- | --- | --- | --- | --- | --- | --- |\n";
   let rows = `| 2026-01-01 | R-1 | spec | \`${x}\` | fable | procedural | Fixture review. |\n`;
   if (withAcceptance) rows += `| 2026-01-01 | R-1 | spec | \`${x}\` | n/a | n/a | accepted by owner |\n`;
   text = text.replace(header, header + rows) + `\n### R-1\n\n${records}\n`;
   writeFileSync(path, text);
-  git(home, f.project, "commit", "-q", "-m", "fixture: review R-1", "--", FEATURE_PATH);
+  git(home, f.project, "commit", "-q", "-m", "fixture: review R-1", "--", doc);
   git(home, f.project, "push", "-q", "origin", "main");
   return x;
 }
@@ -372,20 +374,20 @@ export const FIXTURE_TASKS =
 
 // editDoc replaces text in the feature document in the checkout at cwd and commits it there; push sends
 // the current branch to origin.
-export function editDoc(f: Fixtures, cwd: string, from: string, to: string, message: string, push = false) {
-  const path = join(cwd, FEATURE_PATH);
+export function editDoc(f: Fixtures, cwd: string, from: string, to: string, message: string, push = false, doc = FEATURE_PATH) {
+  const path = join(cwd, doc);
   const text = readFileSync(path, "utf8");
   if (!text.includes(from)) throw new Error(`the feature has no ${from}`);
   writeFileSync(path, text.replace(from, to));
-  git(f.home, cwd, "commit", "-q", "-m", message, "--", FEATURE_PATH);
+  git(f.home, cwd, "commit", "-q", "-m", message, "--", doc);
   if (push) git(f.home, cwd, "push", "-q", "origin", "HEAD");
 }
 
 // plan accepts the fixture feature, moves it to planned and writes its tasks, all on the default branch.
-export function plan(f: Fixtures, tasks = FIXTURE_TASKS) {
-  accept(f);
-  editDoc(f, f.project, "status: draft\n", "status: planned\n", "fixture: planned", true);
-  editDoc(f, f.project, "## Tasks\n\nNone yet.\n", `## Tasks\n\n${tasks}`, "fixture: tasks", true);
+export function plan(f: Fixtures, tasks = FIXTURE_TASKS, doc = FEATURE_PATH) {
+  accept(f, "NO FINDINGS", true, doc);
+  editDoc(f, f.project, "status: draft\n", "status: planned\n", "fixture: planned", true, doc);
+  editDoc(f, f.project, "## Tasks\n\nNone yet.\n", `## Tasks\n\n${tasks}`, "fixture: tasks", true, doc);
 }
 
 // claim publishes the in-progress claim on the default branch and, unless told otherwise, creates the
@@ -398,6 +400,39 @@ export function claim(f: Fixtures, opts: { branch?: boolean; worktree?: boolean 
   if (opts.worktree === false) return f.project;
   git(f.home, f.project, "worktree", "add", "-q", owning, FEATURE_BRANCH);
   return owning;
+}
+
+export function prepareOtherFeature(f: Fixtures): string {
+  const feature = FEATURE
+    .replaceAll("greet.sh", "farewell.sh")
+    .replaceAll("test.sh", "test-farewell.sh")
+    .replaceAll("Hello,", "Goodbye,")
+    .replaceAll("Greeting", "Farewell")
+    .replaceAll("greeting", "farewell")
+    .replace("greet prints", "farewell prints")
+    .replace('issue: "#1"', 'issue: "#2"');
+  write(join(f.project, OTHER_FEATURE_PATH), feature);
+  write(join(f.project, "farewell.sh"), '#!/bin/sh\necho "Goodbye, world."\n', 0o755);
+  write(
+    join(f.project, "test-farewell.sh"),
+    readFileSync(join(f.project, "test.sh"), "utf8").replaceAll("greet.sh", "farewell.sh").replaceAll("Hello,", "Goodbye,"),
+    0o755,
+  );
+  const files = [OTHER_FEATURE_PATH, "farewell.sh", "test-farewell.sh"];
+  git(f.home, f.project, "add", "--", ...files);
+  git(f.home, f.project, "commit", "-q", "-m", "fixture: second feature", "--", ...files);
+  plan(f, "- [ ] T1 `farewell.sh` - `./test-farewell.sh` passes for a name and no argument (AC-01, AC-02, AC-03)\n", OTHER_FEATURE_PATH);
+  editDoc(
+    f,
+    f.project,
+    "status: planned\n",
+    `status: in-progress\nbranch: ${OTHER_FEATURE_BRANCH}\n`,
+    "fixture: claim farewell-name",
+    true,
+    OTHER_FEATURE_PATH,
+  );
+  git(f.home, f.worktree, "merge", "-q", "--ff-only", "main");
+  return f.worktree;
 }
 
 // The S11 review fixture: four criteria, each built to draw a different verdict from an honest reviewer.
@@ -442,8 +477,8 @@ In scope: one name argument for \`greet.sh\`, a \`--shout\` flag, macOS support,
 | --- | --- |
 | AC-01 | \`./test.sh\` |
 | AC-02 | \`./test-shout.sh\` |
-| AC-03 | No check exists yet: nothing here runs on macOS |
-| AC-04 | \`FIXTURE_LIVE=1 ./test-live.sh\`, run only by the release job |
+| AC-03 | None. No check covers macOS: \`./test.sh\` runs on Linux only and is not a check for this criterion |
+| AC-04 | \`FIXTURE_LIVE=1 ./test-live.sh\` is the check. Only the release job can run it; anywhere else it prints SKIP |
 
 ## Tasks
 

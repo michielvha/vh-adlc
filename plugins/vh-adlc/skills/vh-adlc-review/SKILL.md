@@ -5,6 +5,9 @@ description: Run an independent implementation review of a vh-adlc feature at an
 
 # vh-adlc-review
 
+The plugin directory is two levels above this skill's own directory. Every path below that starts
+with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
+
 Input: a feature document, its issue, or its slug, and optionally the model to review with. Follow
 `references/loop.md`, `references/authority.md` and `references/review-protocol.md`.
 
@@ -37,6 +40,8 @@ commit X, the repository directory, the document, the docs revision, the binary 
   usage-credit prompt, dispatch on `opus`, say so in the run, and record `opus`.
 - With a model named, pass it as given. If the host refuses it, do not fall back: leave the review pending
   and list the models the host offers.
+- With no reviewer model named outside Claude Code, omit the model override and use the host's session
+  default, as the protocol describes. Do not request a Claude alias on another host.
 - If the reviewer cannot be dispatched at all, write a self-contained handoff (the document, X, the record
   format the standard gives at the revision, and the commands that establish each criterion) for the owner
   to run elsewhere, and leave the review visibly pending. Never review it yourself and call that
@@ -44,18 +49,21 @@ commit X, the repository directory, the document, the docs revision, the binary 
 
 ## Store and apply
 
-1. Store the returned text after its `MODEL:` line, byte for byte, under the next `### R-<n>`, with a
-   Review Log row at X recording the kind, the model that line names (or `unknown`) and the isolation
-   (`procedural` unless the host is verified to enforce the reviewer's restrictions). If that model is
-   not the one you asked for, say so, as `references/review-protocol.md` describes. Save the stored text
-   to a scratch file outside the repository and run
+1. Apply the model eligibility rules in `references/review-protocol.md`. A requested model must match.
+   An unrequested non-Claude default may report `MODEL: unknown`; record `unknown` and report that
+   model identity was not attested, without claiming a match. Never infer it from the main session.
+   When the protocol leaves the review pending, store nothing: report the pending handoff and stop.
+2. Otherwise store the returned text after its `MODEL:` line, byte for byte, under the next `### R-<n>`,
+   with a Review Log row at X recording the kind, the model that valid header names and the
+   isolation (`procedural` unless the host is verified to enforce the reviewer's restrictions). Save the
+   stored text to a scratch file outside the repository and run
    `vh-adlc review check <doc> --review R-<n> --returned <file>`. Quote its result.
-2. For every criterion the review did not return as `met`, untick it and add an evidence line naming
+3. For every criterion the review did not return as `met`, untick it and add an evidence line naming
    `R-<n>` and the verdict. Leave a criterion it returned as `met` as it is, with its own evidence line.
-3. Run `vh-adlc lint <doc>`, edit the commit message and the Review Log outcome with
+4. Run `vh-adlc lint <doc>`, edit the commit message and the Review Log outcome with
    `guides/humanize-prose.md` at the resolved revision, stage the document alone and commit on the feature
    branch. Do not push.
-4. Run `vh-adlc next` and report where it routes the feature: usually `/vh-adlc-tasks` for the criteria
+5. Run `vh-adlc next` and report where it routes the feature: usually `/vh-adlc-tasks` for the criteria
    that are not met, or `/vh-adlc-ship` when everything is met.
 
 Never edit a returned record, never change a verdict, and never tick a criterion the review did not return
@@ -64,5 +72,5 @@ as `met`.
 ## Report
 
 The knowledge line; `fresh` and `review check`, quoted; the target commit; the model that ran and the
-isolation, or why the review is pending; each criterion's verdict; what was unticked; the commit; the page
+isolation, or the `review pending` line the review protocol describes; each criterion's verdict; what was unticked; the commit; the page
 and revision used to edit the prose; and the next step.

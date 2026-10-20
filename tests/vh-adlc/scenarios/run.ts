@@ -11,7 +11,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, 
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, plan, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
+import { accept, addCI, AGENT_NAME, agentHome, build, claim, gh, SHIP_REPO, shipIssue, toGitHub, criterionRecords, pushFromElsewhere, reviewedFeature, reviewFeature, editDoc, editFeature, FEATURE_BRANCH, FEATURE_PATH, FIXTURE_TASKS, type Fixtures, git, gitEnv, OTHER_FEATURE_BRANCH, OTHER_FEATURE_PATH, plan, prepareOtherFeature, PROSE_CANARIES, SECRET_CANARIES } from "../fixtures/build";
 import { CLAUDE_TOKEN, claude, cli, profile, type ToolUse, toolUses, type Turn, version } from "./host";
 
 const ROOT = resolve(import.meta.dir, "..", "..", "..");
@@ -262,7 +262,7 @@ const SCENARIOS: Scenario[] = [
     phase: 4,
     run: async (f) => {
       // The real package, installed from this checkout into an isolated profile.
-      const home = mkdtempSync(join(tmpdir(), "vh-adlc-s1-home-"));
+      const home = scratch("vh-adlc-s1-home-");
       agentHome(home);
       const p = profile(home);
       const out: string[] = [];
@@ -299,6 +299,7 @@ const SCENARIOS: Scenario[] = [
           { name: "each operation ran without an error", ok: turns.length === operations().length && turns.every((t) => !t.isError) },
           { name: "the reviewer was dispatched", ok: said(c, "vh-adlc:vh-adlc-reviewer") },
           { name: "uninstall leaves no vh-adlc plugin", ok: !after.includes("vh-adlc@vhco-tools") },
+          citesGuide(c),
           unrelatedIntact(c),
         ],
       };
@@ -310,7 +311,7 @@ const SCENARIOS: Scenario[] = [
     phase: 4,
     run: async (f) => {
       // D-30: no model runs here, only the host's plugin commands in an isolated profile.
-      const home = mkdtempSync(join(tmpdir(), "vh-adlc-s1-home-"));
+      const home = scratch("vh-adlc-s1-home-");
       agentHome(home);
       const p = profile(home);
       const steps: { args: string; code: number }[] = [];
@@ -492,6 +493,7 @@ const SCENARIOS: Scenario[] = [
             { name: "one document for the issue", ok: docs.length === 1 && plans.length === 0, detail: docs.join(", ") },
             { name: "find was used", ok: c.log().some((x) => x.args.startsWith("find ")) },
             { name: "no prose canary or dash reached the document or commits", ok: !PROSE_CANARIES.some((p) => text.includes(p)) && !/[–—]| -- /.test(prose(text)) },
+            citesGuide(c),
             unrelatedIntact(c),
           ];
         },
@@ -564,6 +566,38 @@ const SCENARIOS: Scenario[] = [
       };
     },
   },
+  {
+    // R-32 F-01: S7.7's own review may raise questions, so this case starts from a clean stored review and
+    // proves that spec appends the acceptance row itself and only then moves the document to planned.
+    id: "S7.7.accept",
+    title: "The owner accepts a draft whose review is clean",
+    phase: 4,
+    run: async (f) => {
+      editFeature(f, 'issue: "#1"\n', "issue: null\n", "fixture: local-only work");
+      const reviewed = accept(f, "NO FINDINGS", false);
+      const turns = session(f, [f.pluginA], [
+        `/vh-adlc-spec ${FEATURE_PATH}. The owner here: I accept the document as reviewed in R-1. Record my acceptance and move it to planned.`,
+      ]);
+      return {
+        turns,
+        checks: (c) => {
+          const doc = c.file(FEATURE_PATH) ?? "";
+          const rows = doc.split("\n").filter((l) => /^\| \d{4}-\d{2}-\d{2} \| R-\d+ \|/.test(l));
+          const accepted = rows.filter((l) => l.includes("accepted by owner"));
+          const status = doc.match(/^status: (\S+)/m)?.[1];
+          const planned = gateCalls(c, "planned");
+          return [
+            { name: "one acceptance row, naming R-1 at the reviewed commit", ok: accepted.length === 1 && accepted[0].includes("| R-1 |") && accepted[0].includes(`\`${reviewed}\``) },
+            { name: "no second review was stored", ok: rows.length === 2 },
+            // The gate reads the acceptance row from the document, so a pass means the row came first.
+            { name: "gate planned passed after the acceptance row was written", ok: planned.some((g) => g.json?.result === "pass") },
+            { name: "planned, committed with the gate line", ok: status === "planned" && c.commits().some((x) => x.includes("vh-adlc gate planned: pass")) },
+            unrelatedIntact(c),
+          ];
+        },
+      };
+    },
+  },
   ...(["investigate", "spec", "resume", "tasks", "implement", "review", "ship"] as const).map((op): Scenario => ({
     id: `S14.${op}`,
     title: `Binary unavailable: vh-adlc-${op}`,
@@ -574,7 +608,7 @@ const SCENARIOS: Scenario[] = [
       cpSync(f.pluginA, broken, { recursive: true });
       const lockPath = join(broken, "vh-adlc.lock.json");
       writeFileSync(lockPath, readFileSync(lockPath, "utf8").replaceAll(/file:\/\/[^"]+/g, `file://${join(f.dir, "missing.tar.gz")}`));
-      const empty = mkdtempSync(join(tmpdir(), "vh-adlc-s14-home-"));
+      const empty = scratch("vh-adlc-s14-home-");
       agentHome(empty);
       const g = { ...f, home: empty };
       // Each operation meets the document at the status it would act on.
@@ -695,9 +729,18 @@ function testRuns(uses: ToolUse[]): boolean[] {
     .map((u) => /^FAIL\b/m.test(u.output));
 }
 
+// scratch makes a temporary directory that main removes after a passing scenario's summary is written.
+// A failing scenario keeps its directories, as does any run with VH_ADLC_KEEP set.
+const SCRATCH: string[] = [];
+function scratch(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  SCRATCH.push(dir);
+  return dir;
+}
+
 // passesAt runs the fixture's test suite against a ref, in a scratch copy.
 function passesAt(f: Fixtures, ref: string): boolean {
-  const dir = mkdtempSync(join(tmpdir(), "vh-adlc-at-"));
+  const dir = scratch("vh-adlc-at-");
   const tar = Bun.spawnSync(["sh", "-c", `git archive ${ref} | tar -x -C ${dir}`], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
   if (tar.exitCode !== 0) return false;
   return Bun.spawnSync(["./test.sh"], { cwd: dir, stdout: "pipe", stderr: "pipe" }).exitCode === 0;
@@ -709,7 +752,22 @@ function canaryFree(texts: string[]): Check {
   const text = texts.map((t) => t.replace(/^### R-\d+\n[\s\S]*?(?=^## |^### |(?![\s\S]))/gm, "")).join("\n");
   const hits = PROSE_CANARIES.filter((p) => text.includes(p));
   const dash = /[–—]| -- /.test(prose(text));
-  return { name: "no prose canary or dash in the commits, the document or the reports", ok: hits.length === 0 && !dash, detail: [...hits, dash ? "dash" : ""].filter(Boolean).join("; ") };
+  // The detail shows each hit in its context, so a failure says which text kept it.
+  const context = (p: string) => {
+    const i = text.indexOf(p);
+    return `${p} in "${text.slice(Math.max(0, i - 80), i + p.length + 40).replace(/\s+/g, " ")}"`;
+  };
+  return { name: "no prose canary or dash in the commits, the document or the reports", ok: hits.length === 0 && !dash, detail: [...hits.map(context), dash ? "dash" : ""].filter(Boolean).join("; ") };
+}
+
+// citesGuide checks that every report names the prose guide and the docs revision knowledge resolved
+// (AC-32).
+function citesGuide(c: Ctx): Check {
+  // S1 installs the real package without the logging wrapper; its fixture onboards to the plugin pin.
+  const logged = c.log().find((x) => words(x.args)[0] === "knowledge" && x.json?.knowledge?.revision)?.json?.knowledge?.revision;
+  const rev = String(logged ?? /[0-9a-f]{40}/.exec(readFileSync(join(ROOT, "plugins", "vh-adlc", "knowledge.md"), "utf8"))?.[0] ?? "");
+  const missing = c.turns.map((t, i) => (rev && t.result.includes("humanize-prose") && t.result.includes(rev.slice(0, 7)) ? 0 : i + 1)).filter(Boolean);
+  return { name: "every report cites the prose guide and the docs revision", ok: missing.length === 0, detail: rev ? `turns ${missing.join(", ")}` : "no knowledge revision" };
 }
 
 // The owner's handoff (references/authority.md): a session writes to a feature another session claimed
@@ -789,6 +847,7 @@ const PHASE5: Scenario[] = [
             { name: "the test suite passes at the branch tip", ok: !!branch && passesAt(f, FEATURE_BRANCH) },
             { name: "T1 and the three criteria are ticked with evidence", ok: /^- \[x\] T1 [^\n]*\n\s+Evidence: /m.test(doc) && ["AC-01", "AC-02", "AC-03"].every((id) => new RegExp(`^- \\[x\\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: `, "m").test(doc)) },
             canaryFree([...[...onMain, ...work].map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
+            citesGuide(c),
             unrelatedIntact(c),
           ];
         },
@@ -851,14 +910,19 @@ const PHASE5: Scenario[] = [
   },
   {
     id: "S10.1",
-    title: "Resume in a new session: handoff, then continue",
+    title: "Resume in separate worktrees: both features progress after handoff",
     phase: 5,
     run: async (f) => {
       plan(f);
       const owning = claim(f);
+      const primaryBase = rev(f, FEATURE_BRANCH)!;
+      const other = prepareOtherFeature(f);
       const claimed = rev(f, "main")!;
       const lists = worktrees(f);
-      const other = { head: rev(f, "HEAD", f.worktree), status: gitIn(f, f.worktree, "status", "--porcelain") };
+      const otherBase = rev(f, "HEAD", other)!;
+      const otherTurns: Turn[] = [];
+      let primaryPreserved = false;
+      let otherAfter: { head: string | null; status: string | null } | undefined;
       let beforeHandoff = -1;
       const turns = session(
         f,
@@ -871,22 +935,41 @@ const PHASE5: Scenario[] = [
         ],
         {
           after: (i) => {
-            if (i === 1) beforeHandoff = agentLog(f, f.project).length;
+            if (i !== 1) return;
+            beforeHandoff = agentLog(f, f.project, `${primaryBase}..${FEATURE_BRANCH}`).length;
+            const primary = { head: rev(f, "HEAD", owning), status: gitIn(f, owning, "status", "--porcelain") };
+            otherTurns.push(...session(
+              f,
+              [f.pluginA],
+              ["/vh-adlc-resume farewell-name. The owner here: the earlier session on farewell-name has stopped, and I hand it to you. Implement its first task in its existing worktree, then stop. Do not ship it or work on greeting-name."],
+              { cwd: other },
+            ));
+            primaryPreserved = rev(f, "HEAD", owning) === primary.head && gitIn(f, owning, "status", "--porcelain") === primary.status;
+            otherAfter = { head: rev(f, "HEAD", other), status: gitIn(f, other, "status", "--porcelain") };
           },
         },
       );
       return {
-        turns,
+        turns: [...turns.slice(0, 2), ...otherTurns, ...turns.slice(2)],
+        notes: ["The farewell session runs between the greeting session's second and third turns, before the greeting handoff."],
         checks: (c) => {
-          const work = agentLog(f, f.project, `${claimed}..${FEATURE_BRANCH}`);
+          const work = agentLog(f, f.project, `${primaryBase}..${FEATURE_BRANCH}`);
+          const otherWork = agentLog(f, other, `${otherBase}..${OTHER_FEATURE_BRANCH}`);
+          const primaryTest = Bun.spawnSync(["./test.sh"], { cwd: owning, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
+          const otherTest = Bun.spawnSync(["./test-farewell.sh"], { cwd: other, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
           return [
             { name: "next and fresh ran in the owning worktree", ok: c.log().some((x) => words(x.args)[0] === "next") && c.log().some((x) => words(x.args)[0] === "fresh") },
             { name: "the report names the branch and the owning worktree", ok: said({ ...c, turns: [turns[0]] }, FEATURE_BRANCH) && said({ ...c, turns: [turns[0]] }, "project-greeting-name") },
             { name: "nothing was written before the handoff", ok: beforeHandoff === 0 },
-            { name: "after the handoff the next task progressed on the feature branch", ok: work.length > 0 && work.every((x) => ancestor(f, x.hash, FEATURE_BRANCH)) },
-            { name: "no push, merge or release", ok: rev(f, "main") === claimed && rev(f, "origin/main") === claimed && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "" && (gitIn(f, f.project, "tag") ?? "") === "" },
-            { name: "worktrees and the other feature are untouched", ok: worktrees(f) === lists && rev(f, "HEAD", f.worktree) === other.head && gitIn(f, f.worktree, "status", "--porcelain") === other.status },
-            canaryFree(turns.map((t) => t.result)),
+            { name: "after the handoff the first task progressed on the greeting feature branch", ok: work.some((x) => x.files.includes("greet.sh")) && primaryTest.exitCode === 0 && readFileSync(join(owning, FEATURE_PATH), "utf8").includes("- [x] T1 ") },
+            { name: "the farewell task progressed in its separate worktree", ok: otherWork.some((x) => x.files.includes("farewell.sh")) && otherTest.exitCode === 0 && readFileSync(join(other, OTHER_FEATURE_PATH), "utf8").includes("- [x] T1 ") },
+            { name: "neither feature's commits change the other feature's files", ok: work.every((x) => x.files.every((p) => ![OTHER_FEATURE_PATH, "farewell.sh", "test-farewell.sh"].includes(p))) && otherWork.every((x) => x.files.every((p) => ![FEATURE_PATH, "greet.sh", "test.sh"].includes(p))) },
+            { name: "the greeting worktree was untouched while farewell progressed", ok: primaryPreserved },
+            { name: "the farewell worktree was untouched while greeting progressed", ok: !!otherAfter && rev(f, "HEAD", other) === otherAfter.head && gitIn(f, other, "status", "--porcelain") === otherAfter.status },
+            { name: "no push, merge or release", ok: rev(f, "main") === claimed && rev(f, "origin/main") === claimed && gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH, OTHER_FEATURE_BRANCH) === "" && (gitIn(f, f.project, "tag") ?? "") === "" },
+            { name: "no worktree was created or removed", ok: worktrees(f) === lists },
+            canaryFree([...turns, ...otherTurns].map((t) => t.result)),
+            citesGuide(c),
             unrelatedIntact(c),
           ];
         },
@@ -1055,6 +1138,11 @@ const S11_CASES: S11[] = [
   { id: "S11.3", title: "Review with a named model", prompt: "Review it with sonnet.", expect: "sonnet" },
   { id: "S11.4", title: "Review with an unavailable named model", prompt: "Review it with claude-nonexistent-9.", expect: "pending" },
   { id: "S11.5", title: "Review when the reviewer cannot be dispatched", prompt: "", noAgent: true, expect: "pending" },
+  // D-33 and D-35: a real named model that settings refuse runs elsewhere without notice, so it stays pending.
+  { id: "S11.6", title: "Review with a named model the settings refuse", prompt: "Review it with sonnet.", settings: { availableModels: ["opus", "haiku"] }, model: "opus", expect: "pending" },
+  // D-34: with fable refused and the session on haiku, the first pass lands outside the chain; the retry names opus.
+  // D-38: fable refused, opus allowed but not first, the session and the first allowed model outside the chain.
+  { id: "S11.7", title: "Review when fable is refused and the session runs outside the chain", prompt: "", settings: { availableModels: ["sonnet", "opus"] }, model: "sonnet", expect: "opus" },
 ];
 
 const PHASE6: Scenario[] = S11_CASES.map(
@@ -1074,8 +1162,20 @@ const PHASE6: Scenario[] = S11_CASES.map(
       }
       const uses: ToolUse[] = [];
       const turns = session(f, [plugin], [`/vh-adlc-review greeting-name. ${HANDOFF} ${k.prompt} ${OWNER_NOTE}`.replace(/\s+/g, " ").trim()], { cwd: owning, uses, settings: k.settings, model: k.model });
+      // D-38: the model each reviewer pass ran on, in the order the passes started, by transcript timestamp.
+      const passes = new Map<string, { at: string; model: string }>();
+      for (const u of uses.filter((x) => x.subagent && x.model)) {
+        const seen = passes.get(u.file);
+        if (!seen || u.at < seen.at) passes.set(u.file, { at: u.at, model: u.model });
+      }
+      const ran = [...passes.values()].sort((a, b) => a.at.localeCompare(b.at)).map((x) => x.model);
+      const dispatches = uses.filter((u) => !u.subagent && u.name === "Agent").length;
       return {
         turns,
+        notes: [
+          ...(ran.length ? [`Reviewer passes ran on, in the order they started: ${ran.join(", ")}; the main session dispatched the reviewer ${dispatches} time(s)`] : []),
+          ...(k.id === "S11.7" && ran[0]?.includes("opus") ? ["D-41: the first pass ran on opus, so D-34's second dispatch is unproven on Claude Code; this needs an Open Question"] : []),
+        ],
         checks: (c) => {
           const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
           const rows = implementationRows(doc);
@@ -1084,9 +1184,9 @@ const PHASE6: Scenario[] = S11_CASES.map(
           const unpushed = gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "";
           if (k.expect === "pending") {
             return [
-              { name: "no implementation review was recorded as done", ok: rows.length === 0 },
+              { name: "no implementation review row or subsection was written", ok: rows.length === 0 && !/^### R-[2-9]\d*$/m.test(doc) },
               { name: "the criteria were left as they were", ok: ["AC-01", "AC-02", "AC-03", "AC-04"].every((id) => ticked(doc, id) === ticked(before, id)) },
-              { name: "the report says the review is pending and gives a handoff", ok: said(c, "pending") && said(c, "handoff") },
+              { name: "the report says the review is pending and gives a handoff", ok: said(c, "review pending") && said(c, "handoff") },
               { name: "nothing was pushed", ok: unpushed },
               unrelatedIntact(c),
             ];
@@ -1101,8 +1201,15 @@ const PHASE6: Scenario[] = S11_CASES.map(
             { name: "review check confirmed the stored records", ok: c.log().some((x) => words(x.args).slice(0, 2).join(" ") === "review check" && x.json?.result === "pass") },
             { name: "only the met criterion stays ticked; the others name the review", ok: ticked(doc, "AC-01") && ["AC-02", "AC-03", "AC-04"].every((id) => !ticked(doc, id) && new RegExp(`^- \\[ \\] ${id}:[^\\n]*\\n(\\s+\\S[^\\n]*\\n)*?\\s+Evidence: [^\\n]*${row?.[1]}`, "m").test(doc)) },
             ...(k.expect === "opus" ? [{ name: "the opus fallback was announced", ok: said(c, "opus") && said(c, "fable") }] : []),
+            // D-41: a first pass on opus is the fallback itself; the case then records the host rule instead.
+            ...(k.id === "S11.7"
+              ? ran[0]?.includes("opus")
+                ? [{ name: "first pass ran on opus: recorded as the host rule, one review stored (D-41)", ok: rows.length === 1 }]
+                : [{ name: "exactly one review was stored, after a second dispatch naming opus", ok: rows.length === 1 && dispatches >= 2 && ran.at(-1)?.includes("opus") === true }]
+              : []),
             { name: "committed on the feature branch, not pushed", ok: commits.length > 0 && unpushed },
             canaryFree([...commits.map((x) => `${x.subject}\n${x.body}`), doc, ...turns.map((t) => t.result)]),
+            citesGuide(c),
             unrelatedIntact(c),
           ];
         },
@@ -1350,7 +1457,12 @@ const S13_CASES: S13[] = [
       // Other work already landed the behaviour, so this feature's delivery is its document alone.
       writeFileSync(join(f.project, "greet.sh"), '#!/bin/sh\necho "Hello, ${1:-world}."\n');
       writeFileSync(join(f.project, "test.sh"), readFileSync(join(f.project, "test.sh"), "utf8").replace("# The deliberate failing test: greet.sh does not take a name yet.\n", "# Checks the greeting for a name and for no argument.\n"));
-      git(f.home, f.project, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", "test.sh");
+      // It documented the usage too, so the doc-impact check has nothing left to add. The owner's unstaged
+      // README edit stays on top of the committed text.
+      const readme = "# Greeting fixture\n\nRun `./test.sh`.\n\nRun `./greet.sh <name>` to greet someone, or `./greet.sh` for `Hello, world.`\n";
+      writeFileSync(join(f.project, "README.md"), readme);
+      git(f.home, f.project, "commit", "-q", "-m", "feat: greet the given name", "--", "greet.sh", "test.sh", "README.md");
+      writeFileSync(join(f.project, "README.md"), readme.replace("Run `./test.sh`.", "Run `./test.sh`. Unstaged unrelated edit."));
       git(f.home, f.project, "push", "-q", "origin", "main");
       return { owning: reviewedFeature(f) };
     },
@@ -1415,7 +1527,7 @@ const PHASE7: Scenario[] = S13_CASES.map(
           if (k.expect.partial) {
             checks.push({ name: "nothing reached GitHub and no PR was opened", ok: remote === null && openPRs().length === 0 });
             const report = turns.map((t) => t.result).join("\n");
-            checks.push({ name: "the report calls the delivery partial and names the local commit it stopped at", ok: /\bpart(ial|way)\b/i.test(report) && report.includes(local.slice(0, 7)) });
+            checks.push({ name: "the report calls the delivery partial and names the local commit it stopped at", ok: /partial delivery/i.test(report) && report.includes(local.slice(0, 7)) });
             checks.push({ name: "the remote configuration was left as it was", ok: gitIn(f, f.project, "config", "remote.origin.pushurl") === null && gitIn(f, f.project, "config", "remote.origin.url") === `https://github.com/${SHIP_REPO}.git` });
           } else {
             checks.push({ name: "the feature branch was pushed as it is locally", ok: remote === local });
@@ -1433,6 +1545,7 @@ const PHASE7: Scenario[] = S13_CASES.map(
               checks.push({ name: "the docs-only delivery skipped CI, and the report says skipped", ok: marker && runsFor(local, false) === 0 && said(c, "skipped") });
             }
             checks.push(canaryFree([body, issueComments(issue), ...outgoing.map((x) => `${x.subject}\n${x.body}`), ...turns.map((t) => t.result)]));
+            checks.push(citesGuide(c));
           }
           checks.push({ name: "nothing was merged into GitHub's main", ok: gh(token(), "api", `repos/${SHIP_REPO}/commits/main`, "--jq", ".sha") === mainBefore });
           checks.push({ name: "the token appears in no output", ok: !turns.some((t) => t.raw.includes(token())) });
@@ -1467,7 +1580,7 @@ async function main() {
   const binary = JSON.parse(readFileSync(join(ROOT, "plugins", "vh-adlc", "vh-adlc.lock.json"), "utf8")).version;
   const date = new Date().toISOString().slice(0, 10);
   for (const s of selected) {
-    const f = build(mkdtempSync(join(tmpdir(), `vh-adlc-${s.id}-`)));
+    const f = build(scratch(`vh-adlc-${s.id}-`));
     const started = Date.now();
     let result: Awaited<ReturnType<Scenario["run"]>>;
     try {
@@ -1502,7 +1615,7 @@ async function main() {
       "",
       "## Checks",
       "",
-      ...checks.map((c) => `- [${c.ok ? "x" : " "}] ${c.name}${c.detail && !c.ok ? `: ${c.detail.replace(/\s+/g, " ").slice(0, 200)}` : ""}`),
+      ...checks.map((c) => `- [${c.ok ? "x" : " "}] ${c.name}${c.detail && !c.ok ? `: ${c.detail.replace(/\s+/g, " ").slice(0, 600)}` : ""}`),
       "",
       "## Binary calls",
       "",
@@ -1511,13 +1624,16 @@ async function main() {
       // A failing run keeps each turn's final report, so the failure can be read without a re-run.
       ...(pass
         ? []
-        : ["", "## Reports", ...result.turns.flatMap((t, i) => ["", `Turn ${i + 1}:`, "", ...redactPaths(t.result, f).slice(0, 2000).split("\n").map((l) => `> ${l}`)])]),
+        : ["", "## Reports", ...result.turns.flatMap((t, i) => ["", `Turn ${i + 1}:`, "", ...redactPaths(t.result, f).slice(0, 12000).split("\n").map((l) => `> ${l}`)])]),
       "",
     ];
     const text = lines.join("\n");
     if (scanSecrets(text).length) throw new Error(`${s.id}: a secret canary reached the evidence summary`);
     writeFileSync(join(EVIDENCE, `${s.id}.md`), text);
     console.log(`${s.id} ${pass ? "PASS" : "FAIL"} (${cost.toFixed(2)} USD) ${checks.filter((c) => !c.ok).map((c) => c.name).join("; ")}`);
+    const kept = SCRATCH.splice(0);
+    if (pass && !process.env.VH_ADLC_KEEP) for (const dir of kept) rmSync(dir, { recursive: true, force: true });
+    else console.log(`${s.id} kept ${kept.join(" ")}`);
   }
 }
 
