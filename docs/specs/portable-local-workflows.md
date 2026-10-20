@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing the accepted local portability and GUI checks."
+status: complete
+status_description: "All seven accepted criteria met in R-4; bounded GUI limits remain explicit."
 issue: https://github.com/michielvha/vh-adlc/issues/16
 branch: feat/portable-local-workflows
 goal: "Run the same ADLC workflow in local Codex and existing GUI hosts without generated host implementations."
