@@ -3,7 +3,8 @@
 Date: 2026-10-20
 
 Result: installation, discovery and the read-only investigation passed. A real default-review blocker
-was reproduced; the version 0.1.3 correction still needs its post-update GUI run.
+was reproduced in 0.1.2; the GUI-installed 0.1.3 update then passed the post-update review-storage check.
+The Local implementation and completion loop has not yet been verified.
 
 | Field | Observed value |
 | --- | --- |
@@ -66,7 +67,32 @@ model override and can record an explicit `unknown` header, with identity not at
 and Claude Code's named default chain still require a match. Missing headers remain pending.
 
 The package checks cover those instruction boundaries. They are structural checks, not a substitute
-for the pending post-update GUI test.
+for the post-update GUI test.
+
+## GUI update and regression result
+
+The normal **Chat: Update Plugins** command reported `Updated plugins: michielvha/vh-adlc`. The installed
+manifest then contained version 0.1.3. No cache was edited to simulate an update, and no Force update
+was used.
+
+A fresh chat explicitly selected **Local** again; the New Chat default was not assumed to be Local.
+With no reviewer model named, the primary read the updated protocol and acknowledged that an explicit
+`MODEL: unknown` is eligible only with identity marked unattested. It dispatched the installed reviewer
+against fixture commit `63c1746`.
+
+The reviewer performed exact-commit reads and fixture checks under normal permission prompts, then
+returned `MODEL: unknown` and `NO FINDINGS`. The primary treated that explicit header as eligible,
+recorded model `unknown` and procedural isolation, and wrote `No findings; model identity not attested.`
+It did not substitute the main-session model label.
+
+The actual `review check` and document lint passed. An independent check of the stored R-1 against
+the returned records also passed with `equal: true`. The GUI committed only the fixture document in
+`c684b4995083f1506cb28e7ba4c6c9db52a79fad` and pushed it to the existing local bare origin; an independent
+ref check confirmed the same commit there. Status remained draft, and the staged NOTES file, unstaged
+README edit and untracked scratch file were preserved. No acceptance, implementation or GitHub write
+was authorised in that turn.
+
+The named-model negative GUI case and the Local implementation loop remain unverified.
 
 ## Boundaries
 

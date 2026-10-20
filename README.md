@@ -69,6 +69,15 @@ a Local installation is not proof that a Copilot or Claude harness has loaded th
 No terminal commands are needed for those GUI installs. The first operation can ask permission to
 read the installed plugin's references and its pinned public documentation cache.
 
+#### Claude Code VS Code extension
+
+The native Claude Code extension uses the normal Claude Code plugin registry. In the GUI validation
+run, it loaded the plugin installed through the desktop steps above.
+
+Open your project in Code, run **Claude Code: Open**, and type `/vh-adlc` in the extension's own message
+input. Choose a qualified operation such as `/vh-adlc:vh-adlc-spec`. This is the native extension,
+not Copilot Chat's separate **Claude** harness.
+
 #### Claude Code CLI
 
 In a terminal:
@@ -106,12 +115,13 @@ claiming that the whole scenario matrix passed.
 | Host or capability | Status | Evidence |
 | --- | --- | --- |
 | Claude Code CLI 2.1.303, Linux | Supported | `tests/vh-adlc/evidence/claude-code/` |
-| Claude Code desktop app 2.42304.2, macOS arm64 | Partial GUI validation: installation, seven operations, investigation and independent spec review passed | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md) |
-| Claude Code VS Code extension, remote sessions | Unsupported: discovery not yet run | Not inferred from another Claude Code surface |
-| VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Partial GUI validation: installation, seven operations, reviewer discovery and investigation passed; default-review fix is being validated | [Local GUI run](tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
+| Claude Code desktop app 2.42304.2, macOS arm64 | Core GUI loop passed, from investigation through test-first implementation, independent review and gated completion; publishing withheld | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md) |
+| Claude Code VS Code extension 2.1.301, macOS arm64 | Partial GUI validation: seven operations, investigation, independent spec review and structured owner questions passed | [Native extension GUI run](tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md) |
+| Claude Code remote sessions | Unsupported | Not inferred from another Claude Code surface |
+| VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Partial GUI validation: installation, seven operations, reviewer discovery, investigation and the default-review regression passed | [Local GUI run](tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
 | Copilot CLI | Unsupported | `tests/vh-adlc/evidence/copilot-cli/README.md` |
-| macOS | Unsupported for the loop; binary installation, fixture tests and Claude Code CLI discovery passed on arm64 | [Bounded macOS check](tests/vh-adlc/evidence/claude-code/S1.host.macos.md); no full scenario run |
+| macOS arm64 | Core desktop GUI loop passed; other surfaces and full-matrix limits are listed separately | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md), [binary and fixture checks](tests/vh-adlc/evidence/claude-code/S1.host.macos.md) |
 | Structural reviewer isolation | Unsupported: reviews record `procedural` | The reviewer has a shell, which can still write |
 | Choosing the reviewer's model on Claude Code | Supported, with a caveat | When settings refuse the requested model, Claude Code runs the reviewer on another model without saying so. The reviewer names the model it ran on, and the loop compares it with the request. A named model that ran elsewhere leaves the review pending with a handoff. A default pass that ran on neither `fable` nor `opus` is dispatched again on `opus`. The Review Log records the model that ran |
 
