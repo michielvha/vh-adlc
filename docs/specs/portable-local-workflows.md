@@ -91,7 +91,7 @@ tests use only the existing throwaway repository, never a real project.
 | AC-03 | Contract tests preserve malformed/explicit-model checks; the actual Local GUI explicit-model negative request leaves no new eligible row or subsection. Positive unknown identity is checked with `review check`. |
 | AC-04 | Run the real installer through Bash from a mode-0644 fixture copy. Existing installer tests exercise valid and invalid digests. |
 | AC-05 | Drive the native Codex GUI on a disposable fixture; verify exact commits, status complete, passing tests, an independent criterion review and completion-gate line. Record whether desktop or extension was used; do not infer the other. |
-| AC-06 | Drive actual Local chat on a disposable fixture. Independently compare original dirty entries and other-worktree HEAD, feature tests, review records, completion commit and negative-model outcome. |
+| AC-06 | Drive actual Local chat on a disposable fixture. Compare the unrelated staged/unstaged/untracked contents and modes before and after; require identical snapshots of the second worktree's HEAD, index, tracked and untracked file contents and modes. Verify feature tests, review records, completion commit and negative-model outcome. |
 | AC-07 | Read actual GUI setup/update/remove controls or official native instructions. Record the native Claude attempt and a GUI shipping attempt against the throwaway fixture; report any permission, authentication or quota blocker. Run the package checker and check documentation links. |
 
 ## Tasks
@@ -106,6 +106,16 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-20 | R-1 | spec | `044b43685584208d7c3146289f423858baa0f2b7` | unknown | procedural | One factual should-fix; model identity not attested |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-06
+EVIDENCE: docs/specs/portable-local-workflows.md:94 names comparison of “original dirty entries and other-worktree HEAD”. AC-06 requires not changing another worktree, but its HEAD remains unchanged when its files or index are modified.
+PROPOSAL: Capture and compare the second worktree's HEAD, index and working-file contents, including untracked files, before and after the GUI run. Require those snapshots to match.
 
 ## Sources
 
