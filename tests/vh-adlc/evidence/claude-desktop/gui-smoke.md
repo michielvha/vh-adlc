@@ -2,8 +2,9 @@
 
 Date: 2026-10-20
 
-Result: GUI installation, all seven operation completions, investigation and independent spec review
-passed. The fixture's implementation and implementation review are not yet established by this record.
+Result: GUI installation, all seven operation completions and the core development loop passed:
+investigation, spec review, acceptance, tasks, claim, test-first implementation, independent
+implementation review, gated completion and resume. Publishing was explicitly withheld.
 
 | Field | Observed value |
 | --- | --- |
@@ -62,10 +63,33 @@ All documented pushes targeted the fixture's local bare origin, not GitHub. The 
 repository was unchanged by those GUI agents. Staged NOTES, the unstaged README edit, the untracked
 scratch file and the other worktree were preserved.
 
+## GUI implementation and completion
+
+The accepted fixture was continued through the actual `/vh-adlc:vh-adlc-resume` GUI command. The
+scripted owner authorised the accepted implementation and review, but explicitly withheld shipping.
+The app used the real next-step and gate results rather than restarting the feature.
+
+| Fixture commit | Observed outcome |
+| --- | --- |
+| `408e8d4` | Tasks written and committed on the default branch |
+| `b65cbd0` | Published local-bare-origin claim; existing worktree switched to `feat/greeting-name` |
+| `95bcb3d` | Existing failing test observed before the greeting implementation; the task then passed |
+| `0dc0062` | Independent implementation review R-4 stored |
+| `593ba3c` | Complete gate passed, then the status changed to complete |
+
+R-4 returned all three criteria as `met`. The completion commit carries
+`vh-adlc gate complete: pass (rules 1, docs e4d58d2)`.
+
+An independent post-run check observed `./test.sh` printing `PASS`, the three original unrelated dirty
+entries still present, no remote `feat/greeting-name` branch, and the other worktree still at its
+initial `35657868f6e59924400be37909b9928fddd9ef07` commit. No feature branch was published, and no PR,
+merge, tag or release was performed by this GUI fixture.
+
 ## Boundaries
 
 These are actual desktop UI operations under normal app authentication; no credential file was copied
 to manufacture a headless session. No financial controls were approved.
 
-The evidence does not establish the VS Code extension, remote sessions, every scenario variant, or
-structural reviewer isolation. Raw conversation and UI dumps are not published.
+The successful core loop is not the full scenario matrix. It does not establish another GUI surface,
+remote sessions, every model/permission variant, actual GitHub shipping, or structural reviewer
+isolation. Raw conversation and UI dumps are not published.
