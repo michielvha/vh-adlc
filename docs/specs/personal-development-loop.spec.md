@@ -830,7 +830,7 @@ Agent frontmatter carries no `model:` (see [Hosts](#hosts)). Tier is chosen at d
 | --- | --- |
 | The orchestrating session | The model the owner selected in the host |
 | Independent passes on Claude Code | `fable`. If the host rejects it, the owner declines a usage-credit prompt, or the pass quietly ran on another model, `opus`, announced in the run and recorded. This is the defined default chain, the same as Claude Code's `best` alias |
-| Independent passes on VS Code and Copilot CLI | The model the owner names, otherwise the session model; recorded as such |
+| Independent passes on VS Code and Copilot CLI | The owner-named model when requested; otherwise the host's inherited session default, with no override. Record its reported identity, including `unknown` when it is not exposed (D-37) |
 
 A model the owner names is passed as given, with no fallback: if the host rejects it, the review stays
 pending and lists what the host offers. A host can also run the reviewer on another model without
@@ -843,7 +843,11 @@ run the review on the model named (D-35). For the default chain, a pass that ran
 `fable` is the announced fallback above. A pass that ran on any other model is dispatched again naming
 `opus`. If that pass also ran elsewhere, the review stays pending as for a named model (D-34). Each
 Review Log row records the model that ran. It records `unknown` only where no model was requested, so
-there is nothing to compare (D-37). A stronger model never makes self-review independent.
+there is nothing to compare (D-37). Outside Claude Code, a review with no owner-named model requests no
+override and does not use Claude Code's default chain. Its explicit `MODEL: unknown` header is eligible
+without a model-match claim; the report says that model identity was not attested. A missing header
+stays pending. Named models on every host, and Claude Code's explicitly requested default chain, still
+require the identity check above. A stronger model never makes self-review independent.
 
 ### Authority, identity and preservation
 

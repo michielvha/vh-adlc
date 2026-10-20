@@ -2,7 +2,7 @@
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { build, claim, FEATURE_PATH, type Fixtures, git, gitEnv, OTHER_FEATURE_BRANCH, OTHER_FEATURE_PATH, plan, prepareOtherFeature, realBinary, SECRET_CANARIES } from "./fixtures/build";
@@ -10,12 +10,29 @@ import { build, claim, FEATURE_PATH, type Fixtures, git, gitEnv, OTHER_FEATURE_B
 const ROOT = resolve(import.meta.dir, "..", "..");
 const dir = mkdtempSync(join(tmpdir(), "vh-adlc-fixtures-"));
 let f: Fixtures;
+let packageBefore: ReturnType<typeof packageState>;
 
 beforeAll(() => {
+  packageBefore = packageState();
   f = build(dir);
 }, 180_000);
 
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
+
+function packageState() {
+  const result = Bun.spawnSync(["git", "-C", ROOT, "status", "--porcelain", "--", "plugins/vh-adlc"], {
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  if (result.exitCode !== 0) throw new Error(result.stderr.toString());
+  const root = join(ROOT, "plugins", "vh-adlc");
+  const files = [...new Bun.Glob("**/*").scanSync({ cwd: root, onlyFiles: true, dot: true })].sort().map((path) => ({
+    path,
+    digest: createHash("sha256").update(readFileSync(join(root, path))).digest("hex"),
+    mode: statSync(join(root, path)).mode,
+  }));
+  return { status: result.stdout.toString(), files };
+}
 
 function sh(cwd: string, ...cmd: string[]) {
   const r = Bun.spawnSync(cmd, { cwd, env: gitEnv(f.home), stdout: "pipe", stderr: "pipe" });
@@ -114,8 +131,7 @@ describe("fixture plugins and the logging wrapper", () => {
   });
 
   test("the real lock and package are untouched", () => {
-    const r = Bun.spawnSync(["git", "-C", ROOT, "status", "--porcelain", "--", "plugins/vh-adlc"], { stdout: "pipe" });
-    expect(r.stdout.toString()).toBe("");
+    expect(packageState()).toEqual(packageBefore);
   });
 
   test("the wrapper forwards, logs and seeds the isolated cache", () => {
