@@ -90,7 +90,8 @@ tests use only the existing throwaway repository, never a real project.
       Evidence: native app 26.1013.40934 completed fixture c20fb38 through five independently met criteria and the real completion gate. Independent post-run tests passed and complete preservation snapshots matched. See tests/vh-adlc/evidence/codex/gui-smoke.md.
 - [x] AC-06: VS Code Local executes the remaining coding/review/completion flow and an explicit-model negative case, without including unrelated work or changing another worktree.
       Evidence: real Local GUI completed b10c1a1 after test-first implementation and independent R-2. The negative case left state unchanged; full unrelated/second-worktree snapshots matched. Core-loop permission UI showed Allow all unexpectedly, so normal per-command approval for that full run is not claimed; Default permissions was restored. See tests/vh-adlc/evidence/vscode-local/gui-smoke.md.
-- [x] AC-07: GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
+- [ ] AC-07: GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
+      Evidence: R-3 returned not met: an older Local Boundaries sentence contradicts the recorded Allow all caveat. The factual documentation correction needs a fresh implementation pass.
       Evidence: README names observed Codex install, Refresh, seven skill controls and More actions/Uninstall, with native CLI equivalents. Evidence records the live Claude allowance blocker and actual Codex shipping preflight error on unrelated fixture history; no remote write followed. Root support rows distinguish surfaces and the Local mode caveat.
 
 ## Test Plan
@@ -130,6 +131,7 @@ None.
 | 2026-10-20 | R-1 | spec | `044b43685584208d7c3146289f423858baa0f2b7` | unknown | procedural | One factual should-fix; model identity not attested |
 | 2026-10-20 | R-2 | spec | `41fde3a096a0c55905167b3e4e8d14636ce8542f` | unknown | procedural | No findings; model identity not attested |
 | 2026-10-20 | R-2 | spec | `41fde3a096a0c55905167b3e4e8d14636ce8542f` | n/a | n/a | accepted by owner |
+| 2026-10-20 | R-3 | implementation | `f1afe694eda460cd82cf9f30de83402c38ddbd6e` | unknown | procedural | Six criteria met; AC-07 not met, one factual documentation finding; model identity not attested |
 
 ### R-1
 
@@ -143,6 +145,43 @@ PROPOSAL: Capture and compare the second worktree's HEAD, index and working-file
 ### R-2
 
 NO FINDINGS
+
+### R-3
+
+CRITERION: AC-01 Native Codex discovers the same seven operations from the shared package, while Claude compatibility discovery still works and no generated workflow tree exists.
+VERDICT: met
+EVIDENCE: At f1afe694eda460cd82cf9f30de83402c38ddbd6e, `bun test tests/vh-adlc` passed 76 tests with 280 assertions. Inspected native Codex controls listing all seven operations on 0.2.0. `claude plugin validate --json plugins/vh-adlc` succeeded without warnings. Descriptor equality, Claude discovery artifacts and the shared package layout establish compatibility without generated workflows.
+
+CRITERION: AC-02 Unnamed reviews on every host inherit its default without an override; registered and generic independent dispatch use the same reviewer instructions.
+VERDICT: met
+EVIDENCE: Inspected both review skills, the current shared protocol and canonical reviewer at f1afe694eda460cd82cf9f30de83402c38ddbd6e. Passing contract tests require inherited defaults and the same canonical instructions for generic dispatch. Codex and Local GUI artifacts record independent default reviews with procedural isolation and unattested unknown identities. The revised Claude model policy has no new authenticated session run.
+
+CRITERION: AC-03 An explicit unknown reviewer identity is eligible only without a requested model; missing headers and mismatched explicit requests store no eligible review.
+VERDICT: met
+EVIDENCE: At f1afe694eda460cd82cf9f30de83402c38ddbd6e, passing contract tests preserve missing-header rejection and strict requested-model matching. Inspected the repeated Local negative request under Default permissions: dispatch remained pending, with no new review row or subsection. Both positive unnamed unknown fixture reviews passed independently executed `review check` with `equal: true`.
+
+CRITERION: AC-04 The skill installer works when extracted without its executable bit and still rejects a digest mismatch.
+VERDICT: met
+EVIDENCE: Executed the real installer tests at f1afe694eda460cd82cf9f30de83402c38ddbd6e. Bash invocation of the mode-0644 copy verified the locked binary and preserved its nonexecutable mode. Asset, binary, PATH and cache digest-mismatch cases passed their rejection assertions. Inspected the shared Bash invocation instructions; production lock and verification logic are unchanged.
+
+CRITERION: AC-05 A real Codex local GUI executes investigation, spec review, owner acceptance, tasks, test-first implementation, independent implementation review and gated completion in a disposable fixture.
+VERDICT: met
+EVIDENCE: Inspected native GUI artifacts and fixture history through c20fb38be63eba111cf4bfb08233f4d4b62491ee. Independently reproduced named-output failures before implementation and passing exact-byte output afterward. The fixture suite passed all five cases; R-2 targets 37efd263ac940f377dee9c7ec1534255d42a4aa2. Freshness, review check and completion gate passed. Recorded and live preservation snapshots matched. Extension and remote surfaces are not established.
+
+CRITERION: AC-06 VS Code Local executes the remaining coding/review/completion flow and an explicit-model negative case, without including unrelated work or changing another worktree.
+VERDICT: met
+EVIDENCE: Inspected Local GUI artifacts and history through b10c1a101c1f37a402756025bc95e08c699ee193. Independently reproduced the accepted-scope red/green behavior and ran the passing fixture suite. R-2 review check, freshness and completion gate passed. Recorded and live unrelated-work and second-worktree snapshots matched. The explicit-model rejection ran under Default permissions; normal per-command approval for the entire core loop is not established.
+
+CRITERION: AC-07 GUI-first setup and the support matrix state verified surfaces, exact limits and native update/removal routes; attempted native Claude and shipping checks are recorded without claiming blocked runs passed.
+VERDICT: not met
+EVIDENCE: At f1afe694eda460cd82cf9f30de83402c38ddbd6e, inspected native lifecycle controls, README routes, support limits and both blocked attempts. Claude's allowance limit and Codex's no-merge-base shipping stop are recorded without claiming success. Nine local documentation links resolved. However, the Local evidence contradicts its Allow all caveat by subsequently stating that no unrestricted mode was enabled.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/evidence/vscode-local/gui-smoke.md:143-145
+EVIDENCE: Lines 131-135 report Allow all during automation and again at core-loop completion, followed by restoration of Default permissions. The unqualified Boundaries statement at lines 144-145 says “no unrestricted mode was enabled,” contradicting that limitation.
+PROPOSAL: Scope the normal-permission statement to the earlier checks it describes, or replace it with the observed core-loop limitation and subsequent restoration. Preserve the distinction between successful implementation and unverified whole-loop per-command approval.
 
 ## Sources
 
