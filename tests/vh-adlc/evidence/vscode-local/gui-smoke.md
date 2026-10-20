@@ -141,8 +141,10 @@ unrelated file or second-worktree change was found. Raw UI captures are not publ
 ## Boundaries
 
 Native macOS accessibility and window-specific snapshots drove these tests. No headless CLI agent run
-was counted as GUI proof. Normal permission prompts were reviewed individually; no unrestricted mode
-was enabled. Only public plugin sources, the pinned public cache and disposable fixtures were approved.
+was counted as GUI proof. The earlier installation, investigation and default-review checks used
+individual scoped permission prompts. The later core-loop permission-mode limitation is recorded
+above; normal per-command approval for that whole run is not established. Default permissions was
+restored after completion, and independent checks verified the unrelated work and second worktree.
 
 This record does not prove the Copilot or Claude harnesses, the native Claude Code extension, remote
 sessions, structural isolation, or the full manual scenario selection. Raw UI dumps are not published.
