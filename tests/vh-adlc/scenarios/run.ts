@@ -1176,6 +1176,7 @@ const PHASE6: Scenario[] = S11_CASES.map(
           const doc = readFileSync(join(owning, FEATURE_PATH), "utf8");
           const rows = implementationRows(doc);
           const row = rows.at(-1);
+          const reportedModel = row?.[4]?.replaceAll("`", "").trim() ?? "";
           const commits = agentLog(f, f.project, `${target}..${FEATURE_BRANCH}`);
           const unpushed = gitIn(f, f.project, "ls-remote", "--heads", "origin", FEATURE_BRANCH) === "";
           if (k.expect === "pending") {
@@ -1190,7 +1191,7 @@ const PHASE6: Scenario[] = S11_CASES.map(
           const got = row ? records(doc, row[1]) : {};
           return [
             { name: "the reviewer ran in a separate context", ok: uses.some((u) => u.subagent) },
-            { name: "the review row targets the reviewed commit and records the actual reviewer identity", ok: !!row && target.startsWith(row[3].replaceAll("`", "")) && (k.expect === "default" ? ran.includes(row[4]) || (row[4] === "unknown" && said(c, "not attested")) : row[4].toLowerCase().includes(k.expect)) },
+            { name: "the review row targets the reviewed commit and records the actual reviewer identity", ok: !!row && target.startsWith(row[3].replaceAll("`", "")) && (k.expect === "default" ? ran.includes(reportedModel) || (reportedModel === "unknown" && said(c, "not attested")) : reportedModel.toLowerCase().includes(k.expect)) },
             { name: "isolation is recorded", ok: !!row && ["structural", "procedural", "unknown"].includes(row[5]) },
             { name: "the subagent trace shows the reviewer ran", ok: ran.length > 0 && (k.expect === "default" || ran.some((id) => id.includes(k.expect))), detail: ran.join("; ") },
             { name: "the four verdicts came back distinctly, one per criterion", ok: Object.keys(got).length === 4 && Object.entries(EXPECTED_VERDICTS).every(([id, v]) => got[id] === v), detail: JSON.stringify(got) },
