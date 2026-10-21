@@ -202,7 +202,9 @@ function localMaintenanceRefs(before: string, after: string): boolean {
   const parse = (text: string) => Object.fromEntries(text.split("\n").filter(Boolean).map((line) => line.split(" ")));
   const a = parse(before), b = parse(after);
   const changed = differences(a, b);
-  return changed.length <= 1 && changed.every((name) => /^refs\/heads\/(?:feat|fix|perf|docs|style|test|build|ci|chore|refactor|revert|maintenance)\//.test(name) && b[name]);
+  const owned = Object.keys(a).filter((name) => name.startsWith("refs/heads/") && name !== "refs/heads/main");
+  return changed.length <= 1 && changed.every((name) => name.startsWith("refs/heads/") && name !== "refs/heads/main" && b[name]
+    && (owned.length ? owned.includes(name) : !a[name]));
 }
 
 function localFeatureRefs(before: string, after: string): boolean {
@@ -245,7 +247,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   }
   if (f.id === "L09-bootstrap") checks.push(
     { name: "actual bootstrap guide read", pass: commands.some((c) => c.command.includes("bootstrap-go-project.md") && c.output.includes("# Bootstrap a Go project")) },
-    { name: "actual personal template revision and configuration inspected", pass: commands.some((c) => c.command.includes("template-go-app")) && commands.some((c) => /\b[0-9a-f]{40}\b/.test(c.output)) && commands.some((c) => c.command.includes(".golangci.yml") && c.command.includes(".goreleaser.yml")) },
+    { name: "actual personal template revision and configuration inspected", pass: commands.some((c) => c.command.includes("template-go-app") && c.exitCode === 0 && /\b[0-9a-f]{40}\b/.test(c.output)) && [".golangci.yml", ".goreleaser.yml"].every((p) => commands.some((c) => c.command.includes(p) && c.exitCode === 0 && /version:/.test(c.output))) },
     { name: "bootstrap draft produced before executable creation", pass: changed.some((p) => /^docs\/specs\/[^/]+\.md$/.test(p) && /^status: draft$/m.test(readFileSync(join(f.project, p), "utf8"))) },
   );
   if (f.id === "L10") checks.push(
@@ -359,6 +361,10 @@ export function events(raw: string): { response: string; commands: Command[]; fa
     if (item?.type === "agent_message") response.push(String(item.text));
     if (entry.type === "item.completed" && item?.type === "command_execution" && typeof item.exit_code === "number") {
       commands.push({ command: String(item.command), exitCode: item.exit_code, output: String(item.aggregated_output ?? "") });
+    }
+    if (entry.type === "item.completed" && item?.type === "mcp_tool_call" && item.tool === "github.fetch" && !item.error && !item.result?.isError) {
+      const content = item.result?.structured_content?.content;
+      if (typeof content === "string" && content.length) commands.push({ command: `mcp ${item.server}.${item.tool} ${JSON.stringify(item.arguments)}`, exitCode: 0, output: content });
     }
   }
   return { response: response.join("\n\n"), commands, failed, threadId };

@@ -104,11 +104,11 @@ describe("lifecycle outcome grading", () => {
     expect(grade(f, before, snapshot(f), "Repaired locally.", commands).pass).toBe(false);
   });
 
-  test("a maintenance-prefixed local branch has no publication authority", () => {
+  test.each(["maintenance/greeting", "maintenance-greeting"])("a local maintenance branch %s has no publication authority", (branch) => {
     const f = fixture("L06"), before = snapshot(f);
-    git(f.project, "switch", "-c", "maintenance/greeting");
+    git(f.project, "switch", "-c", branch);
     expect(grade(f, before, snapshot(f), "Review pending.", []).checks.find((c) => c.name === "publication and refs respected")?.pass).toBe(true);
-    git(f.project, "push", "origin", "maintenance/greeting");
+    git(f.project, "push", "origin", branch);
     expect(grade(f, before, snapshot(f), "Review pending.", []).checks.find((c) => c.name === "publication and refs respected")?.pass).toBe(false);
   });
 
@@ -146,5 +146,12 @@ describe("lifecycle outcome grading", () => {
     const ended = JSON.stringify({ type: "item.completed", item: { ...command, exit_code: 1, aggregated_output: "FAIL: Ada" } });
     expect(events(started + "\n" + ended).commands).toEqual([{ command: "bash test.sh", exitCode: 1, output: "FAIL: Ada" }]);
     expect(events('{"type":"turn.failed"}').failed).toBe(true);
+  });
+
+  test("completed GitHub source reads establish inspection while failed reads and announcements do not", () => {
+    const item = { type: "mcp_tool_call", server: "codex_apps", tool: "github.fetch", arguments: { url: "https://github.com/michielvha/template-go-app/blob/" + "a".repeat(40) + "/.golangci.yml" }, result: { structured_content: { content: 'version: "2"' } } };
+    expect(events(JSON.stringify({ type: "item.started", item })).commands).toEqual([]);
+    expect(events(JSON.stringify({ type: "item.completed", item })).commands[0]?.output).toContain('version: "2"');
+    expect(events(JSON.stringify({ type: "item.completed", item: { ...item, error: { message: "Unavailable" } } })).commands).toEqual([]);
   });
 });
