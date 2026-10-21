@@ -8,22 +8,27 @@ vh-adlc. These trials add no framework controller or task store to shared docs.
 ## Current package and CLI evaluation
 
 The selected seven-skill package has digest
-`f4684dac19c40fc250ee11e12b54737937af4e536f2fcd1fea0635c315ac0324`.
-Its last instruction change is commit `96bac62`. The Go binary remains the
+`4ba35c567832c1b80333094f8360a6e1ecba9734e0b680a41f379371dc48d207`.
+Its last instruction change is commit `76e336f`. The Go binary remains the
 checksum-verified 0.1.0 release and the engineering-docs pin is unchanged.
 No eighth entry skill is included.
 
-Independent implementation review R-6 found successful default-branch pushes
-in three generic L05 feature trials whose requests did not authorize publication.
-The original oracle allowed those remote changes. The affected rerun also
-attempted publication, which automatic approval declined.
-[Publication failures](publication-before-fix.json) retains those native results,
-regraded from unchanged saved artifacts and events with their original statuses.
-The corrected [cli-matrix.json](cli-matrix.json) fails; the 58 historical trials
-are not an acceptance pass. [cli-trials.json](cli-trials.json) now reflects the
-corrected checks. Renewed proof requires a corrected frozen package and full
-native matrix. Other historical evidence below remains diagnostic where its
-publication check was invalid.
+[cli-matrix.json](cli-matrix.json) passes all 57 required outcomes and
+repetitions in 58 fresh native CLI trials against this frozen package and the
+unchanged engineering pin. The extra trial is the common-entry comparison's
+L05 case. [cli-trials.json](cli-trials.json) contains the actual checks, original
+and regraded statuses, raw-event identities and linked reviewer receipts. All
+trials were regraded together with the final evaluator revision. This is a
+bounded CLI scenario result; feature completion also requires the independent
+implementation review and real completion gate in the feature document.
+
+R-6 invalidated the preceding package's apparent pass: three generic feature
+trials pushed to their fixture remotes, and four further trials attempted
+publication without authority. [Publication failures](publication-before-fix.json)
+retains those corrected historical failures. The new intake distinguishes
+operation selection from direct invocation and keeps generic document work
+local unless the owner requests publication. The strict oracle rejects both
+remote changes and declined push attempts. The old passing claim is withdrawn.
 
 The native runner installs the package through Codex CLI 0.163.0 into disposable
 profiles and uses temporary repositories with local bare remotes. It retains
@@ -40,7 +45,7 @@ its own contract/target inspection and completed return, matching stored records
 and current source and task definition. A clean-review claim alone fails.
 The evaluator uses completed GitHub connector reads as well as shell reads.
 
-[Accepted-feature repetitions](accepted-feature-repeats.json) contain three
+Historical [accepted-feature repetitions](accepted-feature-repeats.json) contain three
 fresh test-first implementations with canonical independent reviews, all passing
 after regrading unchanged fixtures. [Domain routing](domain-routing.json) covers
 onboarding, inspection of the actual Go template before unaccepted bootstrap,
@@ -48,6 +53,9 @@ and canonical review of committed work. [Delivery](delivery-boundary.json)
 preserves a completed feature during continuation, then applies shipping
 preflight after an explicit request in the same thread. Its destination is a
 local bare fixture; no real GitHub PR, issue or release is created.
+
+The current frozen repetitions and domain/delivery cases are in cli-trials.json;
+the separate linked reports above preserve earlier diagnostics.
 
 The runner preserves exact prompts, installed package hashes, engineering pins,
 host versions, durations, raw-event hashes and final-state checks. Raw native
@@ -74,6 +82,20 @@ with credential persistence disabled, before the seeded filename typo.
 All earlier CI trials remain diagnostic; all three fresh corrected runs pass
 with independently verified review receipts in the final CLI set.
 
+[The reserved investigation fixture](investigation-fixture-ambiguity.json)
+omitted its expected no-write constraint from the owner prompt. Independent
+assessment found that saving an analysis document was ambiguous under the
+named operation and pinned documentation convention. Its failed run remains
+diagnostic. The clarified chat-only prompt preserves the original no-write
+outcome and strict oracle; a fresh trial passes on the same package.
+
+The final evaluator also accepts punctuation after a model-attestation note,
+observed shell-variable comparisons of actual tag output with the README,
+and a reviewer's own exact HEAD resolution. Each rejection was reproduced
+before correction, with negative checks for wrong identity, unexecuted output
+or inherited evidence. Saved participant artifacts and native records were
+not edited to obtain passes.
+
 Several initial failures belonged to the evaluator: Git abbreviations, a model
 attestation note, outer blank lines, brace-expanded contract reads, valid local
 branch names, connector reads and explicitly associated review metadata were
@@ -89,20 +111,18 @@ is also retained separately from its three fresh repetitions.
 
 ## Entry comparison
 
-[comparison.json](comparison.json) records twelve initial core diagnostics and
-three maintenance pilots for unchanged 0.2.0, common intake through seven skills,
-and the same common policy plus a thin eighth entry skill. All three candidates
-passed the question, docs correction, report-only investigation and unaccepted
-feature-draft cases. The baseline already handled those four requests; these
-results do not establish that it generally chose the wrong route.
+[authority-comparison.json](authority-comparison.json) reruns all four core
+cases for unchanged 0.2.0, the corrected seven-skill entry and the same common
+package plus a scratch eighth entry skill. The baseline passes question,
+documentation and report-only investigation but fails the unaccepted-feature
+publication boundary. Both corrected entries pass all four cases; their common
+files are identical. No extra-skill benefit is demonstrated, so the seven-skill
+entry remains selected. This diagnostic comparison is separate from the full
+frozen matrix for that selected package.
 
-The extra skill showed no benefit in that comparison. Both development
-candidates gained the same explicit non-feature authority and maintenance
-procedure. After the feature-continuation clarification, the affected change
-case was rerun for all three candidates at their actual package identities;
-the original oracle marked them passing. R-6 invalidates publication-related
-passes; affected comparisons must be rerun. The seven-skill entry remains
-selected for evaluation, without a completed acceptance claim.
+[comparison.json](comparison.json) retains the earlier comparison under its
+original oracle. R-6 invalidates its publication-related pass claims. Earlier
+maintenance pilots likewise remain diagnostic.
 
 The original maintenance pilots were incomplete: the baseline created neither
 record nor review; the common candidate's clean-review claim had no verified
