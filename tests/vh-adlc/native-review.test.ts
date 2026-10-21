@@ -59,6 +59,17 @@ test("blank lines outside returned records preserve their exact content", () => 
   expect(f.verify().pass).toBe(false);
 });
 
+test("explicit review-ID metadata can accompany a bare verbatim returned record", () => {
+  const f = fixture();
+  const path = join(f.f.project, f.path);
+  const record = readFileSync(path, "utf8");
+  writeFileSync(path, record.replace("## Reviews", `R-1 target: ${f.target}. Model: unknown. Isolation: procedural.\n\n## Reviews`)
+    .replace(`Target: ${f.target}\nModel: unknown\nIsolation: procedural\n\n\x60\x60\x60text\nNO FINDINGS\n\x60\x60\x60`, "### R-1\n\nNO FINDINGS"));
+  expect(f.verify().pass).toBe(true);
+  writeFileSync(path, readFileSync(path, "utf8").replace("R-1 target:", "R-2 target:"));
+  expect(f.verify().pass).toBe(false);
+});
+
 test("bookkeeping after review preserves freshness but source drift does not", () => {
   const f = fixture();
   writeFileSync(join(f.f.project, f.path), readFileSync(join(f.f.project, f.path), "utf8") + "\n## State\n\nComplete locally.\n");
