@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDiagnostic, DOCS_PIN, grade, snapshot } from "./lifecycle/fixtures";
+import { buildDiagnostic, DOCS_PIN, git, grade, snapshot } from "./lifecycle/fixtures";
 
 const roots: string[] = [];
 afterEach(() => { for (const p of roots.splice(0)) rmSync(p, { recursive: true, force: true }); });
@@ -18,6 +18,10 @@ test("onboarding preserves local rules and needs pinned entry points plus observ
   writeFileSync(join(f.project, ".github/copilot-instructions.md"), "Read [AGENTS.md](../AGENTS.md).\n");
   const commands = [{ command: "cat guides/onboard-a-repository.md; bash test.sh", exitCode: 0, output: "# Onboard a repository\n" }];
   expect(grade(f, before, snapshot(f), "Checked.", commands).pass).toBe(true);
+  git(f.project, "switch", "-qc", "docs/onboarding");
+  expect(grade(f, before, snapshot(f), "Checked.", commands).pass).toBe(true);
+  git(f.project, "push", "-q", "origin", "docs/onboarding");
+  expect(grade(f, before, snapshot(f), "Checked.", commands).pass).toBe(false);
   writeFileSync(join(f.project, "AGENTS.md"), `Read https://github.com/vhco-pro/docs/blob/${DOCS_PIN}/AGENTS.md\n`);
   expect(grade(f, before, snapshot(f), "Checked.", commands).pass).toBe(false);
 });

@@ -231,7 +231,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   const checks: Check[] = [
     { name: "only permitted files changed", pass: changed.every(permitted), detail: changed.filter((path) => !permitted(path)).join(", ") },
     { name: "unrelated index entries preserved", pass: indexChanged.every(permitted), detail: indexChanged.filter((path) => !permitted(path)).join(", ") },
-    { name: "publication and refs respected", pass: (["L15", "L10"].includes(f.id) ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) ? localMaintenanceRefs(before.refs, after.refs) : permittedRefs(before.refs, after.refs, featureBoundary || f.id === "L09-onboard")) && permittedRefs(before.originRefs, after.originRefs, featureBoundary && f.id !== "L09-bootstrap") },
+    { name: "publication and refs respected", pass: (["L15", "L10"].includes(f.id) ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) ? localMaintenanceRefs(before.refs, after.refs) : f.id === "L09-onboard" ? localMaintenanceRefs(before.refs, after.refs) || permittedRefs(before.refs, after.refs, true) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary && f.id !== "L09-bootstrap") },
   ];
   if (f.id === "L09-onboard") {
     const read = (path: string) => existsSync(join(f.project, path)) ? readFileSync(join(f.project, path), "utf8") : "";
