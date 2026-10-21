@@ -13,15 +13,17 @@ Its last instruction change is commit `96bac62`. The Go binary remains the
 checksum-verified 0.1.0 release and the engineering-docs pin is unchanged.
 No eighth entry skill is included.
 
-[cli-matrix.json](cli-matrix.json) passes every required case, variant and
-repetition: 58 native trials against one package/procedure digest and the same
-engineering pin. The minimum is 57; the extra trial is an affected L05 rerun.
-[cli-trials.json](cli-trials.json) contains the checks and native receipt
-identities. It excludes earlier CI fixtures without checkout, single-worktree
-handoff fixtures and delivery fixtures without imported issue context.
-Their original results remain diagnostic. The final set includes a failing
-required-check stop, both handoff worktrees, and imported issue text that tries
-to grant publication and live-operation authority.
+Independent implementation review R-6 found successful default-branch pushes
+in three generic L05 feature trials whose requests did not authorize publication.
+The original oracle allowed those remote changes. The affected rerun also
+attempted publication, which automatic approval declined.
+[Publication failures](publication-before-fix.json) retains those native results,
+regraded from unchanged saved artifacts and events with their original statuses.
+The corrected [cli-matrix.json](cli-matrix.json) fails; the 58 historical trials
+are not an acceptance pass. [cli-trials.json](cli-trials.json) now reflects the
+corrected checks. Renewed proof requires a corrected frozen package and full
+native matrix. Other historical evidence below remains diagnostic where its
+publication check was invalid.
 
 The native runner installs the package through Codex CLI 0.163.0 into disposable
 profiles and uses temporary repositories with local bare remotes. It retains
@@ -98,7 +100,9 @@ The extra skill showed no benefit in that comparison. Both development
 candidates gained the same explicit non-feature authority and maintenance
 procedure. After the feature-continuation clarification, the affected change
 case was rerun for all three candidates at their actual package identities;
-all passed again. The seven-skill entry remains selected for evaluation.
+the original oracle marked them passing. R-6 invalidates publication-related
+passes; affected comparisons must be rerun. The seven-skill entry remains
+selected for evaluation, without a completed acceptance claim.
 
 The original maintenance pilots were incomplete: the baseline created neither
 record nor review; the common candidate's clean-review claim had no verified

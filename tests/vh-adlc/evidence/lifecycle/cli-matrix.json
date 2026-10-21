@@ -1,6 +1,6 @@
 {
   "kind": "native-cli-lifecycle-matrix",
-  "pass": true,
+  "pass": false,
   "packageHash": "f4684dac19c40fc250ee11e12b54737937af4e536f2fcd1fea0635c315ac0324",
   "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
   "trialCount": 58,
@@ -253,6 +253,8 @@
       "pass": true
     }
   ],
-  "errors": [],
+  "errors": [
+    "failed or unverified trial evidence"
+  ],
   "limitation": "Native CLI evidence only. This does not establish desktop GUI discovery/invocation or feature completion; other hosts remain unverified."
 }
