@@ -62,37 +62,61 @@ const packageHash = fingerprint(install.installedPath);
 const results: any[] = [];
 console.log(JSON.stringify({ candidate, root, version, packageHash, docsPin: DOCS_PIN, surface: "native-cli-diagnostic" }));
 
-for (const { id, trial, variant, prompt } of plan) {
+for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan) {
   const trialRoot = join(root, trial);
   mkdirSync(trialRoot, { recursive: true });
-  const f = buildDiagnostic(trialRoot, id);
-  if (prompt) f.prompt = prompt;
+  const f = buildDiagnostic(trialRoot, id, { seedReadOnlyWorkflow });
+  if (prompt || prompts) f.prompt = prompt ?? prompts![0];
   const before = snapshot(f);
   const started = Date.now();
-  const rawPath = join(trialRoot, "events.jsonl"), errorPath = join(trialRoot, "stderr.log");
   // --approve-for-me selects workspace-write itself and conflicts with --sandbox.
   // Keep session files inside the disposable profile: independent reviewers may
   // need the parent's persisted rollout. --ephemeral prevented one from starting.
-  const args = ["codex", "exec", "--json", "--color", "never", "--approve-for-me", "--cd", f.project, "--add-dir", f.origin, f.prompt];
-  if (id === "L13") args.splice(2, 0, "--skip-git-repo-check");
-  const child = Bun.spawn(args, { cwd: f.project, env: childEnv, stdout: Bun.file(rawPath), stderr: Bun.file(errorPath) });
-  let timeout = false;
-  const timer = setTimeout(() => { timeout = true; child.kill(); }, 240_000);
-  const exitCode = await child.exited;
-  clearTimeout(timer);
-  const raw = readFileSync(rawPath, "utf8");
+  let timeout = false, exitCode = 0, raw = "", parentThread = "";
+  const phases: any[] = [], phaseChecks: any[] = [];
+  for (const [at, text] of (prompts ?? [f.prompt]).entries()) {
+    const rawPath = join(trialRoot, prompts ? `phase-${at + 1}.events.jsonl` : "events.jsonl");
+    const errorPath = join(trialRoot, prompts ? `phase-${at + 1}.stderr.log` : "stderr.log");
+    const args = ["codex", "exec", "--json", "--color", "never", "--approve-for-me", "--cd", f.project, "--add-dir", f.origin];
+    if (id === "L13") args.push("--skip-git-repo-check");
+    args.push(...(at === 0 ? [text] : ["resume", parentThread, text]));
+    const child = Bun.spawn(args, { cwd: f.project, env: childEnv, stdout: Bun.file(rawPath), stderr: Bun.file(errorPath) });
+    const timer = setTimeout(() => { timeout = true; child.kill(); }, 240_000);
+    exitCode = await child.exited;
+    clearTimeout(timer);
+    const phaseRaw = readFileSync(rawPath, "utf8"), phase = events(phaseRaw);
+    raw += phaseRaw + "\n";
+    phases.push({ prompt: text, exitCode, timeout, thread: phase.threadId });
+    if (timeout || exitCode !== 0 || phase.failed) break;
+    if (at === 0) parentThread = phase.threadId;
+    else phaseChecks.push({ name: `phase ${at + 1} resumes the same native thread`, pass: phase.threadId === parentThread });
+    if (prompts && at === 0) {
+      const checkpoint = snapshot(f);
+      writeFileSync(join(trialRoot, "phase-1.snapshot.json"), JSON.stringify(checkpoint, null, 2));
+      mkdirSync(join(trialRoot, "phase-1-artifact"));
+      cpSync(join(f.project, "README.md"), join(trialRoot, "phase-1-artifact/README.md"));
+      const first = grade({ ...f, id: "L02" }, before, checkpoint, phase.response, phase.commands);
+      phaseChecks.push(...first.checks.map((c) => ({ ...c, name: `phase 1: ${c.name}` })));
+      if (!first.pass || !parentThread) break;
+    }
+  }
+  if (prompts) writeFileSync(join(trialRoot, "events.jsonl"), raw);
   const parsed = events(raw);
   const after = snapshot(f);
   const review = isMaintenance(id) ? verifyMaintenanceReview(f.project, join(profile, "sessions"), parsed.threadId, maintenancePaths(id)) : undefined;
   const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
+  if (prompts) {
+    phaseChecks.push({ name: "all requested scope-change turns completed", pass: phases.length === prompts.length });
+    phaseChecks.push(grade({ ...f, id: "L02" }, before, after, parsed.response, parsed.commands).checks.find((c) => c.name === "README actually corrected"));
+  }
   const unchangedPackage = fingerprint(install.installedPath) === packageHash;
   const result = {
     id, trial, variant, candidate, surface: "native-cli-diagnostic", host: version,
     packageHash, graderHash, docsPin: DOCS_PIN, model: "unknown", configuration: "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
     prompt: f.prompt, durationMs: Date.now() - started, exitCode, timeout,
-    review,
-    status: timeout || exitCode !== 0 || parsed.failed ? "execution-failed" : verdict.pass && unchangedPackage ? "pass" : "fail",
-    checks: [...verdict.checks, { name: "installed candidate unchanged", pass: unchangedPackage }],
+    review, phases: prompts ? phases : undefined,
+    status: timeout || exitCode !== 0 || parsed.failed ? "execution-failed" : verdict.pass && phaseChecks.every((c) => c?.pass) && unchangedPackage ? "pass" : "fail",
+    checks: [...phaseChecks, ...verdict.checks, { name: "installed candidate unchanged", pass: unchangedPackage }],
   };
   writeFileSync(join(trialRoot, "before.json"), JSON.stringify(before, null, 2));
   writeFileSync(join(trialRoot, "after.json"), JSON.stringify(after, null, 2));

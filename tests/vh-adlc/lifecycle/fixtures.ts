@@ -63,7 +63,7 @@ export function snapshot(f: Fixture): Snapshot {
   };
 }
 
-export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
+export function buildDiagnostic(root: string, id: Diagnostic, options: { seedReadOnlyWorkflow?: boolean } = {}): Fixture {
   if (!DIAGNOSTICS.includes(id)) throw new Error(`unsupported lifecycle case: ${id}`);
   const project = join(root, "project");
   const origin = join(root, "origin.git");
@@ -130,7 +130,7 @@ export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
     writeFileSync(join(project, "AGENTS.md"), readFileSync(join(project, "AGENTS.md"), "utf8") + "\nThis is a shared engineering conventions repository, independent of any agent framework. Documentation check: `bash check-docs.sh`.\n");
     git(project, "add", ".assets/banner.svg", "check-docs.sh");
   }
-  if (id === "L16-permissions") {
+  if (id === "L16-permissions" || options.seedReadOnlyWorkflow) {
     mkdirSync(join(project, ".github/workflows"), { recursive: true });
     writeFileSync(join(project, ".github/workflows/ci.yml"), "name: CI\non: [push]\npermissions:\n  contents: read\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: bash test.sh\n");
     git(project, "add", ".github/workflows/ci.yml");

@@ -1,6 +1,6 @@
 // Regrade saved diagnostics without rerunning an agent or overwriting its results.
 // bun tests/vh-adlc/lifecycle/regrade.ts <run-dir> [<run-dir> ...]
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot, type Fixture } from "./fixtures";
 import { verifyMaintenanceReview } from "./native-review";
@@ -21,7 +21,22 @@ const results = roots.flatMap((root) => {
     const review = isMaintenance(f.id) ? verifyMaintenanceReview(f.project, join(root, "profile/sessions"), parsed.threadId, maintenancePaths(f.id)) : undefined;
     const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
     const unchanged = original.checks.find((c: any) => c.name === "installed candidate unchanged");
-    const checks = [...verdict.checks, unchanged];
+    const phaseChecks: any[] = [];
+    if (original.variant === "R04") {
+      const checkpointPath = join(trial, "phase-1.snapshot.json"), artifact = join(trial, "phase-1-artifact");
+      if (existsSync(checkpointPath) && existsSync(join(artifact, "README.md"))) {
+        const checkpoint = JSON.parse(readFileSync(checkpointPath, "utf8"));
+        const hash = new Bun.CryptoHasher("sha256").update(readFileSync(join(artifact, "README.md"))).digest("hex");
+        const first = events(readFileSync(join(trial, "phase-1.events.jsonl"), "utf8"));
+        const secondPath = join(trial, "phase-2.events.jsonl");
+        const second = events(existsSync(secondPath) ? readFileSync(secondPath, "utf8") : "");
+        phaseChecks.push({ name: "phase 1 artifact matches its recorded snapshot", pass: hash === checkpoint.files["README.md"]?.hash });
+        phaseChecks.push(...grade({ ...f, id: "L02", project: artifact }, before, checkpoint, first.response, first.commands).checks.map((c) => ({ ...c, name: `phase 1: ${c.name}` })));
+        phaseChecks.push({ name: "all scope-change turns resume the same native thread", pass: !!first.threadId && second.threadId === first.threadId });
+        phaseChecks.push(grade({ ...f, id: "L02" }, before, after, parsed.response, parsed.commands).checks.find((c) => c.name === "README actually corrected"));
+      } else phaseChecks.push({ name: "scope-change checkpoint evidence exists", pass: false });
+    }
+    const checks = [...phaseChecks, ...verdict.checks, unchanged];
     return {
       ...original, review, originalStatus: original.status, originalGraderHash: original.graderHash ?? "not recorded",
       graderHash, rawEventsHash: new Bun.CryptoHasher("sha256").update(raw).digest("hex"),
