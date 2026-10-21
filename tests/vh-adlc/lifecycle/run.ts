@@ -5,7 +5,7 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildDiagnostic, DOCS_PIN, events, fingerprint, grade, snapshot, type Diagnostic } from "./fixtures";
+import { buildDiagnostic, DIAGNOSTICS, DOCS_PIN, events, fingerprint, grade, snapshot, type Diagnostic } from "./fixtures";
 import { verifyMaintenanceReview } from "./native-review";
 
 const REPO = resolve(import.meta.dir, "../../..");
@@ -58,7 +58,7 @@ run(["codex", "plugin", "marketplace", "add", market, "--json"], root, childEnv)
 const install = JSON.parse(run(["codex", "plugin", "add", "vh-adlc@vhco-lifecycle-evaluation", "--json"], root, childEnv));
 const packageHash = fingerprint(install.installedPath);
 const ids = (flag("--cases")?.split(",") ?? ["L01", "L02", "L04", "L05"]) as Diagnostic[];
-if (ids.some((id) => !["L01", "L02", "L04", "L05", "L06"].includes(id))) throw new Error("unsupported diagnostic case");
+if (ids.some((id) => !DIAGNOSTICS.includes(id))) throw new Error("unsupported diagnostic case");
 const results: any[] = [];
 console.log(JSON.stringify({ candidate, root, version, packageHash, docsPin: DOCS_PIN, surface: "native-cli-diagnostic" }));
 

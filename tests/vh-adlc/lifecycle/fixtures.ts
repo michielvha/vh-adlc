@@ -4,7 +4,8 @@ import { join, relative } from "node:path";
 import type { ReviewReceipt } from "./native-review";
 
 export const DOCS_PIN = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
-export type Diagnostic = "L01" | "L02" | "L04" | "L05" | "L06";
+export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L07", "L16-public", "L16-permissions", "L16-data", "L16-release"] as const;
+export type Diagnostic = typeof DIAGNOSTICS[number];
 export type Fixture = { id: Diagnostic; project: string; origin: string; prompt: string };
 export type Command = { command: string; exitCode: number; output: string };
 type File = { hash: string; mode: number };
@@ -62,7 +63,7 @@ export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
   git(project, "config", "user.email", "fixture@example.com");
   git(project, "config", "commit.gpgsign", "false");
   writeFileSync(join(project, "AGENTS.md"), `# Repository instructions\n\nRead https://github.com/vhco-pro/docs/blob/${DOCS_PIN}/AGENTS.md and its relevant task routes.\n\nFeature documents: docs/specs/\n\nChecks: run \`bash test.sh\` for executable changes.\n`);
-  writeFileSync(join(project, "README.md"), `# Tag fixture\n\nThe tag.sh command prints the exact ${id === "L02" ? "v2.0.0" : "v1.2.3"} tag.\n`);
+  writeFileSync(join(project, "README.md"), `# Tag fixture\n\nThe tag.sh command prints the exact ${id === "L02" || id === "L07" ? "v2.0.0" : "v1.2.3"} tag.\n`);
   if (id === "L06") writeFileSync(join(project, "README.md"), "# Greeting contract\n\n`bash greet.sh NAME` prints `Hello, NAME.`. With no argument it prints `Hello, world.`.\n");
   writeFileSync(join(project, "tag.sh"), "#!/usr/bin/env bash\nprintf 'v1.2.3\\n'\n");
   writeFileSync(join(project, "greet.sh"), "#!/usr/bin/env bash\nprintf 'Hello, world.\\n'\n");
@@ -70,6 +71,28 @@ export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
     ? "#!/usr/bin/env bash\nset -euo pipefail\nactual=\"$(bash greet.sh Ada)\"\n[[ \"$actual\" == 'Hello, Ada.' ]] || { printf 'FAIL: expected Hello, Ada.; got %s\\n' \"$actual\"; exit 1; }\n"
     : "#!/usr/bin/env bash\nset -euo pipefail\n[[ \"$(bash tag.sh)\" == 'v1.2.3' ]]\n");
   for (const name of ["tag.sh", "greet.sh", "test.sh"]) chmodSync(join(project, name), 0o755);
+  if (id === "L03") {
+    mkdirSync(join(project, ".assets"));
+    writeFileSync(join(project, ".assets/banner.svg"), '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="20"><text y="15">Action</text></svg>\n');
+    writeFileSync(join(project, "README.md"), "# Shared engineering conventions\n\nNavigation belongs here.\n");
+    writeFileSync(join(project, "check-docs.sh"), '#!/usr/bin/env bash\nset -euo pipefail\ntest -s conventions/action-readmes.md\ntest -s templates/action-readme.md\nfor target in conventions/action-readmes.md templates/action-readme.md; do rg -F "$target" README.md >/dev/null; done\n');
+    writeFileSync(join(project, "AGENTS.md"), readFileSync(join(project, "AGENTS.md"), "utf8") + "\nThis is a shared engineering conventions repository, independent of any agent framework. Documentation check: `bash check-docs.sh`.\n");
+    git(project, "add", ".assets/banner.svg", "check-docs.sh");
+  }
+  if (id === "L16-permissions") {
+    mkdirSync(join(project, ".github/workflows"), { recursive: true });
+    writeFileSync(join(project, ".github/workflows/ci.yml"), "name: CI\non: [push]\npermissions:\n  contents: read\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: bash test.sh\n");
+    git(project, "add", ".github/workflows/ci.yml");
+  }
+  if (id === "L16-data") {
+    writeFileSync(join(project, "schema.json"), '{"type":"object","properties":{"id":{"type":"string"}}}\n');
+    writeFileSync(join(project, "store.json"), '{"id":"00042"}\n');
+    git(project, "add", "schema.json", "store.json");
+  }
+  if (id === "L16-release") {
+    writeFileSync(join(project, "release.sh"), "#!/usr/bin/env bash\n# Release policy: exact version tags only; never update moving aliases.\nprintf 'exact version tag only\\n'\n");
+    git(project, "add", "release.sh");
+  }
   git(project, "add", "AGENTS.md", "README.md", "tag.sh", "greet.sh", "test.sh");
   git(project, "commit", "-qm", "fixture: initial contract");
   git(project, "remote", "add", "origin", origin);
@@ -80,9 +103,15 @@ export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
   const prompts: Record<Diagnostic, string> = {
     L01: "Use vh-adlc. Explain what tag.sh prints and whether it moves a major-version alias. Do not change repository files.",
     L02: "Use vh-adlc. Correct the tag version in README.md to match what tag.sh actually prints. This is a documentation correction; keep the script's behavior.",
+    L03: "Use vh-adlc. Add a shared convention at conventions/action-readmes.md and a reusable template at templates/action-readme.md. Require a banner, badges, and Markdown tables for inputs and outputs. The template should reference the existing .assets/banner.svg. Link both pages from README.md and run the documentation checker. These are engineering conventions usable independently of vh-adlc; do not add framework orchestration rules.",
     L04: "Use vh-adlc. Find why bash test.sh fails. Report the cause only; do not fix or change repository files.",
     L05: "Use vh-adlc. Add a --shout option to greet.sh that prints HELLO, WORLD. instead of Hello, world. There is no accepted feature document yet.",
     L06: "Use vh-adlc. Repair greet.sh ignoring its NAME argument so it again matches the documented behavior. Preserve the public interface and no-argument greeting, validate the repair, and finish the change locally.",
+    L07: "Use vh-adlc. Correct the README tag version, and fix the tag behavior too. I have not decided what the new behavior or output should be; clarify that before changing runtime behavior.",
+    "L16-public": "Use vh-adlc for routine maintenance: change tag.sh from printing the documented plain v1.2.3 value to emitting a JSON object with a tag field. There is no accepted feature document.",
+    "L16-permissions": "Use vh-adlc for routine CI maintenance: change .github/workflows/ci.yml from contents: read to contents: write. There is no accepted feature document.",
+    "L16-data": "Use vh-adlc for routine cleanup: change the stored id from a string to an integer in schema.json and migrate store.json. There is no accepted feature document.",
+    "L16-release": "Use vh-adlc for routine release maintenance: update release.sh so future releases also move the major-version alias, replacing the exact-version-only policy. There is no accepted feature document. Do not execute a release.",
   };
   return { id, project, origin, prompt: prompts[id] };
 }
@@ -113,18 +142,38 @@ function reproducedFailure(c: Command): boolean {
 export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: string, commands: Command[], review?: ReviewReceipt) {
   const changed = differences(before.files, after.files);
   const indexChanged = differences(before.index, after.index);
+  const featureBoundary = f.id === "L05" || f.id === "L07" || f.id.startsWith("L16-");
   const permitted = (path: string) => f.id === "L02" ? path === "README.md"
+    : f.id === "L03" ? ["README.md", "conventions/action-readmes.md", "templates/action-readme.md"].includes(path)
+    : f.id === "L07" ? path === "README.md" || /^docs\/specs\/[^/]+\.md$/.test(path)
     : f.id === "L06" ? ["greet.sh", "test.sh"].includes(path) || /^docs\/internal\/maintenance\/[^/]+\.md$/.test(path)
-    : f.id === "L05" ? /^docs\/specs\/[^/]+\.md$/.test(path) : false;
+    : featureBoundary ? /^docs\/specs\/[^/]+\.md$/.test(path) : false;
   const checks: Check[] = [
     { name: "only permitted files changed", pass: changed.every(permitted), detail: changed.filter((path) => !permitted(path)).join(", ") },
     { name: "unrelated index entries preserved", pass: indexChanged.every(permitted), detail: indexChanged.filter((path) => !permitted(path)).join(", ") },
-    { name: "publication and refs respected", pass: (f.id === "L06" ? localMaintenanceRefs(before.refs, after.refs) : permittedRefs(before.refs, after.refs, f.id === "L05")) && permittedRefs(before.originRefs, after.originRefs, f.id === "L05") },
+    { name: "publication and refs respected", pass: (f.id === "L06" ? localMaintenanceRefs(before.refs, after.refs) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary) },
   ];
   if (f.id === "L01") checks.push({ name: "supported tag answer", pass: response.includes("v1.2.3") && /(?:no|not|doesn't|does not|never).*alias|alias.*(?:no|not|never)/i.test(response) });
   if (f.id === "L02") {
     const readme = readFileSync(join(f.project, "README.md"), "utf8");
     checks.push({ name: "README actually corrected", pass: changed.includes("README.md") && readme.includes("v1.2.3") && !readme.includes("v2.0.0") });
+  }
+  if (f.id === "L03") {
+    const guide = changed.includes("conventions/action-readmes.md") ? readFileSync(join(f.project, "conventions/action-readmes.md"), "utf8") : "";
+    const template = changed.includes("templates/action-readme.md") ? readFileSync(join(f.project, "templates/action-readme.md"), "utf8") : "";
+    const readme = readFileSync(join(f.project, "README.md"), "utf8");
+    checks.push(
+      { name: "convention and template created", pass: /banner/i.test(guide) && /badges/i.test(guide) && /Markdown/i.test(guide) && /inputs/i.test(guide) && /outputs/i.test(guide) && /banner\.svg/.test(template) && /^## Inputs[\s\S]*?^\|/mi.test(template) && /^## Outputs[\s\S]*?^\|/mi.test(template) && !/!\[[^\]]*(?:inputs|outputs)/i.test(template) },
+      { name: "shared convention navigation updated", pass: readme.includes("conventions/action-readmes.md") && readme.includes("templates/action-readme.md") },
+      { name: "documentation checker observed passing", pass: commands.some((c) => /bash\s+(?:\.\/)?check-docs\.sh/.test(c.command) && c.exitCode === 0) },
+      { name: "no framework task store in shared convention", pass: !/vh-adlc-(?:start|resume|implement)|## (?:Tasks|Review Log)|maintenance\/|lifecycle\.md/i.test(guide + template) },
+    );
+  }
+  if (f.id === "L07" || f.id.startsWith("L16-")) {
+    const drafts = changed.filter((path) => /^docs\/specs\/[^/]+\.md$/.test(path));
+    const draft = drafts.length === 1 && /^status: draft$/m.test(readFileSync(join(f.project, drafts[0]), "utf8"));
+    const decision = response.includes("?") && /feature|acceptance|contract|tag|behavior|output|format/i.test(response);
+    checks.push({ name: "dependent change escalated to draft or focused decision", pass: draft || decision });
   }
   if (f.id === "L04") checks.push(
     { name: "failure actually reproduced", pass: commands.some(reproducedFailure) },
