@@ -142,6 +142,9 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
       { name: "documented greeting repaired", pass: check.exitCode === 0 && named.exitCode === 0 && named.stdout.toString().trim() === "Hello, Ada." && noArg.stdout.toString().trim() === "Hello, world." },
       { name: "regression observed before and after repair", pass: commands.some(reproducedFailure) && commands.some((c) => testInvocation(c) && c.exitCode === 0 && !/^FAIL:/m.test(c.output)) },
       { name: "maintenance record exists without feature state", pass: records.length === 1 && !changed.some((path) => path.startsWith("docs/specs/")) },
+      // This diagnostic adapter does not yet attest independent reviewer execution.
+      // A claimed review or successful repair cannot satisfy the full L06 outcome.
+      { name: "independent maintenance review verified", pass: false, detail: "Unverified: this adapter has no host-attested independent dispatch and returned-review evidence." },
     );
   }
   return { pass: checks.every((c) => c.pass), checks };
