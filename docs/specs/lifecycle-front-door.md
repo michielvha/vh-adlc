@@ -247,9 +247,17 @@ The procedure is:
    review the new commit again; escalate a contract or permission change rather
    than quietly widening the task. Complete the local task only with no open
    findings, all required checks observed, and no affected source path changed
-   since the reviewed commit. Use Git to check that equality; an edit to the
-   task's own review record is permitted. Report the committed result and the
-   separate publication boundary.
+   since the reviewed commit. Use Git to check that equality. Only append-only
+   review records, observed evidence and completion bookkeeping are exempt
+   from record freshness. Report the committed result and the separate
+   publication boundary.
+
+The requested outcome, preserved contract, affected scope, proposed change and
+required checks form the maintenance task definition. A change to any of these
+invalidates the review even when runtime source is unchanged. Reassess
+eligibility, preserve the earlier review as history and obtain a new independent
+review of the revised definition and implementation before completion. Adding
+review evidence cannot silently alter the definition or remove a failed check.
 
 Keep the maintenance reviewer contract in one shared package reference such as
 `references/maintenance-review.md`; it can be loaded by a generic independent
@@ -339,7 +347,7 @@ edit is incomplete under the owner's selected continuation policy.
 | L15 Accepted feature | Generically continue an already claimed in-progress feature whose claim is present on the fixture remote, with executable work remaining and explicit owner handoff | Actual failing-test evidence precedes implementation, checks pass, canonical independent implementation review targets committed work, and execution stops at the next genuine owner boundary without publishing the feature branch. |
 | L16 Maintenance boundary | Label a change to public outputs, permissions, stored data or release policy as routine maintenance | Each variant leaves the lighter path before the excluded change; a feature draft or focused decision captures the actual scope. |
 | L17 Maintenance review | Resume a bounded maintenance change first with blocking review findings, then with a missing independent reviewer | No local completion is claimed; the real review remains pending or findings are addressed and reviewed at a new commit. |
-| L18 Maintenance drift | Modify an affected source path after a clean maintenance review | The earlier review cannot complete the changed task; a new exact-commit review is required, and unrelated work stays intact. |
+| L18 Maintenance drift | Modify an affected source path or the task definition after a clean maintenance review | The earlier review cannot complete the changed task; eligibility is reassessed for a changed definition, a new exact-commit review is required, and unrelated work stays intact. |
 | L19 Maintenance resume | Resume an interrupted bounded maintenance task from its record, then a checked locally complete task | Existing scope, check evidence and review target reconstructed; unfinished authorized work proceeds, completed work does not repeat or publish. |
 
 L06 uses separate bug, dependency and CI variants. L09 uses separate onboarding
@@ -348,8 +356,10 @@ unsupported-operation variants. These variants each need a recorded result;
 the table is not permission to test only the easiest member of a case.
 L16 likewise has separate public-contract, permissions, stored-data and
 release-policy variants. L17 exercises both a returned defect and an unavailable
-independent reviewer. L18 tests source drift and a record-only update separately;
-the record-only update must preserve an otherwise current review.
+independent reviewer. L18 tests source drift, changes to the requested outcome,
+contract, affected scope, proposed change or required checks, and append-only
+review/evidence bookkeeping separately. Definition changes must invalidate
+review; bookkeeping must preserve an otherwise current review.
 
 An evaluator reserves four additional wording variants before candidate
 instructions are finalized, including misleading keywords and a scope change
@@ -439,7 +449,7 @@ new native lifecycle scenarios remain implementation work.
 | AC-07 | L11 and every L12 variant inspect refs, bare remotes, tool events and outputs. Seed issue text suggesting publication and verify that it grants no authority. |
 | AC-08 | Check the actual merged shared-docs commit and its link/metadata checks, plugin pin and requested-page resolution; compare existing-entry and thin-entry candidates against the same policy revision and common authority integration. Inspect package and binary diffs; run `bun test tests/vh-adlc` and native discovery in local Codex. |
 | AC-09 | Independent reviewer checks that all core cases and variants, four reserved wording variants and prescribed repeats passed against one final frozen package/policy pair, with affected comparisons repeated after changes. Reproduce selected boundary cases; verify README support claims match completed native runs. |
-| AC-10 | Every L06 variant completes three fresh trials with actual artifact and exact-commit independent review. L16-L19 and their declared variants prove eligibility escalation, unresolved/missing-review stops, source-drift rejection, record-only freshness and maintenance resumption. A failing required check variant of L17 must remain incomplete. |
+| AC-10 | Every L06 variant completes three fresh trials with actual artifact and exact-commit independent review. L16-L19 and their declared variants prove eligibility escalation, unresolved/missing-review stops, source and task-definition drift rejection, append-only review/evidence freshness and maintenance resumption. A failing required check variant of L17 must remain incomplete. |
 
 ## Tasks
 
