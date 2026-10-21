@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Historical analysis, source checks and a manual rewrite pilot completed; independent model trials, human comprehension testing and spec review remain pending."
+status_description: "Historical investigation and a 48-call controlled model pilot completed; human comprehension testing, independent spec review and acceptance remain pending."
 issue: https://github.com/michielvha/vh-adlc/issues/20
 goal: "Determine whether repeated agent work makes Stackweaver harder for its owner to understand and whether a tested vh-adlc safeguard is justified."
 covers:
@@ -181,6 +181,94 @@ commit and actual caller. It becomes longer than the short paraphrase of the
 false claims. Correcting meaning sometimes needs more words. These are manual
 worked examples, not independent model trials or a measured human benefit.
 
+#### Controlled model trials
+
+The owner authorized separate model sessions, then explicitly authorized sending
+the selected private Stackweaver passages and supporting source excerpts to
+GitHub Copilot. The experiment ran 48 fresh sessions through the installed
+Copilot CLI. Every response reported `claude-haiku-4.5`, the runner's default
+model; no model override was supplied. The CLI reported version 1.0.56 through
+an installed 1.0.54 launcher. This is a pilot on that model and harness.
+
+Before execution, the protocol fixed six conditions, two repetitions per
+condition and four rounds per repetition. Each response rewrote the same three
+passages: queue handling, collection installation and the run timeline. Every
+request received identical code excerpts at `66730960` and the same task. Each
+inherited condition received the preceding round's text. The fresh control
+received the original text every time. The full pinned prose guide was supplied
+to the four guide conditions. Each additional instruction was tested separately.
+
+All 48 calls completed. Verification confirmed the registered inputs and guide
+placement, the same reported model, exactly one response per call, no tool calls,
+disabled MCP servers and no reported file edits. The protocol fingerprint is
+`b4e78c0646c32da92bcbce3e7c6d6622732e4ffa59f0be823f94d1d73c9ae679`.
+
+The final 12 responses were assigned randomized labels and reviewed against the
+source before revealing their conditions. The investigating assistant performed
+that review. It is not an independent human comprehension test. The assessment
+separates wrong assertions, missing details, unsupported historical claims and
+missing source references.
+
+| Condition | Mean words, round 1 | Mean words, round 4 | What changed |
+| --- | ---: | ---: | --- |
+| Minimal instruction, inherited text | 480.5 | 499 | One chain grew from 491 to 530 words; the other stayed near its starting length, 470 to 468. |
+| Minimal instruction, original text each round | 431.5 | 372 | Fresh requests also varied considerably. |
+| Existing prose guide, inherited text | 382.5 | 331.5 | Both chains ended shorter than they began. |
+| Guide plus direct actor/action/conditions instruction | 470 | 313 | Both chains shortened; factual and precision problems still occurred. |
+| Guide plus questioning abstractions and real consumers | 310.5 | 249 | Both chains shortened; one final queue explanation omitted ordinary-error handling. |
+| Guide plus consolidation and replacement of obsolete claims | 404.5 | 316 | Both chains shortened; both final queue explanations invented retry behavior. |
+
+Counts are whitespace-delimited words across the three passages, averaged over
+two repetitions. Longer first-round text can add details missing from the seed;
+it is not automatically worse. There are too few repetitions to rank safeguards
+reliably. The first-to-last increase in one minimally instructed chain is a local
+observation, not proof of the post's long-project explanation.
+
+The clearest failure appeared in the consolidation condition. In both final
+outputs, an ordinary handler error left a message available for retry. The code
+instead logs that error and attempts acknowledgement
+(`backend/cmd/ansible-runner/main.go:485-498`). In one chain this wrong claim
+appeared in round 2 and persisted through round 4. The other chain already made
+it in round 1 and kept it throughout. The same source code was available at
+every round. This demonstrates an error being carried through repeated edits;
+it does not establish that inheritance caused every observed error.
+
+Three final responses still said `VerticalRunTimeline` was never built or
+implemented, despite the supplied deletion evidence. These came from minimal
+inheritance, the existing guide and the abstraction-review condition. Other
+outputs invented completion or shipping history that the supplied observations
+did not establish. Correcting repetition did not reliably correct the underlying
+claim.
+
+Collection explanations often flattened a conditional rule into a list. The
+actual base search path comes from the environment, otherwise configuration,
+otherwise defaults. These are alternatives, not three paths always appended
+together (`ansible_cfg.go:147-191`). One output also claimed that a repository
+without requirements uses only bundled collections; the supplied source says
+such a job keeps its existing environment and configuration. Some queue text
+also described claim-time indexing as simultaneous with receipt, although the
+source explicitly records the index afterward on a best-effort basis.
+
+The existing guide reduced length in this pilot. The extra instructions showed
+no consistent accuracy benefit over that guide. These observations support
+checking source facts and their conditions before accepting a simplification.
+None of the tested instructions is a validated safeguard against long-term
+language drift.
+
+The main limits are one small model, two chains per condition, four rounds,
+short text tasks and source excerpts supplied on every request. The harness's
+default system context and constant skill metadata remained; custom project
+instructions were disabled. Temperature, sampling seed and reasoning settings
+were not overridden. No code-generation experiment or human comprehension
+test ran. The CLI exposed 15.84 premium-request units for the 48 calls, not a
+dollar cost or input/output token counts. Prompts, outputs, byte counts and usage
+records are retained for inspection.
+
+The native Claude preflight hit its account spend limit and generated no study
+output. A Codex preflight did not establish an empty tool surface and was
+excluded. Neither preflight contributes to the 48-call results. No trial was
+discarded or rerun to favor a condition.
+
 #### Recommendation and remaining hypotheses
 
 Try a small advisory addition to the existing spec/review workflow before
@@ -200,17 +288,25 @@ audit would duplicate existing machinery. The missing proof is whether a more
 specific review instruction catches these failures reliably at acceptable cost.
 
 Historical model identity, prompts, human steering and files read by agents are
-unavailable from Git. Independent repeated-writing trials require additional
-agent sessions; authorization has been requested and no such sessions have run.
-Blind human comprehension testing has not run. The causal explanation and the
-best safeguard therefore remain open. No acceptance criterion is marked met by
-the investigating assistant, and no plugin or Stackweaver fix is included.
+unavailable from Git. The controlled pilot is now complete. Blind human
+comprehension testing has not run. The causal explanation and the best safeguard
+therefore remain open. No acceptance criterion is marked met by the investigating
+assistant, and no plugin or Stackweaver fix is included.
+
+The next candidate should ask an editor to retain a short list of source-backed
+behavioral facts, check failure conditions and fallback alternatives, and limit
+history claims to the revisions actually examined. It should then apply the
+existing prose guide. This candidate has not been tested here. A new blocking
+check or a claim that this prevents drift would exceed the evidence.
 
 Raw measurements, source probes, worked rewrites, commands and test output are
 retained in the local evidence bundle
-`/private/tmp/vh-adlc-language-study-20261021.zip`. The smallest next decision is
-whether to run the controlled trials, then assess a single advisory review
-instruction before specifying enforcement.
+`/private/tmp/vh-adlc-language-study-20261021.zip`. The controlled trial protocol,
+all 48 prompts and outputs, verification and grading records are retained in
+`/private/tmp/vh-adlc-language-trials-20261021.zip`. The smallest next decision is
+whether to prototype and evaluate the source-fact review instruction before
+specifying enforcement. Raw private excerpts remain in the local evidence
+bundle; this report publishes the measurements and findings.
 
 ## Scope
 
@@ -353,4 +449,6 @@ Independent spec review and owner acceptance are pending.
 - [Documentation convention](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/documentation.md): existing plain-language guidance and placement of investigation findings.
 - [Humanize prose](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): prose editing baseline used for this draft.
 - [Feature documents](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md), [template](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/feature-document-template.md), [delivery](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/delivery.md), [entry point](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md) and [task routes](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/README.md): draft format, documentation-only delivery and applicable reading routes.
-- Local vh-adlc and Stackweaver measurements at the exact revisions listed in Context: available procedures, historical comparisons, source probes, manual rewrites and six queue tests. Independent model trials and human comprehension testing remain pending.
+- Local vh-adlc and Stackweaver measurements at the exact revisions listed in Context: available procedures, historical comparisons, source probes, manual rewrites and six queue tests.
+- Installed `copilot --help` and `copilot help permissions`: tool filtering and non-interactive trial controls. The local controlled-trial bundle contains the registered protocol, source contexts, 48 prompts and responses, usage records and the source-based assessment. Human comprehension testing remains pending.
+- [OpenAI configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference): consulted while checking command execution and instruction controls for the excluded Codex preflight. The actual trials used Copilot.
