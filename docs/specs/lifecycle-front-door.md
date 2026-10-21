@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Owner accepted continuation and testing with explicit docs/framework separation; clarified baseline awaits verification."
+status: planned
+status_description: "Accepted against clean review R-5; preparing the local evaluation tasks on the owner-selected feature branch."
 issue: null
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
 covers:
@@ -473,6 +473,8 @@ None.
 | 2026-10-21 | R-2 | spec | `a803b8a8791b7c388674a9ee4e9905203356f021` | unknown | procedural | Claim-publication conflict in accepted-change fixture; model identity not attested |
 | 2026-10-21 | R-3 | spec | `8890a6a10cf2de980b711728dc61ee6ebf017ad0` | unknown | procedural | Maintenance-record scope changes must invalidate review; model identity not attested |
 | 2026-10-21 | R-4 | spec | `ef66f34fbfe3dd80a19d76059c4219e4f9d6ffea` | unknown | procedural | NO FINDINGS; model identity not attested |
+| 2026-10-21 | R-5 | spec | `d9c9482aeb373aab3ebdfc1832cb8010c0bfe8b2` | unknown | procedural | NO FINDINGS; docs/framework separation verified; model identity not attested |
+| 2026-10-21 | R-5 | spec | `d9c9482aeb373aab3ebdfc1832cb8010c0bfe8b2` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -516,6 +518,10 @@ EVIDENCE: docs/specs/lifecycle-front-door.md:228-232 places the requested outcom
 PROPOSAL: Limit the freshness exception to appending review records, observed evidence and completion bookkeeping. Require renewed eligibility assessment and independent review when the requested outcome, preserved contract, affected scope or required checks change, and add an L18 variant proving that distinction.
 
 ### R-4
+
+NO FINDINGS
+
+### R-5
 
 NO FINDINGS
 
