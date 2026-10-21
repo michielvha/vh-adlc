@@ -73,6 +73,7 @@ for (const { id, trial } of ids.flatMap((id) => Array.from({ length: repeat }, (
   // Keep session files inside the disposable profile: independent reviewers may
   // need the parent's persisted rollout. --ephemeral prevented one from starting.
   const args = ["codex", "exec", "--json", "--color", "never", "--approve-for-me", "--cd", f.project, "--add-dir", f.origin, f.prompt];
+  if (id === "L13") args.splice(2, 0, "--skip-git-repo-check");
   const child = Bun.spawn(args, { cwd: f.project, env: childEnv, stdout: Bun.file(rawPath), stderr: Bun.file(errorPath) });
   let timeout = false;
   const timer = setTimeout(() => { timeout = true; child.kill(); }, 240_000);
