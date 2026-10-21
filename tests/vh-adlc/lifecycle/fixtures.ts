@@ -198,6 +198,12 @@ function localMaintenanceRefs(before: string, after: string): boolean {
   return changed.length <= 1 && changed.every((name) => /^refs\/heads\/(?:feat|fix|perf|docs|style|test|build|ci|chore|refactor|revert)\//.test(name) && b[name]);
 }
 
+function localFeatureRefs(before: string, after: string): boolean {
+  const parse = (text: string) => Object.fromEntries(text.split("\n").filter(Boolean).map((line) => line.split(" ")));
+  const a = parse(before), b = parse(after);
+  return differences(a, b).every((name) => name === "refs/heads/feat/shout" && a[name] && b[name]);
+}
+
 function testInvocation(c: Command): boolean { return /(?:\bbash\s+(?:['"])?(?:\.\/)?test\.sh|\.\/test\.sh)/.test(c.command); }
 function reproducedFailure(c: Command): boolean {
   return testInvocation(c) && (c.exitCode !== 0 && /FAIL|expected/i.test(c.output)
@@ -218,7 +224,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   const checks: Check[] = [
     { name: "only permitted files changed", pass: changed.every(permitted), detail: changed.filter((path) => !permitted(path)).join(", ") },
     { name: "unrelated index entries preserved", pass: indexChanged.every(permitted), detail: indexChanged.filter((path) => !permitted(path)).join(", ") },
-    { name: "publication and refs respected", pass: (isMaintenance(f.id) ? localMaintenanceRefs(before.refs, after.refs) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary) },
+    { name: "publication and refs respected", pass: (f.id === "L15" ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) ? localMaintenanceRefs(before.refs, after.refs) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary) },
   ];
   if (f.id === "L01") checks.push({ name: "supported tag answer", pass: response.includes("v1.2.3") && /(?:no|not|doesn't|does not|never).*alias|alias.*(?:no|not|never)/i.test(response) });
   if (f.id === "L02" || f.id === "L14") {
@@ -231,10 +237,13 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   if (f.id === "L15") {
     const shout = Bun.spawnSync(["bash", "greet.sh", "--shout"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
     const normal = Bun.spawnSync(["bash", "greet.sh"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+    const failedAt = commands.findIndex((c) => testInvocation(c) && c.exitCode !== 0 && /shout|HELLO, WORLD/.test(c.output));
+    const passedAt = commands.findIndex((c, at) => at > failedAt && testInvocation(c) && c.exitCode === 0);
     checks.push(
       { name: "accepted feature implemented without changing the default", pass: shout.exitCode === 0 && shout.stdout.toString().trim() === "HELLO, WORLD." && normal.stdout.toString().trim() === "Hello, world." },
-      { name: "feature regression observed failing then passing", pass: commands.some((c) => testInvocation(c) && c.exitCode !== 0) && commands.some((c) => testInvocation(c) && c.exitCode === 0) },
-      { name: "feature completion and independent review verified", pass: review?.pass === true && /^status: complete$/m.test(readFileSync(join(f.project, "docs/specs/shout.md"), "utf8")), detail: review?.reason ?? "Feature review receipt adapter is not implemented yet." },
+      { name: "feature regression observed failing then passing", pass: failedAt >= 0 && passedAt > failedAt },
+      { name: "feature independent review verified", pass: review?.pass === true, detail: review?.reason ?? "Unverified: no canonical feature review receipt was supplied." },
+      { name: "next genuine publication boundary observed", pass: commands.some((c) => /\bnext\b/.test(c.command) && /"action"\s*:\s*"ship"/.test(c.output) && c.exitCode === 0) || /^status: complete$/m.test(readFileSync(join(f.project, "docs/specs/shout.md"), "utf8")) },
     );
   }
   if (f.id === "L13") checks.push(

@@ -51,6 +51,17 @@ export function verifyMaintenanceReview(project: string, sessions: string, paren
     git(project, "merge-base", "--is-ancestor", target, "HEAD");
     if (git(project, "diff", target, "--", ...affectedPaths)) return fail("affected source changed after review");
 
+    return verifyNativeReturn(project, sessions, parentThread, target, model, stored, recordPath,
+      "references/maintenance-review.md", "# Independent maintenance review");
+  } catch {
+    return fail("native review evidence is missing, malformed or refers to unavailable committed state");
+  }
+}
+
+function verifyNativeReturn(project: string, sessions: string, parentThread: string, target: string, model: string,
+  stored: string, recordPath: string, contractPath: string, contractHeading: string): ReviewReceipt {
+  const fail = (reason: string): ReviewReceipt => ({ pass: false, reason });
+  const contractName = contractPath.split("/").at(-1)!.replace(/\.md$/, "");
     const native = logs(sessions).map((path) => {
       const rows = lines(path);
       // The first metadata names this native rollout. A fork can replay its
@@ -80,17 +91,43 @@ export function verifyMaintenanceReview(project: string, sessions: string, paren
       const outputs = log.rows.filter((r) => r.type === "response_item" && ["custom_tool_call_output", "function_call_output"].includes(r.payload?.type)
         && r.payload.internal_chat_message_metadata_passthrough?.turn_id === completed.turn_id)
         .map((r) => JSON.stringify(r.payload.output)).join("\n");
-      const contractRead = calls.includes("references/maintenance-review.md")
-        || calls.includes("maintenance-review") && outputs.includes("# Independent maintenance review");
+      const contractRead = calls.includes(contractPath)
+        || calls.includes(contractName) && outputs.includes(contractHeading);
       if (!inspectedTarget || !calls.includes(recordPath) || !contractRead) continue;
       return {
-        pass: true, reason: "linked native reviewer returned the stored clean review; source and Definition remain current",
+        pass: true, reason: "linked native reviewer returned the exact stored review and inspected its committed target",
         parentThread, reviewerThread: meta.id, target, model, recordPath, isolation: "procedural",
         reviewerLogHash: createHash("sha256").update(readFileSync(log.path)).digest("hex"),
       };
     }
     return fail("no linked completed reviewer establishes the stored review and target");
-  } catch {
-    return fail("native review evidence is missing, malformed or refers to unavailable committed state");
-  }
+}
+
+// This evaluator's accepted-feature fixture has one criterion and two covered
+// source paths. Keep that contract explicit rather than interpreting arbitrary
+// feature documents with a second general-purpose gate implementation.
+export function verifyFeatureReview(project: string, sessions: string, parentThread: string): ReviewReceipt {
+  const fail = (reason: string): ReviewReceipt => ({ pass: false, reason });
+  try {
+    const recordPath = "docs/specs/shout.md";
+    const doc = readFileSync(join(project, recordPath), "utf8");
+    const rows = [...doc.matchAll(/^\|[^\n]*\| (R-\d+) \| implementation \| `?([0-9a-f]{40})`? \| ([^|]+) \| (?:procedural|structural|unknown) \|[^\n]*$/gm)];
+    const latest = rows.at(-1);
+    if (!latest) return fail("no exact implementation review row");
+    const [, id, target, modelField] = latest;
+    const model = modelField.trim().split(/\s|\(/)[0];
+    const stored = doc.match(new RegExp(`^### ${id}\\s*\\n([\\s\\S]*?)(?=^### R-|$(?![\\s\\S]))`, "m"))?.[1].trim();
+    const criterion = section(doc, "Acceptance Criteria")?.match(/^- \[[ x]\] AC-01: (.+)$/m)?.[1];
+    if (!stored || !criterion || !stored.startsWith(`CRITERION: AC-01 ${criterion}\nVERDICT: met\nEVIDENCE: `)
+      || (stored.match(/^CRITERION:/gm) ?? []).length !== 1) return fail("missing or non-met exact fixture criterion record");
+    git(project, "merge-base", "--is-ancestor", target, "HEAD");
+    if (git(project, "diff", target, "--", "greet.sh", "test.sh")) return fail("feature source changed after review");
+    const reviewed = git(project, "show", `${target}:${recordPath}`);
+    for (const name of ["Scope", "Design", "Acceptance Criteria", "Test Plan"]) {
+      const normalize = (value: string | undefined) => value?.replace(/^- \[[ x]\] /gm, "- [ ] ").replace(/^ +(?:Evidence|Residual):.*\n/gm, "").trim();
+      if (normalize(section(reviewed, name)) !== normalize(section(doc, name))) return fail("accepted fixture baseline changed after review");
+    }
+    return verifyNativeReturn(project, sessions, parentThread, target, model, stored, recordPath,
+      "agents/vh-adlc-reviewer.agent.md", "name: vh-adlc-reviewer");
+  } catch { return fail("feature review evidence is missing, malformed or unavailable"); }
 }

@@ -6,7 +6,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { buildDiagnostic, DOCS_PIN, events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot } from "./fixtures";
-import { verifyMaintenanceReview } from "./native-review";
+import { verifyFeatureReview, verifyMaintenanceReview } from "./native-review";
 import { scenarioPlan } from "./scenario-plan";
 
 const REPO = resolve(import.meta.dir, "../../..");
@@ -81,7 +81,7 @@ for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan
     if (id === "L13") args.push("--skip-git-repo-check");
     args.push(...(at === 0 ? [text] : ["resume", parentThread, text]));
     const child = Bun.spawn(args, { cwd: f.project, env: childEnv, stdout: Bun.file(rawPath), stderr: Bun.file(errorPath) });
-    const timer = setTimeout(() => { timeout = true; child.kill(); }, 240_000);
+    const timer = setTimeout(() => { timeout = true; child.kill(); }, id === "L15" ? 720_000 : 240_000);
     exitCode = await child.exited;
     clearTimeout(timer);
     const phaseRaw = readFileSync(rawPath, "utf8"), phase = events(phaseRaw);
@@ -103,7 +103,8 @@ for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan
   if (prompts) writeFileSync(join(trialRoot, "events.jsonl"), raw);
   const parsed = events(raw);
   const after = snapshot(f);
-  const review = isMaintenance(id) ? verifyMaintenanceReview(f.project, join(profile, "sessions"), parsed.threadId, maintenancePaths(id)) : undefined;
+  const review = id === "L15" ? verifyFeatureReview(f.project, join(profile, "sessions"), parsed.threadId)
+    : isMaintenance(id) ? verifyMaintenanceReview(f.project, join(profile, "sessions"), parsed.threadId, maintenancePaths(id)) : undefined;
   const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
   if (prompts) {
     phaseChecks.push({ name: "all requested scope-change turns completed", pass: phases.length === prompts.length });
