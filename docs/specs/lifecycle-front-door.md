@@ -455,6 +455,8 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | R-1 | spec | `5489da4cd213965f315c2a2cd15ad266906d5656` | unknown | procedural | One blocking evaluation gap and two missing scenario checks; model identity not attested |
 | 2026-10-21 | R-2 | spec | `a803b8a8791b7c388674a9ee4e9905203356f021` | unknown | procedural | Claim-publication conflict in accepted-change fixture; model identity not attested |
+| 2026-10-21 | R-3 | spec | `8890a6a10cf2de980b711728dc61ee6ebf017ad0` | unknown | procedural | Maintenance-record scope changes must invalidate review; model identity not attested |
+
 
 ### R-1
 
@@ -487,6 +489,15 @@ SEVERITY: should-fix
 WHERE: Design, Behavioral evaluation, L15
 EVIDENCE: docs/specs/lifecycle-front-door.md:250 starts L15 from a planned, accepted feature and requires failing-test evidence, implementation and independent review without publishing. However, plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md, Enter, requires a planned feature without a branch to have its default-branch claim pushed successfully before the feature branch is created. The pinned conventions/delivery.md likewise requires publishing that claim. L15 therefore needs a required push before it can reach the implementation evidence while its pass condition forbids publishing.
 PROPOSAL: Start L15 from an already claimed in-progress feature whose claim is present on the fixture remote, with explicit owner handoff. Alternatively, explicitly permit the claim-only push to the local bare remote while prohibiting feature-branch publication and shipping.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Bounded maintenance; Behavioral evaluation L18
+EVIDENCE: docs/specs/lifecycle-front-door.md:228-232 places the requested outcome, preserved contract, affected paths, proposed change and checks in the maintenance record. Lines 245-260 require source equality with the reviewed commit but permit editing the review record. Lines 350-352 require a record-only update to preserve review freshness without distinguishing review-evidence updates from changes to the task definition. The design therefore does not explicitly invalidate review when its scope or required checks change while source files remain unchanged.
+PROPOSAL: Limit the freshness exception to appending review records, observed evidence and completion bookkeeping. Require renewed eligibility assessment and independent review when the requested outcome, preserved contract, affected scope or required checks change, and add an L18 variant proving that distinction.
 
 ## Sources
 
