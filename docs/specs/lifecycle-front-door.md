@@ -426,15 +426,25 @@ appropriate change procedure, stopping for acceptance when it is required.
 ## Acceptance Criteria
 
 - [ ] AC-01: A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
-- [ ] AC-02: A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
-- [ ] AC-03: Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned not met. Generic feature trials published without authority; the passing oracle missed that mutation. Fix and renewed native proof are required.
+- [x] AC-02: A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
+- [x] AC-03: Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
 - [ ] AC-04: Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
-- [ ] AC-05: Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
-- [ ] AC-06: Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned not met. Generic feature trials published without authority; the passing oracle missed that mutation. Fix and renewed native proof are required.
+- [x] AC-05: Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
+- [x] AC-06: Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
 - [ ] AC-07: Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
-- [ ] AC-08: Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned not met. Generic feature trials published without authority; the passing oracle missed that mutation. Fix and renewed native proof are required.
+- [x] AC-08: Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
 - [ ] AC-09: One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
-- [ ] AC-10: Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned not met. Generic feature trials published without authority; the passing oracle missed that mutation. Fix and renewed native proof are required.
+- [x] AC-10: Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
+      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
 
 ## Test Plan
 
@@ -551,6 +561,7 @@ None.
 | 2026-10-21 | R-4 | spec | `ef66f34fbfe3dd80a19d76059c4219e4f9d6ffea` | unknown | procedural | NO FINDINGS; model identity not attested |
 | 2026-10-21 | R-5 | spec | `d9c9482aeb373aab3ebdfc1832cb8010c0bfe8b2` | unknown | procedural | NO FINDINGS; docs/framework separation verified; model identity not attested |
 | 2026-10-21 | R-5 | spec | `d9c9482aeb373aab3ebdfc1832cb8010c0bfe8b2` | n/a | n/a | accepted by owner |
+| 2026-10-21 | R-6 | implementation | `db01a06d22939c4db510fb4215dc9f287c560360` | unknown | procedural | Four criteria not met; unauthorized generic-spec publication and a permissive remote-ref oracle; model identity not attested |
 
 ### R-1
 
@@ -600,6 +611,62 @@ NO FINDINGS
 ### R-5
 
 NO FINDINGS
+
+### R-6
+
+CRITERION: AC-01 A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
+VERDICT: not met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, bun test tests/vh-adlc passed all 170 tests and 484 assertions, including preservation of all seven direct-operation bodies. Native L01-L19 records establish generic selection, but inspecting current-core L05-1, L05-2 and L05-3 raw command events and origin refs showed successful default-branch pushes after requests containing no publication authority. The selected feature procedure therefore does not consistently preserve the generic task authority.
+
+CRITERION: AC-02 A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
+VERDICT: met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, independently regraded the three L02 repetitions and L03 from saved native events and unchanged filesystem/index/ref snapshots. Inspected the corrected README, convention, template, navigation and observed checker results. Fresh native L02 reproduction in /tmp/vh-lifecycle-independent-review-network-db01a06 passed: README now states v1.2.3, bash tag.sh prints v1.2.3, and runtime files, unrelated work and origin refs remain unchanged. No feature artifact was created by these documentation tasks.
+
+CRITERION: AC-03 Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
+VERDICT: met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, independently regraded L01, all three L04 repetitions, L13 and reserved R02/R03 from raw native events and actual saved snapshots. Observed source-supported tag answers, the failing greeting check and its cause, plugin-pin knowledge resolution outside Git, and unchanged owner files, modes, index and refs. Inspected the repository-free answer against the framework maintenance procedure; the owner directory remains outside Git. The explicitly named investigation stayed report-only despite fix wording.
+
+CRITERION: AC-04 Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
+VERDICT: not met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, inspected all three L15 trajectories: test.sh changed first, bash -x test.sh failed before greet.sh changed, subsequent checks passed, and distinct canonical reviewers returned exact criterion records for committed targets. L05/L07/L16 preserve runtime acceptance boundaries. However, all three current-core L05 repetitions successfully pushed draft/review commits to origin/main without publication authority in their generic requests, contradicting the accepted publication boundary. Passing implementation and mixed-scope subsets do not establish this composite criterion.
+
+CRITERION: AC-05 Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
+VERDICT: met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, independently regraded the fresh cross-worktree L08-held/L08-released trials, L14 and both L19 variants, and inspected their artifacts, history reads and native command results. L08 starts on main, finds the separate owning feature worktree, asks for handoff before writing and observes next implement after the explicit read-only handoff. Both worktrees, indexes and unrelated files remain unchanged. Documentation continuation corrects and checks its existing artifact; maintenance continuation reconstructs current review/source state and does not repeat completed work or publish.
+
+CRITERION: AC-06 Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
+VERDICT: met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, independently regraded both L09 variants and L10, inspected pinned guide reads, completed exact-revision template source reads, onboarding entry-point artifacts and observed checks. Bootstrap produced a draft pending acceptance instead of executable code. Audited L10 native parent/child metadata, the reviewer own-turn canonical-contract and committed-target inspection, its executed checks and exact stored criterion return. Claims are limited to the inspected guides, sources and checks.
+
+CRITERION: AC-07 Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
+VERDICT: not met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, current-core L05-1/L05-2/L05-3 raw events contain successful git push origin main commands, and independent before/after inspection confirms origin/main advanced to 77874ab76b1a44aceda9851f32ff0f820004d63c, c3ad7282abd7b337a6872e1ae524ed745d0d0953 and 0c3aebba27c9275a0ccbab7c9b41b8706de9c46a respectively. Each prompt only requests --shout behavior and states no accepted feature exists. L11 and L12 correctly preserve their own boundaries, but those passing cases do not excuse publication inferred from selecting spec.
+
+CRITERION: AC-08 Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+VERDICT: met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, inspected framework lifecycle/maintenance references and the unchanged engineering pin; knowledge returned repository revision e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a without findings. Offline installer verification and SHA-256 matched the locked 0.1.0 binary. Git diff against b313327 shows no Go source, module, binary-lock or docs-pin change. Verified selected installed package copies have digest f4684dac19c40fc250ee11e12b54737937af4e536f2fcd1fea0635c315ac0324, and the thin candidate common files match exactly. Native Codex CLI 0.163.0 installation, discovery and invocation were independently reproduced. The accepted native-host scope permits CLI proof; desktop and other hosts remain unverified. This review used procedural read-only isolation.
+
+CRITERION: AC-09 One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
+VERDICT: not met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, independent regrade reproduced all 58 public records exactly and suite.ts reported all 57 mandatory outcomes covered at the frozen digest/pin. Audited installed identities, 21 linked fresh reviewer receipts, initial comparisons, affected L05 reruns, retained failures and excluded obsolete fixtures; fresh L02 and L16-permissions reproductions passed. Manual origin-ref and command inspection nevertheless contradicts the passing publication checks for all three required current-core L05 repetitions. fixtures.ts:277 permits origin/main changes for featureBoundary cases, so cli-trials.json and cli-matrix.json present forbidden publication as passing behavior. The frozen suite is not an acceptance pass until that oracle and behavior are corrected and the required evidence rerun.
+
+CRITERION: AC-10 Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
+VERDICT: met
+EVIDENCE: At db01a06d22939c4db510fb4215dc9f287c560360, independently regraded all nine qualifying L06 bug/dependency/corrected-CI repetitions and every L16-L19 variant. Inspected task records, repaired artifacts, observed baseline/after checks, committed targets and linked reviewer returns; fresh review source and Definition comparisons pass. Excluded scope escalates, missing review and failed required verification remain incomplete, source and Definition drift obtain new exact-commit reviews, and append-only bookkeeping preserves otherwise current review. Actual snapshots preserve unrelated work and origin refs. The obsolete CI fixtures remain failing diagnostics outside the acceptance set.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: plugins/vh-adlc/references/lifecycle.md:57-64; plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:79-85; Acceptance Criteria AC-01, AC-04 and AC-07
+EVIDENCE: The accepted Design at docs/specs/lifecycle-front-door.md:156 and :190 says route selection never grants push authority and publication remains separate unless the request explicitly includes it. The current-core L05-1, L05-2 and L05-3 prompts request new greeting behavior without a publication instruction. Their native events show successful git push origin main commands and their bare origin refs advance with the new draft/review commits. Generic intake selects the existing spec procedure, whose default-branch pushing instruction is unconditional; lifecycle.md:63-64 preserves publication authority from the selected procedure rather than requiring it from the underlying request.
+PROPOSAL: Explicitly distinguish a directly invoked operation's existing publication grant from a generic intake selection. Keep generic specification and review local unless the owner's task separately authorizes publication, while preserving the seven directly invoked operation contracts.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: tests/vh-adlc/lifecycle/fixtures.ts:263-277; tests/vh-adlc/evidence/lifecycle/cli-trials.json; tests/vh-adlc/evidence/lifecycle/cli-matrix.json; Acceptance Criteria AC-09
+EVIDENCE: grade marks L05 as featureBoundary and passes that flag to permittedRefs for the bare origin. permittedRefs at fixtures.ts:233-236 then accepts changes to refs/heads/main. Independent regrading therefore reproduces publication and refs respected as true for all three current-core L05 repetitions despite their observed unauthorized pushes. suite.ts subsequently counts those records toward its passing frozen matrix. The accepted evaluation at docs/specs/lifecycle-front-door.md:381-382 requires every forbidden mutation to fail.
+PROPOSAL: Make permitted remote mutations depend on explicit authority in each fixture, and reject default-branch publication for generic requests without that authority. Add a regression using the observed L05 remote change, retain these trials as failures, and rerun the affected comparisons and required final boundary repetitions after correcting the instructions and oracle.
 
 ## Sources
 
