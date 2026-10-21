@@ -466,9 +466,7 @@ None.
 | 2026-10-21 | R-1 | spec | `5489da4cd213965f315c2a2cd15ad266906d5656` | unknown | procedural | One blocking evaluation gap and two missing scenario checks; model identity not attested |
 | 2026-10-21 | R-2 | spec | `a803b8a8791b7c388674a9ee4e9905203356f021` | unknown | procedural | Claim-publication conflict in accepted-change fixture; model identity not attested |
 | 2026-10-21 | R-3 | spec | `8890a6a10cf2de980b711728dc61ee6ebf017ad0` | unknown | procedural | Maintenance-record scope changes must invalidate review; model identity not attested |
-
 | 2026-10-21 | R-4 | spec | `ef66f34fbfe3dd80a19d76059c4219e4f9d6ffea` | unknown | procedural | NO FINDINGS; model identity not attested |
-
 
 ### R-1
 
