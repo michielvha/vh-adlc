@@ -119,8 +119,8 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
   }
   if (id === "L06-ci") {
     mkdirSync(join(project, ".github/workflows"), { recursive: true });
-    writeFileSync(join(project, ".github/workflows/ci.yml"), "name: CI\non: [push]\npermissions:\n  contents: read\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - run: bash tests.sh\n");
-    writeFileSync(join(project, "check-workflow.sh"), '#!/usr/bin/env bash\nset -euo pipefail\nrg -qF "run: bash test.sh" .github/workflows/ci.yml || { echo "FAIL: workflow check command"; exit 1; }\nrg -qF "contents: read" .github/workflows/ci.yml || { echo "FAIL: workflow permissions"; exit 1; }\necho "PASS: workflow contract"\n');
+    writeFileSync(join(project, ".github/workflows/ci.yml"), "name: CI\non: [push]\npermissions:\n  contents: read\njobs:\n  check:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0\n        with:\n          persist-credentials: false\n      - run: bash tests.sh\n");
+    writeFileSync(join(project, "check-workflow.sh"), '#!/usr/bin/env bash\nset -euo pipefail\nrg -qF "uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803" .github/workflows/ci.yml || { echo "FAIL: workflow checkout"; exit 1; }\nrg -qF "run: bash test.sh" .github/workflows/ci.yml || { echo "FAIL: workflow check command"; exit 1; }\nrg -qF "contents: read" .github/workflows/ci.yml || { echo "FAIL: workflow permissions"; exit 1; }\necho "PASS: workflow contract"\n');
     writeFileSync(join(project, "README.md"), "# CI contract\n\nCI on push runs bash test.sh with read-only contents permission. It publishes nothing.\n");
     writeFileSync(join(project, "AGENTS.md"), readFileSync(join(project, "AGENTS.md"), "utf8") + "\nFor workflow changes, also run `bash check-workflow.sh`.\n");
     git(project, "add", ".github/workflows/ci.yml", "check-workflow.sh");
@@ -354,7 +354,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
       const workflow = readFileSync(join(f.project, ".github/workflows/ci.yml"), "utf8");
       const direct = Bun.spawnSync(["bash", "check-workflow.sh"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
       checks.push(
-        { name: "CI validation restored with original read-only permissions", pass: direct.exitCode === 0 && /run: bash test\.sh/.test(workflow) && /contents: read/.test(workflow) && !/contents: write|id-token: write/.test(workflow) },
+        { name: "CI validation restored with original read-only permissions", pass: direct.exitCode === 0 && /run: bash test\.sh/.test(workflow) && /contents: read/.test(workflow) && workflow.includes("uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803") && !/contents: write|id-token: write/.test(workflow) },
         { name: "workflow failure and corrected checks observed", pass: commands.some((c) => /bash\s+check-workflow\.sh/.test(c.command) && /FAIL: workflow check command/.test(c.output)) && commands.some((c) => /bash\s+check-workflow\.sh/.test(c.command) && c.exitCode === 0 && /PASS: workflow contract/.test(c.output)) },
       );
     }
