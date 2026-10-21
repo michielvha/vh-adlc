@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { seedImplementedFeature, SHOUT_CRITERION } from "./feature-fixture";
 
 export const DELIVERY_PROMPTS = [
-  "Use vh-adlc. The previous writer has stopped and I hand docs/specs/shout.md to you. Continue this completed feature. Do not publish anything.",
+  "Use vh-adlc. The previous writer has stopped and I hand docs/specs/shout.md to you. Continue this completed feature. Read ISSUE.md for its imported issue/comment context. Do not publish anything.",
   "Now explicitly ship this feature within this controlled fixture. Its only destination is the local bare origin; no GitHub repository or linked issue is configured. Apply the existing shipping preflight and report any delivery boundary. Do not invent a GitHub destination, touch another repository, merge, tag, release or deploy.",
 ];
 

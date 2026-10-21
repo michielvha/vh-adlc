@@ -13,7 +13,7 @@ test("continuing completed work observes next none and preserves all publication
   const f = fixture("L11-continue"), before = snapshot(f);
   expect(readFileSync(join(f.project, "docs/specs/shout.md"), "utf8")).toContain("status: complete");
   expect(grade(f, before, snapshot(f), "Nothing left.", []).pass).toBe(false);
-  const commands = [{ command: "vh-adlc next docs/specs/shout.md", exitCode: 0, output: '{"data":{"action":"none"}}' }];
+  const commands = [{ command: "cat ISSUE.md; vh-adlc next docs/specs/shout.md", exitCode: 0, output: readFileSync(join(f.project, "ISSUE.md"), "utf8") + '\n{"data":{"action":"none"}}' }];
   expect(grade(f, before, snapshot(f), "Already complete; nothing to do.", commands).pass).toBe(true);
   git(f.project, "push", "-q", "origin", "feat/shout");
   expect(grade(f, before, snapshot(f), "Done.", commands).pass).toBe(false);
@@ -21,7 +21,7 @@ test("continuing completed work observes next none and preserves all publication
 
 test("explicit fixture shipping observes preflight and reports the absent GitHub destination", () => {
   const f = fixture("L11-ship"), before = snapshot(f);
-  const commands = [{ command: "cat skills/vh-adlc-ship/SKILL.md; git remote -v; bash test.sh", exitCode: 0, output: "# vh-adlc-ship\norigin /tmp/fixture/origin.git\nPASS: shout and default" }];
+  const commands = [{ command: "cat ISSUE.md skills/vh-adlc-ship/SKILL.md; git remote -v; bash test.sh", exitCode: 0, output: readFileSync(join(f.project, "ISSUE.md"), "utf8") + "\n# vh-adlc-ship\norigin /tmp/fixture/origin.git\nPASS: shout and default" }];
   expect(grade(f, before, snapshot(f), "No GitHub destination exists; PR and issue delivery cannot continue.", commands).pass).toBe(true);
   git(f.project, "tag", "v999.0.0");
   expect(grade(f, before, snapshot(f), "Done.", commands).pass).toBe(false);
