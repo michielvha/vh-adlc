@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Historical investigation and a 48-call controlled model pilot completed; human comprehension testing, independent spec review and acceptance remain pending."
+status_description: "Historical investigation and 96 controlled calls across Haiku and Opus completed; human comprehension testing, independent spec review and acceptance remain pending."
 issue: https://github.com/michielvha/vh-adlc/issues/20
 goal: "Determine whether repeated agent work makes Stackweaver harder for its owner to understand and whether a tested vh-adlc safeguard is justified."
 covers:
@@ -26,9 +26,10 @@ new abstractions. This is an anecdote supplied in the 2026-10-21 request; its
 author and URL were not provided. It does not establish that Stackweaver has
 the same problem.
 
-The owner selected Stackweaver as a long-running generated project and requested
-only a tracking issue and investigation spec in this session. The eventual
-target is the custom vh-adlc harness plugin. Implementation remains separate.
+The owner selected Stackweaver as a long-running generated project. The initial
+request covered a tracking issue and spec; follow-ups authorized the historical
+investigation and controlled model trials. The eventual target is the custom
+vh-adlc harness plugin. Implementation remains separate.
 
 ### Measured starting points
 
@@ -58,20 +59,21 @@ prove agent authorship, the amount of human steering, or what an agent read.
 
 ### Decisions already supplied by the owner
 
-Track this work in vh-adlc, use Stackweaver as the example, isolate the work from
-the other active agent, and stop this session after the issue and draft spec.
+Track this work in vh-adlc, use Stackweaver as the example, and isolate the work
+from the other active agent. After the draft, run the investigation and controlled
+trials, including a stronger-model comparison requested after the Haiku pilot.
+No implementation is authorized by this investigation.
 
 ### Investigation findings, 2026-10-21
 
-The owner's follow-up authorizes the investigation. The draft-only boundary below
-records the initial delivery. Implementation remains outside the request.
+The findings below cover the investigation authorized after the initial draft.
 
-There is enough evidence to try a small advisory review step in vh-adlc.
 Stackweaver contains repeated explanations, contradictory current-state claims
-and unused code abstractions. The historical sample does **not** establish that
-agents progressively inflate language, or that copied terminology caused the
-unused code. A mandatory vocabulary or length check is not supported by these
-results.
+and unused code abstractions. These deserve review. The historical sample does
+not establish that agents progressively inflate language or that copied
+terminology caused the unused code. The stronger-model comparison below also
+weakens the case for a new plugin instruction based on the Haiku pilot alone.
+The evidence does not justify a mandatory vocabulary or length check.
 
 #### Historical measurements
 
@@ -185,7 +187,7 @@ worked examples, not independent model trials or a measured human benefit.
 
 The owner authorized separate model sessions, then explicitly authorized sending
 the selected private Stackweaver passages and supporting source excerpts to
-GitHub Copilot. The experiment ran 48 fresh sessions through the installed
+GitHub Copilot. The first experiment ran 48 fresh sessions through the installed
 Copilot CLI. Every response reported `claude-haiku-4.5`, the runner's default
 model; no model override was supplied. The CLI reported version 1.0.56 through
 an installed 1.0.54 launcher. This is a pilot on that model and harness.
@@ -269,18 +271,75 @@ output. A Codex preflight did not establish an empty tool surface and was
 excluded. Neither preflight contributes to the 48-call results. No trial was
 discarded or rerun to favor a condition.
 
+#### Stronger-model comparison
+
+After the owner questioned Haiku's suitability, the same 48-call protocol ran
+with an explicit `--model claude-opus-4.8`. A probe and every trial response
+reported that model. Task, source excerpts, seeds, guide, conditions, schedule
+and four-round chains matched the Haiku protocol. Only the requested model
+changed in the runner arguments. This compares two models in one harness;
+it does not establish a general model ranking.
+
+All 48 calls produced the three requested passages, without tools or reported
+file edits. One response added a preamble before its JSON, stopping the strict
+parser. Its JSON was extracted verbatim, the format violation retained, and
+the two unexecuted rounds continued. No model call was rerun or discarded.
+The same 11 verification checks passed. The protocol fingerprint is
+`70cce14778d0fd550dcd343f8f1663dc5cf28fb2cbf48691d5a73e836686513d`.
+Final responses received new randomized labels and the same source-based
+assessment before their condition key was opened. This remains an assessment
+by the investigating assistant, not an independent reader study.
+
+| Condition | Haiku mean words, round 1 to 4 | Opus mean words, round 1 to 4 |
+| --- | ---: | ---: |
+| Minimal instruction, inherited text | 480.5 to 499 | 1,015.5 to 1,032.5 |
+| Minimal instruction, original text each round | 431.5 to 372 | 1,092 to 1,016.5 |
+| Existing prose guide | 382.5 to 331.5 | 645.5 to 673.5 |
+| Guide plus direct behavior instruction | 470 to 313 | 713 to 712 |
+| Guide plus questioning abstractions | 310.5 to 249 | 669.5 to 646.5 |
+| Guide plus consolidation | 404.5 to 316 | 676 to 647.5 |
+
+Opus was longer and preserved more source details. All 12 final responses
+correctly described ordinary-error acknowledgement, treated the deleted
+timeline components as having existed, and retained the environment/configuration/
+default fallback alternatives. Haiku's two invented-retry explanations and
+three never-built claims did not recur. Both source function names and their
+file paths also survived in all 12 Opus collection explanations. These are
+specific findings, not a validated overall accuracy score.
+
+Errors remained. Five final queue explanations said a crash between `BLMOVE`
+and acknowledgement leaves an in-flight index entry, without preserving the
+best-effort write gap. Another described indexing as the same step as the move,
+then acknowledged the gap later. Other outputs explained the gap but could
+state the index requirement for cross-consumer recovery more clearly. Several
+timeline explanations still extrapolated replacement history, intent or
+never-used claims from the limited deletion-parent evidence. Both
+abstraction-review finals explained the index gap; neither existing-guide final
+did. The fresh controls also explained it. That is a candidate benefit to
+recheck, with too few repetitions to distinguish the instruction's effect from
+variation between responses. The extra instructions showed no consistent
+advantage as a group.
+
+The minimally instructed inherited chains stayed at 1,016 words throughout,
+or rose once from 1,015 to 1,049 and stayed there. This gives no convincing
+evidence of continuing growth over four rounds. Fresh controls also varied.
+Length and terminology counts cannot decide whether these longer explanations
+are harder for a person to understand. The same short-task and missing human
+comprehension limits apply. Opus used 48 reported premium-request units,
+compared with Haiku's 15.84; these are CLI usage units, not dollar prices.
+
 #### Recommendation and remaining hypotheses
 
-Try a small advisory addition to the existing spec/review workflow before
-building a new detector. Ask the reviewer to explain the behavior plainly,
-identify a real consumer for a new abstraction, and replace obsolete current-state
-claims wherever a correction changes them. A finding should name the passage,
-the supporting code or caller, and a concrete correction. Keep history clearly
-separate from the description of current behavior. Reference the existing prose
-guide instead of creating a second writing policy.
+Keep the existing prose guide. The Opus results weaken the earlier recommendation
+to add a plugin instruction based on the Haiku pilot: the clearest Haiku failures
+did not recur, and the extra instructions showed no consistent factual benefit
+over the guide. None of the tested instructions has earned implementation as a
+preventive safeguard from this evidence.
 
-The evidence supports piloting this review on changed documentation and new
-interfaces. It does not support blocking on a word count, banning technical
+The historical contradictions still justify reviewing documentation against its
+code. A useful review finding names the passage, supporting code or caller,
+and a concrete correction. Keep historical claims within the revisions examined.
+The evidence does not support blocking on a word count, banning technical
 terms, automatically deleting wrappers, or automatically consolidating the corpus.
 Stackweaver already has scheduled auditing and a consolidation resolver
 (`agents/docs-drift-audit.md`, `agents/docs-drift-resolver.md`); another scheduled
@@ -288,12 +347,14 @@ audit would duplicate existing machinery. The missing proof is whether a more
 specific review instruction catches these failures reliably at acceptable cost.
 
 Historical model identity, prompts, human steering and files read by agents are
-unavailable from Git. The controlled pilot is now complete. Blind human
+unavailable from Git. Both controlled pilots are now complete. Blind human
 comprehension testing has not run. The causal explanation and the best safeguard
 therefore remain open. No acceptance criterion is marked met by the investigating
 assistant, and no plugin or Stackweaver fix is included.
 
-The next candidate should ask an editor to retain a short list of source-backed
+If this investigation continues, test realistic longer edits and human
+understanding with a capable model before choosing a plugin change. A candidate
+review could ask an editor to retain a short list of source-backed
 behavioral facts, check failure conditions and fallback alternatives, and limit
 history claims to the revisions actually examined. It should then apply the
 existing prose guide. This candidate has not been tested here. A new blocking
@@ -303,10 +364,12 @@ Raw measurements, source probes, worked rewrites, commands and test output are
 retained in the local evidence bundle
 `/private/tmp/vh-adlc-language-study-20261021.zip`. The controlled trial protocol,
 all 48 prompts and outputs, verification and grading records are retained in
-`/private/tmp/vh-adlc-language-trials-20261021.zip`. The smallest next decision is
-whether to prototype and evaluate the source-fact review instruction before
-specifying enforcement. Raw private excerpts remain in the local evidence
-bundle; this report publishes the measurements and findings.
+`/private/tmp/vh-adlc-language-trials-20261021.zip`. The matched Opus protocol,
+48 prompts and outputs, format-recovery record, comparison and assessments are
+in `/private/tmp/vh-adlc-language-opus-trials-20261021.zip`. The smallest next
+decision is whether a longer edit and human comprehension test is worth running.
+Raw private excerpts remain in the local evidence bundles; this report publishes
+the measurements and findings.
 
 ## Scope
 
@@ -315,10 +378,10 @@ explanations and the code behind selected behaviors. It compares history and
 tests candidate safeguards in disposable copies. It records findings and the
 recommended next step in this document.
 
-This session creates the issue and draft only. The experiments, a Stackweaver
-cleanup, production code changes, plugin changes, new mandatory checks and
-releases are outside this session. The investigation does not establish a
-general causal claim about all models or all generated software.
+The investigation includes historical measurements and controlled documentation
+trials. A Stackweaver cleanup, production code changes, plugin changes, new
+mandatory checks and releases remain outside its scope. The investigation does
+not establish a general causal claim about all models or all generated software.
 
 ## Design
 
@@ -374,7 +437,8 @@ Also compare against a condition that starts each round from the original prose.
 Repeat matched runs and record the number of rounds, trials and input tokens.
 Choose these counts before the runs and retain every output, including failures.
 If a combination is tested, identify it separately from the individual changes.
-Run no experiments or model calls as part of drafting this spec.
+The owner authorized model calls after the initial draft; the findings record
+the completed protocol separately from this proposed method.
 
 ### Assess human understanding and correctness
 
@@ -427,7 +491,8 @@ implementation needs a later owner decision and its own accepted scope.
 
 ## Tasks
 
-None yet. This session drafts the investigation only.
+No implementation tasks. This document records an investigation; independent
+spec review and owner acceptance remain pending.
 
 ## Open Questions
 
@@ -450,5 +515,6 @@ Independent spec review and owner acceptance are pending.
 - [Humanize prose](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): prose editing baseline used for this draft.
 - [Feature documents](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md), [template](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/feature-document-template.md), [delivery](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/delivery.md), [entry point](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md) and [task routes](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/README.md): draft format, documentation-only delivery and applicable reading routes.
 - Local vh-adlc and Stackweaver measurements at the exact revisions listed in Context: available procedures, historical comparisons, source probes, manual rewrites and six queue tests.
-- Installed `copilot --help` and `copilot help permissions`: tool filtering and non-interactive trial controls. The local controlled-trial bundle contains the registered protocol, source contexts, 48 prompts and responses, usage records and the source-based assessment. Human comprehension testing remains pending.
+- Installed `copilot --help`, `copilot help permissions` and `copilot help config`: tool filtering, non-interactive controls and explicit model selection. The local trial bundles contain both protocols, all 96 prompts and responses, usage and source-based assessments. Human comprehension testing remains pending.
+- [GitHub Copilot supported models](https://docs.github.com/en/copilot/reference/ai-models/supported-models), consulted 2026-10-21: model availability reference; the installed CLI and account probe verified the actual Opus model used.
 - [OpenAI configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference): consulted while checking command execution and instruction controls for the excluded Codex preflight. The actual trials used Copilot.
