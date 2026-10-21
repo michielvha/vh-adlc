@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Investigated and drafted; waiting for owner scope decisions and independent spec review."
+status_description: "Draft reviewed in R-1; factual findings and owner scope decisions remain open."
 issue: null
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
 covers:
@@ -371,6 +371,30 @@ the host evaluation work required to earn it.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-21 | R-1 | spec | `5489da4cd213965f315c2a2cd15ad266906d5656` | unknown | procedural | One blocking evaluation gap and two missing scenario checks; model identity not attested |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Behavioral evaluation; Acceptance Criteria AC-09
+EVIDENCE: docs/specs/lifecycle-front-door.md:198-205 requires comparing candidates at the same policy revision and selecting docs-only when sufficient. Lines 222-227 select a candidate before the full evaluation. Lines 260-272 permit fixing failures and rerunning failed cases, recording each trial's package identity and docs revision, but do not require the passing evidence to describe one final package and policy revision. Consequently, all cases can have passing records without any single final candidate having passed the prescribed suite, and a later policy fix can invalidate the recorded reason for rejecting docs-only.
+PROPOSAL: Require the acceptance suite to pass against one frozen final package and policy revision. When a fix changes candidate instructions or shared policy, rerun the affected candidate comparison before retaining the entry-surface decision and establish a complete passing suite for the final candidate.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Behavioral evaluation; Test Plan AC-01, AC-03 and AC-05
+EVIDENCE: docs/specs/lifecycle-front-door.md:175-178 explicitly requires repository-free questions to use the plugin-pin fallback and verify any scratch Git path in evaluation. Lines 163 and 283-287 also define non-feature resumption using authoritative artifacts and Git history. However, L01 asks about a fixture repository, L08 resumes only a claimed feature, and the Test Plan adds neither a repository-free trial nor a non-feature resume trial.
+PROPOSAL: Add a repository-free question case that verifies the selected pin, scratch isolation and unchanged owner files, plus a non-feature resume case that reconstructs an interrupted documentation task without manufacturing feature state.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Behavioral evaluation; Test Plan AC-04
+EVIDENCE: docs/specs/lifecycle-front-door.md:299 requires generic executable changes to preserve acceptance, test-first, review and publication gates. L05 explicitly begins without an accepted feature and can pass by producing a draft. L06 does not require an accepted implementation fixture, while L08 requires an actual next result without fixing which next step must execute. The AC-04 proof at line 318 therefore permits all mandatory generic-entry trials to stop before test-first implementation and implementation review. Direct-operation regressions do not establish that generic continuation reaches those operations correctly.
+PROPOSAL: If Q1 selects continuation, require a generic request against an accepted feature with executable work remaining, and verify observed failing-test evidence, the resulting implementation, canonical independent review and the next genuine authority boundary. Retain the existing unaccepted-work cases to prove rejection as well as authorized execution.
 
 ## Sources
 
