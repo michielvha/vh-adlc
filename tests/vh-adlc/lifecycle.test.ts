@@ -18,7 +18,8 @@ describe("lifecycle outcome grading", () => {
     const before = snapshot(f);
     expect(grade(f, before, snapshot(f), "Updated README to v1.2.3.", []).pass).toBe(false);
     writeFileSync(join(f.project, "README.md"), "# Tag fixture\n\nPrints the exact v1.2.3 tag.\n");
-    expect(grade(f, before, snapshot(f), "Updated README to v1.2.3.", []).pass).toBe(true);
+    expect(grade(f, before, snapshot(f), "Updated README to v1.2.3.", []).pass).toBe(false);
+    expect(grade(f, before, snapshot(f), "Updated README to v1.2.3.", [{ command: "bash tag.sh", exitCode: 0, output: "v1.2.3\n" }]).pass).toBe(true);
   });
 
   test("a correct README cannot hide a runtime change", () => {
