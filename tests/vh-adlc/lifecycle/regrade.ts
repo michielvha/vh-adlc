@@ -2,7 +2,7 @@
 // bun tests/vh-adlc/lifecycle/regrade.ts <run-dir> [<run-dir> ...]
 import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { events, fingerprint, grade, snapshot, type Fixture } from "./fixtures";
+import { events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot, type Fixture } from "./fixtures";
 import { verifyMaintenanceReview } from "./native-review";
 
 const roots = process.argv.slice(2).map((root) => resolve(root));
@@ -18,7 +18,7 @@ const results = roots.flatMap((root) => {
     if (JSON.stringify(snapshot(f)) !== JSON.stringify(after)) throw new Error(`${original.candidate}/${original.id}: saved fixture has drifted`);
     const raw = readFileSync(join(trial, "events.jsonl"), "utf8");
     const parsed = events(raw);
-    const review = f.id === "L06" ? verifyMaintenanceReview(f.project, join(root, "profile/sessions"), parsed.threadId, ["greet.sh", "test.sh"]) : undefined;
+    const review = isMaintenance(f.id) ? verifyMaintenanceReview(f.project, join(root, "profile/sessions"), parsed.threadId, maintenancePaths(f.id)) : undefined;
     const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
     const unchanged = original.checks.find((c: any) => c.name === "installed candidate unchanged");
     const checks = [...verdict.checks, unchanged];

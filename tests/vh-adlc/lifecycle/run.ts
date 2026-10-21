@@ -5,7 +5,7 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildDiagnostic, DIAGNOSTICS, DOCS_PIN, events, fingerprint, grade, snapshot, type Diagnostic } from "./fixtures";
+import { buildDiagnostic, DIAGNOSTICS, DOCS_PIN, events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot, type Diagnostic } from "./fixtures";
 import { verifyMaintenanceReview } from "./native-review";
 
 const REPO = resolve(import.meta.dir, "../../..");
@@ -81,7 +81,7 @@ for (const { id, trial } of ids.flatMap((id) => Array.from({ length: repeat }, (
   const raw = readFileSync(rawPath, "utf8");
   const parsed = events(raw);
   const after = snapshot(f);
-  const review = id === "L06" ? verifyMaintenanceReview(f.project, join(profile, "sessions"), parsed.threadId, ["greet.sh", "test.sh"]) : undefined;
+  const review = isMaintenance(id) ? verifyMaintenanceReview(f.project, join(profile, "sessions"), parsed.threadId, maintenancePaths(id)) : undefined;
   const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
   const unchangedPackage = fingerprint(install.installedPath) === packageHash;
   const result = {

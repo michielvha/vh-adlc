@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDiagnostic, grade, snapshot } from "./lifecycle/fixtures";
+import { buildDiagnostic, git, grade, snapshot } from "./lifecycle/fixtures";
 
 const roots: string[] = [];
 afterEach(() => { for (const p of roots.splice(0)) rmSync(p, { recursive: true, force: true }); });
@@ -11,6 +11,14 @@ function fixture(id: any) {
   roots.push(root);
   return buildDiagnostic(root, id);
 }
+
+test("every Git fixture carries unrelated staged, unstaged and untracked work", () => {
+  const f = fixture("L02");
+  const status = git(f.project, "status", "--porcelain");
+  expect(status).toContain("A  NOTES.md");
+  expect(git(f.project, "diff", "--name-only")).toContain("LOCAL.md");
+  expect(status).toContain("?? scratch.txt");
+});
 
 test("a shared convention needs its actual guide, template, navigation and observed checker", () => {
   const f = fixture("L03"), before = snapshot(f);
