@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted against clean review R-5; preparing the local evaluation tasks on the owner-selected feature branch."
+status: in-progress
+status_description: "Accepted against R-5; implementing and testing locally on the owner-selected branch. No publication authorized."
 issue: null
+branch: feat/lifecycle-front-door
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
 covers:
   - plugins/vh-adlc/
@@ -75,9 +76,11 @@ The owner requested investigation and a spec, suggested a feature branch, and
 confirmed that vh-adlc's intended scope is the whole lifecycle. This draft is
 therefore on `feat/lifecycle-front-door`, in the existing clean checkout, rather
 than following the normal default-branch spec publication procedure. No
-worktree was created or taken over. This is a documentation-stage exception;
-implementation has not been claimed, the feature remains `draft`, and nothing
-has been pushed. This request does not accept an implementation baseline.
+worktree was created or taken over. The initial exception covered specification. The owner then accepted the
+clarified baseline and requested testing on this existing feature branch. The
+local implementation claim stays here as a continuation of that instruction;
+no default-branch claim or feature branch is pushed. This is a recorded
+owner-directed branch exception, not the normal claim-publication procedure.
 
 The owner subsequently selected these design decisions in session:
 
