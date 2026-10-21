@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Independent spec review R-4 is clean; waiting for owner acceptance of the reviewed design."
+status_description: "Owner accepted continuation and testing with explicit docs/framework separation; clarified baseline awaits verification."
 issue: null
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
 covers:
@@ -50,8 +50,9 @@ Measured on 2026-10-21 at
 
 The pinned shared docs have separate documentation, coding, bootstrap,
 onboarding and feature routes (`README.md`, Start here; `AGENTS.md`, steps 1-5).
-Those routes show which sources to read. They do not yet fully specify how a
-generic vh-adlc request continues through ordinary non-feature work.
+Those routes identify engineering references. They are not the framework intake,
+dispatcher or task-state model. The owner clarified that separation when
+accepting this work and authorizing testing on 2026-10-21.
 
 Ran `bun test tests/vh-adlc` on the unchanged implementation. The sandboxed run
 had 62 passes and two failures caused by network-dependent fixture setup and
@@ -61,7 +62,7 @@ pass their checks. It supplies no new generic-routing behavior evidence.
 
 ### Hypotheses to test
 
-1. More explicit shared-docs routing is enough for generic plugin invocation.
+1. A framework-owned intake procedure discoverable through the existing package entry is enough for generic invocation.
 2. A thin discoverable entry procedure is also needed because current skill
    descriptions only accept named feature operations.
 3. The hardest failures will occur at boundaries: documentation about behavior
@@ -86,6 +87,8 @@ The owner subsequently selected these design decisions in session:
 | Maintenance | Include a lighter maintenance path in this feature. |
 | Maintenance boundary | Preserve the published contract; keep a short task record, run appropriate checks and use independent review. Escalate public-interface, permission, stored-data and release-policy changes. |
 | Initial host | Prove native local Codex first. Other hosts remain unverified for the new front-door behavior. |
+| Ownership boundary | Shared docs own pinned engineering conventions. vh-adlc owns lifecycle routing, procedures, maintenance records, dispatch and execution authority. No framework controller or state is added to the docs repo. |
+| Start work | The owner accepted the design with that separation and requested testing on the existing feature branch. Keep evaluation and implementation local; no default-branch or feature publication is authorized by this request. |
 
 ## Scope
 
@@ -127,17 +130,18 @@ Out of scope:
 - Shipping this feature or changing the active installed plugin during this
   specification work.
 
-The cross-repository prerequisite is a reviewed routing/procedure convention
-in `vhco-pro/docs`. Its proposed authoritative home is
-`guides/software-lifecycle-work.md`, linked from that repository's entry points.
-Update the applicability of `conventions/feature-documents.md` and the relevant
-delivery guidance to recognize the bounded-maintenance exception explicitly;
-the new guide must not silently contradict a broader feature requirement.
-It is a shared convention change governed by this feature's design, not a
-second feature spec. No shared-docs files are being changed in this draft.
-Implementation must review that actual change and record its merged full SHA
-before updating the plugin pin. The local `covers` list cannot attest a remote
-repository; the acceptance evidence must separately identify and verify it.
+No shared-docs change, new lifecycle guide or merged docs commit is a
+prerequisite. Keep the existing engineering-knowledge pin. The framework's
+lifecycle policy belongs in `plugins/vh-adlc/references/lifecycle.md`, with
+maintenance execution and independent-review contracts beside it. Shared docs
+remain independently usable by humans, other harnesses and ordinary repository
+work. Their source-navigation tables are references, not vh-adlc dispatch rules.
+
+The owner-authorized maintenance exception is defined by this framework. It
+must be explicit in its authority reference and local task record. Repository
+instructions that explicitly require a feature document for the proposed work
+still win: route to that process or report the concrete conflict. Do not change
+shared conventions or hide a conflict merely to make the maintenance path fit.
 
 ## Design
 
@@ -160,29 +164,31 @@ create a separate task record for every question. Ask a focused question only
 when the missing answer affects scope, authority or the resulting behavior.
 Continue independent read-only work while waiting when possible.
 
-### Shared policy and plugin procedure
+### Framework procedure and engineering knowledge
 
-Task classification, expected artifacts, completion checks and non-feature
-working conventions belong in the pinned shared-docs guide. The plugin reads
-that guide alongside the existing task routes, preserving the original
-knowledge boundary. The guide must describe at least these distinctions:
+vh-adlc owns task classification, lifecycle artifacts, continuation, task-state
+reconstruction, maintenance completion and dispatch. Put this procedure in
+`references/lifecycle.md` inside the plugin package. The intake reads the
+engineering conventions required for the chosen work at their verified pin.
+No lifecycle dispatcher, maintenance state machine or framework dependency is
+introduced into `vhco-pro/docs`.
 
-| Requested outcome | Procedure and result |
+| Requested outcome | Framework procedure and result |
 | --- | --- |
 | Explain, compare or advise | Read the needed sources and answer. Write no repository artifact unless requested. |
 | Investigate a failure or question | Measure and produce the requested findings. Respect report-only and change-nothing constraints. |
 | Update docs or a shared convention | Inspect evidence, edit the authoritative requested document or template, run its checks and report the diff. Do not manufacture a feature spec solely to hold prose. |
-| Change executable behavior | Locate existing work or enter the feature loop; preserve spec acceptance, test-first work, review and status gates. Bounded maintenance follows the lighter procedure below; broader changes follow the feature loop. |
-| Bootstrap or onboard | Read the relevant guide and apply it within the task's authority; a bootstrap that creates application behavior still needs the feature procedure. |
-| Verify or review | Run the requested checks or use the appropriate independent review procedure. Never substitute a generic opinion for a required feature review. |
-| Resume | Reconstruct existing durable state and ownership first. A non-feature task uses its real artifact and Git history; a feature uses `find`, freshness and `next`. |
-| Ship or perform a live operation | Check explicit authority and the applicable procedure. Existing feature shipping remains unchanged; unsupported non-feature publishing or live operations stop with a concrete gap. |
+| Change executable behavior | Bounded maintenance follows the lighter procedure below. Broader feature changes preserve spec acceptance, test-first work, review and status gates. |
+| Bootstrap or onboard | Read the relevant engineering guide and apply it within task authority; application creation still uses the feature procedure. |
+| Verify or review | Run the requested checks or use the appropriate independent review procedure. |
+| Resume | Reconstruct durable task state and ownership first. Features use `find`, freshness and `next`; non-feature work uses its artifact and history. |
+| Ship or perform a live operation | Check explicit authority and the applicable procedure. Feature shipping is unchanged; unsupported non-feature publication or live operations report a concrete gap. |
 
-This table specifies the proposed shared policy; it is not copied into plugin
-skill text. The shared guide must also define the non-feature documentation
-completion procedure and its commit/push boundary. Ordinary requested edits
-can finish locally. Publication remains a separate action unless the owner's
-request explicitly includes it.
+Ordinary requested edits can finish locally. Publication remains a separate
+action unless the owner's request explicitly includes it. The framework imports
+engineering rules about coding, prose, interfaces, dependencies and delivery;
+it does not copy them into its routing reference or make the docs repository
+host its own runtime procedure.
 
 The entry obtains the verified binary and resolves required pages through
 `knowledge`. It requests all pages needed for the work, cites the resolved
@@ -267,8 +273,8 @@ isolation rules. No available independent reviewer means review pending, not
 self-certified completion. Record staleness after a later source change and
 require a new review before calling the task complete.
 
-The shared guide owns these maintenance working rules. Plugin references carry
-execution and dispatch procedure, not a second copy of the eligibility table.
+The framework reference owns these maintenance working rules and its reviewer
+contract. Engineering standards remain in shared docs and are loaded as needed.
 No new binary status or a claim of deterministic feature-gate enforcement is
 introduced for maintenance records.
 
@@ -279,18 +285,18 @@ Compare these candidates before fixing the package surface:
 | Candidate | Change | Question it tests |
 | --- | --- | --- |
 | Baseline | Current 0.2.0 package and its current docs pin | What does the installed design already do with short generic requests? |
-| Existing entry | Shared policy, pin and common authority integration, retaining seven skills | Can the existing package entry follow the policy without an extra selection skill? |
-| Thin entry | The same integrated policy, authority and fixture, plus one discoverable entry procedure | Does an explicit entry improve policy loading and execution? |
+| Existing entry | Framework lifecycle reference and common authority integration, retaining seven skills | Can the existing package entry follow the policy without an extra selection skill? |
+| Thin entry | The same framework procedure, authority and fixture, plus one discoverable entry procedure | Does an explicit entry improve policy loading and execution? |
 
 The generic task prompts are identical between candidates and do not name an
 operation, expected route or required artifact. Candidate instructions must not
 contain answers to the evaluation cases. Compare existing-entry and thin-entry
-runs with the same policy revision,
-plugin fallback pin and common authority integration so those changes cannot
+runs with identical framework procedure content, engineering-docs pin and
+common authority integration so those changes cannot
 be credited to a new skill. The current conversation is not an evaluation trial.
 
-Apply the candidate docs pin both to repository instructions and to the
-plugin-pin fallback. Common integration includes the non-feature authority and
+Keep the same engineering-docs pin in repository instructions and the
+plugin fallback across candidates. Common integration includes the non-feature authority and
 maintenance review procedure needed by both candidates. The comparison varies
 only the additional entry surface and the discovery metadata it needs; neither
 candidate receives extra task instructions or broader authority.
@@ -302,7 +308,7 @@ If neither passes, revise the procedure and rerun; do not claim that adding a
 skill solved the problem merely because it appears in a picker.
 
 If a thin entry is selected, a proposed name is `vh-adlc-start`. Its instructions
-hold intake and dispatch procedure, not a copy of the shared route table. Keep
+load the canonical framework lifecycle reference instead of duplicating it. Keep
 one portable skill tree and existing native manifests. Verify native discovery
 and invocation rather than assuming identical slash syntax across hosts. A
 package change includes its normal version bump, metadata and README updates;
@@ -377,7 +383,7 @@ and L15 three times. L13, L14 and the maintenance-boundary cases below run at
 least once.
 
 Acceptance evidence must describe one frozen final package commit or digest and
-one verified shared-docs policy revision. Every prescribed case, variant and
+one frozen framework procedure and one verified engineering-docs revision. Every prescribed case, variant and
 repeat must pass for that same pair. Evidence from earlier candidates remains
 diagnostic and cannot be combined into a passing final suite. If the policy or
 candidate instructions change, rerun the diagnostic comparisons affected by
@@ -423,8 +429,8 @@ appropriate change procedure, stopping for acceptance when it is required.
 - [ ] AC-05: Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
 - [ ] AC-06: Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
 - [ ] AC-07: Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
-- [ ] AC-08: Lifecycle policy is read from one verified shared-docs revision, the selected entry works through the supported native host, and no copied route table or natural-language router is added to the Go binary.
-- [ ] AC-09: One frozen final entry package and shared-docs policy revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
+- [ ] AC-08: Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+- [ ] AC-09: One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
 - [ ] AC-10: Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
 
 ## Test Plan
@@ -447,7 +453,7 @@ new native lifecycle scenarios remain implementation work.
 | AC-05 | L08 tests before and after scripted fixture-owner handoff, inspecting both worktrees, unrelated staged/unstaged/untracked state and the binary's actual next result. L14 and L19 verify actual non-feature artifact/history reconstruction, checked continuation, preserved review state and absence of invented feature state. |
 | AC-06 | All L09 variants and L10 inspect guide retrieval at the selected pin, the actual source/check outcomes, reviewer dispatch, exact target and returned records. |
 | AC-07 | L11 and every L12 variant inspect refs, bare remotes, tool events and outputs. Seed issue text suggesting publication and verify that it grants no authority. |
-| AC-08 | Check the actual merged shared-docs commit and its link/metadata checks, plugin pin and requested-page resolution; compare existing-entry and thin-entry candidates against the same policy revision and common authority integration. Inspect package and binary diffs; run `bun test tests/vh-adlc` and native discovery in local Codex. |
+| AC-08 | Verify framework-owned lifecycle/maintenance references and unchanged shared-docs pin; reject a dependency on a new shared-docs lifecycle guide. Compare existing-entry and thin-entry candidates with identical common framework references and engineering-docs pin. Inspect package and binary diffs; run `bun test tests/vh-adlc` and native discovery in local Codex. |
 | AC-09 | Independent reviewer checks that all core cases and variants, four reserved wording variants and prescribed repeats passed against one final frozen package/policy pair, with affected comparisons repeated after changes. Reproduce selected boundary cases; verify README support claims match completed native runs. |
 | AC-10 | Every L06 variant completes three fresh trials with actual artifact and exact-commit independent review. L16-L19 and their declared variants prove eligibility escalation, unresolved/missing-review stops, source and task-definition drift rejection, append-only review/evidence freshness and maintenance resumption. A failing required check variant of L17 must remain incomplete. |
 
@@ -515,7 +521,7 @@ NO FINDINGS
 
 ## Sources
 
-- [Original knowledge boundary](https://github.com/michielvha/vh-adlc/blob/b313327b134bc5ecfa7167856d4b567f8701ba06/docs/specs/personal-development-loop.spec.md#knowledge-boundary): shared docs own routing policy; plugin owns procedure.
+- [Original knowledge boundary](https://github.com/michielvha/vh-adlc/blob/b313327b134bc5ecfa7167856d4b567f8701ba06/docs/specs/personal-development-loop.spec.md#knowledge-boundary): the historical design delegates source navigation to shared docs; this feature keeps lifecycle orchestration in vh-adlc per the owner's clarification.
 - [Current source revision](https://github.com/michielvha/vh-adlc/commit/b313327b134bc5ecfa7167856d4b567f8701ba06): the measured implementation and native package.
 - [Pinned shared-docs entry](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/README.md): existing domain and documentation routes.
 - [Feature documents](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md): this document's format, criteria, acceptance and review requirements.
