@@ -87,15 +87,16 @@ function verifyNativeReturn(project: string, sessions: string, parentThread: str
       const calls = log.rows.filter((r) => r.type === "response_item" && ["custom_tool_call", "function_call"].includes(r.payload?.type)
         && r.payload.internal_chat_message_metadata_passthrough?.turn_id === completed.turn_id)
         .map((r) => String(r.payload.input ?? r.payload.arguments ?? "")).join("\n");
-      const inspectedTarget = calls.includes(target) || /git (?:show|diff|rev-parse)/.test(calls)
+      const ownOutputs = log.rows.filter((r) => r.type === "response_item" && ["custom_tool_call_output", "function_call_output"].includes(r.payload?.type)
+        && r.payload.internal_chat_message_metadata_passthrough?.turn_id === completed.turn_id)
+        .map((r) => JSON.stringify(r.payload.output)).join("\n");
+      const inspectedTarget = calls.includes(target) || /git\s+rev-parse\s+(?:--verify\s+)?HEAD\b/.test(calls) && ownOutputs.includes(target)
+        || /git (?:show|diff|rev-parse)/.test(calls)
         && [...calls.matchAll(/(?<![0-9a-f])([0-9a-f]{7,39})(?![0-9a-f])/g)].some((m) => {
           try { return git(project, "rev-parse", "--verify", `${m[1]}^{commit}`) === target; } catch { return false; }
         });
-      const outputs = log.rows.filter((r) => r.type === "response_item" && ["custom_tool_call_output", "function_call_output"].includes(r.payload?.type)
-        && r.payload.internal_chat_message_metadata_passthrough?.turn_id === completed.turn_id)
-        .map((r) => JSON.stringify(r.payload.output)).join("\n");
       const contractRead = calls.includes(contractPath)
-        || calls.includes(contractName) && outputs.includes(contractHeading);
+        || calls.includes(contractName) && ownOutputs.includes(contractHeading);
       if (!inspectedTarget || !calls.includes(recordPath) || !contractRead) continue;
       return {
         pass: true, reason: "linked native reviewer returned the exact stored review and inspected its committed target",

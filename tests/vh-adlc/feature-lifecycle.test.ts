@@ -39,3 +39,13 @@ test("accepted-feature execution cannot pass from a completion claim without imp
   const f = fixture("L15"), before = snapshot(f);
   expect(grade(f, before, snapshot(f), "Implemented, reviewed, complete.", []).pass).toBe(false);
 });
+
+test("feature failure evidence accepts the observed capitalized Shout mismatch", () => {
+  const f = fixture("L15"), before = snapshot(f);
+  const result = grade(f, before, snapshot(f), "Observed regression.", [
+    { command: "bash test.sh", exitCode: 1, output: "Shout greeting mismatch\n" },
+    { command: "bash test.sh", exitCode: 0, output: "" },
+  ]);
+  expect(result.checks.find((c) => c.name === "feature regression observed failing then passing")?.pass).toBe(true);
+  expect(result.pass).toBe(false);
+});

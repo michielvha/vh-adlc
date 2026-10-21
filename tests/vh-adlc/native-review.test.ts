@@ -142,6 +142,21 @@ test("an inspected unambiguous Git abbreviation resolves to the exact reviewed c
   expect(f.verify().pass).toBe(true);
 });
 
+test("a reviewer can bind HEAD to an exact observed own-turn commit", () => {
+  const f = fixture();
+  f.child[1].payload.input = `git rev-parse HEAD; git show HEAD; cat ${f.path} references/maintenance-review.md`;
+  f.child.push({ type: "response_item", payload: { type: "custom_tool_call_output", output: f.target, internal_chat_message_metadata_passthrough: { turn_id: "review-turn" } } } as any);
+  f.logs();
+  expect(f.verify().pass).toBe(true);
+  f.child.at(-1)!.payload.output = "f".repeat(40);
+  f.logs();
+  expect(f.verify().pass).toBe(false);
+  f.child.at(-1)!.payload.output = f.target;
+  f.child.at(-1)!.payload.internal_chat_message_metadata_passthrough.turn_id = "parent-turn";
+  f.logs();
+  expect(f.verify().pass).toBe(false);
+});
+
 test("an attestation note in the stored model field cannot change the returned model identity", () => {
   const f = fixture();
   const path = join(f.f.project, f.path);

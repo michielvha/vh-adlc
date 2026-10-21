@@ -324,7 +324,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   if (f.id === "L15") {
     const shout = Bun.spawnSync(["bash", "greet.sh", "--shout"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
     const normal = Bun.spawnSync(["bash", "greet.sh"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
-    const failedAt = commands.findIndex((c) => testInvocation(c) && c.exitCode !== 0 && /shout|HELLO, WORLD/.test(c.output));
+    const failedAt = commands.findIndex((c) => testInvocation(c) && c.exitCode !== 0 && /shout|HELLO, WORLD/i.test(c.output));
     const passedAt = commands.findIndex((c, at) => at > failedAt && testInvocation(c) && c.exitCode === 0);
     checks.push(
       { name: "accepted feature implemented without changing the default", pass: shout.exitCode === 0 && shout.stdout.toString().trim() === "HELLO, WORLD." && normal.stdout.toString().trim() === "Hello, world." },
