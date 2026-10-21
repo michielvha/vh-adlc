@@ -66,7 +66,9 @@ for (const id of ids) {
   const started = Date.now();
   const rawPath = join(trialRoot, "events.jsonl"), errorPath = join(trialRoot, "stderr.log");
   // --approve-for-me selects workspace-write itself and conflicts with --sandbox.
-  const args = ["codex", "exec", "--ephemeral", "--json", "--color", "never", "--approve-for-me", "--cd", f.project, "--add-dir", f.origin, f.prompt];
+  // Keep session files inside the disposable profile: independent reviewers may
+  // need the parent's persisted rollout. --ephemeral prevented one from starting.
+  const args = ["codex", "exec", "--json", "--color", "never", "--approve-for-me", "--cd", f.project, "--add-dir", f.origin, f.prompt];
   const child = Bun.spawn(args, { cwd: f.project, env: childEnv, stdout: Bun.file(rawPath), stderr: Bun.file(errorPath) });
   let timeout = false;
   const timer = setTimeout(() => { timeout = true; child.kill(); }, 240_000);
@@ -79,7 +81,7 @@ for (const id of ids) {
   const unchangedPackage = fingerprint(install.installedPath) === packageHash;
   const result = {
     id, candidate, surface: "native-cli-diagnostic", host: version,
-    packageHash, graderHash, docsPin: DOCS_PIN, model: "unknown", configuration: "isolated profile default; workspace-write; automatic approval review; no model override",
+    packageHash, graderHash, docsPin: DOCS_PIN, model: "unknown", configuration: "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
     prompt: f.prompt, durationMs: Date.now() - started, exitCode, timeout,
     status: timeout || exitCode !== 0 || parsed.failed ? "execution-failed" : verdict.pass && unchangedPackage ? "pass" : "fail",
     checks: [...verdict.checks, { name: "installed candidate unchanged", pass: unchangedPackage }],

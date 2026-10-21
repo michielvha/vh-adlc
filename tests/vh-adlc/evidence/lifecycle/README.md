@@ -73,12 +73,36 @@ Later instruction changes require affected comparisons to be rerun.
 ## Remaining acceptance work
 
 The prescribed L01-L19 variants, reserved wording variants and repetitions
-remain open. Independent maintenance review needs observable dispatch and
-returned-result evidence; a final evaluator must not infer it from a task
-record. Historical GUI results for 0.2.0 do not validate this behavior.
+remain open. A final evaluator needs observable dispatch and returned-result
+evidence; it must not infer independence from a task record. Historical GUI
+results for 0.2.0 do not validate this behavior.
 
 Native desktop verification could not run: the Computer Use tool refused access
 to `com.openai.codex`, reporting "Computer Use is not allowed to use the app
 'com.openai.codex' for safety reasons." No alternate UI route was attempted.
 This is a host testing limitation, not a passing desktop result. The feature
 stays in progress; other hosts are unverified for the lifecycle front door.
+
+## Reviewer transport pilot
+
+The earlier thin-entry failure reported that its parent's rollout could not be
+loaded. The runner used `--ephemeral`, which does not persist session files.
+A fourth L06 pilot retained session files inside its disposable profile,
+without changing the package, model selection, authority or sandbox policy.
+
+[reviewer-transport.json](reviewer-transport.json) records a manual audit of the
+saved native host logs. A distinct reviewer thread links to the parent. Its
+tools inspected repair commit `f606c619170fb6ab6b1882dc4435058a516b8f26`,
+reproduced the failing baseline outside the repository and ran the repaired
+tests and shell syntax checks. It returned `MODEL: unknown` and `NO FINDINGS`;
+the parent stored the records verbatim. Source and Definition remained unchanged
+through the final bookkeeping commit. Isolation was procedural and model
+identity was not attested. Unrelated state and publication boundaries passed.
+
+This establishes independent reviewer startup and returned-result evidence for
+one CLI pilot with retained sessions. The original comparison remains unchanged;
+its ephemeral runs are not retroactively credited with this proof. The grader
+still reports this new pilot as failing its unimplemented reviewer-evidence
+check. T7 must add an automated receipt verifier and run the prescribed fresh
+matrix before completion. Private rollout contents stay outside Git; the public
+audit stores hashes, identities and check summaries.

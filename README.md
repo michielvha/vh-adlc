@@ -41,8 +41,9 @@ changes use the feature procedure. Stricter local repository instructions still 
 retain acceptance, test-first implementation and review gates; publication needs its existing authority.
 
 Version 0.3.0 is under development on `feat/lifecycle-front-door`. Twelve core Codex CLI diagnostic
-trials passed across three entry candidates; they do not establish full lifecycle support. Maintenance
-review independence, the full scenario matrix and native desktop execution remain unverified.
+trials passed across three entry candidates; they do not establish full lifecycle support. One later
+CLI pilot verified independent reviewer startup and return. Automated review-receipt validation,
+the full scenario matrix and native desktop execution remain open.
 See the [comparison and limitations](tests/vh-adlc/evidence/lifecycle/README.md). No new entry skill
 was selected, and the owner's installed plugin was not changed by those isolated trials.
 
@@ -175,7 +176,7 @@ claiming that the whole scenario matrix passed.
 | Claude Code CLI 2.1.303, Linux | Historical full scenario proof; the 0.2.0 model-policy changes have not had an authenticated scenario rerun | `tests/vh-adlc/evidence/claude-code/`; [0.2.0 compatibility discovery](tests/vh-adlc/evidence/codex/gui-smoke.md) |
 | Codex desktop app 26.1013.40934, macOS arm64 | Core GUI loop passed on plugin 0.2.0, through independent implementation review and gated completion; unsafe shipping preflight correctly stopped | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
 | Codex CLI 0.163.0 | Native package installation passed in an isolated, credential-free profile; no CLI agent-loop claim | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
-| Lifecycle front door, development 0.3.0, Codex CLI 0.163.0 | Diagnostic only: twelve core comparison trials pass; all three maintenance pilots lack verified independent review. Full matrix unrun | [Lifecycle comparison](tests/vh-adlc/evidence/lifecycle/README.md) |
+| Lifecycle front door, development 0.3.0, Codex CLI 0.163.0 | Diagnostic only: twelve core comparison trials pass; one later retained-session pilot has verified independent review. Automated receipt validation and full matrix remain open | [Lifecycle comparison](tests/vh-adlc/evidence/lifecycle/README.md) |
 | Lifecycle front door, development 0.3.0, desktop and other hosts | Unverified; Computer Use refused access to the local Codex app, so no new desktop result is claimed | [Lifecycle testing limits](tests/vh-adlc/evidence/lifecycle/README.md) |
 | Codex VS Code extension and Copilot's Codex harness | Not yet tested | Not inferred from the desktop app |
 | Claude Code desktop app 2.42304.2, macOS arm64 | Historical core GUI loop passed on plugin 0.1.2, through gated completion; the new inherited-default policy has not been rerun here | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md) |
