@@ -38,6 +38,17 @@ describe("lifecycle outcome grading", () => {
     ]).pass).toBe(true);
   });
 
+  test("a reproduced failure can precede a successful inspection in one shell call", () => {
+    const f = fixture("L04");
+    const before = snapshot(f);
+    expect(grade(f, before, snapshot(f), "Expected Ada, got world.", [
+      { command: "bash test.sh; git status --short", exitCode: 0, output: "FAIL: expected Hello, Ada.; got Hello, world." },
+    ]).pass).toBe(true);
+    expect(grade(f, before, snapshot(f), "Expected Ada, got world.", [
+      { command: "cat test.sh", exitCode: 0, output: "printf 'FAIL: expected Hello, Ada.; got Hello, world.'" },
+    ]).pass).toBe(false);
+  });
+
   test("report-only work rejects a fix even if its diagnosis is correct", () => {
     const f = fixture("L04");
     const before = snapshot(f);

@@ -103,6 +103,12 @@ function localMaintenanceRefs(before: string, after: string): boolean {
   return changed.length <= 1 && changed.every((name) => /^refs\/heads\/(?:fix|chore)\//.test(name) && b[name]);
 }
 
+function testInvocation(c: Command): boolean { return /(?:\bbash\s+(?:['"])?(?:\.\/)?test\.sh|\.\/test\.sh)/.test(c.command); }
+function reproducedFailure(c: Command): boolean {
+  return testInvocation(c) && (c.exitCode !== 0 && /FAIL|expected/i.test(c.output)
+    || /^FAIL: expected Hello, Ada\.; got Hello, world\.$/m.test(c.output));
+}
+
 export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: string, commands: Command[]) {
   const changed = differences(before.files, after.files);
   const indexChanged = differences(before.index, after.index);
@@ -120,7 +126,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
     checks.push({ name: "README actually corrected", pass: changed.includes("README.md") && readme.includes("v1.2.3") && !readme.includes("v2.0.0") });
   }
   if (f.id === "L04") checks.push(
-    { name: "failure actually reproduced", pass: commands.some((c) => /(?:bash\s+|\.\/)?test\.sh/.test(c.command) && c.exitCode !== 0 && /FAIL|expected/i.test(c.output)) },
+    { name: "failure actually reproduced", pass: commands.some(reproducedFailure) },
     { name: "cause explained", pass: response.includes("Ada") && /world|argument|hardcod|ignores/i.test(response) },
   );
   if (f.id === "L05") {
@@ -134,7 +140,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
     const records = changed.filter((path) => /^docs\/internal\/maintenance\/[^/]+\.md$/.test(path));
     checks.push(
       { name: "documented greeting repaired", pass: check.exitCode === 0 && named.exitCode === 0 && named.stdout.toString().trim() === "Hello, Ada." && noArg.stdout.toString().trim() === "Hello, world." },
-      { name: "regression observed before and after repair", pass: commands.some((c) => /test\.sh/.test(c.command) && c.exitCode === 1) && commands.some((c) => /test\.sh/.test(c.command) && c.exitCode === 0) },
+      { name: "regression observed before and after repair", pass: commands.some(reproducedFailure) && commands.some((c) => testInvocation(c) && c.exitCode === 0 && !/^FAIL:/m.test(c.output)) },
       { name: "maintenance record exists without feature state", pass: records.length === 1 && !changed.some((path) => path.startsWith("docs/specs/")) },
     );
   }
