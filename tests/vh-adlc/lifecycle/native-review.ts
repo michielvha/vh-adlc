@@ -44,7 +44,7 @@ export function verifyMaintenanceReview(project: string, sessions: string, paren
     const named = entry && record.match(new RegExp(`^${entry[1]} target: ([0-9a-f]{40})\\. Model: ([^\\s.]+)\\. Isolation: (?:procedural|structural|unknown)\\.[ \\t]*$`, "m"));
     const target = latest.match(/^Target: ([0-9a-f]{40})\s*$/m)?.[1] ?? named?.[1];
     if (!target) return fail("no exact review target in the record");
-    const model = latest.match(/^Model: ([^\s()]+)(?:[ \t]+\([^\n]*\))?[ \t]*$/m)?.[1] ?? named?.[2];
+    const model = latest.match(/^Model: ([^\s()]+)(?:[ \t]+\([^\n]*\)\.?)?[ \t]*$/m)?.[1] ?? named?.[2];
     const stored = latest.match(/^```text\n([\s\S]*?)\n```/m)?.[1] ?? (latest.trim() === "NO FINDINGS" ? "NO FINDINGS" : undefined);
     if (!model || stored !== "NO FINDINGS") return fail("no clean, well-formed stored review");
     const definition = section(record, "Definition");
