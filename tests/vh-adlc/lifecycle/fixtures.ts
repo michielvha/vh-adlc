@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { chmodSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import type { ReviewReceipt } from "./native-review";
 
 export const DOCS_PIN = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
 export type Diagnostic = "L01" | "L02" | "L04" | "L05" | "L06";
@@ -109,7 +110,7 @@ function reproducedFailure(c: Command): boolean {
     || /^FAIL: expected Hello, Ada\.; got Hello, world\.$/m.test(c.output));
 }
 
-export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: string, commands: Command[]) {
+export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: string, commands: Command[], review?: ReviewReceipt) {
   const changed = differences(before.files, after.files);
   const indexChanged = differences(before.index, after.index);
   const permitted = (path: string) => f.id === "L02" ? path === "README.md"
@@ -142,21 +143,21 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
       { name: "documented greeting repaired", pass: check.exitCode === 0 && named.exitCode === 0 && named.stdout.toString().trim() === "Hello, Ada." && noArg.stdout.toString().trim() === "Hello, world." },
       { name: "regression observed before and after repair", pass: commands.some(reproducedFailure) && commands.some((c) => testInvocation(c) && c.exitCode === 0 && !/^FAIL:/m.test(c.output)) },
       { name: "maintenance record exists without feature state", pass: records.length === 1 && !changed.some((path) => path.startsWith("docs/specs/")) },
-      // This diagnostic adapter does not yet attest independent reviewer execution.
-      // A claimed review or successful repair cannot satisfy the full L06 outcome.
-      { name: "independent maintenance review verified", pass: false, detail: "Unverified: this adapter has no host-attested independent dispatch and returned-review evidence." },
+      { name: "independent maintenance review verified", pass: review?.pass === true, detail: review?.reason ?? "Unverified: no native reviewer receipt was supplied." },
     );
   }
   return { pass: checks.every((c) => c.pass), checks };
 }
 
-export function events(raw: string): { response: string; commands: Command[]; failed: boolean } {
+export function events(raw: string): { response: string; commands: Command[]; failed: boolean; threadId: string } {
   const response: string[] = [];
   const commands: Command[] = [];
   let failed = false;
+  let threadId = "";
   for (const line of raw.split("\n")) {
     let entry: any;
     try { entry = JSON.parse(line); } catch { continue; }
+    if (entry.type === "thread.started" && typeof entry.thread_id === "string") threadId = entry.thread_id;
     if (entry.type === "turn.failed" || entry.type === "error") failed = true;
     const item = entry.item;
     if (item?.type === "agent_message") response.push(String(item.text));
@@ -164,5 +165,5 @@ export function events(raw: string): { response: string; commands: Command[]; fa
       commands.push({ command: String(item.command), exitCode: item.exit_code, output: String(item.aggregated_output ?? "") });
     }
   }
-  return { response: response.join("\n\n"), commands, failed };
+  return { response: response.join("\n\n"), commands, failed, threadId };
 }
