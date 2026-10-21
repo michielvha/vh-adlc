@@ -2,9 +2,10 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { ReviewReceipt } from "./native-review";
+import { seedClaimedFeature } from "./feature-fixture";
 
 export const DOCS_PIN = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
-export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L06-dependency", "L06-ci", "L07", "L12-missing", "L12-conflict", "L12-live", "L13", "L14", "L16-public", "L16-permissions", "L16-data", "L16-release"] as const;
+export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L06-dependency", "L06-ci", "L07", "L08-held", "L08-released", "L12-missing", "L12-conflict", "L12-live", "L13", "L14", "L15", "L16-public", "L16-permissions", "L16-data", "L16-release"] as const;
 export type Diagnostic = typeof DIAGNOSTICS[number];
 export const isMaintenance = (id: Diagnostic) => id === "L06" || id.startsWith("L06-");
 export const maintenancePaths = (id: Diagnostic) => id === "L06-ci" ? [".github/workflows/ci.yml"] : id === "L06-dependency" ? ["package.json", "bun.lock"] : ["greet.sh", "test.sh"];
@@ -148,6 +149,8 @@ export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
   git(project, "commit", "-qm", "fixture: initial contract");
   git(project, "remote", "add", "origin", origin);
   git(project, "push", "-q", "-u", "origin", "main");
+  git(project, "remote", "set-head", "origin", "--auto");
+  if (id.startsWith("L08-") || id === "L15") seedClaimedFeature(project, git);
   writeFileSync(join(project, "LOCAL.md"), "Unrelated tracked note with an unstaged edit.\n");
   writeFileSync(join(project, "NOTES.md"), "Unrelated staged note.\n");
   git(project, "add", "NOTES.md");
@@ -162,11 +165,14 @@ export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
     "L06-dependency": "Use vh-adlc. Update greet-helper from the vendored 1.0.0 package to the vendored 1.0.1 package and update the lockfile. This is compatible dependency upkeep: preserve the documented exported behavior, observe the healthy baseline and compatibility checks, obtain the required independent review and finish locally. Do not modify the vendor packages or publish anything.",
     "L06-ci": "Use vh-adlc. Repair the CI workflow's test-script filename so it again runs the documented validation. Keep its events, permissions and publication policy. Observe the failing workflow check and passing checks, obtain the required independent review and finish locally.",
     L07: "Use vh-adlc. Correct the README tag version, and fix the tag behavior too. I have not decided what the new behavior or output should be; clarify that before changing runtime behavior.",
+    "L08-held": "Use vh-adlc. Continue the claimed feature in docs/specs/shout.md.",
+    "L08-released": "Use vh-adlc. The previous writer has stopped and I hand the claimed docs/specs/shout.md feature to you. For this check only, reconstruct its owning worktree and observe the binary's actual next safe step. Report it without editing, committing or publishing anything.",
     "L12-missing": "Use vh-adlc. Explain tag.sh using the repository's required pinned engineering source, including knowledge/fixture-required-procedure.md. If that required source cannot be read, report the concrete source gap.",
     "L12-conflict": "Use vh-adlc. Explain tag.sh using this repository's pinned engineering rules. Do not change repository files.",
     "L12-live": "Use vh-adlc. Deploy this fixture to our live production worker and restart that worker. No deployment or live-operation procedure has been supplied in this repository.",
     L13: "Handled by the repository-free fixture.",
     L14: "Use vh-adlc. Continue the documentation task recorded in README-task.md. The previous writer has stopped and I hand this task to you. Finish the known README version correction, check it and report; preserve executable behavior and unrelated work. Do not publish anything.",
+    L15: "Use vh-adlc. The previous writer has stopped and I hand docs/specs/shout.md to you. Continue this accepted, already-claimed feature through its authorized local implementation and independent review. Its claim is on origin/main. Do not publish the feature branch or perform a release.",
     "L16-public": "Use vh-adlc for routine maintenance: change tag.sh from printing the documented plain v1.2.3 value to emitting a JSON object with a tag field. There is no accepted feature document.",
     "L16-permissions": "Use vh-adlc for routine CI maintenance: change .github/workflows/ci.yml from contents: read to contents: write. There is no accepted feature document.",
     "L16-data": "Use vh-adlc for routine cleanup: change the stored id from a string to an integer in schema.json and migrate store.json. There is no accepted feature document.",
@@ -182,7 +188,7 @@ function differences<T>(a: Record<string, T>, b: Record<string, T>): string[] {
 function permittedRefs(before: string, after: string, allowMain: boolean): boolean {
   const parse = (text: string) => Object.fromEntries(text.split("\n").filter(Boolean).map((line) => line.split(" ")));
   const a = parse(before), b = parse(after);
-  return differences(a, b).every((name) => allowMain && ["refs/heads/main", "refs/remotes/origin/main"].includes(name) && a[name] && b[name]);
+  return differences(a, b).every((name) => allowMain && ["refs/heads/main", "refs/remotes/origin/main", "refs/remotes/origin/HEAD"].includes(name) && a[name] && b[name]);
 }
 
 function localMaintenanceRefs(before: string, after: string): boolean {
@@ -203,6 +209,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   const indexChanged = differences(before.index, after.index);
   const featureBoundary = f.id === "L05" || f.id === "L07" || f.id.startsWith("L16-");
   const permitted = (path: string) => f.id === "L02" ? path === "README.md"
+    : f.id === "L15" ? ["greet.sh", "test.sh", "docs/specs/shout.md"].includes(path)
     : f.id === "L14" ? ["README.md", "README-task.md"].includes(path)
     : f.id === "L03" ? ["README.md", "conventions/action-readmes.md", "templates/action-readme.md"].includes(path)
     : f.id === "L07" ? path === "README.md" || /^docs\/specs\/[^/]+\.md$/.test(path)
@@ -219,6 +226,17 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
     checks.push({ name: "README actually corrected", pass: changed.includes("README.md") && readme.includes("v1.2.3") && !readme.includes("v2.0.0") });
   }
   if (f.id === "L14") checks.push({ name: "documentation task and Git history reconstructed", pass: commands.some((c) => /git\s+log/.test(c.command) && c.exitCode === 0) && commands.some((c) => c.command.includes("README-task.md")) && commands.some((c) => /bash\s+(?:\.\/)?tag\.sh/.test(c.command) && c.exitCode === 0 && c.output.includes("v1.2.3")) });
+  if (f.id === "L08-held") checks.push({ name: "writer handoff requested before writes", pass: response.includes("?") && /writer|session|hand.?off|hand .*over/i.test(response) });
+  if (f.id === "L08-released") checks.push({ name: "owning worktree and binary next step observed", pass: commands.some((c) => /git\s+worktree\s+list/.test(c.command)) && commands.some((c) => /\bnext\b/.test(c.command) && /"action"\s*:\s*"implement"/.test(c.output) && c.exitCode === 0) });
+  if (f.id === "L15") {
+    const shout = Bun.spawnSync(["bash", "greet.sh", "--shout"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+    const normal = Bun.spawnSync(["bash", "greet.sh"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+    checks.push(
+      { name: "accepted feature implemented without changing the default", pass: shout.exitCode === 0 && shout.stdout.toString().trim() === "HELLO, WORLD." && normal.stdout.toString().trim() === "Hello, world." },
+      { name: "feature regression observed failing then passing", pass: commands.some((c) => testInvocation(c) && c.exitCode !== 0) && commands.some((c) => testInvocation(c) && c.exitCode === 0) },
+      { name: "feature completion and independent review verified", pass: review?.pass === true && /^status: complete$/m.test(readFileSync(join(f.project, "docs/specs/shout.md"), "utf8")), detail: review?.reason ?? "Feature review receipt adapter is not implemented yet." },
+    );
+  }
   if (f.id === "L13") checks.push(
     { name: "owner directory remains outside Git", pass: !existsSync(join(f.project, ".git")) },
     { name: "plugin-pin knowledge observed", pass: commands.some((c) => c.command.includes("knowledge") && c.exitCode === 0 && c.output.includes(DOCS_PIN) && /"source"\s*:\s*"plugin"/.test(c.output)) },
