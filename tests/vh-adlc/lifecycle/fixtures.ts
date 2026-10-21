@@ -309,7 +309,14 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   if (f.id === "L02" || f.id === "L14") {
     const readme = readFileSync(join(f.project, "README.md"), "utf8");
     checks.push({ name: "README actually corrected", pass: changed.includes("README.md") && readme.includes("v1.2.3") && !readme.includes("v2.0.0") });
-    checks.push({ name: "README correction checked against actual tag output", pass: commands.some((c) => /(?:\bbash\s+(?:-[A-Za-z]+\s+)*['"]?(?:\.\/)?tag\.sh|\.\/tag\.sh)/.test(c.command) && c.exitCode === 0 && /^v1\.2\.3$/m.test(c.output)) });
+    checks.push({ name: "README correction checked against actual tag output", pass: commands.some((c) => {
+      if (c.exitCode !== 0 || !/(?:\bbash\s+(?:-[A-Za-z]+\s+)*['"]?(?:\.\/)?tag\.sh|\.\/tag\.sh)/.test(c.command)) return false;
+      if (/^v1\.2\.3$/m.test(c.output)) return true;
+      const captured = c.command.match(/\b([A-Za-z_]\w*)=\$\(\s*(?:bash\s+|\.\/)(?:\.\/)?tag\.sh\s*\)/)?.[1];
+      return !!captured && (c.command.includes(`$${captured}`) || c.command.includes(`\${${captured}}`))
+        && /\brg\s+[^\n]*--fixed-strings[^\n]*--line-regexp[^\n]*README\.md/.test(c.command)
+        && c.output.split("\n").some((line) => line.includes("v1.2.3") && readme.split("\n").includes(line));
+    }) });
   }
   if (f.id === "L14") checks.push({ name: "documentation task and Git history reconstructed", pass: commands.some((c) => /git\s+log/.test(c.command) && c.exitCode === 0) && commands.some((c) => c.command.includes("README-task.md")) && commands.some((c) => /bash\s+(?:\.\/)?tag\.sh/.test(c.command) && c.exitCode === 0 && c.output.includes("v1.2.3")) });
   if (f.id === "L08-held") checks.push({ name: "writer handoff requested before writes", pass: response.includes("?") && /writer|session|hand.?off|hand .*over/i.test(response) });

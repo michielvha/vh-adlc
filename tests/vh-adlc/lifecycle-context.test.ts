@@ -53,3 +53,13 @@ test("initializing the owner's directory fails even though Git metadata is exclu
   const commands = [{ command: "vh-adlc knowledge --repo /tmp/scratch", exitCode: 0, output: JSON.stringify({ result: "answered", knowledge: { source: "plugin", revision: DOCS_PIN } }) }];
   expect(grade(f, before, snapshot(f), "Independent review and checks are required.", commands).pass).toBe(false);
 });
+
+test("documentation resume can check captured tag output against the actual README line", () => {
+  const f = fixture("L14"), before = snapshot(f);
+  writeFileSync(join(f.project, "README.md"), "The tag.sh command prints the exact v1.2.3 tag.\n");
+  const history = { command: "git log -3 --oneline; cat README-task.md", exitCode: 0, output: "fixture: initial contract" };
+  const command = 'actual_tag=$(bash tag.sh)\nexpected_line="The tag.sh command prints the exact ${actual_tag} tag."\nrg --fixed-strings --line-regexp "$expected_line" README.md';
+  const check = { command, exitCode: 0, output: "The tag.sh command prints the exact v1.2.3 tag.\n" };
+  expect(grade(f, before, snapshot(f), "Checked the actual tag.", [history, check]).pass).toBe(true);
+  expect(grade(f, before, snapshot(f), "Checked the actual tag.", [history, { ...check, command: 'cat tag.sh; echo "The tag.sh command prints the exact v1.2.3 tag."' }]).pass).toBe(false);
+});
