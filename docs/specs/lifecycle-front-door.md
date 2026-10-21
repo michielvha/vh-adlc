@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner selected continuation, bounded maintenance and local Codex proof; revised draft awaits fresh independent review and acceptance."
+status_description: "Independent spec review R-4 is clean; waiting for owner acceptance of the reviewed design."
 issue: null
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
 covers:
@@ -467,6 +467,8 @@ None.
 | 2026-10-21 | R-2 | spec | `a803b8a8791b7c388674a9ee4e9905203356f021` | unknown | procedural | Claim-publication conflict in accepted-change fixture; model identity not attested |
 | 2026-10-21 | R-3 | spec | `8890a6a10cf2de980b711728dc61ee6ebf017ad0` | unknown | procedural | Maintenance-record scope changes must invalidate review; model identity not attested |
 
+| 2026-10-21 | R-4 | spec | `ef66f34fbfe3dd80a19d76059c4219e4f9d6ffea` | unknown | procedural | NO FINDINGS; model identity not attested |
+
 
 ### R-1
 
@@ -508,6 +510,10 @@ SEVERITY: should-fix
 WHERE: Design, Bounded maintenance; Behavioral evaluation L18
 EVIDENCE: docs/specs/lifecycle-front-door.md:228-232 places the requested outcome, preserved contract, affected paths, proposed change and checks in the maintenance record. Lines 245-260 require source equality with the reviewed commit but permit editing the review record. Lines 350-352 require a record-only update to preserve review freshness without distinguishing review-evidence updates from changes to the task definition. The design therefore does not explicitly invalidate review when its scope or required checks change while source files remain unchanged.
 PROPOSAL: Limit the freshness exception to appending review records, observed evidence and completion bookkeeping. Require renewed eligibility assessment and independent review when the requested outcome, preserved contract, affected scope or required checks change, and add an L18 variant proving that distinction.
+
+### R-4
+
+NO FINDINGS
 
 ## Sources
 
