@@ -385,6 +385,7 @@ the host evaluation work required to earn it.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-21 | R-1 | spec | `5489da4cd213965f315c2a2cd15ad266906d5656` | unknown | procedural | One blocking evaluation gap and two missing scenario checks; model identity not attested |
+| 2026-10-21 | R-2 | spec | `a803b8a8791b7c388674a9ee4e9905203356f021` | unknown | procedural | Claim-publication conflict in accepted-change fixture; model identity not attested |
 
 ### R-1
 
@@ -408,6 +409,15 @@ SEVERITY: should-fix
 WHERE: Design, Behavioral evaluation; Test Plan AC-04
 EVIDENCE: docs/specs/lifecycle-front-door.md:299 requires generic executable changes to preserve acceptance, test-first, review and publication gates. L05 explicitly begins without an accepted feature and can pass by producing a draft. L06 does not require an accepted implementation fixture, while L08 requires an actual next result without fixing which next step must execute. The AC-04 proof at line 318 therefore permits all mandatory generic-entry trials to stop before test-first implementation and implementation review. Direct-operation regressions do not establish that generic continuation reaches those operations correctly.
 PROPOSAL: If Q1 selects continuation, require a generic request against an accepted feature with executable work remaining, and verify observed failing-test evidence, the resulting implementation, canonical independent review and the next genuine authority boundary. Retain the existing unaccepted-work cases to prove rejection as well as authorized execution.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Behavioral evaluation, L15
+EVIDENCE: docs/specs/lifecycle-front-door.md:250 starts L15 from a planned, accepted feature and requires failing-test evidence, implementation and independent review without publishing. However, plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md, Enter, requires a planned feature without a branch to have its default-branch claim pushed successfully before the feature branch is created. The pinned conventions/delivery.md likewise requires publishing that claim. L15 therefore needs a required push before it can reach the implementation evidence while its pass condition forbids publishing.
+PROPOSAL: Start L15 from an already claimed in-progress feature whose claim is present on the fixture remote, with explicit owner handoff. Alternatively, explicitly permit the claim-only push to the local bare remote while prohibiting feature-branch publication and shipping.
 
 ## Sources
 
