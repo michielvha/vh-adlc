@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Accepted against R-5; implementing and testing locally on the owner-selected branch. No publication authorized."
+status: complete
+status_description: "Implemented locally on the owner-selected branch; R-7 met all ten criteria, the native CLI matrix passed, and the real completion gate passed. Publication remains separate."
 issue: null
 branch: feat/lifecycle-front-door
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
