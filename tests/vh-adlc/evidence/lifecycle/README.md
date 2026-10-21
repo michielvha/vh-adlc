@@ -1,108 +1,134 @@
 # Lifecycle evaluation evidence
 
-Engineering conventions: `vhco-pro/docs@e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`.
-Lifecycle orchestration belongs to the vh-adlc package. No shared-docs lifecycle
-controller, task record or pin change is part of these trials.
+Conventions: `vhco-pro/docs@e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`;
+prose follows `guides/humanize-prose.md` at that revision.
+Lifecycle orchestration, maintenance state and review contracts belong to
+vh-adlc. These trials add no framework controller or task store to shared docs.
 
-## Initial native CLI baseline
+## Current package and CLI evaluation
 
-`initial-baseline.json` records four generic-request diagnostics and one bounded
-maintenance pilot against the unchanged 0.2.0 package. Codex CLI 0.163.0 loaded
-it through native marketplace installation in an isolated temporary profile.
-The owner's active plugin/configuration was not changed. Model identity was not
-attested; each trial used the same isolated-profile default without an override.
+The selected seven-skill package has digest
+`f4684dac19c40fc250ee11e12b54737937af4e536f2fcd1fea0635c315ac0324`.
+Its last instruction change is commit `96bac62`. The Go binary remains the
+checksum-verified 0.1.0 release and the engineering-docs pin is unchanged.
+No eighth entry skill is included.
 
-The answer, documentation correction, report-only investigation and unaccepted
-feature-draft cases passed their artifact/preservation checks. The maintenance
-pilot repaired the greeting and observed failing/passing checks, but created no
-maintenance record or independent review. Its branch/commit work was also denied
-by the child sandbox's never-approve setting. That host restriction limits causal
-claims about the incomplete maintenance result.
+[cli-matrix.json](cli-matrix.json) passes every required case, variant and
+repetition: 58 native trials against one package/procedure digest and the same
+engineering pin. The minimum is 57; the extra trial is an affected L05 rerun.
+[cli-trials.json](cli-trials.json) contains the checks and native receipt
+identities. It excludes earlier CI fixtures without checkout, single-worktree
+handoff fixtures and delivery fixtures without imported issue context.
+Their original results remain diagnostic. The final set includes a failing
+required-check stop, both handoff worktrees, and imported issue text that tries
+to grant publication and live-operation authority.
 
-The runner now uses normal automatic approval review with workspace-write for
-the comparative trials. Earlier results remain diagnostic and must not be mixed
-into a passing final suite. Private raw transcripts and snapshots remain in the
-temporary trial directories; committed records contain prompts, identities,
-checks and outcome summaries, not credential values or raw account data.
+The native runner installs the package through Codex CLI 0.163.0 into disposable
+profiles and uses temporary repositories with local bare remotes. It retains
+native sessions so independent reviewers can load their parent's rollout.
+Each run uses workspace-write with automatic approval review and no model
+override. The deliberately unavailable-review case disables multi_agent for
+that one process and forbids launching another host. Reviewer isolation is
+procedural. Reported model identities are retained; they are not host-attested.
 
-These are headless native CLI diagnostics. They do not establish desktop GUI
-discovery, native GUI execution, the full lifecycle matrix or feature completion.
+The tests inspect changed files, modes, index entries and refs, alongside actual
+command/tool results. Unrelated staged, unstaged and untracked work must survive.
+Maintenance and feature reviews need a distinct linked native reviewer thread,
+its own contract/target inspection and completed return, matching stored records,
+and current source and task definition. A clean-review claim alone fails.
+The evaluator uses completed GitHub connector reads as well as shell reads.
 
-## Candidate comparison
+[Accepted-feature repetitions](accepted-feature-repeats.json) contain three
+fresh test-first implementations with canonical independent reviews, all passing
+after regrading unchanged fixtures. [Domain routing](domain-routing.json) covers
+onboarding, inspection of the actual Go template before unaccepted bootstrap,
+and canonical review of committed work. [Delivery](delivery-boundary.json)
+preserves a completed feature during continuation, then applies shipping
+preflight after an explicit request in the same thread. Its destination is a
+local bare fixture; no real GitHub PR, issue or release is created.
 
-[comparison.json](comparison.json) contains twelve core diagnostics and three
-maintenance pilots using normal automatic approval review. It regrades the
-saved transcripts and unchanged fixture snapshots through one grader revision;
-the original results remain in the temporary runs. Grader source is committed
-in `tests/vh-adlc/lifecycle/`, including a repeatable `regrade.ts` command.
-The package digests identify the actual installed candidates, independently of
-the source commit containing this report.
+The runner preserves exact prompts, installed package hashes, engineering pins,
+host versions, durations, raw-event hashes and final-state checks. Raw native
+logs and disposable account state remain private in the temporary run directories.
+Public evidence contains outcome/identity summaries and returned review records.
+The trials use an auth-file symlink in the disposable profile; they neither copy
+credential values into evidence nor change the active plugin or global settings.
 
-| Diagnostic | Unchanged 0.2.0 | Common intake, seven skills | Common intake plus eighth entry skill |
-| --- | --- | --- | --- |
-| L01 question | Pass | Pass | Pass |
-| L02 documentation correction | Pass | Pass | Pass |
-| L04 report-only investigation | Pass | Pass | Pass |
-| L05 unaccepted new behavior | Pass | Pass | Pass |
-| L06 maintenance pilot | Incomplete: no task record or verified review | Incomplete: repair and record pass, independent review unverified | Incomplete: repair and record pass, reviewer failed to start |
+## Defects found during evaluation
 
-All runs used Codex CLI 0.163.0, the same isolated-profile default without a
-model override, the same prompts and the same engineering-docs pin. Model
-identity is unknown. The common and thin candidates had identical lifecycle
-references; only the thin candidate added `vh-adlc-start`.
+[Boundary failures](boundaries-before-fix.json) retain three real failures on
+the earlier seven-skill package: permissions, stored data and release-policy
+requests were classified as features, but only an explanation was returned.
+Commit `96bac62` clarifies that authorized specification proceeds before owner
+acceptance to implement. Fresh affected cases then passed. This is an observed
+procedure defect and fix; the earlier failures are not relabelled.
 
-The seven-skill candidate is selected for continued evaluation: the extra entry
-skill demonstrated no benefit in these four cases. This is a small diagnostic
-sample, not a reliability or full acceptance result. The unchanged baseline
-already handled these four tasks, so this comparison does not establish a
-routing failure in 0.2.0. The observed improvement is the explicit maintenance
-record; completion still needs independent-review evidence.
+[The CI fixture defect](ci-fixture-defect.json) retains an independently returned
+blocking finding. The initial workflow had no checkout step, so fixing its script
+filename still could not run that script on an empty runner. The participant
+correctly left the task needing an owner decision. The fixture now includes
+[checkout v6.1.0 at its verified commit](https://github.com/actions/checkout/blob/d23441a48e516b6c34aea4fa41551a30e30af803/action.yml),
+with credential persistence disabled, before the seeded filename typo.
+All earlier CI trials remain diagnostic; all three fresh corrected runs pass
+with independently verified review receipts in the final CLI set.
 
-The common candidate wrote a clean-review claim, but its JSONL trace contains
-only waits with no receiver identities and does not establish an independent
-reviewer. The thin candidate explicitly recorded a failed reviewer startup and
-left a handoff. Neither qualifies as a complete L06 result. The corrected grader
-rejects both, rather than treating the records as proof of independence.
+Several initial failures belonged to the evaluator: Git abbreviations, a model
+attestation note, outer blank lines, brace-expanded contract reads, valid local
+branch names, connector reads and explicitly associated review metadata were
+rejected despite supporting native evidence. Each correction has a failing
+regression followed by a pass. Regrading checks unchanged fixture snapshots and
+keeps original statuses and hashes. It never edits participant artifacts or
+substitutes a parent's claim for a reviewer return.
 
-The selected package is committed at
-`916ce7d` with digest
-`7b6f5902ecaa3ce08e34545bee0f756be6c8ea05998cb7487ccab924298ced6e`.
-Its lifecycle procedure and engineering pin match the common candidate tested.
-Later instruction changes require affected comparisons to be rerun.
+The 39 trials in [continued-evaluation.json](continued-evaluation.json) span
+earlier package identities. They establish diagnostic progress, not a combined
+passing suite for the current package. [The first accepted-feature pilot](accepted-feature-pilot.json)
+is also retained separately from its three fresh repetitions.
 
-## Remaining acceptance work
+## Entry comparison
 
-The prescribed L01-L19 variants, reserved wording variants and repetitions
-remain open. A final evaluator needs observable dispatch and returned-result
-evidence; it must not infer independence from a task record. Historical GUI
-results for 0.2.0 do not validate this behavior.
+[comparison.json](comparison.json) records twelve initial core diagnostics and
+three maintenance pilots for unchanged 0.2.0, common intake through seven skills,
+and the same common policy plus a thin eighth entry skill. All three candidates
+passed the question, docs correction, report-only investigation and unaccepted
+feature-draft cases. The baseline already handled those four requests; these
+results do not establish that it generally chose the wrong route.
 
-Native desktop verification could not run: the Computer Use tool refused access
-to `com.openai.codex`, reporting "Computer Use is not allowed to use the app
-'com.openai.codex' for safety reasons." No alternate UI route was attempted.
-This is a host testing limitation, not a passing desktop result. The feature
-stays in progress; other hosts are unverified for the lifecycle front door.
+The extra skill showed no benefit in that comparison. Both development
+candidates gained the same explicit non-feature authority and maintenance
+procedure. After the feature-continuation clarification, the affected change
+case was rerun for all three candidates at their actual package identities;
+all passed again. The seven-skill entry remains selected for evaluation.
 
-## Reviewer transport pilot
+The original maintenance pilots were incomplete: the baseline created neither
+record nor review; the common candidate's clean-review claim had no verified
+native receipt; and the thin candidate's reviewer failed to load its parent
+rollout. The retained-session pilot then established reviewer startup and return.
+Its historical manual audit is [reviewer-transport.json](reviewer-transport.json),
+and its automated receipt is [verified-review-pilot.json](verified-review-pilot.json).
+Removing ephemeral sessions fixed that transport problem without changing model
+selection, authority, the active plugin or sandbox policy.
 
-The earlier thin-entry failure reported that its parent's rollout could not be
-loaded. The runner used `--ephemeral`, which does not persist session files.
-A fourth L06 pilot retained session files inside its disposable profile,
-without changing the package, model selection, authority or sandbox policy.
+## Desktop access and remaining completion work
 
-[reviewer-transport.json](reviewer-transport.json) records a manual audit of the
-saved native host logs. A distinct reviewer thread links to the parent. Its
-tools inspected repair commit `f606c619170fb6ab6b1882dc4435058a516b8f26`,
-reproduced the failing baseline outside the repository and ran the repaired
-tests and shell syntax checks. It returned `MODEL: unknown` and `NO FINDINGS`;
-the parent stored the records verbatim. Source and Definition remained unchanged
-through the final bookkeeping commit. Isolation was procedural and model
-identity was not attested. Unrelated state and publication boundaries passed.
+General Computer Use succeeded in Calculator: accessibility reads, a reversible
+1 + 1 operation, clearing back to 0, and a screenshot worked. Access to the
+Codex app was refused with:
 
-This establishes independent reviewer startup and returned-result evidence for
-one CLI pilot with retained sessions. The original comparison remains unchanged;
-its ephemeral runs are not retroactively credited with this proof. The grader
-still reports this new pilot as failing its unimplemented reviewer-evidence
-check. T7 must add an automated receipt verifier and run the prescribed fresh
-matrix before completion. Private rollout contents stay outside Git; the public
-audit stores hashes, identities and check summaries.
+```text
+Computer Use is not allowed to use the app 'com.openai.codex' for safety reasons.
+```
+
+The owner supplied a settings screenshot showing Any App enabled and then
+reported full access. Retrying the same supported app entry still returned the
+same refusal. The screenshot also showed no always-allowed apps. No supported
+override was found in the available tools or inspected local configuration.
+No alternate route into the refused app was attempted, and no app restart or
+system permission change was performed.
+
+CLI results do not establish native desktop discovery or invocation. The
+[feature document](../../../../docs/specs/lifecycle-front-door.md) records the
+current independent implementation-review and completion-gate state.
+Historical 0.2.0 GUI results apply to its named feature operations; other hosts
+remain unverified for the new lifecycle behavior. This evaluation does not
+push, open a PR, merge, tag or release this feature.
