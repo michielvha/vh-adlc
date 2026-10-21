@@ -459,7 +459,14 @@ new native lifecycle scenarios remain implementation work.
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `tests/vh-adlc/lifecycle.test.ts` - observe failing fixture/grader tests for correct artifacts, forbidden mutations, state preservation and stable candidate identity before the helper exists (AC-01, AC-02, AC-03, AC-07, AC-09).
+- [ ] T2 `tests/vh-adlc/lifecycle/fixtures.ts` - implement isolated task fixtures, snapshots, candidate fingerprints and outcome graders; T1 passes on real filesystem and Git state (AC-01, AC-02, AC-03, AC-07, AC-09).
+- [ ] T3 `tests/vh-adlc/lifecycle/run.ts`, `tests/vh-adlc/evidence/lifecycle/` - run the four generic requests against the unchanged baseline, retaining actual outcomes and establishing any expected behavior failures before changing the procedure (AC-01, AC-02, AC-03, AC-04, AC-09).
+- [ ] T4 `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/references/maintenance-review.md`, `plugins/vh-adlc/references/maintenance-record.md`, `plugins/vh-adlc/references/authority.md` - add framework-owned intake and bounded-maintenance procedure plus independent review and record contracts; common-integration trials prove that no new shared-docs controller or pin is required (AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-10).
+- [ ] T5 `tests/vh-adlc/lifecycle/run.ts`, `tests/vh-adlc/evidence/lifecycle/` - compare existing entry and a scratch thin-entry candidate against identical framework references and engineering pin; record all twelve diagnostic trials and select only a candidate whose actual outcomes pass (AC-01, AC-08, AC-09).
+- [ ] T6 `plugins/vh-adlc/skills/vh-adlc-start/SKILL.md` if selected, plugin manifests, `tests/vh-adlc/check.test.ts`, `README.md` - commit the selected entry after its diagnostic failure/passing evidence, update exact package inventory and version metadata, and preserve all seven direct operation contracts (AC-01, AC-08).
+- [ ] T7 `tests/vh-adlc/lifecycle/`, `tests/vh-adlc/evidence/lifecycle/`, `README.md` - execute and grade L01-L19 variants, reserved wording variants and required repetitions against one frozen candidate; record native local Codex proof and keep unrun hosts unverified (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10).
+- [ ] T8 `tests/vh-adlc/evidence/lifecycle/`, `docs/specs/lifecycle-front-door.md` - observe required regressions and independent exact-commit implementation review, resolve findings in scope, and complete only after the real completion gate passes (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10).
 
 ## Open Questions
 
