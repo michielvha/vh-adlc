@@ -38,7 +38,7 @@ function fixture() {
   }
   logs();
   const verify = () => verifyMaintenanceReview(f.project, sessions, "parent", ["greet.sh", "test.sh"]);
-  return { f, sessions, path, parent, child, logs, verify };
+  return { f, sessions, path, target, parent, child, logs, verify };
 }
 
 test("a linked native reviewer return establishes independence without attesting a model", () => {
@@ -112,4 +112,11 @@ test("inherited inspection cannot stand in for the reviewer's own tool evidence"
   f.child[1].payload.internal_chat_message_metadata_passthrough.turn_id = "parent-turn";
   f.logs();
   expect(f.verify().pass).toBe(false);
+});
+
+test("an inspected unambiguous Git abbreviation resolves to the exact reviewed commit", () => {
+  const f = fixture();
+  f.child[1].payload.input = f.child[1].payload.input.replace(f.target, f.target.slice(0, 7));
+  f.logs();
+  expect(f.verify().pass).toBe(true);
 });
