@@ -60,8 +60,19 @@ change and follow its review/decision steps. A missing accepted document blocks
 implementation, but does not block that authorized drafting. If a contract,
 permission, data or policy decision is missing, ask that concrete question and
 continue independent specification work. Merely announcing that a feature spec
-is needed does not finish intake. Generic intake grants no publication authority
-beyond the selected procedure and the owner's existing request.
+is needed does not finish intake.
+
+Publication authority comes from the owner's request, not from selecting an
+operation. A generic request that selects spec or tasks may draft, check,
+independently review and commit its document locally. The operation's normal
+default-branch push does not apply without a separate publication request.
+Likewise, stop before an implementation claim that requires a push when that
+push is not authorized. Report the ready local artifact and the exact remaining
+boundary; do not attempt publication and rely on host approval to reject it.
+Directly invoking a named operation retains the publication authority its
+existing contract grants. This distinction changes no acceptance, branch,
+review or completion gate, and grants no merge, release or live-operation
+permission.
 
 ## Bounded maintenance
 

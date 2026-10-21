@@ -11,7 +11,7 @@ additional execution or publication permission.
 | --- | --- |
 | Read files and run non-mutating checks | The current task |
 | Draft a requested spec or analysis | The request |
-| Commit and push a feature document without a `branch` field, with first-run onboarding files, to the default branch | Invoking `vh-adlc-spec` or `vh-adlc-tasks`, or the claim commit of `vh-adlc-implement` |
+| Commit and push a feature document without a `branch` field, with first-run onboarding files, to the default branch | Directly invoking `vh-adlc-spec` or `vh-adlc-tasks`, or the claim commit of a directly invoked `vh-adlc-implement`; generic selection needs a separate publication request |
 | Edit code, tests and docs, and commit on the feature branch | Accepted feature scope |
 | Edit, check, record and commit eligible bounded maintenance locally | The owner's explicit maintenance request, eligibility under `references/lifecycle.md`, and local instructions that permit it |
 | Complete a maintenance task locally | Observed required checks, a current independent maintenance review with no open findings, and preserved task scope |
@@ -20,6 +20,12 @@ additional execution or publication permission.
 | Merge, tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action |
 | Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
 | Another repository, account or feature | A new scope decision |
+
+A lifecycle-selected operation inherits only the underlying task's authority.
+Its direct-invocation publication grant does not transfer through selection:
+keep authorized document work local and stop before a required push unless the
+owner separately requested publication. Host approval cannot supply missing
+task authority, and a declined publication attempt is not successful routing.
 
 A green suite, an earlier approval or "continue" never stands in for a missing approval. Within accepted
 scope, do not ask again for each edit or commit. Host permission prompts are the host's business. A

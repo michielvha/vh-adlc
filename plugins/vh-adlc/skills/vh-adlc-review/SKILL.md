@@ -10,8 +10,12 @@ description: Run an independent implementation review of a vh-adlc feature at an
 For a generic explicit vh-adlc request with no operation named, read
 `references/lifecycle.md` from the plugin root before the operation below.
 A lifecycle-selected operation proceeds below without repeating intake; its
-underlying task authority still applies. A directly named operation retains
-its original scope, gates and stopping conditions.
+underlying task authority still applies. For lifecycle-selected work, any push,
+issue or PR step below requires a separate publication request from the owner;
+selecting this operation does not count as invoking its publication grant.
+Keep authorized drafting, checks, independent review and commits local, then
+stop before a required publication step when that authority is absent.
+A directly named operation retains its original scope, gates and stopping conditions.
 
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
