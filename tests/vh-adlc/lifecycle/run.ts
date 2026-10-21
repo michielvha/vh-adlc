@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import { buildDiagnostic, DOCS_PIN, events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot } from "./fixtures";
 import { verifyFeatureReview, verifyMaintenanceReview } from "./native-review";
 import { scenarioPlan } from "./scenario-plan";
+import { needsMaintenanceReview } from "./maintenance-fixture";
 
 const REPO = resolve(import.meta.dir, "../../..");
 function flag(name: string): string | undefined {
@@ -79,6 +80,7 @@ for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan
     const errorPath = join(trialRoot, prompts ? `phase-${at + 1}.stderr.log` : "stderr.log");
     const args = ["codex", "exec", "--json", "--color", "never", "--approve-for-me", "--cd", f.project, "--add-dir", f.origin];
     if (id === "L13") args.push("--skip-git-repo-check");
+    if (id === "L17-missing") args.push("--disable", "multi_agent");
     args.push(...(at === 0 ? [text] : ["resume", parentThread, text]));
     const child = Bun.spawn(args, { cwd: f.project, env: childEnv, stdout: Bun.file(rawPath), stderr: Bun.file(errorPath) });
     const timer = setTimeout(() => { timeout = true; child.kill(); }, id === "L15" ? 720_000 : 240_000);
@@ -104,7 +106,7 @@ for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan
   const parsed = events(raw);
   const after = snapshot(f);
   const review = ["L15", "L10"].includes(id) ? verifyFeatureReview(f.project, join(profile, "sessions"), parsed.threadId)
-    : isMaintenance(id) ? verifyMaintenanceReview(f.project, join(profile, "sessions"), parsed.threadId, maintenancePaths(id)) : undefined;
+    : isMaintenance(id) || needsMaintenanceReview(id) ? verifyMaintenanceReview(f.project, join(profile, "sessions"), parsed.threadId, maintenancePaths(id)) : undefined;
   const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
   if (prompts) {
     phaseChecks.push({ name: "all requested scope-change turns completed", pass: phases.length === prompts.length });
@@ -116,6 +118,7 @@ for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan
     packageHash, graderHash, docsPin: DOCS_PIN, model: "unknown", configuration: "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
     prompt: f.prompt, durationMs: Date.now() - started, exitCode, timeout,
     review, phases: prompts ? phases : undefined,
+    hostConstraint: id === "L17-missing" ? "native multi_agent disabled for this trial; launching a replacement host is outside its request" : undefined,
     status: timeout || exitCode !== 0 || parsed.failed ? "execution-failed" : verdict.pass && phaseChecks.every((c) => c?.pass) && unchangedPackage ? "pass" : "fail",
     checks: [...phaseChecks, ...verdict.checks, { name: "installed candidate unchanged", pass: unchangedPackage }],
   };

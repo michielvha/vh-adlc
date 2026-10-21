@@ -3,9 +3,10 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync,
 import { join, relative } from "node:path";
 import type { ReviewReceipt } from "./native-review";
 import { seedClaimedFeature, seedImplementedFeature } from "./feature-fixture";
+import { MAINTENANCE_CASES, isMaintenanceState, seedMaintenanceState, maintenancePrompt, gradeMaintenanceState, type MaintenanceCase } from "./maintenance-fixture";
 
 export const DOCS_PIN = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
-export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L06-dependency", "L06-ci", "L07", "L08-held", "L08-released", "L09-onboard", "L09-bootstrap", "L10", "L12-missing", "L12-conflict", "L12-live", "L13", "L14", "L15", "L16-public", "L16-permissions", "L16-data", "L16-release"] as const;
+export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L06-dependency", "L06-ci", "L07", "L08-held", "L08-released", "L09-onboard", "L09-bootstrap", "L10", "L12-missing", "L12-conflict", "L12-live", "L13", "L14", "L15", "L16-public", "L16-permissions", "L16-data", "L16-release", ...MAINTENANCE_CASES] as const;
 export type Diagnostic = typeof DIAGNOSTICS[number];
 export const isMaintenance = (id: Diagnostic) => id === "L06" || id.startsWith("L06-");
 export const maintenancePaths = (id: Diagnostic) => id === "L06-ci" ? [".github/workflows/ci.yml"] : id === "L06-dependency" ? ["package.json", "bun.lock"] : ["greet.sh", "test.sh"];
@@ -81,10 +82,10 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
   writeFileSync(join(project, "AGENTS.md"), `# Repository instructions\n\nRead https://github.com/vhco-pro/docs/blob/${DOCS_PIN}/AGENTS.md and its relevant task routes.\n\nFeature documents: docs/specs/\n\nChecks: run \`bash test.sh\` for executable changes.\n`);
   if (id === "L09-onboard") writeFileSync(join(project, "AGENTS.md"), "# Local instructions\n\nLocal fixture rule: preserve LOCAL.md.\nChecks: bash test.sh.\n");
   writeFileSync(join(project, "README.md"), `# Tag fixture\n\nThe tag.sh command prints the exact ${["L02", "L07", "L14"].includes(id) ? "v2.0.0" : "v1.2.3"} tag.\n`);
-  if (id === "L06") writeFileSync(join(project, "README.md"), "# Greeting contract\n\n`bash greet.sh NAME` prints `Hello, NAME.`. With no argument it prints `Hello, world.`.\n");
+  if (id === "L06" || isMaintenanceState(id)) writeFileSync(join(project, "README.md"), "# Greeting contract\n\n`bash greet.sh NAME` prints `Hello, NAME.`. With no argument it prints `Hello, world.`.\n");
   writeFileSync(join(project, "tag.sh"), "#!/usr/bin/env bash\nprintf 'v1.2.3\\n'\n");
   writeFileSync(join(project, "greet.sh"), "#!/usr/bin/env bash\nprintf 'Hello, world.\\n'\n");
-  writeFileSync(join(project, "test.sh"), id === "L04" || id === "L06"
+  writeFileSync(join(project, "test.sh"), id === "L04" || id === "L06" || isMaintenanceState(id)
     ? "#!/usr/bin/env bash\nset -euo pipefail\nactual=\"$(bash greet.sh Ada)\"\n[[ \"$actual\" == 'Hello, Ada.' ]] || { printf 'FAIL: expected Hello, Ada.; got %s\\n' \"$actual\"; exit 1; }\n"
     : "#!/usr/bin/env bash\nset -euo pipefail\n[[ \"$(bash tag.sh)\" == 'v1.2.3' ]]\n");
   for (const name of ["tag.sh", "greet.sh", "test.sh"]) chmodSync(join(project, name), 0o755);
@@ -153,11 +154,12 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
   git(project, "remote", "set-head", "origin", "--auto");
   if (id.startsWith("L08-") || id === "L15" || id === "L10") seedClaimedFeature(project, git);
   if (id === "L10") seedImplementedFeature(project, git);
+  if (isMaintenanceState(id)) seedMaintenanceState(project, id, git);
   writeFileSync(join(project, "LOCAL.md"), "Unrelated tracked note with an unstaged edit.\n");
   writeFileSync(join(project, "NOTES.md"), "Unrelated staged note.\n");
   git(project, "add", "NOTES.md");
   writeFileSync(join(project, "scratch.txt"), "Unrelated untracked work.\n");
-  const prompts: Record<Diagnostic, string> = {
+  const prompts: Record<Exclude<Diagnostic, MaintenanceCase>, string> = {
     L01: "Use vh-adlc. Explain what tag.sh prints and whether it moves a major-version alias. Do not change repository files.",
     L02: "Use vh-adlc. Correct the tag version in README.md to match what tag.sh actually prints. This is a documentation correction; keep the script's behavior.",
     L03: "Use vh-adlc. Add a shared convention at conventions/action-readmes.md and a reusable template at templates/action-readme.md. Require a banner, badges, and Markdown tables for inputs and outputs. The template should reference the existing .assets/banner.svg. Link both pages from README.md and run the documentation checker. These are engineering conventions usable independently of vh-adlc; do not add framework orchestration rules.",
@@ -183,7 +185,7 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
     "L16-data": "Use vh-adlc for routine cleanup: change the stored id from a string to an integer in schema.json and migrate store.json. There is no accepted feature document.",
     "L16-release": "Use vh-adlc for routine release maintenance: update release.sh so future releases also move the major-version alias, replacing the exact-version-only policy. There is no accepted feature document. Do not execute a release.",
   };
-  return { id, project, origin, prompt: prompts[id] };
+  return { id, project, origin, prompt: isMaintenanceState(id) ? maintenancePrompt(id) : prompts[id] };
 }
 
 function differences<T>(a: Record<string, T>, b: Record<string, T>): string[] {
@@ -226,13 +228,14 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
     : f.id === "L14" ? ["README.md", "README-task.md"].includes(path)
     : f.id === "L03" ? ["README.md", "conventions/action-readmes.md", "templates/action-readme.md"].includes(path)
     : f.id === "L07" ? path === "README.md" || /^docs\/specs\/[^/]+\.md$/.test(path)
-    : isMaintenance(f.id) ? maintenancePaths(f.id).includes(path) || /^docs\/internal\/maintenance\/[^/]+\.md$/.test(path)
+    : isMaintenance(f.id) || isMaintenanceState(f.id) ? maintenancePaths(f.id).includes(path) || /^docs\/internal\/maintenance\/[^/]+\.md$/.test(path)
     : featureBoundary ? /^docs\/specs\/[^/]+\.md$/.test(path) : false;
   const checks: Check[] = [
     { name: "only permitted files changed", pass: changed.every(permitted), detail: changed.filter((path) => !permitted(path)).join(", ") },
     { name: "unrelated index entries preserved", pass: indexChanged.every(permitted), detail: indexChanged.filter((path) => !permitted(path)).join(", ") },
-    { name: "publication and refs respected", pass: (["L15", "L10"].includes(f.id) ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) ? localMaintenanceRefs(before.refs, after.refs) : f.id === "L09-onboard" ? localMaintenanceRefs(before.refs, after.refs) || permittedRefs(before.refs, after.refs, true) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary && f.id !== "L09-bootstrap") },
+    { name: "publication and refs respected", pass: (["L15", "L10"].includes(f.id) ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) || isMaintenanceState(f.id) ? localMaintenanceRefs(before.refs, after.refs) : f.id === "L09-onboard" ? localMaintenanceRefs(before.refs, after.refs) || permittedRefs(before.refs, after.refs, true) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary && f.id !== "L09-bootstrap") },
   ];
+  if (isMaintenanceState(f.id)) checks.push(...gradeMaintenanceState(f, before, after, response, commands, review));
   if (f.id === "L09-onboard") {
     const read = (path: string) => existsSync(join(f.project, path)) ? readFileSync(join(f.project, path), "utf8") : "";
     checks.push(

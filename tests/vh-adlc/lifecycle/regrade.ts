@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot, type Fixture } from "./fixtures";
 import { verifyFeatureReview, verifyMaintenanceReview } from "./native-review";
+import { needsMaintenanceReview } from "./maintenance-fixture";
 
 const roots = process.argv.slice(2).map((root) => resolve(root));
 if (!roots.length) throw new Error("provide saved run directories");
@@ -19,7 +20,7 @@ const results = roots.flatMap((root) => {
     const raw = readFileSync(join(trial, "events.jsonl"), "utf8");
     const parsed = events(raw);
     const review = ["L15", "L10"].includes(f.id) ? verifyFeatureReview(f.project, join(root, "profile/sessions"), parsed.threadId)
-      : isMaintenance(f.id) ? verifyMaintenanceReview(f.project, join(root, "profile/sessions"), parsed.threadId, maintenancePaths(f.id)) : undefined;
+      : isMaintenance(f.id) || needsMaintenanceReview(f.id) ? verifyMaintenanceReview(f.project, join(root, "profile/sessions"), parsed.threadId, maintenancePaths(f.id)) : undefined;
     const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
     const unchanged = original.checks.find((c: any) => c.name === "installed candidate unchanged");
     const phaseChecks: any[] = [];
