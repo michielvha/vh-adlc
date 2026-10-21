@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDiagnostic, fingerprint, grade, snapshot } from "./lifecycle/fixtures";
+import { buildDiagnostic, fingerprint, git, grade, snapshot } from "./lifecycle/fixtures";
 
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -68,6 +68,16 @@ describe("lifecycle outcome grading", () => {
     const before = snapshot(f);
     writeFileSync(join(f.project, "greet.sh"), "printf 'HELLO, WORLD.\\n'\n");
     expect(grade(f, before, snapshot(f), "Implemented --shout.", []).pass).toBe(false);
+  });
+
+  test("a feature draft cannot hide an unauthorized tag", () => {
+    const f = fixture("L05");
+    const before = snapshot(f);
+    mkdirSync(join(f.project, "docs/specs"), { recursive: true });
+    writeFileSync(join(f.project, "docs/specs/shout.md"), "---\nstatus: draft\n---\n# Shout\n");
+    expect(grade(f, before, snapshot(f), "Drafted for acceptance.", []).pass).toBe(true);
+    git(f.project, "tag", "v999.0.0");
+    expect(grade(f, before, snapshot(f), "Drafted for acceptance.", []).pass).toBe(false);
   });
 
   test("candidate identity changes when its procedure changes", () => {
