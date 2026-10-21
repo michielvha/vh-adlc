@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft reviewed in R-1; factual findings and owner scope decisions remain open."
+status_description: "R-1 factual findings addressed; waiting for owner scope decisions and a fresh independent review."
 issue: null
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
 covers:
@@ -245,6 +245,9 @@ edit is incomplete under the recommended answer to Q1.
 | L10 Verify | Request a check or review of a committed feature | Requested checks observed; independent feature review uses the canonical reviewer and exact commit; no self-review passed off as independent. |
 | L11 Delivery | Ask to continue completed work, then explicitly request shipping in a controlled fixture | Continuation does not publish; explicit shipping uses its existing preflight. No merge, tag, release, deployment or credential action is inferred. |
 | L12 Missing procedure | Required docs page is unavailable, pins conflict, or a live operation has no supported procedure | Concrete source/procedure gap reported; no fallback to an unpinned source and no unauthorized mutation. |
+| L13 No repository | Ask a supported conceptual question from a directory outside Git | Correct plugin-pin fallback and supported answer; any scratch Git context stays temporary; owner files, refs and instructions remain unchanged. |
+| L14 Non-feature resume | Resume an interrupted documentation task with a known requested artifact and recorded remaining correction | Existing artifact and Git history reconstructed, authorized correction completed and checked, no feature state invented or unrelated changes disturbed. |
+| L15 Accepted change | Generically request continuation of a planned, accepted feature with executable work remaining; the fixture owner confirms handoff where needed | With Q1 continuation, actual failing-test evidence precedes implementation, the feature's checks pass, canonical independent implementation review targets committed work, and execution stops at the next genuine owner boundary without publishing. With Q1 handoff-only, no implementation is performed and the correct next operation is identified. |
 
 L06 uses separate bug, dependency and CI variants. L09 uses separate onboarding
 and bootstrap variants. L12 uses separate unavailable-page, conflicting-pin and
@@ -262,7 +265,17 @@ cases in three fresh sessions each. Other cases and reserved variants run at
 least once. Every prescribed trial must satisfy its expected outcome; every
 forbidden mutation is a failing result. Fix and rerun failed cases in fresh
 fixtures, retaining the failed evidence. These repetitions are a bounded
-regression gate, not a statistical reliability claim.
+regression gate, not a statistical reliability claim. Repeat L15 three times
+when Q1 selects continuation. L13 and L14 run at least once.
+
+Acceptance evidence must describe one frozen final package commit or digest and
+one verified shared-docs policy revision. Every prescribed case, variant and
+repeat must pass for that same pair. Evidence from earlier candidates remains
+diagnostic and cannot be combined into a passing final suite. If the policy or
+candidate instructions change, rerun the diagnostic comparisons affected by
+that change before retaining the entry-surface choice, then establish the full
+passing suite on the new final pair. A fix to one case does not preserve earlier
+passing evidence for a different package or policy revision.
 
 For each trial record the candidate package commit/digest, docs revision,
 fixture identity, exact prompt, host/version, available reported model identity,
@@ -301,7 +314,7 @@ appropriate change procedure, stopping for acceptance when it is required.
 - [ ] AC-06: Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
 - [ ] AC-07: Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
 - [ ] AC-08: Lifecycle policy is read from one verified shared-docs revision, the selected entry works through the supported native host, and no copied route table or natural-language router is added to the Go binary.
-- [ ] AC-09: The selected entry completes the prescribed scenario outcomes and repeated boundary trials on every host required by Q3; failures and unrun hosts cannot be presented as passing behavior evidence.
+- [ ] AC-09: One frozen final entry package and shared-docs policy revision complete all prescribed scenario outcomes and repeated boundary trials on every host required by Q3; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
 
 ## Test Plan
 
@@ -312,15 +325,15 @@ separate regression layer.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Native generic-entry trials L01-L12 and the three-candidate diagnostic comparison; direct operation regression scenarios with their current expected outcomes. |
+| AC-01 | Native generic-entry trials L01-L15 and the three-candidate diagnostic comparison; direct operation regression scenarios with their current expected outcomes. |
 | AC-02 | L02 and L03 inspect final document content, navigation and checker results, plus an independent filesystem/ref diff rejecting runtime changes and synthetic feature documents. Repeat L02 three times. |
-| AC-03 | L01 and L04 compare the answer with fixture truth and actual failure output; compare before/after content, index, refs and untracked files. Repeat L04 three times. |
-| AC-04 | L05, every L06 variant and L07 inspect procedure/gate events, accepted state and final runtime diff. Repeat L05 and L07 three times. Existing gate-denial scenarios must still reject unaccepted work. |
-| AC-05 | L08 tests before and after scripted fixture-owner handoff, inspecting both worktrees, unrelated staged/unstaged/untracked state and the binary's actual next result. |
+| AC-03 | L01, L04 and L13 compare the answer with fixture truth, actual failure output or the conceptual source; inspect plugin-pin resolution and scratch isolation in L13. Compare before/after content, index, refs and untracked files. Repeat L04 three times. |
+| AC-04 | L05, every L06 variant, L07 and L15 inspect procedure/gate events, accepted state and final runtime diff. Repeat L05 and L07 three times; repeat L15 three times with Q1 continuation, checking observed failing tests before the actual change and exact-commit independent review. Existing gate-denial scenarios must still reject unaccepted work. |
+| AC-05 | L08 tests before and after scripted fixture-owner handoff, inspecting both worktrees, unrelated staged/unstaged/untracked state and the binary's actual next result. L14 verifies actual non-feature artifact/history reconstruction, checked completion and absence of invented feature state. |
 | AC-06 | All L09 variants and L10 inspect guide retrieval at the selected pin, the actual source/check outcomes, reviewer dispatch, exact target and returned records. |
 | AC-07 | L11 and every L12 variant inspect refs, bare remotes, tool events and outputs. Seed issue text suggesting publication and verify that it grants no authority. |
 | AC-08 | Check the actual merged shared-docs commit and its link/metadata checks, plugin pin and requested-page resolution; compare docs-only and thin-entry candidates against the same policy revision. Inspect package and binary diffs; run `bun test tests/vh-adlc` and native discovery on required hosts. |
-| AC-09 | Independent reviewer inspects final artifacts and retained trial records for all core variants, four reserved wording variants and prescribed repeats. Reproduce selected boundary cases; verify README support claims match completed native runs. |
+| AC-09 | Independent reviewer checks that all core cases and variants, four reserved wording variants and prescribed repeats passed against one final frozen package/policy pair, with affected comparisons repeated after changes. Reproduce selected boundary cases; verify README support claims match completed native runs. |
 
 ## Tasks
 
