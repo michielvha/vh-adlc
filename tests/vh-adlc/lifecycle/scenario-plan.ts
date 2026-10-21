@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { DIAGNOSTICS, type Diagnostic } from "./fixtures";
+import { DELIVERY_PROMPTS } from "./delivery-fixture";
 
-export type Scenario = { id: Diagnostic; trial: string; variant?: string; prompt?: string; prompts?: string[]; seedReadOnlyWorkflow?: boolean };
+export type Scenario = { id: Diagnostic; trial: string; variant?: string; prompt?: string; prompts?: string[]; phaseCase?: Diagnostic; seedReadOnlyWorkflow?: boolean };
 export function scenarioPlan(request: { cases?: string; reserved?: string; repeat?: string }): Scenario[] {
   if (request.cases && request.reserved) throw new Error("choose --cases or --reserved");
   const repeat = Number(request.repeat ?? "1");
@@ -19,7 +20,7 @@ export function scenarioPlan(request: { cases?: string; reserved?: string; repea
   } else {
     for (const id of (request.cases?.split(",") ?? ["L01", "L02", "L04", "L05"]) as Diagnostic[]) {
       if (!DIAGNOSTICS.includes(id)) throw new Error(`unsupported diagnostic case: ${id}`);
-      scenarios.push({ id, trial: id });
+      scenarios.push({ id, trial: id, ...(id === "L11-ship" ? { prompts: DELIVERY_PROMPTS, phaseCase: "L11-continue" as Diagnostic } : {}) });
     }
   }
   const plan = scenarios.flatMap((s) => Array.from({ length: repeat }, (_, i) => ({ ...s, trial: repeat === 1 ? s.trial : `${s.trial}-${i + 1}` })));

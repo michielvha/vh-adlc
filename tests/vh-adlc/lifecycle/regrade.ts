@@ -24,7 +24,7 @@ const results = roots.flatMap((root) => {
     const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
     const unchanged = original.checks.find((c: any) => c.name === "installed candidate unchanged");
     const phaseChecks: any[] = [];
-    if (original.variant === "R04") {
+    if (original.variant === "R04" || original.phaseCase) {
       const checkpointPath = join(trial, "phase-1.snapshot.json"), artifact = join(trial, "phase-1-artifact");
       if (existsSync(checkpointPath) && existsSync(join(artifact, "README.md"))) {
         const checkpoint = JSON.parse(readFileSync(checkpointPath, "utf8"));
@@ -33,9 +33,11 @@ const results = roots.flatMap((root) => {
         const secondPath = join(trial, "phase-2.events.jsonl");
         const second = events(existsSync(secondPath) ? readFileSync(secondPath, "utf8") : "");
         phaseChecks.push({ name: "phase 1 artifact matches its recorded snapshot", pass: hash === checkpoint.files["README.md"]?.hash });
-        phaseChecks.push(...grade({ ...f, id: "L02", project: artifact }, before, checkpoint, first.response, first.commands).checks.map((c) => ({ ...c, name: `phase 1: ${c.name}` })));
+        if (original.phaseCase) phaseChecks.push({ name: "complete phase 1 artifact matches its recorded snapshot", pass: fingerprint(artifact) === new Bun.CryptoHasher("sha256").update(JSON.stringify(checkpoint.files)).digest("hex") });
+        phaseChecks.push(...grade({ ...f, id: original.phaseCase ?? "L02", project: artifact }, before, checkpoint, first.response, first.commands).checks.map((c) => ({ ...c, name: `phase 1: ${c.name}` })));
         phaseChecks.push({ name: "all scope-change turns resume the same native thread", pass: !!first.threadId && second.threadId === first.threadId });
-        phaseChecks.push(grade({ ...f, id: "L02" }, before, after, parsed.response, parsed.commands).checks.find((c) => c.name === "README actually corrected"));
+        phaseChecks.push({ name: "all requested turns completed successfully", pass: original.phases?.length === 2 && original.phases.every((p: any) => p.exitCode === 0 && !p.timeout) && !first.failed && !second.failed });
+        if (!original.phaseCase) phaseChecks.push(grade({ ...f, id: "L02" }, before, after, parsed.response, parsed.commands).checks.find((c) => c.name === "README actually corrected"));
       } else phaseChecks.push({ name: "scope-change checkpoint evidence exists", pass: false });
     }
     const checks = [...phaseChecks, ...verdict.checks, unchanged];

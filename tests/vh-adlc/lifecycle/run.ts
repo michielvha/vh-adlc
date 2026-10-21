@@ -4,7 +4,7 @@
 // Raw transcripts and isolated account/profile state stay in the temporary run.
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { buildDiagnostic, DOCS_PIN, events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot } from "./fixtures";
 import { verifyFeatureReview, verifyMaintenanceReview } from "./native-review";
 import { scenarioPlan } from "./scenario-plan";
@@ -63,7 +63,7 @@ const packageHash = fingerprint(install.installedPath);
 const results: any[] = [];
 console.log(JSON.stringify({ candidate, root, version, packageHash, docsPin: DOCS_PIN, surface: "native-cli-diagnostic" }));
 
-for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan) {
+for (const { id, trial, variant, prompt, prompts, phaseCase, seedReadOnlyWorkflow } of plan) {
   const trialRoot = join(root, trial);
   mkdirSync(trialRoot, { recursive: true });
   const f = buildDiagnostic(trialRoot, id, { seedReadOnlyWorkflow });
@@ -95,9 +95,8 @@ for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan
     if (prompts && at === 0) {
       const checkpoint = snapshot(f);
       writeFileSync(join(trialRoot, "phase-1.snapshot.json"), JSON.stringify(checkpoint, null, 2));
-      mkdirSync(join(trialRoot, "phase-1-artifact"));
-      cpSync(join(f.project, "README.md"), join(trialRoot, "phase-1-artifact/README.md"));
-      const first = grade({ ...f, id: "L02" }, before, checkpoint, phase.response, phase.commands);
+      cpSync(f.project, join(trialRoot, "phase-1-artifact"), { recursive: true, filter: (path) => ![".git", "node_modules"].includes(basename(path)) });
+      const first = grade({ ...f, id: phaseCase ?? "L02" }, before, checkpoint, phase.response, phase.commands);
       phaseChecks.push(...first.checks.map((c) => ({ ...c, name: `phase 1: ${c.name}` })));
       if (!first.pass || !parentThread) break;
     }
@@ -110,14 +109,14 @@ for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan
   const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
   if (prompts) {
     phaseChecks.push({ name: "all requested scope-change turns completed", pass: phases.length === prompts.length });
-    phaseChecks.push(grade({ ...f, id: "L02" }, before, after, parsed.response, parsed.commands).checks.find((c) => c.name === "README actually corrected"));
+    if (!phaseCase) phaseChecks.push(grade({ ...f, id: "L02" }, before, after, parsed.response, parsed.commands).checks.find((c) => c.name === "README actually corrected"));
   }
   const unchangedPackage = fingerprint(install.installedPath) === packageHash;
   const result = {
     id, trial, variant, candidate, surface: "native-cli-diagnostic", host: version,
     packageHash, graderHash, docsPin: DOCS_PIN, model: "unknown", configuration: "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
     prompt: f.prompt, durationMs: Date.now() - started, exitCode, timeout,
-    review, phases: prompts ? phases : undefined,
+    review, phases: prompts ? phases : undefined, phaseCase,
     hostConstraint: id === "L17-missing" ? "native multi_agent disabled for this trial; launching a replacement host is outside its request" : undefined,
     status: timeout || exitCode !== 0 || parsed.failed ? "execution-failed" : verdict.pass && phaseChecks.every((c) => c?.pass) && unchangedPackage ? "pass" : "fail",
     checks: [...phaseChecks, ...verdict.checks, { name: "installed candidate unchanged", pass: unchangedPackage }],

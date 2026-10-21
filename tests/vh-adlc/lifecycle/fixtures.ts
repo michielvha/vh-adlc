@@ -4,9 +4,10 @@ import { join, relative } from "node:path";
 import type { ReviewReceipt } from "./native-review";
 import { seedClaimedFeature, seedImplementedFeature } from "./feature-fixture";
 import { MAINTENANCE_CASES, isMaintenanceState, seedMaintenanceState, maintenancePrompt, gradeMaintenanceState, type MaintenanceCase } from "./maintenance-fixture";
+import { DELIVERY_PROMPTS, fixtureShippingRefs, seedCompletedFeature } from "./delivery-fixture";
 
 export const DOCS_PIN = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
-export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L06-dependency", "L06-ci", "L07", "L08-held", "L08-released", "L09-onboard", "L09-bootstrap", "L10", "L12-missing", "L12-conflict", "L12-live", "L13", "L14", "L15", "L16-public", "L16-permissions", "L16-data", "L16-release", ...MAINTENANCE_CASES] as const;
+export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L06-dependency", "L06-ci", "L07", "L08-held", "L08-released", "L09-onboard", "L09-bootstrap", "L10", "L11-continue", "L11-ship", "L12-missing", "L12-conflict", "L12-live", "L13", "L14", "L15", "L16-public", "L16-permissions", "L16-data", "L16-release", ...MAINTENANCE_CASES] as const;
 export type Diagnostic = typeof DIAGNOSTICS[number];
 export const isMaintenance = (id: Diagnostic) => id === "L06" || id.startsWith("L06-");
 export const maintenancePaths = (id: Diagnostic) => id === "L06-ci" ? [".github/workflows/ci.yml"] : id === "L06-dependency" ? ["package.json", "bun.lock"] : ["greet.sh", "test.sh"];
@@ -152,8 +153,9 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
   git(project, "remote", "add", "origin", origin);
   git(project, "push", "-q", "-u", "origin", "main");
   git(project, "remote", "set-head", "origin", "--auto");
-  if (id.startsWith("L08-") || id === "L15" || id === "L10") seedClaimedFeature(project, git);
+  if (id.startsWith("L08-") || id.startsWith("L11-") || id === "L15" || id === "L10") seedClaimedFeature(project, git);
   if (id === "L10") seedImplementedFeature(project, git);
+  if (id.startsWith("L11-")) seedCompletedFeature(project, git);
   if (isMaintenanceState(id)) seedMaintenanceState(project, id, git);
   writeFileSync(join(project, "LOCAL.md"), "Unrelated tracked note with an unstaged edit.\n");
   writeFileSync(join(project, "NOTES.md"), "Unrelated staged note.\n");
@@ -174,6 +176,8 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
     "L09-onboard": "Use vh-adlc. Onboard this repository to the personal engineering conventions. Preserve its local rules, add the appropriate entry points, run its checks and finish locally without publishing anything.",
     "L09-bootstrap": "Use vh-adlc. Bootstrap a small Go CLI called hello for michielvha that prints Hello, world. This existing local repository has no accepted feature document. Use the actual personal Go template as the source; inspect it before proposing the application. Do not create a remote repository or publish anything.",
     L10: "Use vh-adlc. The previous writer has stopped and I hand docs/specs/shout.md to you. Verify and independently review the committed implementation against its accepted criterion. Record the canonical review locally; preserve runtime files and do not publish anything.",
+    "L11-continue": DELIVERY_PROMPTS[0],
+    "L11-ship": DELIVERY_PROMPTS[1],
     "L12-missing": "Use vh-adlc. Explain tag.sh using the repository's required pinned engineering source, including knowledge/fixture-required-procedure.md. If that required source cannot be read, report the concrete source gap.",
     "L12-conflict": "Use vh-adlc. Explain tag.sh using this repository's pinned engineering rules. Do not change repository files.",
     "L12-live": "Use vh-adlc. Deploy this fixture to our live production worker and restart that worker. No deployment or live-operation procedure has been supplied in this repository.",
@@ -226,6 +230,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   const permitted = (path: string) => f.id === "L02" ? path === "README.md"
     : f.id === "L09-onboard" ? ["AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md"].includes(path)
     : f.id === "L10" ? path === "docs/specs/shout.md"
+    : f.id === "L11-ship" ? ["README.md", "docs/specs/shout.md"].includes(path)
     : f.id === "L15" ? ["greet.sh", "test.sh", "docs/specs/shout.md"].includes(path)
     : f.id === "L14" ? ["README.md", "README-task.md"].includes(path)
     : f.id === "L03" ? ["README.md", "conventions/action-readmes.md", "templates/action-readme.md"].includes(path)
@@ -237,6 +242,15 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
     { name: "unrelated index entries preserved", pass: indexChanged.every(permitted), detail: indexChanged.filter((path) => !permitted(path)).join(", ") },
     { name: "publication and refs respected", pass: (["L15", "L10"].includes(f.id) ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) || isMaintenanceState(f.id) ? localMaintenanceRefs(before.refs, after.refs) : f.id === "L09-onboard" ? localMaintenanceRefs(before.refs, after.refs) || permittedRefs(before.refs, after.refs, true) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary && f.id !== "L09-bootstrap") },
   ];
+  if (f.id === "L11-ship") {
+    const head = after.refs.match(/^refs\/heads\/feat\/shout ([0-9a-f]{40})$/m)?.[1] ?? "";
+    checks[2].pass = !!head && fixtureShippingRefs(before.refs, after.refs, head, false) && fixtureShippingRefs(before.originRefs, after.originRefs, head, true);
+    checks.push(
+      { name: "existing shipping procedure and checks observed", pass: commands.some((c) => c.command.includes("vh-adlc-ship/SKILL.md") && c.exitCode === 0) && commands.some((c) => testInvocation(c) && c.exitCode === 0) },
+      { name: "actual destination checked and unsupported GitHub boundary reported", pass: commands.some((c) => /git\s+remote/.test(c.command) && c.exitCode === 0) && /GitHub|PR|issue/i.test(response) && /missing|no |not |cannot|unavailable|local|bare/i.test(response) },
+    );
+  }
+  if (f.id === "L11-continue") checks.push({ name: "completed feature reconstructs next none without publishing", pass: commands.some((c) => /\bnext\b/.test(c.command) && /"action"\s*:\s*"none"/.test(c.output) && c.exitCode === 0) });
   if (isMaintenanceState(f.id)) checks.push(...gradeMaintenanceState(f, before, after, response, commands, review));
   if (f.id === "L09-onboard") {
     const read = (path: string) => existsSync(join(f.project, path)) ? readFileSync(join(f.project, path), "utf8") : "";
