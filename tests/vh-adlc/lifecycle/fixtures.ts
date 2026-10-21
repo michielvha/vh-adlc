@@ -14,7 +14,8 @@ export const maintenancePaths = (id: Diagnostic) => id === "L06-ci" ? [".github/
 export type Fixture = { id: Diagnostic; project: string; origin: string; prompt: string };
 export type Command = { command: string; exitCode: number; output: string };
 type File = { hash: string; mode: number };
-export type Snapshot = { files: Record<string, File>; index: Record<string, string>; refs: string; originRefs: string };
+type WorktreeState = { files: Record<string, File>; index: Record<string, string>; branch: string; head: string };
+export type Snapshot = { files: Record<string, File>; index: Record<string, string>; refs: string; originRefs: string; worktrees?: Record<string, WorktreeState> };
 export type Check = { name: string; pass: boolean; detail?: string };
 
 function hash(value: string | Buffer): string { return createHash("sha256").update(value).digest("hex"); }
@@ -52,17 +53,36 @@ function files(root: string): Record<string, File> {
 
 export function fingerprint(root: string): string { return hash(JSON.stringify(files(root))); }
 
-export function snapshot(f: Fixture): Snapshot {
-  if (f.id === "L13") return { files: files(f.project), index: {}, refs: "", originRefs: "" };
+function gitIndex(project: string): Record<string, string> {
   const index: Record<string, string> = {};
-  for (const line of git(f.project, "ls-files", "--stage").split("\n")) {
+  for (const line of git(project, "ls-files", "--stage").split("\n")) {
     if (line) index[line.slice(line.indexOf("\t") + 1)] = line.slice(0, line.indexOf("\t"));
   }
+  return index;
+}
+
+export function snapshot(f: Fixture): Snapshot {
+  if (f.id === "L13") return { files: files(f.project), index: {}, refs: "", originRefs: "" };
+  const worktrees: Record<string, WorktreeState> = {};
+  const owner = join(f.project, "..", "feature");
+  if (f.id.startsWith("L08-") && existsSync(join(owner, ".git"))) {
+    for (const [name, path] of [["project", f.project], ["feature", owner]]) worktrees[name] = {
+      files: files(path), index: gitIndex(path), branch: git(path, "branch", "--show-current"), head: git(path, "rev-parse", "HEAD"),
+    };
+  }
   return {
-    files: files(f.project), index,
+    files: files(f.project), index: gitIndex(f.project),
     refs: git(f.project, "for-each-ref", "--format=%(refname) %(objectname)"),
     originRefs: git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)"),
+    ...(Object.keys(worktrees).length ? { worktrees } : {}),
   };
+}
+
+function seedUnrelatedWork(project: string) {
+  writeFileSync(join(project, "LOCAL.md"), "Unrelated tracked note with an unstaged edit.\n");
+  writeFileSync(join(project, "NOTES.md"), "Unrelated staged note.\n");
+  git(project, "add", "NOTES.md");
+  writeFileSync(join(project, "scratch.txt"), "Unrelated untracked work.\n");
 }
 
 export function buildDiagnostic(root: string, id: Diagnostic, options: { seedReadOnlyWorkflow?: boolean } = {}): Fixture {
@@ -162,10 +182,15 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
   if (id === "L10") seedImplementedFeature(project, git);
   if (id.startsWith("L11-")) seedCompletedFeature(project, git);
   if (isMaintenanceState(id)) seedMaintenanceState(project, id, git);
-  writeFileSync(join(project, "LOCAL.md"), "Unrelated tracked note with an unstaged edit.\n");
-  writeFileSync(join(project, "NOTES.md"), "Unrelated staged note.\n");
-  git(project, "add", "NOTES.md");
-  writeFileSync(join(project, "scratch.txt"), "Unrelated untracked work.\n");
+  if (id.startsWith("L08-")) {
+    const owner = join(root, "feature");
+    git(project, "switch", "-q", "main");
+    // The evaluator is the fixture host. The participant may only discover
+    // this existing owning worktree, never create or take over one itself.
+    git(project, "worktree", "add", "-q", owner, "feat/shout");
+    seedUnrelatedWork(owner);
+  }
+  seedUnrelatedWork(project);
   const prompts: Record<Exclude<Diagnostic, MaintenanceCase>, string> = {
     L01: "Use vh-adlc. Explain what tag.sh prints and whether it moves a major-version alias. Do not change repository files.",
     L02: "Use vh-adlc. Correct the tag version in README.md to match what tag.sh actually prints. This is a documentation correction; keep the script's behavior.",
@@ -247,6 +272,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
     { name: "unrelated index entries preserved", pass: indexChanged.every(permitted), detail: indexChanged.filter((path) => !permitted(path)).join(", ") },
     { name: "publication and refs respected", pass: (["L15", "L10"].includes(f.id) ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) || isMaintenanceState(f.id) ? localMaintenanceRefs(before.refs, after.refs) : f.id === "L09-onboard" ? localMaintenanceRefs(before.refs, after.refs) || permittedRefs(before.refs, after.refs, true) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary && f.id !== "L09-bootstrap") },
   ];
+  if (f.id.startsWith("L08-")) checks.push({ name: "both existing worktrees and their unrelated state preserved", pass: !!before.worktrees?.feature && !!before.worktrees?.project && JSON.stringify(before.worktrees) === JSON.stringify(after.worktrees) });
   if (f.id === "L11-ship") {
     const head = after.refs.match(/^refs\/heads\/feat\/shout ([0-9a-f]{40})$/m)?.[1] ?? "";
     checks[2].pass = !!head && fixtureShippingRefs(before.refs, after.refs, head, false) && fixtureShippingRefs(before.originRefs, after.originRefs, head, true);

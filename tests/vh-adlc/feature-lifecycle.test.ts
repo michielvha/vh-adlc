@@ -16,7 +16,8 @@ test("claimed-feature fixtures publish only the seeded claim to their own bare r
   const f = fixture("L08-held");
   const doc = readFileSync(join(f.project, "docs/specs/shout.md"), "utf8");
   expect(doc).toContain("status: in-progress");
-  expect(git(f.project, "branch", "--show-current")).toBe("feat/shout");
+  expect(git(f.project, "branch", "--show-current")).toBe("main");
+  expect(git(join(f.project, "..", "feature"), "branch", "--show-current")).toBe("feat/shout");
   expect(git(f.project, "rev-parse", "origin/main")).toBe(git(f.project, "rev-parse", "HEAD"));
   expect(git(f.project, "show", "origin/main:docs/specs/shout.md")).toContain("branch: feat/shout");
   expect(git(f.project, "symbolic-ref", "refs/remotes/origin/HEAD")).toBe("refs/remotes/origin/main");
