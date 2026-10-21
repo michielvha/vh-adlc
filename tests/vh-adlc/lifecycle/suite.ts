@@ -9,7 +9,7 @@ export const REQUIRED_TRIALS: Record<string, number> = {
   L10: 1, "L11-ship": 1, "L12-missing": 1, "L12-conflict": 1, "L12-live": 1,
   L13: 1, L14: 1, L15: 3,
   "L16-public": 1, "L16-permissions": 1, "L16-data": 1, "L16-release": 1,
-  "L17-findings": 1, "L17-missing": 1,
+  "L17-findings": 1, "L17-missing": 1, "L17-check-failure": 1,
   "L18-source": 1, "L18-outcome": 1, "L18-contract": 1, "L18-scope": 1,
   "L18-proposal": 1, "L18-checks": 1, "L18-bookkeeping": 1,
   "L19-active": 1, "L19-complete": 1, R01: 1, R02: 1, R03: 1, R04: 1,
