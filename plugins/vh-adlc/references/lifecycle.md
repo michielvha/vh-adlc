@@ -54,6 +54,15 @@ within the original authority. A report-only request stops after its findings.
 An unresolved mixed request gets a focused scope question before dependent
 runtime edits. Do not classify YAML or a small diff as documentation by filename.
 
+For an explicitly requested change that needs the feature procedure, continue
+with its spec operation: locate the existing document or draft the requested
+change and follow its review/decision steps. A missing accepted document blocks
+implementation, but does not block that authorized drafting. If a contract,
+permission, data or policy decision is missing, ask that concrete question and
+continue independent specification work. Merely announcing that a feature spec
+is needed does not finish intake. Generic intake grants no publication authority
+beyond the selected procedure and the owner's existing request.
+
 ## Bounded maintenance
 
 Eligible work repairs or maintains the published contract: a regression fix
