@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Investigation proposed; experiments, independent review and owner acceptance remain pending."
+status_description: "Historical analysis, source checks and a manual rewrite pilot completed; independent model trials, human comprehension testing and spec review remain pending."
 issue: https://github.com/michielvha/vh-adlc/issues/20
 goal: "Determine whether repeated agent work makes Stackweaver harder for its owner to understand and whether a tested vh-adlc safeguard is justified."
 covers:
@@ -60,6 +60,157 @@ prove agent authorship, the amount of human steering, or what an agent read.
 
 Track this work in vh-adlc, use Stackweaver as the example, isolate the work from
 the other active agent, and stop this session after the issue and draft spec.
+
+### Investigation findings, 2026-10-21
+
+The owner's follow-up authorizes the investigation. The draft-only boundary below
+records the initial delivery. Implementation remains outside the request.
+
+There is enough evidence to try a small advisory review step in vh-adlc.
+Stackweaver contains repeated explanations, contradictory current-state claims
+and unused code abstractions. The historical sample does **not** establish that
+agents progressively inflate language, or that copied terminology caused the
+unused code. A mandatory vocabulary or length check is not supported by these
+results.
+
+#### Historical measurements
+
+The case study uses committed Stackweaver files, without changing that checkout.
+The three snapshots are:
+
+| Snapshot | Commit |
+| --- | --- |
+| Early, 2026-01-18 documentation move | `7d9fb3b26a6dba6da5be876c383b70efcea90e7f` |
+| Middle, last reachable commit before 2026-06-01 | `bab15c70e1895a7918a11a8a085478f49b9f99c2` |
+| Late, sampled checkout | `66730960cb815947a4fe7b00568859d505aaf6a6` |
+
+Selection was fixed before rating: every Markdown path under `docs/internal/`
+present at all three snapshots, excluding `README.md` and the TFE compatibility
+matrix. This gives 85 documents. The fixed manual sample is all three overviews
+in that cohort. The largest text increases were inspected separately to explain
+growth; they are not a random sample of defects.
+
+The parser removes frontmatter, fenced code, comments, headings, tables and
+quoted blocks. It replaces inline code with a placeholder before counting
+English words. These counts measure the remaining prose, not comprehension.
+
+| Measurement | Early | Middle | Late |
+| --- | ---: | ---: | ---: |
+| Matched documents | 85 | 85 | 85 |
+| Prose words in those documents | 79,626 | 81,943 | 95,452 |
+| Prose words excluding both API-reference documents | 76,081 | 78,388 | 80,665 |
+| Occurrences of the fixed exploratory vocabulary list, all 85 documents | 35 | 35 | 35 |
+
+Forty-five normalized prose bodies are identical between early and late. Thirty-six
+documents gain words, three lose words and 46 retain the same count. Overall
+growth is 19.9%; growth without the two API references is 6.0%. A single generated
+backend reference accounts for 70.6% of the overall increase. Its endpoint
+inventory expanded, so that increase is not evidence of more abstract wording
+(`git diff 7d9fb3b2 66730960 -- docs/internal/api-reference/backend-api-reference.md`).
+
+The fixed vocabulary list is in the evidence protocol. It includes words such as
+orchestration, subsystem, comprehensive and contract. Flat counts do not prove
+clarity, but they contradict a claim that these particular signals increased in
+this cohort. The cohort omits new, moved and deleted documents; it cannot
+characterize the whole project. The 45 identical bodies exclude inline-code
+details, so they do not mean that every code reference stayed unchanged.
+
+#### Cases checked against source and history
+
+All current file locations below refer to the late snapshot unless another ref
+is named.
+
+| Case | What was observed | What it supports |
+| --- | --- | --- |
+| Repeated opening | `docs/internal/overviews/ansible.md:13-17` explains the combined Terraform/Ansible platform twice. The same wording already appears at `7d9fb3b2`. | There is prose to consolidate, but this example was already verbose at the early snapshot. It does not show gradual inflation. |
+| Useful added detail | The runner overview grows from 123 to 410 counted prose words. The diff replaces a sample Dockerfile with actual build stages and explains the writable filesystem and collection search order. `runner-images/ansible/Dockerfile:64-99` and `backend/cmd/ansible-runner/ansible_cfg.go:108-136` support those operational details. | Some added complexity explains real behavior and should stay. The counted increase also reflects code being replaced by prose. |
+| Contradictory corrections | `docs/internal/plans/features/terraform/workspace-run-ui-enhancement-plan.md:159-171` says `CreatedNode` was deleted, then says it is implemented but not rendered. At lines 145-151, completion labels coexist with missing features and tests. | Adding a correction without replacing obsolete claims leaves humans to reconstruct the truth. |
+| A correction is itself false | The same plan at line 146 says `VerticalRunTimeline` was never built. Its 251-line implementation exists at `d5120773^`, and `d5120773` deletes it. | A confident maintenance note must be checked against history, just like the older text it corrects. |
+| Readable but wrong example | `docs/internal/overviews/ansible-runner-overview.md:44-58` uses `BLPop` and `ansible:jobs`. The early implementation already uses `BRPop` and `ansible_jobs`; the current consumer uses `DequeueReliable`, acknowledgement and dead-letter handling (`backend/cmd/ansible-runner/main.go:476-498`). | Clear sentences and plausible snippets can still teach the wrong behavior. This error predates the sampled period. |
+| Partly refreshed description | The overview names runtime user `iac` at line 255. The current Dockerfile creates and selects `stackweaver` at lines 80-83; UID 1001 remains the same. | Refreshing one paragraph does not establish the accuracy of adjacent claims. |
+| Unused component designs | At `d5120773^`, references to `CreatedNode`, `PhaseConnectionLine` and `VerticalRunTimeline` occur only in their own source files. The next commit deletes them. | There was code with no other source caller immediately before deletion. This is not proof that it was never used throughout its history. |
+| Surviving unused interface | `core/plugins/interface.go:18-24` declares the older plugin interface. Source searches find no qualified `plugins.Plugin` use and no production selector calls to `Plan`, `Apply`, `Destroy` or `Validate`. The runner calls concrete `PlanWithOptions` and `ApplyWithOptions`; `Plan` forwards to the options method (`core/plugins/opentofu/plugin.go:99-104`). | A proposed abstraction should name a real consumer. These searches and the existing dead-code analysis support reviewing this interface; they do not prove it is safe to delete. |
+| Inputs carried without use | `UnifiedPhaseTimeline.tsx:35-54` explicitly discards three props. `RunDetail.tsx:574-579` still passes them. Its comment also describes a Created node absent from the current component tree. | An interface and its explanation can retain work that callers no longer need. No language-to-code causal link was established. |
+
+The existing `docs/internal/analysis/dead-code-sweep-2026-10.md` was read as a
+source observation, then the interface/caller claims above were checked directly.
+The recent `saving-a-struct-loaded-before-a-long-step.md` is a counterexample to
+the idea that all recent writing is abstract: it names the write, the rows it can
+restore, the measured cases and the untested cases. Its repository `GetByID`
+preloads and `Save` path were inspected; its database experiment was not rerun.
+
+#### Executed checks and pilot rewrites
+
+Twelve static source probes confirmed the recorded contradictions, old queue
+example, caller patterns, discarded props and runtime-user mismatch. Their scope
+is the source patterns recorded in the evidence, not runtime reachability or
+proof of why the code was written.
+
+Six existing `core/queue` tests were run with fresh temporary Go caches and
+in-memory Redis: `TestDequeueReliable_MovesToProcessing`,
+`TestAck_RemovesFromProcessing`, `TestDeadLetter_MovesPoisonAside`,
+`TestRequeueProcessing_RecoversInFlight`,
+`TestReclaim_RecoversOrphanedAndSkipsFresh`, and
+`TestAck_ClearsInflightIndex`. All passed. No live Stackweaver service or database
+was used. These tests confirm why removing the recovery and acknowledgement
+details would lose meaningful behavior. The first sandboxed attempt could not
+populate the dependency cache; the successful run used temporary caches and
+downloaded the versions pinned by the module.
+
+The existing audit was also executed:
+`node scripts/docs-audit.js --churn --prune --json <temporary-report>`.
+It reported 172 findings: 2 errors, 67 warnings and 103 informational findings,
+plus 55 suppressions. Eighteen findings concern length. There are no findings
+or suppressions for the runner overview or run UI plan above.
+`scripts/docs-audit.js:634-647` flags length above 3,500 words. This run shows
+that the existing structural checks do not cover the verified contradictions;
+it does not establish that all 172 other findings are valid.
+
+Two one-pass rewrites were written and checked by the investigating assistant:
+
+| Passage | Whitespace-delimited words | Supported claims checked |
+| --- | --- | --- |
+| Repeated Ansible introduction | 51 to 12 | Three: Ansible support, Terraform workspaces, and which provides provisioning versus configuration management. |
+| Collection installation paragraph | 70 to 51 | Seven: no separate image install, bundled package, version relationship, both version files, conditional per-job requirements install, search precedence, and both source symbols with their file paths. |
+
+The shorter introduction reads: Stackweaver provisions infrastructure through
+Terraform workspaces and manages configuration through Ansible automation.
+
+A third worked example repairs the run UI contradictions using the deletion
+commit and actual caller. It becomes longer than the short paraphrase of the
+false claims. Correcting meaning sometimes needs more words. These are manual
+worked examples, not independent model trials or a measured human benefit.
+
+#### Recommendation and remaining hypotheses
+
+Try a small advisory addition to the existing spec/review workflow before
+building a new detector. Ask the reviewer to explain the behavior plainly,
+identify a real consumer for a new abstraction, and replace obsolete current-state
+claims wherever a correction changes them. A finding should name the passage,
+the supporting code or caller, and a concrete correction. Keep history clearly
+separate from the description of current behavior. Reference the existing prose
+guide instead of creating a second writing policy.
+
+The evidence supports piloting this review on changed documentation and new
+interfaces. It does not support blocking on a word count, banning technical
+terms, automatically deleting wrappers, or automatically consolidating the corpus.
+Stackweaver already has scheduled auditing and a consolidation resolver
+(`agents/docs-drift-audit.md`, `agents/docs-drift-resolver.md`); another scheduled
+audit would duplicate existing machinery. The missing proof is whether a more
+specific review instruction catches these failures reliably at acceptable cost.
+
+Historical model identity, prompts, human steering and files read by agents are
+unavailable from Git. Independent repeated-writing trials require additional
+agent sessions; authorization has been requested and no such sessions have run.
+Blind human comprehension testing has not run. The causal explanation and the
+best safeguard therefore remain open. No acceptance criterion is marked met by
+the investigating assistant, and no plugin or Stackweaver fix is included.
+
+Raw measurements, source probes, worked rewrites, commands and test output are
+retained in the local evidence bundle
+`/private/tmp/vh-adlc-language-study-20261021.zip`. The smallest next decision is
+whether to run the controlled trials, then assess a single advisory review
+instruction before specifying enforcement.
 
 ## Scope
 
@@ -202,4 +353,4 @@ Independent spec review and owner acceptance are pending.
 - [Documentation convention](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/documentation.md): existing plain-language guidance and placement of investigation findings.
 - [Humanize prose](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): prose editing baseline used for this draft.
 - [Feature documents](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md), [template](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/feature-document-template.md), [delivery](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/delivery.md), [entry point](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md) and [task routes](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/README.md): draft format, documentation-only delivery and applicable reading routes.
-- Local vh-adlc and Stackweaver measurements at the exact revisions listed in Context: available procedures, corpus and candidate history. The full investigation has not run.
+- Local vh-adlc and Stackweaver measurements at the exact revisions listed in Context: available procedures, historical comparisons, source probes, manual rewrites and six queue tests. Independent model trials and human comprehension testing remain pending.
