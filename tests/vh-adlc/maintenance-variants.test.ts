@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildDiagnostic, grade, snapshot } from "./lifecycle/fixtures";
+import { buildDiagnostic, git, grade, installLocalDependencies, snapshot } from "./lifecycle/fixtures";
 
 const roots: string[] = [];
 afterEach(() => { for (const p of roots.splice(0)) rmSync(p, { recursive: true, force: true }); });
@@ -23,7 +23,7 @@ test("compatible dependency upkeep needs the actual dependency, lockfile, baseli
   const manifest = JSON.parse(readFileSync(join(f.project, "package.json"), "utf8"));
   manifest.dependencies["greet-helper"] = "file:./vendor/greet-helper-1.0.1";
   writeFileSync(join(f.project, "package.json"), JSON.stringify(manifest, null, 2) + "\n");
-  const install = Bun.spawnSync(["bun", "install"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+  const install = installLocalDependencies(f.project);
   expect(install.exitCode).toBe(0);
   record(f.project);
   const commands = [{ command: "bash test.sh", exitCode: 0, output: "PASS: dependency contract" }, { command: "bash test.sh", exitCode: 0, output: "PASS: dependency contract" }];
@@ -35,6 +35,7 @@ test("compatible dependency upkeep needs the actual dependency, lockfile, baseli
 test("CI repair must preserve permissions and restore the intended check command", () => {
   const f = fixture("L06-ci"), before = snapshot(f);
   expect(grade(f, before, snapshot(f), "CI fixed.", []).pass).toBe(false);
+  git(f.project, "switch", "-c", "ci/repair-script");
   const path = join(f.project, ".github/workflows/ci.yml");
   writeFileSync(path, readFileSync(path, "utf8").replace("bash tests.sh", "bash test.sh"));
   record(f.project);

@@ -77,7 +77,12 @@ export function verifyMaintenanceReview(project: string, sessions: string, paren
         && [...calls.matchAll(/(?<![0-9a-f])([0-9a-f]{7,39})(?![0-9a-f])/g)].some((m) => {
           try { return git(project, "rev-parse", "--verify", `${m[1]}^{commit}`) === target; } catch { return false; }
         });
-      if (!inspectedTarget || !calls.includes(recordPath) || !calls.includes("references/maintenance-review.md")) continue;
+      const outputs = log.rows.filter((r) => r.type === "response_item" && ["custom_tool_call_output", "function_call_output"].includes(r.payload?.type)
+        && r.payload.internal_chat_message_metadata_passthrough?.turn_id === completed.turn_id)
+        .map((r) => JSON.stringify(r.payload.output)).join("\n");
+      const contractRead = calls.includes("references/maintenance-review.md")
+        || calls.includes("maintenance-review") && outputs.includes("# Independent maintenance review");
+      if (!inspectedTarget || !calls.includes(recordPath) || !contractRead) continue;
       return {
         pass: true, reason: "linked native reviewer returned the stored clean review; source and Definition remain current",
         parentThread, reviewerThread: meta.id, target, model, recordPath, isolation: "procedural",

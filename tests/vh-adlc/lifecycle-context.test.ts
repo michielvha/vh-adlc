@@ -21,6 +21,7 @@ test.each([
   ["L12-missing", "Required knowledge/fixture-required-procedure.md is unavailable.", "missing-page"],
   ["L12-conflict", "AGENTS.md and CLAUDE.md pin conflicting revisions.", "invalid-pin"],
   ["L12-live", "No supported deployment procedure is available.", ""],
+  ["L12-live", "This repository supplies neither a deployment procedure nor a production target. Please supply the runbook.", ""],
 ])("%s accepts an observed concrete gap without changing owner state", (id, response, result) => {
   const f = fixture(id), before = snapshot(f);
   const commands = result ? [{ command: "vh-adlc knowledge", exitCode: 1, output: JSON.stringify({ result }) }] : [];

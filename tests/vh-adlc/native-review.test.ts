@@ -129,3 +129,11 @@ test("an attestation note in the stored model field cannot change the returned m
   writeFileSync(path, readFileSync(path, "utf8").replace("Model: unknown", "Model: another-model"));
   expect(f.verify().pass).toBe(false);
 });
+
+test("a native contract read may use shell brace expansion when its returned source is observed", () => {
+  const f = fixture();
+  f.child[1].payload.input = f.child[1].payload.input.replace("references/maintenance-review.md", "references/{maintenance-review,lifecycle}.md");
+  f.child.push({ type: "response_item", payload: { type: "custom_tool_call_output", output: "# Independent maintenance review\nRead only.", internal_chat_message_metadata_passthrough: { turn_id: "review-turn" } } } as any);
+  f.logs();
+  expect(f.verify().pass).toBe(true);
+});
