@@ -1,5 +1,10 @@
 # Authority, identity and preservation
 
+Lifecycle orchestration belongs to this framework. Shared docs supply pinned
+engineering rules; they do not own its dispatcher or maintenance state. Generic
+intake follows `references/lifecycle.md`; selecting a procedure creates no
+additional execution or publication permission.
+
 ## What each action needs
 
 | Action | Authority needed |
@@ -8,6 +13,8 @@
 | Draft a requested spec or analysis | The request |
 | Commit and push a feature document without a `branch` field, with first-run onboarding files, to the default branch | Invoking `vh-adlc-spec` or `vh-adlc-tasks`, or the claim commit of `vh-adlc-implement` |
 | Edit code, tests and docs, and commit on the feature branch | Accepted feature scope |
+| Edit, check, record and commit eligible bounded maintenance locally | The owner's explicit maintenance request, eligibility under `references/lifecycle.md`, and local instructions that permit it |
+| Complete a maintenance task locally | Observed required checks, a current independent maintenance review with no open findings, and preserved task scope |
 | Create a tracking issue | Included in acceptance, or requested |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request |
 | Merge, tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action |

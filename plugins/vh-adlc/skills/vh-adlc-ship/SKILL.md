@@ -1,9 +1,18 @@
 ---
 name: vh-adlc-ship
-description: Ship a vh-adlc feature on the owner's explicit request - doc-impact check, verification, the complete gate, one PR and the linked issue - and report CI for the pushed commit. Use only when the owner invokes /vh-adlc-ship or explicitly asks to ship a vh-adlc feature; it never merges.
+description: Ship a vh-adlc feature on the owner's explicit request - doc-impact check, verification, the complete gate, one PR and the linked issue - and report CI for the pushed commit. Use only when the owner invokes /vh-adlc-ship or explicitly asks to ship a vh-adlc feature; it never merges. A generic explicit vh-adlc request without an operation name may instead use the framework lifecycle intake.
 ---
 
 # vh-adlc-ship
+
+## Generic intake
+
+For a generic explicit vh-adlc request with no operation named, read
+`references/lifecycle.md` from the plugin root before the operation below.
+A lifecycle-selected operation proceeds below without repeating intake; its
+underlying task authority still applies. A directly named operation retains
+its original scope, gates and stopping conditions.
+
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
 with `references/` or `scripts/`, and `knowledge.md`, is in that directory.

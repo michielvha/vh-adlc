@@ -1,9 +1,18 @@
 ---
 name: vh-adlc-review
-description: Run an independent implementation review of a vh-adlc feature at an exact commit, store the reviewer's criterion records as returned, and untick what was not met. Use only when the owner invokes /vh-adlc-review or a resumed vh-adlc feature's next step is review; for a spec review use /vh-adlc-spec review.
+description: Run an independent implementation review of a vh-adlc feature at an exact commit, store the reviewer's criterion records as returned, and untick what was not met. Use only when the owner invokes /vh-adlc-review or a resumed vh-adlc feature's next step is review; for a spec review use /vh-adlc-spec review. A generic explicit vh-adlc request without an operation name may instead use the framework lifecycle intake.
 ---
 
 # vh-adlc-review
+
+## Generic intake
+
+For a generic explicit vh-adlc request with no operation named, read
+`references/lifecycle.md` from the plugin root before the operation below.
+A lifecycle-selected operation proceeds below without repeating intake; its
+underlying task authority still applies. A directly named operation retains
+its original scope, gates and stopping conditions.
+
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
 with `references/` or `scripts/`, and `knowledge.md`, is in that directory.

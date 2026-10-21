@@ -1,9 +1,18 @@
 ---
 name: vh-adlc-investigate
-description: Investigate an issue, failure, question or document for the vh-adlc loop, measuring the live tree instead of remembering, and write substantial findings into a document. Use only when the owner invokes /vh-adlc-investigate or explicitly asks for a vh-adlc investigation; it never ships a fix.
+description: Investigate an issue, failure, question or document for the vh-adlc loop, measuring the live tree instead of remembering, and write substantial findings into a document. Use only when the owner invokes /vh-adlc-investigate or explicitly asks for a vh-adlc investigation; it never ships a fix. A generic explicit vh-adlc request without an operation name may instead use the framework lifecycle intake.
 ---
 
 # vh-adlc-investigate
+
+## Generic intake
+
+For a generic explicit vh-adlc request with no operation named, read
+`references/lifecycle.md` from the plugin root before the operation below.
+A lifecycle-selected operation proceeds below without repeating intake; its
+underlying task authority still applies. A directly named operation retains
+its original scope, gates and stopping conditions.
+
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
 with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
