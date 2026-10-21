@@ -76,7 +76,8 @@ function verifyNativeReturn(project: string, sessions: string, parentThread: str
       const meta = log.meta;
       if (meta?.source?.subagent?.thread_spawn?.parent_thread_id !== parentThread || meta.id === parentThread || !sameDirectory(meta.cwd, project)) continue;
       const completed = log.rows.filter((r) => r.type === "event_msg" && r.payload.type === "task_complete").at(-1)?.payload;
-      if (!completed?.turn_id || !completed.root_turn_id || completed.last_agent_message !== `MODEL: ${model}\n${stored}`) continue;
+      const returned = completed?.last_agent_message?.match(/^MODEL: ([^\n]+)\n([\s\S]*)$/);
+      if (!completed?.turn_id || !completed.root_turn_id || returned?.[1] !== model || returned[2].trim() !== stored) continue;
       if (!dispatches.some((r) => {
         if (r.payload.internal_chat_message_metadata_passthrough?.turn_id !== completed.root_turn_id) return false;
         try { return !("model" in JSON.parse(r.payload.arguments)); } catch { return false; }

@@ -49,6 +49,16 @@ test("a linked native reviewer return establishes independence without attesting
   expect(result.reviewerThread).toBe("reviewer");
 });
 
+test("blank lines outside returned records preserve their exact content", () => {
+  const f = fixture();
+  f.child[2].payload.last_agent_message = "MODEL: unknown\n\nNO FINDINGS\n";
+  f.logs();
+  expect(f.verify().pass).toBe(true);
+  f.child[2].payload.last_agent_message = "MODEL: unknown\n\nNO FINDINGS after editing";
+  f.logs();
+  expect(f.verify().pass).toBe(false);
+});
+
 test("bookkeeping after review preserves freshness but source drift does not", () => {
   const f = fixture();
   writeFileSync(join(f.f.project, f.path), readFileSync(join(f.f.project, f.path), "utf8") + "\n## State\n\nComplete locally.\n");
