@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Historical investigation and 96 controlled calls across Haiku and Opus completed; human comprehension testing, independent spec review and acceptance remain pending."
+status: abandoned
+status_description: "Closed after investigation: no plugin safeguard will be built from this evidence. Findings retained; further experiments require a new scope decision."
 issue: https://github.com/michielvha/vh-adlc/issues/20
 goal: "Determine whether repeated agent work makes Stackweaver harder for its owner to understand and whether a tested vh-adlc safeguard is justified."
 covers:
@@ -63,6 +63,12 @@ Track this work in vh-adlc, use Stackweaver as the example, and isolate the work
 from the other active agent. After the draft, run the investigation and controlled
 trials, including a stronger-model comparison requested after the Haiku pilot.
 No implementation is authorized by this investigation.
+
+On 2026-10-21, after the historical study and stronger-model comparison, the
+owner requested closure. The investigation is closed with no plugin change.
+The proposal is marked `abandoned` because it will not proceed to implementation;
+the findings remain available as evidence. This decision does not establish
+that language drift cannot happen.
 
 ### Investigation findings, 2026-10-21
 
@@ -347,10 +353,11 @@ audit would duplicate existing machinery. The missing proof is whether a more
 specific review instruction catches these failures reliably at acceptable cost.
 
 Historical model identity, prompts, human steering and files read by agents are
-unavailable from Git. Both controlled pilots are now complete. Blind human
+unavailable from Git. Both controlled pilots are complete. Blind human
 comprehension testing has not run. The causal explanation and the best safeguard
-therefore remain open. No acceptance criterion is marked met by the investigating
-assistant, and no plugin or Stackweaver fix is included.
+remain unresolved research questions, with no further work scheduled under this
+issue. No acceptance criterion is marked met by the investigating assistant,
+and no plugin or Stackweaver fix is included.
 
 If this investigation continues, test realistic longer edits and human
 understanding with a capable model before choosing a plugin change. A candidate
@@ -362,14 +369,15 @@ check or a claim that this prevents drift would exceed the evidence.
 
 Raw measurements, source probes, worked rewrites, commands and test output are
 retained in the local evidence bundle
-`/private/tmp/vh-adlc-language-study-20261021.zip`. The controlled trial protocol,
+`~/code/personal/vh-adlc-language-drift-evidence/2026-10-21/vh-adlc-language-study-20261021.zip`. The controlled trial protocol,
 all 48 prompts and outputs, verification and grading records are retained in
-`/private/tmp/vh-adlc-language-trials-20261021.zip`. The matched Opus protocol,
+`~/code/personal/vh-adlc-language-drift-evidence/2026-10-21/vh-adlc-language-trials-20261021.zip`. The matched Opus protocol,
 48 prompts and outputs, format-recovery record, comparison and assessments are
-in `/private/tmp/vh-adlc-language-opus-trials-20261021.zip`. The smallest next
-decision is whether a longer edit and human comprehension test is worth running.
-Raw private excerpts remain in the local evidence bundles; this report publishes
-the measurements and findings.
+in `~/code/personal/vh-adlc-language-drift-evidence/2026-10-21/vh-adlc-language-opus-trials-20261021.zip`.
+The evidence directory includes archive sizes and SHA-256 hashes in
+`manifest.json`. The bundles were copied out of temporary storage and verified
+before worktree cleanup. Raw private excerpts remain local; this report publishes
+the measurements and findings. No evidence merge or implementation remains.
 
 ## Scope
 
@@ -496,12 +504,13 @@ spec review and owner acceptance remain pending.
 
 ## Open Questions
 
-None for the requested tracking scope. Safeguard selection and enforcement
-policy remain future owner decisions after the investigation produces evidence.
+None. The owner closed the investigation with no plugin implementation. Further
+experiments or a safeguard proposal require a new scope decision.
 
 ## Review Log
 
-Independent spec review and owner acceptance are pending.
+No independent spec review or implementation acceptance was performed. The owner
+closed the unbuilt proposal after reviewing the investigation outcome.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
