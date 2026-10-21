@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: michielvha/go-ci-action@bc485542c70d6cf51da9642c632ef268571597db # main
+      - uses: michielvha/go-ci-action@ab14d6420148179e8d20ecc0b7cb89760193cb37 # v0.1.0
 
   checker:
     runs-on: ubuntu-latest
@@ -47,37 +47,15 @@ jobs:
       - name: Check the vh-adlc package
         run: bun test tests/vh-adlc
 
-  release-gate:
-    needs: [verify, checker, checker-macos]
-    runs-on: ubuntu-latest
-    permissions:
-      pull-requests: read
-    outputs:
-      tag: ${{ steps.gate.outputs.tag }}
-    steps:
-      - name: Main, or an open PR labelled release:preview at this commit
-        id: gate
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          BRANCH: ${{ github.ref_name }}
-          SHA: ${{ github.sha }}
-        run: |
-          tag=true
-          if [[ "$BRANCH" != main ]]; then
-            tag=$(gh pr list --head "$BRANCH" --state open --label release:preview \
-              --json headRefOid --jq "any(.[]; .headRefOid == \"$SHA\")")
-          fi
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
+  # Tags main, and a branch whose open PR has the release:preview label at this
+  # commit. Every other run only calculates the version.
   version:
-    needs: release-gate
+    needs: [verify, checker, checker-macos]
     permissions:
       contents: read
-    uses: vhco-pro/.github/.github/workflows/reusable-version.yml@88a3b76a8d0cd07227f0ea4696c683775f3981ba # thin GitVersion wrapper under review
+      pull-requests: read
+    uses: vhco-pro/version-workflow/.github/workflows/version.yml@22021f1c05a8bc3682697f63fc0789907b02b170 # unreleased draft
     with:
-      dry-run: ${{ needs.release-gate.outputs.tag != 'true' }}
       release-app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
     secrets:
       release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}

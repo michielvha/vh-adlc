@@ -98,14 +98,19 @@ func TestCIWorkflow(t *testing.T) {
 	if !slices.Contains(runs(w), "bun test tests/vh-adlc") {
 		t.Error("CI must retain the existing plugin checker")
 	}
-	if !slices.Equal(dependencies(t, w.Jobs["release-gate"].Needs), []string{"verify", "checker", "checker-macos"}) {
-		t.Error("the release gate must wait for every check through native needs")
+	if _, ok := w.Jobs["release-gate"]; ok {
+		t.Error("the shared version workflow decides when to tag; the caller has no gate of its own")
 	}
 	version := w.Jobs["version"]
-	if !strings.HasPrefix(version.Uses, "vhco-pro/.github/.github/workflows/reusable-version.yml@") ||
-		!slices.Equal(dependencies(t, version.Needs), []string{"release-gate"}) ||
-		version.With["dry-run"] != "${{ needs.release-gate.outputs.tag != 'true' }}" {
-		t.Error("versioning must call the shared GitVersion wrapper, tagging only when the gate allows it")
+	if !strings.HasPrefix(version.Uses, "vhco-pro/version-workflow/.github/workflows/version.yml@") ||
+		!slices.Equal(dependencies(t, version.Needs), []string{"verify", "checker", "checker-macos"}) {
+		t.Error("versioning must call the shared version workflow after every check, through native needs")
+	}
+	if _, ok := version.With["dry-run"]; ok {
+		t.Error("the caller must not override the shared tag decision")
+	}
+	if version.Permissions["contents"] != "read" || version.Permissions["pull-requests"] != "read" {
+		t.Error("the version job reads PRs for the preview label; the App, not GITHUB_TOKEN, pushes the tag")
 	}
 	if version.Secrets["release-app-private-key"] != "${{ secrets.RELEASE_APP_PRIVATE_KEY }}" {
 		t.Error("only the version job receives the App key")
@@ -183,7 +188,7 @@ func TestReleaseWorkflow(t *testing.T) {
 		t.Errorf("release.yml push trigger = %+v, want only three-component version tags", on.Push)
 	}
 	release, ok := w.Jobs["release"]
-	if !ok || !strings.HasPrefix(release.Uses, "vhco-pro/.github/.github/workflows/reusable-go-release.yml@") ||
+	if !ok || !strings.HasPrefix(release.Uses, "vhco-pro/go-release-workflow/.github/workflows/go-release.yml@") ||
 		len(release.Steps) != 0 {
 		t.Fatal("release.yml must be a thin caller of the shared Go release workflow")
 	}
