@@ -42,7 +42,7 @@ export function verifyMaintenanceReview(project: string, sessions: string, paren
     const target = targets.at(-1)?.[1];
     if (!target) return fail("no exact review target in the record");
     const latest = reviews!.slice(targets.at(-1)!.index);
-    const model = latest.match(/^Model: ([^\n]+)$/m)?.[1].trim();
+    const model = latest.match(/^Model: ([^\s()]+)(?:[ \t]+\([^\n]*\))?[ \t]*$/m)?.[1];
     const stored = latest.match(/^```text\n([\s\S]*?)\n```/m)?.[1];
     if (!model || stored !== "NO FINDINGS") return fail("no clean, well-formed stored review");
     const definition = section(record, "Definition");

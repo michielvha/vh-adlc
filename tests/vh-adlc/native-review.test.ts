@@ -120,3 +120,12 @@ test("an inspected unambiguous Git abbreviation resolves to the exact reviewed c
   f.logs();
   expect(f.verify().pass).toBe(true);
 });
+
+test("an attestation note in the stored model field cannot change the returned model identity", () => {
+  const f = fixture();
+  const path = join(f.f.project, f.path);
+  writeFileSync(path, readFileSync(path, "utf8").replace("Model: unknown", "Model: unknown (identity not attested)"));
+  expect(f.verify().pass).toBe(true);
+  writeFileSync(path, readFileSync(path, "utf8").replace("Model: unknown", "Model: another-model"));
+  expect(f.verify().pass).toBe(false);
+});
