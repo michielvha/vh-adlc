@@ -103,7 +103,7 @@ for (const { id, trial, variant, prompt, prompts, seedReadOnlyWorkflow } of plan
   if (prompts) writeFileSync(join(trialRoot, "events.jsonl"), raw);
   const parsed = events(raw);
   const after = snapshot(f);
-  const review = id === "L15" ? verifyFeatureReview(f.project, join(profile, "sessions"), parsed.threadId)
+  const review = ["L15", "L10"].includes(id) ? verifyFeatureReview(f.project, join(profile, "sessions"), parsed.threadId)
     : isMaintenance(id) ? verifyMaintenanceReview(f.project, join(profile, "sessions"), parsed.threadId, maintenancePaths(id)) : undefined;
   const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
   if (prompts) {

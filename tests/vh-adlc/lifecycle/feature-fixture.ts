@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const SHOUT_CRITERION = "Running bash greet.sh --shout prints HELLO, WORLD. and running it without arguments still prints Hello, world.";
@@ -71,4 +71,15 @@ None.
   git(project, "commit", "-qm", "fixture: publish the implementation claim", "--", path);
   git(project, "push", "-q", "origin", "main");
   git(project, "switch", "-qc", "feat/shout");
+}
+
+export function seedImplementedFeature(project: string, git: Git) {
+  writeFileSync(join(project, "greet.sh"), '#!/usr/bin/env bash\nset -euo pipefail\nif [[ "${1-}" == --shout ]]; then printf "HELLO, WORLD.\\n"; else printf "Hello, world.\\n"; fi\n');
+  writeFileSync(join(project, "test.sh"), '#!/usr/bin/env bash\nset -euo pipefail\n[[ "$(bash tag.sh)" == v1.2.3 ]]\n[[ "$(bash greet.sh)" == "Hello, world." ]]\n[[ "$(bash greet.sh --shout)" == "HELLO, WORLD." ]]\necho "PASS: shout and default"\n');
+  const path = "docs/specs/shout.md";
+  writeFileSync(join(project, path), readFileSync(join(project, path), "utf8")
+    .replace("- [ ] T1 ", "- [x] T1 ").replace("- [ ] AC-01:", "- [x] AC-01:")
+    .replace("\n## Test Plan", "\n      Evidence: Seeded fixture behavior; bash test.sh passes.\n\n## Test Plan"));
+  git(project, "add", "greet.sh", "test.sh", path);
+  git(project, "commit", "-qm", "fixture: implement accepted shout behavior", "--", "greet.sh", "test.sh", path);
 }

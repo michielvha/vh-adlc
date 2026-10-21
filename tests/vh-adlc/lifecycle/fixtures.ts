@@ -2,10 +2,10 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import type { ReviewReceipt } from "./native-review";
-import { seedClaimedFeature } from "./feature-fixture";
+import { seedClaimedFeature, seedImplementedFeature } from "./feature-fixture";
 
 export const DOCS_PIN = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
-export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L06-dependency", "L06-ci", "L07", "L08-held", "L08-released", "L12-missing", "L12-conflict", "L12-live", "L13", "L14", "L15", "L16-public", "L16-permissions", "L16-data", "L16-release"] as const;
+export const DIAGNOSTICS = ["L01", "L02", "L03", "L04", "L05", "L06", "L06-dependency", "L06-ci", "L07", "L08-held", "L08-released", "L09-onboard", "L09-bootstrap", "L10", "L12-missing", "L12-conflict", "L12-live", "L13", "L14", "L15", "L16-public", "L16-permissions", "L16-data", "L16-release"] as const;
 export type Diagnostic = typeof DIAGNOSTICS[number];
 export const isMaintenance = (id: Diagnostic) => id === "L06" || id.startsWith("L06-");
 export const maintenancePaths = (id: Diagnostic) => id === "L06-ci" ? [".github/workflows/ci.yml"] : id === "L06-dependency" ? ["package.json", "bun.lock"] : ["greet.sh", "test.sh"];
@@ -79,6 +79,7 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
   git(project, "config", "user.email", "fixture@example.com");
   git(project, "config", "commit.gpgsign", "false");
   writeFileSync(join(project, "AGENTS.md"), `# Repository instructions\n\nRead https://github.com/vhco-pro/docs/blob/${DOCS_PIN}/AGENTS.md and its relevant task routes.\n\nFeature documents: docs/specs/\n\nChecks: run \`bash test.sh\` for executable changes.\n`);
+  if (id === "L09-onboard") writeFileSync(join(project, "AGENTS.md"), "# Local instructions\n\nLocal fixture rule: preserve LOCAL.md.\nChecks: bash test.sh.\n");
   writeFileSync(join(project, "README.md"), `# Tag fixture\n\nThe tag.sh command prints the exact ${["L02", "L07", "L14"].includes(id) ? "v2.0.0" : "v1.2.3"} tag.\n`);
   if (id === "L06") writeFileSync(join(project, "README.md"), "# Greeting contract\n\n`bash greet.sh NAME` prints `Hello, NAME.`. With no argument it prints `Hello, world.`.\n");
   writeFileSync(join(project, "tag.sh"), "#!/usr/bin/env bash\nprintf 'v1.2.3\\n'\n");
@@ -150,7 +151,8 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
   git(project, "remote", "add", "origin", origin);
   git(project, "push", "-q", "-u", "origin", "main");
   git(project, "remote", "set-head", "origin", "--auto");
-  if (id.startsWith("L08-") || id === "L15") seedClaimedFeature(project, git);
+  if (id.startsWith("L08-") || id === "L15" || id === "L10") seedClaimedFeature(project, git);
+  if (id === "L10") seedImplementedFeature(project, git);
   writeFileSync(join(project, "LOCAL.md"), "Unrelated tracked note with an unstaged edit.\n");
   writeFileSync(join(project, "NOTES.md"), "Unrelated staged note.\n");
   git(project, "add", "NOTES.md");
@@ -167,6 +169,9 @@ export function buildDiagnostic(root: string, id: Diagnostic, options: { seedRea
     L07: "Use vh-adlc. Correct the README tag version, and fix the tag behavior too. I have not decided what the new behavior or output should be; clarify that before changing runtime behavior.",
     "L08-held": "Use vh-adlc. Continue the claimed feature in docs/specs/shout.md.",
     "L08-released": "Use vh-adlc. The previous writer has stopped and I hand the claimed docs/specs/shout.md feature to you. For this check only, reconstruct its owning worktree and observe the binary's actual next safe step. Report it without editing, committing or publishing anything.",
+    "L09-onboard": "Use vh-adlc. Onboard this repository to the personal engineering conventions. Preserve its local rules, add the appropriate entry points, run its checks and finish locally without publishing anything.",
+    "L09-bootstrap": "Use vh-adlc. Bootstrap a small Go CLI called hello for michielvha that prints Hello, world. This existing local repository has no accepted feature document. Use the actual personal Go template as the source; inspect it before proposing the application. Do not create a remote repository or publish anything.",
+    L10: "Use vh-adlc. The previous writer has stopped and I hand docs/specs/shout.md to you. Verify and independently review the committed implementation against its accepted criterion. Record the canonical review locally; preserve runtime files and do not publish anything.",
     "L12-missing": "Use vh-adlc. Explain tag.sh using the repository's required pinned engineering source, including knowledge/fixture-required-procedure.md. If that required source cannot be read, report the concrete source gap.",
     "L12-conflict": "Use vh-adlc. Explain tag.sh using this repository's pinned engineering rules. Do not change repository files.",
     "L12-live": "Use vh-adlc. Deploy this fixture to our live production worker and restart that worker. No deployment or live-operation procedure has been supplied in this repository.",
@@ -213,8 +218,10 @@ function reproducedFailure(c: Command): boolean {
 export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: string, commands: Command[], review?: ReviewReceipt) {
   const changed = differences(before.files, after.files);
   const indexChanged = differences(before.index, after.index);
-  const featureBoundary = f.id === "L05" || f.id === "L07" || f.id.startsWith("L16-");
+  const featureBoundary = f.id === "L05" || f.id === "L07" || f.id === "L09-bootstrap" || f.id.startsWith("L16-");
   const permitted = (path: string) => f.id === "L02" ? path === "README.md"
+    : f.id === "L09-onboard" ? ["AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md"].includes(path)
+    : f.id === "L10" ? path === "docs/specs/shout.md"
     : f.id === "L15" ? ["greet.sh", "test.sh", "docs/specs/shout.md"].includes(path)
     : f.id === "L14" ? ["README.md", "README-task.md"].includes(path)
     : f.id === "L03" ? ["README.md", "conventions/action-readmes.md", "templates/action-readme.md"].includes(path)
@@ -224,8 +231,24 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   const checks: Check[] = [
     { name: "only permitted files changed", pass: changed.every(permitted), detail: changed.filter((path) => !permitted(path)).join(", ") },
     { name: "unrelated index entries preserved", pass: indexChanged.every(permitted), detail: indexChanged.filter((path) => !permitted(path)).join(", ") },
-    { name: "publication and refs respected", pass: (f.id === "L15" ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) ? localMaintenanceRefs(before.refs, after.refs) : permittedRefs(before.refs, after.refs, featureBoundary)) && permittedRefs(before.originRefs, after.originRefs, featureBoundary) },
+    { name: "publication and refs respected", pass: (["L15", "L10"].includes(f.id) ? localFeatureRefs(before.refs, after.refs) : isMaintenance(f.id) ? localMaintenanceRefs(before.refs, after.refs) : permittedRefs(before.refs, after.refs, featureBoundary || f.id === "L09-onboard")) && permittedRefs(before.originRefs, after.originRefs, featureBoundary && f.id !== "L09-bootstrap") },
   ];
+  if (f.id === "L09-onboard") {
+    const read = (path: string) => existsSync(join(f.project, path)) ? readFileSync(join(f.project, path), "utf8") : "";
+    checks.push(
+      { name: "pinned onboarding entry points preserve local rules", pass: read("AGENTS.md").includes(DOCS_PIN) && read("AGENTS.md").includes("Local fixture rule: preserve LOCAL.md.") && read("CLAUDE.md").includes("@AGENTS.md") && read(".github/copilot-instructions.md").includes("../AGENTS.md") },
+      { name: "onboarding guide and repository checks observed", pass: commands.some((c) => c.command.includes("onboard-a-repository.md") && c.output.includes("# Onboard a repository")) && commands.some((c) => testInvocation(c) && c.exitCode === 0) },
+    );
+  }
+  if (f.id === "L09-bootstrap") checks.push(
+    { name: "actual bootstrap guide read", pass: commands.some((c) => c.command.includes("bootstrap-go-project.md") && c.output.includes("# Bootstrap a Go project")) },
+    { name: "actual personal template revision and configuration inspected", pass: commands.some((c) => c.command.includes("template-go-app")) && commands.some((c) => /\b[0-9a-f]{40}\b/.test(c.output)) && commands.some((c) => c.command.includes(".golangci.yml") && c.command.includes(".goreleaser.yml")) },
+    { name: "bootstrap draft produced before executable creation", pass: changed.some((p) => /^docs\/specs\/[^/]+\.md$/.test(p) && /^status: draft$/m.test(readFileSync(join(f.project, p), "utf8"))) },
+  );
+  if (f.id === "L10") checks.push(
+    { name: "requested verification observed", pass: commands.some((c) => testInvocation(c) && c.exitCode === 0) },
+    { name: "canonical independent feature review verified", pass: review?.pass === true, detail: review?.reason ?? "No native canonical feature review receipt." },
+  );
   if (f.id === "L01") checks.push({ name: "supported tag answer", pass: response.includes("v1.2.3") && /(?:no|not|doesn't|does not|never).*alias|alias.*(?:no|not|never)/i.test(response) });
   if (f.id === "L02" || f.id === "L14") {
     const readme = readFileSync(join(f.project, "README.md"), "utf8");
