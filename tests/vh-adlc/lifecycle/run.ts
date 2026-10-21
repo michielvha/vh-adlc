@@ -5,8 +5,9 @@
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { buildDiagnostic, DIAGNOSTICS, DOCS_PIN, events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot, type Diagnostic } from "./fixtures";
+import { buildDiagnostic, DOCS_PIN, events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot } from "./fixtures";
 import { verifyMaintenanceReview } from "./native-review";
+import { scenarioPlan } from "./scenario-plan";
 
 const REPO = resolve(import.meta.dir, "../../..");
 function flag(name: string): string | undefined {
@@ -20,8 +21,9 @@ const candidate = flag("--candidate");
 if (!candidate || !/^[a-z][a-z0-9-]*$/.test(candidate)) throw new Error("--candidate is required");
 const sourceRef = flag("--source-ref"), packageDir = flag("--package");
 if (!!sourceRef === !!packageDir) throw new Error("choose --source-ref or --package");
-const repeat = Number(flag("--repeat") ?? "1");
-if (!Number.isInteger(repeat) || repeat < 1 || repeat > 10) throw new Error("--repeat must be an integer from 1 to 10");
+const plan = scenarioPlan({ cases: flag("--cases"), reserved: flag("--reserved"), repeat: flag("--repeat") });
+const allowed = new Set(["--candidate", "--source-ref", "--package", "--output", "--cases", "--reserved", "--repeat"]);
+for (let i = 2; i < process.argv.length; i += 2) if (!allowed.has(process.argv[i]) || !process.argv[i + 1]) throw new Error(`unknown or incomplete argument: ${process.argv[i]}`);
 const root = flag("--output") ? resolve(flag("--output")!) : mkdtempSync(join(tmpdir(), `vh-lifecycle-${candidate}-`));
 if (existsSync(root) && readdirSync(root).length) throw new Error("output directory must be empty; saved trial evidence cannot be overwritten");
 mkdirSync(root, { recursive: true });
@@ -57,15 +59,14 @@ const version = run(["codex", "--version"], root).trim();
 run(["codex", "plugin", "marketplace", "add", market, "--json"], root, childEnv);
 const install = JSON.parse(run(["codex", "plugin", "add", "vh-adlc@vhco-lifecycle-evaluation", "--json"], root, childEnv));
 const packageHash = fingerprint(install.installedPath);
-const ids = (flag("--cases")?.split(",") ?? ["L01", "L02", "L04", "L05"]) as Diagnostic[];
-if (ids.some((id) => !DIAGNOSTICS.includes(id))) throw new Error("unsupported diagnostic case");
 const results: any[] = [];
 console.log(JSON.stringify({ candidate, root, version, packageHash, docsPin: DOCS_PIN, surface: "native-cli-diagnostic" }));
 
-for (const { id, trial } of ids.flatMap((id) => Array.from({ length: repeat }, (_, i) => ({ id, trial: repeat === 1 ? id : `${id}-${i + 1}` })))) {
+for (const { id, trial, variant, prompt } of plan) {
   const trialRoot = join(root, trial);
   mkdirSync(trialRoot, { recursive: true });
   const f = buildDiagnostic(trialRoot, id);
+  if (prompt) f.prompt = prompt;
   const before = snapshot(f);
   const started = Date.now();
   const rawPath = join(trialRoot, "events.jsonl"), errorPath = join(trialRoot, "stderr.log");
@@ -86,7 +87,7 @@ for (const { id, trial } of ids.flatMap((id) => Array.from({ length: repeat }, (
   const verdict = grade(f, before, after, parsed.response, parsed.commands, review);
   const unchangedPackage = fingerprint(install.installedPath) === packageHash;
   const result = {
-    id, trial, candidate, surface: "native-cli-diagnostic", host: version,
+    id, trial, variant, candidate, surface: "native-cli-diagnostic", host: version,
     packageHash, graderHash, docsPin: DOCS_PIN, model: "unknown", configuration: "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
     prompt: f.prompt, durationMs: Date.now() - started, exitCode, timeout,
     review,
