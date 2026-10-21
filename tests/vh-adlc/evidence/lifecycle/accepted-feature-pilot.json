@@ -1,0 +1,76 @@
+{
+  "kind": "native-cli-diagnostic-comparison",
+  "graderHash": "37dec7ae27d3159a3df25123b7c22af3a03e6aa4f99abee401474f3aca012c14",
+  "limitation": "Not final acceptance evidence. Each review needs a valid native receipt; native desktop and the full matrix remain untested.",
+  "results": [
+    {
+      "id": "L15",
+      "trial": "L15",
+      "candidate": "accepted-feature",
+      "surface": "native-cli-diagnostic",
+      "host": "codex-cli 0.163.0",
+      "packageHash": "f4684dac19c40fc250ee11e12b54737937af4e536f2fcd1fea0635c315ac0324",
+      "graderHash": "37dec7ae27d3159a3df25123b7c22af3a03e6aa4f99abee401474f3aca012c14",
+      "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+      "model": "unknown",
+      "configuration": "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
+      "prompt": "Use vh-adlc. The previous writer has stopped and I hand docs/specs/shout.md to you. Continue this accepted, already-claimed feature through its authorized local implementation and independent review. Its claim is on origin/main. Do not publish the feature branch or perform a release.",
+      "durationMs": 152313,
+      "exitCode": 0,
+      "timeout": false,
+      "review": {
+        "pass": true,
+        "reason": "linked native reviewer returned the exact stored review and inspected its committed target",
+        "parentThread": "01a15ca9-e2dd-7fe1-83d2-7c916eee3dd5",
+        "reviewerThread": "01a15cab-3557-7c80-8863-9427e7ec653f",
+        "target": "1e4a842625e7d5c8e9d44ecc823a073866ffdf5a",
+        "model": "unknown",
+        "recordPath": "docs/specs/shout.md",
+        "isolation": "procedural",
+        "reviewerLogHash": "1f764e021cc5717aaff3ddb3cd74cf08955210c27f7d71f466e68b16e1720681"
+      },
+      "status": "pass",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "accepted feature implemented without changing the default",
+          "pass": true
+        },
+        {
+          "name": "feature regression observed failing then passing",
+          "pass": true
+        },
+        {
+          "name": "feature independent review verified",
+          "pass": true,
+          "detail": "linked native reviewer returned the exact stored review and inspected its committed target"
+        },
+        {
+          "name": "next genuine publication boundary observed",
+          "pass": true
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ],
+      "originalStatus": "fail",
+      "originalGraderHash": "cd899ffd46420b8c19393d6f0a15c50f23533e2d7e91383392473e4b0afde664",
+      "rawEventsHash": "5a7fd6d0b739924fe2e587fa48f66effdfed9cb6c327c6b3620463ab25278888",
+      "fixtureUnchangedSinceTrial": true
+    }
+  ]
+}

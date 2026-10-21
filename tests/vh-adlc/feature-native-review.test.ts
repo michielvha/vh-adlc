@@ -66,3 +66,13 @@ test("source drift invalidates feature review while a local feature commit prese
   writeFileSync(join(f.f.project, "greet.sh"), "exit 0\n");
   expect(f.verify().pass).toBe(false);
 });
+
+test("an observed Bash xtrace regression remains test-first evidence", () => {
+  const f = fixture();
+  const commands = [
+    { command: "bash -x test.sh", exitCode: 1, output: "+ bash greet.sh --shout\n+ [[ Hello, world. == \\H\\E\\L\\L\\O ] ]" },
+    { command: "bash test.sh", exitCode: 0, output: "PASS: shout and default" },
+    { command: "vh-adlc next", exitCode: 0, output: '{"data":{"action":"ship"}}' },
+  ];
+  expect(grade(f.f, f.before, snapshot(f.f), "Ready.", commands, f.verify()).pass).toBe(true);
+});

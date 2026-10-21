@@ -200,7 +200,7 @@ function localMaintenanceRefs(before: string, after: string): boolean {
   const parse = (text: string) => Object.fromEntries(text.split("\n").filter(Boolean).map((line) => line.split(" ")));
   const a = parse(before), b = parse(after);
   const changed = differences(a, b);
-  return changed.length <= 1 && changed.every((name) => /^refs\/heads\/(?:feat|fix|perf|docs|style|test|build|ci|chore|refactor|revert)\//.test(name) && b[name]);
+  return changed.length <= 1 && changed.every((name) => /^refs\/heads\/(?:feat|fix|perf|docs|style|test|build|ci|chore|refactor|revert|maintenance)\//.test(name) && b[name]);
 }
 
 function localFeatureRefs(before: string, after: string): boolean {
@@ -209,7 +209,7 @@ function localFeatureRefs(before: string, after: string): boolean {
   return differences(a, b).every((name) => name === "refs/heads/feat/shout" && a[name] && b[name]);
 }
 
-function testInvocation(c: Command): boolean { return /(?:\bbash\s+(?:['"])?(?:\.\/)?test\.sh|\.\/test\.sh)/.test(c.command); }
+function testInvocation(c: Command): boolean { return /(?:\bbash\s+(?:-[A-Za-z]+\s+)*(?:['"])?(?:\.\/)?test\.sh|\.\/test\.sh)/.test(c.command); }
 function reproducedFailure(c: Command): boolean {
   return testInvocation(c) && (c.exitCode !== 0 && /FAIL|expected/i.test(c.output)
     || /^FAIL: expected Hello, Ada\.; got Hello, world\.$/m.test(c.output));
