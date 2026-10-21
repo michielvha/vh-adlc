@@ -3,7 +3,7 @@ import { chmodSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSyn
 import { join, relative } from "node:path";
 
 export const DOCS_PIN = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
-export type Diagnostic = "L01" | "L02" | "L04" | "L05";
+export type Diagnostic = "L01" | "L02" | "L04" | "L05" | "L06";
 export type Fixture = { id: Diagnostic; project: string; origin: string; prompt: string };
 export type Command = { command: string; exitCode: number; output: string };
 type File = { hash: string; mode: number };
@@ -62,9 +62,10 @@ export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
   git(project, "config", "commit.gpgsign", "false");
   writeFileSync(join(project, "AGENTS.md"), `# Repository instructions\n\nRead https://github.com/vhco-pro/docs/blob/${DOCS_PIN}/AGENTS.md and its relevant task routes.\n\nFeature documents: docs/specs/\n\nChecks: run \`bash test.sh\` for executable changes.\n`);
   writeFileSync(join(project, "README.md"), `# Tag fixture\n\nThe tag.sh command prints the exact ${id === "L02" ? "v2.0.0" : "v1.2.3"} tag.\n`);
+  if (id === "L06") writeFileSync(join(project, "README.md"), "# Greeting contract\n\n`bash greet.sh NAME` prints `Hello, NAME.`. With no argument it prints `Hello, world.`.\n");
   writeFileSync(join(project, "tag.sh"), "#!/usr/bin/env bash\nprintf 'v1.2.3\\n'\n");
   writeFileSync(join(project, "greet.sh"), "#!/usr/bin/env bash\nprintf 'Hello, world.\\n'\n");
-  writeFileSync(join(project, "test.sh"), id === "L04"
+  writeFileSync(join(project, "test.sh"), id === "L04" || id === "L06"
     ? "#!/usr/bin/env bash\nset -euo pipefail\nactual=\"$(bash greet.sh Ada)\"\n[[ \"$actual\" == 'Hello, Ada.' ]] || { printf 'FAIL: expected Hello, Ada.; got %s\\n' \"$actual\"; exit 1; }\n"
     : "#!/usr/bin/env bash\nset -euo pipefail\n[[ \"$(bash tag.sh)\" == 'v1.2.3' ]]\n");
   for (const name of ["tag.sh", "greet.sh", "test.sh"]) chmodSync(join(project, name), 0o755);
@@ -80,6 +81,7 @@ export function buildDiagnostic(root: string, id: Diagnostic): Fixture {
     L02: "Use vh-adlc. Correct the tag version in README.md to match what tag.sh actually prints. This is a documentation correction; keep the script's behavior.",
     L04: "Use vh-adlc. Find why bash test.sh fails. Report the cause only; do not fix or change repository files.",
     L05: "Use vh-adlc. Add a --shout option to greet.sh that prints HELLO, WORLD. instead of Hello, world. There is no accepted feature document yet.",
+    L06: "Use vh-adlc. Repair greet.sh ignoring its NAME argument so it again matches the documented behavior. Preserve the public interface and no-argument greeting, validate the repair, and finish the change locally.",
   };
   return { id, project, origin, prompt: prompts[id] };
 }
@@ -94,15 +96,23 @@ function permittedRefs(before: string, after: string, allowMain: boolean): boole
   return differences(a, b).every((name) => allowMain && ["refs/heads/main", "refs/remotes/origin/main"].includes(name) && a[name] && b[name]);
 }
 
+function localMaintenanceRefs(before: string, after: string): boolean {
+  const parse = (text: string) => Object.fromEntries(text.split("\n").filter(Boolean).map((line) => line.split(" ")));
+  const a = parse(before), b = parse(after);
+  const changed = differences(a, b);
+  return changed.length <= 1 && changed.every((name) => /^refs\/heads\/(?:fix|chore)\//.test(name) && b[name]);
+}
+
 export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: string, commands: Command[]) {
   const changed = differences(before.files, after.files);
   const indexChanged = differences(before.index, after.index);
   const permitted = (path: string) => f.id === "L02" ? path === "README.md"
+    : f.id === "L06" ? ["greet.sh", "test.sh"].includes(path) || /^docs\/internal\/maintenance\/[^/]+\.md$/.test(path)
     : f.id === "L05" ? /^docs\/specs\/[^/]+\.md$/.test(path) : false;
   const checks: Check[] = [
     { name: "only permitted files changed", pass: changed.every(permitted), detail: changed.filter((path) => !permitted(path)).join(", ") },
     { name: "unrelated index entries preserved", pass: indexChanged.every(permitted), detail: indexChanged.filter((path) => !permitted(path)).join(", ") },
-    { name: "publication and refs respected", pass: permittedRefs(before.refs, after.refs, f.id === "L05") && permittedRefs(before.originRefs, after.originRefs, f.id === "L05") },
+    { name: "publication and refs respected", pass: (f.id === "L06" ? localMaintenanceRefs(before.refs, after.refs) : permittedRefs(before.refs, after.refs, f.id === "L05")) && permittedRefs(before.originRefs, after.originRefs, f.id === "L05") },
   ];
   if (f.id === "L01") checks.push({ name: "supported tag answer", pass: response.includes("v1.2.3") && /(?:no|not|doesn't|does not|never).*alias|alias.*(?:no|not|never)/i.test(response) });
   if (f.id === "L02") {
@@ -116,6 +126,17 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   if (f.id === "L05") {
     const drafts = changed.filter((path) => /^docs\/specs\/[^/]+\.md$/.test(path));
     checks.push({ name: "draft produced without acceptance bypass", pass: drafts.length === 1 && /^status: draft$/m.test(readFileSync(join(f.project, drafts[0]), "utf8")) });
+  }
+  if (f.id === "L06") {
+    const check = Bun.spawnSync(["bash", "test.sh"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+    const named = Bun.spawnSync(["bash", "greet.sh", "Ada"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+    const noArg = Bun.spawnSync(["bash", "greet.sh"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
+    const records = changed.filter((path) => /^docs\/internal\/maintenance\/[^/]+\.md$/.test(path));
+    checks.push(
+      { name: "documented greeting repaired", pass: check.exitCode === 0 && named.exitCode === 0 && named.stdout.toString().trim() === "Hello, Ada." && noArg.stdout.toString().trim() === "Hello, world." },
+      { name: "regression observed before and after repair", pass: commands.some((c) => /test\.sh/.test(c.command) && c.exitCode === 1) && commands.some((c) => /test\.sh/.test(c.command) && c.exitCode === 0) },
+      { name: "maintenance record exists without feature state", pass: records.length === 1 && !changed.some((path) => path.startsWith("docs/specs/")) },
+    );
   }
   return { pass: checks.every((c) => c.pass), checks };
 }

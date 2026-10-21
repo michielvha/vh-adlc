@@ -1,0 +1,209 @@
+[
+  {
+    "id": "L01",
+    "candidate": "baseline",
+    "surface": "native-cli-diagnostic",
+    "host": "codex-cli 0.163.0",
+    "packageHash": "b1167f58fdba02b6b37cabb5e0413685b9c8f8206cc1d3a9018a2e9f90e06b81",
+    "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+    "model": "unknown",
+    "configuration": "isolated profile default; no model override",
+    "prompt": "Use vh-adlc. Explain what tag.sh prints and whether it moves a major-version alias. Do not change repository files.",
+    "durationMs": 38359,
+    "exitCode": 0,
+    "timeout": false,
+    "status": "pass",
+    "checks": [
+      {
+        "name": "only permitted files changed",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "unrelated index entries preserved",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "publication and refs respected",
+        "pass": true
+      },
+      {
+        "name": "supported tag answer",
+        "pass": true
+      },
+      {
+        "name": "installed candidate unchanged",
+        "pass": true
+      }
+    ]
+  },
+  {
+    "id": "L02",
+    "candidate": "baseline",
+    "surface": "native-cli-diagnostic",
+    "host": "codex-cli 0.163.0",
+    "packageHash": "b1167f58fdba02b6b37cabb5e0413685b9c8f8206cc1d3a9018a2e9f90e06b81",
+    "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+    "model": "unknown",
+    "configuration": "isolated profile default; no model override",
+    "prompt": "Use vh-adlc. Correct the tag version in README.md to match what tag.sh actually prints. This is a documentation correction; keep the script's behavior.",
+    "durationMs": 42195,
+    "exitCode": 0,
+    "timeout": false,
+    "status": "pass",
+    "checks": [
+      {
+        "name": "only permitted files changed",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "unrelated index entries preserved",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "publication and refs respected",
+        "pass": true
+      },
+      {
+        "name": "README actually corrected",
+        "pass": true
+      },
+      {
+        "name": "installed candidate unchanged",
+        "pass": true
+      }
+    ]
+  },
+  {
+    "id": "L04",
+    "candidate": "baseline",
+    "surface": "native-cli-diagnostic",
+    "host": "codex-cli 0.163.0",
+    "packageHash": "b1167f58fdba02b6b37cabb5e0413685b9c8f8206cc1d3a9018a2e9f90e06b81",
+    "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+    "model": "unknown",
+    "configuration": "isolated profile default; no model override",
+    "prompt": "Use vh-adlc. Find why bash test.sh fails. Report the cause only; do not fix or change repository files.",
+    "durationMs": 44754,
+    "exitCode": 0,
+    "timeout": false,
+    "status": "pass",
+    "checks": [
+      {
+        "name": "only permitted files changed",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "unrelated index entries preserved",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "publication and refs respected",
+        "pass": true
+      },
+      {
+        "name": "failure actually reproduced",
+        "pass": true
+      },
+      {
+        "name": "cause explained",
+        "pass": true
+      },
+      {
+        "name": "installed candidate unchanged",
+        "pass": true
+      }
+    ]
+  },
+  {
+    "id": "L05",
+    "candidate": "baseline",
+    "surface": "native-cli-diagnostic",
+    "host": "codex-cli 0.163.0",
+    "packageHash": "b1167f58fdba02b6b37cabb5e0413685b9c8f8206cc1d3a9018a2e9f90e06b81",
+    "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+    "model": "unknown",
+    "configuration": "isolated profile default; no model override",
+    "prompt": "Use vh-adlc. Add a --shout option to greet.sh that prints HELLO, WORLD. instead of Hello, world. There is no accepted feature document yet.",
+    "durationMs": 84723,
+    "exitCode": 0,
+    "timeout": false,
+    "status": "pass",
+    "checks": [
+      {
+        "name": "only permitted files changed",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "unrelated index entries preserved",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "publication and refs respected",
+        "pass": true
+      },
+      {
+        "name": "draft produced without acceptance bypass",
+        "pass": true
+      },
+      {
+        "name": "installed candidate unchanged",
+        "pass": true
+      }
+    ]
+  },
+  {
+    "id": "L06",
+    "candidate": "baseline-maintenance",
+    "surface": "native-cli-diagnostic",
+    "host": "codex-cli 0.163.0",
+    "packageHash": "b1167f58fdba02b6b37cabb5e0413685b9c8f8206cc1d3a9018a2e9f90e06b81",
+    "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+    "model": "unknown",
+    "configuration": "isolated profile default; no model override",
+    "prompt": "Use vh-adlc. Repair greet.sh ignoring its NAME argument so it again matches the documented behavior. Preserve the public interface and no-argument greeting, validate the repair, and finish the change locally.",
+    "durationMs": 58546,
+    "exitCode": 0,
+    "timeout": false,
+    "status": "fail",
+    "checks": [
+      {
+        "name": "only permitted files changed",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "unrelated index entries preserved",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "publication and refs respected",
+        "pass": true
+      },
+      {
+        "name": "documented greeting repaired",
+        "pass": true
+      },
+      {
+        "name": "regression observed before and after repair",
+        "pass": true
+      },
+      {
+        "name": "maintenance record exists without feature state",
+        "pass": false
+      },
+      {
+        "name": "installed candidate unchanged",
+        "pass": true
+      }
+    ]
+  }
+]
