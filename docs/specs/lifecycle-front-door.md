@@ -580,7 +580,9 @@ new native lifecycle scenarios remain implementation work.
 
 - [x] T48 `plugins/vh-adlc/skills/*/SKILL.md`, lifecycle/authority references and compatibility tests - replace repeated intake policy with a shared pointer, keep direct-operation bodies unchanged and make explicit ship authority clear (AC-01, AC-07, AC-08).
       Evidence: The compact-prefix compatibility test first failed for all seven operations, then passed with all 47 package checks (54 tests, 171 assertions). Each original operation body remains byte-identical to baseline b313327; only discovery wording, shared intake pointers and explicit shipping-authority clarification changed. A full new native matrix is required for the changed package.
-- [ ] T49 `tests/vh-adlc/evidence/lifecycle/` and evaluation tooling - retain compact current evidence, original failure identities and immutable historical references; run all candidate comparisons and the full required native matrix on one new frozen package, then obtain fresh Opus reviews (AC-01 through AC-10).
+- [x] T49 `tests/vh-adlc/evidence/lifecycle/`, `tests/vh-adlc/evidence-index.ts` and its tests - replace bulky active-tree diagnostic reports with an immutable historical index and an independently traceable compact trial index (AC-08, AC-09).
+      Evidence: The evidence-index test first failed because its module was absent, then both tests passed with 11 assertions. The full compact-package suite passed 197 tests and 532 assertions. Every removed report matches its named ancestor commit and SHA-256; original failure reports remain in the tree. The archive removes more than 8,000 active-tree report lines without rewriting Git history. Compact indexes carry no overall pass and cannot substitute for regrading native logs.
+- [ ] T50 `tests/vh-adlc/evidence/lifecycle/`, README and this feature document - run all candidate comparisons and the full required native matrix on the frozen compact package, preserve failures and obtain fresh Opus reviews before merge (AC-01 through AC-10).
 
 ## Open Questions
 
