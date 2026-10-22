@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Implemented locally on the owner-selected branch; R-8 met all ten criteria, the native CLI matrix passed, and the real completion gate passed. Publication remains separate."
+status_description: "Copilot Opus 5.5 review found portability, publication-oracle and README defects after main integration. Review clearance and the completion gate must be re-established before merge."
 issue: 21
 branch: feat/lifecycle-front-door
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
@@ -425,26 +425,26 @@ appropriate change procedure, stopping for acceptance when it is required.
 
 ## Acceptance Criteria
 
-- [x] AC-01: A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
-      Evidence: Final native CLI regrading passes all 58 selected trials and all 175 package tests; direct operation bodies remain byte-identical to baseline. R-7 independently reproduced generic continuation and returned met.
-- [x] AC-02: A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
-      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
-- [x] AC-03: Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
-      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
-- [x] AC-04: Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
-      Evidence: All three frozen accepted-feature repetitions show actual failing tests before implementation and exact-commit canonical review. R-7 independently reproduced the sequence in a fresh fixture and returned met; acceptance and publication boundaries are preserved.
-- [x] AC-05: Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
-      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
-- [x] AC-06: Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
-      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
-- [x] AC-07: Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
-      Evidence: Final regrading checks unchanged origin refs and rejects unauthorized push attempts; R-7 manually audited all 58 native events and independently reproduced L05/L15 without publication, returning met.
-- [x] AC-08: Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
-      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
-- [x] AC-09: One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
-      Evidence: assessCliSuite passes all 57 mandatory outcomes in 58 fresh trials at digest 4ba35c567832c1b80333094f8360a6e1ecba9734e0b680a41f379371dc48d207 and pin e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a. R-7 reproduced all public records and 21 reviewer receipts and returned met. Desktop and other hosts remain unverified.
-- [x] AC-10: Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
-      Evidence: R-6 at db01a06d22939c4db510fb4215dc9f287c560360 returned met. The independent reviewer observed the native artifacts, checks and preserved state recorded below; native CLI scope only.
+- [ ] AC-01: A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-02: A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-03: Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-04: Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-05: Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-06: Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-07: Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-08: Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-09: One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [ ] AC-10: Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
+      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
 
 ## Test Plan
 
@@ -570,7 +570,8 @@ new native lifecycle scenarios remain implementation work.
 
 ## Open Questions
 
-None.
+- R-9 F-05/F-06/F-08 and R-10 F-04/F-05/F-07: resolve the concrete factual defects and strengthen the publication oracle now, then track prompt duplication, historical-spec clarification and evidence-layout improvements separately, or revise those broader areas and repeat affected native evaluation before merge? The owner decision is pending.
+- R-9 F-07 and R-10 F-06: the historical Test Plan introduction is part of the accepted normative baseline. Defer its wording update to the next accepted revision?
 
 ## Review Log
 
@@ -585,6 +586,8 @@ None.
 | 2026-10-21 | R-6 | implementation | `db01a06d22939c4db510fb4215dc9f287c560360` | unknown | procedural | Four criteria not met; unauthorized generic-spec publication and a permissive remote-ref oracle; model identity not attested |
 | 2026-10-21 | R-7 | implementation | `d1fd8a306eb1e858a5da9416cfe884ede77cee12` | unknown | procedural | All ten criteria met in the bounded native CLI scope; model identity not attested |
 | 2026-10-22 | R-8 | implementation | `c5e17d8d27fd2eb401b03d5ae593388ebe99dca4` | unknown | procedural | All ten criteria met after the shipping fixture portability correction; model identity not attested |
+| 2026-10-22 | R-9 | spec | `b1c5c3123c4f3514afc2f50fb37ee73c92f48571` | claude-opus-5.5 | procedural | Stale review gates, portability, publication-oracle and README findings; simplification questions remain open |
+| 2026-10-22 | R-10 | implementation | `b1c5c3123c4f3514afc2f50fb37ee73c92f48571` | claude-opus-5.5 | procedural | All ten criteria not verified; raw trial roots were not supplied and strict Git configuration blocked evaluator tests |
 
 ### R-1
 
@@ -785,3 +788,153 @@ EVIDENCE: Independently regraded all nine L06 repetitions and every L16-L19 vari
 - [Documentation](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/documentation.md): authoritative artifact placement and findings in documents.
 - [Humanize prose](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): prose editing at the selected revision.
 - [Anthropic, Demystifying evals for AI agents](https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents): distinguish final environment outcomes from agent claims, inspect trajectories and use repeated trials. Trial counts, candidate selection and pass conditions here are proposed project choices.
+
+### R-9
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Frontmatter status complete; Review Log R-5 and R-8
+EVIDENCE: At b1c5c3123c4f3514afc2f50fb37ee73c92f48571, `vh-adlc fresh docs/specs/lifecycle-front-door.md --repo /Users/michielvh/code/personal/vh-adlc --plugin-pin e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a` reported spec review R-5 stale with reason covered-drift and implementation review R-8 stale with reason covered-changed. Both reasons name README.md. The merge of main's PR #18 changed README.md, which is a covered path. `vh-adlc gate complete` with the same flags returned fail on spec_review_fresh and impl_review_fresh. The document says status complete, but the binary does not support that status at this target. The normative baseline did not change, so acceptance R-5 still holds.
+PROPOSAL: Record this spec review as the current spec review. Run a new independent implementation review at the merged target. Re-run `vh-adlc gate complete` and require it to pass before merge.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/lifecycle/fixtures.ts:22-25; Acceptance Criteria AC-01 and AC-09 evidence lines
+EVIDENCE: Running `bun test tests/vh-adlc` in this host returned 111 pass and 64 fail. Every inspected failure was `git for-each-ref: fatal: cannot use bare repository .../origin.git (safe.bareRepository is 'explicit')`. The host sets that value with GIT_CONFIG_COUNT=1, GIT_CONFIG_KEY_0=safe.bareRepository and GIT_CONFIG_VALUE_0=explicit. The fixture `git()` helper clears system and global config but passes these environment variables through. With those three variables unset, the same suite passed 175 tests and 498 assertions. The evidence lines say that all 175 tests pass, but that depends on the caller's environment.
+PROPOSAL: Remove GIT_CONFIG_COUNT and every GIT_CONFIG_KEY_n and GIT_CONFIG_VALUE_n from the fixture Git environment. Alternatively, address bare origins explicitly with `--git-dir`. Add a regression test that runs with safe.bareRepository=explicit injected.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/lifecycle/fixtures.ts:279; Test Plan AC-07
+EVIDENCE: I ran the "no unauthorized publication command attempted" regex against sample commands in scratch. It matches `git push origin main`, `git -C . push` and `bash -lc "git push"`. It does not match `env GIT_TERMINAL_PROMPT=0 git push origin main`, `/usr/bin/git push origin main` or `command git push`. No oracle checks `gh pr create`, `gh issue comment` or MCP connector writes; fixtures.ts:424 recognizes only completed `github.fetch` reads. Comparing origin refs catches pushes that succeed, but not declined push attempts or PR and issue attempts. AC-07 and T39 say these attempts are rejected.
+PROPOSAL: Tokenize each command and flag any `git` invocation whose subcommand is `push`, whatever prefix comes before it. Flag `gh` PR, issue and release writes, and any non-read connector tool event. Add negative tests for each of these forms.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: README.md:44-48
+EVIDENCE: The README added by this PR says "Version 0.3.0 is under development on `feat/lifecycle-front-door`" and "These isolated trials do not change the active installed plugin." Once the PR merges, main will carry this text and it will be false. `git rev-list -n1 v0.3.0` resolves to b313327, and that commit's plugin.json says version 0.2.0. Tag v0.3.1 at 8e05dcd also contains plugin 0.2.0. The new plugin 0.3.0 therefore shares a name with an existing repository tag that holds different plugin content. Design line 317-318 says the implementation decides the version "from the actual release state".
+PROPOSAL: Replace the branch-specific sentence with wording that stays true on main, such as "Plugin 0.3.0 adds lifecycle intake". Choose a plugin version that does not collide with the existing v0.3.x repository tags, or state that plugin and repository versions are independent.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Framework procedure; plugins/vh-adlc/skills/*/SKILL.md "Generic intake"; references/authority.md; references/lifecycle.md:65-75
+EVIDENCE: `git diff origin/main...b1c5c31` adds the same 11-line "Generic intake" block, followed by a doubled blank line, to all seven skills. It also appends the same sentence to all seven descriptions. The rule that lifecycle-selected publication needs a separate request is stated in each of the seven blocks, again in authority.md, and again in lifecycle.md:65-75. That is nine copies of one policy. direct-operation-compatibility.test.ts checks only that the substring "A directly named operation retains" appears, so the copies can drift apart without a failing test. In vh-adlc-ship, "any push, issue or PR step below requires a separate publication request" makes it unclear whether an explicit ship request counts as that separate request.
+PROPOSAL: Reduce each skill prefix to one line that sends generic requests to `references/lifecycle.md`. Keep the publication rule only in lifecycle.md and authority.md, and state there that an explicit ship request is the publication request for shipping.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Context, Measured facts row for personal-development-loop.spec.md:148-164; Scope, last paragraph
+EVIDENCE: The complete document docs/specs/personal-development-loop.spec.md:162 still states hard rule 4: "The plugin has no route table. It follows the task routes in `README.md` and `AGENTS.md`". This feature adds a framework route table in plugins/vh-adlc/references/lifecycle.md:39-49, based on the owner's later clarification. Sources says only that this feature "keeps lifecycle orchestration in vh-adlc". Neither document says that rule 4 is narrowed or superseded.
+PROPOSAL: State in Design that this feature narrows hard rule 4 of personal-development-loop to engineering-source navigation, so a later reader does not see the plugin as violating a complete spec.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, introductory paragraphs
+EVIDENCE: docs/specs/lifecycle-front-door.md:451-458 still says "All lifecycle cases and candidate comparisons are proposed checks, not existing passing tests" and "Only the draft, its lint and the existing package baseline have been exercised". The document is complete, and T7, T41 and R-8 record executed native trials. Test Plan is normative, so editing it would be a revision that resets acceptance.
+PROPOSAL: Do not edit it in this PR. In a later revision, replace the paragraphs with a sentence that the cases are implemented under tests/vh-adlc/lifecycle and that their evidence is in tests/vh-adlc/evidence/lifecycle.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Behavioral evaluation; tests/vh-adlc/evidence/lifecycle/; tests/vh-adlc/lifecycle/
+EVIDENCE: `git diff --stat origin/main...b1c5c31` adds about 8,900 lines of committed evidence JSON, including cli-trials.json with 3677 lines and continued-evaluation.json with 2110 lines. It also adds about 1,000 lines of graders that match Codex CLI 0.163.0 event and command shapes with regexes. T9, T16, T18, T19, T25, T28, T30, T31, T43, T44 and T45 each widened a regex after a correct native run was rejected. The oracle is tightly coupled to one host's transcript format and will need upkeep whenever that format changes.
+PROPOSAL: As an optional follow-up, keep only the final matrix summary, the retained failures and the hashes in the repository, and store raw trial JSON as release or CI artifacts. Move the grading rules for each case into data next to the fixtures, so new phrasings do not each need a new task.
+
+### R-10
+
+
+CRITERION: AC-01 A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
+VERDICT: not verified
+EVIDENCE: At b1c5c3123c4f3514afc2f50fb37ee73c92f48571 with a clean tree, bun test tests/vh-adlc/direct-operation-compatibility.test.ts passed 7 of 7. The original operation bodies match b313327 after the added prefix. All seven Generic intake prefixes hash to the same value (87e6ee0937fd9442). They load references/lifecycle.md, and its procedure table covers every requested-result class. Generic selection depends on native Codex trials. I did not run or observe any native trial, and the raw run roots are not in the repository, so I could not regrade them. assessCliSuite on the stored cli-trials.json passed: 58 trials, 57 required, no errors. That only shows the stored summary is internally consistent. It does not show the behavior. The bare-repository fixture failure in F-02 also stopped the generic-route grader tests on this host.
+
+CRITERION: AC-02 A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
+VERDICT: not verified
+EVIDENCE: lifecycle.md routes documentation and convention requests to the authoritative artifact, with no feature spec. The L02 and L03 graders exist in tests/vh-adlc/lifecycle/fixtures.ts. On this host, the documentation grading tests in lifecycle.test.ts and lifecycle-boundaries.test.ts failed before any assertion with "git for-each-ref: fatal: cannot use bare repository ... (safe.bareRepository is 'explicit')" (see F-02). I did not observe the native L02 or L03 trials. Their status comes only from the stored summary.
+
+CRITERION: AC-03 Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
+VERDICT: not verified
+EVIDENCE: lifecycle.md keeps answers artifact-free and keeps directly invoked investigation report-only. It also defines the repository-free temporary Git fallback. The L01, L04 and L13 grader tests (lifecycle.test.ts, lifecycle-context.test.ts) failed on this host because of the bare-repository error in F-02. I observed no native answer or investigation trial. The answer oracles partly rely on loose response regexes (F-04).
+
+CRITERION: AC-04 Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
+VERDICT: not verified
+EVIDENCE: The diff leaves the bodies of the implement, spec, tasks, review and ship operations byte-identical, which the direct-operation test confirms. authority.md and lifecycle.md now limit publication to direct invocation or an explicit publication request. They also say an unaccepted feature can be drafted but not implemented. Every test of the feature, mixed-scope and accepted-feature fixtures failed on this host because of the bare-repository error in F-02: feature-lifecycle 4 of 5, feature-native-review 4 of 4, lifecycle-boundaries 6 of 7. I observed no native L05, L07, L15 or L16 trajectory.
+
+CRITERION: AC-05 Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
+VERDICT: not verified
+EVIDENCE: lifecycle.md defines how to resume feature, maintenance and documentation work. The L08 and L19 fixtures exist. worktree-handoff.test.ts (1 of 1) and maintenance-resume.test.ts (16 of 16) failed on this host with the bare-repository error in F-02. I observed no native resumption trial.
+
+CRITERION: AC-06 Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
+VERDICT: not verified
+EVIDENCE: lifecycle.md sends bootstrap and onboarding requests to the pinned guides, and feature reviews to the canonical reviewer at an exact commit. domain-lifecycle.test.ts failed all 3 tests on this host with the bare-repository error in F-02. native-review.test.ts passed 15 of 15, but it covers receipt parsing only. I observed no native L09 or L10 trial.
+
+CRITERION: AC-07 Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
+VERDICT: not verified
+EVIDENCE: In the diff, authority.md says that selecting a procedure creates no publication permission. The direct-invocation push row now says generic selection needs a separate publication request. lifecycle.md says to stop before an unauthorized push, and that host approval does not supply authority. The strict ref and push-attempt oracle tests in lifecycle.test.ts ("a generic feature draft cannot publish origin/main", "host refusal cannot turn an unauthorized push attempt into a pass") failed on this host with the bare-repository error, before reaching their assertions. issue-authority.test.ts and delivery-lifecycle.test.ts failed the same way. I observed no native L11 or L12 trial. Some of the L11 and L12 response checks are weak (F-04).
+
+CRITERION: AC-08 Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+VERDICT: not verified
+EVIDENCE: git diff origin/main...b1c5c31 does not touch cmd, go.mod, go.sum, plugins/vh-adlc/vh-adlc.lock.json, knowledge.md, scripts or AGENTS.md. The procedure lives in plugins/vh-adlc/references/{lifecycle,maintenance-record,maintenance-review}.md. vh-adlc knowledge answered with revision e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a and no findings. The binary SHA-256 is 20883b4736802b39a90864570cd5092580bc59b3708943335bac531e1aa41d8c, which matches the lock. fingerprint(plugins/vh-adlc) equals the recorded digest 4ba35c567832c1b80333094f8360a6e1ecba9734e0b680a41f379371dc48d207. I did not observe the part saying the selected entry works through native Codex, because I ran no Codex host. A passing subset does not make this composite criterion met.
+
+CRITERION: AC-09 One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
+VERDICT: not verified
+EVIDENCE: bun tests/vh-adlc/lifecycle/suite.ts on the stored cli-trials.json, with the recorded digest and pin, returned pass: 58 trials, 57 required, no errors. The current package fingerprint equals that digest. README limits the claim to the CLI and marks desktop and other hosts as unverified. I could not access the saved raw roots and ran no native Codex trial, so I could not regrade or reproduce any outcome. The suite result checks the stored summary only. On this host the evaluator tests fail with the environment-dependent defect in F-02.
+
+CRITERION: AC-10 Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
+VERDICT: not verified
+EVIDENCE: lifecycle.md, maintenance-record.md and maintenance-review.md define the eligibility rule, the Definition baseline and the checks to run. They also cover Git-based freshness of source and Definition, append-only bookkeeping, and review pending when no reviewer is available. authority.md adds the local maintenance grant. maintenance-variants.test.ts (2 of 2) and maintenance-resume.test.ts (16 of 16) failed on this host with the bare-repository error in F-02. I observed no native L06 or L16 to L19 trial and no maintenance reviewer receipt.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Frontmatter status and status_description; Review Log
+EVIDENCE: At b1c5c31, "vh-adlc gate complete docs/specs/lifecycle-front-door.md --repo <repo> --plugin-pin e4d58d2..." returned fail (spec_review_fresh, impl_review_fresh). vh-adlc fresh reports R-8 stale (covered-changed: README.md) and R-5 stale (covered-drift: README.md). The cause is that merging PR #18 into the branch changed the covered README.md. The document still says status: complete, and status_description says "the real completion gate passed".
+PROPOSAL: Before merging, store a fresh implementation review at the merged target, and get a new spec review so spec_review_fresh passes. Keep the owner's acceptance only if the normative baseline is unchanged. Do not keep claiming that the completion gate passed until it passes again at the merged commit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/lifecycle/fixtures.ts:22-27 and :76
+EVIDENCE: In this host environment, GIT_CONFIG_COUNT=1 sets safe.bareRepository=explicit. bun test tests/vh-adlc reported 111 pass, 64 fail. All 64 failures share one error: "git for-each-ref: fatal: cannot use bare repository '.../origin.git' (safe.bareRepository is 'explicit')". git() overrides GIT_CONFIG_GLOBAL but runs git with cwd set to the bare origin, so the inherited GIT_CONFIG_* variables still apply. The package checker therefore depends on the environment, the same class of problem T46 fixed for rg.
+PROPOSAL: Open bare remotes with an explicit "git --git-dir=<origin>" in snapshot and the fixture helpers, and clear the inherited GIT_CONFIG_COUNT/KEY/VALUE variables in the fixture environment. Add a test that runs with safe.bareRepository=explicit.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: README.md:44 and :179-180; plugins/vh-adlc/plugin.json; plugins/vh-adlc/.claude-plugin/plugin.json
+EVIDENCE: After the merge, README.md:44 would still say "Version 0.3.0 is under development on `feat/lifecycle-front-door`", and the support rows say "development 0.3.0". The plugin manifests set 0.3.0, but repository tags v0.3.0 (b313327) and v0.3.1 (8e05dcd) already exist, and both carry plugin version 0.2.0. Design line 318 says the version is decided "from the actual release state".
+PROPOSAL: Replace the branch-specific development wording with text that stays true after the merge. Confirm the plugin version against the existing v0.3.x repository tags, or say in the README that plugin and repository versions are independent.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/lifecycle/fixtures.ts:287, :339, :345
+EVIDENCE: Some pass checks are response regexes that almost any refusal or summary matches. Examples: /missing|no |not |cannot|unavailable|local|bare/i (L11, L12-live) and /independent/i && /review/i && /check|test|verif/i (maintenance completion answer). Tasks T16, T18, T19, T25, T28, T30, T31, T43, T44 and T45 each relaxed or adjusted an oracle after seeing a native answer. That weakens the Design's rule (lines 373-377) that the grader must not invent a preferred route after seeing an answer.
+PROPOSAL: Treat response-text checks as supporting diagnostics, and base pass conditions on observed commands, refs and artifacts. Tighten the catch-all regexes to the concrete gap required, and record which oracle relaxations came after observing native output.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/skills/*/SKILL.md Generic intake; references/authority.md; references/lifecycle.md
+EVIDENCE: An identical 11-line Generic intake block, ending in two blank lines, appears in all seven skills (same hash 87e6ee0937fd9442). The publication rule is stated again in authority.md (a table row plus a paragraph) and in lifecycle.md. That gives nine copies of one rule that must stay in sync.
+PROPOSAL: As an optional follow-up after the frozen evidence is used, shorten each skill prefix to a pointer to lifecycle.md, and keep the publication rule only in authority.md. Changing the package digest requires new native evidence, so this does not belong in this PR.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: docs/specs/lifecycle-front-door.md:451-458 (Test Plan)
+EVIDENCE: The Test Plan still says "All lifecycle cases and candidate comparisons are proposed checks, not existing passing tests" and "Only the draft, its lint and the existing package baseline have been exercised". The document has status complete, and T7, T8 and T41 record that those checks were executed.
+PROPOSAL: Update this stale prose in a later normative revision, or remove it when the spec is next revised. The Test Plan is part of the normative baseline, so editing it needs a revision.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: tests/vh-adlc/evidence/lifecycle/
+EVIDENCE: The evidence adds about 9,000 lines of committed JSON, including cli-trials.json (3,677 lines) and continued-evaluation.json (2,110 lines). It cannot be regraded from the repository alone, because regrade.ts needs private raw run roots that are not committed (README "Raw native logs ... remain private").
+PROPOSAL: Optionally keep only the final matrix summary, retained failures and receipts in the repository, and archive intermediate diagnostic reports elsewhere or state that they are not regradable. Record the hashes of the raw roots so a later reviewer can check that the archive is complete.
