@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "First review recorded; live Claude target needs confirmation before a fresh review and acceptance."
+status_description: "First review recorded; Remote Control target confirmed; revised spec review and acceptance pending."
 issue: null
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
 covers:
@@ -120,6 +120,27 @@ installer verifies. Exercise interrupted downloads and invalid cached driver/bro
 Go binary alone does not prove a usable installation. `gh release list --repo michielvha/auth-refresh`
 returned an empty array on 2026-10-22, so release availability remains a delivery prerequisite.
 
+### Required acceptance matrix
+
+The owner confirmed Claude Remote Control sessions through the phone app on 2026-10-22.
+The required live targets are this Codex desktop/Fedora host and that Claude Remote Control flow.
+Phone push delivery and continuation must pass on Remote Control; chat text alone is not equivalent.
+
+| Target | Required installation routes | Required proof |
+| --- | --- | --- |
+| Codex desktop on this Fedora host | Standalone and vhco-tools auth-refresh plugin | Discovery and live provider matrix below; interactive MFA displayed immediately |
+| Claude Remote Control through the phone app | Standalone and vhco-tools auth-refresh plugin | Discovery, live provider matrix, phone notification arrival, one-tap MFA and continuation |
+| Isolated Codex CLI profile | Standalone and vhco-tools auth-refresh plugin | Native install, discovery, read-only invocation, update and uninstall |
+| Isolated Claude CLI profile | Standalone and vhco-tools auth-refresh plugin | Native install, discovery, old-agent compatibility, update and uninstall |
+| VS Code Local profile | Standalone and vhco-tools auth-refresh plugin | Native install, discovery, read-only invocation, update and uninstall |
+
+For each required live target, test AWS cold login, warm reuse and STS for all configured profiles;
+Azure device-code login and token validation; Okta admin and normal-lane login, save/restart and
+expected-account verification; AKS/EKS read-only identity; configured GitHub account status without
+account switching; registry manifest access; PAT/Sonar token validation and manual-renewal reporting;
+and service-health outage reporting without login dispatch. Missing host inputs leave their rows
+open. No required target is removed during implementation to narrow the claimed support set.
+
 ## Acceptance Criteria
 
 - [ ] AC-01: Auth-refresh installs and is discoverable as a separate plugin from vhco-tools and directly from its own repository on each claimed harness, without installing vh-adlc or requiring a source checkout.
@@ -150,28 +171,7 @@ None yet; populate after independent review and owner acceptance.
 
 ## Open Questions
 
-### Q1: Which Claude surface must pass the live phone-notification acceptance test?
-
-**Recommendation:** Keep this Codex desktop/Fedora host and the owner's existing Claude daily-use
-surface as mandatory live targets. Confirm whether that surface is remote control, desktop or another
-client. Use isolated profiles for standalone and shared-marketplace install/discovery on Codex CLI,
-Claude CLI and VS Code Local. No missing target is removed from the matrix during implementation.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Current Codex host and daily Claude surface** | Live proof of both workflows the owner uses | Access to the Claude surface and phone confirmation |
-| B. Add further live surfaces now | Live acceptance for more clients or operating systems | A named accessible host and phone test for each |
-
-**Why this is yours:** Only the owner can name which daily-use surface must retain its existing phone
-experience. Unsupported targets cannot be substituted silently.
-
-For each required live host, freeze these provider operations in the accepted matrix: AWS cold login,
-warm reuse and STS for all configured profiles; Azure device-code login and token validation; Okta admin
-and normal-lane login, save/restart and expected-account verification; AKS/EKS read-only identity;
-configured GitHub account status without account switching; registry manifest access; PAT/Sonar token
-validation and manual-renewal reporting; service-health outage reporting without login dispatch.
-Both installation routes and Claude's phone delivery are separate required rows. Missing host inputs
-leave their rows open, rather than redefining the claimed support set.
+None. The live Claude target is Remote Control through the phone app.
 
 ## Review Log
 
