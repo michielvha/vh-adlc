@@ -69,6 +69,8 @@ default-branch push does not apply without a separate publication request.
 Likewise, stop before an implementation claim that requires a push when that
 push is not authorized. Report the ready local artifact and the exact remaining
 boundary; do not attempt publication and rely on host approval to reject it.
+An explicit request to ship the feature is the publication request for that
+shipping operation, whether intake selects it or the owner names the skill.
 Directly invoking a named operation retains the publication authority its
 existing contract grants. This distinction changes no acceptance, branch,
 review or completion gate, and grants no merge, release or live-operation

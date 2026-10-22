@@ -16,7 +16,7 @@ additional execution or publication permission.
 | Edit, check, record and commit eligible bounded maintenance locally | The owner's explicit maintenance request, eligibility under `references/lifecycle.md`, and local instructions that permit it |
 | Complete a maintenance task locally | Observed required checks, a current independent maintenance review with no open findings, and preserved task scope |
 | Create a tracking issue | Included in acceptance, or requested |
-| Push the feature branch, create or update its PR, update the linked issue | An explicit ship request |
+| Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
 | Merge, tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action |
 | Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
 | Another repository, account or feature | A new scope decision |
