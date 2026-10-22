@@ -85,11 +85,10 @@ runtime code. `bun test tests/auth-refresh/probe-contract.test.ts` now passes al
 
 In-progress component changes add native standalone marketplace metadata and a shared skill, retain
 Claude's PushNotification/background sequence in the canonical workflow, and replace the 20 KB
-session-size rule with identity and restore checks. Both native standalone install tests pass in
-isolated Codex and Claude profiles. Shared-marketplace install tests remain red until integration.
+session-size rule with identity and restore checks. At that intermediate stage, both native standalone install tests passed in
+isolated Codex and Claude profiles; shared-marketplace tests still awaited integration.
 The unverified-driver execution test now passes: startup checks pinned file hashes before execution.
-Fresh verified-archive setup and doctor both passed in disposable caches. These component changes
-still require committed review targets and final regression checks before their criteria can close.
+Fresh verified-archive setup and doctor both passed in disposable caches. The final committed validation and remaining acceptance gaps are recorded below.
 
 The release lock deliberately has no version or digests while no runtime release exists. Its installer
 fails with a provisioning-pending error rather than compiling a replacement or inventing an artifact.
@@ -101,13 +100,14 @@ they remain open rather than being counted as fixture coverage.
 
 The pinned component is `a00c6001d6c448479fb851729a9a7d9147a9f814`. Both shared catalog formats
 reference that exact commit. Independent R-5 executed the review reproducers and found the three
-blocking code defects resolved. Unknown GitHub output and AWS permission failures now warn without
+blocking code defects resolved. R-6 reviewed the final component and marketplace commits, found no
+new actionable defects, and confirmed AC-05 while leaving composite acceptance criteria open. Unknown GitHub output and AWS permission failures now warn without
 login fixes; HTTP probes also reject incomplete responses and distinguish empty/unreadable files.
 The canonical workflow's explicit verified-binary function survives env PATH changes and background
 invocation, with an executed shell regression. Its legacy entry point retains the previous installed
 binary fallback and the Claude PushNotification/number/watcher sequence.
 
-`bun test tests/auth-refresh tests/vh-adlc` passed 85/85 tests; the later lifecycle extension adds private-state preservation assertions. The full component
+`bun test tests/auth-refresh tests/vh-adlc` passed 85/85 tests with 325 assertions, including lifecycle private-state preservation. The full component
 Go suite with `AUTH_REFRESH_E2E=1`, vet, module checks, golangci-lint, actionlint and five Python
 installer/workflow tests passed. Fresh verified setup and doctor passed; the existing genuine cache
 passed verification, while the inert replacement driver was rejected before execution.
@@ -252,7 +252,7 @@ open. No required target is removed during implementation to narrow the claimed 
 - [ ] AC-03: Claude's existing MFA phone push, immediate number delivery, background continuation and post-MFA confirmation complete a real login with the same user interaction as before.
 - [ ] AC-04: Other required harnesses complete the shared workflow using available capabilities; missing required notification capabilities stop unattended authentication before a challenge, and delivery failures during a challenge are reported immediately, park the challenge and suppress further pushes.
 - [x] AC-05: All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
-      Evidence: R-5 at component `fda67f43feadcaa9e4482c110dac6d91ba91fd4f`, full Go and independent probe suites plus reviewer fixtures passed; real-provider matrix remains open under AC-07.
+      Evidence: R-5 and R-6; final component `a00c6001d6c448479fb851729a9a7d9147a9f814` provider regressions and independent reviewer fixtures passed. Full Go and independent probe suites passed; real-provider matrix remains open under AC-07.
 - [ ] AC-06: A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
 - [ ] AC-07: Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
 - [ ] AC-08: Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
@@ -299,6 +299,8 @@ None. The live Claude target is Remote Control through the phone app.
 | 2026-10-22 | R-3 | spec | `f3ea3bb5373572683856e832b92e52725590258e` | n/a | n/a | accepted by owner |
 | 2026-10-22 | R-4 | implementation | `f3ea3bb5373572683856e832b92e52725590258e` | unknown | procedural | Diagnostic review at runtime b2fca51 found three blockers; required live tests remain unverified. |
 | 2026-10-22 | R-5 | implementation | `11cb22c99de97d50d30e54fcebf87c69504bfcf3` | unknown | procedural | Focused re-review at runtime fda67f4 resolved all three code blockers; AC-05 met, other composite criteria unverified. |
+
+| 2026-10-22 | R-6 | implementation | `ee31174e8eafcbeda232d9274bbaf790f706309f` | unknown | procedural | Final focused review at runtime a00c600 found no new actionable defects; AC-05 met, composite criteria remain unverified. |
 
 ### R-1
 
@@ -419,6 +421,40 @@ EVIDENCE: At runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f, the complete Go s
 CRITERION: AC-08 Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
 VERDICT: not verified
 EVIDENCE: The disposable native installation tests passed at marketplace 11cb22c99de97d50d30e54fcebf87c69504bfcf3 and runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f. Inspection confirms the independent Claude entry point retains its tools and ambient installed-binary fallback. Actual legacy invocation and the full update, uninstall and rollback procedure with private-state preservation remain unverified.
+
+### R-6
+
+CRITERION: AC-01 Auth-refresh installs and is discoverable as a separate plugin from vhco-tools and directly from its own repository on each claimed harness, without installing vh-adlc or requiring a source checkout.
+VERDICT: not verified
+EVIDENCE: `bun test tests/auth-refresh/package-contract.test.ts` at marketplace ee31174e8eafcbeda232d9274bbaf790f706309f with runtime a00c6001d6c448479fb851729a9a7d9147a9f814 passed all seven tests and 42 assertions, including both native installation routes in disposable Codex and Claude profiles. Required VS Code Local, Codex desktop and Claude Remote Control acceptance executions and published installation without a checkout remain unverified.
+
+CRITERION: AC-02 Both install routes load the same canonical workflow and a verified pinned runtime; corrupt downloads, missing artifacts and unsupported platforms fail before executable code runs.
+VERDICT: not verified
+EVIDENCE: At runtime a00c6001d6c448479fb851729a9a7d9147a9f814, four Python installer tests and the verified-path workflow shell test passed. Additional no-network downloader fixtures verified rejection of invalid schemes, embedded credentials and missing hostnames before subprocess execution, bounded curl arguments, staged artifact reading, nonzero-exit rejection and timeout propagation. Source inspection retains archive and binary verification before execution. The release lock intentionally remains unpopulated; published provisioning and the complete provisioning failure matrix remain unverified.
+
+CRITERION: AC-03 Claude's existing MFA phone push, immediate number delivery, background continuation and post-MFA confirmation complete a real login with the same user interaction as before.
+VERDICT: not verified
+EVIDENCE: Inspected the unchanged legacy agent and shared notification workflow at runtime a00c6001d6c448479fb851729a9a7d9147a9f814. PushNotification, immediate number delivery and the bounded Azure confirmation watcher remain documented. Actual phone arrival and Remote Control continuation were not executed, as explicitly deferred by the owner.
+
+CRITERION: AC-04 Other required harnesses complete the shared workflow using available capabilities; missing required notification capabilities stop unattended authentication before a challenge, and delivery failures during a challenge are reported immediately, park the challenge and suppress further pushes.
+VERDICT: not verified
+EVIDENCE: Inspected the capability reference and verified bootstrap at runtime a00c6001d6c448479fb851729a9a7d9147a9f814. Capability checks, interactive continuation and delivery-failure cleanup remain specified. Required native-host notification failures, challenge parking and post-approval continuation were not executed and remain unverified.
+
+CRITERION: AC-05 All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
+VERDICT: met
+EVIDENCE: `go test -count=1 -v ./internal/check` at runtime a00c6001d6c448479fb851729a9a7d9147a9f814 passed all provider, HTTP, token-file and AWS-cache tests. Executed cache cases distinguish absent or expired credentials from malformed metadata, foreign start URLs and unreadable expiry values; warning results offer no fix. The prior AWS permission and GitHub permission/unknown-output regressions and incomplete HTTP response regression also pass. Source inspection confirms manual tokens remain manual. This establishes tested classification behavior, not real-provider acceptance.
+
+CRITERION: AC-06 A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
+VERDICT: not verified
+EVIDENCE: The lane implementation and browser tests are unchanged from runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f, where this reviewer observed `AUTH_REFRESH_E2E=1 go test -count=1 ./...` pass every package, including real-browser lane tests. Those tests were not rerun in this focused review of a00c6001d6c448479fb851729a9a7d9147a9f814. Real IdP restoration and cessation of actual abandoned phone pushes remain unverified.
+
+CRITERION: AC-07 Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
+VERDICT: not verified
+EVIDENCE: The focused provider suite passed at runtime a00c6001d6c448479fb851729a9a7d9147a9f814. This review did not execute the live-provider acceptance matrix. The earlier full Go and browser suite at fda67f43feadcaa9e4482c110dac6d91ba91fd4f and current fixture results do not establish real-provider success on the required hosts.
+
+CRITERION: AC-08 Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
+VERDICT: not verified
+EVIDENCE: At marketplace ee31174e8eafcbeda232d9274bbaf790f706309f and runtime a00c6001d6c448479fb851729a9a7d9147a9f814, native lifecycle tests passed standalone and shared-marketplace installation, local refresh or update, and uninstall in disposable Codex and Claude profiles. Sentinel config and credential contents and restrictive credential permissions survived. Codex re-adds the local fixture rather than testing a published Git marketplace upgrade. Actual legacy invocation and the documented rollback procedure remain unverified.
 
 ## Sources
 
