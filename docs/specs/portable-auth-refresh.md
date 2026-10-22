@@ -92,7 +92,8 @@ Fresh verified-archive setup and doctor both passed in disposable caches. The fi
 
 The release lock deliberately has no version or digests while no runtime release exists. Its installer
 fails with a provisioning-pending error rather than compiling a replacement or inventing an artifact.
-The owner has not authorized publication or cutover. Real phone delivery and Remote Control continuation
+Publication was not authorized during the initial implementation; the release authorization below
+supersedes that limit. Daily-use cutover remains unauthorized. Real phone delivery and Remote Control continuation
 remain unverified. The owner explicitly deferred them on 2026-10-22 to another host that has the flow;
 they remain open rather than being counted as fixture coverage.
 
@@ -132,7 +133,7 @@ normal missing-login error. The informational metadata cache on this host was re
 versions, preserving a private backup and leaving authentication caches untouched; the existing
 credential request still timed out, so Azure live login remains unverified.
 
-Migration is blocked by:
+Initial migration blockers before release authorization:
 
 - Publication of the pinned component and marketplace commits and a verified runtime release. The
   committed runtime lock remains intentionally empty; invoking the new release-backed skill reports
@@ -146,6 +147,28 @@ Migration is blocked by:
   result is counted as phone delivery.
 - Race testing on a host with a C compiler. The verified browser archive lock currently covers Linux
   amd64 only; other browser platforms fail explicitly until separately pinned and tested.
+
+
+### Remote release and install validation, 2026-10-22
+
+The owner authorized pushing the changes and publishing a verified runtime release to test actual
+marketplace installation. Phone delivery and Remote Control continuation remain deferred. This
+instruction authorizes publication, not merging the feature PRs or switching the daily-use setup.
+
+Remote inspection found auth-refresh is private and has no `PGP_PRIVATE_KEY` repository secret;
+the configured signed release workflow cannot yet run. This host has only a Git Credential Manager
+secret key, which is not a release signing identity. The owner was asked to identify the existing
+release key or authorize checksum-only test artifacts. No new signing identity was generated.
+
+The bootstrap now supports authenticated `gh release download` after a failed anonymous GitHub
+release download, while retaining both pinned archive and binary hashes and bounded subprocesses.
+The additional private-access tests pass, along with the prior checksum and workflow regressions
+(eight Python tests total). The candidate runtime/plugin version is `0.2.0-rc.1`.
+
+Both remote default branches were refreshed before publication. Marketplace main gained unrelated
+CI/release updates, merged without changing their behavior. Auth-refresh main was rewritten with
+identical baseline files; `git diff ceaea336fd14e3e270f49cedcb72e89f9e5243fd origin/main`
+was empty. The feature changes remain intact.
 
 ## Scope
 
