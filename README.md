@@ -209,22 +209,33 @@ The [shared release design](https://github.com/vhco-pro/docs) composes
 `michielvha/go-ci-action`, `michielvha/gitversion-tag-action`, and the release-only
 `michielvha/goreleaser-action`, each pinned to its reviewed implementation.
 
-PR CI and tagged releases use the same Go CI action. The **Version** workflow
-calls the GitVersion action directly. PRs calculate a version without pushing
-tags. A manual run defaults to dry-run; disabling it on a trusted feature branch
-creates its prerelease tag. A main-branch run selects a stable version.
-Exact tag pushes start the shared Go CI and release workflow.
+Every branch push runs **CI**: the Go CI action plus the Linux and macOS plugin
+checks. A PR shows those checks on its head commit; there is no separate PR run.
+When every check passes, CI calls the shared GitVersion workflow:
 
-This repository is the first binary-only rollout pilot. The Version workflow
-automatically tags main-branch changes that select a new version; it is not a
-dry-run-only workflow. Artifact publication still starts from the tag event.
+| Branch | GitVersion |
+| --- | --- |
+| `main` | Pushes the exact stable tag when the version is new |
+| Feature branch with an open `release:preview` PR at this commit | Pushes the exact prerelease tag |
+| Any other feature branch | Calculates the version only |
+
+A writer adds `release:preview` once; every later push to that PR gets a
+prerelease until the label is removed or the PR closes. Adding the label reruns
+CI on the branch, so the current head gets a prerelease without a new push.
+Fork PRs do not run this workflow.
+
+CI runs on the branch rather than the PR merge ref, so GitVersion sees the real
+branch and its configuration decides the version. Only the exact tag push starts
+the shared Go CI and release workflow, which builds, signs and publishes.
 
 Automated tagging uses the reusable `michielvha-repo-write` GitHub App, installed
 on the owner's repositories. Each tagging job requests a short-lived token for
 this repository only, with Contents: write. Its `RELEASE_APP_CLIENT_ID` repository
 variable and `RELEASE_APP_PRIVATE_KEY` secret configure that identity;
-`PGP_PRIVATE_KEY` signs artifacts. PR preview jobs receive none of these
-credentials. Do not grant the App key to untrusted code.
+`PGP_PRIVATE_KEY` signs artifacts. Check jobs receive none
+of these credentials. Only eligible versioning receives a repository-scoped
+tag token, and only tag-triggered publication receives the signing key.
+Do not grant the App key to untrusted code.
 
 No cleanup is enabled. Re-run the original tag workflow for a transient failure;
 inspect a partial release before retrying. GoReleaser's configuration forbids

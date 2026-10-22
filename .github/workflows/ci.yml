@@ -1,12 +1,16 @@
 name: CI
 
 on:
-  pull_request:
   push:
-    branches: [main]
+    branches: ['**']
+  workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   verify:
@@ -15,7 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: michielvha/go-ci-action@bc485542c70d6cf51da9642c632ef268571597db # main
+      - uses: michielvha/go-ci-action@ab14d6420148179e8d20ecc0b7cb89760193cb37 # v0.1.0
 
   checker:
     runs-on: ubuntu-latest
@@ -23,6 +27,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.3
@@ -35,8 +40,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.3
       - name: Check the vh-adlc package
         run: bun test tests/vh-adlc
+
+  # Tags main, and a branch whose open PR has the release:preview label at this
+  # commit. Every other run only calculates the version.
+  version:
+    needs: [verify, checker, checker-macos]
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: vhco-pro/version-workflow/.github/workflows/version.yml@3b78b04df802ea1592cbe19338d7a882d1888389 # v0.1.0
+    with:
+      release-app-client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+    secrets:
+      release-app-private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
