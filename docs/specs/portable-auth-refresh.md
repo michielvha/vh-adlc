@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 status_description: "Coverage revision reviewed; component review fixes and final regression checks are in progress."
 issue: null
 branch: feat/portable-auth-refresh
