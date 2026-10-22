@@ -6,6 +6,8 @@ import { pathToFileURL } from "node:url";
 
 const source = realpathSync(process.env.AUTH_REFRESH_SOURCE ?? resolve(import.meta.dir, "../../../auth-refresh"));
 const marketplace = resolve(import.meta.dir, "../..");
+const remote = process.env.AUTH_REFRESH_REMOTE_ACCEPTANCE === "1";
+const remoteRef = process.env.AUTH_REFRESH_MARKETPLACE_REF ?? "feat/portable-auth-refresh";
 
 test("both marketplaces pin the same canonical component commit", () => {
   const entries = [".agents/plugins/marketplace.json", ".claude-plugin/marketplace.json"].map((path) =>
@@ -50,17 +52,23 @@ describe("native installs in isolated profiles", () => {
             DISABLE_AUTOUPDATER: "1",
             AUTH_REFRESH_CONFIG: privateConfig,
             AUTH_REFRESH_HOME: join(scratch, "lane-state"),
+            XDG_CACHE_HOME: join(scratch, "cache"),
           };
           // Test the real source selectors and exact Git commit before publication.
           // Only this child process remaps the remote to the canonical local Git repo.
-          const count = Number(process.env.GIT_CONFIG_COUNT ?? "0");
-          Object.assign(env, {
-            GIT_CONFIG_COUNT: String(count + 1),
-            [`GIT_CONFIG_KEY_${count}`]: `url.${pathToFileURL(source).href}.insteadOf`,
-            [`GIT_CONFIG_VALUE_${count}`]: "https://github.com/michielvha/auth-refresh.git",
-          });
-          const add = Bun.spawnSync([client, "plugin", "marketplace", "add", directory], {
-            env, stdout: "pipe", stderr: "pipe", timeout: 25_000,
+          if (!remote) {
+            const count = Number(process.env.GIT_CONFIG_COUNT ?? "0");
+            Object.assign(env, {
+              GIT_CONFIG_COUNT: String(count + 1),
+              [`GIT_CONFIG_KEY_${count}`]: `url.${pathToFileURL(source).href}.insteadOf`,
+              [`GIT_CONFIG_VALUE_${count}`]: "https://github.com/michielvha/auth-refresh.git",
+            });
+          }
+          const repo = route === "standalone" ? "michielvha/auth-refresh" : "michielvha/vh-adlc";
+          const selector = remote ? (client === "codex" ? repo : `https://github.com/${repo}.git#${remoteRef}`) : directory;
+          const add = Bun.spawnSync([client, "plugin", "marketplace", "add", selector,
+            ...(remote && client === "codex" ? ["--ref", remoteRef] : [])], {
+            env, stdout: "pipe", stderr: "pipe", timeout: 90_000,
           });
           const added = `${add.stdout.toString()}${add.stderr.toString()}`;
           expect(add.exitCode, `marketplace add failed: ${added}`).toBe(0);
@@ -71,17 +79,34 @@ describe("native installs in isolated profiles", () => {
           expect(catalog, "installed marketplace metadata is missing").toBeDefined();
           const name = JSON.parse(readFileSync(catalog!, "utf8")).name;
           const install = Bun.spawnSync([client, "plugin", client === "codex" ? "add" : "install", `auth-refresh@${name}`], {
-            env, stdout: "pipe", stderr: "pipe", timeout: 25_000,
+            env, stdout: "pipe", stderr: "pipe", timeout: 90_000,
           });
           expect(install.exitCode, `${install.stdout.toString()}${install.stderr.toString()}`).toBe(0);
+          if (remote) {
+            const paths = Bun.spawnSync(["rg", "--files", "--hidden", scratch, "-g", "ensure-auth-refresh.sh"]);
+            const installer = paths.stdout.toString().trim().split("\n").find((path) => path.includes("/plugins/cache/"));
+            expect(installer, "installed plugin bootstrap is missing").toBeDefined();
+            const provision = Bun.spawnSync(["bash", installer!], { env, stdout: "pipe", stderr: "pipe", timeout: 150_000 });
+            expect(provision.exitCode, provision.stderr.toString()).toBe(0);
+            const binary = provision.stdout.toString().trim();
+            expect(binary.startsWith(join(scratch, "cache/auth-refresh/bin/"))).toBe(true);
+            const lock = JSON.parse(readFileSync(join(source, "auth-refresh.lock.json"), "utf8"));
+            const version = Bun.spawnSync([binary, "version"], { env, stdout: "pipe", stderr: "pipe" });
+            expect(version.exitCode).toBe(0);
+            expect(version.stdout.toString().trim()).toBe(`auth-refresh ${lock.version}`);
+            const reuse = Bun.spawnSync(["bash", installer!], { env, stdout: "pipe", stderr: "pipe", timeout: 20_000 });
+            expect(reuse.exitCode, reuse.stderr.toString()).toBe(0);
+            expect(reuse.stdout.toString().trim()).toBe(binary);
+          }
           for (const command of [
             // Codex's upgrade command applies to Git marketplaces, not these local
             // directory fixtures. Re-adding below refreshes its local plugin copy.
+            ...(remote && client === "codex" ? [[client, "plugin", "marketplace", "upgrade", name]] : []),
             ...(client === "claude" ? [[client, "plugin", "marketplace", "update", name]] : []),
             [client, "plugin", client === "codex" ? "add" : "update", `auth-refresh@${name}`],
             [client, "plugin", client === "codex" ? "remove" : "uninstall", `auth-refresh@${name}`],
           ]) {
-            const result = Bun.spawnSync(command, { env, stdout: "pipe", stderr: "pipe", timeout: 25_000 });
+            const result = Bun.spawnSync(command, { env, stdout: "pipe", stderr: "pipe", timeout: 90_000 });
             expect(result.exitCode, `${command.join(" ")}: ${result.stdout.toString()}${result.stderr.toString()}`).toBe(0);
           }
           expect(readFileSync(privateConfig, "utf8")).toBe('{"sentinel":"preserve"}\n');
@@ -90,7 +115,7 @@ describe("native installs in isolated profiles", () => {
         } finally {
           rmSync(scratch, { recursive: true, force: true });
         }
-      }, 150_000);
+      }, remote ? 420_000 : 150_000);
     }
   }
 });

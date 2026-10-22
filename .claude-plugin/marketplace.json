@@ -19,7 +19,7 @@
       "source": {
         "source": "url",
         "url": "https://github.com/michielvha/auth-refresh.git",
-        "sha": "a00c6001d6c448479fb851729a9a7d9147a9f814"
+        "sha": "513b7cc137a9414aed9716ab5e2da46b236ac474"
       },
       "description": "Check and restore local SSO identities with isolated account lanes and Claude phone notifications."
     }
