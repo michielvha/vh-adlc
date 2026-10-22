@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Initial acceptance tests reproduce provider and packaging failures; runtime fixes and live prerequisites remain."
+status: draft
+status_description: "Revising covered paths for the existing marketplace checker; accepted behavior is unchanged."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
