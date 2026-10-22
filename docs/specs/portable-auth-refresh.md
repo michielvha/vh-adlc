@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Code review fixes complete and local suites pass; publication and required host acceptance remain open."
+status_description: "Feature branches published and remote plugin installs pass; runtime release signing and host acceptance remain open."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -169,6 +169,30 @@ Both remote default branches were refreshed before publication. Marketplace main
 CI/release updates, merged without changing their behavior. Auth-refresh main was rewritten with
 identical baseline files; `git diff ceaea336fd14e3e270f49cedcb72e89f9e5243fd origin/main`
 was empty. The feature changes remain intact.
+
+
+Published review targets are component `513b7cc137a9414aed9716ab5e2da46b236ac474` and marketplace
+`30f1e9ef63982d9f9fab4aa13b4218185d2ae6d1`, both on `feat/portable-auth-refresh`. Draft PRs are
+[auth-refresh #6](https://github.com/michielvha/auth-refresh/pull/6) and
+[vh-adlc #24](https://github.com/michielvha/vh-adlc/pull/24); neither was merged. A focused independent
+review of the component's private-download change found no actionable findings and executed all
+eight Python regressions successfully.
+
+`AUTH_REFRESH_REMOTE_ACCEPTANCE=1 bun test tests/auth-refresh/package-contract.test.ts` used real
+GitHub Git sources and no local transport remap. All four client/route combinations added the remote
+marketplace and installed the plugin. Each then failed at the expected empty release-lock check:
+three top-level metadata tests passed, four end-to-end tests failed with provisioning pending.
+This proves remote plugin packaging and discovery, not verified runtime installation. The fixture
+profiles were removed, and no daily-use plugin configuration was changed.
+
+The Linux amd64 release candidate was built from component `513b7cc` with Go 1.27.1,
+`-trimpath -ldflags '-s -w -X main.version=0.2.0-rc.1'`. Its `version` command returned
+`auth-refresh 0.2.0-rc.1`, and its `doctor` passed all checks, including managed browser verification
+and launch. The staged binary SHA-256 is
+`42e427c4d7c444a9d6d5d1eaee8685ad330652438a219c62a18be3ad8696a159`.
+No runtime release or release tag has been published while the signing decision remains pending.
+The full component Go/browser suite and static gates passed again at this target. Phone tests stay
+deferred, and the feature remains in progress.
 
 ## Scope
 
