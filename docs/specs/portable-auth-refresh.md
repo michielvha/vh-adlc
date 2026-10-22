@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner requirements captured; independent review and acceptance pending."
+status_description: "First review recorded; live Claude target needs confirmation before a fresh review and acceptance."
 issue: null
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
 covers:
@@ -91,7 +91,10 @@ chat and complete the flow in the main conversation when the owner chooses that 
 
 Notification adapters receive only provider, account label and MFA number or device authorization
 instructions. Never send passwords, tokens, cookies, assertions or session files. Test missing and
-failed notification delivery, stale challenges and bounded retries. Keep one outstanding push across
+failed notification delivery, stale challenges and bounded retries. Check notification capability and
+configuration before starting unattended authentication. If delivery fails after a challenge begins,
+report immediately, park the challenge, suppress further pushes and leave the login incomplete.
+Keep one outstanding push across
 lanes, cancel abandoned challenge pages and finish post-MFA consent without asking whether the owner
 tapped. Host-specific instructions must not require unavailable tools on another host.
 
@@ -111,12 +114,18 @@ a manual PAT and reporting its owner action is not an automatic PAT renewal feat
 target revisions and observable outcomes, including notification arrival on the phone. Missing
 credentials, network access or a native host leave that row untested; a fixture pass cannot close it.
 
+Clean-cache provisioning tests must launch the pinned driver, bundled Node.js and headless shell through
+`doctor`. Document the integrity check for each executable dependency, including what the upstream
+installer verifies. Exercise interrupted downloads and invalid cached driver/browser artifacts; a valid
+Go binary alone does not prove a usable installation. `gh release list --repo michielvha/auth-refresh`
+returned an empty array on 2026-10-22, so release availability remains a delivery prerequisite.
+
 ## Acceptance Criteria
 
 - [ ] AC-01: Auth-refresh installs and is discoverable as a separate plugin from vhco-tools and directly from its own repository on each claimed harness, without installing vh-adlc or requiring a source checkout.
 - [ ] AC-02: Both install routes load the same canonical workflow and a verified pinned runtime; corrupt downloads, missing artifacts and unsupported platforms fail before executable code runs.
 - [ ] AC-03: Claude's existing MFA phone push, immediate number delivery, background continuation and post-MFA confirmation complete a real login with the same user interaction as before.
-- [ ] AC-04: Other claimed harnesses complete the shared workflow using available capabilities, and missing or failed required phone notifications are surfaced before an unattended challenge starts.
+- [ ] AC-04: Other required harnesses complete the shared workflow using available capabilities; missing required notification capabilities stop unattended authentication before a challenge, and delivery failures during a challenge are reported immediately, park the challenge and suppress further pushes.
 - [ ] AC-05: All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
 - [ ] AC-06: A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
 - [ ] AC-07: Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
@@ -127,9 +136,9 @@ credentials, network access or a native host leave that row untested; a fixture 
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Fresh native-client profiles install from each source, enumerate the skill and invoke a read-only check. Verify auth-refresh-only installation does not load ADLC. Record exact client versions and sources. |
-| AC-02 | Installer tests execute with a local HTTP artifact fixture: valid artifact, wrong digest, corrupted archive, missing asset, unsupported platform, offline cache, wrong preinstalled binary. Native installs resolve the same pinned revision. |
+| AC-02 | Installer tests execute with a local HTTP artifact fixture: valid artifact, wrong digest, corrupted archive, missing asset, unsupported platform, offline cache, wrong preinstalled binary. Native installs resolve the same pinned revision. Clean-cache provisioning launches the driver, bundled Node.js and headless shell through doctor; interrupted downloads and invalid cached artifacts fail visibly. Record each dependency's integrity mechanism. |
 | AC-03 | Live Claude daily-use surface: initiate one cold login, confirm notification arrives on locked phone with matching account/provider/number, tap once, observe confirmation and CLI success without another owner prompt. Repeat warm flow without an unnecessary push. |
-| AC-04 | Fake-provider native-host scenarios plus actual claimed host run: immediate number visibility, continuation after approval, notification transport failure and missing capability before challenge. Never count a chat message as proof of phone delivery. |
+| AC-04 | Fake-provider native-host scenarios plus actual required host run: immediate number visibility, continuation after approval, missing capability before challenge, and delivery failure after challenge followed by parking and no further push. Never count a chat message as proof of phone delivery. |
 | AC-05 | Table-driven CLI and HTTP-server regressions for every identity type, including silent Azure timeout, registry transport failure, HTTP 401/403/429/5xx, TLS and DNS errors, malformed data, missing files and missing tools. Assert status, exit code and absence/presence of suggested login. |
 | AC-06 | Mandatory real-browser fake-IdP tests cover two lanes, mismatched credentials, saves below 20 KB, restart, passive status/whoami, simultaneous callers and cancellation. Real IdP restart verifies expected account without another push. |
 | AC-07 | Execute each real-provider row after host prerequisites exist. Use read-only identity/API checks, confirm deliberate login success where applicable, record missing inputs as untested and keep criterion open. Run full Go suite, browser suite, vet, module checks, configured lint and supported race checks. |
@@ -141,13 +150,57 @@ None yet; populate after independent review and owner acceptance.
 
 ## Open Questions
 
-None. The owner selected a separate marketplace plugin and retained Claude phone notifications.
-Unavailable host capabilities and real-provider prerequisites remain acceptance blockers, not waived tests.
+### Q1: Which Claude surface must pass the live phone-notification acceptance test?
+
+**Recommendation:** Keep this Codex desktop/Fedora host and the owner's existing Claude daily-use
+surface as mandatory live targets. Confirm whether that surface is remote control, desktop or another
+client. Use isolated profiles for standalone and shared-marketplace install/discovery on Codex CLI,
+Claude CLI and VS Code Local. No missing target is removed from the matrix during implementation.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Current Codex host and daily Claude surface** | Live proof of both workflows the owner uses | Access to the Claude surface and phone confirmation |
+| B. Add further live surfaces now | Live acceptance for more clients or operating systems | A named accessible host and phone test for each |
+
+**Why this is yours:** Only the owner can name which daily-use surface must retain its existing phone
+experience. Unsupported targets cannot be substituted silently.
+
+For each required live host, freeze these provider operations in the accepted matrix: AWS cold login,
+warm reuse and STS for all configured profiles; Azure device-code login and token validation; Okta admin
+and normal-lane login, save/restart and expected-account verification; AKS/EKS read-only identity;
+configured GitHub account status without account switching; registry manifest access; PAT/Sonar token
+validation and manual-renewal reporting; service-health outage reporting without login dispatch.
+Both installation routes and Claude's phone delivery are separate required rows. Missing host inputs
+leave their rows open, rather than redefining the claimed support set.
 
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-22 | R-1 | spec | `dedfae46681a2b7b2a6b6cacf4831c234b74a4dc` | unknown | procedural | Two blocking findings and one should-fix; model identity not attested. |
+
+### R-1
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design, Acceptance Criteria and Test Plan
+EVIDENCE: At dedfae46681a2b7b2a6b6cacf4831c234b74a4dc, AC-01 and AC-04 quantify over "claimed harnesses"; AC-07 refers to an "acceptance matrix". No matrix specifies required harnesses, platforms, installation routes, provider operations or target environments. Design names provider families but does not define these combinations.
+PROPOSAL: Define the required acceptance matrix before accepting the spec, including this Codex host and the existing Claude daily-use surface. Name each required operation and installation route, and keep unavailable targets explicitly untested rather than allowing the claimed support set to shrink during implementation.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: blocking
+WHERE: AC-04 and its Test Plan row
+EVIDENCE: AC-04 requires failed phone notifications to be surfaced "before an unattended challenge starts". The canonical agents/auth-refresh.md obtains the MFA number from an existing challenge using `lane mfa`, then sends PushNotification. Delivery of that number can fail only after the challenge has started; a successful capability check cannot guarantee subsequent delivery.
+PROPOSAL: Require capability and notification configuration checks before starting unattended authentication. Separately require actual delivery failures to surface immediately, cancel or park the active challenge, prevent further pushes and leave the operation incomplete; test both failure stages.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: One component and two installation routes; AC-02 Test Plan
+EVIDENCE: The proposed installer verifies the runtime binary, but the canonical README.md:9-14 describes additional executable downloads: Playwright's driver, Node.js and Chromium. The AC-02 fixture cases cover the runtime artifact without explicitly exercising provisioning and integrity failures for those browser dependencies.
+PROPOSAL: State which component verifies each downloaded executable dependency and require a clean-cache installation test through doctor and a real browser launch. Include interrupted downloads and invalid cached browser or driver artifacts so a verified runtime alone cannot satisfy usable installation.
 
 ## Sources
 
