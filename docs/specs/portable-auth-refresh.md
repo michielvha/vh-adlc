@@ -76,6 +76,25 @@ through Remote Control. Missing local PAT/Sonar files and the configured AKS con
 they were not created or replaced. The existing admin lane was left parked, and the normal lane stopped.
 No criterion below is marked complete from this partial run.
 
+### Fix progress, 2026-10-22
+
+The standalone component now has feature branch `feat/portable-auth-refresh`. Commit `1d3a3c2`
+corrects non-authentication failure classifications and adds the independent provider cases beside the
+runtime code. `bun test tests/auth-refresh/probe-contract.test.ts` now passes all 21 scenarios.
+
+In-progress component changes add native standalone marketplace metadata and a shared skill, retain
+Claude's PushNotification/background sequence in the canonical workflow, and replace the 20 KB
+session-size rule with identity and restore checks. Both native standalone install tests pass in
+isolated Codex and Claude profiles. Shared-marketplace install tests remain red until integration.
+The unverified-driver execution test now passes: startup checks pinned file hashes before execution.
+Fresh verified-archive setup and doctor both passed in disposable caches. These component changes
+still require committed review targets and final regression checks before their criteria can close.
+
+The release lock deliberately has no version or digests while no runtime release exists. Its installer
+fails with a provisioning-pending error rather than compiling a replacement or inventing an artifact.
+The owner has not authorized publication or cutover. Real phone delivery and Remote Control continuation
+remain unverified; the host running that session has been requested.
+
 ## Scope
 
 Coordinate changes in this marketplace and the standalone auth-refresh repository. Keep runtime,
@@ -203,6 +222,8 @@ open. No required target is removed during implementation to narrow the claimed 
 - [x] T1 `tests/auth-refresh/probe-contract.test.ts`, `tests/auth-refresh/fixtures/probe-contract_test.go.txt` - execute acceptance probes against the canonical runtime without modifying that checkout; demonstrate unsafe authentication recommendations and preserve the failure evidence (AC-05, AC-07).
 - [x] T2 `tests/auth-refresh/package-contract.test.ts`, `tests/auth-refresh/provisioning-contract.test.ts` - exercise native plugin validation and verify standalone and shared-marketplace discovery inputs against the exact component revision; missing supported packaging fails visibly (AC-01, AC-02, AC-08).
 - [x] T3 `docs/specs/portable-auth-refresh.md` - record observed baseline gates and live-host prerequisites, with each missing input remaining untested (AC-03, AC-04, AC-06, AC-07).
+- [x] T6 `auth-refresh:internal/check/` - fix the provider rejection/outage cases in the standalone component; its local unit suite and all 21 independent acceptance scenarios pass (AC-05).
+- [ ] T7 `auth-refresh:internal/browserruntime/`, `auth-refresh:skills/`, `auth-refresh:scripts/`, `auth-refresh:plugin.json` - implement and test verified runtime provisioning and canonical portable packaging while retaining the legacy Claude notification flow (AC-01, AC-02, AC-03, AC-04, AC-06, AC-08).
 - [ ] T4 `README.md`, `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json` - integrate the reviewed canonical portable auth-refresh component and its verified release, once its corresponding implementation exists (AC-01, AC-02, AC-08).
 - [ ] T5 `tests/auth-refresh/` - run both native installation routes, notification failure and continuation scenarios, and the full fixed acceptance matrix; keep unavailable live rows open (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08).
 
