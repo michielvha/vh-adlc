@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Owner accepted scope; clean R-2 review and planned gate passed; acceptance testing starts next."
+status: in-progress
+status_description: "Acceptance testing in progress; packaging, provider and notification criteria remain open."
 issue: null
+branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
 covers:
   - .agents/plugins/marketplace.json
