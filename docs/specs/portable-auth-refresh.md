@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revising covered paths for the existing marketplace checker; accepted behavior is unchanged."
+status: planned
+status_description: "Coverage revision reviewed; component review fixes and final regression checks are in progress."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -244,6 +244,9 @@ None. The live Claude target is Remote Control through the phone app.
 | 2026-10-22 | R-1 | spec | `dedfae46681a2b7b2a6b6cacf4831c234b74a4dc` | unknown | procedural | Two blocking findings and one should-fix; model identity not attested. |
 | 2026-10-22 | R-2 | spec | `9474365fe7fc40a342da80f5e521f92298921c1f` | unknown | procedural | Clean independent review; model identity not attested. |
 | 2026-10-22 | R-2 | spec | `9474365fe7fc40a342da80f5e521f92298921c1f` | n/a | n/a | accepted by owner |
+| 2026-10-22 | R-3 | spec | `f3ea3bb5373572683856e832b92e52725590258e` | unknown | procedural | Clean review of checker coverage revision; model identity not attested. |
+| 2026-10-22 | R-3 | spec | `f3ea3bb5373572683856e832b92e52725590258e` | n/a | n/a | accepted by owner |
+| 2026-10-22 | R-4 | implementation | `f3ea3bb5373572683856e832b92e52725590258e` | unknown | procedural | Diagnostic review at runtime b2fca51 found three blockers; required live tests remain unverified. |
 
 ### R-1
 
@@ -271,6 +274,65 @@ PROPOSAL: State which component verifies each downloaded executable dependency a
 ### R-2
 
 NO FINDINGS
+
+### R-3
+
+NO FINDINGS
+
+### R-4
+
+CRITERION: AC-01 Auth-refresh installs and is discoverable as a separate plugin from vhco-tools and directly from its own repository on each claimed harness, without installing vh-adlc or requiring a source checkout.
+VERDICT: not verified
+EVIDENCE: `bun test tests/auth-refresh` at marketplace f3ea3bb5373572683856e832b92e52725590258e with runtime b2fca516069d4a4aa4439c562564b1740509c7d7 passed all nine tests, including standalone and shared-marketplace installation in disposable Codex and Claude profiles. Required VS Code Local, Codex desktop and Claude Remote Control acceptance executions were not observed; local-profile installation does not establish published installation without a checkout.
+
+CRITERION: AC-02 Both install routes load the same canonical workflow and a verified pinned runtime; corrupt downloads, missing artifacts and unsupported platforms fail before executable code runs.
+VERDICT: not met
+EVIDENCE: At runtime b2fca516069d4a4aa4439c562564b1740509c7d7, four Python installer tests passed and the independent Bun test confirmed doctor rejects an unverified driver before execution. However, a disposable shell fixture with the verified runtime directory initially first on PATH executed an alternative binary from ~/.local/bin after applying workflow.md:26. The committed release lock intentionally remains unpopulated; production runtime provisioning is pending.
+
+CRITERION: AC-03 Claude's existing MFA phone push, immediate number delivery, background continuation and post-MFA confirmation complete a real login with the same user interaction as before.
+VERDICT: not verified
+EVIDENCE: Inspected the legacy agent and shared workflow at runtime b2fca516069d4a4aa4439c562564b1740509c7d7. PushNotification, immediate number delivery and the bounded Azure confirmation watcher remain documented. Actual phone arrival and Remote Control continuation were not executed, as explicitly deferred by the owner.
+
+CRITERION: AC-04 Other required harnesses complete the shared workflow using available capabilities; missing required notification capabilities stop unattended authentication before a challenge, and delivery failures during a challenge are reported immediately, park the challenge and suppress further pushes.
+VERDICT: not verified
+EVIDENCE: Inspected skills/auth-refresh/references/capabilities.md at runtime b2fca516069d4a4aa4439c562564b1740509c7d7. It specifies capability checks, interactive continuation and cleanup after failed delivery. The passing installation and provider suites do not execute native-host notification failures, challenge parking or post-approval continuation; required host executions were not observed.
+
+CRITERION: AC-05 All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
+VERDICT: not met
+EVIDENCE: The committed provider suite and all 21 independent overlay scenarios passed at runtime b2fca516069d4a4aa4439c562564b1740509c7d7. Additional temporary overlay cases executed through production One returned DEAD instead of WARN for AWS AccessDenied with an absent SSO cache, GitHub JSON reporting permission denied reading config.yml, and unknown GitHub text output. Those results permit inappropriate authentication fixes.
+
+CRITERION: AC-06 A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
+VERDICT: not verified
+EVIDENCE: `AUTH_REFRESH_E2E=1 go test -count=1 ./...` at runtime b2fca516069d4a4aa4439c562564b1740509c7d7 passed every package, including the real-browser lane suite. This establishes the executed fake-IdP and lane regressions. Real IdP restoration and cessation of actual abandoned phone pushes were not executed; the composite criterion remains unverified.
+
+CRITERION: AC-07 Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
+VERDICT: not verified
+EVIDENCE: At runtime b2fca516069d4a4aa4439c562564b1740509c7d7, the complete Go suite with mandatory browser tests passed; go vet and go mod tidy -diff produced no errors or changes. No live-provider acceptance matrix was executed during this review. Fixture results do not establish real-provider success on the required hosts.
+
+CRITERION: AC-08 Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
+VERDICT: not verified
+EVIDENCE: The disposable native installation tests passed at marketplace f3ea3bb5373572683856e832b92e52725590258e and runtime b2fca516069d4a4aa4439c562564b1740509c7d7. Source inspection confirms the legacy Claude agent retains its tool declarations and installed-binary bootstrap. An actual legacy invocation and the full update, uninstall and rollback procedure with private-state preservation were not executed.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: auth-refresh skills/auth-refresh/references/workflow.md:26
+EVIDENCE: At b2fca516069d4a4aa4439c562564b1740509c7d7, SKILL.md prepends the verified runtime directory, but the shared workflow subsequently prepends ~/.local/bin before calling auth-refresh env and all later runtime commands. A disposable fixture with distinguishable verified and alternative binaries printed UNPINNED after executing that exact bootstrap.
+PROPOSAL: Retain the verified absolute executable path throughout the portable workflow, including env, lane commands and background watchers. Preserve the ambient-PATH fallback only for the explicitly supported legacy entry point.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: auth-refresh internal/check/check.go:315
+EVIDENCE: At b2fca516069d4a4aa4439c562564b1740509c7d7, a temporary Go overlay passed an AWS GetCallerIdentity AccessDenied result with an absent fixture SSO cache through One. TestReviewAdditionalFailureKinds/AWS_denied_with_no_cache returned DEAD instead of WARN because the absent-cache fallback overrides permission and setup failures not matched by awsNetRe.
+PROPOSAL: Classify explicit permission and host-setup errors before the cache-based credential fallback. Add cases for AccessDenied, invalid profiles and unreadable or malformed caches, asserting that these failures do not suggest a login.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: auth-refresh internal/check/check.go:471 and internal/check/check.go:495
+EVIDENCE: At b2fca516069d4a4aa4439c562564b1740509c7d7, temporary overlay cases passed GitHub JSON reporting Permission denied reading config.yml and unrecognized text output through One. Both returned DEAD instead of WARN. The JSON and text fallbacks treat failures outside the transport regex as credential rejection without affirmative authentication evidence.
+PROPOSAL: Require explicit evidence of absent or rejected credentials before returning DEAD. Return WARN for permission, setup and unrecognized output, and test both JSON and text paths with assertions that no login fix is offered.
 
 ## Sources
 
