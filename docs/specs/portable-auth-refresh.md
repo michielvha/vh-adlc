@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Feature branches published and remote plugin installs pass; runtime release signing and host acceptance remain open."
+status_description: "Signed runtime published and automatic previews enabled; remote runtime acceptance is running and phone tests remain deferred."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -156,8 +156,8 @@ marketplace installation. Phone delivery and Remote Control continuation remain 
 instruction authorizes publication, not merging the feature PRs or switching the daily-use setup.
 
 Remote inspection found auth-refresh is private and has no `PGP_PRIVATE_KEY` repository secret;
-the configured signed release workflow cannot yet run. This host has only a Git Credential Manager
-secret key, which is not a release signing identity. The owner was asked to identify the existing
+the configured signed release workflow could not yet run. The initial check inspected only the active
+GPG keyring and missed the exported VHCO Pro key; the 2026-10-23 correction below supersedes that conclusion. The owner was asked to identify the existing
 release key or authorize checksum-only test artifacts. No new signing identity was generated.
 
 The bootstrap now supports authenticated `gh release download` after a failed anonymous GitHub
@@ -213,6 +213,49 @@ its `doctor` passed all checks and its binary SHA-256 is
 release or a populated runtime lock. Native packaging tests passed again at this final source pin
 (seven tests, 42 assertions). Publication still requires the owner's pending signing choice; no key
 was generated, existing secret stores were not changed, and no tag was created.
+
+### Signed release and automatic versioning, 2026-10-23
+
+The host is `fedora-43`. The existing exported release key was located under the host's private key
+storage; its public primary fingerprint is `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, matching
+vh-adlc's committed release key. No replacement key was generated. The owner explicitly approved
+transferring it to auth-refresh's encrypted `PGP_PRIVATE_KEY` Actions secret after automatic approval
+review required separate permission for the transfer. The secret is now configured without printing
+its contents. Earlier missing-key and checksum-only-release notes are historical.
+
+Auth-refresh now pins the published `vhco-pro/go-release-workflow` v0.1.0 implementation
+`311467ed4ba150944298460af16497abad8b7a69`, publishes the public verification key and documents
+signature verification. Release tag `v0.2.0-rc.1` targets component `d686c6d`; its signed release is
+being produced by the configured workflow. No manual artifact upload competes with that workflow.
+
+vh-adlc already pins `vhco-pro/version-workflow` v0.1.0 at
+`3b78b04df802ea1592cbe19338d7a882d1888389`. Its main CI and signed release for `v0.3.1` both succeeded;
+feature-branch CI at `218eb25` succeeded but correctly computed without tagging because PR #24 lacked
+`release:preview`. That label is now enabled. The existing Preview workflow successfully dispatched
+branch CI; after all checks pass, the shared version workflow should tag a prerelease, whose tag push
+starts the signed release workflow. This preserves the existing trusted-branch opt-in rather than
+turning every branch into an automatic publisher. The actual tag and release results will be recorded.
+
+Phone tests remain deferred, and no default branch merge or daily-use cutover is included.
+
+The automatic preview release completed successfully:
+[v0.4.0-feat-portable-auth-refresh.1](https://github.com/michielvha/vh-adlc/releases/tag/v0.4.0-feat-portable-auth-refresh.1),
+from CI `39872899345` and release run `39872991718`. Its checksum signature verified against the expected
+VHCO Pro primary fingerprint. No reusable-workflow code change was needed in vh-adlc: the missing
+preview opt-in was the cause. Future successful pushes to PR #24 now produce prereleases automatically.
+
+Auth-refresh release run `39872978575` succeeded and published the signed
+[v0.2.0-rc.1 runtime](https://github.com/michielvha/auth-refresh/releases/tag/v0.2.0-rc.1).
+The downloaded `checksums.txt.sig` verified with `gpgv` against primary fingerprint
+`9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`. All four archives matched the signed checksum file;
+the binary in each archive was measured independently. Component `be34aa21b1701dfed73ef2f8c8f7c780d2728996` commits those
+archive and binary hashes to `auth-refresh.lock.json`. Linux amd64 archive SHA-256 is
+`a9310709910aea6ac9bc2492ff35fe24dd1cb520522d7dc8dfa3f478b90fdf24`; binary SHA-256 is
+`384a159bac9162f5d26bd3773b4b333c9deb246158d7604141821e756f1bc5c8`.
+The earlier locally staged digests are not used. Other platform assets have integrity verification;
+this run executes only Linux amd64. The shared catalogs now pin the published lock-bearing component.
+Remote tests will compare installed workflow/bootstrap/lock bytes with that exact canonical payload,
+provision from the real private release, invoke a read-only fixture check, refresh and uninstall.
 
 ## Scope
 

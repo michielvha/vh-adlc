@@ -34,8 +34,8 @@ It can also be installed independently from its own repository.
 
 The candidate is published on `feat/portable-auth-refresh` in both repositories. Actual GitHub-backed
 plugin installation passed in disposable Codex and Claude CLI profiles through both marketplace
-routes. Runtime provisioning remains blocked until the release signing choice is resolved and the
-verified release lock is populated. The default branches have not been changed.
+routes. Runtime provisioning pins the signed `v0.2.0-rc.1` release, whose checksum signature and archive
+hashes were verified against the existing VHCO Pro release key. The default branches have not been changed.
 
 To test this branch in Codex, use `codex plugin marketplace add michielvha/vh-adlc --ref feat/portable-auth-refresh`,
 then install `auth-refresh@vhco-tools`. For Claude, add

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const source = realpathSync(process.env.AUTH_REFRESH_SOURCE ?? resolve(import.meta.dir, "../../../auth-refresh"));
@@ -86,6 +86,13 @@ describe("native installs in isolated profiles", () => {
             const paths = Bun.spawnSync(["rg", "--files", "--hidden", scratch, "-g", "ensure-auth-refresh.sh"]);
             const installer = paths.stdout.toString().trim().split("\n").find((path) => path.includes("/plugins/cache/"));
             expect(installer, "installed plugin bootstrap is missing").toBeDefined();
+            const installedRoot = dirname(dirname(installer!));
+            for (const path of ["auth-refresh.lock.json", "scripts/ensure-auth-refresh.sh", "scripts/runtime-install.py",
+              "skills/auth-refresh/SKILL.md", "skills/auth-refresh/references/workflow.md",
+              "skills/auth-refresh/references/capabilities.md"]) {
+              expect(readFileSync(join(installedRoot, path)), `installed ${path} differs from the canonical pin`)
+                .toEqual(readFileSync(join(source, path)));
+            }
             const provision = Bun.spawnSync(["bash", installer!], { env, stdout: "pipe", stderr: "pipe", timeout: 150_000 });
             expect(provision.exitCode, provision.stderr.toString()).toBe(0);
             const binary = provision.stdout.toString().trim();
@@ -97,6 +104,16 @@ describe("native installs in isolated profiles", () => {
             const reuse = Bun.spawnSync(["bash", installer!], { env, stdout: "pipe", stderr: "pipe", timeout: 20_000 });
             expect(reuse.exitCode, reuse.stderr.toString()).toBe(0);
             expect(reuse.stdout.toString().trim()).toBe(binary);
+            const probeConfig = join(scratch, "probe-config.json");
+            writeFileSync(probeConfig, JSON.stringify({ identities: [{
+              name: "fixture-token", type: "http_token", file: join(scratch, "absent-token"),
+              url: "https://example.invalid/token",
+            }] }), { mode: 0o600 });
+            const probe = Bun.spawnSync([binary, "check", "--json"], {
+              env: { ...env, AUTH_REFRESH_CONFIG: probeConfig }, stdout: "pipe", stderr: "pipe", timeout: 10_000,
+            });
+            expect(probe.exitCode, probe.stderr.toString()).toBe(1);
+            expect(JSON.parse(probe.stdout.toString())[0].status).toBe("MISSING");
           }
           for (const command of [
             // Codex's upgrade command applies to Git marketplaces, not these local
