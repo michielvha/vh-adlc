@@ -14,22 +14,25 @@ import (
 )
 
 type step struct {
-	ID   string            `yaml:"id"`
-	If   string            `yaml:"if"`
-	Uses string            `yaml:"uses"`
-	Run  string            `yaml:"run"`
-	With map[string]string `yaml:"with"`
+	ID    string            `yaml:"id"`
+	If    string            `yaml:"if"`
+	Uses  string            `yaml:"uses"`
+	Run   string            `yaml:"run"`
+	Shell string            `yaml:"shell"`
+	With  map[string]string `yaml:"with"`
+	Env   map[string]string `yaml:"env"`
 }
 
 type workflow struct {
 	On          yaml.Node         `yaml:"on"`
 	Permissions map[string]string `yaml:"permissions"`
 	Jobs        map[string]struct {
-		Needs       any               `yaml:"needs"`
+		Needs       yaml.Node         `yaml:"needs"`
 		If          string            `yaml:"if"`
 		Uses        string            `yaml:"uses"`
 		Permissions map[string]string `yaml:"permissions"`
 		Secrets     map[string]string `yaml:"secrets"`
+		With        map[string]string `yaml:"with"`
 		Steps       []step            `yaml:"steps"`
 	} `yaml:"jobs"`
 }
@@ -78,30 +81,52 @@ func runs(w workflow) []string {
 func TestCIWorkflow(t *testing.T) {
 	w, _ := readWorkflow(t, "ci.yml")
 	checkPins(t, "ci.yml", w)
-	verify, ok := w.Jobs["verify"]
-	if !ok || len(verify.Steps) != 2 {
-		t.Fatal("CI verification must compose checkout and the shared Go CI action")
-	}
-	if !strings.HasPrefix(verify.Steps[0].Uses, "actions/checkout@") ||
-		verify.Steps[0].With["persist-credentials"] != "false" {
-		t.Error("CI must check out source without persisting credentials")
-	}
-	if !strings.HasPrefix(verify.Steps[1].Uses, "michielvha/go-ci-action@") {
-		t.Error("CI must use the shared Go CI action rather than duplicate its commands")
-	}
-	if !slices.Contains(runs(w), "bun test tests/vh-adlc") {
-		t.Error("CI must retain the existing plugin checker")
-	}
-	var on map[string]any
+	var on map[string]yaml.Node
 	if err := w.On.Decode(&on); err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := on["pull_request"]; !ok {
-		t.Error("ci.yml does not run on pull requests")
+	if _, ok := on["pull_request"]; ok {
+		t.Error("CI runs on branch pushes so GitVersion sees the real branch, not the PR merge ref")
 	}
 	if _, ok := on["push"]; !ok {
 		t.Error("ci.yml does not run on pushes")
 	}
+	verify := w.Jobs["verify"]
+	if len(verify.Steps) != 2 || !strings.HasPrefix(verify.Steps[1].Uses, "michielvha/go-ci-action@") {
+		t.Error("CI-only verification is checkout plus the Go CI action, nothing else")
+	}
+	if !slices.Contains(runs(w), "bun test tests/vh-adlc") {
+		t.Error("CI must retain the existing plugin checker")
+	}
+	if _, ok := w.Jobs["release-gate"]; ok {
+		t.Error("the shared version workflow decides when to tag; the caller has no gate of its own")
+	}
+	version := w.Jobs["version"]
+	if !strings.HasPrefix(version.Uses, "vhco-pro/version-workflow/.github/workflows/version.yml@") ||
+		!slices.Equal(dependencies(t, version.Needs), []string{"verify", "checker", "checker-macos"}) {
+		t.Error("versioning must call the shared version workflow after every check, through native needs")
+	}
+	if _, ok := version.With["dry-run"]; ok {
+		t.Error("the caller must not override the shared tag decision")
+	}
+	if version.Permissions["contents"] != "read" || version.Permissions["pull-requests"] != "read" {
+		t.Error("the version job reads PRs for the preview label; the App, not GITHUB_TOKEN, pushes the tag")
+	}
+	if version.Secrets["release-app-private-key"] != "${{ secrets.RELEASE_APP_PRIVATE_KEY }}" {
+		t.Error("only the version job receives the App key")
+	}
+}
+
+func dependencies(t *testing.T, node yaml.Node) []string {
+	t.Helper()
+	if node.Kind == yaml.ScalarNode {
+		return []string{node.Value}
+	}
+	var names []string
+	if err := node.Decode(&names); err != nil {
+		t.Fatal(err)
+	}
+	return names
 }
 
 // TestLayout holds the Go conventions' layout: cmd/vh-adlc is wiring only and
@@ -163,7 +188,7 @@ func TestReleaseWorkflow(t *testing.T) {
 		t.Errorf("release.yml push trigger = %+v, want only three-component version tags", on.Push)
 	}
 	release, ok := w.Jobs["release"]
-	if !ok || !strings.HasPrefix(release.Uses, "vhco-pro/.github/.github/workflows/reusable-go-release.yml@") ||
+	if !ok || !strings.HasPrefix(release.Uses, "vhco-pro/go-release-workflow/.github/workflows/go-release.yml@") ||
 		len(release.Steps) != 0 {
 		t.Fatal("release.yml must be a thin caller of the shared Go release workflow")
 	}
@@ -173,68 +198,16 @@ func TestReleaseWorkflow(t *testing.T) {
 	}
 }
 
-func TestVersionWorkflow(t *testing.T) {
-	w, _ := readWorkflow(t, "version.yml")
-	checkPins(t, "version.yml", w)
-	var on struct {
-		Push struct {
-			Branches []string `yaml:"branches"`
-		} `yaml:"push"`
-		WorkflowDispatch struct {
-			Inputs map[string]struct {
-				Default bool `yaml:"default"`
-			} `yaml:"inputs"`
-		} `yaml:"workflow_dispatch"`
+func TestPreviewWorkflow(t *testing.T) {
+	w, _ := readWorkflow(t, "preview.yml")
+	request := w.Jobs["request"]
+	if !strings.Contains(request.If, "release:preview") ||
+		!strings.Contains(request.If, "head.repo.full_name == github.repository") {
+		t.Error("only adding release:preview to a same-repository PR reruns branch CI")
 	}
-	if err := w.On.Decode(&on); err != nil {
-		t.Fatal(err)
-	}
-	if !slices.Equal(on.Push.Branches, []string{"main"}) ||
-		!on.WorkflowDispatch.Inputs["dry-run"].Default {
-		t.Error("versioning must run on main, with manual requests defaulting to dry-run")
-	}
-	for name, job := range w.Jobs {
-		taggers := 0
-		for _, s := range job.Steps {
-			if s.Run != "" {
-				t.Errorf("%s: versioning must call shared actions, not custom commands", name)
-			}
-			if strings.HasPrefix(s.Uses, "michielvha/gitversion-tag-action@") {
-				taggers++
-				if s.With["prefix"] != "v" || s.With["configFilePath"] != "" {
-					t.Errorf("%s: versioning must use prefix v and the bundled configuration", name)
-				}
-				if name == "preview" && s.With["dry-run"] != "true" {
-					t.Error("PR version calculation must be a dry-run")
-				}
-			}
-		}
-		if taggers != 1 {
-			t.Errorf("%s must call the shared GitVersion action exactly once", name)
-		}
-	}
-	preview, ok := w.Jobs["preview"]
-	if !ok || len(preview.Steps) != 2 ||
-		!strings.Contains(preview.If, "github.event_name == 'pull_request'") ||
-		preview.Permissions["contents"] != "read" ||
-		preview.Steps[0].With["persist-credentials"] != "false" {
-		t.Fatal("PR previews must be read-only checkout and version calculation")
-	}
-	tag, ok := w.Jobs["tag"]
-	if !ok || len(tag.Steps) != 3 {
-		t.Fatal("trusted tagging must compose App authentication, checkout, and GitVersion")
-	}
-	if strings.Contains(tag.If, "pull_request") || !strings.Contains(tag.If, "refs/heads/main") ||
-		!strings.Contains(tag.If, "!inputs.dry-run") {
-		t.Error("tag creation must be limited to main pushes and authorized manual branch requests")
-	}
-	if !strings.HasPrefix(tag.Steps[0].Uses, "actions/create-github-app-token@") ||
-		tag.Steps[0].With["permission-contents"] != "write" ||
-		tag.Steps[0].With["owner"] != "${{ github.repository_owner }}" ||
-		tag.Steps[0].With["repositories"] != "${{ github.event.repository.name }}" ||
-		tag.Steps[1].With["token"] != "${{ steps.app.outputs.token }}" ||
-		tag.Steps[1].With["persist-credentials"] != "true" {
-		t.Error("the actual tag push must use the repository-scoped App identity")
+	if request.Permissions["actions"] != "write" || len(request.Steps) != 1 ||
+		!strings.Contains(request.Steps[0].Run, "gh workflow run ci.yml") {
+		t.Error("the label request only reruns CI on the PR branch")
 	}
 }
 
