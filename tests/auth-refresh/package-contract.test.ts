@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -39,11 +39,17 @@ describe("native installs in isolated profiles", () => {
         try {
           mkdirSync(join(scratch, "codex"));
           mkdirSync(join(scratch, "claude"));
+          const privateConfig = join(scratch, "auth-config.json");
+          const privateCredentials = join(scratch, "credentials");
+          writeFileSync(privateConfig, '{"sentinel":"preserve"}\n', { mode: 0o600 });
+          writeFileSync(privateCredentials, "[fixture]\npass=fixture-only\n", { mode: 0o600 });
           const env = {
             ...process.env,
             CODEX_HOME: join(scratch, "codex"),
             CLAUDE_CONFIG_DIR: join(scratch, "claude"),
             DISABLE_AUTOUPDATER: "1",
+            AUTH_REFRESH_CONFIG: privateConfig,
+            AUTH_REFRESH_HOME: join(scratch, "lane-state"),
           };
           // Test the real source selectors and exact Git commit before publication.
           // Only this child process remaps the remote to the canonical local Git repo.
@@ -68,10 +74,23 @@ describe("native installs in isolated profiles", () => {
             env, stdout: "pipe", stderr: "pipe", timeout: 25_000,
           });
           expect(install.exitCode, `${install.stdout.toString()}${install.stderr.toString()}`).toBe(0);
+          for (const command of [
+            // Codex's upgrade command applies to Git marketplaces, not these local
+            // directory fixtures. Re-adding below refreshes its local plugin copy.
+            ...(client === "claude" ? [[client, "plugin", "marketplace", "update", name]] : []),
+            [client, "plugin", client === "codex" ? "add" : "update", `auth-refresh@${name}`],
+            [client, "plugin", client === "codex" ? "remove" : "uninstall", `auth-refresh@${name}`],
+          ]) {
+            const result = Bun.spawnSync(command, { env, stdout: "pipe", stderr: "pipe", timeout: 25_000 });
+            expect(result.exitCode, `${command.join(" ")}: ${result.stdout.toString()}${result.stderr.toString()}`).toBe(0);
+          }
+          expect(readFileSync(privateConfig, "utf8")).toBe('{"sentinel":"preserve"}\n');
+          expect(readFileSync(privateCredentials, "utf8")).toBe("[fixture]\npass=fixture-only\n");
+          expect(statSync(privateCredentials).mode & 0o077).toBe(0);
         } finally {
           rmSync(scratch, { recursive: true, force: true });
         }
-      }, 60_000);
+      }, 150_000);
     }
   }
 });

@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Coverage revision reviewed; component review fixes and final regression checks are in progress."
+status_description: "Code review fixes complete and local suites pass; publication and required host acceptance remain open."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -96,6 +96,56 @@ fails with a provisioning-pending error rather than compiling a replacement or i
 The owner has not authorized publication or cutover. Real phone delivery and Remote Control continuation
 remain unverified. The owner explicitly deferred them on 2026-10-22 to another host that has the flow;
 they remain open rather than being counted as fixture coverage.
+
+### Final local validation and remaining migration blockers
+
+The pinned component is `a00c6001d6c448479fb851729a9a7d9147a9f814`. Both shared catalog formats
+reference that exact commit. Independent R-5 executed the review reproducers and found the three
+blocking code defects resolved. Unknown GitHub output and AWS permission failures now warn without
+login fixes; HTTP probes also reject incomplete responses and distinguish empty/unreadable files.
+The canonical workflow's explicit verified-binary function survives env PATH changes and background
+invocation, with an executed shell regression. Its legacy entry point retains the previous installed
+binary fallback and the Claude PushNotification/number/watcher sequence.
+
+`bun test tests/auth-refresh tests/vh-adlc` passed 85/85 tests; the later lifecycle extension adds private-state preservation assertions. The full component
+Go suite with `AUTH_REFRESH_E2E=1`, vet, module checks, golangci-lint, actionlint and five Python
+installer/workflow tests passed. Fresh verified setup and doctor passed; the existing genuine cache
+passed verification, while the inert replacement driver was rejected before execution.
+A final cache/setup regression distinguishes unreadable, malformed and foreign SSO metadata from
+absent or expired credentials. Release downloading uses a bounded curl subprocess, avoiding the
+Python network-connection path that hung during host diagnosis.
+
+The local native-install tests remap only their child Git transport to the exact committed component;
+they do not establish that an unpublished commit can be installed from GitHub.
+
+Native CLI same-version refresh/update and uninstall also passed for both installation routes,
+with private sentinel config and credentials unchanged and credential mode preserved. This does not
+prove a version-to-version remote upgrade or an actual legacy agent invocation. The task-owned admin
+lane also restarted under the corrected runtime and restored the real expected IdP account from
+the 7,318-byte saved session, then remained parked with the normal lane stopped.
+
+A new read-only configured-provider check returned AWS OK; Azure, AKS, registry and service health
+WARN without login suggestions; the configured GitHub account DEAD; and the two PAT files and Sonar
+MISSING. The latter manual token renewals were not attempted. Azure startup was traced to a network
+fetch in its version metadata path. An isolated profile with installed-version metadata reached the
+normal missing-login error. The informational metadata cache on this host was repaired from installed
+versions, preserving a private backup and leaving authentication caches untouched; the existing
+credential request still timed out, so Azure live login remains unverified.
+
+Migration is blocked by:
+
+- Publication of the pinned component and marketplace commits and a verified runtime release. The
+  committed runtime lock remains intentionally empty; invoking the new release-backed skill reports
+  provisioning pending. No release, tag, push, installed-plugin cutover or old-setup removal was done.
+- Required real-provider acceptance where this host lacks a healthy Azure request path, configured
+  Kubernetes context, corporate GitHub login, registry reachability, or manual PAT/Sonar files.
+- Native Codex desktop and VS Code Local invocation plus update/uninstall/rollback acceptance. CLI
+  installation and fixture tests do not establish these client behaviors.
+- Claude Remote Control phone delivery, failed-delivery cleanup and continuation on another host.
+  The owner explicitly deferred these tests. Their criteria remain open; no chat message or fixture
+  result is counted as phone delivery.
+- Race testing on a host with a C compiler. The verified browser archive lock currently covers Linux
+  amd64 only; other browser platforms fail explicitly until separately pinned and tested.
 
 ## Scope
 
@@ -201,7 +251,8 @@ open. No required target is removed during implementation to narrow the claimed 
 - [ ] AC-02: Both install routes load the same canonical workflow and a verified pinned runtime; corrupt downloads, missing artifacts and unsupported platforms fail before executable code runs.
 - [ ] AC-03: Claude's existing MFA phone push, immediate number delivery, background continuation and post-MFA confirmation complete a real login with the same user interaction as before.
 - [ ] AC-04: Other required harnesses complete the shared workflow using available capabilities; missing required notification capabilities stop unattended authentication before a challenge, and delivery failures during a challenge are reported immediately, park the challenge and suppress further pushes.
-- [ ] AC-05: All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
+- [x] AC-05: All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
+      Evidence: R-5 at component `fda67f43feadcaa9e4482c110dac6d91ba91fd4f`, full Go and independent probe suites plus reviewer fixtures passed; real-provider matrix remains open under AC-07.
 - [ ] AC-06: A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
 - [ ] AC-07: Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
 - [ ] AC-08: Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
@@ -225,7 +276,7 @@ open. No required target is removed during implementation to narrow the claimed 
 - [x] T2 `tests/auth-refresh/package-contract.test.ts`, `tests/auth-refresh/provisioning-contract.test.ts` - exercise native plugin validation and verify standalone and shared-marketplace discovery inputs against the exact component revision; missing supported packaging fails visibly (AC-01, AC-02, AC-08).
 - [x] T3 `docs/specs/portable-auth-refresh.md` - record observed baseline gates and live-host prerequisites, with each missing input remaining untested (AC-03, AC-04, AC-06, AC-07).
 - [x] T6 `auth-refresh:internal/check/` - fix the provider rejection/outage cases in the standalone component; its local unit suite and all 21 independent acceptance scenarios pass (AC-05).
-- [ ] T7 `auth-refresh:internal/browserruntime/`, `auth-refresh:skills/`, `auth-refresh:scripts/`, `auth-refresh:plugin.json` - implement and test verified runtime provisioning and canonical portable packaging while retaining the legacy Claude notification flow (AC-01, AC-02, AC-03, AC-04, AC-06, AC-08).
+- [x] T7 `auth-refresh:internal/browserruntime/`, `auth-refresh:skills/`, `auth-refresh:scripts/`, `auth-refresh:plugin.json` - implement and test verified runtime provisioning and canonical portable packaging while retaining the legacy Claude notification flow (AC-01, AC-02, AC-03, AC-04, AC-06, AC-08).
 - [ ] T4 `README.md`, `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json` - integrate the reviewed canonical portable auth-refresh component and its verified release, once its corresponding implementation exists (AC-01, AC-02, AC-08).
 - [ ] T5 `tests/auth-refresh/` - run both native installation routes, notification failure and continuation scenarios, and the full fixed acceptance matrix; keep unavailable live rows open (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08).
 
@@ -247,6 +298,7 @@ None. The live Claude target is Remote Control through the phone app.
 | 2026-10-22 | R-3 | spec | `f3ea3bb5373572683856e832b92e52725590258e` | unknown | procedural | Clean review of checker coverage revision; model identity not attested. |
 | 2026-10-22 | R-3 | spec | `f3ea3bb5373572683856e832b92e52725590258e` | n/a | n/a | accepted by owner |
 | 2026-10-22 | R-4 | implementation | `f3ea3bb5373572683856e832b92e52725590258e` | unknown | procedural | Diagnostic review at runtime b2fca51 found three blockers; required live tests remain unverified. |
+| 2026-10-22 | R-5 | implementation | `11cb22c99de97d50d30e54fcebf87c69504bfcf3` | unknown | procedural | Focused re-review at runtime fda67f4 resolved all three code blockers; AC-05 met, other composite criteria unverified. |
 
 ### R-1
 
@@ -333,6 +385,40 @@ SEVERITY: blocking
 WHERE: auth-refresh internal/check/check.go:471 and internal/check/check.go:495
 EVIDENCE: At b2fca516069d4a4aa4439c562564b1740509c7d7, temporary overlay cases passed GitHub JSON reporting Permission denied reading config.yml and unrecognized text output through One. Both returned DEAD instead of WARN. The JSON and text fallbacks treat failures outside the transport regex as credential rejection without affirmative authentication evidence.
 PROPOSAL: Require explicit evidence of absent or rejected credentials before returning DEAD. Return WARN for permission, setup and unrecognized output, and test both JSON and text paths with assertions that no login fix is offered.
+
+### R-5
+
+CRITERION: AC-01 Auth-refresh installs and is discoverable as a separate plugin from vhco-tools and directly from its own repository on each claimed harness, without installing vh-adlc or requiring a source checkout.
+VERDICT: not verified
+EVIDENCE: `bun test tests/auth-refresh` at marketplace 11cb22c99de97d50d30e54fcebf87c69504bfcf3 with runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f passed all nine tests, including standalone and shared-marketplace installation in disposable Codex and Claude profiles. Required VS Code Local, Codex desktop and Claude Remote Control acceptance executions and published installation without a checkout remain unverified.
+
+CRITERION: AC-02 Both install routes load the same canonical workflow and a verified pinned runtime; corrupt downloads, missing artifacts and unsupported platforms fail before executable code runs.
+VERDICT: not verified
+EVIDENCE: At runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f, four Python installer tests and the independent doctor integrity test passed. `PYTHONDONTWRITEBYTECODE=1 python3 scripts/test_workflow.py` passed its executed shell fixture, preserving the verified executable after env PATH changes and during background invocation. The previous routing defect is resolved. The release lock intentionally remains unpopulated; published runtime provisioning and the complete provisioning failure matrix remain unverified.
+
+CRITERION: AC-03 Claude's existing MFA phone push, immediate number delivery, background continuation and post-MFA confirmation complete a real login with the same user interaction as before.
+VERDICT: not verified
+EVIDENCE: Inspected the legacy agent and shared workflow at runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f. PushNotification, immediate number delivery and the bounded Azure confirmation watcher remain documented. Actual phone arrival and Remote Control continuation were not executed, as explicitly deferred by the owner.
+
+CRITERION: AC-04 Other required harnesses complete the shared workflow using available capabilities; missing required notification capabilities stop unattended authentication before a challenge, and delivery failures during a challenge are reported immediately, park the challenge and suppress further pushes.
+VERDICT: not verified
+EVIDENCE: Inspected the capability reference and corrected shared bootstrap at runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f. Capability checks, interactive continuation and delivery-failure cleanup remain specified. Installation and provider fixtures do not execute required native-host notification failures, challenge parking or post-approval continuation; these executions remain unverified.
+
+CRITERION: AC-05 All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
+VERDICT: met
+EVIDENCE: At runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f, the complete Go suite and independent provider contract passed. The original temporary reviewer overlay now passes all three cases: AWS AccessDenied without an SSO cache, GitHub configuration permission denial and unknown GitHub text output all produce WARN without a login fix. The committed provider regressions and TestTokenFileAndPartialResponseFailures also passed, covering unreadable and empty token files and an incomplete HTTP response. Source inspection confirms warning results suppress fixes and manual token renewal remains manual. This establishes tested classification behavior, not real-provider acceptance.
+
+CRITERION: AC-06 A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
+VERDICT: not verified
+EVIDENCE: `AUTH_REFRESH_E2E=1 go test -count=1 ./...` at runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f passed every package, including the real-browser lane suite. This establishes executed fake-IdP and lane regressions. Real IdP restoration and cessation of actual abandoned phone pushes were not executed; the composite criterion remains unverified.
+
+CRITERION: AC-07 Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
+VERDICT: not verified
+EVIDENCE: At runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f, the complete Go suite with mandatory browser tests passed; go vet and go mod tidy -diff passed. No live-provider acceptance matrix was executed during this review. Fixture results do not establish real-provider success on the required hosts.
+
+CRITERION: AC-08 Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
+VERDICT: not verified
+EVIDENCE: The disposable native installation tests passed at marketplace 11cb22c99de97d50d30e54fcebf87c69504bfcf3 and runtime fda67f43feadcaa9e4482c110dac6d91ba91fd4f. Inspection confirms the independent Claude entry point retains its tools and ambient installed-binary fallback. Actual legacy invocation and the full update, uninstall and rollback procedure with private-state preservation remain unverified.
 
 ## Sources
 
