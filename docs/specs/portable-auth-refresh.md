@@ -194,6 +194,15 @@ No runtime release or release tag has been published while the signing decision 
 The full component Go/browser suite and static gates passed again at this target. Phone tests stay
 deferred, and the feature remains in progress.
 
+
+GitHub CI at component `513b7cc` passed its mandatory browser job but failed its verification job:
+its pinned golangci-lint 2.15.0 checks discarded errors received from channels, while this host's
+2.14.0 did not flag them. Component `8136096` explicitly acknowledges the three intentionally
+discarded process-wait errors, preserving the existing log/cancellation error reporting. The shared
+marketplace pins this corrected component. The candidate must be rebuilt and rechecked at this
+revision before publication; the earlier staged digest above is historical and will not be pinned.
+The repeated combined local suite passed 85 tests and 325 assertions after merging marketplace main.
+
 ## Scope
 
 Coordinate changes in this marketplace and the standalone auth-refresh repository. Keep runtime,
