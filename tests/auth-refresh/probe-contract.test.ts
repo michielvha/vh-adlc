@@ -16,7 +16,7 @@ test("all providers distinguish authentication failures from host and service fa
     ], { cwd: source, stdout: "pipe", stderr: "pipe", timeout: 120_000 });
     const output = `${result.stdout.toString()}${result.stderr.toString()}`;
     process.stdout.write(output);
-    expect(result.exitCode, output).toBe(0);
+    expect(result.exitCode).toBe(0);
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }

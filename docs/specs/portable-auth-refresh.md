@@ -169,7 +169,7 @@ open. No required target is removed during implementation to narrow the claimed 
 ## Tasks
 
 - [x] T1 `tests/auth-refresh/probe-contract.test.ts`, `tests/auth-refresh/fixtures/probe-contract_test.go.txt` - execute acceptance probes against the canonical runtime without modifying that checkout; demonstrate unsafe authentication recommendations and preserve the failure evidence (AC-05, AC-07).
-- [ ] T2 `tests/auth-refresh/package-contract.test.ts` - exercise native plugin validation and verify standalone and shared-marketplace discovery inputs against the exact component revision; missing supported packaging fails visibly (AC-01, AC-02, AC-08).
+- [x] T2 `tests/auth-refresh/package-contract.test.ts`, `tests/auth-refresh/provisioning-contract.test.ts` - exercise native plugin validation and verify standalone and shared-marketplace discovery inputs against the exact component revision; missing supported packaging fails visibly (AC-01, AC-02, AC-08).
 - [ ] T3 `docs/specs/portable-auth-refresh.md` - record observed baseline gates and live-host prerequisites, with each missing input remaining untested (AC-03, AC-04, AC-06, AC-07).
 - [ ] T4 `README.md`, `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json` - integrate the reviewed canonical portable auth-refresh component and its verified release, once its corresponding implementation exists (AC-01, AC-02, AC-08).
 - [ ] T5 `tests/auth-refresh/` - run both native installation routes, notification failure and continuation scenarios, and the full fixed acceptance matrix; keep unavailable live rows open (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08).
