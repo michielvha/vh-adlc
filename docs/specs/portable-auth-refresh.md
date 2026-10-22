@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Acceptance testing in progress; packaging, provider and notification criteria remain open."
+status_description: "Initial acceptance tests reproduce provider and packaging failures; runtime fixes and live prerequisites remain."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -43,6 +43,38 @@ tokens at line 488 likewise classify transport failures as expired credentials. 
 context and PAT/Sonar token files are absent here. These observations do not establish provider login
 coverage. A real Azure device-code attempt produced no URL or code and was canceled. The race suite
 could not build because this host has no C compiler.
+
+### Initial acceptance run, 2026-10-22
+
+Target runtime: `ceaea336fd14e3e270f49cedcb72e89f9e5243fd`, with a clean working tree.
+Test implementation: this feature branch at `2dc9f86`. Host: Fedora Linux 43,
+Codex CLI 0.163.0, Claude Code 2.1.303 and Bun 1.4.3. No runtime source was changed by these tests.
+
+| Check | Executed result | What it establishes |
+| --- | --- | --- |
+| `AUTH_REFRESH_E2E=1 go test -count=1 -v ./...` in auth-refresh | Passed; zero skipped tests | Existing unit tests, real-browser fake-IdP scenarios, process-tree cleanup and restart behavior pass |
+| `go vet ./...`, `go mod tidy -diff`, `golangci-lint config verify`, `golangci-lint run`, `actionlint` | All passed, with stop-on-error verification | Existing static gates pass; they do not establish the new acceptance criteria |
+| `bun test tests/auth-refresh` in vh-adlc | 1 passing and 7 failing top-level tests | The new acceptance suite remains red against the unchanged runtime and packaging |
+| Go overlay provider scenarios from `probe-contract.test.ts` | 6 passing and 15 failing scenarios across all seven identity types | Non-authentication failures still produce credential-renewal suggestions in Azure, AWS, Kubernetes, GitHub, registry and HTTP probes |
+| Native Codex and Claude install tests | Both clients rejected the standalone marketplace source and could not find auth-refresh in vhco-tools | Both installation routes need implementation; disposable profiles were removed after each run |
+| Native `claude plugin validate` | Passed for the existing standalone Claude manifest | Legacy manifest validity only, not portable discovery or phone delivery |
+| `setup`, then `doctor`, with empty temporary driver and browser directories | Both exited 0 and launched Chromium 151.0.7922.34 with driver 1.62.1 | Clean-cache provisioning works on this Fedora host; installed browser and lane sessions were untouched |
+| Inert cached-driver fixture through `doctor` | Doctor exited 1, but the marker executable ran before rejection | Current startup does not satisfy the accepted rejection-before-execution integrity requirement; the fixture and marker stayed in a disposable directory |
+| `az --version` with an empty temporary Azure config and telemetry/version checks disabled | Timed out after 20 seconds | Azure startup is blocked independently of the live token cache; no device-code flow was started by this diagnostic |
+| `systemctl --user show claude-remote-control.service` | Inactive/dead with an empty FragmentPath | The named service is not configured on this host; this does not establish whether the owner's phone workflow runs on another host or outside systemd |
+| Race tests | Could not build: C compiler `gcc` missing | Race coverage remains unverified |
+
+Raw command output for this run is retained locally in `/tmp/auth-refresh-full-tests.log` and
+`/tmp/auth-refresh-acceptance.log`; those temporary files are not durable evidence. The committed
+tests reproduce the acceptance failures without editing the canonical component. The Go overlay
+uses fixture credentials and local HTTP servers only. Native installs use disposable client profiles.
+
+Real-provider gaps remain: Azure login, both required live host routes, normal-lane IdP login,
+AKS/EKS identity on configured contexts, the configured corporate GitHub account, registry access,
+PAT/Sonar validation, phone notification arrival, stale-challenge cleanup and post-MFA continuation
+through Remote Control. Missing local PAT/Sonar files and the configured AKS context remain missing;
+they were not created or replaced. The existing admin lane was left parked, and the normal lane stopped.
+No criterion below is marked complete from this partial run.
 
 ## Scope
 
@@ -170,7 +202,7 @@ open. No required target is removed during implementation to narrow the claimed 
 
 - [x] T1 `tests/auth-refresh/probe-contract.test.ts`, `tests/auth-refresh/fixtures/probe-contract_test.go.txt` - execute acceptance probes against the canonical runtime without modifying that checkout; demonstrate unsafe authentication recommendations and preserve the failure evidence (AC-05, AC-07).
 - [x] T2 `tests/auth-refresh/package-contract.test.ts`, `tests/auth-refresh/provisioning-contract.test.ts` - exercise native plugin validation and verify standalone and shared-marketplace discovery inputs against the exact component revision; missing supported packaging fails visibly (AC-01, AC-02, AC-08).
-- [ ] T3 `docs/specs/portable-auth-refresh.md` - record observed baseline gates and live-host prerequisites, with each missing input remaining untested (AC-03, AC-04, AC-06, AC-07).
+- [x] T3 `docs/specs/portable-auth-refresh.md` - record observed baseline gates and live-host prerequisites, with each missing input remaining untested (AC-03, AC-04, AC-06, AC-07).
 - [ ] T4 `README.md`, `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json` - integrate the reviewed canonical portable auth-refresh component and its verified release, once its corresponding implementation exists (AC-01, AC-02, AC-08).
 - [ ] T5 `tests/auth-refresh/` - run both native installation routes, notification failure and continuation scenarios, and the full fixed acceptance matrix; keep unavailable live rows open (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08).
 
