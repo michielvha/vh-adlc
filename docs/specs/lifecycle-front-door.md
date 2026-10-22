@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Implemented locally on the owner-selected branch; R-7 met all ten criteria, the native CLI matrix passed, and the real completion gate passed. Publication remains separate."
+status_description: "Implemented locally on the owner-selected branch; R-8 met all ten criteria, the native CLI matrix passed, and the real completion gate passed. Publication remains separate."
 issue: 21
 branch: feat/lifecycle-front-door
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
@@ -584,6 +584,7 @@ None.
 | 2026-10-21 | R-5 | spec | `d9c9482aeb373aab3ebdfc1832cb8010c0bfe8b2` | n/a | n/a | accepted by owner |
 | 2026-10-21 | R-6 | implementation | `db01a06d22939c4db510fb4215dc9f287c560360` | unknown | procedural | Four criteria not met; unauthorized generic-spec publication and a permissive remote-ref oracle; model identity not attested |
 | 2026-10-21 | R-7 | implementation | `d1fd8a306eb1e858a5da9416cfe884ede77cee12` | unknown | procedural | All ten criteria met in the bounded native CLI scope; model identity not attested |
+| 2026-10-22 | R-8 | implementation | `c5e17d8d27fd2eb401b03d5ae593388ebe99dca4` | unknown | procedural | All ten criteria met after the shipping fixture portability correction; model identity not attested |
 
 ### R-1
 
@@ -731,6 +732,48 @@ EVIDENCE: Regrade of the saved raw roots verified unchanged actual fixtures and 
 CRITERION: AC-10 Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
 VERDICT: met
 EVIDENCE: Independently regraded all nine final L06 bug/dependency/CI repetitions and every L16-L19 variant. Executed graders check actual repaired behavior, lockfile or workflow results and unchanged snapshots. Inspected maintenance Definitions, committed diffs, verification events and linked reviewers own-turn checks/returns. Eligible changes have current independent reviews without feature state. Excluded scope escalates; missing review and failed required verification remain incomplete. Source and every defined task-definition drift variant obtain a new exact-commit review while retaining history. Append-only bookkeeping preserves otherwise current review, and completed repairs are not repeated or published.
+
+### R-8
+
+CRITERION: AC-01 A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
+VERDICT: met
+EVIDENCE: At c5e17d8d27fd2eb401b03d5ae593388ebe99dca4, independently regraded all saved native roots and exactly reproduced the 58 final records. Inspected generic route artifacts and command events across L01-L19. The seven direct-operation regression tests pass and their operation bodies remain byte-identical to b313327. My network-enabled bun test tests/vh-adlc passed 175 tests and 498 assertions. Fresh generic L06-ci completed its checked local repair and independent review. These establish the prescribed CLI scenarios, not arbitrary-request reliability.
+
+CRITERION: AC-02 A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
+VERDICT: met
+EVIDENCE: Independently regraded the three L02 repetitions and L03 and inspected their actual files, native checks and before/after snapshots. README corrections match executed tag.sh output. The shared convention, template and navigation contain the requested banner, badges and Markdown input/output tables, with check-docs.sh observed passing. Runtime files and modes, unrelated index entries and origin refs remain unchanged. No feature document was created for these documentation tasks.
+
+CRITERION: AC-03 Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
+VERDICT: met
+EVIDENCE: Inspected and regraded L01, three L04 repetitions, L13 and reserved R02/R03 from actual native events and current snapshots. Tag answers match source and observed output; investigation checks reproduce the Ada greeting failure and explain its cause. L13 resolves the verified plugin pin in temporary Git context while the owner directory stays outside Git. The clarified R03 remains chat-only despite fix wording. Files, modes, index and refs preserve unauthorized state; the original ambiguous R03 remains a failed diagnostic.
+
+CRITERION: AC-04 Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
+VERDICT: met
+EVIDENCE: Regraded L05, L07, all L16 variants and three L15 repetitions, then inspected native edit/check ordering, committed feature artifacts, exact reviewer targets and returns. Actual failing shout checks precede the final implementation and passing checks; L15-1 corrects its initial ineffective assertion and restores baseline before its observed failure and final repair. Canonical independent reviews target committed work. Unaccepted and mixed-scope requests produce drafts or decisions, preserve runtime scope and do not publish. Direct operation bodies and gates remain unchanged.
+
+CRITERION: AC-05 Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
+VERDICT: met
+EVIDENCE: Regraded and inspected L08-held/L08-released, L14 and both L19 variants. The native commands reconstruct Git history, the separate owning feature worktree, review freshness and actual next implement result. Missing handoff stops before writes; the explicit read-only handoff preserves both worktrees. Documentation continuation corrects and checks its existing artifact. Maintenance continuation preserves completed repairs and resumes unfinished authorized work. Actual snapshots preserve unrelated staged, unstaged and untracked files and origin refs.
+
+CRITERION: AC-06 Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
+VERDICT: met
+EVIDENCE: Inspected both L09 variants and L10 against their actual guide reads, source results, artifacts and checks. Bootstrap inspects template revision b8f86cd8a50e45c2aa4c95f7f2fa992c8e0ec3cd and its configuration, then stops at a reviewed draft pending acceptance. Onboarding preserves local rules and creates the documented entry points. L10 has a distinct linked canonical reviewer, exact committed target, reviewer own-turn contract/source inspection and executed greeting checks, with the exact return stored. Claims establish the tested CLI host only.
+
+CRITERION: AC-07 Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
+VERDICT: met
+EVIDENCE: Compared actual before/after origin refs for all 58 final trials and inspected publication-related command events; all origins remain unchanged and no push attempt occurs. The strict grader tests reject remote changes and declined unauthorized pushes. L11 preserves state under imported issue instructions and only runs shipping preflight after the explicit second-turn request, stopping on its failed gate. All L12 variants report missing pages, conflicting pins or unsupported live procedure without unpinned fallback. Fresh L06-ci likewise preserves origin and unrelated state.
+
+CRITERION: AC-08 Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+VERDICT: met
+EVIDENCE: Verified framework lifecycle, maintenance and review ownership and knowledge resolution at e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a. Offline installer verification passes; binary SHA-256 is the locked 20883b4736802b39a90864570cd5092580bc59b3708943335bac531e1aa41d8c. Baseline diff changes no Go code, modules, binary lock or engineering pin. Production and all selected installed copies have digest 4ba35c567832c1b80333094f8360a6e1ecba9734e0b680a41f379371dc48d207; thin-candidate common files are byte-identical. Fresh native CLI 0.163.0 installation and invocation succeeded. Desktop and other hosts remain unverified; review isolation is procedural.
+
+CRITERION: AC-09 One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
+VERDICT: met
+EVIDENCE: My current-driver regrade verified unchanged actual fixtures and exactly matched all 58 public final records and all 12 comparison records, including 21 final reviewer receipts. suite.ts independently passes all 57 required outcomes at the single package digest and pin in AC-08. Baseline L05 remains failed for unauthorized publication; common and thin comparisons pass. The only fixture delta is three identical fixed-string checks changed from rg to grep; production instructions are byte-identical to R-7. My scratch reproduction observes the old portability failure and new intended failure/pass. Fresh native L06-ci and its independent review pass in /tmp/vh-r8-native-ci-network-20261022. Initial sandbox network failures remain diagnostics; normal network-enabled reruns pass. README retains failed historical trials and CLI-only limits.
+
+CRITERION: AC-10 Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
+VERDICT: met
+EVIDENCE: Independently regraded all nine L06 repetitions and every L16-L19 variant, inspecting actual repaired behavior, Definitions, committed diffs, checks and linked reviewer returns. Excluded scope escalates; missing review and failed required checks stay incomplete. Source and Definition drift require new exact-commit reviews while preserving history; append-only evidence preserves otherwise current review. Fresh native L06-ci completed locally with a current independent NO FINDINGS review at da50d242b8ed12c5c345d6c5816238cb70ddb728, preserving the workflow contract and unrelated state without a feature spec or publication. Its independent regrade and system-PATH workflow check pass. My required system-PATH regression passes eight assertions; full suite passes 175 tests and 498 assertions.
 
 ## Sources
 
