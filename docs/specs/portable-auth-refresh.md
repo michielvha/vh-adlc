@@ -8,6 +8,7 @@ covers:
   - .agents/plugins/marketplace.json
   - .claude-plugin/marketplace.json
   - tests/auth-refresh/
+  - tests/vh-adlc/check.test.ts
   - README.md
 ---
 
@@ -93,7 +94,8 @@ still require committed review targets and final regression checks before their 
 The release lock deliberately has no version or digests while no runtime release exists. Its installer
 fails with a provisioning-pending error rather than compiling a replacement or inventing an artifact.
 The owner has not authorized publication or cutover. Real phone delivery and Remote Control continuation
-remain unverified; the host running that session has been requested.
+remain unverified. The owner explicitly deferred them on 2026-10-22 to another host that has the flow;
+they remain open rather than being counted as fixture coverage.
 
 ## Scope
 

@@ -2,9 +2,20 @@ import { describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const source = realpathSync(process.env.AUTH_REFRESH_SOURCE ?? resolve(import.meta.dir, "../../../auth-refresh"));
 const marketplace = resolve(import.meta.dir, "../..");
+
+test("both marketplaces pin the same canonical component commit", () => {
+  const entries = [".agents/plugins/marketplace.json", ".claude-plugin/marketplace.json"].map((path) =>
+    JSON.parse(readFileSync(join(marketplace, path), "utf8")).plugins.find((entry: { name: string }) => entry.name === "auth-refresh"));
+  expect(entries[0]?.source).toEqual(entries[1]?.source);
+  expect(entries[0]?.source.url).toBe("https://github.com/michielvha/auth-refresh.git");
+  const pin = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: source });
+  expect(pin.exitCode).toBe(0);
+  expect(entries[0]?.source.sha).toBe(pin.stdout.toString().trim());
+});
 
 test("the existing standalone Claude manifest passes its native validator", () => {
   const result = Bun.spawnSync(["claude", "plugin", "validate", source], {
@@ -34,6 +45,14 @@ describe("native installs in isolated profiles", () => {
             CLAUDE_CONFIG_DIR: join(scratch, "claude"),
             DISABLE_AUTOUPDATER: "1",
           };
+          // Test the real source selectors and exact Git commit before publication.
+          // Only this child process remaps the remote to the canonical local Git repo.
+          const count = Number(process.env.GIT_CONFIG_COUNT ?? "0");
+          Object.assign(env, {
+            GIT_CONFIG_COUNT: String(count + 1),
+            [`GIT_CONFIG_KEY_${count}`]: `url.${pathToFileURL(source).href}.insteadOf`,
+            [`GIT_CONFIG_VALUE_${count}`]: "https://github.com/michielvha/auth-refresh.git",
+          });
           const add = Bun.spawnSync([client, "plugin", "marketplace", "add", directory], {
             env, stdout: "pipe", stderr: "pipe", timeout: 25_000,
           });

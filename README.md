@@ -19,7 +19,24 @@ The scripts need [Bun](https://bun.sh).
 | Plugin | What it does |
 |---|---|
 | `github-app-registration` | Registers a GitHub App through GitHub's manifest flow, stores its credentials locally with mode 0600, and copies them into a project's env and key files without printing them. |
+| `auth-refresh` | Checks and restores local SSO identities in isolated account lanes. It is installed separately and keeps Claude Remote Control phone notifications. |
 | `vh-adlc` | A spec-driven development loop. One feature document is both spec and plan, and the `vh-adlc` binary decides every status change. |
+
+## auth-refresh
+
+Auth-refresh is a separate plugin in this marketplace. Installing vh-adlc does not install it.
+Its source and canonical workflow live in [michielvha/auth-refresh](https://github.com/michielvha/auth-refresh).
+Both catalog formats pin the same component commit. No provider workflow is copied into this repository.
+
+In Claude Code, install `auth-refresh@vhco-tools`. In Codex, select auth-refresh from the
+vhco-tools marketplace or run `codex plugin add auth-refresh@vhco-tools` after adding the marketplace.
+It can also be installed independently from its own repository.
+
+The feature candidate has passed native install tests using an isolated local Git transport for the
+pinned component. The component commit must be published before remote installation can succeed,
+and the release lock still needs a verified runtime release. Claude phone delivery remains deferred
+to another host at the owner's request. Read the current [acceptance results](docs/specs/portable-auth-refresh.md)
+before migrating an existing setup.
 
 ## vh-adlc
 
