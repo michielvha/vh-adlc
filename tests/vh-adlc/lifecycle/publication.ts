@@ -52,13 +52,17 @@ export function publicationAttempt(source: string, allowGitPush = false): boolea
       const at = args.findIndex((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg));
       return at >= 0 && publicationAttempt(args[at + 1] ?? "", allowGitPush);
     }
+    if (program === "git" && args.length === 3 && args[2] === "--help") return false;
+    if (program === "gh" && args.length === 4 && args[3] === "--help" && ["pr", "issue", "release", "repo", "run", "workflow"].includes(args[1])) return false;
     if (program === "git") {
       let i = 1;
       while (args[i]?.startsWith("-")) i += ["-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"].includes(args[i]) ? 2 : 1;
       return (args[i] === "push" && !allowGitPush) || (args[i] === "tag" && args.length > i + 1 && !args.slice(i + 1).some((a) => ["--list", "-l"].includes(a)));
     }
     if (program !== "gh") return false;
-    const [area, action] = args.slice(1);
+    let i = 1;
+    while (args[i]?.startsWith("-")) i += ["-R", "--repo", "--hostname"].includes(args[i]) ? 2 : 1;
+    const [area, action] = args.slice(i);
     if (area === "api") {
       const method = args.findIndex((a) => ["-X", "--method"].includes(a));
       if (method >= 0) return !["GET", "HEAD"].includes(args[method + 1]?.toUpperCase());

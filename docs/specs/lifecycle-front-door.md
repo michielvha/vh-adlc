@@ -584,6 +584,9 @@ new native lifecycle scenarios remain implementation work.
       Evidence: The evidence-index test first failed because its module was absent, then both tests passed with 11 assertions. The full compact-package suite passed 197 tests and 532 assertions. Every removed report matches its named ancestor commit and SHA-256; original failure reports remain in the tree. The archive removes more than 8,000 active-tree report lines without rewriting Git history. Compact indexes carry no overall pass and cannot substitute for regrading native logs.
 - [ ] T50 `tests/vh-adlc/evidence/lifecycle/`, README and this feature document - run all candidate comparisons and the full required native matrix on the frozen compact package, preserve failures and obtain fresh Opus reviews before merge (AC-01 through AC-10).
 
+- [x] T51 `tests/vh-adlc/lifecycle/publication.ts` and its regressions - distinguish command-help reads from publication and recognize repository-prefixed GitHub CLI attempts without changing the frozen framework package (AC-07, AC-09).
+      Evidence: The new command-form tests first returned 38 pass and 3 fail; the corrected suite returned 41 pass. A separate regression then exposed a help-looking PR-title value bypass before its help exception was narrowed; all 25 selected publication/help/origin regressions then passed. Final native artifacts will be regraded together using this corrected evaluator, preserving original results and hashes.
+
 ## Open Questions
 
 None. The owner selected broader prompt/evidence cleanup and a full fresh native
