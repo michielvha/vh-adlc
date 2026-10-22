@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "First review recorded; Remote Control target confirmed; revised spec review and acceptance pending."
+status: planned
+status_description: "Owner accepted scope; clean R-2 review and planned gate passed; acceptance testing starts next."
 issue: null
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
 covers:
@@ -167,7 +167,15 @@ open. No required target is removed during implementation to narrow the claimed 
 
 ## Tasks
 
-None yet; populate after independent review and owner acceptance.
+- [ ] T1 `tests/auth-refresh/probe-contract.test.ts`, `tests/auth-refresh/fixtures/probe-contract_test.go` - execute acceptance probes against the canonical runtime without modifying that checkout; demonstrate unsafe authentication recommendations and preserve the failure evidence (AC-05, AC-07).
+- [ ] T2 `tests/auth-refresh/package-contract.test.ts` - exercise native plugin validation and verify standalone and shared-marketplace discovery inputs against the exact component revision; missing supported packaging fails visibly (AC-01, AC-02, AC-08).
+- [ ] T3 `docs/specs/portable-auth-refresh.md` - record observed baseline gates and live-host prerequisites, with each missing input remaining untested (AC-03, AC-04, AC-06, AC-07).
+- [ ] T4 `README.md`, `.agents/plugins/marketplace.json`, `.claude-plugin/marketplace.json` - integrate the reviewed canonical portable auth-refresh component and its verified release, once its corresponding implementation exists (AC-01, AC-02, AC-08).
+- [ ] T5 `tests/auth-refresh/` - run both native installation routes, notification failure and continuation scenarios, and the full fixed acceptance matrix; keep unavailable live rows open (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08).
+
+Runtime fixes, canonical skill packaging, notification adapters and verified artifact provisioning are
+implemented and reviewed in the standalone component before T4 pins their exact published revision.
+This does not waive the combined criteria or authorize publication.
 
 ## Open Questions
 
@@ -178,6 +186,8 @@ None. The live Claude target is Remote Control through the phone app.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-22 | R-1 | spec | `dedfae46681a2b7b2a6b6cacf4831c234b74a4dc` | unknown | procedural | Two blocking findings and one should-fix; model identity not attested. |
+| 2026-10-22 | R-2 | spec | `9474365fe7fc40a342da80f5e521f92298921c1f` | unknown | procedural | Clean independent review; model identity not attested. |
+| 2026-10-22 | R-2 | spec | `9474365fe7fc40a342da80f5e521f92298921c1f` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -201,6 +211,10 @@ SEVERITY: should-fix
 WHERE: One component and two installation routes; AC-02 Test Plan
 EVIDENCE: The proposed installer verifies the runtime binary, but the canonical README.md:9-14 describes additional executable downloads: Playwright's driver, Node.js and Chromium. The AC-02 fixture cases cover the runtime artifact without explicitly exercising provisioning and integrity failures for those browser dependencies.
 PROPOSAL: State which component verifies each downloaded executable dependency and require a clean-cache installation test through doctor and a real browser launch. Include interrupted downloads and invalid cached browser or driver artifacts so a verified runtime alone cannot satisfy usable installation.
+
+### R-2
+
+NO FINDINGS
 
 ## Sources
 
