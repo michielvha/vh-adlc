@@ -198,10 +198,21 @@ deferred, and the feature remains in progress.
 GitHub CI at component `513b7cc` passed its mandatory browser job but failed its verification job:
 its pinned golangci-lint 2.15.0 checks discarded errors received from channels, while this host's
 2.14.0 did not flag them. Component `8136096` explicitly acknowledges the three intentionally
-discarded process-wait errors, preserving the existing log/cancellation error reporting. The shared
-marketplace pins this corrected component. The candidate must be rebuilt and rechecked at this
-revision before publication; the earlier staged digest above is historical and will not be pinned.
+discarded process-wait errors, preserving the existing log/cancellation error reporting. That initial correction conflicted with staticcheck S1005. The final
+component `7709650` instead joins process-exit errors with startup/cancellation errors and checks
+the test server shutdown result. The mandatory real-browser lane suite and local lint pass; a focused
+independent source review found no regression. Both shared catalogs pin this final revision.
+The candidate must be rebuilt and rechecked at this revision before publication; the earlier staged digest above is historical and will not be pinned.
 The repeated combined local suite passed 85 tests and 325 assertions after merging marketplace main.
+
+
+The final static (`CGO_ENABLED=0`) Linux amd64 candidate was rebuilt from `7709650a83d58fcdac7c72480c5da7cf56f77591`;
+its `doctor` passed all checks and its binary SHA-256 is
+`a2b478b9841520c4f8ee7a23813a5bfb404b246cf68ec4fafda72fce5d14f057`. The staged archive SHA-256 is
+`ca35ce2616d79929b0d5681f39577a28d2844865a51025d67182fd8852fad87c`. These are local staged artifacts, not a published
+release or a populated runtime lock. Native packaging tests passed again at this final source pin
+(seven tests, 42 assertions). Publication still requires the owner's pending signing choice; no key
+was generated, existing secret stores were not changed, and no tag was created.
 
 ## Scope
 
