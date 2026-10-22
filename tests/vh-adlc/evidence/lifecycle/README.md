@@ -145,6 +145,33 @@ assertions pass. Regrading the unchanged native evidence still passes all 58
 trials and verifies 21 reviewer receipts at the same production package digest.
 The failed CI run remains visible; no check or task boundary was waived.
 
+## Copilot review corrections
+
+Copilot CLI ran independent spec and implementation reviews with host-attested
+`claude-opus-5.5`. Their verbatim findings are R-9 and R-10 in the feature
+document. They did not clear the merged target. The first dispatch also omitted
+the private raw trial locations, so it could not verify behavior from the
+committed summaries. A new dispatch receives the original run roots, not just
+those summaries.
+
+The fixture now names its bare origin with `--git-dir`, retaining the caller's
+strict Git setting. Publication checks tokenize the supported shell forms,
+recognize wrapper and absolute-path commands, and retain attempted connector
+writes even when denied. Quoted examples remain data. The evaluator is a bounded
+host-specific behavior check; it does not sandbox arbitrary child programs.
+Response checks now require a concrete missing destination or deployment
+procedure instead of generic refusal words. A regression preserves an explicit
+local-origin explanation that no PR, issue or CI service exists.
+
+The new tests first failed for the reported defects. The corrected suite passes
+195 tests and 521 assertions with `safe.bareRepository=explicit`. Earlier local
+reruns exceeded their five-second wall-clock limits; the final strict run used a
+longer local timeout and executed all assertions. CI keeps its existing timeout.
+Regrading all original evidence still passes the selected 58 trials, verifies
+21 native reviewer receipts and preserves the baseline's publication failure.
+No participant artifact, prompt, raw log or framework package was changed.
+[Review corrections](review-corrections.json) records the identities and checks.
+
 ## Desktop access and remaining completion work
 
 General Computer Use succeeded in Calculator: accessibility reads, a reversible

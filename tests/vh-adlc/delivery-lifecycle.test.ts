@@ -23,6 +23,8 @@ test("explicit fixture shipping observes preflight and reports the absent GitHub
   const f = fixture("L11-ship"), before = snapshot(f);
   const commands = [{ command: "cat ISSUE.md skills/vh-adlc-ship/SKILL.md; git remote -v; bash test.sh", exitCode: 0, output: readFileSync(join(f.project, "ISSUE.md"), "utf8") + "\n# vh-adlc-ship\norigin /tmp/fixture/origin.git\nPASS: shout and default" }];
   expect(grade(f, before, snapshot(f), "No GitHub destination exists; PR and issue delivery cannot continue.", commands).pass).toBe(true);
+  expect(grade(f, before, snapshot(f), "No errors; PR checks passed.", commands).pass).toBe(false);
+  expect(grade(f, before, snapshot(f), "The local bare origin provides no PR, issue or CI service, so delivery is unavailable.", commands).pass).toBe(true);
   git(f.project, "tag", "v999.0.0");
   expect(grade(f, before, snapshot(f), "Done.", commands).pass).toBe(false);
 });

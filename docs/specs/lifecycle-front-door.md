@@ -93,6 +93,13 @@ The owner subsequently selected these design decisions in session:
 | Ownership boundary | Shared docs own pinned engineering conventions. vh-adlc owns lifecycle routing, procedures, maintenance records, dispatch and execution authority. No framework controller or state is added to the docs repo. |
 | Start work | The owner accepted the design with that separation and requested testing on the existing feature branch. Keep evaluation and implementation local; no default-branch or feature publication is authorized by this request. |
 
+The owner later requested Copilot CLI Opus 5.5 review and authorized merge only
+after clearance. After reading R-9/R-10, the owner chose prompt/evidence cleanup
+and a full new native matrix before merge. The earlier complete spec's rule 4
+is narrowed by this accepted lifecycle feature: shared-docs navigation selects
+engineering sources; vh-adlc owns lifecycle routing. The earlier document
+remains a historical record, not an alternative dispatcher.
+
 ## Scope
 
 In scope:
@@ -568,10 +575,22 @@ new native lifecycle scenarios remain implementation work.
 - [x] T46 `tests/vh-adlc/maintenance-variants.test.ts`, `tests/vh-adlc/lifecycle/fixtures.ts` and lifecycle evidence - reproduce the shipping Linux failure without optional developer tools, use standard grep for the same fixture checks and verify unchanged frozen native outcomes (AC-09, AC-10).
       Evidence: shipping CI at 48770ab passed 174 tests but failed the CI-repair fixture. The same test failed locally with PATH=/usr/bin:/bin. The new subprocess assertion observed the wrong baseline failure before the correction; with grep it observes the seeded script-command failure and then passes after repair. All 175 package tests and 498 assertions pass, including all preservation negatives. The 58 unchanged native trials and 21 reviewer receipts regrade successfully with the current driver, and production package digest remains 4ba35c567832c1b80333094f8360a6e1ecba9734e0b680a41f379371dc48d207. ci-portability.json retains the failed run and reproduction. This shipping verification fix requires a fresh independent implementation review before the next push; no normative baseline or completion criterion changed.
 
+- [x] T47 `tests/vh-adlc/lifecycle/publication.ts`, `tests/vh-adlc/lifecycle/fixtures.ts`, affected regression tests, README and evidence - correct the factual R-9/R-10 portability, publication-attempt and README findings without changing accepted criteria or the frozen framework package (AC-07, AC-09).
+      Evidence: New regression tests first returned 25 pass and 13 fail; vague-response checks first returned 13 pass and 2 fail. The corrected strict-Git suite passed 195 tests and 521 assertions with a longer local timeout after host wall-clock interruptions. All 58 selected trials and 21 reviewer receipts regrade from unchanged native artifacts at evaluator e6f7aa6d11f0979ae593b3ae4507b29b16a531663889f037e652e6fd8ca5fa63; the baseline publication failure remains. R-9/R-10 records are unchanged, and all criteria await a new independent implementation verdict.
+
+- [ ] T48 `plugins/vh-adlc/skills/*/SKILL.md`, lifecycle/authority references and compatibility tests - replace repeated intake policy with a shared pointer, keep direct-operation bodies unchanged and make explicit ship authority clear (AC-01, AC-07, AC-08).
+- [ ] T49 `tests/vh-adlc/evidence/lifecycle/` and evaluation tooling - retain compact current evidence, original failure identities and immutable historical references; run all candidate comparisons and the full required native matrix on one new frozen package, then obtain fresh Opus reviews (AC-01 through AC-10).
+
 ## Open Questions
 
-- R-9 F-05/F-06/F-08 and R-10 F-04/F-05/F-07: resolve the concrete factual defects and strengthen the publication oracle now, then track prompt duplication, historical-spec clarification and evidence-layout improvements separately, or revise those broader areas and repeat affected native evaluation before merge? The owner decision is pending.
-- R-9 F-07 and R-10 F-06: the historical Test Plan introduction is part of the accepted normative baseline. Defer its wording update to the next accepted revision?
+None. The owner selected broader prompt/evidence cleanup and a full fresh native
+matrix before merge on 2026-10-23. R-9/R-10 judgement findings are addressed
+within the accepted framework design: keep the seven operations and their
+contracts, centralize shared intake policy, reduce active-tree diagnostic bulk,
+and preserve original records, failures and hashes. No engineering conventions
+or framework state move into shared docs. The accepted Test Plan remains the
+baseline for evaluation; its introductory draft-time claims are historical and
+current results are recorded in Tasks and the evaluation evidence.
 
 ## Review Log
 
