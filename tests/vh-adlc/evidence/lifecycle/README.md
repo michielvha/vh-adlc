@@ -133,6 +133,18 @@ and its automated receipt is [verified-review-pilot.json](verified-review-pilot.
 Removing ephemeral sessions fixed that transport problem without changing model
 selection, authority, the active plugin or sandbox policy.
 
+## Shipping fixture portability
+
+[The first shipping CI run](ci-portability.json) passed 174 tests and failed the
+CI-repair fixture on Linux. Its workflow checker used optional ripgrep.
+A local system-PATH reproduction failed before the seeded script typo was
+checked. The fixture now uses standard grep for the same three requirements;
+the regression checks both the intended baseline failure and the corrected
+workflow without developer tools on PATH. All 175 local tests and 498
+assertions pass. Regrading the unchanged native evidence still passes all 58
+trials and verifies 21 reviewer receipts at the same production package digest.
+The failed CI run remains visible; no check or task boundary was waived.
+
 ## Desktop access and remaining completion work
 
 General Computer Use succeeded in Calculator: accessibility reads, a reversible

@@ -34,11 +34,16 @@ test("compatible dependency upkeep needs the actual dependency, lockfile, baseli
 
 test("CI repair must preserve permissions and restore the intended check command", () => {
   const f = fixture("L06-ci"), before = snapshot(f);
+  const portableCheck = () => Bun.spawnSync(["/bin/bash", "check-workflow.sh"], { cwd: f.project, env: { ...process.env, PATH: "/usr/bin:/bin" }, stdout: "pipe", stderr: "pipe" });
+  const baseline = portableCheck();
+  expect(baseline.exitCode).toBe(1);
+  expect(baseline.stdout.toString()).toContain("FAIL: workflow check command");
   expect(grade(f, before, snapshot(f), "CI fixed.", []).pass).toBe(false);
   git(f.project, "switch", "-c", "ci/repair-script");
   const path = join(f.project, ".github/workflows/ci.yml");
   expect(readFileSync(path, "utf8")).toContain("uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803");
   writeFileSync(path, readFileSync(path, "utf8").replace("bash tests.sh", "bash test.sh"));
+  expect(portableCheck().exitCode).toBe(0);
   record(f.project);
   const commands = [{ command: "bash check-workflow.sh", exitCode: 1, output: "FAIL: workflow check command" }, { command: "bash check-workflow.sh", exitCode: 0, output: "PASS: workflow contract" }, { command: "bash test.sh", exitCode: 0, output: "" }];
   expect(grade(f, before, snapshot(f), "Repaired and verified.", commands, receipt).pass).toBe(true);
