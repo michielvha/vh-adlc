@@ -23,19 +23,19 @@ may be proposed when explicitly requested, with fresh report-first approval befo
 Source measurements:
 
 - Stackweaver `7c3790f187b2d3286248dbf8f2fa310749dfb322`: `agents/issue-triage.md:57` inventories
-  issues and merged references, `:83` joins plan metadata, `:113` verifies real remaining scope,
-  `:149` classifies dispositions, `:170` ranks work, `:194` reports before asking, and `:246`
+  issues and merged references, `:82` joins plan metadata, `:113` verifies real remaining scope,
+  `:149` classifies dispositions, `:172` ranks work, `:195` reports before asking, and `:246`
   defines sweep, next, close, stale and explicit-issue modes.
 - `agents/issue-triage.md:19` permits comments/labels freely, while `:32` and
   `.claude/commands/triage.md:30` require reporting before execution. The owner's decision above
   resolves this conflict for the shared workflow and its Stackweaver migration.
-- `agents/issue-triage.md:40` hardcodes protected issue numbers and bot ownership; `:172` prioritizes
+- `agents/issue-triage.md:40` hardcodes protected issue numbers and bot ownership; `:176` prioritizes
   a named project milestone. These are repository settings, not shared defaults.
 - Stackweaver `AGENTS.md:12` routes to local playbooks and `:23` routes Claude commands. Installing
   a plugin alone does not replace those instructions. The existing playbook is 266 lines and its
   wrapper is 40 lines (`wc -l`); this change replaces their duplicated triage procedure only.
 - Shared vh-adlc `9b68b56292416da212910c62e133e09a49cd5258` has seven skills and a feature reviewer
-  (`git ls-tree -r --name-only HEAD plugins/vh-adlc`). `references/lifecycle.md:36` routes generic
+  (`git ls-tree -r --name-only HEAD plugins/vh-adlc`). `references/lifecycle.md:37` routes generic
   requests and `:79` supports bounded maintenance. This is already useful lifecycle machinery,
   not the dependency/security-backlog maintenance sweep in Stackweaver `agents/maintenance.md`.
 - Shared `references/authority.md:12` distinguishes reads, requested local work and publication.
@@ -192,7 +192,9 @@ remaining operations. No push, merge, release or implementation follows merely f
    a duplicate and reverse drift. Include protected umbrellas both without an owner request and with an
    explicit checklist/closure request. Compare scope, evidence, exclusions, ranking and proposed actions.
    Separately record intentional differences: all remote writes await approval, collection is paginated,
-   and incomplete evidence is explicit. Neither run posts comments or applies labels.
+   and incomplete evidence is explicit. The shared flow also requires a current explicit owner request
+   before proposing an umbrella checklist/closure action; a historical issue comment remains a lead,
+   not authority. The parity result must name this difference. Neither run posts comments or applies labels.
 4. **Integrate deliberately:** publish/install a reviewed shared plugin revision. Make Stackweaver's
    `agents/issue-triage.md` a thin forwarding entry plus the settings pointer, update only triage routing
    in `AGENTS.md`, and keep `/triage` as a Claude compatibility command with its existing arguments.
@@ -253,9 +255,70 @@ is implemented by this specification request.
 
 ## Open Questions
 
-None. The owner selected report-first approval for every GitHub write and preserved the protected-umbrella
-exception only for explicitly requested, freshly approved checklist/closure actions. The owner accepted
-the reviewed specification on 2026-10-23. Implementation and publication retain their separate authority.
+### Q1: Should approval bind exact action payloads and include plan synchronization explicitly?
+
+**Recommendation:** A. Bind comment text, label names, closure reason, duplicate target and checklist
+patch to the approved batch; changed payloads need renewed approval. Include local plan-status sync
+as an approved action with a negative test for bypassing a completion gate (R-3 F-02, F-06).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Exact payloads and gated sync** | Execution matches what the owner reviewed. | Payload changes require a new decision. |
+| **B. Broader action-type approval** | Execution can adjust content after approval. | The owner approves less precise effects. |
+
+**Why this is yours:** This defines what the owner's approval authorizes.
+
+### Q2: Does incomplete required collection block every closure in the report?
+
+**Recommendation:** A. Any missing required page or verification input leaves every closure proposal
+non-executable for that report; report other findings with explicit incomplete coverage (R-3 F-03).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Report-wide closure block** | One clear rule with conservative closure behavior. | One failed page postpones otherwise evidenced closures. |
+| **B. Block only dependent claims** | Unaffected closures may proceed. | Each claim needs a collection-dependency proof. |
+
+**Why this is yours:** This trades partial progress against the risk of closing with incomplete context.
+
+### Q3: Should the cross-repository trial use an exact local plugin revision before publication?
+
+**Recommendation:** A. Install an exact local shared revision for trials, keep Stackweaver edits on an
+isolated migration branch, and bind its exact commit and clean migration paths to the vh-adlc review.
+Publication and merges retain their own authority. This removes the ship-before-complete dependency
+without splitting the accepted migration scope (R-3 F-04).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Local revision and paired commits** | Both sides can be validated before shipping. | Review must verify two repository commits. |
+| **B. Split migration into a later feature** | Shared implementation has a smaller completion boundary. | Stackweaver cutover waits for a separately accepted feature. |
+
+**Why this is yours:** This sets the delivery boundary across the owner's two repositories.
+
+### Q4: Should the new operation require the four named clients and leave other GUI surfaces unclaimed?
+
+**Recommendation:** A. Require Codex CLI, Claude CLI, Codex desktop and VS Code Local explicitly.
+Keep Claude desktop/extension support for this new operation unclaimed. Missing required GUI execution
+leaves AC-01 unverified and blocks completion until proved or owner-residualised (R-3 F-05).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Four required clients** | The original test matrix has an exact completion rule. | An unavailable required GUI run can block completion. |
+| **B. Add Claude desktop and extension** | Every previously claimed surface is tested for triage. | Two additional GUI acceptance runs are required. |
+
+**Why this is yours:** This defines the supported client and completion scope.
+
+### Q5: Should the criteria name concrete report properties and a fixed migration fixture directory?
+
+**Recommendation:** A. Replace vague ranking/cutover wording with source/mode scope, history-preserving
+reports, dependency-safe ranking, explicit parity differences and exact install/adapter commits.
+Use `tests/agent-triage/` for Stackweaver-only fixtures (R-3 F-07).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Concrete criteria and fixed paths** | Review has repeatable pass conditions and a bounded diff. | Fixture additions stay within the named directory. |
+| **B. Retain the current wording** | No wording or path change. | Review retains the reported ambiguity. |
+
+**Why this is yours:** The accepted end states and cross-repository change boundary are being revised.
 
 ## Review Log
 
