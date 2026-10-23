@@ -12,6 +12,20 @@
         "authentication": "ON_INSTALL"
       },
       "category": "Productivity"
+    },
+    {
+      "name": "auth-refresh",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/michielvha/auth-refresh.git",
+        "sha": "360d8cd5b52877c18da102662a568cbcce4688a3"
+      },
+      "description": "Check and restore local SSO identities with isolated account lanes and Claude phone notifications.",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
     }
   ]
 }

@@ -1,0 +1,929 @@
+{
+  "date": "2026-10-23",
+  "canonical_commit": "1b35928f7ecd00a02835e48ee638def789b59ee0",
+  "marketplace_base": "709d4972fb7fb4b1d3cc2c2597a57367aa7feef1",
+  "broken_pin": "2fadfe08349ef9c67059de3925a5e32dd560c20a",
+  "before": [
+    {
+      "client": "claude",
+      "route": "standalone",
+      "result": "pass",
+      "error": null
+    },
+    {
+      "client": "claude",
+      "route": "vhco-tools",
+      "result": "fail",
+      "error": "['claude', 'plugin', 'install', 'auth-refresh@vhco-tools'] exited 1: \u2718 Failed to install plugin \"auth-refresh@vhco-tools\": Failed to checkout commit 2fadfe08349ef9c67059de3925a5e32dd560c20a: fatal: unable to read tree (2fadfe08349ef9c67059de3925a5e32dd560c20a)\n"
+    },
+    {
+      "client": "codex",
+      "route": "standalone",
+      "result": "pass",
+      "error": null
+    },
+    {
+      "client": "codex",
+      "route": "vhco-tools",
+      "result": "fail",
+      "error": "['codex', 'plugin', 'add', 'auth-refresh@vhco-tools'] exited 1: Error: git checkout 2fadfe08349ef9c67059de3925a5e32dd560c20a failed with status exit status: 128\nstdout:\n\nstderr:\nfatal: unable to read tree (2fadfe08349ef9c67059de3925a5e32dd560c20a)\n\nCaused by:\n    git checkout 2fadfe08349ef9c67059de3925a5e32dd560c20a failed with status exit status: 128\n    stdout:\n    \n    stderr:\n    fatal: unable to read tree (2fadfe08349ef9c67059de3925a5e32dd560c20a)\n"
+    }
+  ],
+  "candidate": [
+    {
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "clients": {
+        "claude": "2.1.283 (Claude Code)",
+        "codex": "codex-cli 0.163.0"
+      },
+      "cases": [
+        {
+          "client": "claude",
+          "route": "standalone",
+          "result": "pass",
+          "private_state_preserved": true,
+          "steps": [
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "marketplace",
+                "add",
+                "https://github.com/michielvha/auth-refresh.git"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "install",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "list",
+                "--json"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/claude/plugins/cache/auth-refresh/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/darwin_arm64/auth-refresh",
+                "version"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/claude/plugins/cache/auth-refresh/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/darwin_arm64/auth-refresh",
+                "check",
+                "--json"
+              ],
+              "exit": 1
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "marketplace",
+                "update",
+                "auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "update",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "uninstall",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "client": "claude",
+          "route": "vhco-tools",
+          "result": "pass",
+          "private_state_preserved": true,
+          "steps": [
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "marketplace",
+                "add",
+                "/Users/michielvh/code/personal/vh-adlc-auth-acceptance"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "install",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "list",
+                "--json"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/claude/plugins/cache/vhco-tools/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/darwin_arm64/auth-refresh",
+                "version"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/claude/plugins/cache/vhco-tools/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/darwin_arm64/auth-refresh",
+                "check",
+                "--json"
+              ],
+              "exit": 1
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "marketplace",
+                "update",
+                "vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "update",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "uninstall",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "client": "codex",
+          "route": "standalone",
+          "result": "pass",
+          "private_state_preserved": true,
+          "steps": [
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "marketplace",
+                "add",
+                "michielvha/auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "add",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "list",
+                "--json"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/codex/plugins/cache/auth-refresh/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/darwin_arm64/auth-refresh",
+                "version"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/codex/plugins/cache/auth-refresh/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/darwin_arm64/auth-refresh",
+                "check",
+                "--json"
+              ],
+              "exit": 1
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "marketplace",
+                "upgrade",
+                "auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "add",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "remove",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "client": "codex",
+          "route": "vhco-tools",
+          "result": "pass",
+          "private_state_preserved": true,
+          "steps": [
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "marketplace",
+                "add",
+                "/Users/michielvh/code/personal/vh-adlc-auth-acceptance"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "add",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "list",
+                "--json"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/codex/plugins/cache/vhco-tools/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/darwin_arm64/auth-refresh",
+                "version"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/codex/plugins/cache/vhco-tools/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/darwin_arm64/auth-refresh",
+                "check",
+                "--json"
+              ],
+              "exit": 1
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "add",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "remove",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "platform": "Linux-7.0.13-100.fc43.x86_64-x86_64-with-glibc2.42",
+      "clients": {
+        "claude": "2.1.303 (Claude Code)",
+        "codex": "codex-cli 0.163.0"
+      },
+      "cases": [
+        {
+          "client": "claude",
+          "route": "standalone",
+          "result": "pass",
+          "private_state_preserved": true,
+          "steps": [
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "marketplace",
+                "add",
+                "https://github.com/michielvha/auth-refresh.git"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "install",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "list",
+                "--json"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/claude/plugins/cache/auth-refresh/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/linux_amd64/auth-refresh",
+                "version"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/claude/plugins/cache/auth-refresh/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/linux_amd64/auth-refresh",
+                "check",
+                "--json"
+              ],
+              "exit": 1
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "marketplace",
+                "update",
+                "auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "update",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "uninstall",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "client": "claude",
+          "route": "vhco-tools",
+          "result": "pass",
+          "private_state_preserved": true,
+          "steps": [
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "marketplace",
+                "add",
+                "/tmp/auth-refresh-marketplace.pwiDkT"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "install",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "list",
+                "--json"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/claude/plugins/cache/vhco-tools/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/linux_amd64/auth-refresh",
+                "version"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/claude/plugins/cache/vhco-tools/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/linux_amd64/auth-refresh",
+                "check",
+                "--json"
+              ],
+              "exit": 1
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "marketplace",
+                "update",
+                "vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "update",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "claude",
+                "plugin",
+                "uninstall",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "client": "codex",
+          "route": "standalone",
+          "result": "pass",
+          "private_state_preserved": true,
+          "steps": [
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "marketplace",
+                "add",
+                "michielvha/auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "add",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "list",
+                "--json"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/codex/plugins/cache/auth-refresh/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/linux_amd64/auth-refresh",
+                "version"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/codex/plugins/cache/auth-refresh/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/linux_amd64/auth-refresh",
+                "check",
+                "--json"
+              ],
+              "exit": 1
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "marketplace",
+                "upgrade",
+                "auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "add",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "remove",
+                "auth-refresh@auth-refresh"
+              ],
+              "exit": 0
+            }
+          ]
+        },
+        {
+          "client": "codex",
+          "route": "vhco-tools",
+          "result": "pass",
+          "private_state_preserved": true,
+          "steps": [
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "marketplace",
+                "add",
+                "/tmp/auth-refresh-marketplace.pwiDkT"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "add",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "list",
+                "--json"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/codex/plugins/cache/vhco-tools/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/linux_amd64/auth-refresh",
+                "version"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "bash",
+                "<profile>/codex/plugins/cache/vhco-tools/auth-refresh/0.2.0-rc.1/scripts/ensure-auth-refresh.sh"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "<profile>/cache/auth-refresh/bin/0.2.0-rc.1/linux_amd64/auth-refresh",
+                "check",
+                "--json"
+              ],
+              "exit": 1
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "add",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            },
+            {
+              "command": [
+                "codex",
+                "plugin",
+                "remove",
+                "auth-refresh@vhco-tools"
+              ],
+              "exit": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "canonical_payload_sha256": {
+    "auth-refresh.lock.json": "5908dac238de5b756dbb800282f71a07415c31b7123dd4346703f62f78088a92",
+    "scripts/ensure-auth-refresh.sh": "659d67bde9d14a0500be3f2805f0cd8ed0e0ed3fca2752569bbb1bdac2e31ed2",
+    "scripts/runtime-install.py": "50ea76209e4384655b0a8b9a0bce3b95950d6baeb94e43572f476358bb087a67",
+    "skills/auth-refresh/SKILL.md": "67b16da372b590ea2c9cfdd0ea3b5f9bee9cb47c6e96aedb48af212f38462289",
+    "skills/auth-refresh/references/workflow.md": "ae28d24220f368dfd6efcabfdd1872877c1360476386d5288e0af38ccaf6dd03",
+    "skills/auth-refresh/references/capabilities.md": "3d0e81aa28af2309c065d2395798e4452ddfef671aa107954e92a5369d24747b",
+    "agents/auth-refresh.md": "039af0d44bf0e0a2e68b822cf4e15ee988389aac9088ae7a086e0c045899ef31"
+  },
+  "limits": [
+    "Repaired vhco-tools catalog was a local candidate; its component source and runtime were downloaded from GitHub.",
+    "Same-version refresh and reinstall passed on both clients and hosts; Claude Linux rollback and legacy invocation passed in the continued acceptance run below.",
+    "No fixture result establishes live provider authentication or phone MFA continuation."
+  ],
+  "continued_acceptance": {
+    "date": "2026-10-23",
+    "host": "Fedora Linux x86_64",
+    "runtime": "0.2.0-rc.1",
+    "aws": {
+      "cold_device_login": "pass",
+      "cli_exit": 0,
+      "consent_buttons_completed": true,
+      "saved_session_bytes": 7573,
+      "expected_admin_identity_verified": true,
+      "sts_profiles": 9,
+      "all_accounts_and_roles_match": true
+    },
+    "azure": {
+      "device_login": "pass",
+      "cli_exit": 0,
+      "configured_tenant_token_probe_exit": 0,
+      "token_expiry": "2026-10-23 22:20:51.000000",
+      "warm_admin_idp_session_reused": true,
+      "saved_session_bytes": 18551,
+      "transport_override": "Temporary process-only urllib3 IPv4 resolver wrapper; installed Azure CLI and system routing unchanged.",
+      "unmodified_cli_limitation": "Python requests selected unreachable IPv6 addresses before IPv4 and hung in tenant/version metadata requests.",
+      "informational_version_cache_restored": true
+    },
+    "admin_restart": {
+      "steps": [
+        {
+          "action": "lane stop admin",
+          "exit": 0,
+          "expected_identity_verified": null
+        },
+        {
+          "action": "lane start admin",
+          "exit": 0,
+          "expected_identity_verified": null
+        },
+        {
+          "action": "lane whoami admin",
+          "exit": 0,
+          "expected_identity_verified": true
+        }
+      ],
+      "all_live_lanes_parked": true,
+      "admin_session_bytes": 18551
+    },
+    "eks": {
+      "clusters_discovered": 8,
+      "temporary_kubeconfigs_created": 8,
+      "identity_probe_successes": 0,
+      "all_identity_probes_failed_on_dns": true,
+      "default_kubeconfig_preserved": true
+    },
+    "aks": {
+      "configured_cluster_discovered": true,
+      "temporary_user_kubeconfig_exit": 0,
+      "identity_probe_exit": 1,
+      "missing_credential_executable": "kubelogin",
+      "private_hostname_resolves": false,
+      "default_kubeconfig_preserved": true
+    },
+    "rollback": {
+      "client": "Claude CLI",
+      "from": "0.2.0-rc.1",
+      "to": "0.1.0",
+      "historical_component": "c1d01ba1a424d1565103c3adf103cfada774cdab",
+      "native_reinstall": "pass",
+      "legacy_agent_invocation": {
+        "exit": 0,
+        "subtype": "success",
+        "is_error": false,
+        "missing_manual_token_reported": true,
+        "private_state_preserved": true,
+        "stderr": ""
+      },
+      "fixture_config_credentials_and_session_bytes_and_0600_preserved": true,
+      "current_runtime_cache_retained": true
+    },
+    "claude_missing_capability": {
+      "fixture_config_valid": true,
+      "cli_exit": 0,
+      "tools": "Bash,Read,Skill; no PushNotification or ToolSearch",
+      "stopped_before_login": true,
+      "lane_state_created": false,
+      "result_excerpt": "Stopped before starting the login. The required phone-notification capability is not available in this session, so per capabilities.md the unattended push flow must not begin."
+    },
+    "claude_native_remote_control": {
+      "push_tool_available": true,
+      "push_status_schema": [
+        "proactive"
+      ],
+      "bounded_background_wait_seconds": 45,
+      "background_wait_completed": true,
+      "normal_live_login": {
+        "owner_account_specific_approval": true,
+        "result": "Stopped before credential submission or challenge: Claude auto mode rejected whoami as PII Data Handling and tenant navigation as Real-World Transactions.",
+        "new_mfa_sent": false,
+        "security_settings_changed": false
+      },
+      "fake_challenge_delivery_failure": {
+        "notification_calls": 1,
+        "test_code": 62,
+        "tool_result": "Not sent — this terminal is active, so your output here already reaches the user; a separate notification would be redundant.",
+        "automatic_retry": false,
+        "native_park_exit": 0,
+        "native_status_exit": 0,
+        "parked": true,
+        "page_polling_stopped": true,
+        "fixture_stop_exit": 0,
+        "fixture_server_stopped": true
+      }
+    },
+    "transport_checks": [
+      {
+        "provider": "registry_transport",
+        "exit": 0,
+        "http_status": "401",
+        "dns_failure": false
+      },
+      {
+        "provider": "service_health",
+        "exit": 6,
+        "http_status": "000",
+        "dns_failure": true
+      }
+    ],
+    "remaining_inputs": {
+      "corporate_github_account": "Not logged in; personal account unchanged.",
+      "manual_token_files_missing": 3,
+      "registry_authenticated_access": "Not verified; IPv4 unauthenticated v2 endpoint returned 401.",
+      "managed_work_host": "Existing SSH route refused authorization and requested SSM Connect Reconnect Existing Workspace; no bypass attempted."
+    },
+    "cleanup": {
+      "real_challenges_active": false,
+      "admin_authenticated_and_parked": true,
+      "normal_test_lane_stopped": true,
+      "fake_lane_and_server_stopped": true,
+      "native_remote_control_test_session_exited": true
+    }
+  }
+}

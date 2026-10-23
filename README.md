@@ -19,7 +19,34 @@ The scripts need [Bun](https://bun.sh).
 | Plugin | What it does |
 |---|---|
 | `github-app-registration` | Registers a GitHub App through GitHub's manifest flow, stores its credentials locally with mode 0600, and copies them into a project's env and key files without printing them. |
+| `auth-refresh` | Checks and restores local SSO identities in isolated account lanes. It is installed separately and keeps Claude Remote Control phone notifications. |
 | `vh-adlc` | Software lifecycle intake and bounded maintenance, with a gated feature loop whose document is both spec and plan. |
+
+## auth-refresh
+
+Auth-refresh is a separate plugin in this marketplace. Installing vh-adlc does not install it.
+Its source and canonical workflow live in [michielvha/auth-refresh](https://github.com/michielvha/auth-refresh).
+Both catalog formats pin the same component commit. No provider workflow is copied into this repository.
+
+In Claude Code, install `auth-refresh@vhco-tools`. In Codex, select auth-refresh from the
+vhco-tools marketplace or run `codex plugin add auth-refresh@vhco-tools` after adding the marketplace.
+It can also be installed independently from its own repository.
+
+The standalone component is available from its default branch.
+Both catalogs select component `360d8cd5b52877c18da102662a568cbcce4688a3` and provision the signed
+`v0.2.0-rc.2` runtime, which includes the provider probe classification fixes. Native Claude and Codex
+installation, update and uninstall passed through both routes on macOS and Linux. Claude rollback and
+legacy-agent invocation also passed. The release signature and archive hashes were verified against
+the existing VHCO Pro release key.
+
+To test this branch in Codex, use `codex plugin marketplace add michielvha/vh-adlc --ref feat/portable-auth-refresh`,
+then install `auth-refresh@vhco-tools`. For Claude, add
+`https://github.com/michielvha/vh-adlc.git#feat/portable-auth-refresh` as the marketplace source.
+The auth-refresh repository and runtime release are public; GitHub credentials are not required for
+source access or runtime provisioning.
+The owner confirmed receipt of a test phone notification. A complete phone MFA login and the remaining
+corporate-provider checks still need acceptance. The [acceptance results and corporate-host handoff](docs/specs/portable-auth-refresh.md)
+record the completed checks and prerequisites. Keep the existing setup until those checks pass.
 
 ## vh-adlc
 
