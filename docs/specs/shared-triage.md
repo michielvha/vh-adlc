@@ -264,6 +264,7 @@ the reviewed specification on 2026-10-23. Implementation and publication retain 
 | 2026-10-23 | R-1 | spec | `b12baa57c5ca379474b97873e5aaeb43e5044098` | unknown | procedural | Blocking closure-evidence conflict and missing protected-umbrella parity exception; model identity not attested. |
 | 2026-10-23 | R-2 | spec | `3a874470e499590afde434f165feaf19ca4d1e54` | unknown | procedural | No findings; model identity not attested. |
 | 2026-10-23 | R-2 | spec | `3a874470e499590afde434f165feaf19ca4d1e54` | n/a | n/a | accepted by owner |
+| 2026-10-23 | R-3 | spec | `b74f650edfbd88244b058d824b31a5d9043f4c19` | claude-opus-5.5 | procedural | Copilot bounded-packet review: ten findings; decisions and source/gate verification follow-up required. |
 
 ### R-1
 
@@ -284,6 +285,78 @@ PROPOSAL: Record the legacy umbrella exception in the migration baseline and add
 ### R-2
 
 NO FINDINGS
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Collection, verification and report; Design / Stackweaver migration and rollback; Test Plan / AC-07
+EVIDENCE: Stackweaver agents/issue-triage.md:50-55 triages umbrella trackers by refreshing their checklist by default. It also surfaces a close candidate when the owner already left a closing comment on the issue. docs/specs/shared-triage.md:126-127 surfaces umbrella checklist or closure proposals only on an explicit owner request. Line 164-165 treats issue comments as untrusted data that are never authority, so an owner's closing comment on an issue can no longer trigger the proposal. Line 185 still says the migration will "Preserve the legacy umbrella checklist/owner-intended closure exception", while line 194-195 lists only three intentional differences: approval for remote writes, pagination and explicit incomplete evidence. The parity case at line 192-193 for umbrellas without an owner request will therefore differ from legacy output in a way the document does not record.
+PROPOSAL: Add the changed umbrella behavior to the recorded intentional differences: no checklist refresh without a request, and no closure proposal from an owner comment alone. Alternatively, define how an owner comment found on the issue is surfaced as a lead without counting as authority. Make the parity pass condition name the expected difference.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Owner-approved execution; Acceptance Criteria / AC-06
+EVIDENCE: docs/specs/shared-triage.md:158-160 says that approval binds the repository, issue IDs, action types and the report or evidence. It does not bind the exact comment text, label names, closure reason or canonical issue for a duplicate. Line 171 chooses the closure reason at execution time. AC-06 at line 230 says only "the approved target/action set". Under this wording, execution could post different comment text, apply a different label or use a different closure reason from the ones the owner saw, and still pass the criterion.
+PROPOSAL: Make approval bind each action's exact payload: comment body, label names, closure reason and the duplicate's canonical issue. Treat any change to a payload as invalidating that item, and add a negative case to the AC-06 Test Plan row.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Canonical workflow and harness boundary; Acceptance Criteria / AC-03; Test Plan / AC-03
+EVIDENCE: docs/specs/shared-triage.md:91-93 limits the effect of an unavailable source to "affected claims", which then cannot become executable close candidates. AC-03 at line 227 says "partial data never establishes ... an executable closure proposal". The Test Plan at line 241 says "incomplete reports cannot produce executable closure proposals", which applies to the whole report. These three readings conflict. Take a sweep where a single issue's comment page fails. Under line 91-93, closures for other issues are still allowed. Under line 241, every closure is blocked. Incomplete coverage of the closed-issue inventory affects duplicate verdicts for every issue, but the document does not say so.
+PROPOSAL: State one rule: either any incomplete coverage blocks every executable closure, or only claims whose evidence depends on the missing data are blocked. Name which collections, such as the closed-issue and merged-PR inventories, affect every closure. Align AC-03 and its Test Plan row with that rule.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope; Design / Stackweaver migration and rollback; Acceptance Criteria / AC-07, AC-08
+EVIDENCE: The `covers` paths at docs/specs/shared-triage.md:6-9 are inside vh-adlc only, and line 52-54 verifies Stackweaver separately at its own commit. Line 196 requires that a "reviewed shared plugin revision" be published or installed before cutover, and AC-07 needs it installed in Stackweaver. README.md:126-127 and :139-143 install from the vhco-tools Git marketplace. That route serves published content, which normally exists only after shipping, and shipping follows the complete gate. The complete gate needs AC-07 and AC-08 to be met or residualised. Its implementation review covers one vh-adlc commit, and `feature_tree_clean` cannot see Stackweaver. authority.md:19-22 requires a separate request to push or ship, and a new scope decision for another repository. The document does not name the install source, the Stackweaver branch or commit authority, or how Stackweaver evidence is tied to the reviewed vh-adlc commit.
+PROPOSAL: State how the Stackweaver trial installs the reviewed revision before shipping, for example a local install of an exact commit. State how the implementation review records and verifies the Stackweaver commit for AC-07 through AC-09. State which authority covers Stackweaver commits and any push. Otherwise, split the Stackweaver migration into a later feature.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria / AC-01; Design / Validation surfaces; Test Plan / AC-01
+EVIDENCE: AC-01 at docs/specs/shared-triage.md:225 says "the required native clients" but does not name them. Line 218 requires discovery to "remain valid for the clients already claimed by vh-adlc". README.md:183-184 claims the Claude Code desktop app and the Claude Code VS Code extension. The Test Plan at line 239 names only Codex CLI, Claude CLI, Codex desktop and VS Code Local. README.md:181 records that Computer Use was refused access to the Codex app, so the required Codex desktop capture may not be possible. The document does not say whether that leaves AC-01 unmet, residualised, or met with the remaining clients.
+PROPOSAL: List the exact required clients in AC-01. Either add the Claude Code desktop app and extension to the Test Plan or record that the README must not claim the new operation on them. State what happens to AC-01 when a required GUI run is unavailable.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Owner-approved execution; Test Plan / AC-05, AC-06
+EVIDENCE: docs/specs/shared-triage.md:175-176 requires that local plan-status sync is shown in the batch and cannot bypass a feature completion gate. Legacy Stackweaver agents/issue-triage.md:229-232 rewrites plan `status` when an issue closes. No criterion and no Test Plan row at lines 243-244 covers plan-status sync. Nothing tests a sync that would move a gated feature document to `complete`, and nothing tests a sync that was left out of the approved batch.
+PROPOSAL: Name plan-status sync in AC-06, or in a new criterion. Add fixtures that show a sync appears in the batch, that an unapproved sync is not applied, and that a gated document is not moved past its gate.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria / AC-05, AC-07; Scope; Test Plan / AC-09
+EVIDENCE: AC-05 at docs/specs/shared-triage.md:229 uses "bounded" and "appropriate ranking", and AC-07 at line 231 uses "the intended cutover behavior". None of these is an observable end state. Line 53-54 allows "any triage-only verification fixtures" in the Stackweaver migration paths. This leaves the AC-09 diff check at line 247 without a fixed path set.
+PROPOSAL: Replace these words with the specific properties that Design lines 140-153 and 202-212 already define. Name the Stackweaver fixture directory so the AC-09 diff has an exact allowed path list.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: docs/specs/shared-triage.md:26-27 cites Stackweaver agents/issue-triage.md:83, :170 and :194, and line 32 cites :172 for the milestone priority. In the exported file at 7c3790f, line 83 is blank, and Step 2 is on line 82. Line 170 is the end of the label paragraph, and Step 5 starts on line 172. Line 194 is blank, and Step 6 is on line 195. The `Public Go Live` milestone rule is on lines 176-177. Line 39 cites references/lifecycle.md:36 for intake routing. At b74f650, that line is blank, and the routing table is on lines 37-49.
+PROPOSAL: Correct the line citations to 82, 172, 195 and 176. Cite the lifecycle routing at the commit actually read.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context; Scope / Deferred work register
+EVIDENCE: The packet does not include several cited sources. From Stackweaver, these are agents/maintenance.md, agents/codebase-audit.md, agents/docs-impact.md, docs-drift-audit.md, docs-drift-resolver.md, docs-truth.md, agents/tfe-compat.md, agents/provider-fork.md and CLAUDE.md. vh-adlc at 9b68b56 is also missing. Without them, these claims cannot be decided: the protection-policy conflict between wrapper and playbook in D-01, the local auto-merge behavior in D-02, and the documentation and domain files in D-03 and D-04. The Context claims about 9b68b56 at docs/specs/shared-triage.md:37-40 cannot be decided either. vh-adlc-tree.txt shows seven skills and a reviewer, but only at b74f650.
+PROPOSAL: Give the reviewer these sources at exact commits, or cite the claims at b74f650 and at Stackweaver commits included in the packet. Until then, treat D-01 through D-04 and the 9b68b56 claims as unverified.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter; Review Log
+EVIDENCE: The binary at /home/m/.cache/vh-adlc/bin/0.1.0/linux_amd64/vh-adlc could not be run, and no shell was available. So `lint`, `fresh`, `gate planned` and `review check` were not observed, and the sha256 values in source-manifest.json could not be checked. The acceptance row at docs/specs/shared-triage.md:266 accepts R-2 at 3a874470, but this review targets b74f650. The claim at line 3, "planned gate passed", and the condition that the normative baseline at b74f650 matches 3a874470 could not be decided.
+PROPOSAL: Run `fresh` and `gate planned` at b74f650 on the original host. Confirm that the export hashes match. If the normative baseline changed after 3a874470, move the document back to draft and get acceptance again.
 
 ## Sources
 
