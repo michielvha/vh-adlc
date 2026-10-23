@@ -300,6 +300,17 @@ including the pinned newer linter. The owner then authorized merging PR #8. It m
 `42d4d37034c8a23f0b5f16d0c5495626bfe2994a`, so main now contains the three process-error fixes.
 The portable-auth migration PRs remain separate and unmerged.
 
+On 2026-10-23, the owner authorized making auth-refresh public. Gitleaks 8.21.2 scanned all reachable
+Git history (24 commits) with redacted reporting and found no leaks. The repository visibility was
+changed to PUBLIC and confirmed through GitHub metadata. An anonymous Git request with system/global
+Git config and credential helpers excluded resolved main to
+`42d4d37034c8a23f0b5f16d0c5495626bfe2994a`. An unauthenticated curl download of the Linux amd64
+`v0.2.0-rc.1` archive matched its committed SHA-256 pin. A fresh disposable-cache installer run with
+GitHub token variables removed and an empty GH_CONFIG_DIR succeeded and returned the expected
+`auth-refresh 0.2.0-rc.1` version. Public installation no longer requires authenticated gh; its private
+release fallback remains available. Historical private-repository observations above describe earlier
+runs. The portable-plugin PRs remain unmerged, and phone/GUI/provider acceptance gaps remain open.
+
 ## Scope
 
 Coordinate changes in this marketplace and the standalone auth-refresh repository. Keep runtime,

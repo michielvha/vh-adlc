@@ -35,12 +35,13 @@ It can also be installed independently from its own repository.
 The candidate is published on `feat/portable-auth-refresh` in both repositories. Actual GitHub-backed
 plugin installation passed in disposable Codex and Claude CLI profiles through both marketplace
 routes. Runtime provisioning pins the signed `v0.2.0-rc.1` release, whose checksum signature and archive
-hashes were verified against the existing VHCO Pro release key. The default branches have not been changed.
+hashes were verified against the existing VHCO Pro release key. The portable-plugin PRs have not been merged into the default branches.
 
 To test this branch in Codex, use `codex plugin marketplace add michielvha/vh-adlc --ref feat/portable-auth-refresh`,
 then install `auth-refresh@vhco-tools`. For Claude, add
 `https://github.com/michielvha/vh-adlc.git#feat/portable-auth-refresh` as the marketplace source.
-The auth-refresh source repository is private, so Git access and authenticated `gh` access are required.
+The auth-refresh repository and runtime release are public; GitHub credentials are not required for
+source access or runtime provisioning.
 Claude phone delivery remains deferred to another host at the owner's request. Read the current
 [acceptance results](docs/specs/portable-auth-refresh.md) before migrating an existing setup.
 
