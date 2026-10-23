@@ -327,6 +327,16 @@ with the verified production binary's config parser, lane listing and doctor in 
 setup, without changing the live config or starting a login. The shared catalogs pin that README
 revision while retaining the same signed runtime release and hashes.
 
+On the owner's request, auth-refresh PR #6 was merged on 2026-10-23. The remote history was
+subsequently rewritten; current merge `7d1f59c` has the identical tree
+`b15931026ea12d3aef5625a3360d0c35e2df9450` as the initially observed merge `37af2e6`.
+README follow-up `1b35928f7ecd00a02835e48ee638def789b59ee0` is published on current main. Standalone
+install commands now use the default branch, while shared-marketplace instructions explicitly identify
+open vh-adlc PR #24 and its candidate branch. A fresh disposable-cache install from that main checkout,
+with empty GitHub token variables and an empty GH_CONFIG_DIR, returned `auth-refresh 0.2.0-rc.1`.
+The marketplace catalogs above still name their historical component pin; this main merge does not
+establish new marketplace acceptance or resolve the deferred phone, GUI, rollback or provider tests.
+
 ## Scope
 
 Coordinate changes in this marketplace and the standalone auth-refresh repository. Keep runtime,
