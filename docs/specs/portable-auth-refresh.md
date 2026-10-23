@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "CLI lifecycle, rollback, admin restore and AWS login pass; Azure needs an IPv4 override. Phone MFA, GUI routes and remaining providers stay open."
+status_description: "Marketplace checks pass after merging main. Provider source fixes await merge and runtime publication; corporate and phone acceptance remain open."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -446,6 +446,61 @@ active. Desktop UI automation was not restarted after the owner reported duplica
 AC-08 now has rollback and legacy-invocation evidence as well as the eight installation lifecycle
 cases. T5 remains open for the complete phone MFA flow, required GUI routes, normal-lane login,
 Kubernetes identity and the remaining real-provider rows. The shared-catalog repair remains local.
+
+### Corporate-host handoff, 2026-10-23
+
+The owner authorized publishing the in-progress work for continuation on the corporate host.
+Marketplace merge `02e862d2feb16d88f5703d07b70267fca9968707` includes main
+`9b68b56292416da212910c62e133e09a49cd5258`, preserving its vh-adlc 0.3.0 lifecycle content and the
+auth-refresh catalog entry. Its verification passed `go test ./...`, `go vet ./...`,
+`go mod tidy -diff`, golangci-lint 2.15.0 configuration and analysis, the combined Bun suite
+(217 tests, 595 assertions), and the registration plugin suite (34 tests). All four macOS native
+Claude/Codex standalone/shared lifecycle cases passed again. Initial sandbox-only failures were
+rerun with the loopback and download access required by the fixtures.
+
+A clean-cache macOS browser setup exited 1 with `verified browser runtime unavailable for darwin/arm64`.
+This matches the component's documented Linux amd64 managed-browser support. macOS installation and
+read-only checks are tested; browser login acceptance must run on a supported host.
+
+Independent review R-8 found four additional classification failures in the pinned component:
+wrapped Kubernetes credential-plugin network, cache-permission and Conditional Access failures,
+plus an AWS TLS verification failure with absent SSO cache. They incorrectly offered a login.
+Source correction `babe4dba267f1183417b9474ac276ad231b78749` is on auth-refresh branch
+`fix/provider-probe-failures` in [auth-refresh PR #3](https://github.com/michielvha/auth-refresh/pull/3).
+New regressions failed before the changes and passed afterward, including expired-cache TLS,
+unknown plugin failures and explicit provider codes wrapped by generic OAuth errors. A bounded
+independent source re-review at that commit reran all five reviewer reproductions and positive
+credential regressions, with no remaining findings. It did not exercise a released runtime or live
+providers. Existing positive expired-token tests still pass. Full Go tests, provider race tests,
+vet, module consistency and golangci-lint 2.15.0
+passed locally. macOS Go tests used `TMPDIR=/tmp` for the Unix socket path limit; this does not establish
+browser E2E coverage. The published `v0.2.0-rc.1` binary and both catalog pins remain unchanged.
+Do not treat the source correction as a released runtime or close AC-05 until delivery is verified.
+
+Continue from this feature branch and PR #24, reading this document before starting new work. Reuse
+the recorded passing checks unless new changes, failures or an outstanding criterion justify a rerun.
+Use the corporate host's local configuration and credentials; do not copy private files between hosts.
+
+1. Reconnect the managed workspace through SSM Connect if its existing SSH route still refuses access.
+   Inspect the owning worktree with `git status --short` and `git worktree list --porcelain`, fetch
+   `origin/feat/portable-auth-refresh`, and update a clean checkout without replacing unrelated work.
+2. Read the host notes and run the configured read-only provider check. Verify private AKS/EKS and
+   service DNS, `kubelogin`, the exact corporate GitHub identity and the three manual token files.
+   Use existing valid tokens; token issuance remains a manual operation. Keep personal GitHub state.
+3. Review and test auth-refresh `fix/provider-probe-failures`. A binary built from that source is a
+   development test candidate, not the plugin's signed runtime. Coordinate a verified runtime release
+   and catalog update before claiming the classification defects are fixed in the installed plugin.
+4. Complete one real normal-lane IdP login and the full Claude phone flow: matching account/provider
+   and MFA number, one actual phone notification, bounded continuation, post-approval consent,
+   saved state and expected identity. Resolve task-specific native permission prompts through the
+   host's normal approval path; do not disable its protections. Keep one outstanding MFA challenge,
+   park on delivery failure or timeout, and suppress retries.
+5. Run read-only AKS/EKS identity and registry checks using temporary kubeconfigs when needed. Verify
+   GitHub, PAT/Sonar and service health from the corporate network. Check plain Azure operation without
+   the earlier temporary IPv4 wrapper. Finish the outstanding desktop and shared-route GUI invocation.
+6. Record sanitized outcomes here, obtain fresh exact-commit reviews and run the completion gate only
+   after all criteria are met or owner-approved residuals have durable trackers. Keep this feature
+   in progress until then; do not infer a production cutover from the branch push.
 
 ## Scope
 
