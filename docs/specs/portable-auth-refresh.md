@@ -548,14 +548,22 @@ open. No required target is removed during implementation to narrow the claimed 
 ## Acceptance Criteria
 
 - [ ] AC-01: Auth-refresh installs and is discoverable as a separate plugin from vhco-tools and directly from its own repository on each claimed harness, without installing vh-adlc or requiring a source checkout.
+      Evidence: R-8, not verified; see the exact-commit review records below.
 - [ ] AC-02: Both install routes load the same canonical workflow and a verified pinned runtime; corrupt downloads, missing artifacts and unsupported platforms fail before executable code runs.
+      Evidence: R-8, not verified; see the exact-commit review records below.
 - [ ] AC-03: Claude's existing MFA phone push, immediate number delivery, background continuation and post-MFA confirmation complete a real login with the same user interaction as before.
+      Evidence: R-8, not verified; see the exact-commit review records below.
 - [ ] AC-04: Other required harnesses complete the shared workflow using available capabilities; missing required notification capabilities stop unattended authentication before a challenge, and delivery failures during a challenge are reported immediately, park the challenge and suppress further pushes.
-- [x] AC-05: All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
+      Evidence: R-8, not verified; see the exact-commit review records below.
+- [ ] AC-05: All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
+      Evidence: R-8, not met; see the exact-commit review records below.
       Evidence: R-5, R-6 and R-7; component `be34aa21b1701dfed73ef2f8c8f7c780d2728996` provider regressions and independent reviewer fixtures passed. Full Go and independent probe suites passed; real-provider matrix remains open under AC-07.
 - [ ] AC-06: A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
+      Evidence: R-8, not verified; see the exact-commit review records below.
 - [ ] AC-07: Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
-- [x] AC-08: Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
+      Evidence: R-8, not verified; see the exact-commit review records below.
+- [ ] AC-08: Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
+      Evidence: R-8, not verified; see the exact-commit review records below.
       Evidence: Native lifecycle driver at marketplace `f4109b6` passed both routes in Claude and Codex on macOS and Linux against component `1b35928f7ecd00a02835e48ee638def789b59ee0`. Native Claude Linux rollback to the real historical 0.1.0 package and old-agent invocation passed; fixture private bytes and mode 0600 were preserved and the current runtime cache was retained. Sanitized results: `tests/auth-refresh/evidence/native-2026-10-23.json`, including `continued_acceptance.rollback`.
 
 ## Test Plan
@@ -600,10 +608,9 @@ None. The live Claude target is Remote Control through the phone app.
 | 2026-10-22 | R-3 | spec | `f3ea3bb5373572683856e832b92e52725590258e` | n/a | n/a | accepted by owner |
 | 2026-10-22 | R-4 | implementation | `f3ea3bb5373572683856e832b92e52725590258e` | unknown | procedural | Diagnostic review at runtime b2fca51 found three blockers; required live tests remain unverified. |
 | 2026-10-22 | R-5 | implementation | `11cb22c99de97d50d30e54fcebf87c69504bfcf3` | unknown | procedural | Focused re-review at runtime fda67f4 resolved all three code blockers; AC-05 met, other composite criteria unverified. |
-
 | 2026-10-22 | R-6 | implementation | `ee31174e8eafcbeda232d9274bbaf790f706309f` | unknown | procedural | Final focused review at runtime a00c600 found no new actionable defects; AC-05 met, composite criteria remain unverified. |
-
 | 2026-10-23 | R-7 | implementation | `18e27d3da334cddc3c76d80c9be79f1893442c92` | unknown | procedural | Verified signed runtime assets and reran actual remote acceptance at component be34aa2; no findings, AC-05 met and composite gaps remain open. |
+| 2026-10-23 | R-8 | implementation | `02e862d2feb16d88f5703d07b70267fca9968707` | unknown | procedural | Independent native and fixture checks passed; four additional provider failures violate AC-05. Composite live criteria remain unverified. |
 
 ### R-1
 
@@ -792,6 +799,55 @@ EVIDENCE: The focused provider suite passed at component be34aa21b1701dfed73ef2f
 CRITERION: AC-08 Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
 VERDICT: not verified
 EVIDENCE: The independently executed remote suite at marketplace 18e27d3da334cddc3c76d80c9be79f1893442c92 and component be34aa21b1701dfed73ef2f8c8f7c780d2728996 passed Git marketplace refresh or upgrade, plugin update or refresh, and uninstall across both clients and both routes. Sentinel config and credential contents and restrictive credential permissions survived. Installed canonical payloads matched the component pin. Actual legacy Claude invocation and the documented rollback procedure without logout remain unverified.
+
+### R-8
+
+
+CRITERION: AC-01 Auth-refresh installs and is discoverable as a separate plugin from vhco-tools and directly from its own repository on each claimed harness, without installing vh-adlc or requiring a source checkout.
+VERDICT: not verified
+EVIDENCE: Independently executed native-acceptance.py at marketplace 02e862d2feb16d88f5703d07b70267fca9968707 and component 1b35928f7ecd00a02835e48ee638def789b59ee0. All four standalone/shared Claude 2.1.283 and Codex 0.163.0 cases passed in disposable macOS profiles. The shared catalog was local; component payloads came from GitHub. Required GUI and Remote Control routes were not executed.
+
+CRITERION: AC-02 Both install routes load the same canonical workflow and a verified pinned runtime; corrupt downloads, missing artifacts and unsupported platforms fail before executable code runs.
+VERDICT: not verified
+EVIDENCE: At the reviewed marketplace and component commits, all four native lifecycle cases passed canonical payload comparisons, published runtime provisioning, version verification and cache reuse. Eight Python regressions and the independent corrupt-driver rejection test passed. The complete provisioning failure matrix, interrupted downloads and browser dependency scenarios were not executed.
+
+CRITERION: AC-03 Claude's existing MFA phone push, immediate number delivery, background continuation and post-MFA confirmation complete a real login with the same user interaction as before.
+VERDICT: not verified
+EVIDENCE: Inspected the pinned legacy agent and canonical workflow; phone delivery, immediate number reporting and background confirmation instructions remain present. No real login, phone notification or Remote Control continuation was executed in this review. Historical recorded outcomes are not executions observed here.
+
+CRITERION: AC-04 Other required harnesses complete the shared workflow using available capabilities; missing required notification capabilities stop unattended authentication before a challenge, and delivery failures during a challenge are reported immediately, park the challenge and suppress further pushes.
+VERDICT: not verified
+EVIDENCE: Inspected capability selection and failed-delivery cleanup instructions at component 1b35928f7ecd00a02835e48ee638def789b59ee0. Four native lifecycle cases passed read-only fixture invocation. Required-host challenge delivery, capability rejection, parking and continuation scenarios were not executed.
+
+CRITERION: AC-05 All identity types distinguish credential rejection from transport, permission and setup failures; only supported credential failures offer a login, and manual tokens remain manual.
+VERDICT: not met
+EVIDENCE: The component Go suite and committed provider contract passed. Independently executed TestReviewAdditionalClassification through /tmp/auth-refresh-extra-review-9_ppwp3i/overlay.json at component 1b35928f7ecd00a02835e48ee638def789b59ee0. Four additional cases failed: Kubernetes credential-plugin network, permission and Conditional Access failures, plus AWS certificate verification failure with absent fixture cache, returned DEAD and start fixes instead of WARN without login.
+
+CRITERION: AC-06 A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
+VERDICT: not verified
+EVIDENCE: Executed go test -count=1 ./... with GOCACHE=/tmp/auth-refresh-review-go-cache and TMPDIR=/tmp at the pinned component; all six packages passed. A separate verbose lane run confirmed browser-dependent tests skipped because the pinned driver was absent. Real-provider restoration, account verification and abandoned phone-push cessation were not executed.
+
+CRITERION: AC-07 Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
+VERDICT: not verified
+EVIDENCE: Independently executed the component Go suite and marketplace provider/provisioning checks; the focused Bun run passed 49 tests and 153 assertions. No required live-provider matrix was executed. origin/main is an ancestor of marketplace 02e862d2feb16d88f5703d07b70267fca9968707; plugin implementation and CI files match origin/main, and both catalogs select the inspected component commit.
+
+CRITERION: AC-08 Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
+VERDICT: not verified
+EVIDENCE: All four independently executed native lifecycle cases preserved fixture config, credentials and saved-session bytes with mode 0600 during installation, refresh and uninstall. Inspected the retained legacy entry point. Historical rollback and actual legacy-agent invocation were not rerun in this review, so the passing lifecycle subset does not close this composite criterion.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: auth-refresh internal/check/check.go:347 and internal/check/check.go:389
+EVIDENCE: At component 1b35928f7ecd00a02835e48ee638def789b59ee0, TestReviewAdditionalClassification reproduced Kubernetes exec-plugin endpoint connection failure, Permission denied reading cache, and AADSTS53003 Conditional Access rejection. Each returned DEAD with a start fix. The generic getting credentials, executable failure and AADSTS patterns classify these failures as authentication before evaluating their actual cause.
+PROPOSAL: Require affirmative credential-rejection evidence for DEAD. Classify transport, permission and policy failures as WARN without login fixes, and retain regressions for wrapped credential-plugin errors.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: auth-refresh internal/check/check.go:294 and internal/check/check.go:321
+EVIDENCE: At component 1b35928f7ecd00a02835e48ee638def789b59ee0, TestReviewAdditionalClassification supplied SSL validation failed with CERTIFICATE_VERIFY_FAILED and an absent fixture SSO cache. The result was DEAD with start aws. awsNetRe misses certificate verification failures, allowing the absent-cache fallback to override the transport failure.
+PROPOSAL: Recognize TLS and certificate validation failures before cache-based credential fallback and return WARN without a login fix. Add regression coverage with absent and expired caches.
 
 ## Sources
 
