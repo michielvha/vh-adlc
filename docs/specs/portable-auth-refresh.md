@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "CLI lifecycle and local VS Code invocation pass; repaired catalog pin awaits publication, with real MFA continuation and provider acceptance open."
+status_description: "CLI lifecycle, rollback, admin restore and AWS login pass; Azure needs an IPv4 override. Phone MFA, GUI routes and remaining providers stay open."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -401,6 +401,52 @@ Composite criteria and T5 remain open. The catalog repair, CLI fixture results a
 do not establish the required complete provider matrix, failed-delivery cleanup during a real
 challenge, version rollback, or standalone/shared invocation in every required GUI.
 
+### Live login, rollback and notification cleanup, 2026-10-23
+
+The continued run used the same component commit and verified release above. Sanitized results are
+stored under `continued_acceptance` in `tests/auth-refresh/evidence/native-2026-10-23.json`.
+Raw provider logs, account identifiers, device URLs, tokens and browser state are excluded.
+
+| Executed check | Result | Limit |
+| --- | --- | --- |
+| Cold AWS device-code login through the admin browser lane | Okta number-match approval, AWS Confirm and continue, and Allow access completed; `aws sso login` exited 0 | The number was delivered in the active conversation; this was not the complete Claude phone flow |
+| `aws sts get-caller-identity` for each configured SSO profile | All nine returned the expected account and role | Read-only identity verification |
+| Azure device-code login for the configured tenant | Warm admin IdP session reused; Microsoft Continue completed; `az login` and expiry-only token validation exited 0 | A temporary process-only IPv4 resolver wrapper was required |
+| Admin session save and deliberate stop/start | Saved 18,551 bytes; `lane whoami admin` verified the expected LIVE identity after restart, without another MFA | The normal lane remains unauthenticated |
+| EKS discovery and temporary kubeconfigs | All eight discovered clusters produced user kubeconfigs | Every `kubectl auth whoami` failed on DNS resolution; no Kubernetes identity success is claimed |
+| Configured AKS cluster | Discovered through Azure; user kubeconfig fetched into a temporary file | `kubelogin` is missing and the private cluster hostname does not resolve |
+| Claude native version rollback | Reinstalled the real historical 0.1.0 package from component `c1d01ba1a424d1565103c3adf103cfada774cdab`, then invoked its legacy agent successfully | Linux disposable profile; fixture config, credentials and saved state retained their bytes and mode 0600; the current runtime cache was retained |
+| Claude CLI with Bash, Read and Skill, without phone tools | Reported missing notification capability and stopped before creating lane state or starting a challenge | Isolated, production-parser-validated config; no credentials or provider contact |
+| Claude native Remote Control, fake challenge | One actual PushNotification returned Not sent because the terminal was active; Claude immediately parked only the fixture lane and verified `about:blank`, with no retry | Fake number 62; page polling stopped after parking. This proves failure cleanup, not phone delivery |
+| Registry and service transport | IPv4 registry `/v2/` returned HTTP 401 without credentials; service-health request failed DNS | Registry authenticated access remains unverified; an unauthenticated 401 does not establish credential rejection |
+
+Azure's original timeout was traced to Python requests selecting unreachable IPv6 addresses before
+IPv4 during tenant and version metadata requests. IPv4 requests returned HTTP 200. The test wrapper
+changed urllib3 address-family selection only within the Azure process. Installed CLI files and
+system routing were unchanged, and the informational version-check cache was restored afterward.
+The normal Azure command remains unverified on this network without that override.
+
+The native Remote Control session loaded PushNotification through ToolSearch. Its current schema
+accepts only `status: proactive`. The bounded 45-second background command completed, but the
+approved normal-account login stopped before credentials or a challenge: Claude's own auto-mode
+classifier rejected `whoami` as PII Data Handling and tenant navigation as Real-World Transactions.
+No security setting was changed and no new MFA was sent. The later fake-challenge cleanup used an
+isolated local provider and state directory, without retrying those rejected real-account actions.
+
+The existing managed SSH route to the work host also refused authorization and requested SSM Connect
+Reconnect Existing Workspace. Its authorization was not bypassed. Corporate GitHub remains logged
+out, the three manual token files remain absent, and registry restoration through the cluster secret
+could not be exercised while Kubernetes access was unavailable. Default kubeconfig bytes were
+preserved during both AKS and EKS checks.
+
+Cleanup left the authenticated admin lane parked, stopped the test normal lane, stopped the fake
+lane and local HTTP server, and exited the native Remote Control test session. No challenge remains
+active. Desktop UI automation was not restarted after the owner reported duplicate keyboard input.
+
+AC-08 now has rollback and legacy-invocation evidence as well as the eight installation lifecycle
+cases. T5 remains open for the complete phone MFA flow, required GUI routes, normal-lane login,
+Kubernetes identity and the remaining real-provider rows. The shared-catalog repair remains local.
+
 ## Scope
 
 Coordinate changes in this marketplace and the standalone auth-refresh repository. Keep runtime,
@@ -509,7 +555,8 @@ open. No required target is removed during implementation to narrow the claimed 
       Evidence: R-5, R-6 and R-7; component `be34aa21b1701dfed73ef2f8c8f7c780d2728996` provider regressions and independent reviewer fixtures passed. Full Go and independent probe suites passed; real-provider matrix remains open under AC-07.
 - [ ] AC-06: A saved authenticated session survives lane restart, the expected identity is verified, distinct lanes cannot share credentials or cookies, and abandoned challenges stop generating pushes.
 - [ ] AC-07: Each claimed real-provider operation in the acceptance matrix succeeds on its target host, including Azure and AWS login, Okta lanes, Kubernetes identity, GitHub status, registry access, HTTP token validation and service-health reporting.
-- [ ] AC-08: Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
+- [x] AC-08: Installation, update and uninstall preserve private host config and credentials, the independent Claude entry point remains usable, and migration instructions permit returning to the previous setup without logging out.
+      Evidence: Native lifecycle driver at marketplace `f4109b6` passed both routes in Claude and Codex on macOS and Linux against component `1b35928f7ecd00a02835e48ee638def789b59ee0`. Native Claude Linux rollback to the real historical 0.1.0 package and old-agent invocation passed; fixture private bytes and mode 0600 were preserved and the current runtime cache was retained. Sanitized results: `tests/auth-refresh/evidence/native-2026-10-23.json`, including `continued_acceptance.rollback`.
 
 ## Test Plan
 

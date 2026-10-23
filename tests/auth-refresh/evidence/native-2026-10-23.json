@@ -784,7 +784,146 @@
   },
   "limits": [
     "Repaired vhco-tools catalog was a local candidate; its component source and runtime were downloaded from GitHub.",
-    "Same-version refresh and reinstall were tested; version rollback remains open.",
+    "Same-version refresh and reinstall passed on both clients and hosts; Claude Linux rollback and legacy invocation passed in the continued acceptance run below.",
     "No fixture result establishes live provider authentication or phone MFA continuation."
-  ]
+  ],
+  "continued_acceptance": {
+    "date": "2026-10-23",
+    "host": "Fedora Linux x86_64",
+    "runtime": "0.2.0-rc.1",
+    "aws": {
+      "cold_device_login": "pass",
+      "cli_exit": 0,
+      "consent_buttons_completed": true,
+      "saved_session_bytes": 7573,
+      "expected_admin_identity_verified": true,
+      "sts_profiles": 9,
+      "all_accounts_and_roles_match": true
+    },
+    "azure": {
+      "device_login": "pass",
+      "cli_exit": 0,
+      "configured_tenant_token_probe_exit": 0,
+      "token_expiry": "2026-10-23 22:20:51.000000",
+      "warm_admin_idp_session_reused": true,
+      "saved_session_bytes": 18551,
+      "transport_override": "Temporary process-only urllib3 IPv4 resolver wrapper; installed Azure CLI and system routing unchanged.",
+      "unmodified_cli_limitation": "Python requests selected unreachable IPv6 addresses before IPv4 and hung in tenant/version metadata requests.",
+      "informational_version_cache_restored": true
+    },
+    "admin_restart": {
+      "steps": [
+        {
+          "action": "lane stop admin",
+          "exit": 0,
+          "expected_identity_verified": null
+        },
+        {
+          "action": "lane start admin",
+          "exit": 0,
+          "expected_identity_verified": null
+        },
+        {
+          "action": "lane whoami admin",
+          "exit": 0,
+          "expected_identity_verified": true
+        }
+      ],
+      "all_live_lanes_parked": true,
+      "admin_session_bytes": 18551
+    },
+    "eks": {
+      "clusters_discovered": 8,
+      "temporary_kubeconfigs_created": 8,
+      "identity_probe_successes": 0,
+      "all_identity_probes_failed_on_dns": true,
+      "default_kubeconfig_preserved": true
+    },
+    "aks": {
+      "configured_cluster_discovered": true,
+      "temporary_user_kubeconfig_exit": 0,
+      "identity_probe_exit": 1,
+      "missing_credential_executable": "kubelogin",
+      "private_hostname_resolves": false,
+      "default_kubeconfig_preserved": true
+    },
+    "rollback": {
+      "client": "Claude CLI",
+      "from": "0.2.0-rc.1",
+      "to": "0.1.0",
+      "historical_component": "c1d01ba1a424d1565103c3adf103cfada774cdab",
+      "native_reinstall": "pass",
+      "legacy_agent_invocation": {
+        "exit": 0,
+        "subtype": "success",
+        "is_error": false,
+        "missing_manual_token_reported": true,
+        "private_state_preserved": true,
+        "stderr": ""
+      },
+      "fixture_config_credentials_and_session_bytes_and_0600_preserved": true,
+      "current_runtime_cache_retained": true
+    },
+    "claude_missing_capability": {
+      "fixture_config_valid": true,
+      "cli_exit": 0,
+      "tools": "Bash,Read,Skill; no PushNotification or ToolSearch",
+      "stopped_before_login": true,
+      "lane_state_created": false,
+      "result_excerpt": "Stopped before starting the login. The required phone-notification capability is not available in this session, so per capabilities.md the unattended push flow must not begin."
+    },
+    "claude_native_remote_control": {
+      "push_tool_available": true,
+      "push_status_schema": [
+        "proactive"
+      ],
+      "bounded_background_wait_seconds": 45,
+      "background_wait_completed": true,
+      "normal_live_login": {
+        "owner_account_specific_approval": true,
+        "result": "Stopped before credential submission or challenge: Claude auto mode rejected whoami as PII Data Handling and tenant navigation as Real-World Transactions.",
+        "new_mfa_sent": false,
+        "security_settings_changed": false
+      },
+      "fake_challenge_delivery_failure": {
+        "notification_calls": 1,
+        "test_code": 62,
+        "tool_result": "Not sent — this terminal is active, so your output here already reaches the user; a separate notification would be redundant.",
+        "automatic_retry": false,
+        "native_park_exit": 0,
+        "native_status_exit": 0,
+        "parked": true,
+        "page_polling_stopped": true,
+        "fixture_stop_exit": 0,
+        "fixture_server_stopped": true
+      }
+    },
+    "transport_checks": [
+      {
+        "provider": "registry_transport",
+        "exit": 0,
+        "http_status": "401",
+        "dns_failure": false
+      },
+      {
+        "provider": "service_health",
+        "exit": 6,
+        "http_status": "000",
+        "dns_failure": true
+      }
+    ],
+    "remaining_inputs": {
+      "corporate_github_account": "Not logged in; personal account unchanged.",
+      "manual_token_files_missing": 3,
+      "registry_authenticated_access": "Not verified; IPv4 unauthenticated v2 endpoint returned 401.",
+      "managed_work_host": "Existing SSH route refused authorization and requested SSM Connect Reconnect Existing Workspace; no bypass attempted."
+    },
+    "cleanup": {
+      "real_challenges_active": false,
+      "admin_authenticated_and_parked": true,
+      "normal_test_lane_stopped": true,
+      "fake_lane_and_server_stopped": true,
+      "native_remote_control_test_session_exited": true
+    }
+  }
 }
