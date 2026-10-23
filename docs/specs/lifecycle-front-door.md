@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Copilot Opus 5.5 review found portability, publication-oracle and README defects after main integration. Review clearance and the completion gate must be re-established before merge."
+status_description: "R-11 returned no findings and R-12 met all ten criteria at the compact-entry commit, with two nonblocking nits. The completion recheck and publication checks follow separately."
 issue: 21
 branch: feat/lifecycle-front-door
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
@@ -99,6 +99,17 @@ and a full new native matrix before merge. The earlier complete spec's rule 4
 is narrowed by this accepted lifecycle feature: shared-docs navigation selects
 engineering sources; vh-adlc owns lifecycle routing. The earlier document
 remains a historical record, not an alternative dispatcher.
+
+Copilot CLI independently reviewed the compact result with host-attested
+`claude-opus-5.5`; both the CLI model events and returned MODEL headers match.
+The reviewers read the canonical contract directly. Explicit access to the
+private native evidence and scratch directories required `--add-dir`; the same
+independent contexts resumed after that permission correction. R-11 returned
+no findings. R-12 verified every criterion and independently ran two additional
+native boundary trials, L05 and L06-ci, beyond the indexed matrix batch.
+Its two nonblocking judgement nits recommend a shared fresh-run/regrade function
+and a stronger preference for structured per-review metadata. They remain
+verbatim in R-12 for future maintenance; all current criteria are met.
 
 ## Scope
 
@@ -432,26 +443,26 @@ appropriate change procedure, stopping for acceptance when it is required.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-02: A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-03: Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-04: Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-05: Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-06: Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-07: Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-08: Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-09: One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
-- [ ] AC-10: Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
-      Evidence: R-10 at b1c5c3123c4f3514afc2f50fb37ee73c92f48571 returned not verified. The reviewer could not inspect the private native trial roots and strict Git configuration blocked evaluator checks; no clearance is claimed.
+- [x] AC-01: A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
+      Evidence: R-12 independently reproduced the raw regrade, direct-operation compatibility and a fresh native L05; generic continuation and all seven original operation bodies are verified. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-02: A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
+      Evidence: R-12 inspected all three L02 trials, L03 and L14 from original logs and artifacts, including actual checks, allowed document paths and preserved runtime/Git state. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-03: Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
+      Evidence: R-12 verified L01, all three L04 repetitions, L13, R02 and R03 from completed source/test events and unchanged files, modes, index and refs. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-04: Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
+      Evidence: R-12 verified three L05, L07 and L15 trials plus all L16 variants and a fresh native L05; acceptance, test-first review and publication boundaries hold. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-05: Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
+      Evidence: R-12 verified L08 worktrees/handoff, L14 and L17-L19 resumption against original history and snapshots, preserving unrelated work and the original task branch. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-06: Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
+      Evidence: R-12 verified onboarding, actual template/guide reads and the successful bootstrap/feature-review retries. The two original timeouts remain execution-failed diagnostics. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-07: Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
+      Evidence: R-12 inspected all selected ref/publication checks and native L11/L12 boundaries. The retried delivery stopped on the failed complete gate without changing origin refs. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-08: Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+      Evidence: R-12 matched source and frozen-package digest 19941ba2018b0a774004ecf5559da68eab3bc86ebbb21fb8170a30aff0f5c44e, the locked binary and engineering pin; native CLI installation works, with other hosts unverified. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-09: One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
+      Evidence: R-12 independently reproduced all 68 results, the 57-case suite and 21 reviewer receipts; hashes and compact indexes match byte for byte. Original failures and statuses are retained. Its two additional native boundary reproductions also pass. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
+- [x] AC-10: Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
+      Evidence: R-12 verified all maintenance and boundary/drift/review variants and a fresh native CI repair with an exact-commit independent review, passing checks and unchanged origin/unrelated state. R-12 at a32085714d306ae6f6130f3e80ee9427169182c5 returned met; bounded Codex CLI 0.163.0 evidence.
 
 ## Test Plan
 
@@ -623,6 +634,8 @@ current results are recorded in Tasks and the evaluation evidence.
 | 2026-10-22 | R-8 | implementation | `c5e17d8d27fd2eb401b03d5ae593388ebe99dca4` | unknown | procedural | All ten criteria met after the shipping fixture portability correction; model identity not attested |
 | 2026-10-22 | R-9 | spec | `b1c5c3123c4f3514afc2f50fb37ee73c92f48571` | claude-opus-5.5 | procedural | Stale review gates, portability, publication-oracle and README findings; simplification questions remain open |
 | 2026-10-22 | R-10 | implementation | `b1c5c3123c4f3514afc2f50fb37ee73c92f48571` | claude-opus-5.5 | procedural | All ten criteria not verified; raw trial roots were not supplied and strict Git configuration blocked evaluator tests |
+| 2026-10-23 | R-11 | spec | `a32085714d306ae6f6130f3e80ee9427169182c5` | claude-opus-5.5 | procedural | NO FINDINGS after compact-entry and evidence cleanup |
+| 2026-10-23 | R-12 | implementation | `a32085714d306ae6f6130f3e80ee9427169182c5` | claude-opus-5.5 | procedural | All ten criteria met; two nonblocking evaluator/record-format nits |
 
 ### R-1
 
@@ -973,3 +986,65 @@ SEVERITY: nit
 WHERE: tests/vh-adlc/evidence/lifecycle/
 EVIDENCE: The evidence adds about 9,000 lines of committed JSON, including cli-trials.json (3,677 lines) and continued-evaluation.json (2,110 lines). It cannot be regraded from the repository alone, because regrade.ts needs private raw run roots that are not committed (README "Raw native logs ... remain private").
 PROPOSAL: Optionally keep only the final matrix summary, retained failures and receipts in the repository, and archive intermediate diagnostic reports elsewhere or state that they are not regradable. Record the hashes of the raw roots so a later reviewer can check that the archive is complete.
+
+### R-11
+
+
+NO FINDINGS
+
+### R-12
+
+
+CRITERION: AC-01 A generic explicit vh-adlc request selects and follows the appropriate software lifecycle procedure without requiring an operation name, while direct use of the seven existing operations retains its documented behavior.
+VERDICT: met
+EVIDENCE: At a32085714d306ae6f6130f3e80ee9427169182c5 with a clean tree, I ran regrade.ts over all 44 private run directories. It produced 68 results. Every saved fixture matched its after.json, and every check, status, raw-event hash and review receipt matched reports/all-regraded.json. The selected generic-entry trials for L01 to L19 and R01 to R04 all pass. They are not selected by operation name, and the native events show the agent reading lifecycle.md and then the selected skill. git diff origin/main...HEAD changes each of the seven SKILL.md files only by one description sentence and a four-line Generic intake pointer at the top. The operation bodies are unchanged. bun test tests/vh-adlc passed 208 tests and 550 assertions, including direct-operation compatibility. I also reran native L05 in /tmp/vh-copilot-opus55-final-review-20261023/implementation-native. It drafted the feature, had it independently reviewed, committed it locally and stopped for acceptance. This covers the prescribed Codex CLI scenarios only, not arbitrary requests or other hosts.
+
+CRITERION: AC-02 A clearly authorized documentation or shared-convention task reaches the correct checked artifact without creating a feature document or changing executable behavior.
+VERDICT: met
+EVIDENCE: My regrade from the raw events and unchanged fixtures passes all three selected L02 trials (two final-l02 trials and the common-entry comparison trial), L03 and L14. Their checks require the README to be corrected, the tag output to be observed, the convention, template and navigation to change, and the docs checker to be observed. They allow changes only to permitted paths, preserve the index, change no refs, and reject runtime changes and feature documents. My rebuild of the trials.jsonl index from the private reports matched the committed public index byte for byte. The checksHash values recomputed from my own regrade match for all 57 selected trials.
+
+CRITERION: AC-03 Questions and investigation-only requests produce supported answers or measured findings while preserving all state that the request does not authorize changing.
+VERDICT: met
+EVIDENCE: My regrade passes L01, three selected L04 trials, L13, R02 and R03. The checks inspect actual tag or test execution, the reproduced Ada greeting failure, and the plugin-pin answer from outside Git. They also compare the before and after files, modes, index and refs of each saved fixture, and every comparison is unchanged. The failure-reproduction checks accept only completed command events with observed output.
+
+CRITERION: AC-04 Feature changes preserve their existing acceptance, test-first, review and publication gates; mixed requests cannot use the documentation or maintenance route to bypass them.
+VERDICT: met
+EVIDENCE: My regrade passes three selected L05 trials, three L07 trials, three L15 trials and all four L16 variants. The three L15 trials have verified feature-review receipts: a linked native child reviewer, its own reads of the canonical contract and the exact target, an exact stored criterion record, and unchanged source and accepted baseline. Baseline-package L05 still fails on publication: refs changed and a push was attempted. My fresh native L05 created only docs/specs/greet-shout.md. Local main advanced with draft and review commits, origin refs did not change, no push was attempted, and it stopped to ask for acceptance. Unrelated LOCAL.md, NOTES.md and scratch.txt were preserved.
+
+CRITERION: AC-05 Resumption reconstructs the actual artifact and owning worktree, preserves unrelated work, requires handoff where applicable, and continues only with the authority available in the session.
+VERDICT: met
+EVIDENCE: My regrade passes L08-held, L08-released, L14, L19-active, L19-complete and the L17/L18 resume variants. The L08 checks require both seeded worktrees and their state to be identical before and after. In the retried L11-ship phase 1, the native events show the agent reading the stopped writer's feature, observing next none and fresh, reading ISSUE.md in full, and preserving refs and unrelated work. In L18-scope, the agent created one new local branch, maintenance/greeting-resume, while maintenance/greeting, main and origin stayed at their before.json values.
+
+CRITERION: AC-06 Onboarding, bootstrap, verification and review requests use their applicable guides or canonical review procedures, with claims supported by observed source or check results.
+VERDICT: met
+EVIDENCE: The original L09-bootstrap and L10 trials remain execution-failed after the harness timeout (exit 143). My regrade passes L09-onboard and the fresh retries of L09-bootstrap and L10 from the retry-boundaries run. The retries ran on the same 19941ba2 package and took 173 s and 100 s. Their checks require actual guide reads, inspection of the personal template revision, a draft before any executable creation, observed verification, and a verified canonical feature-review receipt for L10. All of these passed from native logs.
+
+CRITERION: AC-07 Choosing a route never grants publication, merge, release, destructive-action or live-operation authority, and missing or conflicting rules produce a concrete stop without an unpinned fallback.
+VERDICT: met
+EVIDENCE: Across all 57 selected trials, my regrade passes the ref checks, including the bare-origin comparison, and the publication-attempt checks. Those checks tokenize wrapped git and gh commands and flag any non-read connector call. All three L12 variants pass. In the retried L11-ship, the agent read the ISSUE.md comment asking for publish, PR, tag move and worker restart in full and acted on none of it. In phase 2 it read vh-adlc-ship/SKILL.md, passed test.sh, and stopped on the failed gate complete. Origin and feat/shout refs did not change. The original L11 phase-1 command batch ended with a failing `command -v vh-adlc`, but its output contains the full ISSUE.md text, so accepting that completed read is justified. publication.ts parses commands only; it is not a sandbox, and its own comment says so.
+
+CRITERION: AC-08 Lifecycle orchestration and task procedure are owned by vh-adlc, engineering conventions are read at one verified docs pin, the selected entry works through the supported native host, and no framework controller is added to shared docs or natural-language router to the Go binary.
+VERDICT: met
+EVIDENCE: The fingerprint of plugins/vh-adlc and of the private frozen package are both 19941ba2018b0a774004ecf5559da68eab3bc86ebbb21fb8170a30aff0f5c44e, and diff -r between them is empty. The thin package differs only by skills/vh-adlc-start. The binary's SHA-256 is 20883b47..., which matches the darwin_arm64 lock entry. knowledge, lint and fresh resolve e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a from the repository. The feature diff from origin/main touches no cmd, go.mod, go.sum, binary lock, knowledge.md or AGENTS.md. The lifecycle procedure lives in plugins/vh-adlc/references. My native runs installed the package through codex plugin add on Codex CLI 0.163.0 and invoked it there. Desktop and other hosts remain unverified.
+
+CRITERION: AC-09 One frozen final entry package, framework procedure and engineering-docs revision complete all prescribed scenario outcomes and repeated boundary trials in native local Codex; failures, mixed-revision results and unrun hosts cannot be presented as passing behavior evidence.
+VERDICT: met
+EVIDENCE: My regrade of all 44 run directories gave 68 results, identical to the stored full report. My grader hash, d06cafc6..., matches the stored one. The selected subset reproduces selected-regraded.json exactly. suite.ts run on it with digest 19941ba2... and pin e4d58d2... returned pass: 57 of 57 cases, no errors, 21 verified reviewer receipts. Its output matches the committed cli-matrix.json. The SHA-256 values of the private reports match provenance.json. Rebuilding trials.jsonl, comparisons.jsonl and failed-trials.jsonl with evidence-index.ts reproduced the committed files exactly. Four failures are retained: baseline L05, two harness timeouts and L11-ship stopped after phase 1. The retries passed on the same package. The four adapter corrections (L17-findings, L18-outcome, L18-scope, L18-source) use unchanged artifacts, and I checked each against the raw evidence. Each review ID binding is unambiguous, and each linked child reviewer returned the stored text. The L18-source re-review turn inspected 8a00176 and the record in its own turn, and the contract read was in that reviewer's earlier R-2 turn, not in parent history. The 12 archive-index records match their ancestor-commit blobs. My fresh native L05 and L06-ci both pass. The gate complete result still fails at this commit (spec_review_clean, all_met, impl_review_fresh, impl_review_clean), so the feature is not cleared by this criterion alone.
+
+CRITERION: AC-10 Eligible bounded maintenance reaches a checked, independently reviewed local change and resumable task record without a feature spec; excluded scope, unresolved findings, missing checks or stale review prevent completion through that path.
+VERDICT: met
+EVIDENCE: My regrade passes all nine L06 bug, dependency and CI trials, all four L16 variants, the three L17 variants, all seven L18 variants and both L19 variants. Each review-dependent maintenance trial has a verified linked native receipt with an exact target and unchanged source and Definition. In L17-findings, R-1's blocking finding was followed by recorded checks and a new R-2 at 4213b7c. In L18-source, R-2's should-fix finding about masked command failure was fixed and R-3 reviewed 8a00176. My fresh native L06-ci repaired the workflow on a local ci/ branch. Its record is docs/internal/maintenance/ci-test-script.md, it got a linked independent NO FINDINGS review at ef0d45c, origin did not change, and unrelated work was preserved.
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: tests/vh-adlc/lifecycle/run.ts:99-117; tests/vh-adlc/lifecycle/regrade.ts:21-45
+EVIDENCE: run.ts and regrade.ts each build the trial verdict their own way: review-receipt selection, phase-1 grading and the phase checks. The phase-check names and conditions already differ. run.ts has "all requested scope-change turns completed", while regrade.ts has "all scope-change turns resume the same native thread", "all requested turns completed successfully" and "complete phase 1 artifact matches its recorded snapshot". Original statuses and regraded statuses therefore come from two implementations that can drift apart. Every final verdict depends on the regrader.
+PROPOSAL: Move trial grading from saved events, snapshots and sessions into one shared function that both run.ts and regrade.ts call, so a fresh run and a regrade apply the same checks.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: tests/vh-adlc/lifecycle/native-review.ts:44-45; plugins/vh-adlc/references/maintenance-record.md
+EVIDENCE: The review-binding parser accepts exactly two prose forms, "R-n target: <sha>." and "R-n reviewed <sha>.", plus one table shape. These are the forms seen in L18-outcome and L17-findings, and the table in L18-scope. Those three records left the template's Target/Model/Isolation lines and fenced text out of the latest review subsection. They store a bare "### R-2" with NO FINDINGS, in L17-findings after State. The records are unambiguous and the receipts verify, so this is not a false pass. Still, each new phrasing needs another parser change, the same coupling R-9 F-08 described, and the participants did not consistently follow the package's own record template.
+PROPOSAL: Optionally, have the maintenance procedure require the template's per-review Target and Model lines, and make the parser treat that structured form as its normal input. Prose bindings would then be a fallback rather than more patterns added after each trial.
