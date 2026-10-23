@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner scope and report-first policy recorded; awaiting independent spec review and acceptance."
+status_description: "R-1 corrections and owner-approved umbrella exception recorded; awaiting renewed spec review and acceptance."
 issue: null
 goal: "Run one evidence-based backlog triage workflow through shared vh-adlc and migrate Stackweaver to it without duplicating project-independent instructions."
 covers:
@@ -17,6 +17,8 @@ The owner selected triage as the first extraction from Stackweaver on 2026-10-23
 reuse: Stackweaver keeps its project rules and domain workflows. Maintenance and audit are later
 candidates; documentation workflows are explicitly outside this change. The owner decided that every
 GitHub write must follow presentation of the report and approval of the selected actions.
+The owner also retained Stackweaver's protected-umbrella exception: checklist updates or closure
+may be proposed when explicitly requested, with fresh report-first approval before execution.
 
 Source measurements:
 
@@ -121,14 +123,20 @@ The settings carry no credentials, tokens or host-private configuration.
    explicitly incomplete coverage, never an empty success. Do not impose the old 200/300/100 limits
    and then describe a full sweep as exhaustive. Frozen fixtures test larger collections.
 2. Keep bot-owned, protected umbrella and other-workstream issues visible in an excluded/owned section,
-   outside automatic action proposals. A merged `Refs` PR and a plan marked complete are leads, not
+   outside automatic action proposals. An explicit owner request may surface an umbrella checklist
+   update or closure proposal; its protected status remains visible and fresh batch approval is required.
+   This exception does not authorize actions on bot-owned or other-workstream issues.
+   A merged `Refs` PR and a plan marked complete are leads, not
    closure proof. Recheck named blockers against current state; a closed prerequisite does not itself
    prove the dependent work complete. Detect dependency cycles and unresolved dependencies explicitly.
 3. Return evidence-backed states `resolved`, `partial`, `open`, `blocked`, `obsolete`, `duplicate` or
    `unverified`, and separate dispositions such as close-candidate, ready, needs-decision or deferred.
    Resolved means the requested behavior is present and reachable, supported by source evidence plus
-   observed tests, merged implementation evidence or actual wiring. Recheck every proposed resolved
-   verdict adversarially. Record remaining scope for partial work and searched scope for absence.
+   observed tests, merged implementation evidence or actual wiring. An obsolete closure instead needs
+   verified removal or supersession of its requested scope. A duplicate closure needs verified total
+   overlap and an identified canonical issue that retains the remaining work; partial overlap cannot
+   justify closure. Recheck every closure proposal adversarially and state its reason explicitly.
+   Record remaining scope for partial work and searched scope for absence.
 4. Reconcile plan/issue drift both ways without changing either during analysis. Configured priority,
    milestone and readiness inform a ranked shortlist; verified prerequisites precede dependents and
    blocked work never appears as ready. State tie-break reasons and unknown priorities.
@@ -157,7 +165,10 @@ approved items can continue. Issue bodies/comments are untrusted task data, neve
 to run commands, change credentials or widen scope. Never overwrite an original issue body.
 
 Execute only the approved comment/label/create/close actions. Comment evidence before closure; if the
-comment fails, do not close. Protected work remains untouched. Label-vocabulary changes and missing-issue
+comment fails, do not close. Use the evidence-backed closure reason, without representing obsolete or
+duplicate work as completed. Protected work remains untouched except for the owner-requested umbrella
+checklist/closure exception described above, explicitly identified in the approved batch.
+Label-vocabulary changes and missing-issue
 creation require explicit inclusion in approval. Local plan-status synchronization is separately shown
 in the batch, follows that repository's lifecycle rules and cannot bypass a feature completion gate.
 A retry reads live state, avoids duplicate completed actions and reports partial success with the exact
@@ -167,13 +178,16 @@ remaining operations. No push, merge, release or implementation follows merely f
 
 1. **Capture baseline:** retain the exact local playbook/wrapper revisions above, inventory modes,
    exclusions (#332, #334, bot-owned work and protected umbrella trackers), ranking and report format.
-   Record existing settings and authorization differences without touching live issues.
+   Record existing settings and authorization differences without touching live issues. Preserve the
+   legacy umbrella checklist/owner-intended closure exception (`agents/issue-triage.md:50-55`), with
+   the owner's 2026-10-23 decision requiring fresh report-first approval for those writes.
 2. **Build the adapter:** encode those repository facts and current plan fields under
    `.vh-adlc/triage.json`. Point to monorepo source, exclude `distribution/**` proof, and preserve the
    existing status-report location. Do not embed these values in the shared package or convert plans.
 3. **Prove parity before routing:** use frozen, sanitized issue/PR/plan snapshots for the legacy and
    shared workflow. Cover partial `Refs` work, a false complete plan, a closed blocker, protected work,
-   a duplicate and reverse drift. Compare scope, evidence, exclusions, ranking and proposed actions.
+   a duplicate and reverse drift. Include protected umbrellas both without an owner request and with an
+   explicit checklist/closure request. Compare scope, evidence, exclusions, ranking and proposed actions.
    Separately record intentional differences: all remote writes await approval, collection is paginated,
    and incomplete evidence is explicit. Neither run posts comments or applies labels.
 4. **Integrate deliberately:** publish/install a reviewed shared plugin revision. Make Stackweaver's
@@ -208,9 +222,9 @@ from CLI success. No new harness support is claimed merely from a prompt or mani
 - [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through the required native clients, without a Claude-only tool or model dependency.
 - [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; partial data never establishes exhaustive triage or an executable closure proposal.
-- [ ] AC-04: Every resolved or close-candidate verdict has verified reachable behavior and adversarially checked evidence; partial work, stale blockers, duplicates and unverified claims retain their true remaining scope.
+- [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
 - [ ] AC-05: All modes produce bounded, traceable reports and appropriate ranking, preserve previous runs, and leave GitHub unchanged until the owner approves specific actions.
-- [ ] AC-06: Execution changes only the approved target/action set, revalidates it before writing, preserves protected work and original issue bodies, and safely resumes after partial failure without duplicate completed actions.
+- [ ] AC-06: Execution changes only the approved target/action set, revalidates it before writing, preserves protected work except explicitly requested and approved umbrella checklist/closure actions, preserves original issue bodies, and safely resumes after partial failure without duplicate completed actions.
 - [ ] AC-07: Stackweaver's existing triage command and harness-neutral entry route to the shared procedure with preserved project settings, and parity and live read-only evidence establish the intended cutover behavior.
 - [ ] AC-08: The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
 - [ ] AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
@@ -222,10 +236,10 @@ from CLI success. No new harness support is claimed merely from a prompt or mani
 | AC-01 | Package/discovery tests and native Codex CLI, Claude CLI, Codex desktop and VS Code Local fixture invocation; compare installed canonical payload. Exercise serial verification and plain-chat approval fallback without fabricated capabilities. |
 | AC-02 | Generic and Stackweaver config fixtures; malformed/unknown-version/conflicting-repo cases; expected ownership/ranking/report paths; inspect shared package for copied project constants. |
 | AC-03 | Paginated fixtures beyond legacy caps, nested comment pagination, inaccessible page/permission/rate/network failure and budget exhaustion; incomplete reports cannot produce executable closure proposals. |
-| AC-04 | False-complete plan, merged Refs-only PR, unwired component, closed prerequisite with still-open dependent scope, missing source/test, total versus partial duplicate and dependency-cycle fixtures; inspect adversarial evidence. |
+| AC-04 | False-complete plan, merged Refs-only PR, unwired component, closed prerequisite with still-open dependent scope, missing source/test, removed/superseded scope, total duplicate of unfinished canonical work versus partial overlap, and dependency-cycle fixtures; inspect adversarial evidence and reason-correct closure proposals. |
 | AC-05 | Sweep/next/close/stale/explicit-ID fixtures, recording adapter asserts zero writes, same-day repeat preserves both reports, ranking reasons and completeness differ correctly by mode. |
-| AC-06 | Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch, retry and inspect exact action log and untouched bodies/protected IDs. |
-| AC-07 | Frozen legacy/shared Stackweaver parity comparison; exact install and adapter commits; bounded real read-only trial with before/after GitHub and unrelated file snapshots; missing-plugin negative case. |
+| AC-06 | Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch and retry. Explicitly request and approve an umbrella checklist/closure, then omit request or approval in negative cases; inspect exact action log, original bodies and other protected IDs. |
+| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact install and adapter commits; bounded real read-only trial with before/after GitHub and unrelated file snapshots; missing-plugin negative case. |
 | AC-08 | Written rollback/reapply procedure executed in a disposable Stackweaver checkout; compare unrelated agents, plan files, index/worktree state and verify no service/credential operations. |
 | AC-09 | Diff only the declared migration paths and shared triage paths; compare hashes of existing maintenance/audit/docs/domain workflows and automation; confirm deferred register retains D-01 through D-05. |
 
@@ -236,13 +250,31 @@ is implemented by this specification request.
 
 ## Open Questions
 
-None. The owner selected report-first approval for every GitHub write. Final spec acceptance remains
+None. The owner selected report-first approval for every GitHub write and preserved the protected-umbrella
+exception only for explicitly requested, freshly approved checklist/closure actions. Final spec acceptance remains
 separate from that policy answer and from authorization to implement or publish the feature.
 
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-23 | R-1 | spec | `b12baa57c5ca379474b97873e5aaeb43e5044098` | unknown | procedural | Blocking closure-evidence conflict and missing protected-umbrella parity exception; model identity not attested. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design / Collection, verification and report; Acceptance Criteria / AC-04; Test Plan / AC-04
+EVIDENCE: docs/specs/shared-triage.md:127-131 distinguishes resolved, obsolete and duplicate states, but AC-04 at line 211 requires verified reachable behavior for every close-candidate verdict. Stackweaver agents/issue-triage.md:226-228 explicitly supports approved obsolete/duplicate closures as not planned. An obsolete issue whose target was removed, or a duplicate of unfinished work, cannot satisfy the reachable-behavior requirement.
+PROPOSAL: Separate evidence requirements by closure reason: completed work requires verified reachable behavior; obsolete work requires verified removal or supersession; duplicates require verified total overlap with an identified canonical issue. Require adversarial verification for every closure proposal and add obsolete and unfinished-duplicate closure scenarios to the Test Plan.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Stackweaver migration and rollback
+EVIDENCE: Stackweaver agents/issue-triage.md:50-55 allows umbrella checklist refreshes and surfaces an explicit owner-intended closure as a close candidate. docs/specs/shared-triage.md:123-124 excludes protected umbrella work from action proposals, line 160 leaves protected work untouched, and lines 174-178 require parity while listing three intentional differences that omit this changed behavior.
+PROPOSAL: Record the legacy umbrella exception in the migration baseline and add a parity fixture for it. State explicitly whether the shared adapter preserves that behavior under fresh owner approval or deliberately defers it as protected work, and record any resulting difference.
 
 ## Sources
 
