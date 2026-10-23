@@ -287,6 +287,18 @@ verified against the same expected primary key. This proves continuing automatic
 not only the one-time label dispatch. The auth-refresh lock-bearing commit's CI also passed both
 verification and mandatory browser jobs (run `39873419571`).
 
+
+A later common-CI report was checked against auth-refresh main `88ed421` and failing run `39873019130`.
+Its three errcheck findings are current on that main-based branch, not a regression in the signed
+portable component: startup and probe process errors plus the saved-session test cleanup error are
+already handled in the component's reviewed `7709650` correction. A minimal main-based backport is
+[auth-refresh PR #8](https://github.com/michielvha/auth-refresh/pull/8), commit `f1219b3`, changing only
+those three files. It lets the common-CI PR #3 proceed independently of the full migration PR #6.
+The main-based full Go suite with mandatory browser tests, vet, module check, local lint and whitespace
+checks passed. GitHub CI run `39875627899` also passed its verification and mandatory browser jobs,
+including the pinned newer linter. The focused backport is validated; main itself remains unchanged
+until PR #8 is merged.
+
 ## Scope
 
 Coordinate changes in this marketplace and the standalone auth-refresh repository. Keep runtime,
