@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner accepted all five R-3 recommendations; revised spec awaits Copilot re-review."
+status_description: "R-4 verified revised sources and returned four remaining design decisions plus a wording correction."
 issue: null
 goal: "Run one evidence-based backlog triage workflow through shared vh-adlc and migrate Stackweaver to it without duplicating project-independent instructions."
 covers:
@@ -249,7 +249,7 @@ surfaces until separately tested. No other harness support is implied.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local, without a Claude-only tool or model dependency; an unavailable required invocation leaves this criterion unverified.
+- [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local, without a Claude-only tool or model dependency.
 - [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
 - [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
@@ -280,11 +280,58 @@ is implemented by this specification request.
 
 ## Open Questions
 
-None. On 2026-10-23 the owner accepted all five R-3 recommendations: exact payload approval and
-gated plan sync, report-wide closure blocking for incomplete required inputs, local exact-revision
-installation with paired migration commits, the four explicitly named required clients, and concrete
-report/parity criteria with Stackweaver fixtures limited to `tests/agent-triage/`. The revised normative
-baseline still needs independent re-review and acceptance before implementation.
+### Q6: Does local completion deliver a reviewed migration branch ready for publication?
+
+**Recommendation:** A. Define the feature's deliverable as the shared operation and reviewed
+Stackweaver migration branch ready to publish. Actual main-branch cutover follows separately:
+publish/install vh-adlc first, then publish and merge the Stackweaver adapter under explicit authority.
+This clarifies the already selected local paired-commit trial (R-4 F-01).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Reviewed branch ready to publish** | Local completion precedes shipping without a circular gate. | Actual main cutover remains a named follow-up. |
+| **B. Include live main cutover in completion** | Complete means both defaults have migrated. | Publication and merge authority become prerequisites. |
+
+**Why this is yours:** It defines the observable delivery boundary across both repositories.
+
+### Q7: Should the live trial write only an uncommitted report outside Stackweaver?
+
+**Recommendation:** A. Use a temporary external destination for the read-only live trial. Separately
+prove the configured normal report path in a disposable fixture, and account for the external artifact
+in the trial evidence without widening the Stackweaver migration diff (R-4 F-02).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. External uncommitted trial report** | Tracker and checkout snapshots remain unchanged. | Normal report placement is verified separately. |
+| **B. Allow a committed trial report in Stackweaver** | Trial evidence lives in that repository. | The allowed migration path set and index changes grow. |
+
+**Why this is yours:** It changes where the migration trial leaves durable project artifacts.
+
+### Q8: Should legacy report and follow-up details be retained with explicit approval for writes?
+
+**Recommendation:** A. Keep counts and run-over-run differences, approve new-label descriptions/colors
+and new-issue URL backfill patches exactly, and include these in parity. Save reports uncommitted by
+default; a local report commit requires an explicit request and follows repository skip-CI rules.
+Record that commit default as an intentional legacy difference (R-4 F-03).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Preserve details with explicit commit request** | Useful legacy behavior survives under the selected approval contract. | Report commits require a request. |
+| **B. Preserve legacy automatic report commit** | Stackweaver retains its current local commit behavior. | Every triage run can add a local commit. |
+
+**Why this is yours:** It sets local side effects and the retained migration behavior.
+
+### Q9: Should acceptance explicitly cover generic routing and existing-route regressions?
+
+**Recommendation:** A. Extend AC-01 with generic backlog-triage routing, regression cases for existing
+intake/maintenance routes, and accurate README skill/support claims for the expanded package (R-4 F-04).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Add explicit routing regression proof** | The changed intake is tested along with native discovery. | Acceptance includes the additional existing-route cases. |
+| **B. Keep discovery-only acceptance** | The current criterion stays unchanged. | The review's routing-coverage gap remains. |
+
+**Why this is yours:** The accepted criterion and its required proof are being revised.
 
 ## Review Log
 
@@ -294,6 +341,7 @@ baseline still needs independent re-review and acceptance before implementation.
 | 2026-10-23 | R-2 | spec | `3a874470e499590afde434f165feaf19ca4d1e54` | unknown | procedural | No findings; model identity not attested. |
 | 2026-10-23 | R-2 | spec | `3a874470e499590afde434f165feaf19ca4d1e54` | n/a | n/a | accepted by owner |
 | 2026-10-23 | R-3 | spec | `b74f650edfbd88244b058d824b31a5d9043f4c19` | claude-opus-5.5 | procedural | Copilot bounded-packet review: ten findings; decisions and source/gate verification follow-up required. |
+| 2026-10-23 | R-4 | spec | `1e159d65aa8cbde4525de59a27439129a0efeaea` | claude-opus-5.5 | procedural | Five findings: delivery boundary, trial output, legacy report/write details, lifecycle regression coverage and a verdict-wording nit. |
 
 ### R-1
 
@@ -386,6 +434,43 @@ SEVERITY: should-fix
 WHERE: Frontmatter; Review Log
 EVIDENCE: The binary at /home/m/.cache/vh-adlc/bin/0.1.0/linux_amd64/vh-adlc could not be run, and no shell was available. So `lint`, `fresh`, `gate planned` and `review check` were not observed, and the sha256 values in source-manifest.json could not be checked. The acceptance row at docs/specs/shared-triage.md:266 accepts R-2 at 3a874470, but this review targets b74f650. The claim at line 3, "planned gate passed", and the condition that the normative baseline at b74f650 matches 3a874470 could not be decided.
 PROPOSAL: Run `fresh` and `gate planned` at b74f650 on the original host. Confirm that the export hashes match. If the normative baseline changed after 3a874470, move the document back to draft and get acceptance again.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Stackweaver migration and rollback; Acceptance Criteria / AC-07
+EVIDENCE: The goal at docs/specs/shared-triage.md:5 is to "migrate Stackweaver". Lines 206-209 install an unpublished local commit, and lines 223-225 limit Stackweaver work to local commits on `feat/shared-triage-migration` in an isolated checkout. Lines 231-232 keep pushes, PRs and merges under separate authority, and lines 234-236 call the migration complete after local parity, invocation, trial and rollback proof. The feature-documents standard at line 61 makes `complete` terminal for its scope, and authority.md:19-20 lets ship push only the vh-adlc branch. So when every box is ticked, Stackweaver main still runs the legacy playbook, and the paired adapter is on an unpublished branch. No step says who publishes it, or in what order relative to the vh-adlc release. If the adapter merges before the marketplace serves the triage skill, the retired prose leaves Stackweaver with only the missing-plugin blocker from line 235.
+PROPOSAL: Say what state of Stackweaver main counts as migrated at `complete`. Name the follow-up and its order: publish vh-adlc first, then publish the Stackweaver branch under separate approval. Otherwise, narrow the goal and AC-07 to a reviewed migration branch that is ready to publish.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Collection, verification and report; Design / Stackweaver migration and rollback; Test Plan / AC-07, AC-09
+EVIDENCE: docs/specs/shared-triage.md:147 writes the report to the configured repository documentation location. Line 196-197 keeps Stackweaver's existing status-report location, which is `docs/internal/status/` with a generated index (Stackweaver agents/issue-triage.md:197-205). The live trial at line 215-216 freezes unrelated file snapshots. The AC-09 proof at line 274 diffs only the declared migration paths, and line 52-54 lists those paths without `docs/internal/status/`. The document does not say where the live trial's report goes, or whether it is committed. So that run either breaks the frozen snapshot and the AC-09 path set, or uses a destination that the spec never names.
+PROPOSAL: Name the live trial's report destination and commit state, for example an uncommitted report outside the Stackweaver checkout or an explicitly allowed path. Make the AC-07 and AC-09 snapshot comparisons account for it.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Collection, verification and report; Design / Owner-approved execution; Design / Stackweaver migration and rollback step 3
+EVIDENCE: Legacy Stackweaver agents/issue-triage.md:201-203 puts the counts and a diff against the previous triage report in the report. Line 211 commits the report with `[skip ci]`. Lines 224-225 create approved labels with a description and color. Lines 233-234 write a new issue's URL back into the plan's `issue:` frontmatter. docs/specs/shared-triage.md:147-149 does not keep counts or the run-over-run diff. Line 162-165 binds label names but not the description and color of a new label. Lines 175 and 181-184 cover no `issue:` write-back, and line 150-151 leaves report commit behavior undecided. The parity at line 201 compares only scope, evidence, exclusions, ranking and proposed actions. Lines 202-205 record no other intentional difference, so these regressions would pass parity unrecorded.
+PROPOSAL: For each of these legacy behaviors, either keep it, with exact-payload approval where it writes, or list it as a recorded intentional difference. Add the report contents and the follow-up writes to the parity comparison.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope; Design / Canonical workflow and harness boundary; Acceptance Criteria / AC-01; Test Plan / AC-01
+EVIDENCE: docs/specs/shared-triage.md:49 and :80-82 expose triage through the existing lifecycle intake and change `references/lifecycle.md`. Line 96 says the existing gates and bounded maintenance remain intact. AC-01 at line 252 and its proof at line 266 cover only native discovery and invocation. No criterion or Test Plan row checks that a generic request routes to triage. None checks that existing intake routes still behave as before after the change. README.md:44-48 rests lifecycle support on 57 trials of one package, and README.md:29 and :79 state "seven skills". README.md is in `covers`, but no criterion says how those claims change when an eighth skill is added.
+PROPOSAL: Add a criterion or extend AC-01 to require that generic intake routes a backlog-triage request to the operation, with regression cases for existing intake and maintenance routes. Require the README skill count and support claims to match the new package.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria / AC-01
+EVIDENCE: AC-01 at docs/specs/shared-triage.md:252 ends "an unavailable required invocation leaves this criterion unverified". The pinned feature-documents standard at lines 84 and 175-185 requires criteria to state an end state. It defines verdicts as `met`, `not met`, `untested` or `not verified`, and "unverified" is not one of them. Design line 244-245 already states the consequence for completion.
+PROPOSAL: End AC-01 at its end state, and keep the unavailable-client rule in Design. Alternatively, use the standard verdict term `not verified`.
 
 ## Sources
 
