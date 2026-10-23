@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Catalogs pin signed runtime v0.2.0-rc.2 with the provider fixes; corporate-host logins pass. Remote Control phone push and GUI invocation remain open."
+status_description: "Signed runtime v0.2.0-rc.2 pinned, all PRs merged, corporate-host logins and exact-commit review pass. Remote Control phone push and GUI invocation remain open (#25)."
 issue: 25
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -534,9 +534,17 @@ Component PR #5 pinned those archive and binary hashes; it merged as
 `360d8cd5b52877c18da102662a568cbcce4688a3` after CI passed. A fresh-cache install verified both hashes,
 reported `auth-refresh 0.2.0-rc.2` and reused its cache. Both catalogs now pin that commit.
 
+Follow-up on the same night. Auth-refresh #4 (CI runner), #6 (per-app MFA and AWS consent-banner
+guidance) and #7 (legacy agent provisions the verified runtime when no binary is on PATH) merged with
+green CI; vh-adlc #23, #26 and #27 merged, and both catalogs pin component
+`3695e2c73df68d1b3bad8e21dbb204e431adcd3d`. Before #7 the installed agent stopped with a missing-binary
+report; afterwards Claude CLI 2.1.289 provisioned `0.2.0-rc.2` and completed the full read-only check
+with every identity OK. The host's Claude now has `auth-refresh@vhco-tools` installed at user scope;
+the old agent file and setup remain. The live config dropped the two removed keys, with a mode-0600
+backup kept. An independent exact-commit review of `1b35928..3695e2c` reported no findings.
+
 Still open and tracked in [issue #25](https://github.com/michielvha/vh-adlc/issues/25): the Claude Remote
-Control phone-push flow, desktop and shared-route GUI invocation, the two AWS workflow notes above, and
-a fresh exact-commit review before completion.
+Control phone-push flow from a new phone session, and desktop and standalone GUI invocation.
 
 ## Scope
 
