@@ -38,10 +38,10 @@ export function verifyMaintenanceReview(project: string, sessions: string, paren
     const recordPath = paths[0];
     const record = readFileSync(join(project, recordPath), "utf8");
     const reviews = section(record, "Reviews");
-    const entries = [...(reviews ?? "").matchAll(/^### (R-\d+)[ \t]*\n/gm)];
+    const entries = [...record.matchAll(/^### (R-\d+)[ \t]*\n/gm)];
     const entry = entries.at(-1);
-    const latest = entry ? reviews!.slice(entry.index! + entry[0].length) : reviews ?? "";
-    const named = entry && record.match(new RegExp(`^${entry[1]} target: ([0-9a-f]{40})\\. Model: ([^\\s.]+)\\. Isolation: (?:procedural|structural|unknown)\\.[ \\t]*$`, "m"));
+    const latest = entry ? record.slice(entry.index! + entry[0].length).split(/^## |^### R-/m)[0] : reviews ?? "";
+    const named = entry && record.match(new RegExp(`^${entry[1]} (?:target:|reviewed) ([0-9a-f]{40})\\. Model: ([^\\s.]+)\\. Isolation: (?:procedural|structural|unknown)\\.[ \\t]*$`, "m"));
     const target = latest.match(/^Target: ([0-9a-f]{40})\s*$/m)?.[1] ?? named?.[1];
     if (!target) return fail("no exact review target in the record");
     const model = latest.match(/^Model: ([^\s()]+)(?:[ \t]+\([^\n]*\)\.?)?[ \t]*$/m)?.[1] ?? named?.[2];

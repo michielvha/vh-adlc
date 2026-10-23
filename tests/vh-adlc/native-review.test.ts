@@ -70,6 +70,15 @@ test("explicit review-ID metadata can accompany a bare verbatim returned record"
   expect(f.verify().pass).toBe(false);
 });
 
+test("the latest explicitly bound review may follow completion bookkeeping", () => {
+  const f = fixture(), path = join(f.f.project, f.path);
+  const record = readFileSync(path, "utf8");
+  writeFileSync(path, record.slice(0, record.indexOf("## Reviews")) + `## Reviews\n\n### R-1\n\nHistorical finding retained.\n\n## State\n\nComplete locally.\n\nR-2 reviewed ${f.target}. Model: unknown. Isolation: procedural.\n\n### R-2\n\nNO FINDINGS\n`);
+  expect(f.verify().pass).toBe(true);
+  writeFileSync(path, readFileSync(path, "utf8").replace("R-2 reviewed", "R-1 reviewed"));
+  expect(f.verify().pass).toBe(false);
+});
+
 test("bookkeeping after review preserves freshness but source drift does not", () => {
   const f = fixture();
   writeFileSync(join(f.f.project, f.path), readFileSync(join(f.f.project, f.path), "utf8") + "\n## State\n\nComplete locally.\n");
