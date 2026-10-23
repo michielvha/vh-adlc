@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Independent spec review R-2 has no findings; awaiting owner acceptance, with no implementation started."
+status: planned
+status_description: "Owner accepted R-2 on 2026-10-23; planned gate passed; ready for task planning."
 issue: null
 goal: "Run one evidence-based backlog triage workflow through shared vh-adlc and migrate Stackweaver to it without duplicating project-independent instructions."
 covers:
@@ -254,8 +254,8 @@ is implemented by this specification request.
 ## Open Questions
 
 None. The owner selected report-first approval for every GitHub write and preserved the protected-umbrella
-exception only for explicitly requested, freshly approved checklist/closure actions. Final spec acceptance remains
-separate from that policy answer and from authorization to implement or publish the feature.
+exception only for explicitly requested, freshly approved checklist/closure actions. The owner accepted
+the reviewed specification on 2026-10-23. Implementation and publication retain their separate authority.
 
 ## Review Log
 
@@ -263,6 +263,7 @@ separate from that policy answer and from authorization to implement or publish 
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-23 | R-1 | spec | `b12baa57c5ca379474b97873e5aaeb43e5044098` | unknown | procedural | Blocking closure-evidence conflict and missing protected-umbrella parity exception; model identity not attested. |
 | 2026-10-23 | R-2 | spec | `3a874470e499590afde434f165feaf19ca4d1e54` | unknown | procedural | No findings; model identity not attested. |
+| 2026-10-23 | R-2 | spec | `3a874470e499590afde434f165feaf19ca4d1e54` | n/a | n/a | accepted by owner |
 
 ### R-1
 
