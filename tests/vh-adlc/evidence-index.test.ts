@@ -26,3 +26,7 @@ test("indexing cannot hide failed checks or invent a verified trial", () => {
   expect(failed.failedChecks).toEqual(["state preserved"]);
   expect(failed.status).toBe("fail");
 });
+
+test("regraded evidence retains its original failed outcome", () => {
+  expect(compactTrial({ ...trial, originalStatus: "fail" }, "run").originalStatus).toBe("fail");
+});

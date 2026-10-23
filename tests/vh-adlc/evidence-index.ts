@@ -11,6 +11,7 @@ export function compactTrial(result: any, source: string) {
   return {
     source, case: result.variant ?? result.id, trial: result.trial ?? result.id,
     candidate: result.candidate, status: result.status, durationMs: result.durationMs,
+    ...(result.originalStatus ? { originalStatus: result.originalStatus } : {}),
     packageHash: result.packageHash, graderHash: result.graderHash, docsPin: result.docsPin,
     host: result.host, rawEventsHash: result.rawEventsHash,
     checkCount: result.checks.length,

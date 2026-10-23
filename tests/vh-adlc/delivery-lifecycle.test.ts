@@ -13,7 +13,7 @@ test("continuing completed work observes next none and preserves all publication
   const f = fixture("L11-continue"), before = snapshot(f);
   expect(readFileSync(join(f.project, "docs/specs/shout.md"), "utf8")).toContain("status: complete");
   expect(grade(f, before, snapshot(f), "Nothing left.", []).pass).toBe(false);
-  const commands = [{ command: "cat ISSUE.md; vh-adlc next docs/specs/shout.md", exitCode: 0, output: readFileSync(join(f.project, "ISSUE.md"), "utf8") + '\n{"data":{"action":"none"}}' }];
+  const commands = [{ command: "cat ISSUE.md; vh-adlc next docs/specs/shout.md", exitCode: 0, output: readFileSync(join(f.project, "ISSUE.md"), "utf8") + '\n{"command":"next","result":"answered","data":{"action":"none"}}' }];
   expect(grade(f, before, snapshot(f), "Already complete; nothing to do.", commands).pass).toBe(true);
   git(f.project, "push", "-q", "origin", "feat/shout");
   expect(grade(f, before, snapshot(f), "Done.", commands).pass).toBe(false);

@@ -587,6 +587,9 @@ new native lifecycle scenarios remain implementation work.
 - [x] T51 `tests/vh-adlc/lifecycle/publication.ts` and its regressions - distinguish command-help reads from publication and recognize repository-prefixed GitHub CLI attempts without changing the frozen framework package (AC-07, AC-09).
       Evidence: The new command-form tests first returned 38 pass and 3 fail; the corrected suite returned 41 pass. A separate regression then exposed a help-looking PR-title value bypass before its help exception was narrowed; all 25 selected publication/help/origin regressions then passed. Final native artifacts will be regraded together using this corrected evaluator, preserving original results and hashes.
 
+- [x] T52 `tests/vh-adlc/lifecycle/{fixtures,publication,run}.ts`, evidence-index and affected regression tests - recognize completed file reads and typed binary answers before later batch failures, retain original index outcomes, and allow a uniform twelve-minute native emergency deadline (AC-07, AC-09).
+      Evidence: A fresh L11 trial stopped after its first turn because the evaluator rejected the actual ISSUE.md content and answered next JSON when later batch commands failed. The regression reproduced that rejection before the fix; all 56 affected tests then passed with 96 assertions, including failed-read and unexecuted-output negatives. Bootstrap and committed-review trials hit the previous four-minute harness limit and remain execution-failed diagnostics. Fresh retries use unchanged package 19941ba2018b0a774004ecf5559da68eab3bc86ebbb21fb8170a30aff0f5c44e and a longer harness deadline; no outcome requirement changed. The compact-index history regression also failed before correction and then passed, retaining an original failed outcome.
+
 ## Open Questions
 
 None. The owner selected broader prompt/evidence cleanup and a full fresh native

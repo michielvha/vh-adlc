@@ -57,7 +57,7 @@ test("source drift invalidates feature review while a local feature commit prese
   const commands = [
     { command: "bash test.sh", exitCode: 1, output: "FAIL: expected HELLO, WORLD.; got Hello, world." },
     { command: "bash test.sh", exitCode: 0, output: "PASS: shout and default" },
-    { command: "vh-adlc next docs/specs/shout.md", exitCode: 0, output: '{"data":{"action":"ship"}}' },
+    { command: "vh-adlc next docs/specs/shout.md", exitCode: 0, output: '{"command":"next","result":"answered","data":{"action":"ship"}}' },
   ];
   expect(grade(f.f, f.before, snapshot(f.f), "Ready for shipping when requested.", commands, f.verify()).pass).toBe(true);
   expect(grade(f.f, f.before, snapshot(f.f), "Done", [...commands].reverse(), f.verify()).pass).toBe(false);
@@ -72,7 +72,7 @@ test("an observed Bash xtrace regression remains test-first evidence", () => {
   const commands = [
     { command: "bash -x test.sh", exitCode: 1, output: "+ bash greet.sh --shout\n+ [[ Hello, world. == \\H\\E\\L\\L\\O ] ]" },
     { command: "bash test.sh", exitCode: 0, output: "PASS: shout and default" },
-    { command: "vh-adlc next", exitCode: 0, output: '{"data":{"action":"ship"}}' },
+    { command: "vh-adlc next", exitCode: 0, output: '{"command":"next","result":"answered","data":{"action":"ship"}}' },
   ];
   expect(grade(f.f, f.before, snapshot(f.f), "Ready.", commands, f.verify()).pass).toBe(true);
 });

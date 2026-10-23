@@ -45,13 +45,20 @@ function executable(words: string[]): string[] {
   return words.slice(i);
 }
 
-export function publicationAttempt(source: string, allowGitPush = false): boolean {
-  return commands(source).some((words) => {
+export function shellInvocations(source: string): string[][] {
+  return commands(source).flatMap((words) => {
     const args = executable(words), program = basename(args[0] ?? "");
     if (["bash", "zsh", "sh"].includes(program)) {
       const at = args.findIndex((arg) => /^-[A-Za-z]*c[A-Za-z]*$/.test(arg));
-      return at >= 0 && publicationAttempt(args[at + 1] ?? "", allowGitPush);
+      return at >= 0 ? shellInvocations(args[at + 1] ?? "") : [];
     }
+    return [args];
+  });
+}
+
+export function publicationAttempt(source: string, allowGitPush = false): boolean {
+  return shellInvocations(source).some((args) => {
+    const program = basename(args[0] ?? "");
     if (program === "git" && args.length === 3 && args[2] === "--help") return false;
     if (program === "gh" && args.length === 4 && args[3] === "--help" && ["pr", "issue", "release", "repo", "run", "workflow"].includes(args[1])) return false;
     if (program === "git") {

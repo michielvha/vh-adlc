@@ -83,7 +83,7 @@ for (const { id, trial, variant, prompt, prompts, phaseCase, seedReadOnlyWorkflo
     if (id === "L17-missing") args.push("--disable", "multi_agent");
     args.push(...(at === 0 ? [text] : ["resume", parentThread, text]));
     const child = Bun.spawn(args, { cwd: f.project, env: childEnv, stdout: Bun.file(rawPath), stderr: Bun.file(errorPath) });
-    const timer = setTimeout(() => { timeout = true; child.kill(); }, id === "L15" ? 720_000 : 240_000);
+    const timer = setTimeout(() => { timeout = true; child.kill(); }, 720_000);
     exitCode = await child.exited;
     clearTimeout(timer);
     const phaseRaw = readFileSync(rawPath, "utf8"), phase = events(phaseRaw);
