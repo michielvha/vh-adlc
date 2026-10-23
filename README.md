@@ -33,7 +33,7 @@ vhco-tools marketplace or run `codex plugin add auth-refresh@vhco-tools` after a
 It can also be installed independently from its own repository.
 
 The standalone component is available from its default branch.
-Both catalogs select component `bd43c6b7391bd7e1b637fde87ed52313f266425a` and provision the signed
+Both catalogs select component `3695e2c73df68d1b3bad8e21dbb204e431adcd3d` and provision the signed
 `v0.2.0-rc.2` runtime, which includes the provider probe classification fixes. Native Claude and Codex
 installation, update and uninstall passed through both routes on macOS and Linux. Claude rollback and
 legacy-agent invocation also passed. The release signature and archive hashes were verified against
