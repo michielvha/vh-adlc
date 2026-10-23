@@ -32,13 +32,12 @@ In Claude Code, install `auth-refresh@vhco-tools`. In Codex, select auth-refresh
 vhco-tools marketplace or run `codex plugin add auth-refresh@vhco-tools` after adding the marketplace.
 It can also be installed independently from its own repository.
 
-The standalone component is available from its default branch. This marketplace integration remains
-on `feat/portable-auth-refresh` in [PR #24](https://github.com/michielvha/vh-adlc/pull/24).
-Both catalogs select component `1b35928f7ecd00a02835e48ee638def789b59ee0` and provision the signed
-`v0.2.0-rc.1` runtime. Native Claude and Codex installation, update and uninstall passed through both
-routes on macOS and Linux against the repaired catalog candidate. Claude rollback and legacy-agent
-invocation also passed. The release signature and archive hashes were verified against the existing
-VHCO Pro release key.
+The standalone component is available from its default branch.
+Both catalogs select component `360d8cd5b52877c18da102662a568cbcce4688a3` and provision the signed
+`v0.2.0-rc.2` runtime, which includes the provider probe classification fixes. Native Claude and Codex
+installation, update and uninstall passed through both routes on macOS and Linux. Claude rollback and
+legacy-agent invocation also passed. The release signature and archive hashes were verified against
+the existing VHCO Pro release key.
 
 To test this branch in Codex, use `codex plugin marketplace add michielvha/vh-adlc --ref feat/portable-auth-refresh`,
 then install `auth-refresh@vhco-tools`. For Claude, add

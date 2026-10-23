@@ -1,7 +1,7 @@
 ---
 status: in-progress
-status_description: "Marketplace checks pass after merging main. Provider source fixes await merge and runtime publication; corporate and phone acceptance remain open."
-issue: null
+status_description: "Catalogs pin signed runtime v0.2.0-rc.2 with the provider fixes; corporate-host logins pass. Remote Control phone push and GUI invocation remain open."
+issue: 25
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
 covers:
@@ -501,6 +501,42 @@ Use the corporate host's local configuration and credentials; do not copy privat
 6. Record sanitized outcomes here, obtain fresh exact-commit reviews and run the completion gate only
    after all criteria are met or owner-approved residuals have durable trackers. Keep this feature
    in progress until then; do not infer a production cutover from the branch push.
+
+### Corporate-host run, 2026-10-24
+
+Run on the corporate Linux host against marketplace `eaa7b22` and the development candidate built
+from auth-refresh `babe4dba267f1183417b9474ac276ad231b78749`. This was not the signed runtime. The
+host's private config was copied to a temporary path with only the two removed browser keys dropped.
+The live config, credentials and old setup were left unchanged.
+
+| Executed check | Result | Limit |
+| --- | --- | --- |
+| Candidate `CGO_ENABLED=1 AUTH_REFRESH_E2E=1 go test -race -count=1 ./...`, vet, `go mod tidy -diff`, golangci-lint 2.14.0 | 162 test/subtest passes, zero skips or failures; no lint issues | Fake-IdP browser suite |
+| Marketplace `go test ./...`, `go vet ./...` | Passed | |
+| `bun test tests/auth-refresh tests/vh-adlc` with Codex CLI 0.164.0 and `AUTH_REFRESH_SOURCE` at the pinned main component | 217 passed, 579 assertions | Against the fix branch checkout, the pin test fails by design because the catalogs still pin main |
+| Candidate `setup` and `doctor` | Driver 1.62.1 and Chromium 151 started; all checks ok | |
+| Read-only provider check | Azure DEAD (sign-in frequency expiry), AWS DEAD (expired SSO token), AKS WARN (timeout, not a login offer), corporate GitHub identity, both PATs, Sonar, registry and service health OK | Kubernetes identity depends on the dead parents |
+| Private AKS/EKS DNS and `kubelogin` | All configured cluster hostnames resolve; kubelogin v0.2.19 present | Identity unverified until az and AWS are live |
+| Normal-lane Okta login | Password login with no MFA prompt; session saved; deliberate stop/start; `whoami` matched the expected account | Okta did not challenge, so this proves no phone flow |
+| Plain Azure device-code start without the IPv4 wrapper | Device code printed within one second | Login not completed (see next row) |
+| First admin Azure login with MFA push | Number surfaced immediately; push unanswered and expired. Lane parked, owned `az` cancelled, no retry push | Owner briefly unavailable |
+| Second admin Azure login, plain network | Owner tapped the surfaced number; watcher clicked the Microsoft confirm; `az login` exited 0; token valid; session saved; `whoami` matched the expected admin account | Number delivered in VS Code chat, not by Claude phone push |
+| AWS SSO device login on the same admin lane | Okta required a second number-match for the AWS app (no warm-session reuse across these apps). After the tap, a cookie banner blocked Confirm until declined; Allow access then completed and `aws sso login` exited 0 | Workflow should mention the AWS cookie banner and the second Okta tap |
+| STS for every configured SSO profile | 9/9 returned an identity | Read-only |
+| AKS/EKS `kubectl auth whoami` on all 25 configured contexts, via a temporary kubeconfig copy | 25/25 returned an identity; default kubeconfig hash unchanged | Read-only |
+| Candidate `check` after logins | All nine identities OK, including AKS through kubelogin and corporate GitHub | |
+| Admin saved session after deliberate stop/start | `whoami` matched without MFA; no lane left on a live challenge; both lanes stopped afterwards | |
+
+The owner then asked to merge the open auth-refresh work. PRs #3 and #2 merged, superseded #1 closed,
+and tag `v0.2.0-rc.2` at main `a0f8c59` produced a signed release. Its checksum signature verified
+against primary fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`, and all four archives matched.
+Component PR #5 pinned those archive and binary hashes; it merged as
+`360d8cd5b52877c18da102662a568cbcce4688a3` after CI passed. A fresh-cache install verified both hashes,
+reported `auth-refresh 0.2.0-rc.2` and reused its cache. Both catalogs now pin that commit.
+
+Still open and tracked in [issue #25](https://github.com/michielvha/vh-adlc/issues/25): the Claude Remote
+Control phone-push flow, desktop and shared-route GUI invocation, the two AWS workflow notes above, and
+a fresh exact-commit review before completion.
 
 ## Scope
 
