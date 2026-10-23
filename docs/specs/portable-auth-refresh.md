@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Signed runtime and automatic previews verified; both remote CLI install routes pass, with phone and remaining host acceptance open."
+status_description: "CLI lifecycle and local VS Code invocation pass; repaired catalog pin awaits publication, with real MFA continuation and provider acceptance open."
 issue: null
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -336,6 +336,70 @@ open vh-adlc PR #24 and its candidate branch. A fresh disposable-cache install f
 with empty GitHub token variables and an empty GH_CONFIG_DIR, returned `auth-refresh 0.2.0-rc.1`.
 The marketplace catalogs above still name their historical component pin; this main merge does not
 establish new marketplace acceptance or resolve the deferred phone, GUI, rollback or provider tests.
+
+### Cross-client acceptance and catalog regression, 2026-10-23
+
+The owner requested the remaining app, CLI and notification tests and confirmed the phone was
+available. The canonical source under test was main `1b35928f7ecd00a02835e48ee638def789b59ee0`;
+the marketplace candidate started at `709d4972fb7fb4b1d3cc2c2597a57367aa7feef1`.
+
+Fresh GitHub installation reproduced a shared-marketplace regression on macOS in both Claude CLI
+2.1.283 and Codex CLI 0.163.0: `auth-refresh@vhco-tools` failed with
+`fatal: unable to read tree (2fadfe08349ef9c67059de3925a5e32dd560c20a)`. The standalone default-branch
+route passed. The shared catalogs still pinned history removed by the component rewrite described
+above. Both catalogs now select the measured current main commit `1b35928f7ecd00a02835e48ee638def789b59ee0`.
+This repair is local; the published marketplace remains broken until the branch update is pushed.
+
+The acceptance driver at `tests/auth-refresh/native-acceptance.py` installs into disposable native
+client profiles. Run it with `--report <path>` against published sources, or add
+`--shared-source <marketplace checkout>` to test an unpublished catalog repair. `AUTH_REFRESH_SOURCE`
+selects the canonical component checkout; it defaults to the sibling `auth-refresh` directory.
+It compares the installed skill, references, legacy agent, installer and lock to that source,
+downloads and reuses the verified runtime, invokes a missing-token check, refreshes and uninstalls,
+and checks that fixture config, credentials and saved session state retain their bytes and mode 0600.
+
+| Executed check | Result | Limit |
+| --- | --- | --- |
+| Native Claude and Codex lifecycle, macOS arm64 | All four client/route combinations passed against the repaired candidate | Component and runtime came from GitHub; the repaired shared catalog was local |
+| Native Claude 2.1.303 and Codex lifecycle, Fedora Linux x86_64 | All four client/route combinations passed against the same candidate | Same-version refresh and reinstall; version rollback remains open |
+| `bun test tests/auth-refresh tests/vh-adlc` | 85 tests passed, 326 assertions | Fixture and packaging coverage |
+| Canonical component `CGO_ENABLED=1 AUTH_REFRESH_E2E=1 go test -race -count=1 -json ./...` on Fedora | 152 test/subtest passes, zero skips or failures | Real-browser fake-IdP suite; no live provider login |
+| Component Python installer/workflow regressions | All eight passed | No native phone-delivery proof |
+| Actual Claude CLI `--plugin-dir <component> --agent auth-refresh:auth-refresh --print` | Completed the fixture check; reported MISSING and manual token issuance, without login or notification | Existing normal Claude authentication; no copied credentials. Relative-reference lookup needed a fallback to the equivalent sibling checkout |
+| Actual VS Code Local, Claude extension v2.1.309 | Project-scoped standalone install; `/auth-refresh:auth-refresh` appeared in the native menu and ran the verified macOS runtime; fixture reported MISSING and manual renewal | No browser runtime or provider login; shared-route GUI invocation remains open |
+| VS Code fixture cleanup | Native project uninstall and marketplace removal succeeded; the original three user plugins remained installed and enabled | Runtime cache is retained as documented |
+| Actual Claude desktop Remote Control notification test | Background commands completed and resumed the session. Three explicit PushNotification calls returned `Not sent` because the terminal was active | Tool result cannot establish successful explicit push delivery |
+| Owner phone observation | Owner reported receiving a notification containing test code 47 | Arrival is confirmed; the notification mechanism conflicts with the explicit tool results. No real MFA challenge was used |
+
+The native lifecycle results, commands and payload hashes are retained in
+`tests/auth-refresh/evidence/native-2026-10-23.json`. The notification test used a new disposable
+Claude desktop window on the configured Fedora Remote Control environment. It requested test-only
+notifications, not an SSO login. The 20-second and 30-second background waits both resumed the
+session and attempted the requested notification once. Each tool response said:
+
+```text
+Not sent — this terminal is active, so your output here already reaches the user; a separate notification would be redundant.
+```
+
+The owner then reported: "I recieved a notifcation of 47 ? so I think it worked fine".
+This closes the question of whether a test notification reached the phone, while AC-03 remains
+open for a real MFA login, immediate number delivery, post-MFA consent and verified provider success.
+After the test window closed, the UI controller could not reacquire Claude desktop: native app
+selection repeatedly returned `timeoutReached`, including after reopening it through Finder.
+No application restart was forced while unrelated sessions were running. Native desktop plugin
+invocation therefore remains open.
+
+The verified production runtime's live-host `doctor` passed, including Chromium startup. Its
+read-only provider check reported Azure WARN (timeout), the configured AKS context WARN (absent),
+AWS DEAD (expired SSO token), the configured corporate GitHub identity DEAD (not logged in), registry
+and service-health WARN, and the two PATs plus Sonar token MISSING. These unavailable inputs remain
+open; no tokens were minted and no account was switched. Passive lane status showed the admin lane
+parked and the normal lane stopped; `lane whoami admin` reported an invalid session. No live
+challenge was started, and the existing sessions were left unchanged.
+
+Composite criteria and T5 remain open. The catalog repair, CLI fixture results and phone receipt
+do not establish the required complete provider matrix, failed-delivery cleanup during a real
+challenge, version rollback, or standalone/shared invocation in every required GUI.
 
 ## Scope
 
