@@ -1,9 +1,13 @@
 ---
 name: vh-adlc-tasks
-description: Break an accepted vh-adlc feature document into one-commit tasks in its own Tasks section, or replan the unchecked tail of an existing list. Use only when the owner invokes /vh-adlc-tasks or the vh-adlc binary's next step is tasks; it never changes a status or ticks a task.
+description: Break an accepted vh-adlc feature document into one-commit tasks in its own Tasks section, or replan the unchecked tail of an existing list. Use only when the owner invokes /vh-adlc-tasks or the vh-adlc binary's next step is tasks; it never changes a status or ticks a task. Generic vh-adlc requests use lifecycle intake.
 ---
 
 # vh-adlc-tasks
+
+## Generic intake
+
+For generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
 with `references/` or `scripts/`, and `knowledge.md`, is in that directory.

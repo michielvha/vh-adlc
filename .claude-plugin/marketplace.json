@@ -12,7 +12,7 @@
     {
       "name": "vh-adlc",
       "source": "./plugins/vh-adlc",
-      "description": "A spec-driven development loop whose status changes are decided by the deterministic vh-adlc binary."
+      "description": "Explicit software lifecycle intake and bounded maintenance, with deterministic gates for the feature loop."
     },
     {
       "name": "auth-refresh",

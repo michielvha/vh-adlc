@@ -1,0 +1,91 @@
+{
+  "kind": "historical-lifecycle-evidence-index",
+  "status": "historical; excluded from the simplified package acceptance suite",
+  "retrieval": "Each original file remains byte-identical in the named ancestor commit. Use the immutable URL or git show <commit>:tests/vh-adlc/evidence/lifecycle/<file>. Git history is preserved; this cleanup reduces the active tree, not existing clone history.",
+  "records": [
+    {
+      "file": "accepted-feature-pilot.json",
+      "sha256": "14c914915b7c5ba648f80257a18b146976fc92fad56e45de8fdd868eb6cc9a5d",
+      "bytes": 3118,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/accepted-feature-pilot.json"
+    },
+    {
+      "file": "accepted-feature-repeats.json",
+      "sha256": "2eaac4744aa1e2d6053f9280f943abd1da8469a17580b2efaa481789eea8441f",
+      "bytes": 8792,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/accepted-feature-repeats.json"
+    },
+    {
+      "file": "authority-comparison.json",
+      "sha256": "ede003885387faaf4b1be766108fea03cd8c17dd5ac41fef741e0b9b66a9c9ef",
+      "bytes": 22488,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/authority-comparison.json"
+    },
+    {
+      "file": "cli-trials.json",
+      "sha256": "26485db81ca24cd40ba15445893c9ff33f169e60a083818dd625de9c94f3773c",
+      "bytes": 141590,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/cli-trials.json"
+    },
+    {
+      "file": "cli-matrix.json",
+      "sha256": "19ee8b1f840aa92a928245acb85a88c049304a37daf3f44f683cf09a454cb2a7",
+      "bytes": 4546,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/cli-matrix.json"
+    },
+    {
+      "file": "comparison.json",
+      "sha256": "88ee535f3bdaac768f077e3545949bfa4b69c67e9d6ea6a9443dfde3d06a894c",
+      "bytes": 25526,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/comparison.json"
+    },
+    {
+      "file": "continued-evaluation.json",
+      "sha256": "0d79ecd251565a8d434ed74a8604f895026bd7810917179215c9aed83ae96d5a",
+      "bytes": 80805,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/continued-evaluation.json"
+    },
+    {
+      "file": "delivery-boundary.json",
+      "sha256": "dc153fe796bec69f344ec69f024ef5a8ec40af2a63fc9a1136bf32c59400a7d6",
+      "bytes": 3917,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/delivery-boundary.json"
+    },
+    {
+      "file": "domain-routing.json",
+      "sha256": "813b8d46c12c6890b4375a716b2a4c721fe4d80ecc0ea3651440f9dcc5623f5e",
+      "bytes": 6809,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/domain-routing.json"
+    },
+    {
+      "file": "initial-baseline.json",
+      "sha256": "be009d0ee89212d82f487a7a41483e05024f6dbeb01ed958c14da7699ac4809a",
+      "bytes": 5886,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/initial-baseline.json"
+    },
+    {
+      "file": "reviewer-transport.json",
+      "sha256": "b6c2f368910a61c2f8f36f7cc67029b0d335998e512c251f6635fa9fa94258f6",
+      "bytes": 2869,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/reviewer-transport.json"
+    },
+    {
+      "file": "verified-review-pilot.json",
+      "sha256": "175cb8f9d88b146c446a5eed25d57f83577c797fe5cfb62f084b6dd3448f8bba",
+      "bytes": 3027,
+      "commit": "a5c9bd6714929290f1632efbf20aa30e21b3d797",
+      "url": "https://github.com/michielvha/vh-adlc/blob/a5c9bd6714929290f1632efbf20aa30e21b3d797/tests/vh-adlc/evidence/lifecycle/verified-review-pilot.json"
+    }
+  ]
+}

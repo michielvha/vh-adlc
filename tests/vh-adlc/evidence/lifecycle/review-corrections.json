@@ -1,0 +1,60 @@
+{
+  "kind": "copilot-opus-review-corrections",
+  "requestedModel": "claude-opus-5.5",
+  "attestedModel": "claude-opus-5.5",
+  "reviewedCommit": "b1c5c3123c4f3514afc2f50fb37ee73c92f48571",
+  "reviews": [
+    "R-9",
+    "R-10"
+  ],
+  "isolation": "procedural",
+  "sessions": {
+    "spec": "605fd71a-6b99-4411-9c61-52dcfe0ff16d",
+    "implementation": "0aaaa77c-a938-492e-97fe-acf9d82daddc"
+  },
+  "initialAttempt": "Both original sessions failed with CAPI connection errors before any verdict. Resumed sessions returned the stored records; no clearance was inferred from interrupted runs.",
+  "regressionsBefore": {
+    "command": "bun test tests/vh-adlc/lifecycle.test.ts",
+    "pass": 25,
+    "fail": 13,
+    "defects": [
+      "implicit bare-origin discovery under strict Git policy",
+      "wrapped and absolute-path push attempts",
+      "GitHub CLI writes",
+      "started or denied connector writes"
+    ]
+  },
+  "responseRegressionsBefore": {
+    "command": "bun test tests/vh-adlc/delivery-lifecycle.test.ts tests/vh-adlc/lifecycle-context.test.ts",
+    "pass": 13,
+    "fail": 2
+  },
+  "localOriginExplanationBefore": {
+    "command": "bun test tests/vh-adlc/delivery-lifecycle.test.ts",
+    "pass": 2,
+    "fail": 1,
+    "reason": "Concrete local-origin/no-PR-service explanation was initially rejected; vague success remains rejected."
+  },
+  "verification": {
+    "command": "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.bareRepository GIT_CONFIG_VALUE_0=explicit bun test --timeout 600000 tests/vh-adlc",
+    "pass": 195,
+    "fail": 0,
+    "assertions": 521,
+    "limitation": "Longer local timeout after interrupted wall-clock runs; repository and CI timeout unchanged."
+  },
+  "graderHash": "e6f7aa6d11f0979ae593b3ae4507b29b16a531663889f037e652e6fd8ca5fa63",
+  "packageHash": "4ba35c567832c1b80333094f8360a6e1ecba9734e0b680a41f379371dc48d207",
+  "regrading": {
+    "allRetainedTrials": 67,
+    "selectedTrials": 58,
+    "selectedPass": 58,
+    "verifiedReviewerReceipts": 21,
+    "baselinePublicationFailureRetained": true,
+    "participantArtifactsChanged": false
+  },
+  "limitations": [
+    "No Copilot lifecycle behavioral support is claimed by this independent code review.",
+    "Desktop and other lifecycle hosts remain unverified.",
+    "Optional prompt and evidence refactors await the owner decision."
+  ]
+}
