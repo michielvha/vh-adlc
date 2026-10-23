@@ -1,0 +1,84 @@
+{
+  "kind": "ci-fixture-defect",
+  "packageHash": "f4684dac19c40fc250ee11e12b54737937af4e536f2fcd1fea0635c315ac0324",
+  "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+  "originalResult": {
+    "id": "L06-ci",
+    "trial": "L06-ci-2",
+    "candidate": "current-maintenance",
+    "surface": "native-cli-diagnostic",
+    "host": "codex-cli 0.163.0",
+    "packageHash": "f4684dac19c40fc250ee11e12b54737937af4e536f2fcd1fea0635c315ac0324",
+    "graderHash": "cd899ffd46420b8c19393d6f0a15c50f23533e2d7e91383392473e4b0afde664",
+    "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+    "model": "unknown",
+    "configuration": "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
+    "prompt": "Use vh-adlc. Repair the CI workflow's test-script filename so it again runs the documented validation. Keep its events, permissions and publication policy. Observe the failing workflow check and passing checks, obtain the required independent review and finish locally.",
+    "durationMs": 148554,
+    "exitCode": 0,
+    "timeout": false,
+    "review": {
+      "pass": false,
+      "reason": "no clean, well-formed stored review"
+    },
+    "status": "fail",
+    "checks": [
+      {
+        "name": "only permitted files changed",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "unrelated index entries preserved",
+        "pass": true,
+        "detail": ""
+      },
+      {
+        "name": "publication and refs respected",
+        "pass": true
+      },
+      {
+        "name": "required fixture test passes independently",
+        "pass": true
+      },
+      {
+        "name": "maintenance record exists without feature state",
+        "pass": true
+      },
+      {
+        "name": "independent maintenance review verified",
+        "pass": false,
+        "detail": "no clean, well-formed stored review"
+      },
+      {
+        "name": "CI validation restored with original read-only permissions",
+        "pass": true
+      },
+      {
+        "name": "workflow failure and corrected checks observed",
+        "pass": true
+      },
+      {
+        "name": "installed candidate unchanged",
+        "pass": true
+      }
+    ]
+  },
+  "reviewer": {
+    "parentThread": "01a15cb9-661c-7900-927d-088fbbb6ef88",
+    "reviewerThread": "01a15cba-d2b6-7fb2-bd10-0d4a126aa065",
+    "target": "4938d317e2c958c21df404667b941ac0f2d26338",
+    "reportedModel": "unknown",
+    "isolation": "procedural",
+    "logHash": "297117019c0240de1dab3ac8c1c462fce3d55bb71b1b15af3136e9e0c487f467",
+    "returnedRecord": "FINDING: F-01\nKIND: factual\nSEVERITY: blocking\nWHERE: .github/workflows/ci.yml:9\nEVIDENCE: At 4938d317e2c958c21df404667b941ac0f2d26338, the ubuntu-latest job has only `run: bash test.sh` and no checkout step. Independently executing that command in an empty temporary workspace exited 127 with `bash: test.sh: No such file or directory`. Local `bash check-workflow.sh` and `bash test.sh` pass, but neither establishes that repository scripts exist on the runner.\nPROPOSAL: Resolve the additional checkout repair with the owner before declaring CI restored. Add an appropriately pinned checkout step and verify the resulting workflow while preserving its events, permissions and publication policy.",
+    "audit": "Linked child completion matches the stored finding; its own turn inspected the target and maintenance-review contract."
+  },
+  "finding": "The fixture workflow had no checkout step. Its filename-only repair cannot restore execution on an empty GitHub runner. The participant correctly left the task needing owner scope, rather than asserting completion.",
+  "correction": "Seed a verified SHA-pinned checkout step before the filename defect, require it in the fixture checker and grader, and rerun all three CI trials. Earlier CI trials remain diagnostic.",
+  "verifiedCheckoutRelease": {
+    "version": "v6.1.0",
+    "commit": "d23441a48e516b6c34aea4fa41551a30e30af803",
+    "evidence": "git ls-remote actions/checkout refs/tags/v6.1.0; exact-commit action.yml fetched through the GitHub connector."
+  }
+}

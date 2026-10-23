@@ -1,9 +1,13 @@
 ---
 name: vh-adlc-implement
-description: Implement an accepted vh-adlc feature task by task on its feature branch, after claiming it on the default branch, with each criterion's test written first and watched failing. Use only when the owner invokes /vh-adlc-implement or a resumed vh-adlc feature's next step is implement.
+description: Implement an accepted vh-adlc feature task by task on its feature branch, after claiming it on the default branch, with each criterion's test written first and watched failing. Use only when the owner invokes /vh-adlc-implement or a resumed vh-adlc feature's next step is implement. Generic vh-adlc requests use lifecycle intake.
 ---
 
 # vh-adlc-implement
+
+## Generic intake
+
+For generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
 with `references/` or `scripts/`, and `knowledge.md`, is in that directory.

@@ -19,13 +19,34 @@ The scripts need [Bun](https://bun.sh).
 | Plugin | What it does |
 |---|---|
 | `github-app-registration` | Registers a GitHub App through GitHub's manifest flow, stores its credentials locally with mode 0600, and copies them into a project's env and key files without printing them. |
-| `vh-adlc` | A spec-driven development loop. One feature document is both spec and plan, and the `vh-adlc` binary decides every status change. |
+| `vh-adlc` | Software lifecycle intake and bounded maintenance, with a gated feature loop whose document is both spec and plan. |
 
 ## vh-adlc
 
-The loop runs only when you invoke one of its operations. Each takes its rules from
-[vhco-pro/docs](https://github.com/vhco-pro/docs) at the revision your repository pins in `AGENTS.md`, or
-at the plugin's own pin when the repository has none.
+Invoke vh-adlc explicitly. You can describe the result without choosing an operation:
+`Use vh-adlc to correct this README`, `Use vh-adlc to diagnose this failure; report only`, or
+`Use vh-adlc to repair this regression and finish locally`. The development package uses the existing
+seven skills to enter one [lifecycle procedure](plugins/vh-adlc/references/lifecycle.md), inspect scope
+and authority, and continue the appropriate work. Direct operations retain their contracts below.
+
+Lifecycle procedures, task state and maintenance review belong to vh-adlc.
+[vhco-pro/docs](https://github.com/vhco-pro/docs) supplies engineering conventions at the revision your
+repository pins in `AGENTS.md`, or at the plugin pin when the repository has none. Shared docs are
+independently usable conventions; they are not the framework's router or task store.
+
+Documentation work edits its authoritative artifact. Eligible maintenance preserves the published
+contract and uses a short [task record](plugins/vh-adlc/references/maintenance-record.md), appropriate
+checks and an independent review. Public-interface, permissions, stored-data and release-policy
+changes use the feature procedure. Stricter local repository instructions still apply. New features
+retain acceptance, test-first implementation and review gates. Generic selection requires a separate
+publication request; directly named operations retain their existing authority.
+
+Plugin 0.3.0 adds lifecycle intake. Native Codex CLI trials check
+actual artifacts, unrelated Git state, authority boundaries and linked independent reviewer returns.
+The [evaluation evidence](tests/vh-adlc/evidence/lifecycle/README.md) records the package identities,
+case coverage, retained failures and remaining desktop limit. The comparisons have shown no benefit
+from an eighth entry skill. Plugin versions come from their manifests; repository release tags
+follow a separate version sequence.
 
 | Operation | Invocation | What it does |
 | --- | --- | --- |
@@ -155,14 +176,16 @@ claiming that the whole scenario matrix passed.
 | --- | --- | --- |
 | Claude Code CLI 2.1.303, Linux | Historical full scenario proof; the 0.2.0 model-policy changes have not had an authenticated scenario rerun | `tests/vh-adlc/evidence/claude-code/`; [0.2.0 compatibility discovery](tests/vh-adlc/evidence/codex/gui-smoke.md) |
 | Codex desktop app 26.1013.40934, macOS arm64 | Core GUI loop passed on plugin 0.2.0, through independent implementation review and gated completion; unsafe shipping preflight correctly stopped | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
-| Codex CLI 0.163.0 | Native package installation passed in an isolated, credential-free profile; no CLI agent-loop claim | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
+| Codex CLI 0.163.0, plugin 0.2.0 packaging | Historical native installation check in an isolated, credential-free profile; no 0.2.0 CLI agent-loop claim | [Codex GUI run](tests/vh-adlc/evidence/codex/gui-smoke.md) |
+| Lifecycle front door, plugin 0.3.0, Codex CLI 0.163.0 | 57 fresh native CLI trials pass on one compact package/docs pair, with required repetitions and linked independent review; prior publication failures are retained. This is a bounded scenario result | [Lifecycle evaluation](tests/vh-adlc/evidence/lifecycle/README.md) |
+| Lifecycle front door, plugin 0.3.0, desktop and other hosts | Unverified; Computer Use refused access to the local Codex app, so no new desktop result is claimed | [Lifecycle testing limits](tests/vh-adlc/evidence/lifecycle/README.md) |
 | Codex VS Code extension and Copilot's Codex harness | Not yet tested | Not inferred from the desktop app |
 | Claude Code desktop app 2.42304.2, macOS arm64 | Historical core GUI loop passed on plugin 0.1.2, through gated completion; the new inherited-default policy has not been rerun here | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md) |
 | Claude Code VS Code extension 2.1.301, macOS arm64 | Partial GUI validation: seven operations, investigation, independent spec review and structured owner questions passed | [Native extension GUI run](tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md) |
 | Claude Code remote sessions | Unsupported | Not inferred from another Claude Code surface |
 | VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Core GUI loop and explicit-model rejection passed; permission-mode caveat recorded separately | [Local GUI run](tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
-| Copilot CLI | Unsupported | `tests/vh-adlc/evidence/copilot-cli/README.md` |
+| Copilot CLI lifecycle intake and agent loop | Unsupported | `tests/vh-adlc/evidence/copilot-cli/README.md` |
 | macOS arm64 | Core desktop GUI loop passed; other surfaces and full-matrix limits are listed separately | [Desktop GUI run](tests/vh-adlc/evidence/claude-desktop/gui-smoke.md), [binary and fixture checks](tests/vh-adlc/evidence/claude-code/S1.host.macos.md) |
 | Structural reviewer isolation | Unsupported: reviews record `procedural` | The reviewer has a shell, which can still write |
 | Choosing a specific reviewer model | Capability-dependent; a mismatch remains pending | A host must be able to pass the requested model and return a matching identity. A silently substituted model or an unavailable selector never counts as a match |

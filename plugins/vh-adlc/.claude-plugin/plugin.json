@@ -1,7 +1,7 @@
 {
   "name": "vh-adlc",
-  "version": "0.2.0",
-  "description": "The vh-adlc development loop: specify, decompose, implement, review, ship and resume a feature, with every status change decided by the vh-adlc binary. Runs only when invoked.",
+  "version": "0.3.0",
+  "description": "Explicit software lifecycle intake, bounded maintenance and the existing gated feature operations; framework procedure lives in this package and engineering conventions remain pinned external inputs.",
   "author": {
     "name": "Michiel VH"
   },

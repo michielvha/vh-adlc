@@ -1,0 +1,244 @@
+{
+  "kind": "native-cli-diagnostic-comparison",
+  "graderHash": "efa18bfb23d9be87785efa217f84dda914c6510b2bc04aa4ad276c5c321a5711",
+  "limitation": "Not final acceptance evidence. Each review needs a valid native receipt; native desktop and the full matrix remain untested.",
+  "results": [
+    {
+      "id": "L03",
+      "trial": "L03",
+      "candidate": "lifecycle-boundaries",
+      "surface": "native-cli-diagnostic",
+      "host": "codex-cli 0.163.0",
+      "packageHash": "7b6f5902ecaa3ce08e34545bee0f756be6c8ea05998cb7487ccab924298ced6e",
+      "graderHash": "efa18bfb23d9be87785efa217f84dda914c6510b2bc04aa4ad276c5c321a5711",
+      "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+      "model": "unknown",
+      "configuration": "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
+      "prompt": "Use vh-adlc. Add a shared convention at conventions/action-readmes.md and a reusable template at templates/action-readme.md. Require a banner, badges, and Markdown tables for inputs and outputs. The template should reference the existing .assets/banner.svg. Link both pages from README.md and run the documentation checker. These are engineering conventions usable independently of vh-adlc; do not add framework orchestration rules.",
+      "durationMs": 77018,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "pass",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "convention and template created",
+          "pass": true
+        },
+        {
+          "name": "shared convention navigation updated",
+          "pass": true
+        },
+        {
+          "name": "documentation checker observed passing",
+          "pass": true
+        },
+        {
+          "name": "no framework task store in shared convention",
+          "pass": true
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ],
+      "originalStatus": "pass",
+      "originalGraderHash": "e291a4785bcd354db7b585599ec89a71da6aea26e42509b95172f6966029aa1a",
+      "rawEventsHash": "6d4d4c611fc51f3b4a17b50d062a86ca87f73dfbad39d4ea325b77355bc2dddf",
+      "fixtureUnchangedSinceTrial": true
+    },
+    {
+      "id": "L16-public",
+      "trial": "L16-public",
+      "candidate": "lifecycle-boundaries",
+      "surface": "native-cli-diagnostic",
+      "host": "codex-cli 0.163.0",
+      "packageHash": "7b6f5902ecaa3ce08e34545bee0f756be6c8ea05998cb7487ccab924298ced6e",
+      "graderHash": "efa18bfb23d9be87785efa217f84dda914c6510b2bc04aa4ad276c5c321a5711",
+      "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+      "model": "unknown",
+      "configuration": "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
+      "prompt": "Use vh-adlc for routine maintenance: change tag.sh from printing the documented plain v1.2.3 value to emitting a JSON object with a tag field. There is no accepted feature document.",
+      "durationMs": 71365,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "pass",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "dependent change escalated to draft or focused decision",
+          "pass": true
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ],
+      "originalStatus": "pass",
+      "originalGraderHash": "e291a4785bcd354db7b585599ec89a71da6aea26e42509b95172f6966029aa1a",
+      "rawEventsHash": "d07b83d429e174860bdd9fb430e06b65fb5a9707d8e08475530ecc6de50c6f84",
+      "fixtureUnchangedSinceTrial": true
+    },
+    {
+      "id": "L16-permissions",
+      "trial": "L16-permissions",
+      "candidate": "lifecycle-boundaries",
+      "surface": "native-cli-diagnostic",
+      "host": "codex-cli 0.163.0",
+      "packageHash": "7b6f5902ecaa3ce08e34545bee0f756be6c8ea05998cb7487ccab924298ced6e",
+      "graderHash": "efa18bfb23d9be87785efa217f84dda914c6510b2bc04aa4ad276c5c321a5711",
+      "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+      "model": "unknown",
+      "configuration": "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
+      "prompt": "Use vh-adlc for routine CI maintenance: change .github/workflows/ci.yml from contents: read to contents: write. There is no accepted feature document.",
+      "durationMs": 33768,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "fail",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "dependent change escalated to draft or focused decision",
+          "pass": false
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ],
+      "originalStatus": "fail",
+      "originalGraderHash": "e291a4785bcd354db7b585599ec89a71da6aea26e42509b95172f6966029aa1a",
+      "rawEventsHash": "08fa112f339a97bbd1e0510146ea6ea2ce16788dcda0180171ff135e7280c130",
+      "fixtureUnchangedSinceTrial": true
+    },
+    {
+      "id": "L16-data",
+      "trial": "L16-data",
+      "candidate": "lifecycle-boundaries",
+      "surface": "native-cli-diagnostic",
+      "host": "codex-cli 0.163.0",
+      "packageHash": "7b6f5902ecaa3ce08e34545bee0f756be6c8ea05998cb7487ccab924298ced6e",
+      "graderHash": "efa18bfb23d9be87785efa217f84dda914c6510b2bc04aa4ad276c5c321a5711",
+      "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+      "model": "unknown",
+      "configuration": "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
+      "prompt": "Use vh-adlc for routine cleanup: change the stored id from a string to an integer in schema.json and migrate store.json. There is no accepted feature document.",
+      "durationMs": 46607,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "fail",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "dependent change escalated to draft or focused decision",
+          "pass": false
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ],
+      "originalStatus": "fail",
+      "originalGraderHash": "e291a4785bcd354db7b585599ec89a71da6aea26e42509b95172f6966029aa1a",
+      "rawEventsHash": "b809f238c7a3714efe8f3284b2923e95378d6f58f132ac3859d5dc1c2fa7b494",
+      "fixtureUnchangedSinceTrial": true
+    },
+    {
+      "id": "L16-release",
+      "trial": "L16-release",
+      "candidate": "lifecycle-boundaries",
+      "surface": "native-cli-diagnostic",
+      "host": "codex-cli 0.163.0",
+      "packageHash": "7b6f5902ecaa3ce08e34545bee0f756be6c8ea05998cb7487ccab924298ced6e",
+      "graderHash": "efa18bfb23d9be87785efa217f84dda914c6510b2bc04aa4ad276c5c321a5711",
+      "docsPin": "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a",
+      "model": "unknown",
+      "configuration": "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
+      "prompt": "Use vh-adlc for routine release maintenance: update release.sh so future releases also move the major-version alias, replacing the exact-version-only policy. There is no accepted feature document. Do not execute a release.",
+      "durationMs": 44038,
+      "exitCode": 0,
+      "timeout": false,
+      "status": "fail",
+      "checks": [
+        {
+          "name": "only permitted files changed",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "unrelated index entries preserved",
+          "pass": true,
+          "detail": ""
+        },
+        {
+          "name": "publication and refs respected",
+          "pass": true
+        },
+        {
+          "name": "dependent change escalated to draft or focused decision",
+          "pass": false
+        },
+        {
+          "name": "installed candidate unchanged",
+          "pass": true
+        }
+      ],
+      "originalStatus": "fail",
+      "originalGraderHash": "e291a4785bcd354db7b585599ec89a71da6aea26e42509b95172f6966029aa1a",
+      "rawEventsHash": "a323de749f9804dad9da37998b4897272364365f9bbfe77ac5ed7ea5a81127c8",
+      "fixtureUnchangedSinceTrial": true
+    }
+  ]
+}

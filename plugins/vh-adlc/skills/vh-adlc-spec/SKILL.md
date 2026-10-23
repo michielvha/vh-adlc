@@ -1,9 +1,13 @@
 ---
 name: vh-adlc-spec
-description: Author or review a vh-adlc feature document, the single document that is both a feature's spec and its plan. Use only when the owner invokes /vh-adlc-spec or explicitly asks to specify, revise or review a feature with the vh-adlc loop; it is not the entry point for planning in general.
+description: Author or review a vh-adlc feature document, the single document that is both a feature's spec and its plan. Use only when the owner invokes /vh-adlc-spec or explicitly asks to specify, revise or review a feature with the vh-adlc loop; it is not the entry point for planning in general. Generic vh-adlc requests use lifecycle intake.
 ---
 
 # vh-adlc-spec
+
+## Generic intake
+
+For generic vh-adlc requests without an operation name, follow `references/lifecycle.md`; then continue here.
 
 The plugin directory is two levels above this skill's own directory. Every path below that starts
 with `references/` or `scripts/`, and `knowledge.md`, is in that directory.
