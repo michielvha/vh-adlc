@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Owner accepted R-2 on 2026-10-23; planned gate passed; ready for task planning."
+status: draft
+status_description: "Copilot Opus review R-3 identified decisions and corrections; revising before implementation."
 issue: null
 goal: "Run one evidence-based backlog triage workflow through shared vh-adlc and migrate Stackweaver to it without duplicating project-independent instructions."
 covers:
