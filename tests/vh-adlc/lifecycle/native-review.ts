@@ -41,10 +41,14 @@ export function verifyMaintenanceReview(project: string, sessions: string, paren
     const entries = [...record.matchAll(/^### (R-\d+)[ \t]*\n/gm)];
     const entry = entries.at(-1);
     const latest = entry ? record.slice(entry.index! + entry[0].length).split(/^## |^### R-/m)[0] : reviews ?? "";
-    const named = entry && record.match(new RegExp(`^${entry[1]} (?:target:|reviewed) ([0-9a-f]{40})\\. Model: ([^\\s.]+)\\. Isolation: (?:procedural|structural|unknown)\\.[ \\t]*$`, "m"));
-    const target = latest.match(/^Target: ([0-9a-f]{40})\s*$/m)?.[1] ?? named?.[1];
-    if (!target) return fail("no exact review target in the record");
-    const model = latest.match(/^Model: ([^\s()]+)(?:[ \t]+\([^\n]*\)\.?)?[ \t]*$/m)?.[1] ?? named?.[2];
+    const named = entry ? [...record.matchAll(new RegExp(`^${entry[1]} (?:target:|reviewed) ([0-9a-f]{40})\\. Model: (\\S+?)\\. Isolation: (?:procedural|structural|unknown)\\.(?:[ \\t]+[^\\n]*)?$`, "gm"))] : [];
+    const table = entry ? [...record.matchAll(new RegExp(`^\\|[ \\t]*${entry[1]}[ \\t]*\\|[ \\t]*\x60?([0-9a-f]{40})\x60?[ \\t]*\\|([^|]+)\\|[ \\t]*(?:procedural|structural|unknown)[ \\t]*\\|[^\\n]*$`, "gm"))] : [];
+    const bindings = [...named.map((m) => [m[1], m[2]]), ...table.map((m) => [m[1], m[2].trim().split(/[\s(]/)[0]])];
+    const targets = [...new Set([latest.match(/^Target: ([0-9a-f]{40})\s*$/m)?.[1], ...bindings.map((b) => b[0])].filter(Boolean))];
+    if (targets.length !== 1) return fail("no unambiguous exact review target in the record");
+    const target = targets[0]!;
+    const models = [...new Set([latest.match(/^Model: ([^\s()]+)(?:[ \t]+\([^\n]*\)\.?)?[ \t]*$/m)?.[1], ...bindings.map((b) => b[1])].filter(Boolean))];
+    const model = models.length === 1 ? models[0] : undefined;
     const stored = latest.match(/^```text\n([\s\S]*?)\n```/m)?.[1] ?? (latest.trim() === "NO FINDINGS" ? "NO FINDINGS" : undefined);
     if (!model || stored !== "NO FINDINGS") return fail("no clean, well-formed stored review");
     const definition = section(record, "Definition");
@@ -95,8 +99,15 @@ function verifyNativeReturn(project: string, sessions: string, parentThread: str
         && [...calls.matchAll(/(?<![0-9a-f])([0-9a-f]{7,39})(?![0-9a-f])/g)].some((m) => {
           try { return git(project, "rev-parse", "--verify", `${m[1]}^{commit}`) === target; } catch { return false; }
         });
-      const contractRead = calls.includes(contractPath)
-        || calls.includes(contractName) && ownOutputs.includes(contractHeading);
+      const reviewTurns = new Set(log.rows.filter((r) => r.type === "event_msg" && r.payload?.type === "task_complete"
+        && r.payload.root_turn_id === completed.root_turn_id && r.payload.turn_id !== r.payload.root_turn_id
+        && r.payload.last_agent_message?.startsWith(`MODEL: ${model}\n`)).map((r) => r.payload.turn_id));
+      const contextCalls = log.rows.filter((r) => r.type === "response_item" && ["custom_tool_call", "function_call"].includes(r.payload?.type)
+        && reviewTurns.has(r.payload.internal_chat_message_metadata_passthrough?.turn_id)).map((r) => String(r.payload.input ?? r.payload.arguments ?? "")).join("\n");
+      const contextOutputs = log.rows.filter((r) => r.type === "response_item" && ["custom_tool_call_output", "function_call_output"].includes(r.payload?.type)
+        && reviewTurns.has(r.payload.internal_chat_message_metadata_passthrough?.turn_id)).map((r) => JSON.stringify(r.payload.output)).join("\n");
+      const contractRead = contextCalls.includes(contractPath)
+        || contextCalls.includes(contractName) && contextOutputs.includes(contractHeading);
       if (!inspectedTarget || !calls.includes(recordPath) || !contractRead) continue;
       return {
         pass: true, reason: "linked native reviewer returned the exact stored review and inspected its committed target",

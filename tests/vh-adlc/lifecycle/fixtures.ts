@@ -243,7 +243,7 @@ function localMaintenanceRefs(before: string, after: string): boolean {
   const changed = differences(a, b);
   const owned = Object.keys(a).filter((name) => name.startsWith("refs/heads/") && name !== "refs/heads/main");
   return changed.length <= 1 && changed.every((name) => name.startsWith("refs/heads/") && name !== "refs/heads/main" && b[name]
-    && (owned.length ? owned.includes(name) : !a[name]));
+    && (!a[name] || owned.length === 1 && owned.includes(name)));
 }
 
 function localFeatureRefs(before: string, after: string): boolean {

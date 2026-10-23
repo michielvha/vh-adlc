@@ -172,6 +172,18 @@ describe("lifecycle outcome grading", () => {
     expect(grade(f, before, snapshot(f), "Repaired locally.", commands).pass).toBe(false);
   });
 
+  test("maintenance may preserve its original branch and continue on one new local branch", () => {
+    const f = fixture("L06");
+    git(f.project, "switch", "-c", "maintenance/greeting");
+    const before = snapshot(f);
+    git(f.project, "switch", "-c", "maintenance/greeting-resume");
+    git(f.project, "commit", "--allow-empty", "-qm", "fixture: local continuation");
+    const allowed = () => grade(f, before, snapshot(f), "Local continuation.", []).checks.find((c) => c.name === "publication and refs respected")?.pass;
+    expect(allowed()).toBe(true);
+    git(f.project, "branch", "-f", "maintenance/greeting", "HEAD");
+    expect(allowed()).toBe(false);
+  });
+
   test.each(["maintenance/greeting", "maintenance-greeting"])("a local maintenance branch %s has no publication authority", (branch) => {
     const f = fixture("L06"), before = snapshot(f);
     git(f.project, "switch", "-c", branch);

@@ -51,7 +51,7 @@ const results = roots.flatMap((root) => {
   });
 });
 console.log(JSON.stringify({
-  kind: "native-cli-diagnostic-comparison", graderHash,
-  limitation: "Not final acceptance evidence. Each review needs a valid native receipt; native desktop and the full matrix remain untested.",
+  kind: "native-cli-regraded-trials", graderHash,
+  limitation: "Regrading requires unchanged native artifacts and valid reviewer receipts. Coverage, independent implementation review and feature completion require their separate checks; desktop and other hosts are not established here.",
   results,
 }, null, 2));

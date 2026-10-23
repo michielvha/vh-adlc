@@ -79,6 +79,34 @@ test("the latest explicitly bound review may follow completion bookkeeping", () 
   expect(f.verify().pass).toBe(false);
 });
 
+test.each(["prose", "table"])("explicit %s metadata binds the latest bare review", (format) => {
+  const f = fixture(), path = join(f.f.project, f.path);
+  const record = readFileSync(path, "utf8");
+  const metadata = format === "prose"
+    ? `R-2 target: ${f.target}. Model: unknown. Isolation: procedural. Model identity was not attested.`
+    : `| Review | Target | Model | Isolation | Outcome |\n| --- | --- | --- | --- | --- |\n| R-2 | ${f.target} | unknown | procedural | No findings |`;
+  writeFileSync(path, record.slice(0, record.indexOf("## Reviews")) + metadata + "\n\n## Reviews\n\n### R-1\n\nHistorical finding.\n\n### R-2\n\nNO FINDINGS\n");
+  expect(f.verify().pass).toBe(true);
+  writeFileSync(path, readFileSync(path, "utf8").replace(format === "prose" ? "R-2 target:" : "| R-2 |", format === "prose" ? "R-1 target:" : "| R-1 |"));
+  expect(f.verify().pass).toBe(false);
+});
+
+test("an independent reviewer retains its own contract context during re-review", () => {
+  const f = fixture();
+  f.child[1].payload.input = "cat references/maintenance-review.md";
+  f.child[1].payload.internal_chat_message_metadata_passthrough.turn_id = "old-review-turn";
+  f.child[2].payload.turn_id = "old-review-turn";
+  f.child[2].payload.last_agent_message = "MODEL: unknown\nFINDING: F-01\nEarlier defect.";
+  f.child.push({ type: "response_item", payload: { type: "custom_tool_call", input: `git show ${f.target}; cat ${f.path}`, internal_chat_message_metadata_passthrough: { turn_id: "new-review-turn" } } } as any);
+  f.child.push({ type: "event_msg", payload: { type: "task_complete", last_agent_message: "MODEL: unknown\nNO FINDINGS", turn_id: "new-review-turn", root_turn_id: "parent-turn" } } as any);
+  f.logs();
+  expect(f.verify().pass).toBe(true);
+  f.child[1].payload.internal_chat_message_metadata_passthrough.turn_id = "parent-turn";
+  f.child.splice(1, 0, { type: "event_msg", payload: { type: "task_complete", last_agent_message: "MODEL: unknown\nNO FINDINGS", turn_id: "parent-turn", root_turn_id: "parent-turn" } } as any);
+  f.logs();
+  expect(f.verify().pass).toBe(false);
+});
+
 test("bookkeeping after review preserves freshness but source drift does not", () => {
   const f = fixture();
   writeFileSync(join(f.f.project, f.path), readFileSync(join(f.f.project, f.path), "utf8") + "\n## State\n\nComplete locally.\n");
