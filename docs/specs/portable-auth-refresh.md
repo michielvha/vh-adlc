@@ -272,7 +272,8 @@ The published Linux amd64 binary also passed `doctor` on this host after a fresh
 cache install. The combined local suite passed 85 tests with 325 assertions. An independent reviewer
 verified the runtime signature, every archive and binary lock hash, and GitHub release metadata.
 The publication/provisioning blocker is resolved. Remaining migration gaps are the deferred phone
-flow, desktop and VS Code invocation/rollback, the full live-provider matrix and race coverage.
+flow, desktop and VS Code invocation/rollback, and the full live-provider matrix. Race coverage
+was subsequently completed on this host as recorded below.
 No criterion is closed from a passing subset, and T5 remains open.
 
 Independent implementation review R-7 observed the same seven remote acceptance tests and 104
@@ -310,6 +311,21 @@ GitHub token variables removed and an empty GH_CONFIG_DIR succeeded and returned
 `auth-refresh 0.2.0-rc.1` version. Public installation no longer requires authenticated gh; its private
 release fallback remains available. Historical private-repository observations above describe earlier
 runs. The portable-plugin PRs remain unmerged, and phone/GUI/provider acceptance gaps remain open.
+
+On the owner's request, GCC 15.3.1 and its required Fedora development dependencies were installed
+on this host. The package manager also updated glibc to the matching development-package version.
+`CGO_ENABLED=1 AUTH_REFRESH_E2E=1 go test -race -count=1 -v ./...` passed all six packages at runtime
+source `be34aa2`; the full real-browser lane suite ran, with zero skipped tests and no race reports.
+CGO was enabled for this command without changing the host's default Go environment. The earlier
+missing-compiler/race-test gap is resolved; phone, GUI/legacy rollback and remaining provider
+acceptance are still open. Raw output is temporarily retained at `/tmp/auth-refresh-race-tests.log`.
+
+Component `2fadfe08349ef9c67059de3925a5e32dd560c20a` replaces the README's old host-copy recipe with first-time local setup:
+create config, notes, lane credentials and token files; select the published runtime; install browser
+dependencies; run setup, doctor and check. The JSON/INI/notes examples were extracted and validated
+with the verified production binary's config parser, lane listing and doctor in a private temporary
+setup, without changing the live config or starting a login. The shared catalogs pin that README
+revision while retaining the same signed runtime release and hashes.
 
 ## Scope
 
