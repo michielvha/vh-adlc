@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "R-11 returned no findings and R-12 met all ten criteria at the compact-entry commit, with two nonblocking nits. The completion recheck and publication checks follow separately."
+status_description: "Compact lifecycle intake is complete. R-11 returned no findings, R-12 met all ten criteria with two nonblocking nits, the fresh native matrix passes and the completion recheck passes. GitHub publication and CI are checked separately."
 issue: 21
 branch: feat/lifecycle-front-door
 goal: "Use vh-adlc as one entry point for software lifecycle work, continuing through the appropriate procedure while preserving each task's authority and evidence requirements."
@@ -110,6 +110,11 @@ native boundary trials, L05 and L06-ci, beyond the indexed matrix batch.
 Its two nonblocking judgement nits recommend a shared fresh-run/regrade function
 and a stronger preference for structured per-review metadata. They remain
 verbatim in R-12 for future maintenance; all current criteria are met.
+
+After R-11/R-12 were stored and checked byte for byte, the completion recheck
+returned `vh-adlc gate complete: pass (rules 1, docs e4d58d2)` with no findings.
+The accepted baseline and both exact-commit reviews remain current. GitHub CI
+and the owner-authorized conditional merge are separate delivery checks.
 
 ## Scope
 
