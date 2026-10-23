@@ -296,8 +296,9 @@ already handled in the component's reviewed `7709650` correction. A minimal main
 those three files. It lets the common-CI PR #3 proceed independently of the full migration PR #6.
 The main-based full Go suite with mandatory browser tests, vet, module check, local lint and whitespace
 checks passed. GitHub CI run `39875627899` also passed its verification and mandatory browser jobs,
-including the pinned newer linter. The focused backport is validated; main itself remains unchanged
-until PR #8 is merged.
+including the pinned newer linter. The owner then authorized merging PR #8. It merged on 2026-10-23 as
+`42d4d37034c8a23f0b5f16d0c5495626bfe2994a`, so main now contains the three process-error fixes.
+The portable-auth migration PRs remain separate and unmerged.
 
 ## Scope
 
