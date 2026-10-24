@@ -656,6 +656,7 @@ changed context needs a new approved explanation while unchanged-batch resume do
 | 2026-10-24 | R-16 | implementation | `8f3ca635096fc663d473fe31389c77891b488dce` | claude-opus-5.5 | procedural | Local proof passes; twelve findings include readiness provenance, tool enforcement, controller resume and missing verification methods. |
 | 2026-10-24 | R-17 | spec | `a28ebbf4d6f1796434bca1407542aedf255f5908` | claude-opus-5.5 | procedural | Eight findings: clarify completion-write authority, analysis confinement, per-adapter proof and changed-evidence comments; one listing command exceeded the review tool procedure. |
 | 2026-10-24 | R-18 | spec | `f279246902847ba0fafccef7a5c61d735701ac6d` | claude-opus-5.5 | procedural | Six findings: verified-state write coverage, criterion end states and guide/task alignment; unread tool-runtime overflow file retained. |
+| 2026-10-24 | R-19 | spec | `781a009cde5d573651958c05871ba46999bb4cc6` | claude-opus-5.5 | procedural | Two factual findings: use one assertion term across gates and name its full scope in migration parity. |
 
 ### R-1
 
@@ -1476,6 +1477,21 @@ SEVERITY: nit
 WHERE: this review
 EVIDENCE: Isolation was procedural. I first inspected proof.sh and proof.py. They only read Git state, hash files and run the pinned lint. I then ran /tmp/shared-triage-spec-review-r18/proof.sh once, with no arguments. It returned integrity true, all four expected targets, proof_manifest_sha256 b9c4a669c1980f63e1fb899653800747209be9e9c28799af8f30844a627b6826, lint result pass with no findings, and lint_exit 0. Every other read used view, grep and glob inside the packet. One grep result was too large, and the tool runtime saved it automatically to /tmp/copilot-tool-output-1792872254490-lj6l1v.txt, outside the packet. I did not read that file. I made no edits, network calls or other commands.
 PROPOSAL: Record isolation as procedural and note the unread overflow file that the tool runtime saved.
+### R-19
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context; Design / Canonical workflow and harness boundary; Design / Enforced verification and recovery; Design / Collection, verification and report step 1; Acceptance Criteria / AC-03, AC-06; Test Plan / AC-03, AC-06
+EVIDENCE: Candidate A is written as an extension next to the term "completion-asserting write". It is not part of that term's definition. docs/specs/shared-triage.md:152-157 defines completion-asserting writes as checklist ticks, plan-status sync and resolution comments, then says "The same rule covers" readiness, partial and cleared-blocker writes. AC-04 (:486) lists "a write asserting completion, partial shipped scope, readiness or a cleared blocker" as separate kinds. Several gates still use only the narrow term. :141-142 and AC-03 (:485) block "every executable closure and completion-asserting write" on incomplete collection or verification input. The AC-03 proof (:499) does the same. :190-191 makes only "executable closure and completion-asserting writes" unavailable on an incapable host. :199-200 requires the boundary only when the helper cannot establish that a write "is free of completion assertions". AC-06 (:488) "permits executable closure and completion-asserting writes only with fresh observed verification". The AC-06 platform case (:502) "fails closed for closure and completion-asserting writes". A `ready` label means "Verified unblocked" (tests/vh-adlc/triage/fixtures/legacy/agents/issue-triage.md:164). It depends on a complete blocker inventory. Under the current AC-03 text, a ready label or verified-unblocked comment published from a report with a missing issue/comment page does not contradict AC-03. A host without the controller is also not tested to deny these writes. Context (:66-68) says the draft applies the boundary "consistently". This is a consistency defect in candidate A as written, not a new policy question and not an answer to Q6.
+PROPOSAL: Define one term, for example "verified-state write". It should cover completion, partial-shipment, readiness and cleared-blocker writes. Use it at :141-142, :190-191, :199-200, :271-272, AC-03, AC-06 and the AC-03/AC-06 incomplete-input, fail-closed-helper and platform proof cases. That keeps the draft fully candidate A, so accepting Q6=A needs no further normative edit.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design / Stackweaver migration and rollback step 3; Test Plan / AC-07
+EVIDENCE: docs/specs/shared-triage.md:387-391 describes the eighth intentional difference `enforced-controller-execution` only as "approved closures and completion assertions". The frozen legacy playbook applies `ready` and `partial` labels. It also posts triage comments that state the verified state and the shipped scope (tests/vh-adlc/triage/fixtures/legacy/agents/issue-triage.md:164-166, :217-220, :224). Under the draft's candidate A (:154-157), those writes now also need the controller. The parity result "must name these differences" (:393), but the recorded difference does not cover readiness, partial-shipment or blocker-clearing writes. T30 (:595) updates guides for these writes, but the normative difference text and the AC-07 proof (:503) do not.
+PROPOSAL: Extend the eighth difference at :387-391 and the AC-07 proof to name ready/partial labels, blocked-label removal and comments that state the verified state or shipped phases. Have T30's manifest change record that scope.
 ## Sources
 
 - [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
