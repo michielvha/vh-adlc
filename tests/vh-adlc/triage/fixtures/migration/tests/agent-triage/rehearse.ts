@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -27,6 +27,7 @@ writeFileSync(join(checkout,"triage-unrelated-untracked.txt"),"Preserve untracke
 git(checkout,"add","triage-unrelated-staged.txt");
 const indexPath = join(checkout,git(checkout,"rev-parse","--git-path","index"));
 const indexBefore = digest(readFileSync(indexPath));
+const entriesBefore = git(checkout,"ls-files","--stage","-z");
 const before = Object.fromEntries(runtime.map((path)=>[path,digest(readFileSync(join(checkout,path)))]));
 git(checkout,"restore",`--source=${baseline}`,"--worktree","--",...runtime.slice(0,3));
 assert(digest(readFileSync(join(checkout,runtime[3]))) === before[runtime[3]],"Settings drift blocks rollback");
@@ -60,8 +61,8 @@ for(const changed of generated) if(changed !== index) {
   const original = trackedBefore.get(changed); assert(!!original,`Unexpected generated path: ${changed}`);
   writeFileSync(join(checkout,changed),original!);
 }
-assert(digest(readFileSync(indexPath)) === indexBefore,"Report/index generation changed staging");
+assert(git(checkout,"ls-files","--stage","-z") === entriesBefore,"Report/index generation changed staged modes, blobs or paths");
 const evidence = {schema_version:1,baseline,adapter,checkout,plugin,rollback:true,reapply:true,index_preserved:true,normal_report:path,
-  report_index:index,history_comparison:report.comparison,generated_paths:generated,only_allowed_runtime_paths:runtime};
+  rollback_index_bytes_preserved:true, report_index:index,history_comparison:report.comparison,generated_paths:generated,only_allowed_runtime_paths:runtime};
 writeFileSync(join(output,"result.json"),JSON.stringify(evidence,null,2)+"\n");
 process.stdout.write(JSON.stringify({output,...evidence},null,2)+"\n");

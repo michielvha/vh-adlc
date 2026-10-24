@@ -55,6 +55,10 @@ its output directory so the evidence can inspect it. Normal report placement/ind
 also exercised in that disposable clone. Do not run product integration tests against slot 0 for
 this prompt/settings migration.
 
+Rollback/reapplication compare the index bytes. The report/index check compares every staged path,
+mode and blob: the fixture's own `git diff` may refresh the index stat cache while preserving all
+staged content. This distinction does not excuse changed staged entries or runtime paths.
+
 ## Rollback and reapplication
 
 Rollback changes only the runtime triage entry points and settings. Keep this handoff and tests
