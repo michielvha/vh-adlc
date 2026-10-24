@@ -56,7 +56,7 @@ test.each([
   { schema_version: 1, protected_ids: ["8"] }, { schema_version: 1, source_roots: "src" },
   { schema_version: 1, index_rules: { executable: "echo bad" } },
   { schema_version: 1, plan_fields: { issue: "same", status: "same" } },
-])("malformed/unknown settings are rejected before collection: %j", (input) => {
+].map((input) => [input]))("malformed/unknown settings are rejected before collection: %j", (input) => {
   const f = project(); f.settings(input);
   expect(() => loadSettings(f.root)).toThrow();
 });
@@ -97,4 +97,32 @@ test("symlinks cannot turn a declared source or report location into host-file a
   expect(() => loadSettings(f.root)).toThrow();
   f.settings({ schema_version: 1, report_dir: "escape/new/reports" });
   expect(() => loadSettings(f.root)).toThrow();
+});
+
+test("root-wide source scope still excludes mirrors and Git metadata", () => {
+  const f = project(); f.write("generated/app.ts", "export const mirror = true;\n");
+  f.settings({ schema_version: 1, generated_mirrors: ["generated"] });
+  const config = loadSettings(f.root);
+  expect(sourcePath(config, "src/app.ts")).toBe(true);
+  expect(sourcePath(config, "generated/app.ts")).toBe(false);
+  expect(sourcePath(config, ".git/config")).toBe(false);
+  f.settings({ schema_version: 1, report_dir: ".git/reports" });
+  expect(() => loadSettings(f.root)).toThrow();
+});
+
+test("dot aliases and internal symlinks cannot disguise mirrors or Git metadata", () => {
+  const f = project(); f.write("generated/app.ts", "export const mirror = true;\n");
+  symlinkSync(join(f.root, "generated"), join(f.root, "alias"), "dir");
+  f.settings({ schema_version: 1, generated_mirrors: ["generated"] });
+  const config = loadSettings(f.root);
+  expect(sourcePath(config, "././.git/config")).toBe(false);
+  expect(sourcePath(config, "alias/app.ts")).toBe(false);
+  f.settings({ schema_version: 1, report_dir: "././.git/reports" });
+  expect(() => loadSettings(f.root)).toThrow();
+});
+
+test("a relative source spelling resolves to the same canonical source", () => {
+  const f = project(); f.settings({ schema_version: 1, source_roots: ["./src"] });
+  const config = loadSettings(f.root);
+  expect(sourcePath(config, "src/app.ts")).toBe(true);
 });
