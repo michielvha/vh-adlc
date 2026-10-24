@@ -1,0 +1,17 @@
+{
+  "repository": "michielvha/stackweaver",
+  "baseline": "129581f6dbe4df71200af8f67d7bc017d35e89ad",
+  "files": {
+    "agents/issue-triage.md": "d03ec9fae185d40139c783c68b7d4fbbf1c70b1e1e5dcb1876b001e27249abba",
+    ".claude/commands/triage.md": "a0ecdbcb65d7bbbc827e1b50e8c9e56716f552d085f2f38697b39b38e6faab34"
+  },
+  "intentional_differences": [
+    "all-writes-approved",
+    "unbounded-pagination",
+    "incomplete-blocks-all-closures",
+    "current-index-request",
+    "all-modes-save-report",
+    "report-commit-opt-in",
+    "scope-safe-history"
+  ]
+}
