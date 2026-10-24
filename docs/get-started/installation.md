@@ -92,11 +92,11 @@ engineering conventions pin when present, otherwise its
 Shared triage uses Bun for its packaged helpers, Git for source verification, and the GitHub CLI
 (`gh`) for its GitHub adapter. Authenticate that CLI for the intended repository using your normal
 account setup before running triage; the plugin does not provision credentials or switch accounts.
-Executable closures also need the [managed verification controller](../../plugins/vh-adlc/references/triage-boundary.md),
+Every published triage verdict and local assessment patch also needs the [managed verification controller](../../plugins/vh-adlc/references/triage-boundary.md),
 which currently requires Linux, Bubblewrap, `flock` from util-linux and an authenticated supported CLI.
 The shared procedure and stream protocol remain independent of the harness; other host integrations
-must enforce the same boundary and pass their own tests. Missing confinement leaves closure execution
-unavailable. Another read adapter must preserve the pagination and error contract. The other feature
+must enforce the same boundary and pass their own tests. Missing confinement leaves closure execution and all assessment writes
+unavailable; local reports remain available. Another read adapter must preserve the pagination and error contract. The other feature
 operations continue to use the verified binary without requiring Bun.
 
 The other marketplace plugins install separately. Bun is required for the

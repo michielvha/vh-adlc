@@ -40,6 +40,7 @@ The frozen legacy prompts and provenance live in vh-adlc's
 | all-modes-save-report | Next and close now save reports as well as returning their findings. |
 | report-commit-opt-in | Save reports uncommitted unless the owner asks for a commit; approved plan patches retain their separately shown local commit. |
 | scope-safe-history | Compare same-scope complete inventories, otherwise only common observed IDs; missing scope never implies removed issues. |
+| enforced-controller-execution | Executable closure and every published triage verdict, including local assessment patches, require current proof in a confined controller plus exact approval. Linux/Bubblewrap/flock and authenticated Codex or Claude CLI are the first managed adapters; other harnesses retain reports and need their own tested confinement for execution. |
 
 A fixture or prompt/manifest check is not native parity proof. The vh-adlc evidence must contain
 actual legacy/shared results, native installation/payload checks, the bounded live read-only trial
@@ -52,14 +53,18 @@ The shared package supplies `scripts/triage/controller.ts`, with optional Codex 
 adapters around one protected analysis protocol. The trusted operator starts it outside analysis
 and keeps its approval input. Cached reports or receipts cannot grant execution authority. The
 shared boundary guide owns setup and protocol details; verify the actual controller capability
-report on the intended host before claiming closure support.
+report on the intended host before claiming closure or assessment-write support.
 
 For the Claude compatibility entry, select the Claude adapter and `--command triage`; the source
 command still declares `model: fable`. Other harnesses invoke the shared operation through their
 supported adapter. Linux/Bubblewrap is the first managed runtime; unconfigured hosts can report
-but must leave closure execution unavailable. Do not silently route to ordinary helper execution.
+but must leave closure execution and every published triage verdict unavailable. Do not silently route to ordinary helper execution.
 
-This is an enforcement prerequisite, not a removal of approved triage closures. Preserve exact
+The boundary applies to all published or applied assessments, including non-closure obsolete, duplicate,
+ready, blocked, ownership, dependency and coverage verdicts. Local reports remain available.
+Plain-chat exceptions cover only structurally attributed owner task data and neutral vocabulary.
+Managed recovery needs a fresh confined native trial and the original exact batch/journal; materially
+changed context requires a fresh approved explanation, and a new batch cannot bypass uncertainty. Preserve exact
 batch approval, source/account checks, protected work, local gates and journals. Provider quota
 failures and missing GUI proof remain visible blockers; a successful install is not acceptance.
 All Stackweaver settings, ownership ledgers and documentation rules remain in this repository.

@@ -11,12 +11,14 @@ Keep `CLAUDE.md` and local verification requirements. The shared operation inher
 the Claude compatibility command retains its own pinned model. Pass the original arguments:
 no argument/`sweep`, `next`, `close`, `stale`, or explicit issue numbers.
 
-Closure execution needs the shared package's managed controller, not cached attestations. Ask the
+Executable closure and every published triage verdict, including local assessment patches, need the
+shared package's managed controller and fresh observed proof. Cached attestations grant no execution
+authority. Ask the
 trusted operator to use its `scripts/triage/controller.ts` entry outside analysis. On the supported
 Claude CLI adapter, `--command triage` retains this repository's declared Fable model; the Codex
 adapter uses the shared operation without that command. Follow the shared controller guide rather
 than copying its protocol here. The analysis client never receives the operator approval channel.
-Missing runtime capabilities, provider access or verified host integration block closure execution;
+Missing runtime capabilities, provider access or verified host integration block closure execution and all assessment writes;
 there is no unconfined or legacy fallback. Keep returning a read-only report when execution is blocked.
 
 Project data and report rules:

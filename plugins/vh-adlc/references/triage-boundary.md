@@ -1,110 +1,115 @@
 # Trusted verification protocol
 
-Closure execution requires a trusted controller invocation. The analysis client may use any
-harness. The protocol is newline-delimited JSON over streams; it names no model, app or tool brand.
-The controller owns the fixed repository, collected inventory, approved check list and output
-location. It must protect this process, its installed code and its operator input from analysis.
-An unrestricted agent's shell is not an operator channel. A host that cannot provide this separation
-can still analyse and save reports, but must report closure execution as unavailable.
+Executable closure and every published triage verdict require current proof in a confined controller,
+plus exact owner approval. This includes factual comments, labels, new issues and local plan/status
+patches about implementation, shipped or removed scope, supersession, overlap, open/blocked/ready work,
+dependencies, ownership and coverage. An unverified annotation or a purpose label cannot exempt an
+assessment. Incomplete required collection or verification blocks every assessment write.
 
-This helper enforces proof origin and channel separation inside its invocation. It does not confine
-a model's other tools or protect against an administrator modifying its runtime. A host adapter
-must enforce that confinement separately. The native acceptance driver does so with a restricted
-tool set and an isolated read adapter; that trial result is not a certification of every host.
+Local reports and proposals remain available across harnesses. Saving or explicitly committing a
+local report grants no tracker mutation, remote report publication or push authority. Outside a
+confined controller, exact plain-chat approval covers only the structurally attributed task-data and
+neutral-vocabulary forms documented in `triage.md`. Unknown prose requires the boundary.
+
+The shared workflow and structured streams name no required model or harness. A host adapter must
+protect its analysis tools, runtime and operator input. An unrestricted agent's shell is not an
+operator channel. Cached reports, serialized receipts and environment flags cannot create current
+execution authority. Administrator control of this runtime is outside the analysis boundary.
 
 ## Managed controller
 
-On Linux with Bubblewrap, `flock` (util-linux) and an authenticated supported CLI, start the shipped controller outside
-analysis. It creates a private working directory outside the selected checkout, performs fixed
-GET-only collection, installs the exact local plugin payload in a disposable client profile, and
-starts a restricted analysis client. Its only analysis tools are the declared read adapter. The
-client receives no operator input, GitHub credential, shell or direct GitHub path. Unexpected tools,
-failed probes, incomplete input or changed payload block execution.
+The shipped adapters currently require Linux, Bubblewrap, util-linux `flock`, Bun, Git, the GitHub CLI
+and an authenticated Codex or Claude CLI. Check capabilities on the intended host. Missing capabilities
+leave closure and assessment writes unavailable; there is no unconfined fallback.
 
 ```sh
 bun "<plugin>/scripts/triage/controller.ts" capabilities
 bun "<plugin>/scripts/triage/controller.ts" start --repo "<checkout>" \
-  --host codex --mode ids --ids 12,34 --output-dir "<new directory outside checkout>"
+  --host codex --mode ids --ids 12,34 --output-dir "<new directory outside checkout>" \
+  --checks "<operator-selected checks.json>" --removals "<operator-selected removals.json>"
 ```
 
-`--host claude` uses the other shipped adapter. A repository's Claude compatibility entry can add
-`--command triage`; its declared model is retained. Other harnesses use the shared procedure and
-protocol; no Claude model or tool is required by the core operation. Host integrations beyond the
-observed CLI adapters remain unverified. Missing capabilities never fall back to unconfined closure.
+`--checks` and `--removals` are optional startup selections from the trusted operator. A checks file
+maps reviewed names to trusted argv arrays, for example `{"module-test":["bun","test","tests/module.test.ts"]}`.
+A removals file is an array of `{path, before_commit}` selections. Never derive executable commands
+from issue or comment text. The controller runs those selections serially in primary and adversarial
+passes before analysis. Their actual receipts, stdout/stderr and ancestor content are hash-bound in
+`verification.json`, which analysis must read completely. Required failures remain controller state
+even if analysis omits them from its response.
 
-After analysis, the parent prints the report result and waits for operator JSON lines. `batch` with
-`params.actions` returns the exact proposed batch. Only a subsequent `execute` with the exact approval
-can apply it. These lines belong to the trusted operator, not the analysis client. Closing operator
-input exits without applying unapproved actions. `resume` retains the original journal and requires
-fresh observed proof. The lower-level protocol below is for trusted host adapters, not a substitute
-for establishing confinement.
+Each check runs in a disposable shallow checkout of the fixed commit, inside isolated filesystem and
+network namespaces. It receives system tools, Bun, its checkout and private temporary directories.
+Owner home/configuration, credentials, agent sockets, unrelated host files, ancestor Git blobs and
+network egress are unavailable. A missing dependency or isolation facility is an explicit failure.
+The original checkout and index stay untouched. Commands cannot import cache receipts as proof.
 
-## Start outside analysis
+The controller performs fixed GET-only collection and installs the exact local plugin into a
+disposable native profile. The model receives only declared read/list/search/probe tools. Their
+read adapter enforces filesystem and network exclusions, while the host adapter checks the actual
+native tool inventory/configuration and trace. Unexpected tools, failed probes, incomplete inputs
+or a changed payload block execution. Model tools cannot read tracker credentials or operator input.
+The native CLI's provider login and provider connection remain in its trusted control plane; the
+host-networked CLI itself is not an OS-isolated process.
 
-The trusted controller runs:
+`--host claude` selects the other adapter. A repository's compatibility entry can add `--command triage`
+to retain its declared local model. Other harnesses can use the shared report procedure and implement
+an adapter with equivalent observed confinement. Required native host acceptance evidence remains
+separate; installing the package or running a unit fixture does not establish it.
+
+## Operator approval
+
+After successful confined analysis, the parent prints its report result and waits for operator JSON
+lines on its own input. The analysis client has no handle to that input. `batch` with `params.actions`
+returns the exact rendered action payloads and hash. Present the report and those payloads, then send
+`execute` with `params.approval`: `batch_hash`, selected `action_ids` and the owner's actual
+`owner_statement`. Closing operator input applies no further actions. An approval record cannot waive
+proof or grant push, merge, release, credential or issue-implementation authority.
+
+The parent revalidates current source, actor, settings, evidence and issue state before effects. It
+serializes effects per hostname/repository under one host user's kernel lock, across batch and output
+paths. This does not serialize another machine or unrelated remote actors. Keep the lock inode;
+never delete a live lock file to force a retry.
+
+## Managed recovery
+
+Keep the original controller output, batch and journal. Select them explicitly and use a fresh
+outside-checkout attempt directory. Supply the exact approval JSON on trusted parent input:
 
 ```sh
-bun "<plugin>/scripts/triage/cli.ts" session --repo "<checkout>" \
-  --inventory "<run>/inventory.json" --checks "<run>/checks.json" \
-  --output-dir "<run>/reports" --control-fd 3
+bun "<plugin>/scripts/triage/controller.ts" resume \
+  --run-dir "<original run>/analysis" --batch-hash "<original hash>" \
+  --output-dir "<new recovery attempt directory>" < "<approved exact batch.json>"
 ```
 
-Descriptor 3 is an independently inherited operator stream. Never give its handle, process access
-or write access to the analysis client. Use operator-selected `--index-requests 12,34` only for the current owner’s explicit request.
-Descriptors aliased to analysis stdin are rejected. With no operator descriptor, the session is read-only on
-GitHub. Both channels return JSON responses on stdout, distinguished by `channel`; the controller
-routes them to the proper client. The controller closes both inputs to finish the invocation.
-Restarting loses live verification authority. Receipts on disk never revive it.
+Recovery validates the original fixed input and current installed payload, runs a fresh confined
+native trial and requires the fresh verdicts to agree. It then makes fresh actual bounded observations,
+re-runs only original operator-selected checks and uses the original exact batch/journal. Archive
+files alone grant no execution authority. Prior artifacts are preserved. Completed comments, closures
+and creations are never repeated within the unchanged original batch.
 
-`checks.json` maps operator-selected names to trusted argv arrays, for example
-`{"module-test":["bun","test","tests/module.test.ts"]}`. Select checks from reviewed repository
-instructions before analysis. The client supplies a check name, never executable argv. Verification
-runs in the existing disposable fixed-commit checkout and cleans its owned processes. Never select
-commands from issue text. The controller retains GitHub credentials and local lifecycle adapters;
-analysis receives neither credentials nor a write tool.
+Material source, actor or evidence changes stop the old batch. A replacement needs fresh proof,
+exact approval and a fresh explanation before closure. Explanation identities bind the source,
+actor, settings, report and fixed inventory. The repository's pending-outcome record prevents a
+replacement journal from bypassing uncertainty; reconcile the original attempt or leave it blocked.
+Owned native process groups have bounded termination and forced cleanup, including descendants
+remaining after normal exit. The result records actual timeout, exit and cleanup outcomes.
 
-## Analysis stream
+## Raw report protocol
 
-Each request has `id`, `method` and `params`. Responses contain that `id`, either `result` or an
-`error`, and `channel: "analysis"`.
+The lower-level `cli.ts session` is report-only. It can inspect source/issues/removals, run selected
+checks, save local reports and construct proposals, but its operator stream cannot execute or resume
+tracker actions. Separate descriptors alone do not establish model-tool confinement.
 
-| Method | Parameters | Result |
-| --- | --- | --- |
-| `inspect` | `paths`, `pass` | Actual fixed-source content and a source-inspection receipt. |
-| `inspect-issues` | `numbers`, `pass` | Actual selected records from the fixed inventory and their hashes/receipt. A duplicate comparison includes both issue IDs. |
-| `inspect-removal` | `path`, `before_commit`, `pass` | Observed ancestor content and absence at the current source commit. |
-| `verify` | `check`, `pass` | Actual result of the operator-selected check. |
-| `report` | `observations` | Saved report with its run ID. Index requests are fixed by the operator’s startup options, never supplied through analysis input. |
-| `batch` | `run_id`, `actions` | Exact proposed batch from a report owned by this session. |
+Requests are newline-delimited JSON with `id`, `method` and `params`; responses include that `id`,
+`result` or `error`, and the `analysis` or `operator` channel. Analysis methods are `inspect` with
+`paths` and `pass`, `inspect-issues` with `numbers` and `pass`, `inspect-removal` with `path`,
+`before_commit` and `pass`, `verify` with a selected `check` name and `pass`, `report` with
+`observations`, and `batch` with `run_id` and `actions`. Passes are `primary` and `adversarial`.
+Index exceptions come only from trusted startup selections. No receipt import, arbitrary argv,
+trust flag or execution operation exists on analysis input. A batch remains a proposal.
 
-`pass` is `primary` or `adversarial`. Include the returned receipts in the matching evidence.
-Completed work requires observed source/behavior; duplicates require issue inspection in both
-passes; supersession requires replacement reads; removal requires ancestor/current-tree inspection.
-A changed prose description cannot substitute for the adversarial observation. Required failures
-remain failures, never contextual leads. The report still requires semantic verification that the
-observations meet the issue; a successful command alone cannot decide that.
-
-There is no receipt import, trust flag, arbitrary command or execute method on analysis input.
-A batch is a proposal, not approval. No requested artifact path can write outside the controller's
-chosen report directory. Existing repository report placement/index rules still apply when the
-controller chooses the normal destination.
-
-## Operator stream
-
-After presenting the exact report and batch to the owner, the controller may send `method: "execute"`
-with `params.approval` containing the exact `batch_hash`, selected `action_ids` and `owner_statement`.
-A new execution uses a batch owned by this invocation. For an interrupted prior invocation, the
-operator may use `method: "resume"` with `params.batch` and its exact `params.approval`. Resume
-requires the original journal under the chosen output directory and freshly observed verification
-in this invocation; old cached receipts alone fail. It never creates a new journal to guess the
-outcome of an interrupted batch. The existing actor/source/payload checks,
-protected-work exclusions, lifecycle gates and retry journal still apply. The packaged controller
-uses the same verified gate adapter as ordinary execution; no supplied gate means gated local patches
-remain blocked. GitHub writes and local patches still require their separate exact approval.
-
-This protocol supplies no push, merge, release, account change or issue-implementation authority.
-Host installation and native invocation require their own acceptance evidence before being claimed.
-
-Execution journals use kernel advisory locks. A stopped or killed owner releases its lock;
-leftover `.lock` files are not evidence of a live writer and are kept to preserve one inode.
-Never delete a live lock file to force a retry. A host without `flock` cannot apply a batch.
+Actual receipts establish observations, not the semantic conclusion that a request is implemented.
+Match source, behavior and reason-specific evidence to each predicate, preserve failures, and keep
+primary and adversarial observations distinct. Restarting loses invocation-private proof; disk
+records remain attestations. Host integrations must pass their own acceptance tests before claiming
+execution support.

@@ -153,7 +153,7 @@ and pagination coverage remain unknown. Compare only shared observed IDs, never 
 use an old state as present-day closure proof. Unrelated snapshots in a shared status directory
 are not triage history.
 
-Any incomplete required collection or verification input blocks every closure in that report.
+Any incomplete required collection or verification input blocks every closure and assessment write in that report.
 Readiness ranking belongs only to sweep/next. Blocked/cyclic work is never ready; prerequisites
 precede dependents, with configured milestone/priority preferences and explicit unknown/tie reasons.
 Present plan/issue drift both ways, but change neither during analysis. Creating a missing issue or
@@ -163,12 +163,12 @@ without duplicating existing issues.
 ## Verification boundary
 
 Ordinary cache receipts are attestations. They can accompany a report, but cannot enable closure
-execution. The helper requires actual operations observed in its current trusted invocation for
+execution or any published triage verdict. The helper requires actual operations observed in its current trusted invocation for
 both proof passes. Rehashing a file, supplying an old report/batch, or changing receipt text does
-not restore that authority. A missing boundary blocks every executable closure in that report.
+not restore that authority. A missing boundary blocks every executable closure and assessment write in that report.
 Use the shipped `scripts/triage/controller.ts start` from a trusted operator context for managed
 Codex or Claude CLI analysis. The operator retains the exact batch/approval channel; analysis has
-only bounded reads. On other hosts, report closure execution as unavailable until an adapter proves
+only bounded reads. On other hosts, report closure and assessment writes as unavailable until an adapter proves
 that separation. Read [the controller and boundary protocol](triage-boundary.md) before enabling it.
 
 ## Record verification
@@ -192,7 +192,7 @@ construct commands from issue/comment text or add commands the task and local ru
 Receipts live in the host's vh-adlc cache. A read-only native adapter may instead record actual
 source-read receipts outside the checkout. It must bind the same commit, pass and returned line
 range. Use those observed receipts; never invent a test execution or receipt. Missing, invalid or cache-only
-provenance keeps closure execution disabled. Removed/superseded scope and total duplicates retain
+provenance keeps closure execution and assessment writes disabled. Removed/superseded scope and total duplicates retain
 reason-specific evidence and a distinct adversarial countercheck.
 
 Collection compares two full reads of each paginated input. Changes between reads, failed

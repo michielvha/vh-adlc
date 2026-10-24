@@ -1,14 +1,14 @@
 {
   "repository": "michielvha/stackweaver",
   "baseline": "129581f6dbe4df71200af8f67d7bc017d35e89ad",
-  "commit": "3b62ee4868a3eed12f8fcecd4542429f8e036b3e",
+  "commit": "ff38a71fae332d44995c52f5a59e999c67898528",
   "files": {
     ".claude/commands/triage.md": "6adc966878c0a3da6a7d8ae5e43191d06ae03743ff4fbb51c1210b85bb306320",
     ".vh-adlc/triage.json": "d0674ca5c019ede57e3b572960618841278045e487e320c110cb0bebd2f4c5c2",
     "AGENTS.md": "55117c22f938006f7f752d49cd9214cd2aa9a1bdff4dda771d2263575e8a2ee9",
-    "agents/issue-triage.md": "98f9afaeaeb199dbc3e95602dd83275495f90f2307a3fa753475062652bda963",
-    "tests/agent-triage/README.md": "ace866f305d3dfbc0508d090a4da775728825452c93b8a163553e09dfb94a423",
-    "tests/agent-triage/contract.test.ts": "7ce673b444921b267bcd75fcce44b66af143861f65067202566e01592c3515e9",
+    "agents/issue-triage.md": "ccd27989f09d025146a406c1fdfbf08c4e29fd4ccbbf9fcf875ee176292bc405",
+    "tests/agent-triage/README.md": "318b6e079e484509c47bd829b20d5ecfe6de4947446c189706a5d72bda4e27e3",
+    "tests/agent-triage/contract.test.ts": "038f7d9551eccc724e3a04359ad3dbfdf013180452b087a165eaa858477b27ce",
     "tests/agent-triage/rehearse.ts": "dcd1a3fadde1c294abfd9f1b9747aaae01ec962fc64c2cfcbcbe84fbf5059160"
   }
 }

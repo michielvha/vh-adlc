@@ -16,7 +16,10 @@ own directory. Resolve references and packaged helpers from that directory, not 
    repository's own instructions. Report the knowledge line.
 3. Run the canonical triage procedure with the requested repository, mode, IDs and report output.
    Default to a read-only sweep and an uncommitted local report. Every remote change needs the
-   presented exact batch and owner approval described there.
+   presented exact batch and owner approval described there. Every published triage verdict and local
+   assessment patch additionally requires current proof in the confined controller from
+   `references/triage-boundary.md`. Plain chat can approve only the structurally attributed task-data
+   and neutral-vocabulary exceptions. Missing confinement keeps assessment writes unavailable.
 
 Use the host's available repository, read adapter and decision capabilities. A host without native
 questions can present the batch in plain chat; serial verification is supported. Missing capabilities

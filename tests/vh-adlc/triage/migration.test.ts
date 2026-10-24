@@ -12,7 +12,7 @@ const allowed = (path: string) => [".vh-adlc/triage.json", "AGENTS.md", ".claude
 test("frozen legacy inputs retain measured source hashes and every intentional difference", () => {
   const manifest = JSON.parse(readFileSync(join(root, "legacy/manifest.json"), "utf8"));
   for (const [path, hash] of Object.entries(manifest.files)) expect(digest(readFileSync(join(root, "legacy", path), "utf8"))).toBe(hash as string);
-  expect(manifest.intentional_differences).toEqual(["all-writes-approved", "unbounded-pagination", "incomplete-blocks-all-closures", "current-index-request", "all-modes-save-report", "report-commit-opt-in", "scope-safe-history"]);
+  expect(manifest.intentional_differences).toEqual(["all-writes-approved", "unbounded-pagination", "incomplete-blocks-all-closures", "current-index-request", "all-modes-save-report", "report-commit-opt-in", "scope-safe-history", "enforced-controller-execution"]);
 });
 
 test("the migration snapshot was exported from one exact adapter commit and only allowed paths", () => {
@@ -70,4 +70,15 @@ test("the adapter retains report frontmatter/index rules and a scope-limited rol
   expect(handoff).toContain("tests/agent-triage/"); expect(handoff).not.toMatch(/reset --hard|clean -fd|docker compose down/);
   const legacy = JSON.parse(readFileSync(join(root,"legacy/manifest.json"),"utf8"));
   for (const difference of legacy.intentional_differences) expect(handoff).toContain(difference);
+});
+
+
+test("every shared triage entry forwards to the all-verdict enforcement guide",()=>{
+ const repo=resolve(import.meta.dir,"../../..");
+ for(const path of ["README.md","plugins/vh-adlc/skills/vh-adlc-triage/SKILL.md","plugins/vh-adlc/references/authority.md","plugins/vh-adlc/references/lifecycle.md","docs/get-started/installation.md","docs/reference/compatibility.md","docs/user-guides/workflows.md"]){
+  expect(readFileSync(join(repo,path),"utf8")).toContain("triage-boundary.md");
+ }
+ const guide=readFileSync(join(repo,"plugins/vh-adlc/references/triage-boundary.md"),"utf8");
+ expect(guide).toContain("every published triage verdict");expect(guide).toContain("report-only");expect(guide).toContain("--checks");expect(guide).toContain("--removals");expect(guide).toContain("--run-dir");
+ expect(read("agents/issue-triage.md")).toContain("every published triage verdict");expect(read("tests/agent-triage/README.md")).toContain("enforced-controller-execution");
 });

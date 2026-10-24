@@ -29,7 +29,7 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 - Check review freshness and completion with deterministic commands.
 - Get independent spec and implementation reviews before completing a feature.
 - Handle documentation and small maintenance tasks without creating a feature spec.
-- Triage backlog issues against source and observed checks, then approve exact tracker changes.
+- Triage backlog issues against source and observed checks. [Every published triage verdict requires the managed verification controller](plugins/vh-adlc/references/triage-boundary.md) and exact approval; local reports work across harnesses.
 
 ## Get started
 

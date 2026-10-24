@@ -9,14 +9,19 @@ does not establish support for a newer workflow. Installation instructions are i
 ## Shared triage
 
 Shared triage is an unpublished local candidate on plugin 0.4.0. Earlier bounded Codex CLI and
-Claude Code CLI trials passed, including private read-only analysis and a synthetic legacy/shared
-comparison. The new managed controller has passed a Codex analysis and explicitly approved execution
-against a disposable fake tracker. Its Claude end-to-end trial is blocked by the provider's
-`usage_limit_reached` response. Earlier Claude results do not verify the new controller.
+Claude Code CLI trials passed, including private read-only analysis, synthetic legacy/shared
+comparison and managed fake-tracker execution. Those results predate the current all-verdict
+proof and recovery changes and do not validate this revision.
 
-The [feature evidence](../specs/shared-triage.md) records exact commits, payload hashes, failures and
-limits. Codex desktop and VS Code Local triage invocations remain unverified. Fresh committed-pair
-proof, independent review and the required unavailable trials still block migration. Other GUI
+Every published triage verdict and local assessment patch requires current proof in a
+[confined controller](../../plugins/vh-adlc/references/triage-boundary.md), plus exact approval.
+The shipped managed adapters currently require Linux, Bubblewrap, util-linux flock and an
+authenticated Codex or Claude CLI. Other harnesses can report; execution needs their own tested
+confinement adapter. A raw session or cache receipt grants no execution authority.
+
+The [feature evidence](../specs/shared-triage.md) records exact commits, hashes, failures and limits.
+Codex desktop and VS Code Local triage invocations remain unverified. Fresh committed-pair native
+and recovery proof, independent review and required GUI trials still block migration. Other GUI
 surfaces have no triage support claim. The historical results below retain their original scope.
 
 ## Support matrix

@@ -12,7 +12,8 @@
     "current-index-request",
     "all-modes-save-report",
     "report-commit-opt-in",
-    "scope-safe-history"
+    "scope-safe-history",
+    "enforced-controller-execution"
   ],
   "history": {
     "docs/internal/status/2026-09-26-issue-triage.md": {

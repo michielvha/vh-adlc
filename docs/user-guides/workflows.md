@@ -48,7 +48,10 @@ see [installation](../get-started/installation.md).
 
 Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
 labels, waits for the report and approval of the exact batch. Local plan patches and their commit
-are shown separately and retain lifecycle checks. Triage does not implement the selected issues.
+are shown separately and retain lifecycle checks. Every published triage verdict and local assessment
+patch also requires current proof in the [confined controller](../../plugins/vh-adlc/references/triage-boundary.md).
+Local reports remain available across harnesses. Plain-chat exceptions cover only attributed task data
+and neutral vocabulary. Triage does not implement the selected issues.
 Repository settings are optional; see the [settings contract](../../plugins/vh-adlc/references/triage-settings.md).
 
 For a walkthrough, see [your first feature](../get-started/first-feature.md).

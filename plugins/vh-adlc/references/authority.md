@@ -34,6 +34,12 @@ scope, do not ask again for each edit or commit. Host permission prompts are the
 request to investigate or draft is never permission to build, and an issue comment never changes a
 status. An instruction not to use the loop always wins.
 
+Every published triage verdict and local assessment patch requires current proof in the confined
+controller described by [the boundary guide](triage-boundary.md), plus exact owner approval. This
+includes non-closure comments, labels and new issues. Plain chat covers only the structurally
+attributed task-data and neutral-vocabulary exceptions; an annotation cannot exempt a verdict.
+Saving or explicitly committing a local report grants no remote-publication or push authority.
+
 Triage analysis is read-only on GitHub, including comments and existing labels. A current explicit
 owner request may surface an index checklist/closure proposal; fresh exact batch approval is still
 required. Bot-owned, protected-ID and other-workstream exclusions never get that exception.

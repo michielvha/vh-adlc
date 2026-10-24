@@ -27,3 +27,10 @@ test("triage migration retains a usable managed-controller handoff",()=>{
   expect(handoff).toContain("Managed controller");expect(handoff).toContain("operator");
   expect(read(".claude/commands/triage.md")).toMatch(/^model: fable$/m);
 });
+
+
+test("the migration requires proof for all published triage assessments",()=>{
+  expect(read("agents/issue-triage.md")).toContain("every published triage verdict");
+  expect(read("tests/agent-triage/README.md")).toContain("enforced-controller-execution");
+  expect(read("tests/agent-triage/README.md")).toContain("original exact batch/journal");
+});
