@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { boundaryCommand, exportInputs, gradeTrial, verifyInputs } from "./native";
+import { boundaryCommand, engineeringInputs, exportInputs, gradeTrial, verifyInputs } from "./native";
 import { fixture, git } from "./fixtures";
 const projects: ReturnType<typeof fixture>[]=[];
 afterEach(()=>{for(const f of projects.splice(0)) f.dispose();});
@@ -108,4 +108,14 @@ test("the real boundary process denies outside input, credentials, egress and mu
   expect(grade(nativeEvents,events.map(event=>({...event,namespaces:event.host_namespaces}))).pass).toBe(false);
   expect(grade(nativeEvents,events.map(event=>({...event,run_id:"other-run"}))).pass).toBe(false);
   expect(grade([{...nativeEvents[0],tools:[...toolNames,"Bash"]},...nativeEvents.slice(1)]).pass).toBe(false);
+},15_000);
+
+
+test("native knowledge input uses the released binary's answered contract and verified pages",async()=>{
+  const f=setup();f.export();await engineeringInputs(f.output,f.root,plugin);
+  const record=JSON.parse(readFileSync(join(f.output,"knowledge.json"),"utf8"));
+  expect(record.result.command).toBe("knowledge");expect(record.result.result).toBe("answered");
+  expect(record.revision).toMatch(/^[a-f0-9]{40}$/);
+  expect(readFileSync(join(f.output,"engineering/guides/humanize-prose.md"),"utf8")).toContain("prose");
+  expect(verifyInputs(f.output,{checkout:f.root,plugin}).pass).toBe(true);
 },15_000);

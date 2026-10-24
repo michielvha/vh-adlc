@@ -115,7 +115,7 @@ export function verifyInputs(input: string, expected: {checkout:string;plugin:st
   } catch { failures.push("unreadable-or-incomplete-inputs"); }
   return {pass:failures.length===0,failures};
 }
-async function engineeringInputs(input:string,checkout:string,plugin:string) {
+export async function engineeringInputs(input:string,checkout:string,plugin:string) {
   const pages=["conventions/feature-documents.md","conventions/coding.md","conventions/documentation.md","conventions/delivery.md","guides/humanize-prose.md"];
   const pin=readFileSync(join(plugin,"knowledge.md"),"utf8").match(/\b[0-9a-f]{40}\b/)?.[0];if(!pin)throw Error("plugin knowledge pin is unavailable");
   const installer=Bun.spawnSync(["bash",join(plugin,"scripts/ensure-vh-adlc.sh")],{stdout:"pipe",stderr:"pipe"});
@@ -124,7 +124,7 @@ async function engineeringInputs(input:string,checkout:string,plugin:string) {
   const result=Bun.spawnSync(command,{stdout:"pipe",stderr:"pipe"});
   if(result.exitCode!==0)throw Error("native trial knowledge collection failed");
   const record=JSON.parse(result.stdout.toString()),revision=record.knowledge?.revision;
-  if(record.result!=="pass"||typeof revision!=="string"||!/^[0-9a-f]{40}$/.test(revision))throw Error("native trial knowledge result is unavailable");
+  if(record.command!=="knowledge"||record.result!=="answered"||typeof revision!=="string"||!/^[0-9a-f]{40}$/.test(revision))throw Error("native trial knowledge result is unavailable");
   const {homedir}=await import("node:os"),cache=process.platform==="darwin"?join(homedir(),"Library/Caches"):process.env.XDG_CACHE_HOME??join(homedir(),".cache");
   for(const page of pages){const path=join(input,"engineering",page);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,readFileSync(join(cache,"vh-adlc/docs",revision,page)));}
   const bytes=json({command,result:record,pages,revision});writeFileSync(join(input,"knowledge.json"),bytes);
