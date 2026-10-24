@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Managed controller implemented; Claude quota, fresh paired review and required GUI trials still block migration."
+status: draft
+status_description: "Owner-requested normative boundary revision awaits fresh spec review and acceptance; runtime recovery and external trials remain open."
 issue: null
 branch: feat/shared-triage
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
