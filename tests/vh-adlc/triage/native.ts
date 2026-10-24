@@ -55,6 +55,17 @@ function source(root: string, commit: string): { entries: Entry[]; content: Map<
   }
   return {entries,content};
 }
+export function committedComponent(root:string,plugin:string,driver:string):string {
+  if(git(root,"status","--porcelain").toString().trim())throw Error("native trial requires a clean committed component");
+  const commit=git(root,"rev-parse","HEAD").toString().trim(),prefix=relative(root,plugin).split(sep).join("/")+"/";
+  const driverPath=relative(root,driver).split(sep).join("/");
+  if(prefix.startsWith("../")||isAbsolute(prefix)||driverPath.startsWith("../")||isAbsolute(driverPath))throw Error("trial component paths escape owning repository");
+  const tracked=source(root,commit),expected=tracked.entries.filter(entry=>entry.path.startsWith(prefix)).map(entry=>({...entry,path:entry.path.slice(prefix.length)}));
+  const ordered=(entries:Entry[])=>[...entries].sort((a,b)=>a.path.localeCompare(b.path));
+  if(!expected.length || json(ordered(expected))!==json(ordered(files(plugin))) ||
+    !tracked.content.get(driverPath)?.equals(readFileSync(driver)))throw Error("trial payload or driver differs from its committed revision");
+  return commit;
+}
 function snapshotMetadata(snapshot: Inventory, config: Settings) {
   if(snapshot.schema_version !== 1 || !Array.isArray(snapshot.coverage) || !Array.isArray(snapshot.issues) || !Array.isArray(snapshot.closed_issues) || !Array.isArray(snapshot.pulls)) throw Error("invalid collected snapshot");
   const selected=snapshot.mode==="ids"?[...snapshot.issues,...snapshot.closed_issues].filter(issue=>snapshot.requested_ids.includes(issue.number)):
@@ -306,7 +317,7 @@ async function serveReadOnly() {
 }
 async function runNativeTrial(options:{host:"codex"|"claude";input:string;checkout:string;plugin:string;output:string;prompt?:string}) {
   const {nativeClient}=await import("./fixtures"),{resolve4}=await import("node:dns/promises");
-  const componentCommit=git(resolve(import.meta.dir,"../../.."),"rev-parse","HEAD").toString().trim(),driverHash=digest(readFileSync(import.meta.path));
+  const componentCommit=committedComponent(resolve(import.meta.dir,"../../.."),resolve(options.plugin),import.meta.path),driverHash=digest(readFileSync(import.meta.path));
   const initial=verifyInputs(options.input,{checkout:options.checkout,plugin:options.plugin});if(!initial.pass)throw Error(`input preflight failed: ${initial.failures.join(", ")}`);
   const current=JSON.parse(readFileSync(join(options.input,"manifest.json"),"utf8")) as InputManifest;
   if(!current.engineering)await engineeringInputs(options.input,options.checkout,options.plugin);

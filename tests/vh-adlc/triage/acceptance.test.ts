@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { boundaryCommand, engineeringInputs, exportInputs, gradeTrial, verifyInputs } from "./native";
+import { boundaryCommand, committedComponent, engineeringInputs, exportInputs, gradeTrial, verifyInputs } from "./native";
 import { fixture, git } from "./fixtures";
 const projects: ReturnType<typeof fixture>[]=[];
 afterEach(()=>{for(const f of projects.splice(0)) f.dispose();});
@@ -17,6 +17,16 @@ function setup() {
   const output=join(f.root,"export");
   return {...f,snapshot,output,export:()=>exportInputs({checkout:f.root,plugin,snapshot:join(f.root,"snapshot.json"),output})};
 }
+
+test("native preflight rejects uncommitted or ignored extra component input before launching a client",()=>{
+  const f=fixture();projects.push(f);
+  expect(committedComponent(f.root,join(f.root,"src"),join(f.root,"src/app.ts"))).toBe(git(f.root,"rev-parse","HEAD"));
+  f.write("src/app.ts","export const answer=0;\n");
+  expect(()=>committedComponent(f.root,join(f.root,"src"),join(f.root,"src/app.ts"))).toThrow();
+  git(f.root,"add","src/app.ts");f.write(".gitignore","src/ignored.env\n");git(f.root,"add",".gitignore");git(f.root,"commit","-qm","test: seed ignored canary rule");
+  f.write("src/ignored.env","NON_SECRET_CANARY=excluded\n");expect(git(f.root,"status","--porcelain")).toBe("");
+  expect(()=>committedComponent(f.root,join(f.root,"src"),join(f.root,"src/app.ts"))).toThrow();
+});
 
 test("input export contains the fixed complete source, full nested history, plugin and hashed coverage",()=>{
   const f=setup(),manifest=f.export();
