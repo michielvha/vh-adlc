@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner accepted Q6-Q9 on 2026-10-24; revised spec awaits Copilot Opus re-review."
+status_description: "R-5 clarifications preserve accepted trial, approval and legacy behavior; awaiting renewed independent review."
 issue: null
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
@@ -80,7 +80,11 @@ scope/spec decision before implementation. Their source remains in Stackweaver u
 
 Add `plugins/vh-adlc/skills/vh-adlc-triage/SKILL.md` backed by one shared
 `references/triage.md` procedure and a versioned repository-settings contract. Extend lifecycle intake
-with backlog triage and update native-discovery expectations. This is a task-specific operation,
+with backlog triage and update native-discovery expectations. Align `references/authority.md` and
+the lifecycle live-operation row with the existing owner-approved triage contract: a presented exact
+batch authorizes only its tracker actions and local plan patches, including the shown local commit.
+This authority is distinct from shipping a feature or updating its linked issue during shipping; it
+grants no push, merge, release, credential change or issue implementation. This is a task-specific operation,
 not another generic front door; `references/lifecycle.md` remains the sole generic intake.
 
 Required capabilities are repository reads/Git, structured data parsing, paginated GitHub reads,
@@ -117,6 +121,13 @@ Resolve repository identity from the selected checkout and confirm the GitHub ta
 shared global account. Reject conflicting configured identity until the owner resolves it. Canonical
 source paths must stay inside the selected repository; generated distribution mirrors are not proof.
 The settings carry no credentials, tokens or host-private configuration.
+
+The run contract permits an explicit `report_output` file path (CLI equivalent `--report-output`)
+without editing repository settings. It changes only the destination of this run's new report. Always
+read previous-report history from the configured report directory, including when writing externally;
+an external destination is never evidence that no prior report exists. A missing/unreadable configured
+history source is reported as unavailable, not as a first run. An existing readable directory with no
+prior reports establishes the first run. The trial uses this override and verifies unchanged settings.
 
 ### Collection, verification and report
 
@@ -191,6 +202,14 @@ an exact approved `issue:` frontmatter backfill in the same batch; show the targ
 template before approval, bind the returned canonical issue URL, and preserve all other plan content.
 If creation succeeds but backfill fails, retry only the backfill using the created issue identity; do
 not create a second issue. A patch template may contain only that returned URL as its variable.
+
+Retain the legacy local commit for approved plan-status and issue-URL patches. The batch also shows
+the exact conventional commit subject and explicit file list. For Stackweaver's internal plans, use
+`docs(internal): sync plan statuses after issue triage [skip ci]` only when its skip-eligibility rules
+permit it. Other repositories follow their own commit/skip rules. Commit only the successfully
+applied, approved plan patches; do not include reports or unrelated staged work. A failed commit
+leaves those patches visibly uncommitted and retryable, without repeating completed tracker writes.
+This retained plan-commit behavior is separate from the explicitly changed report-commit default.
 A retry reads live state, avoids duplicate completed actions and reports partial success with the exact
 remaining operations. No push, merge, release or implementation follows merely from triage execution.
 
@@ -208,7 +227,9 @@ remaining operations. No push, merge, release or implementation follows merely f
    shared workflow. Cover partial `Refs` work, a false complete plan, a closed blocker, protected work,
    a duplicate and reverse drift. Include protected umbrellas both without an owner request and with an
    explicit checklist/closure request. Compare scope, evidence, exclusions, ranking, report counts/diffs
-   and proposed actions, including new-label descriptions/colors and missing-issue URL backfill.
+   and proposed actions, including new-label descriptions/colors, missing-issue URL backfill and
+   resulting plan-commit subject/path set. Verify retained plan commits separately from the report
+   commit-on-request difference.
    Separately record intentional differences: all remote writes await approval, collection is paginated,
    and incomplete evidence is explicit. The shared flow also requires a current explicit owner request
    before proposing an umbrella checklist/closure action; a historical issue comment remains a lead,
@@ -225,13 +246,16 @@ remaining operations. No push, merge, release or implementation follows merely f
    or fallback that silently runs obsolete logic when the plugin is missing.
 5. **Validate cutover:** a bounded real read-only Stackweaver trial checks report scope and existing
    account access. Write its report to an explicitly selected temporary directory outside Stackweaver
-   and leave it uncommitted. Record that external artifact in the evidence; exclude no checkout changes
+   and leave it uncommitted, using the run-level override without changing settings. Read comparison
+   history from the configured normal report location. Record that external artifact in the evidence; exclude no checkout changes
    from the before/after snapshot comparison. Separately verify the configured normal report location
    and index handling in a disposable fixture. Freeze tracker and unrelated file snapshots; no GitHub
    writes or report commits occur during the live trial.
    Exercise the approved-write protocol in an owner-authorized disposable fixture repository, not the
    live Stackweaver backlog. Record exact component and adapter revisions before retiring duplicate prose.
-6. **Rollback:** retain the pre-cutover revisions in Git and a documented way to restore only the triage
+6. **Rollback:** store the exact baseline/pair, restoration/reapplication commands and the ordered
+   publication handoff in Stackweaver's `tests/agent-triage/README.md`, within the declared migration
+   paths. Link it from this feature's evidence. Retain the pre-cutover revisions in Git and restore only the triage
    entry points/settings. Rehearse rollback and reapplication on a disposable checkout. Rollback does not
    undo tracker actions or disturb local work, plans, other agents, credentials, hooks, containers or slots.
 
@@ -278,7 +302,7 @@ surfaces until separately tested. No other harness support is implied.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
 - [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
 - [ ] AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, ranks verified prerequisites before dependents with reasons, excludes blocked work from ready rankings, and leaves GitHub unchanged until exact actions are approved.
-- [ ] AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves protected work except explicitly requested and approved umbrella checklist/closure actions and unrelated body content, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation.
+- [ ] AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves protected work except explicitly requested and approved umbrella checklist/closure actions and unrelated body content, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
 - [ ] AC-07: The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and tracker while writing its report externally, and actual main cutover remains the ordered follow-up.
 - [ ] AC-08: The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
 - [ ] AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
@@ -291,10 +315,10 @@ surfaces until separately tested. No other harness support is implied.
 | AC-02 | Generic and Stackweaver config fixtures; malformed/unknown-version/conflicting-repo cases; expected ownership/ranking/report paths; inspect shared package for copied project constants. |
 | AC-03 | Paginated fixtures beyond legacy caps, nested comment pagination, inaccessible page/permission/rate/network failure and budget exhaustion; a failed required page or verification input makes every closure in that report non-executable, including otherwise evidenced issues; cover failed closed-issue and merged-PR inventory as report-wide blockers. |
 | AC-04 | False-complete plan, merged Refs-only PR, unwired component, closed prerequisite with still-open dependent scope, missing source/test, removed/superseded scope, total duplicate of unfinished canonical work versus partial overlap, and dependency-cycle fixtures; inspect adversarial evidence and reason-correct closure proposals. |
-| AC-05 | Sweep/next/close/stale/explicit-ID fixtures, recording adapter asserts zero writes, same-day repeat preserves both reports, counts and run-over-run differences match snapshots, default reports remain uncommitted and explicit local commits follow repo rules; ranking reasons and completeness differ correctly by mode. |
-| AC-06 | Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch and retry. Explicitly request and approve an umbrella checklist patch/closure, then omit request or approval or change the patch's base body in negative cases; change an approved comment/label/closure/duplicate payload in negative cases. Inspect exact action log, preserved unrelated body content and other protected IDs. Include approved/unapproved plan-status patches and an attempted gated-completion sync; failed gates cannot change status. Bind new-label description/color and issue-URL backfill payloads; fail after issue creation and confirm retry backfills the same URL without another issue. |
-| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/tracker snapshots and an inspected ordered publication handoff; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
-| AC-08 | Written rollback/reapply procedure executed in a disposable Stackweaver checkout; compare unrelated agents, plan files, index/worktree state and verify no service/credential operations. |
+| AC-05 | Sweep/next/close/stale/explicit-ID fixtures, recording adapter asserts zero writes, same-day repeat preserves both reports, an external output override leaves settings unchanged and still reads configured history, counts and run-over-run differences match snapshots, default reports remain uncommitted and explicit local commits follow repo rules; ranking reasons and completeness differ correctly by mode. |
+| AC-06 | Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch and retry. Explicitly request and approve an umbrella checklist patch/closure, then omit request or approval or change the patch's base body in negative cases; change an approved comment/label/closure/duplicate payload in negative cases. Inspect exact action log, preserved unrelated body content and other protected IDs. Include approved/unapproved plan-status patches and an attempted gated-completion sync; failed gates cannot change status. Bind new-label description/color and issue-URL backfill payloads; fail after issue creation and confirm retry backfills the same URL without another issue. Assert the approved plan commit subject/path set, unrelated index preservation and failed-commit retry state; intake-selected triage uses the same narrow authority reference and never shipping authority. |
+| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/tracker snapshots and an inspected ordered publication handoff; verify the explicit output override, unchanged settings and configured previous-report source, and inspect the durable handoff in `tests/agent-triage/README.md`; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
+| AC-08 | Rollback/reapply procedure in `tests/agent-triage/README.md` executed in a disposable Stackweaver checkout; compare unrelated agents, plan files, index/worktree state and verify no service/credential operations. |
 | AC-09 | Diff only the declared migration paths and shared triage paths; compare hashes of existing maintenance/audit/docs/domain workflows and automation; confirm deferred register retains D-01 through D-05. |
 
 ## Tasks
@@ -305,10 +329,11 @@ is implemented by this specification request.
 ## Open Questions
 
 None. The owner accepted the five R-3 recommendations on 2026-10-23 and all four R-4
-recommendations on 2026-10-24. The revised baseline defines a reviewed migration branch ready to
-publish, an external uncommitted live-trial report, preserved legacy report/write details under exact
-approval, report commits only when requested, and explicit generic-routing regression coverage.
-Independent re-review and acceptance still precede implementation under the loop.
+recommendations on 2026-10-24. R-5 clarifications apply those existing decisions: Q7's external trial
+uses a per-run override and Q8's preserved report comparison reads configured history; the authority
+reference must express the already-approved exact-batch policy; legacy plan commits remain intact
+because the selected commit-default change applies to reports; and the rollback/handoff lives inside
+the already-approved `tests/agent-triage/` boundary. No publication or main-cutover authority is inferred.
 
 ## Review Log
 
@@ -319,6 +344,7 @@ Independent re-review and acceptance still precede implementation under the loop
 | 2026-10-23 | R-2 | spec | `3a874470e499590afde434f165feaf19ca4d1e54` | n/a | n/a | accepted by owner |
 | 2026-10-23 | R-3 | spec | `b74f650edfbd88244b058d824b31a5d9043f4c19` | claude-opus-5.5 | procedural | Copilot bounded-packet review: ten findings; decisions and source/gate verification follow-up required. |
 | 2026-10-23 | R-4 | spec | `1e159d65aa8cbde4525de59a27439129a0efeaea` | claude-opus-5.5 | procedural | Five findings: delivery boundary, trial output, legacy report/write details, lifecycle regression coverage and a verdict-wording nit. |
+| 2026-10-24 | R-5 | spec | `61c94b53b41e831e5b37d8e24ccbc9058ea16778` | claude-opus-5.5 | procedural | Clarify approved trial override/history, authority alignment, retained plan commits and durable handoff paths; complete the source list. |
 
 ### R-1
 
@@ -449,9 +475,80 @@ WHERE: Acceptance Criteria / AC-01
 EVIDENCE: AC-01 at docs/specs/shared-triage.md:252 ends "an unavailable required invocation leaves this criterion unverified". The pinned feature-documents standard at lines 84 and 175-185 requires criteria to state an end state. It defines verdicts as `met`, `not met`, `untested` or `not verified`, and "unverified" is not one of them. Design line 244-245 already states the consequence for completion.
 PROPOSAL: End AC-01 at its end state, and keep the unavailable-client rule in Design. Alternatively, use the standard verdict term `not verified`.
 
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Collection, verification and report; Design / Repository settings; Design / Stackweaver migration and rollback step 5; Test Plan / AC-05, AC-07
+EVIDENCE: docs/specs/shared-triage.md:149 writes the report to the configured repository documentation location, and lines 108-110 make the report directory a repository setting. Lines 227-228 require the live trial to write its report to an explicitly selected temporary directory outside Stackweaver while the checkout stays unchanged. No Design text defines a per-run destination override that leaves `.vh-adlc/triage.json` unchanged. Lines 152-153 compare each run with the previous report, and the first run says no previous report exists. Legacy agents/issue-triage.md:202-203 diffs against the previous report in `docs/internal/status/`. The document does not say whether an externally written run reads previous reports from the configured location. If it does not, the live trial reports a false first run and does not exercise the retained count and diff behavior. No AC-05 or AC-07 proof checks the override or this diff source.
+PROPOSAL: Define a run-level report destination that does not edit settings, and state that previous-report comparison still reads the configured history location. Add the override and the previous-report source to the AC-05 or AC-07 proof.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Owner-approved execution; Design / Canonical workflow and harness boundary; Acceptance Criteria / AC-01, AC-06
+EVIDENCE: plugins/vh-adlc/references/authority.md:10-22 is the shared authority table. It has no row for issue comments, labels, closures, label creation or local plan-status and `issue:` patches on arbitrary issues. Line 19 ties updating a linked issue to an explicit ship request. Lines 24-28 say a lifecycle-selected operation inherits only the underlying task's authority. references/lifecycle.md:49 routes live operations to an explicit request and a supported procedure. docs/specs/shared-triage.md:166-195 makes approval of an exact batch the authority for these writes, but Design lines 81-84 change only lifecycle intake and the new skill, and never says that authority.md gains a matching row. A triage comment or closure on a feature's linked issue therefore reads differently under authority.md:19 than under the spec. No AC-01 or AC-06 proof checks that the shared authority reference and lifecycle routing agree with the triage approval model.
+PROPOSAL: Require authority.md, and the lifecycle row where needed, to state the authority for approved triage tracker writes and local plan patches, consistent with lines 166-195. Add a check to AC-01 or AC-06 that intake-selected triage applies that authority and nothing wider.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Owner-approved execution; Design / Stackweaver migration and rollback step 3; Test Plan / AC-06, AC-07
+EVIDENCE: Legacy Stackweaver agents/issue-triage.md:35-36 and :229-232 commit plan-status syncs in one conventional commit with `[skip ci]`, and :233-234 writes the new issue URL into plan frontmatter. docs/specs/shared-triage.md:155-156 defines commit behavior only for reports. Lines 185-193 approve exact plan-status and `issue:` backfill patches but do not say whether those local changes are committed, left uncommitted, or committed only on request. Lines 212-216 record the report commit change as an intentional difference but say nothing about these plan commits. So the parity result can differ from legacy on plan commits without recording it, and AC-06 has no observable commit state to check.
+PROPOSAL: State the commit behavior for approved plan-status and backfill patches, including commit message and skip-CI handling. Either keep the legacy commit with exact approval or add the change to the recorded intentional differences, and assert the resulting Git state in the AC-06 proof.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope; Design / Stackweaver migration and rollback; Acceptance Criteria / AC-07, AC-08; Test Plan / AC-09
+EVIDENCE: docs/specs/shared-triage.md:234-235 requires a documented way to restore the triage entry points, AC-08 at line 283 depends on that documentation, and lines 255-260 and the AC-07 proof at line 296 require an inspected ordered publication handoff. Neither artifact has a named location. Lines 54-56 limit Stackweaver changes to five paths, and the AC-09 proof at line 298 diffs only those paths and the shared triage paths. A rollback guide or handoff written elsewhere in Stackweaver would fail AC-09, and one kept only in the session report would not survive for the later adoption step.
+PROPOSAL: Name where the rollback procedure and the publication handoff are stored, for example this document or one of the declared migration paths, so that AC-08 and AC-09 check a fixed path.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Sources
+EVIDENCE: The pinned feature-documents standard at line 76 says Sources lists every external page read, each with the claim it supports. docs/specs/shared-triage.md:34 cites Stackweaver `AGENTS.md:12` and `:23`. Lines 71-74 rely on Stackweaver `agents/maintenance.md`, `.claude/commands/maintenance.md` (the wrapper conflict, verified at :31-33 against agents/maintenance.md:39-47), `agents/codebase-audit.md` (auto-merge, :241-244), the four docs workflows, `agents/tfe-compat.md` and `agents/provider-fork.md`. Sources at lines 452-457 lists only the triage playbook, the triage command, the 9b68b56 lifecycle page and the feature-documents standard.
+PROPOSAL: Add the other Stackweaver pages read at 7c3790f to Sources, each with the claim it supports.
+
 ## Sources
 
 - [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
 - [Stackweaver command adapter](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/.claude/commands/triage.md): current Claude routing and conflicting early-label versus report-first instructions.
 - [Shared lifecycle procedure](https://github.com/michielvha/vh-adlc/blob/9b68b56292416da212910c62e133e09a49cd5258/plugins/vh-adlc/references/lifecycle.md): existing intake, bounded maintenance and generic-request publication boundaries.
 - [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md): draft, independent review, acceptance, test mapping and one living feature document.
+
+- [Stackweaver harness-neutral entry](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/AGENTS.md): local playbook and Claude-command routing.
+
+- [Stackweaver project rules](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/CLAUDE.md): isolation, verification, documentation and local delivery requirements.
+
+- [Stackweaver maintenance playbook](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/maintenance.md): deferred dependency workflow and satellite-protection behavior.
+
+- [Stackweaver maintenance command](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/.claude/commands/maintenance.md): the deferred wrapper/playbook protection-policy conflict.
+
+- [Stackweaver audit playbook](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/codebase-audit.md): persistent findings and the deferred auto-merge authority decision.
+
+- [Stackweaver docs impact](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-impact.md): the deferred scope-change documentation workflow.
+
+- [Stackweaver docs drift audit](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-drift-audit.md): the deferred corpus-wide drift workflow.
+
+- [Stackweaver docs drift resolver](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-drift-resolver.md): the deferred drift resolution workflow.
+
+- [Stackweaver docs truth](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-truth.md): the deferred live truth verification workflow.
+
+- [Stackweaver TFE compatibility](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/tfe-compat.md): the retained domain-specific compatibility contract.
+
+- [Stackweaver provider fork](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/provider-fork.md): the retained domain-specific fork workflow.
+
+- [Pinned engineering entry](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md): the repository task routes.
+
+- [Pinned coding conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/coding.md): helper runtime, structured parsing and meaningful verification.
+
+- [Pinned documentation conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/documentation.md): source attribution and one authoritative artifact.
+
+- [Pinned delivery conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/delivery.md): feature claims, branches, commits and separate publication.
+
+- [Pinned feature template](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/feature-document-template.md): the feature structure and task/evidence sections.
+
+- [Pinned prose guide](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): reader-facing prose and verbatim review records.
