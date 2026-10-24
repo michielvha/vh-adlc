@@ -412,10 +412,19 @@ describe("README", () => {
     test.todo("install, update, uninstall and support matrix: pending until phase 7");
     return;
   }
-  test("documents install, update, uninstall and a support matrix", () => {
+  test("links to installation, plugin management and a support matrix", () => {
     const readme = read(join(ROOT, "README.md"));
-    for (const heading of ["Install", "Update", "Uninstall", "Support matrix"]) {
-      expect(readme).toMatch(new RegExp(`^#+ .*${heading}`, "mi"));
+    const guides = [
+      { path: "docs/get-started/installation.md", headings: ["Install"] },
+      { path: "docs/user-guides/managing-plugins.md", headings: ["Update", "Uninstall"] },
+      { path: "docs/reference/compatibility.md", headings: ["Support matrix"] },
+    ];
+    for (const { path, headings } of guides) {
+      expect(readme).toContain(`](${path})`);
+      const guide = read(join(ROOT, path));
+      for (const heading of headings) {
+        expect(guide).toMatch(new RegExp(`^#+ .*${heading}`, "mi"));
+      }
     }
   });
 });
