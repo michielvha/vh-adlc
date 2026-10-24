@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The live-trial input boundary and credential/tool isolation are explicit; awaiting independent review."
+status_description: "R-9 has no blocking findings; awaiting owner acceptance, with its trial-proof recommendations retained for tasks."
 issue: null
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
@@ -384,6 +384,12 @@ and mandatory under the existing Stackweaver rules. R-7 preserves already-requir
 protection for unlisted indexes, proves the selected no-write trial through actual confinement, and
 retains mode-specific ranking. R-8 removes any alternate-credential path from that same confinement
 requirement, names the bounded source input set and keeps mutation probes off the live tracker.
+R-9's remaining trial-proof recommendations do not choose a new owner policy: the current
+AC-03/AC-07 already require complete coverage and no reachable mutation path. Implementation must
+test the actual analysis environment's credential/helper/keyring/socket/tool/egress routes, provide the
+complete canonical source and configured history needed for the trial's searches/selection, and retain
+per-collection pagination/error metadata. These recommendations remain visible in R-9 and must be
+covered by tasks and observed implementation evidence before those criteria can pass.
 No publication or main-cutover authority is inferred.
 
 ## Review Log
@@ -399,6 +405,7 @@ No publication or main-cutover authority is inferred.
 | 2026-10-24 | R-6 | spec | `ea38a917ca8e804253e2f53fa682d67cebe1a339` | claude-opus-5.5 | procedural | Clarify comparable report history, no-settings output, read-only trial attribution and mandatory Claude model metadata. |
 | 2026-10-24 | R-7 | spec | `2ad7eebfb05723f8f4bf54b755f543abda6c71cc` | claude-opus-5.5 | procedural | Protect unlisted index issues, require trial confinement and keep ranking limited to ranking modes. |
 | 2026-10-24 | R-8 | spec | `838914d60955ec42280a2db6bc323c9d7eaef7c5` | claude-opus-5.5 | procedural | Remove the alternate-credential bypass in trial confinement and define its source-input boundary. |
+| 2026-10-24 | R-9 | spec | `5a4547da08407737a550a1e042a31b771d0bc226` | claude-opus-5.5 | procedural | No blocking findings; three should-fix recommendations on trial-environment probes, complete source/history input and collection metadata are implementation proof work under AC-03/AC-07. |
 
 ### R-1
 
@@ -634,6 +641,29 @@ SEVERITY: nit
 WHERE: Design / Stackweaver migration and rollback step 5; Test Plan / AC-07
 EVIDENCE: docs/specs/shared-triage.md:285 requires "a non-secret outside-packet canary", and the AC-07 proof at line 357 requires "denied mutation/outside-packet probes". The document never defines "packet". The second route at line 283-284 analyzes "the snapshot", but resolved verdicts also need the Stackweaver source at HEAD (lines 165-166). So the boundary that the canary must sit outside of cannot be determined, and a reviewer cannot tell what a passing probe shows.
 PROPOSAL: Replace "packet" with the defined input set for the analysis agent, such as the collected tracker snapshot plus the Stackweaver checkout. State that the canary sits outside that set and must not be readable.
+
+### R-9
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Stackweaver migration and rollback step 5; Acceptance Criteria / AC-07; Test Plan / AC-07
+EVIDENCE: docs/specs/shared-triage.md:286-288 requires that no GitHub credential, connected write tool or shell/network mutation path is reachable from the analysis agent. Lines 289-291 prove that boundary with two checks only. The first is a non-secret canary outside the declared input set, which tests file reads. The second is a mutation probe against "the offline denying adapter or an authorized disposable fixture". The AC-07 proof at line 363 accepts "denied outside-input-set and offline mutation probes". A probe sent to the offline denying adapter tests the adapter. It never tests the agent's own environment. Counterexample: the agent sandbox blocks file reads outside the input set, so the canary is unreadable. The host still passes `GH_TOKEN` in the agent's environment, or leaves a git credential helper, keyring or agent socket reachable, and network egress to api.github.com stays open. The canary is denied, the offline probe is denied, the adapter trace shows only reads, and line 292 forbids only relying on token metadata. Every AC-07 check passes, yet the agent can still write to the live tracker with `curl` or `gh`. Lines 280-281 then attribute any such write to a concurrent owner change.
+PROPOSAL: Require the negative probes to run from inside the analysis agent's actual environment and cover every route the requirement names: environment variables, credential helpers, keyrings and sockets, connected tools, and direct GitHub network egress. A write attempt may target only the offline adapter or an authorized disposable fixture. Make the AC-07 proof name these probes instead of accepting the offline adapter probe alone.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Stackweaver migration and rollback step 5; Design / Collection, verification and report steps 3 and 5; Test Plan / AC-07
+EVIDENCE: docs/specs/shared-triage.md:284-286 limits the analysis input to "the source files required for the bounded issue scope at the fixed Stackweaver HEAD" and "relevant configured report history". Someone chooses that set before the analysis runs. Line 170 requires searched scope for absence. Lines 166-167 require verified removal or supersession for an obsolete closure. Lines 178-179 have the operation itself select the latest report with the same repository, mode and scope. Legacy Stackweaver agents/issue-triage.md:127-130 bases `open` and `obsolete` on empty searches and removal. Lines :145-146 warn that the repository has two ansible-runner paths and a `distribution/**` mirror. Counterexample: an issue's code moved to a file outside the preselected subset. The agent's search finds nothing, so it records verified removal and proposes an obsolete close. Similarly, a harness that supplies one chosen earlier report as the relevant history decides which report the diff uses, and the operation's own selection rule never runs. The trial still passes AC-07, because AC-07 checks only for writes, the checkout and report placement.
+PROPOSAL: Define the trial input as the complete Stackweaver source tree at the fixed HEAD, read-only and without credentials or host configuration, plus the whole configured report-history directory. Alternatively, require the report to treat any absence or removal claim outside the declared source set as unverified, and to state that limit in its searched scope.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design / Stackweaver migration and rollback step 5; Design / Canonical workflow and harness boundary; Test Plan / AC-07
+EVIDENCE: docs/specs/shared-triage.md:282-286 has a trusted collector make "fixed GET-only calls" and give the agent a tracker snapshot, recorded by path and hash. Lines 90-91 require adapters with equivalent completeness and error behavior. Lines 144-151 make a missing page, permission error or budget limit explicit incomplete coverage, and that blocks every closure. The live trial at line 272 "checks report scope". Nothing requires the collector to record pagination completeness and errors in the snapshot, or requires the operation to read that record. A collector that silently stops after a fixed number of pages produces a snapshot that the agent cannot tell apart from a full one. The trial report then claims a complete sweep, and the AC-07 proof at line 363 does not check this.
+PROPOSAL: Require the collector to record, for each collection, whether every page was fetched and any errors, and include that record in the hashed input set. Require the operation to apply the existing incomplete-coverage rules to it, and add this check to the AC-07 proof.
 
 ## Sources
 
