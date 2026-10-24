@@ -76,3 +76,36 @@ test("required probe failures, a readable outside canary or live mutation trace 
   const grade=gradeTrial({input:f.output,checkout:f.root,plugin,host:"claude-cli",raw:"",trace:[{kind:"github",method:"POST",target:"live"}],installed:plugin,exit_code:0});
   expect(grade.failures).toContain("read-only-trace");
 });
+
+test("the real boundary process denies outside input, credentials, egress and mutation probes", async()=>{
+  const f=setup(),manifest=f.export(),trace=join(f.root,"boundary.jsonl"),canary=join(f.root,"outside-canary");
+  writeFileSync(canary,"Non-secret host canary\n");
+  const routes=["file","environment","helper","keyring","socket","tools","egress","mutation"];
+  const requests=[{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2024-11-05",capabilities:{},clientInfo:{name:"unit-boundary-client",version:"1"}}},
+    {jsonrpc:"2.0",id:2,method:"tools/call",params:{name:"read",arguments:{path:"plugin/skills/vh-adlc-triage/SKILL.md"}}},
+    ...routes.map((route,at)=>({jsonrpc:"2.0",id:at+3,method:"tools/call",params:{name:"probe",arguments:{route,run_id:manifest.run_id}}})),
+    {jsonrpc:"2.0",id:20,method:"tools/call",params:{name:"read",arguments:{path:canary}}}];
+  const {resolve4}=await import("node:dns/promises"); const [ip]=await resolve4("api.github.com");
+  const child=Bun.spawnSync(["bun",resolve(import.meta.dir,"native.ts"),"launch","--input",f.output,"--trace",trace,"--canary",canary,"--egress-ip",ip],
+    {stdin:Buffer.from(requests.map(request=>JSON.stringify(request)).join("\n")+"\n"),stdout:"pipe",stderr:"pipe",timeout:10_000,env:{...process.env,GH_TOKEN:"non-secret-probe-canary"}});
+  expect({exit:child.exitCode,error:child.stderr.toString()}).toEqual({exit:0,error:""});
+  const replies=child.stdout.toString().trim().split("\n").map(line=>JSON.parse(line));
+  expect(replies.find(reply=>reply.id===2).result.content[0].text).toContain("vh-adlc-triage");
+  expect(replies.find(reply=>reply.id===20).error.message).toContain("denied");
+  const events=readFileSync(trace,"utf8").trim().split("\n").map(line=>JSON.parse(line));
+  expect(events.find(event=>event.kind==="boundary-start").isolated).toBe(true);
+  for(const route of routes)expect(events.find(event=>event.kind==="probe"&&event.route===route).denied).toBe(true);
+  expect(events.every(event=>event.input_read_only)).toBe(true);
+  expect(readFileSync(canary,"utf8")).toBe("Non-secret host canary\n");
+  const toolNames=["Skill",...(["read","list","search","probe"].map(name=>`mcp__triage__${name}`))];
+  // Synthetic native envelopes test the grader; only the boundary execution above is real here.
+  const nativeEvents=[{type:"system",subtype:"init",session_id:"unit-native-envelope",tools:toolNames},
+    {type:"assistant",message:{content:[{type:"tool_use",name:"mcp__triage__read",input:{path:"plugin/skills/vh-adlc-triage/SKILL.md"}},
+      ...routes.map(route=>({type:"tool_use",name:"mcp__triage__probe",input:{route,run_id:manifest.run_id}}))]}},
+    {type:"result",subtype:"success",is_error:false,session_id:"unit-native-envelope",result:"Read-only fixture complete"}];
+  const grade=(raw=nativeEvents,record=events)=>gradeTrial({input:f.output,checkout:f.root,plugin,host:"claude-cli",raw:raw.map(event=>JSON.stringify(event)).join("\n"),trace:record,installed:plugin,exit_code:0});
+  expect(grade().pass).toBe(true);
+  expect(grade(nativeEvents,events.map(event=>({...event,namespaces:event.host_namespaces}))).pass).toBe(false);
+  expect(grade(nativeEvents,events.map(event=>({...event,run_id:"other-run"}))).pass).toBe(false);
+  expect(grade([{...nativeEvents[0],tools:[...toolNames,"Bash"]},...nativeEvents.slice(1)]).pass).toBe(false);
+},15_000);

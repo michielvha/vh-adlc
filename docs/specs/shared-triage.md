@@ -422,6 +422,7 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
 - [x] T13 `tests/vh-adlc/triage/acceptance.test.ts` - acceptance-grader and isolation fixtures fail until the native driver exists; reject fabricated discovery, missing full-source/history inputs, incomplete snapshot metadata and unproven environment/helper/keyring/socket/tool/egress isolation (AC-01, AC-03, AC-07; R-9 F-01 through F-03).
       Evidence: acceptance fixtures fail on the missing native driver (`/tmp/shared-triage-t13-red.log`). They require full Git-object source export despite export-ignore attributes, nested history, hashed coverage, tamper/omission rejection, restricted launch arguments and actual native/probe traces rather than prose claims. Bubblewrap network isolation was observed working on the host; the enclosing command sandbox denies its network-namespace setup, so actual boundary tests need the host execution surface. Codex/Claude native invocations are not yet claimed.
 - [ ] T14 `tests/vh-adlc/triage/native.ts`, `tests/vh-adlc/triage/fixtures.ts` - T13 passes with disposable native profiles, hashed complete source/history inputs and a trial-specific enforced read-only boundary verified from its actual analysis environment; probes never target live writes (AC-01, AC-03, AC-07).
+      Evidence so far: the driver builds and all 301 plugin tests pass, including eight acceptance tests and actual Bubblewrap/MCP process probes (`/tmp/shared-triage-t14-suite.log`). An unsupported Bubblewrap flag and a grader accepting forged namespace evidence were observed and fixed. This does not yet establish native context binding or actual client installation; T14 remains open until the first native invocation verifies that boundary.
 - [ ] T15 `tests/vh-adlc/evidence/triage/` and this document's evidence - actual Codex/Claude CLI invocation, existing-route regressions, frozen legacy parity, bounded live read-only trial and rollback/reapply have observed pass results tied to exact component/adapter commits; retain failures and unavailable proof honestly (AC-01, AC-03, AC-07, AC-08, AC-09).
 - [ ] T16 `tests/vh-adlc/evidence/triage/` and this document's evidence - required Codex desktop and VS Code Local discovery/read-only invocation are observed; full relevant checks and a fresh independent committed implementation review establish every criterion or an owner-approved durable residual before the complete gate (AC-01 through AC-09).
 
@@ -795,3 +796,7 @@ NO FINDINGS
 - [Issue comments API](https://docs.github.com/en/rest/issues/comments#list-issue-comments): paginated issue comments and actor provenance.
 
 - [Pull requests API](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests): closed pull inventory for merged implementation references.
+
+- [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference): native command-tool switches and MCP allowlists/settings; actual installed CLI help remains the tested capability source.
+
+- [OpenAI Docs MCP](https://developers.openai.com/resources/docs-mcp): documentation-only MCP scope; it does not supply the required native tool-isolation proof.
