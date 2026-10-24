@@ -1,0 +1,89 @@
+{
+  "scope": "Synthetic example/project fixture; these are observed client runs, not private live or GUI proof.",
+  "runs": [
+    {
+      "schema_version": 1,
+      "host": "claude",
+      "component_commit": "afb10652fc11d0141b49d10d1331051261ada44c",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "82251044acfa0d03b04740ccc063baf6ffbd0be9c9dd1a1ec6bee2a0cd01bc06",
+      "driver_hash": "fbe7358036a22653f8c290cf4813d79f3ac313f5c2a35abfa3df5498b2b66f70",
+      "kind": "live-read-only-boundary",
+      "duration_ms": 39131,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      }
+    },
+    {
+      "schema_version": 1,
+      "host": "codex",
+      "component_commit": "c3b664e37e83c41ef7c442bd7d6814c4239c85df",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "558cbed00f6c88b9e2ddfb2692fe1ebb3e89de395957e6666a4d80efb01d8c28",
+      "driver_hash": "5c805c1852a8226a184800dc4a7828335177fc30bb17a9f97bb7ea2e0367ab15",
+      "kind": "native-discovery",
+      "duration_ms": 109134,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      }
+    },
+    {
+      "schema_version": 1,
+      "host": "codex",
+      "component_commit": "15802ef302f2efd1da1d5f5b7e2bb7dee3d1a819",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "540480c8611e4314c4fabb35117082cffca9047c84d44e773acabb6d6f89bb37",
+      "driver_hash": "5c805c1852a8226a184800dc4a7828335177fc30bb17a9f97bb7ea2e0367ab15",
+      "kind": "native-discovery",
+      "duration_ms": 76630,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      }
+    }
+  ],
+  "diagnostic_runs": [
+    {
+      "name": "claude-5",
+      "eligibility": "Not acceptance evidence: component had uncommitted input.",
+      "host": "claude",
+      "component_commit": "15802ef302f2efd1da1d5f5b7e2bb7dee3d1a819",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "7309011c2fc656b7412529775b230e9ec0186ccbde1d81f4fb3ca330498521a0",
+      "driver_hash": "5c805c1852a8226a184800dc4a7828335177fc30bb17a9f97bb7ea2e0367ab15",
+      "exit_code": 0,
+      "grade": {
+        "pass": false,
+        "failures": [
+          "canonical-plugin",
+          "installed-payload"
+        ]
+      }
+    },
+    {
+      "name": "codex-6",
+      "eligibility": "Not acceptance evidence: component had uncommitted input.",
+      "host": "codex",
+      "component_commit": "15802ef302f2efd1da1d5f5b7e2bb7dee3d1a819",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "7309011c2fc656b7412529775b230e9ec0186ccbde1d81f4fb3ca330498521a0",
+      "driver_hash": "5c805c1852a8226a184800dc4a7828335177fc30bb17a9f97bb7ea2e0367ab15",
+      "exit_code": 0,
+      "grade": {
+        "pass": false,
+        "failures": [
+          "canonical-plugin",
+          "installed-payload"
+        ]
+      }
+    }
+  ]
+}
