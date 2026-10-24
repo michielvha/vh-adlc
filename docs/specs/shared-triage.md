@@ -671,6 +671,7 @@ the complete revised specification still awaits its fresh review and owner accep
 | 2026-10-24 | R-18 | spec | `f279246902847ba0fafccef7a5c61d735701ac6d` | claude-opus-5.5 | procedural | Six findings: verified-state write coverage, criterion end states and guide/task alignment; unread tool-runtime overflow file retained. |
 | 2026-10-24 | R-19 | spec | `781a009cde5d573651958c05871ba46999bb4cc6` | claude-opus-5.5 | procedural | Two factual findings: use one assertion term across gates and name its full scope in migration parity. |
 | 2026-10-24 | R-20 | spec | `cb9208adec2f1b4143eefa49ebaefb0fa5d3e1f4` | claude-opus-5.5 | procedural | Four findings: correct attribution, decide non-closure obsolete/duplicate scope and cover authority/routing edits; intact response recovered from durable session after stdout truncation. |
+| 2026-10-25 | R-21 | spec | `90f3a92719d9390dc2aabd3569d11c3aecb4cd6a` | claude-opus-5.5 | procedural | Four factual findings: remove narrow approval examples, test all local status/report publication paths and cover every instruction entry; one wc listing deviation retained. |
 
 ### R-1
 
@@ -1532,6 +1533,35 @@ SEVERITY: nit
 WHERE: this review
 EVIDENCE: Isolation was procedural. I inspected targets.json, source-manifest.json (by size check only, because it was too large to view), proof.py, proof.sh and proof-hashes.json. I then ran /tmp/shared-triage-spec-review-r20/proof.sh once with no arguments. It returned integrity true, the four expected targets and proof_manifest_sha256 a235ac1268bd36592e10b91658e0015d9c4a39d8a493935a9b19c08cdc52abd9. Lint passed with no findings, lint_exit was 0, and review check returned equal true for R-14 through R-19. Every other read used view, grep and glob inside the packet. One grep result was too large, and the tool runtime saved it automatically outside the packet at /tmp/copilot-tool-output-1792873409512-kvqhqw.txt. I did not read that file. I made no edits, network calls or other commands.
 PROPOSAL: Record isolation as procedural and note the unread overflow file that the tool runtime saved.
+### R-21
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Enforced verification and recovery; Design / Stackweaver migration and rollback step 3; Test Plan / AC-01, AC-06; Tasks / T36
+EVIDENCE: docs/specs/shared-triage.md:159-166 defines a write asserting verified state as any publication, mutation or local patch presenting a factual triage assessment, including implementation/shipped scope, removal/supersession, duplicate/overlap, open/blocked, ready/unblocked, dependencies, ownership and coverage. Several approval gates still use the older four-predicate list. :221-222 permits plain-chat approval for "new issues describing remaining scope that asserts no completion, shipped scope, readiness or cleared blocker". A triage-derived description of remaining scope is itself a shipped-scope assessment, and the qualifier omits obsolete/duplicate, overlap, open/blocked, dependency, ownership and coverage verdicts. :518 (AC-01 proof) tests that plain-chat approval cannot authorize only "closure, a completion/partial-shipment assertion, readiness or a cleared blocker". :523 (AC-06 proof) keeps a "permitted non-completion label-vocabulary/new-open-issue batch". :406-408 binds "all these writes" to the legacy list "completion, partial shipped scope, readiness or a cleared blocker" before the examples that follow. :620 (T36) keeps plain chat for writes "that assert none of those predicates", where "those" refers back to the completion, partial-shipment, ready-label and blocker-clearing list. Under these lines, a new issue or neutral-looking batch that publishes an attested duplicate, ownership, dependency or remaining-scope verdict can pass through plain chat. That is the original attested-publication problem.
+PROPOSAL: Replace each four-predicate list at :221-222, :406-408, :518, :523 and :620 with the defined term "write asserting verified state". Restate the plain-chat example as label-vocabulary changes and new issues whose content is owner-written or clearly attributed task data. Say that a triage-derived remaining-scope description needs the boundary, and add that new-issue case to the AC-06 negative proof.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan / AC-05, AC-06
+EVIDENCE: docs/specs/shared-triage.md:159-160 includes "a local plan/status patch that applies that assessment" in the scope. :168-170 says remote report publication is "subject to the same proof requirement and separate publication authority". The AC-06 proof at :523 denies only "completion plan-status patches" among local patches. It has no case for a non-completion status patch that applies an assessment, such as blocked, superseded or abandoned sync from an unproved verdict. No proof row covers remote report publication. AC-05 proof at :522 checks only that reports stay uncommitted by default and that explicit local commits follow repository rules. An implementation that applies an attested blocked or superseded plan status, or publishes an unproved report remotely, contradicts no Test Plan check.
+PROPOSAL: Add AC-06 negative cases for an unproved non-completion plan/status patch that applies a triage assessment. Add a case that tries to publish the report remotely, through a tracker comment or by pushing a requested report commit, without current proof or separate publication authority, and require that both cases are denied while local report saving stays available.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria / AC-01, AC-07; Test Plan / AC-01, AC-07; Tasks / T30
+EVIDENCE: T30 (docs/specs/shared-triage.md:616) requires authority.md, lifecycle.md, triage-boundary.md, the three guides and Stackweaver agents/issue-triage.md to require the controller for every write asserting verified state "in shared authority/lifecycle/skill guides". It names no SKILL.md path. plugins/vh-adlc/skills/vh-adlc-triage/SKILL.md:18-22 tells every host that "Every remote change needs the presented exact batch and owner approval" and that "A host without native questions can present the batch in plain chat", with no controller qualification. triage-boundary.md:3 and :8 and stackweaver/agents/issue-triage.md:14 and :19 still gate only "Closure execution". AC-01 (:504) and its proof (:518) check only the README and the workflow, compatibility and installation guides. AC-07 proof (:524) checks the parity difference, not the forwarding entry's wording. No criterion or proof row would observe authority.md, lifecycle.md, triage-boundary.md, SKILL.md or the Stackweaver entry stating the requirement, so AC-01 and AC-07 can be marked met while these instructions still allow plain-chat assessment writes.
+PROPOSAL: Add plugins/vh-adlc/skills/vh-adlc-triage/SKILL.md to T30. Extend AC-01, or AC-07 for the Stackweaver entry, and the matching proof rows, to inspect that every T30 file and SKILL.md requires the controller for executable closure and every write asserting verified state, while keeping report-only output available.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: this review
+EVIDENCE: Isolation was procedural. I viewed targets.json, proof.sh, proof.py and proof-hashes.json. source-manifest.json was too large to view whole, so I did not read its contents. I ran /home/m/code/.triage-review-archive/shared-triage-spec-review-r21/proof.sh once with no arguments. It returned integrity true, the four expected targets and proof_manifest_sha256 f5d3f7724aedd2ae8b530ff3c1eb443995b1ccb9224729b86ea04c796a6ac2ae. Lint passed with no findings, lint_exit was 0, and review check returned equal true for R-14 through R-20. I also ran one command outside the permitted set: `wc -l` on the packet copy of docs/specs/shared-triage.md. It returned a line count and changed nothing. All other reads used view, grep and glob inside the packet. I made no edits and no network calls.
+PROPOSAL: Record isolation as procedural and note the single out-of-protocol `wc -l` read command.
 ## Sources
 
 - [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
