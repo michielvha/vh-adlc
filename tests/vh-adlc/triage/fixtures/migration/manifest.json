@@ -1,0 +1,14 @@
+{
+  "repository": "michielvha/stackweaver",
+  "baseline": "129581f6dbe4df71200af8f67d7bc017d35e89ad",
+  "commit": "c398866bb7d6f0e97e7dd032d875d7c5354b427d",
+  "files": {
+    ".claude/commands/triage.md": "6adc966878c0a3da6a7d8ae5e43191d06ae03743ff4fbb51c1210b85bb306320",
+    ".vh-adlc/triage.json": "632c6806208127a25e1178c944f26bdd79f36533180752d57cfadf619db74bcf",
+    "AGENTS.md": "55117c22f938006f7f752d49cd9214cd2aa9a1bdff4dda771d2263575e8a2ee9",
+    "agents/issue-triage.md": "d884535942c29a964cc43cb5ae37db04476694d10913b1641eb6e222db8aaea9",
+    "tests/agent-triage/README.md": "297fae5197e4205c0ee71cbe03a84ec5f00ea6d0836a843c25237a66dac5b1b4",
+    "tests/agent-triage/contract.test.ts": "63054b653184cdd5e32f00180f408163f433acc1bc31b8e9e7e47bee6acf0e12",
+    "tests/agent-triage/rehearse.ts": "0b5487c704f257efb9995c8008b384a6610df542c17bf3ad56395f8b96ba17ba"
+  }
+}

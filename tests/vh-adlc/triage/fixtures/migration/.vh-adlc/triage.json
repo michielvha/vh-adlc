@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "repository": "michielvha/stackweaver",
+  "hostname": "github.com",
+  "source_roots": ["."],
+  "generated_mirrors": ["distribution"],
+  "plan_roots": ["docs/internal"],
+  "plan_fields": {"issue": "issue", "status": "status", "status_description": "status_description", "priority": "priority"},
+  "report_dir": "docs/internal/status",
+  "protected_ids": [332, 334],
+  "index_ids": [13, 395],
+  "index_rules": {"labels": [], "title_prefixes": ["Milestone:"]},
+  "bot_authors": ["renovate", "renovate[bot]", "dependabot", "dependabot[bot]", "stackweaver-release-bot", "stackweaver-release-bot[bot]"],
+  "owned_labels": [],
+  "label_map": {"bug": "bug", "enhancement": "enhancement", "documentation": "documentation", "refactor": "refactor", "security": "security", "major-upgrade": "major-upgrade"},
+  "priority_order": ["high", "medium", "low"],
+  "milestone_order": ["Public Go Live"],
+  "stale_days": 90
+}
