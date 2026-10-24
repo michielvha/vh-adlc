@@ -1,4 +1,6 @@
 import type { Reader, ReadRequest } from "./collect";
+import { normalizeIssue, normalizeComment } from "./collect";
+import { MutationFailure } from "./execute";
 import type { Settings } from "./types";
 
 export function parsePage(raw: string, expected: { hostname: string; endpoint: string; page: number }): { items: unknown[]; next: number | null } {
@@ -47,4 +49,105 @@ export function githubReader(config: Settings): Reader {
     if (result.exitCode !== 0) throw new Error("github-read-failed");
     return parsePage(result.stdout.toString(), { hostname: config.hostname, endpoint, page });
   } };
+}
+
+/** Explicit write adapter; collection never imports or instantiates this path. */
+export function githubExecutor(config: Settings): import("./execute").Adapter {
+  const base = `repos/${config.repository}`, reader = githubReader(config);
+  function request(method: string, endpoint: string, payload?: unknown): unknown {
+    const args = ["gh", "api", "--hostname", config.hostname, "--method", method, "--include", endpoint];
+    if (payload !== undefined) args.push("--input", "-");
+    const result = Bun.spawnSync(args, { env: { ...process.env, GH_PROMPT_DISABLED: "1" },
+      ...(payload !== undefined ? { stdin: Buffer.from(JSON.stringify(payload)) } : {}), stdout: "pipe", stderr: "pipe", timeout: 60_000 });
+    const raw = result.stdout.toString(), status = Number(raw.match(/^HTTP\/[\d.]+ (\d{3})(?:\s|$)/)?.[1]);
+    if (result.exitCode !== 0 || status < 200 || status >= 300 || !status) {
+      if (method !== "GET") throw new MutationFailure(!status || status >= 500 || status === 408);
+      throw new Error("github-action-read-failed");
+    }
+    const split = raw.search(/\r?\n\r?\n/);
+    if (split < 0) throw new Error("invalid-github-action-response");
+    try { return JSON.parse(raw.slice(split).trim()); } catch { throw new Error("invalid-github-action-response"); }
+  }
+  let actor: string | null = null;
+  function identity() {
+    if (actor === null) {
+      const user = request("GET", "user") as { login?: string };
+      if (typeof user.login !== "string" || !user.login) throw new Error("github-actor-unavailable");
+      actor = user.login;
+    }
+    return actor;
+  }
+  async function all(kind: "issues" | "comments", number?: number) {
+    const result: unknown[] = []; let page = 1;
+    while (true) {
+      const response = await reader.page({ kind, ...(number ? { issue: number } : {}) }, page);
+      result.push(...response.items);
+      if (response.next === null) return result;
+      if (response.next !== page + 1) throw new Error("invalid-execution-pagination");
+      page = response.next;
+    }
+  }
+  async function issue(number: number) {
+    identity();
+    const value = normalizeIssue(request("GET", `${base}/issues/${number}`));
+    if (!value || value.number !== number) throw new Error("invalid-execution-issue");
+    value.comments = (await all("comments", number)).map(normalizeComment);
+    return value;
+  }
+  return { issue,
+    async receipt(key, action) {
+      const login = identity(), marker = `<!-- vh-adlc-triage:${key} -->`;
+      if (action.kind === "comment") {
+        const comments = (await all("comments", action.issue)).map(normalizeComment);
+        const matches = comments.filter((comment) => comment.body.includes(marker) && comment.author.toLowerCase() === login.toLowerCase());
+        if (matches.length > 1 || matches.some((comment) => comment.body !== action.body)) throw new Error("conflicting-comment-receipt");
+        return matches.length ? {} : null;
+      }
+      if (action.kind === "create") {
+        const matches = (await all("issues")).map(normalizeIssue).filter((value) => value && value.body.includes(marker) && value.author.toLowerCase() === login.toLowerCase());
+        if (matches.length > 1 || matches.some((value) => value!.body !== action.body || value!.title !== action.title || JSON.stringify([...value!.labels].sort()) !== JSON.stringify([...action.labels].sort()))) throw new Error("conflicting-creation-receipt");
+        return matches.length ? { number: matches[0]!.number, url: `https://${config.hostname}/${config.repository}/issues/${matches[0]!.number}` } : null;
+      }
+      if (action.kind === "labels") {
+        const current = await issue(action.issue);
+        return action.labels.every((label) => current.labels.includes(label)) ? {} : null;
+      }
+      if (action.kind === "close") {
+        const current = request("GET", `${base}/issues/${action.issue}`) as { state: string; state_reason: string };
+        return current.state === "closed" && current.state_reason === action.reason ? {} : null;
+      }
+      if (action.kind === "checklist") return (await issue(action.issue)).body === action.after ? {} : null;
+      if (action.kind === "create-label") {
+        // Listing is paginated; a missing label and a denied read are distinct outcomes.
+        let page = 1;
+        while (true) {
+          const endpoint = `${base}/labels?per_page=100`, response = Bun.spawnSync(["gh", "api", "--hostname", config.hostname, "--method", "GET", "--include", `${endpoint}&page=${page}`], { stdout: "pipe", stderr: "pipe", timeout: 60_000 });
+          if (response.exitCode !== 0) throw new Error("label-inventory-unavailable");
+          const result = parsePage(response.stdout.toString(), { hostname: config.hostname, endpoint, page });
+          const value = result.items.find((item) => (item as { name: string }).name === action.name) as { color: string; description: string | null } | undefined;
+          if (value) {
+            if (value.color.toLowerCase() !== action.color.toLowerCase() || (value.description ?? "") !== action.description) throw new Error("existing-label-vocabulary-conflicts");
+            return {};
+          }
+          if (result.next === null) return null;
+          page = result.next;
+        }
+      }
+      return null;
+    },
+    async mutate(action) {
+      identity();
+      if (action.kind === "comment") request("POST", `${base}/issues/${action.issue}/comments`, { body: action.body });
+      else if (action.kind === "labels") request("POST", `${base}/issues/${action.issue}/labels`, { labels: action.labels });
+      else if (action.kind === "close") request("PATCH", `${base}/issues/${action.issue}`, { state: "closed", state_reason: action.reason });
+      else if (action.kind === "checklist") request("PATCH", `${base}/issues/${action.issue}`, { body: action.after });
+      else if (action.kind === "create-label") request("POST", `${base}/labels`, { name: action.name, color: action.color, description: action.description });
+      else if (action.kind === "create") {
+        const result = request("POST", `${base}/issues`, { title: action.title, body: action.body, labels: action.labels }) as { number: number; html_url: string };
+        if (!Number.isSafeInteger(result.number) || result.number <= 0 || result.html_url !== `https://${config.hostname}/${config.repository}/issues/${result.number}`) throw new Error("invalid-created-issue-identity");
+        return { number: result.number, url: result.html_url };
+      } else throw new Error("unsupported-github-mutation");
+      return "issue" in action ? { issue: await issue(action.issue) } : {};
+    },
+  };
 }

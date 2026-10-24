@@ -96,7 +96,7 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   const label_map: Record<string, string> = {};
   for (const [name, value] of Object.entries(labels)) label_map[name] = string(value, "label_map");
   const config: Settings = {
-    schema_version: 1, root, configured, ...identity,
+    schema_version: 1, root, configured, settings_path: relative(root, path).split(sep).join("/"), ...identity,
     source_roots: strings(input.source_roots, ["."], "source_roots"), generated_mirrors: strings(input.generated_mirrors, [], "generated_mirrors"),
     plan_roots: strings(input.plan_roots, [], "plan_roots"), plan_fields,
     report_dir: input.report_dir === undefined ? ".vh-adlc/reports/triage" : string(input.report_dir, "report_dir"),

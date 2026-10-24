@@ -1,0 +1,272 @@
+import { createHash } from "node:crypto";
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, relative } from "node:path";
+import { git, loadSettings, ownership, resolveInside, sourcePath } from "./settings";
+import type { Report } from "./report";
+import type { Inventory, Issue, Settings } from "./types";
+
+export type Action =
+  | { id: string; kind: "comment"; issue: number; body: string }
+  | { id: string; kind: "labels"; issue: number; labels: string[] }
+  | { id: string; kind: "create-label"; name: string; color: string; description: string }
+  | { id: string; kind: "create"; title: string; body: string; labels: string[] }
+  | { id: string; kind: "close"; issue: number; reason: "completed" | "not_planned"; duplicate_of: number | null; comment: string }
+  | { id: string; kind: "checklist"; issue: number; before: string; after: string }
+  | { id: string; kind: "plan-patch"; path: string; before: string; after: string; gate?: { status: string; document: string }; created_by?: string }
+  | { id: string; kind: "commit"; subject: string; paths: string[]; requires: string[] };
+export type MutationResult = { number?: number; url?: string; issue?: Issue };
+export class MutationFailure extends Error {
+  constructor(readonly uncertain: boolean) { super(uncertain ? "github-write-outcome-unknown" : "github-write-denied"); }
+}
+export type Adapter = {
+  issue(number: number): Promise<Issue>;
+  receipt(key: string, action: Action): Promise<MutationResult | null>;
+  mutate(action: Action, key: string): Promise<MutationResult>;
+};
+export type Batch = {
+  schema_version: 1; hash: string; repository: string; hostname: string; settings_hash: string;
+  source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[];
+};
+export type Approval = { batch_hash: string; action_ids: string[]; owner_statement: string };
+type Journal = {
+  schema_version: 1; batch_hash: string; completed: string[]; started: string | null;
+  results: Record<string, MutationResult>; issues: Record<string, Issue>; source_commit: string;
+  uncertain: string[];
+};
+function canonical(value: unknown): string {
+  return JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
+    ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, item[key]])) : item);
+}
+function hash(value: unknown) { return createHash("sha256").update(canonical(value)).digest("hex"); }
+function batchHash(batch: Omit<Batch, "hash"> | Batch) { const { hash: _hash, ...content } = batch as Batch; return hash(content); }
+function bad(): never { throw new Error("invalid triage action batch or approval"); }
+function nonempty(value: unknown): value is string { return typeof value === "string" && !!value.trim(); }
+function strings(value: unknown): value is string[] { return Array.isArray(value) && value.every(nonempty); }
+function marker(report: Report, id: string) { return `<!-- vh-adlc-triage:${report.run_id}:${id} -->`; }
+export function actionKey(batch: Batch, action: Action) { return `${batch.report.run_id}:${action.id}`; }
+function sourceHash(config: Settings, actions: Action[]) {
+  const ignored = actions.filter((action) => action.kind === "plan-patch").map((action) => action.path);
+  const paths = git(config.root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0")
+    .filter((path) => path && sourcePath(config, path) && !ignored.includes(path)).sort();
+  return hash(paths.map((path) => {
+    const absolute = resolveInside(config.root, path);
+    try {
+      const stat = lstatSync(absolute);
+      if (!stat.isFile()) return [path, "non-file"];
+      return [path, stat.mode & 0o777, createHash("sha256").update(readFileSync(absolute)).digest("hex")];
+    } catch { return [path, "missing"]; }
+  }));
+}
+function material(issue: Issue) {
+  return { number: issue.number, title: issue.title, body: issue.body, state: issue.state, author: issue.author,
+    labels: [...issue.labels].sort(), milestone: issue.milestone,
+    comments: issue.comments.map(({ id, author, body }) => ({ id, author, body })).sort((a,b) => a.id-b.id) };
+}
+function changedOnlyBy(before: Issue, after: Issue, action: Action): boolean {
+  const expected = structuredClone(before);
+  if (action.kind === "comment") {
+    const additions = after.comments.filter((comment) => !before.comments.some((old) => old.id === comment.id));
+    if (additions.length !== 1 || additions[0].body !== action.body) return false;
+    expected.comments.push(additions[0]);
+  } else if (action.kind === "labels") expected.labels = [...new Set([...before.labels, ...action.labels])];
+  else if (action.kind === "close") expected.state = "closed";
+  else if (action.kind === "checklist") expected.body = action.after;
+  return hash(material(expected)) === hash(material(after));
+}
+function checklist(before: string, after: string) {
+  return before !== after && before.replace(/^(\s*[-*+] \[)[ xX](\])/gm, "$1 $2") === after.replace(/^(\s*[-*+] \[)[ xX](\])/gm, "$1 $2");
+}
+function frontmatter(text: string) {
+  const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!match) bad();
+  let data: unknown; try { data = Bun.YAML.parse(match[1]); } catch { bad(); }
+  if (!data || typeof data !== "object" || Array.isArray(data)) bad();
+  return data as Record<string, unknown>;
+}
+function validatePatch(config: Settings, action: Extract<Action, { kind: "plan-patch" }>) {
+  resolveInside(config.root, action.path);
+  if (!action.path.endsWith(".md") || action.path.startsWith(".vh-adlc/") || !nonempty(action.before) || !nonempty(action.after) || action.before === action.after) bad();
+  const placeholder = "https://triage.invalid/created-issue";
+  const before = frontmatter(action.before), after = frontmatter(action.after.replace("{{created_issue_url}}", placeholder)), fields = config.plan_fields;
+  const allowed = action.created_by ? [fields.issue] : [fields.status, fields.status_description];
+  if (Object.keys({ ...before, ...after }).some((key) => !allowed.includes(key) && canonical(before[key]) !== canonical(after[key]))) bad();
+  // Replacing only the approved single-line metadata fields must reproduce the entire file.
+  let patched = action.before;
+  for (const field of allowed) {
+    const pattern = new RegExp(`^${field}:.*$`, "m"), line = action.after.match(pattern)?.[0];
+    if (!line || !pattern.test(action.before)) bad();
+    patched = patched.replace(pattern, () => line);
+  }
+  if (patched !== action.after) bad();
+  if (action.created_by) {
+    if (after[fields.issue] !== placeholder || action.after.split("{{created_issue_url}}").length !== 2 || /\{\{(?!created_issue_url\}\})/.test(action.after)) bad();
+    if (before[fields.issue] !== null && before[fields.issue] !== "") bad();
+  } else if (!action.gate || action.gate.document !== action.path || action.gate.status !== after[fields.status] || !nonempty(action.gate.status)) bad();
+}
+
+export function planBatch(config: Settings, inventory: Inventory, report: Report, requested: Action[]): Batch {
+  if (report.repository !== config.repository || inventory.repository !== config.repository || report.hostname !== config.hostname ||
+      report.source_commit !== inventory.source_commit || git(config.root, "rev-parse", "HEAD") !== report.source_commit || !Array.isArray(requested)) bad();
+  const actions = structuredClone(requested), ids = new Set<string>();
+  for (const action of actions) {
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(action.id) || ids.has(action.id)) bad(); ids.add(action.id);
+    if ("issue" in action) {
+      if (!Number.isSafeInteger(action.issue) || action.issue < 1) bad();
+      const row = report.rows.find((row) => row.number === action.issue), issue = [...inventory.issues, ...inventory.closed_issues].find((issue) => issue.number === action.issue);
+      if (!row || !issue || row.ownership === "protected" || ownership(issue, config, row.ownership === "index") === "protected" ||
+          row.ownership === "index" && (!row.index_requested || !["checklist", "close", "comment"].includes(action.kind))) bad();
+      if (action.kind === "close" && (!row.close_executable || !report.completeness.inventory || !report.completeness.verification || action.reason !== row.closure_reason || action.duplicate_of !== row.duplicate_of)) bad();
+      if (action.kind === "checklist" && (row.ownership !== "index" || !row.index_requested || action.before !== issue.body || !checklist(action.before, action.after))) bad();
+    }
+    switch (action.kind) {
+      case "comment": case "create": {
+        if (!nonempty(action.body) || action.kind === "create" && (!nonempty(action.title) || !strings(action.labels))) bad();
+        action.body += `\n\n${marker(report, action.id)}`; break;
+      }
+      case "labels": if (!strings(action.labels) || !action.labels.length) bad(); break;
+      case "create-label": if (!nonempty(action.name) || !/^[0-9a-f]{6}$/i.test(action.color) || typeof action.description !== "string") bad(); break;
+      case "close": if (!["completed", "not_planned"].includes(action.reason) || !nonempty(action.comment)) bad(); break;
+      case "checklist": break;
+      case "plan-patch": validatePatch(config, action); break;
+      case "commit": if (!/^(?:docs|chore)(?:\([^\r\n]+\))?: [^\r\n]+$/.test(action.subject) || !strings(action.paths) || !action.paths.length || !strings(action.requires) || !action.requires.length) bad(); break;
+      default: bad();
+    }
+  }
+  for (const action of actions) {
+    if (action.kind === "close" && !actions.some((prior) => prior.id === action.comment && prior.kind === "comment" && prior.issue === action.issue && actions.indexOf(prior) < actions.indexOf(action))) bad();
+    if (action.kind === "plan-patch" && action.created_by && !actions.some((prior) => prior.id === action.created_by && prior.kind === "create" && actions.indexOf(prior) < actions.indexOf(action))) bad();
+    if (action.kind === "commit") {
+      const patches = actions.filter((prior) => action.requires.includes(prior.id));
+      if (patches.length !== action.requires.length || patches.some((prior) => prior.kind !== "plan-patch" || actions.indexOf(prior) > actions.indexOf(action)) ||
+          hash([...action.paths].sort()) !== hash(patches.map((prior) => (prior as Extract<Action, { kind: "plan-patch" }>).path).sort())) bad();
+    }
+  }
+  const batch: Batch = { schema_version: 1, hash: "", repository: config.repository, hostname: config.hostname,
+    settings_hash: hash(config), source_commit: report.source_commit, source_hash: sourceHash(config, actions),
+    report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), actions };
+  batch.hash = batchHash(batch); return batch;
+}
+export function approveBatch(batch: Batch, actionIds: string[], ownerStatement: string): Approval {
+  if (batch.hash !== batchHash(batch) || !Array.isArray(actionIds) || new Set(actionIds).size !== actionIds.length ||
+      actionIds.some((id) => !batch.actions.some((action) => action.id === id)) || !nonempty(ownerStatement)) bad();
+  return { batch_hash: batch.hash, action_ids: [...actionIds], owner_statement: ownerStatement };
+}
+function saveJournal(path: string, journal: Journal) {
+  const temporary = `${path}.tmp`;
+  writeFileSync(temporary, JSON.stringify(journal), { mode: 0o600 }); renameSync(temporary, path);
+}
+
+export async function executeBatch(config: Settings, batch: Batch, approval: Approval, adapter: Adapter, options: {
+  journal: string; gate?: (gate: { status: string; document: string }) => Promise<boolean>;
+}): Promise<{ completed: string[]; blocked: string[]; failed: string[] }> {
+  if (batch.hash !== batchHash(batch) || approval.batch_hash !== batch.hash || hash(config) !== batch.settings_hash ||
+      !nonempty(approval.owner_statement) || new Set(approval.action_ids).size !== approval.action_ids.length ||
+      approval.action_ids.some((id) => !batch.actions.some((action) => action.id === id))) bad();
+  const path = options.journal;
+  mkdirSync(dirname(path), { recursive: true });
+  const lock = `${path}.lock`, descriptor = openSync(lock, "wx", 0o600);
+  try {
+    let journal: Journal = { schema_version: 1, batch_hash: batch.hash, completed: [], started: null, results: {}, issues: Object.fromEntries(batch.issues.map((issue) => [issue.number, issue])), source_commit: batch.source_commit, uncertain: [] };
+    if (existsSync(path)) {
+      try { journal = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error("unreadable triage execution journal"); }
+      if (journal.schema_version !== 1 || journal.batch_hash !== batch.hash || !Array.isArray(journal.completed) || !Array.isArray(journal.uncertain) || !journal.results || !journal.issues) bad();
+      const interrupted = batch.actions.find((action) => action.id === journal.started);
+      if (interrupted && !["plan-patch", "commit"].includes(interrupted.kind) && !journal.completed.includes(interrupted.id) && !journal.uncertain.includes(interrupted.id)) {
+        journal.uncertain.push(interrupted.id); saveJournal(path, journal);
+      }
+    }
+    const blocked: string[] = [], failed: string[] = [];
+    const pendingCommit = batch.actions.find((action) => action.id === journal.started && action.kind === "commit") as Extract<Action, { kind: "commit" }> | undefined;
+    const head = git(config.root, "rev-parse", "HEAD");
+    if (pendingCommit && head !== journal.source_commit && approval.action_ids.includes(pendingCommit.id)) {
+      const paths = git(config.root, "diff-tree", "--no-commit-id", "--name-only", "-r", head).split("\n").filter(Boolean).sort();
+      const exact = git(config.root, "show", "-s", "--format=%P", head) === journal.source_commit &&
+        git(config.root, "show", "-s", "--format=%s", head) === pendingCommit.subject && hash(paths) === hash([...pendingCommit.paths].sort()) &&
+        pendingCommit.requires.every((id) => journal.completed.includes(id)) && pendingCommit.paths.every((path) => {
+          const patch = batch.actions.find((action) => action.kind === "plan-patch" && action.path === path) as Extract<Action, { kind: "plan-patch" }>;
+          const expected = patch.created_by ? patch.after.replace("{{created_issue_url}}", journal.results[patch.created_by].url!) : patch.after;
+          const stored = Bun.spawnSync(["git", "-C", config.root, "show", `${head}:${path}`], { stdout: "pipe", stderr: "pipe" });
+          return stored.exitCode === 0 && stored.stdout.toString() === expected && readFileSync(resolveInside(config.root, path), "utf8") === expected;
+        });
+      if (exact && sourceHash(config, batch.actions) === batch.source_hash) {
+        journal.source_commit = head; journal.completed.push(pendingCommit.id); journal.started = null; saveJournal(path, journal);
+      }
+    }
+    const liveConfig = () => {
+      // Identity and settings are re-read before every effect. Custom settings are retained on config.
+      const fresh = loadSettings(config.root, config.configured ? { settingsPath: config.settings_path } : {});
+      return hash(fresh) === batch.settings_hash;
+    };
+    for (const action of batch.actions) {
+      if (!approval.action_ids.includes(action.id) || journal.completed.includes(action.id)) continue;
+      let mutationAttempted = false;
+      try {
+        if (!liveConfig() || git(config.root, "rev-parse", "HEAD") !== journal.source_commit || sourceHash(config, batch.actions) !== batch.source_hash) { blocked.push(action.id); continue; }
+        const dependencies = action.kind === "close" ? [action.comment] : action.kind === "plan-patch" && action.created_by ? [action.created_by] : action.kind === "commit" ? action.requires : [];
+        if (dependencies.some((id) => !journal.completed.includes(id))) { blocked.push(action.id); continue; }
+        let current: Issue | undefined;
+        if ("issue" in action) {
+          current = await adapter.issue(action.issue);
+          const row = batch.report.rows.find((row) => row.number === action.issue)!;
+          if (ownership(current, config, row.ownership === "index") === "protected") { blocked.push(action.id); continue; }
+        }
+        // A receipt reconciles a completed remote request whose response/journal write was lost.
+        const receipt = !["plan-patch", "commit"].includes(action.kind) ? await adapter.receipt(actionKey(batch, action), action) : null;
+        if (receipt) {
+          if (current && !changedOnlyBy(journal.issues[current.number], current, action)) { blocked.push(action.id); continue; }
+          journal.results[action.id] = receipt;
+          if (current) journal.issues[current.number] = current;
+          journal.uncertain = journal.uncertain.filter((id) => id !== action.id);
+          journal.completed.push(action.id); journal.started = null; saveJournal(path, journal); continue;
+        }
+        if (journal.uncertain.includes(action.id)) { blocked.push(action.id); continue; }
+        if (current && hash(material(current)) !== hash(material(journal.issues[current.number]))) { blocked.push(action.id); continue; }
+        journal.started = action.id; saveJournal(path, journal);
+        let result: MutationResult = {};
+        if (action.kind === "plan-patch") {
+          const target = resolveInside(config.root, action.path);
+          if (git(config.root, "diff", "--cached", "--name-only", "--", action.path)) { blocked.push(action.id); continue; }
+          let after = action.after;
+          if (action.created_by) {
+            const created = journal.results[action.created_by], expected = `https://${config.hostname}/${config.repository}/issues/${created?.number}`;
+            if (!created?.number || created.url !== expected) { blocked.push(action.id); continue; }
+            after = after.replace("{{created_issue_url}}", expected);
+          }
+          const content = readFileSync(target, "utf8");
+          if (content !== after) {
+            if (content !== action.before || action.gate && (!options.gate || !await options.gate(action.gate))) { blocked.push(action.id); continue; }
+            if (readFileSync(target, "utf8") !== action.before) { blocked.push(action.id); continue; }
+            writeFileSync(target, after);
+          }
+        } else if (action.kind === "commit") {
+          for (const selected of action.paths) {
+            const patch = batch.actions.find((prior) => prior.kind === "plan-patch" && prior.path === selected) as Extract<Action, { kind: "plan-patch" }>;
+            const after = patch.created_by ? patch.after.replace("{{created_issue_url}}", journal.results[patch.created_by].url!) : patch.after;
+            if (readFileSync(resolveInside(config.root, selected), "utf8") !== after) throw new Error("approved patch changed before commit");
+          }
+          git(config.root, "add", "--", ...action.paths);
+          git(config.root, "commit", "-m", action.subject, "--", ...action.paths);
+          journal.source_commit = git(config.root, "rev-parse", "HEAD");
+        } else {
+          mutationAttempted = true;
+          result = await adapter.mutate(action, actionKey(batch, action));
+          if (current) {
+            const after = result.issue ?? await adapter.issue(current.number);
+            if (!changedOnlyBy(current, after, action)) throw new Error("tracker changed outside the approved payload");
+            journal.issues[current.number] = after;
+          }
+        }
+        journal.results[action.id] = result; journal.completed.push(action.id); journal.started = null; saveJournal(path, journal);
+      } catch (error) {
+        if (mutationAttempted && (!(error instanceof MutationFailure) || error.uncertain)) {
+          if (!journal.uncertain.includes(action.id)) journal.uncertain.push(action.id);
+          saveJournal(path, journal);
+        } else if (mutationAttempted) {
+          journal.started = null; saveJournal(path, journal);
+        }
+        failed.push(action.id);
+      }
+    }
+    return { completed: journal.completed, blocked, failed };
+  } finally { closeSync(descriptor); unlinkSync(lock); }
+}

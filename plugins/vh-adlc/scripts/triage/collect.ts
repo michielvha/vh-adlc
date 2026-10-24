@@ -134,3 +134,5 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
     requested_ids: requested, collected_at: collectedAt, issues: all.filter((value) => value.state === "open"),
     closed_issues: all.filter((value) => value.state === "closed"), pulls, plans: metadata.plans, coverage, plan_metadata: metadata.status };
 }
+
+export { issue as normalizeIssue, comment as normalizeComment };

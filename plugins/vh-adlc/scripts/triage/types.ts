@@ -3,6 +3,7 @@ export type Settings = {
   schema_version: 1;
   root: string;
   configured: boolean;
+  settings_path: string;
   repository: string;
   hostname: string;
   source_roots: string[];
