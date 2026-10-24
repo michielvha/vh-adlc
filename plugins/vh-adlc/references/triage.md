@@ -154,6 +154,10 @@ Present plan/issue drift both ways, but change neither during analysis. Creating
 updating a plan must be its own approved item. Treat untracked plans as leads for missing work,
 without duplicating existing issues.
 
+Collection compares two full reads of each paginated input. Changes between reads, failed
+verification pages or an exhausted page budget leave coverage incomplete. This establishes an
+observed stable read window, not an atomic GitHub snapshot or a guarantee against later changes.
+
 The collector also records the complete repository label vocabulary. Missing or incomplete vocabulary
 blocks label assignment and labeled issue creation. A missing name requires its exact approved
 color/description creation action to complete first; never rely on GitHub to create it implicitly.

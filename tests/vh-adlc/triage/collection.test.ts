@@ -37,8 +37,8 @@ test("every page is collected beyond the legacy issue/PR/comment limits", async 
   expect(result.pulls).toHaveLength(301);
   expect(result.issues[0].comments).toHaveLength(101);
   expect(result.coverage.every((entry) => entry.complete)).toBe(true);
-  expect(result.coverage.find((entry) => entry.collection === "issues")?.pages).toBe(4);
-  expect(result.coverage.find((entry) => entry.collection === "comments:1")?.pages).toBe(2);
+  expect(result.coverage.find((entry) => entry.collection === "issues")?.pages).toBe(8);
+  expect(result.coverage.find((entry) => entry.collection === "comments:1")?.pages).toBe(4);
   expect(result.plan_metadata).toBe("not-configured");
   expect(result.source_commit).toBe(git(f.root, "rev-parse", "HEAD"));
   expect(git(f.root, "status", "--porcelain")).toBe(before);
@@ -81,6 +81,17 @@ test("replayed filtered PR records cannot hide an unstable issue or pull invento
   expect(result.coverage.find(entry=>entry.collection==="pulls")?.complete).toBe(false);
 });
 
+test("an offset shift without repeated IDs cannot claim a complete inventory",async()=>{
+  const f=project(),items=Array.from({length:201},(_,at)=>issue(at+1));let removed=false;
+  const reader:Reader={async page(request,page){
+    if(request.kind!=="issues")return{items:[],next:null};
+    if(page===2&&!removed){items.splice(49,1);removed=true;}
+    const start=(page-1)*100;return{items:items.slice(start,start+100),next:start+100<items.length?page+1:null};
+  }};
+  const result=await collect(loadSettings(f.root),reader);
+  expect(result.coverage.find(entry=>entry.collection==="issues")).toMatchObject({complete:false,error:"collection-changed-during-read"});
+});
+
 test("a configured page budget is incomplete coverage, never a successful empty inventory", async () => {
   const f = project(); f.settings({ schema_version: 1, page_budget: 1 });
   const source = pages({ issues: Array.from({ length: 101 }, (_, i) => issue(i + 1)) });
@@ -94,7 +105,7 @@ test("repository vocabulary is collected on every page and preserves exact label
   const source=pages({labels:Array.from({length:101},(_,at)=>({id:at+1,name:`label-${at}`,color:"aa00ff",description:`Purpose ${at}`}))});
   const result=await collect(loadSettings(project().root),source.reader);
   expect(result.labels).toHaveLength(101);expect(result.labels?.[100].description).toBe("Purpose 100");
-  expect(result.coverage.find(entry=>entry.collection==="labels")).toMatchObject({complete:true,pages:2});
+  expect(result.coverage.find(entry=>entry.collection==="labels")).toMatchObject({complete:true,pages:4});
 });
 
 test("GitHub label reads follow verified numeric links and disable prompts on every page",async()=>{
@@ -144,7 +155,7 @@ test("targeted mode reads comments only for its declared issues and rejects unkn
   const f = project(), source = pages({ issues: [issue(1), issue(2)] });
   const result = await collect(loadSettings(f.root), source.reader, { mode: "ids", ids: [2] });
   expect(result.requested_ids).toEqual([2]);
-  expect(source.calls.filter((call) => call.request.kind === "comments").map((call) => call.request.issue)).toEqual([2]);
+  expect(source.calls.filter((call) => call.request.kind === "comments").map((call) => call.request.issue)).toEqual([2,2]);
   const missing = await collect(loadSettings(f.root), source.reader, { mode: "ids", ids: [99] });
   expect(missing.coverage.some((entry) => !entry.complete && entry.error === "requested-issue-unavailable")).toBe(true);
 });

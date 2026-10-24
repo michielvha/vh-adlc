@@ -119,31 +119,41 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
     const name = request.kind === "comments" ? `comments:${request.issue}` : request.kind;
     const entry: Coverage = { collection: name, scope: request.kind === "comments" ? String(request.issue) : request.kind === "issues" ? "all-states" : request.kind==="labels"?"repository-vocabulary":"all-closed-pulls", pages: 0, complete: false };
     coverage.push(entry);
-    const items: T[] = [], seen = new Set<number>(), rawSeen=new Set<number>();
-    let page = 1;
-    while (true) {
-      if (config.page_budget !== null && fetched >= config.page_budget) { entry.error = "page-budget-exhausted"; break; }
-      let response: Awaited<ReturnType<Reader["page"]>>;
-      try { fetched++; response = await reader.page(request, page); }
-      catch { entry.error = "read-failed"; break; }
-      entry.pages++;
-      try {
-        if (!response || !Array.isArray(response.items) || response.next !== null && (!Number.isSafeInteger(response.next) || response.next !== page + 1)) throw new Error("invalid-page");
-        for (const raw of response.items) {
-          const rawId=id(obj(raw)[["comments","labels"].includes(request.kind)?"id":"number"]);
-          if(rawSeen.has(rawId))throw new Error("repeated-raw-item");
-          rawSeen.add(rawId);
-          const item = normalize(raw);
-          if (item === null) continue;
-          const identity = key(item);
-          if (seen.has(identity)) throw new Error("repeated-item");
-          seen.add(identity); items.push(item);
-        }
-      } catch { entry.error = "invalid-or-unstable-page"; break; }
-      if (response.next === null) { entry.complete = true; break; }
-      page = response.next;
+    async function scan() {
+      const items:T[]=[],rawItems:unknown[]=[],seen=new Set<number>(),rawSeen=new Set<number>();
+      let page=1;
+      while(true){
+        if(config.page_budget!==null&&fetched>=config.page_budget){entry.error="page-budget-exhausted";break;}
+        let response:Awaited<ReturnType<Reader["page"]>>;
+        try{fetched++;response=await reader.page(request,page);}
+        catch{entry.error="read-failed";break;}
+        entry.pages++;
+        try{
+          if(!response||!Array.isArray(response.items)||response.next!==null&&(!Number.isSafeInteger(response.next)||response.next!==page+1))throw Error("invalid-page");
+          for(const raw of response.items){
+            const rawId=id(obj(raw)[["comments","labels"].includes(request.kind)?"id":"number"]);
+            if(rawSeen.has(rawId))throw Error("repeated-raw-item");
+            rawSeen.add(rawId);rawItems.push(raw);
+            const item=normalize(raw);
+            if(item===null)continue;
+            const identity=key(item);
+            if(seen.has(identity))throw Error("repeated-item");
+            seen.add(identity);items.push(item);
+          }
+        }catch{entry.error="invalid-or-unstable-page";break;}
+        if(response.next===null)break;
+        page=response.next;
+      }
+      return{items,fingerprint:JSON.stringify(rawItems)};
     }
-    return items;
+    const first=await scan();
+    if(entry.error)return first.items;
+    const second=await scan();
+    if(!entry.error){
+      if(first.fingerprint!==second.fingerprint)entry.error="collection-changed-during-read";
+      else entry.complete=true;
+    }
+    return first.items;
   }
   const all = await pages({ kind: "issues" }, issue, (value) => value.number);
   const pulls = await pages({ kind: "pulls" }, pull, (value) => value.number);
