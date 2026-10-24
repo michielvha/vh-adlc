@@ -17,7 +17,7 @@ const SCHEDULE: Record<number, string[]> = {
   4: ["investigate", "spec", "resume"],
   5: ["tasks", "implement"],
   6: ["review"],
-  7: ["ship"],
+  7: ["ship", "triage"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
 
@@ -221,7 +221,7 @@ describe("manifest and marketplace", () => {
 });
 
 describe("skills", () => {
-  test("every skill directory is one of the seven operations", () => {
+  test("every skill directory is one of the eight operations", () => {
     const dirs = existsSync(join(PKG, "skills")) ? readdirSync(join(PKG, "skills")).sort() : [];
     for (const d of dirs) expect(ALL_OPERATIONS.map((op) => `vh-adlc-${op}`)).toContain(d);
   });
