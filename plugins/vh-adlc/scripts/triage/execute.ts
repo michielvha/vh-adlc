@@ -19,14 +19,15 @@ export class MutationFailure extends Error {
   constructor(readonly uncertain: boolean) { super(uncertain ? "github-write-outcome-unknown" : "github-write-denied"); }
 }
 export type Adapter = {
+  identity():Promise<string>;
   labels():Promise<Label[]>;
   issue(number: number): Promise<Issue>;
-  receipt(key: string, action: Action): Promise<MutationResult | null>;
+  receipt(key: string, action: Action, context?:{actor:string;attempted_at:string}): Promise<MutationResult | null>;
   mutate(action: Action, key: string): Promise<MutationResult>;
 };
 export type Batch = {
   schema_version: 1; hash: string; repository: string; hostname: string; settings_hash: string;
-  source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[]; labels:Label[];
+  source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[]; labels:Label[];actor:string|null;
 };
 export type Approval = { batch_hash: string; action_ids: string[]; owner_statement: string };
 type Journal = {
@@ -35,6 +36,7 @@ type Journal = {
   uncertain: string[];
   gated?: string[];
   gate_lines?: Record<string,string>;
+  attempts?:Record<string,string>;
 };
 function canonical(value: unknown): string {
   return JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -121,6 +123,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
   const eligibility=(value:Report)=>{const{created_at:_created,comparison:_comparison,...facts}=value;return facts;};
   if(hash(eligibility(rebuilt))!==hash(eligibility(report)))bad();
   const actions = structuredClone(requested), ids = new Set<string>();
+  if(actions.some(action=>!["plan-patch","commit"].includes(action.kind))&&(!nonempty(inventory.actor)||!inventory.coverage.some(entry=>entry.collection==="identity"&&entry.complete&&!entry.error)))bad();
   for (const action of actions) {
     if(action.kind==="create-label" || (action.kind==="labels"||action.kind==="create")&&action.labels.length){
       if(!Array.isArray(inventory.labels)||!inventory.coverage.some(entry=>entry.collection==="labels"&&entry.complete&&!entry.error))bad();
@@ -165,7 +168,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
   }
   const batch: Batch = { schema_version: 1, hash: "", repository: config.repository, hostname: config.hostname,
     settings_hash: hash(config), source_commit: report.source_commit, source_hash: sourceHash(config, actions),
-    report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), labels:structuredClone(inventory.labels??[]), actions };
+    report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), labels:structuredClone(inventory.labels??[]),actor:inventory.actor??null, actions };
   batch.hash = batchHash(batch); return batch;
 }
 export function approveBatch(batch: Batch, actionIds: string[], ownerStatement: string): Approval {
@@ -224,6 +227,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
       if (!approval.action_ids.includes(action.id) || journal.completed.includes(action.id)) continue;
       let mutationAttempted = false;
       try {
+        if(!["plan-patch","commit"].includes(action.kind)&&(!batch.actor||(await adapter.identity()).toLowerCase()!==batch.actor.toLowerCase())){blocked.push(action.id);continue;}
         if (!liveConfig() || git(config.root, "rev-parse", "HEAD") !== journal.source_commit || sourceHash(config, batch.actions, journal) !== batch.source_hash) { blocked.push(action.id); continue; }
         const dependencies = action.kind === "close" ? [action.comment] : action.kind === "plan-patch" && action.created_by ? [action.created_by] : action.kind === "commit" ? action.requires : [];
         if (dependencies.some((id) => !journal.completed.includes(id))) { blocked.push(action.id); continue; }
@@ -251,7 +255,8 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
           }
         }
         // A receipt reconciles a completed remote request whose response/journal write was lost.
-        const receipt = !["plan-patch", "commit"].includes(action.kind) ? await adapter.receipt(actionKey(batch, action), action) : null;
+        const attempted=journal.attempts?.[action.id];
+        const receipt = !["plan-patch", "commit"].includes(action.kind) && (attempted||journal.uncertain.includes(action.id)) ? await adapter.receipt(actionKey(batch, action), action,attempted&&batch.actor?{actor:batch.actor,attempted_at:attempted}:undefined) : null;
         if (receipt) {
           if (current && !changedOnlyBy(journal.issues[current.number], current, action)) { blocked.push(action.id); continue; }
           journal.results[action.id] = receipt;
@@ -261,7 +266,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
         }
         if (journal.uncertain.includes(action.id)) { blocked.push(action.id); continue; }
         if (current && hash(material(current)) !== hash(material(journal.issues[current.number]))) { blocked.push(action.id); continue; }
-        journal.started = action.id; saveJournal(path, journal);
+        journal.started = action.id;journal.attempts={...(journal.attempts??{}),[action.id]:new Date().toISOString()};saveJournal(path, journal);
         let result: MutationResult = {};
         if (action.kind === "plan-patch") {
           const target = resolveInside(config.root, action.path);

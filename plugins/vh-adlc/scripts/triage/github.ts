@@ -48,7 +48,10 @@ export function parsePage(raw: string, expected: { hostname: string; endpoint: s
 export function githubReader(config: Settings): Reader {
   let repositoryId: number | null = null;
   const chains = new Map<string, Map<number, string>>();
-  return { async page(request: ReadRequest, page: number) {
+  return { async identity(){
+    const result=Bun.spawnSync(["gh","api","--hostname",config.hostname,"--method","GET","user","--jq",".login"],{env:{...process.env,GH_PROMPT_DISABLED:"1"},stdout:"pipe",stderr:"pipe",timeout:60_000});
+    const login=result.stdout.toString().trim();if(result.exitCode!==0||!/^[a-z0-9][a-z0-9-]*(?:\[bot\])?$/i.test(login))throw Error("github-actor-unavailable");return login;
+  },async page(request: ReadRequest, page: number) {
     if (!Number.isSafeInteger(page) || page < 1) throw new Error("invalid-page");
     const base = `repos/${config.repository}`;
     let endpoint: string;
@@ -56,6 +59,7 @@ export function githubReader(config: Settings): Reader {
     else if (request.kind === "pulls") endpoint = `${base}/pulls?state=closed&sort=created&direction=asc&per_page=100`;
     else if (request.kind === "labels") endpoint=`${base}/labels?per_page=100`;
     else if (request.kind === "comments" && Number.isSafeInteger(request.issue) && request.issue! > 0) endpoint = `${base}/issues/${request.issue}/comments?per_page=100`;
+    else if (request.kind === "events" && Number.isSafeInteger(request.issue) && request.issue! > 0) endpoint=`${base}/issues/${request.issue}/events?per_page=100`;
     else throw new Error("unsupported-read-request");
     if (repositoryId === null) {
       const identity = Bun.spawnSync(["gh", "api", "--hostname", config.hostname, "--method", "GET", base, "--jq", ".id"], {
@@ -104,7 +108,7 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
     actor = user.login;
     return actor;
   }
-  async function all(kind: "issues" | "comments" | "labels", number?: number) {
+  async function all(kind: "issues" | "comments" | "labels" | "events", number?: number) {
     const result: unknown[] = []; let page = 1;
     while (true) {
       const response = await reader.page({ kind, ...(number ? { issue: number } : {}) }, page);
@@ -122,9 +126,12 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
     return value;
   }
   async function labels(){return(await all("labels")).map(normalizeLabel);}
-  return { issue, labels,
-    async receipt(key, action) {
+  return { issue, labels,async identity(){return identity();},
+    async receipt(key, action,context) {
       const login = identity(), marker = `<!-- vh-adlc-triage:${key} -->`;
+      if(context && context.actor.toLowerCase()!==login.toLowerCase())throw Error("github-approved-actor-changed");
+      const attributed=(event:{id:number;actor?:{login:string};created_at:string}|undefined)=>!!event&&!!context&&Number.isSafeInteger(event.id)&&event.id>0&&
+        event.actor?.login.toLowerCase()===login.toLowerCase()&&Number.isFinite(Date.parse(event.created_at))&&Date.parse(event.created_at)>=Math.floor(Date.parse(context.attempted_at)/1000)*1000;
       if (action.kind === "comment") {
         const comments = (await all("comments", action.issue)).map(normalizeComment);
         const matches = comments.filter((comment) => comment.body.includes(marker) && comment.author.toLowerCase() === login.toLowerCase());
@@ -138,18 +145,25 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
       }
       if (action.kind === "labels") {
         const current = await issue(action.issue);
-        return action.labels.every((label) => current.labels.includes(label)) ? {} : null;
+        if(!action.labels.every(label=>current.labels.includes(label))||!context)return null;
+        const events=await all("events",action.issue) as {id:number;event:string;label?:{name:string};actor?:{login:string};created_at:string}[];
+        return action.labels.every(name=>{
+          const latest=events.filter(event=>["labeled","unlabeled"].includes(event.event)&&event.label?.name.toLowerCase()===name.toLowerCase()).sort((a,b)=>b.id-a.id)[0];
+          return latest?.event==="labeled"&&attributed(latest);
+        })?{}:null;
       }
       if (action.kind === "close") {
         const current = request("GET", `${base}/issues/${action.issue}`) as { state: string; state_reason: string };
-        return current.state === "closed" && current.state_reason === action.reason ? {} : null;
+        if(current.state!=="closed"||current.state_reason!==action.reason||!context)return null;
+        const events=await all("events",action.issue) as {id:number;event:string;actor?:{login:string};created_at:string}[];
+        const latest=events.filter(event=>["closed","reopened"].includes(event.event)).sort((a,b)=>b.id-a.id)[0];
+        return latest?.event==="closed"&&attributed(latest)?{}:null;
       }
-      if (action.kind === "checklist") return (await issue(action.issue)).body === action.after ? {} : null;
+      // Exact body/label vocabulary equality alone cannot attribute a lost write.
+      // Leave uncertain effects without a batch-attributable event blocked.
+      if (action.kind === "checklist") return null;
       if (action.kind === "create-label") {
-        const value=(await labels()).find(label=>label.name.toLowerCase()===action.name.toLowerCase());
-        if(!value)return null;
-        if(value.color!==action.color.toLowerCase()||value.description!==action.description)throw Error("existing-label-vocabulary-conflicts");
-        return {};
+        return null;
       }
       return null;
     },

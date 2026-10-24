@@ -40,4 +40,5 @@ export type Inventory = {
   issues: Issue[]; closed_issues: Issue[]; pulls: Pull[]; plans: Plan[]; coverage: Coverage[];
   plan_metadata: "available" | "not-configured" | "incomplete";
   labels?: Label[];
+  actor?:string|null;
 };

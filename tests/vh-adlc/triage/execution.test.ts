@@ -18,9 +18,10 @@ function setup(extra: Record<string, unknown> = {}) {
   expect(behavior.exitCode).toBe(0);
   const proof = [{ kind: "source", path: "src/app.ts", line: 1, detail: git(f.root, "show", "HEAD:src/app.ts"), verified: true }, { kind: "test", command: "bun: observed exported answer", exit_code: behavior.exitCode, detail: "Export returns 42", verified: true }];
   const report = buildReport(config, inventory, [{ number: 1, state: "resolved", evidence: proof, adversarial: proof, is_index: extra.index === true }], { runId: "execution", indexRequests: extra.index_ids ? [1] : [] });
-  inventory.labels=[];inventory.coverage.push({collection:"labels",scope:"repository-vocabulary",pages:1,complete:true});
+  inventory.actor="operator";inventory.coverage.push({collection:"identity",scope:"current-account",pages:1,complete:true});inventory.labels=[];inventory.coverage.push({collection:"labels",scope:"repository-vocabulary",pages:1,complete:true});
   const issues = new Map([[1, structuredClone(issue)]]), receipts = new Map<string, MutationResult>(), log: Action[] = [], failures = new Set<string>(),vocabulary=new Map<string,Label>();
   const adapter: Adapter = {
+    async identity(){return "operator";},
     async labels(){return [...vocabulary.values()].map(value=>structuredClone(value));},
     async issue(number) { const value = issues.get(number); if (!value) throw new Error("missing"); return structuredClone(value); },
     async receipt(key) { return receipts.get(key) ?? null; },
@@ -123,6 +124,22 @@ test("partial failure after comment resumes closure without repeating the commen
   f.failures.clear();
   expect((await executeBatch(f.config, batch, approval, f.adapter, { journal: f.journal })).completed).toEqual(["explain", "close"]);
   expect(f.log.map((action) => action.kind)).toEqual(["comment", "close"]);
+});
+
+test("retrying a batch under another account cannot execute its remaining actions",async()=>{
+  const f=setup(),batch=f.batch(),approval=approveBatch(batch,["explain","close"],"Approve exact actor-bound batch");
+  f.failures.add("close");await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});
+  f.failures.clear();f.adapter.identity=async()=>"another-account";
+  const retry=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});
+  expect(retry.blocked).toContain("close");expect(f.log.map(action=>action.kind)).toEqual(["comment"]);
+});
+
+test("a concurrent actor's unattempted closure is a material change, not this batch's receipt",async()=>{
+  const f=setup(),batch=f.batch();
+  await executeBatch(f.config,batch,approveBatch(batch,["explain"],"Approve the comment"),f.adapter,{journal:f.journal});
+  f.issues.get(1)!.state="closed";f.adapter.receipt=async()=>({issue:structuredClone(f.issues.get(1)!)});
+  const result=await executeBatch(f.config,batch,approveBatch(batch,["explain","close"],"Approve exact closure"),f.adapter,{journal:f.journal});
+  expect(result.completed).not.toContain("close");expect(result.blocked).toContain("close");
 });
 
 test("hard protected issues never get an exception and closure reasons follow evidence", () => {
@@ -407,4 +424,20 @@ writeFileSync(path,JSON.stringify(data));process.stdout.write("HTTP/2.0 200 OK\\
   const script=`import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};const adapter=githubExecutor(loadSettings(${JSON.stringify(f.root)}));await adapter.issue(1);try{await adapter.mutate({id:"comment",kind:"comment",issue:1,body:"Approved"},"key");}catch{};`;
   const run=Bun.spawnSync(["bun","-e",script],{env:{...process.env,PATH:`${join(f.root,"tools")}:${process.env.PATH}`,TRIAGE_FIXTURE_DB:join(f.root,".vh-adlc/github.json")},stdout:"pipe",stderr:"pipe"});
   expect(run.exitCode).toBe(0);expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/github.json"),"utf8")).writes).toBe(0);
+});
+
+test("GitHub closure receipts require a recent event from the approved actor",async()=>{
+  const f=setup();
+  f.write("tools/gh",`#!/usr/bin/env bun
+const args=process.argv.slice(2),target=args.find(a=>a.startsWith("repos/"))??"user";
+if(args.includes("--jq")){process.stdout.write("42\\n");process.exit(0);}
+let value=target==="user"?{login:"operator"}:target.includes("/events?")?[{id:10,event:"closed",actor:{login:process.env.FIXTURE_EVENT_ACTOR},created_at:process.env.FIXTURE_EVENT_TIME}]:{state:"closed",state_reason:"completed"};
+process.stdout.write("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(value));
+`);
+  const{chmodSync}=await import("node:fs");chmodSync(join(f.root,"tools/gh"),0o700);
+  const code=`import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};console.log(JSON.stringify(await githubExecutor(loadSettings(${JSON.stringify(f.root)})).receipt("key",{id:"close",kind:"close",issue:1,reason:"completed",comment:"proof",duplicate_of:null},{actor:"operator",attempted_at:"2026-10-24T12:00:00Z"})));`;
+  for(const[actor,time,expected]of[["other","2026-10-24T13:00:00Z",null],["operator","2026-10-24T11:00:00Z",null],["operator","2026-10-24T13:00:00Z",{}]]as const){
+    const run=Bun.spawnSync(["bun","-e",code],{env:{...process.env,PATH:`${join(f.root,"tools")}:${process.env.PATH}`,FIXTURE_EVENT_ACTOR:actor,FIXTURE_EVENT_TIME:time},stdout:"pipe",stderr:"pipe"});
+    expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});expect(JSON.parse(run.stdout.toString())).toEqual(expected);
+  }
 });

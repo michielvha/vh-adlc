@@ -158,6 +158,11 @@ The collector also records the complete repository label vocabulary. Missing or 
 blocks label assignment and labeled issue creation. A missing name requires its exact approved
 color/description creation action to complete first; never rely on GitHub to create it implicitly.
 
+The collected GitHub actor is part of the sealed batch and must match on every write and retry.
+Only a previously attempted action may reconcile a remote receipt. A changed state alone is not
+proof of this batch: closure/label receipts need a recent event from the approved actor.
+Unattributed uncertain checklist or vocabulary writes remain blocked for fresh reconciliation.
+
 ## Exact batch approval
 
 Present the report first. Propose only justified actions. Use the packaged `batch` command with the

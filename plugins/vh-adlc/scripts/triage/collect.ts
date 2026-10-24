@@ -3,8 +3,8 @@ import { relative, join, sep } from "node:path";
 import { git, resolveInside } from "./settings";
 import type { Comment, Coverage, Inventory, Issue, Label, Mode, Plan, Pull, Settings } from "./types";
 
-export type ReadRequest = { kind: "issues" | "pulls" | "comments" | "labels"; issue?: number };
-export type Reader = { page(request: ReadRequest, page: number): Promise<{ items: unknown[]; next: number | null }> };
+export type ReadRequest = { kind: "issues" | "pulls" | "comments" | "labels" | "events"; issue?: number };
+export type Reader = { identity?():Promise<string>; page(request: ReadRequest, page: number): Promise<{ items: unknown[]; next: number | null }> };
 function obj(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid-object");
   return value as Record<string, unknown>;
@@ -109,6 +109,11 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
   if (!Number.isFinite(now)) throw new Error("invalid-run-time");
   const collectedAt = new Date(now).toISOString();
   const source = git(config.root, "rev-parse", "HEAD"), coverage: Coverage[] = [];
+  let actor:string|null=null;
+  if(reader.identity){
+    try{actor=await reader.identity();if(!actor?.trim())throw Error("missing-identity");coverage.push({collection:"identity",scope:"current-account",pages:1,complete:true});}
+    catch{actor=null;coverage.push({collection:"identity",scope:"current-account",pages:0,complete:false,error:"account-unavailable"});}
+  }
   let fetched = 0;
   async function pages<T>(request: ReadRequest, normalize: (value: unknown) => T | null, key: (value: T) => number): Promise<T[]> {
     const name = request.kind === "comments" ? `comments:${request.issue}` : request.kind;
@@ -153,7 +158,7 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
   if (git(config.root, "rev-parse", "HEAD") !== source) coverage.push({ collection: "source", scope: source, pages: 0, complete: false, error: "source-head-changed" });
   return { schema_version: 1, repository: config.repository, hostname: config.hostname, source_commit: source, mode,
     requested_ids: requested, collected_at: collectedAt, issues: all.filter((value) => value.state === "open"),
-    closed_issues: all.filter((value) => value.state === "closed"), pulls, labels, plans: metadata.plans, coverage, plan_metadata: metadata.status };
+    closed_issues: all.filter((value) => value.state === "closed"), pulls, labels, actor, plans: metadata.plans, coverage, plan_metadata: metadata.status };
 }
 
 export { issue as normalizeIssue, comment as normalizeComment };
