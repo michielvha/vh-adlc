@@ -3,7 +3,7 @@ import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, re
 import { dirname, relative } from "node:path";
 import { git, loadSettings, ownership, resolveInside, sourcePath } from "./settings";
 import type { Report } from "./report";
-import type { Inventory, Issue, Settings } from "./types";
+import type { Inventory, Issue, Label, Settings } from "./types";
 
 export type Action =
   | { id: string; kind: "comment"; issue: number; body: string }
@@ -19,13 +19,14 @@ export class MutationFailure extends Error {
   constructor(readonly uncertain: boolean) { super(uncertain ? "github-write-outcome-unknown" : "github-write-denied"); }
 }
 export type Adapter = {
+  labels():Promise<Label[]>;
   issue(number: number): Promise<Issue>;
   receipt(key: string, action: Action): Promise<MutationResult | null>;
   mutate(action: Action, key: string): Promise<MutationResult>;
 };
 export type Batch = {
   schema_version: 1; hash: string; repository: string; hostname: string; settings_hash: string;
-  source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[];
+  source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[]; labels:Label[];
 };
 export type Approval = { batch_hash: string; action_ids: string[]; owner_statement: string };
 type Journal = {
@@ -117,6 +118,14 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
       report.source_commit !== inventory.source_commit || git(config.root, "rev-parse", "HEAD") !== report.source_commit || !Array.isArray(requested)) bad();
   const actions = structuredClone(requested), ids = new Set<string>();
   for (const action of actions) {
+    if(action.kind==="create-label" || (action.kind==="labels"||action.kind==="create")&&action.labels.length){
+      if(!Array.isArray(inventory.labels)||!inventory.coverage.some(entry=>entry.collection==="labels"&&entry.complete&&!entry.error))bad();
+      if(action.kind!=="create-label")for(const name of action.labels){
+        const existing=inventory.labels.some(label=>label.name.toLowerCase()===name.toLowerCase());
+        const creation=actions.find(prior=>prior.kind==="create-label"&&prior.name.toLowerCase()===name.toLowerCase()&&actions.indexOf(prior)<actions.indexOf(action));
+        if(!existing&&!creation)bad();
+      }
+    }
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(action.id) || ids.has(action.id)) bad(); ids.add(action.id);
     if ("issue" in action) {
       if (!Number.isSafeInteger(action.issue) || action.issue < 1) bad();
@@ -151,7 +160,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
   }
   const batch: Batch = { schema_version: 1, hash: "", repository: config.repository, hostname: config.hostname,
     settings_hash: hash(config), source_commit: report.source_commit, source_hash: sourceHash(config, actions),
-    report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), actions };
+    report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), labels:structuredClone(inventory.labels??[]), actions };
   batch.hash = batchHash(batch); return batch;
 }
 export function approveBatch(batch: Batch, actionIds: string[], ownerStatement: string): Approval {
@@ -213,6 +222,18 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
         if (!liveConfig() || git(config.root, "rev-parse", "HEAD") !== journal.source_commit || sourceHash(config, batch.actions, journal) !== batch.source_hash) { blocked.push(action.id); continue; }
         const dependencies = action.kind === "close" ? [action.comment] : action.kind === "plan-patch" && action.created_by ? [action.created_by] : action.kind === "commit" ? action.requires : [];
         if (dependencies.some((id) => !journal.completed.includes(id))) { blocked.push(action.id); continue; }
+        if((action.kind==="labels"||action.kind==="create")&&action.labels.length){
+          const live=await adapter.labels();
+          const permitted=action.labels.every(name=>{
+            const current=live.find(label=>label.name.toLowerCase()===name.toLowerCase());
+            if(!current)return false;
+            const previous=batch.labels.find(label=>label.name.toLowerCase()===name.toLowerCase());
+            if(previous)return hash(current)===hash(previous);
+            const creation=batch.actions.find(prior=>prior.kind==="create-label"&&prior.name.toLowerCase()===name.toLowerCase());
+            return creation?.kind==="create-label"&&approval.action_ids.includes(creation.id)&&journal.completed.includes(creation.id)&&current.color===creation.color.toLowerCase()&&current.description===creation.description;
+          });
+          if(!permitted){blocked.push(action.id);continue;}
+        }
         let current: Issue | undefined;
         if ("issue" in action) {
           current = await adapter.issue(action.issue);

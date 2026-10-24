@@ -90,6 +90,31 @@ test("a configured page budget is incomplete coverage, never a successful empty 
   expect(result.coverage.some((entry) => !entry.complete && entry.error === "page-budget-exhausted")).toBe(true);
 });
 
+test("repository vocabulary is collected on every page and preserves exact label metadata",async()=>{
+  const source=pages({labels:Array.from({length:101},(_,at)=>({id:at+1,name:`label-${at}`,color:"aa00ff",description:`Purpose ${at}`}))});
+  const result=await collect(loadSettings(project().root),source.reader);
+  expect(result.labels).toHaveLength(101);expect(result.labels?.[100].description).toBe("Purpose 100");
+  expect(result.coverage.find(entry=>entry.collection==="labels")).toMatchObject({complete:true,pages:2});
+});
+
+test("GitHub label reads follow verified numeric links and disable prompts on every page",async()=>{
+  const f=project();
+  f.write("tools/gh",`#!/usr/bin/env bun
+if(process.env.GH_PROMPT_DISABLED!=="1")throw Error("interactive prompt possible");
+const args=process.argv.slice(2),target=args.find(a=>a.startsWith("repos/")||a.startsWith("https:"));
+if(args.includes("--jq")){process.stdout.write("42\\n");process.exit(0);}
+const second=target.includes("page=2");
+if(second&&!target.startsWith("https://api.github.com/repositories/42/labels?"))throw Error("lost validated target");
+const items=Array.from({length:second?1:100},(_,i)=>({id:(second?100:0)+i+1,name:"label-"+((second?100:0)+i),color:"aa00ff",description:"Exact purpose"}));
+const link=second?"":'Link: <https://api.github.com/repositories/42/labels?per_page=100&page=2>; rel="next"\\r\\n';
+process.stdout.write("HTTP/2.0 200 OK\\r\\n"+link+"\\r\\n"+JSON.stringify(items));
+`);
+  const{chmodSync}=await import("node:fs");chmodSync(join(f.root,"tools/gh"),0o700);
+  const code=`import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};console.log(JSON.stringify(await githubExecutor(loadSettings(${JSON.stringify(f.root)})).labels()));`;
+  const run=Bun.spawnSync(["bun","-e",code],{env:{...process.env,PATH:`${join(f.root,"tools")}:${process.env.PATH}`},stdout:"pipe",stderr:"pipe"});
+  expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});expect(JSON.parse(run.stdout.toString())).toHaveLength(101);
+});
+
 test("plan joins use structured metadata and preserve untracked and foreign references", async () => {
   const f = project();
   f.write("plans/local.md", "---\ntracker: https://github.com/example/project/issues/5\nstate: planned\nrank: high\n---\nDetails\n");

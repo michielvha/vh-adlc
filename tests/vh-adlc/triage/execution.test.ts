@@ -5,7 +5,7 @@ import { approveBatch, executeBatch, MutationFailure, planBatch } from "../../..
 import type { Action, Adapter, MutationResult } from "../../../plugins/vh-adlc/scripts/triage/execute";
 import { buildReport } from "../../../plugins/vh-adlc/scripts/triage/report";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
-import type { Inventory, Issue } from "../../../plugins/vh-adlc/scripts/triage/types";
+import type { Inventory, Issue, Label } from "../../../plugins/vh-adlc/scripts/triage/types";
 import { fixture, git } from "./fixtures";
 
 const projects: ReturnType<typeof fixture>[] = [];
@@ -18,8 +18,10 @@ function setup(extra: Record<string, unknown> = {}) {
   expect(behavior.exitCode).toBe(0);
   const proof = [{ kind: "source", path: "src/app.ts", line: 1, detail: git(f.root, "show", "HEAD:src/app.ts"), verified: true }, { kind: "test", command: "bun: observed exported answer", exit_code: behavior.exitCode, detail: "Export returns 42", verified: true }];
   const report = buildReport(config, inventory, [{ number: 1, state: "resolved", evidence: proof, adversarial: proof, is_index: extra.index === true }], { runId: "execution", indexRequests: extra.index_ids ? [1] : [] });
-  const issues = new Map([[1, structuredClone(issue)]]), receipts = new Map<string, MutationResult>(), log: Action[] = [], failures = new Set<string>();
+  inventory.labels=[];inventory.coverage.push({collection:"labels",scope:"repository-vocabulary",pages:1,complete:true});
+  const issues = new Map([[1, structuredClone(issue)]]), receipts = new Map<string, MutationResult>(), log: Action[] = [], failures = new Set<string>(),vocabulary=new Map<string,Label>();
   const adapter: Adapter = {
+    async labels(){return [...vocabulary.values()].map(value=>structuredClone(value));},
     async issue(number) { const value = issues.get(number); if (!value) throw new Error("missing"); return structuredClone(value); },
     async receipt(key) { return receipts.get(key) ?? null; },
     async mutate(action, key) {
@@ -27,6 +29,7 @@ function setup(extra: Record<string, unknown> = {}) {
       log.push(structuredClone(action));
       let result: MutationResult = {};
       const target = "issue" in action ? issues.get(action.issue)! : null;
+      if(action.kind==="create-label")vocabulary.set(action.name,{id:1,name:action.name,color:action.color,description:action.description});
       if (action.kind === "comment") { target!.comments.push({ id: 100 + log.length, author: "operator", body: action.body, created_at: "2026-10-24T11:00:00Z" }); }
       if (action.kind === "close") target!.state = "closed";
       if (action.kind === "labels") target!.labels = [...new Set([...target!.labels, ...action.labels])];
@@ -128,10 +131,22 @@ test("new label vocabulary approval binds exact descriptions/colors and no unapp
   const f = setup(), actions: Action[] = [{ id: "vocab", kind: "create-label", name: "ready", color: "00aa11", description: "Verified ready work" }, { id: "tag", kind: "labels", issue: 1, labels: ["ready"] }];
   const batch = f.batch(actions), approval = approveBatch(batch, ["tag"], "Apply label only");
   await executeBatch(f.config, batch, approval, f.adapter, { journal: f.journal });
-  expect(f.log.map((action) => action.kind)).toEqual(["labels"]);
+  expect(f.log).toEqual([]);
+  const complete=await executeBatch(f.config,batch,approveBatch(batch,["vocab","tag"],"Create the exact vocabulary, then tag"),f.adapter,{journal:f.journal});
+  expect(complete.completed).toEqual(["vocab","tag"]);
+  expect(f.log.map(action=>action.kind)).toEqual(["create-label","labels"]);
   const altered = structuredClone(batch), full = approveBatch(altered, ["vocab"], "Create exact vocabulary");
   (altered.actions[0] as { color: string }).color = "ffffff";
   await expect(executeBatch(f.config, altered, full, f.adapter, { journal: f.journal })).rejects.toThrow();
+});
+
+test("issue creation cannot create missing vocabulary and removed labels block assignment",async()=>{
+  const f=setup();
+  expect(()=>f.batch([{id:"new",kind:"create",title:"Scope",body:"Exact scope",labels:["missing"]}])).toThrow();
+  f.inventory.labels=[{id:1,name:"existing",color:"00aa11",description:"Already approved vocabulary"}];
+  const batch=f.batch([{id:"tag",kind:"labels",issue:1,labels:["existing"]}]);
+  const result=await executeBatch(f.config,batch,approveBatch(batch,["tag"],"Apply existing vocabulary only"),f.adapter,{journal:f.journal});
+  expect(result.blocked).toContain("tag");expect(f.log).toEqual([]);
 });
 
 test("local status patches require separate approval and a successful lifecycle gate", async () => {

@@ -1,5 +1,5 @@
 import type { Reader, ReadRequest } from "./collect";
-import { normalizeIssue, normalizeComment } from "./collect";
+import { normalizeIssue, normalizeComment, normalizeLabel } from "./collect";
 import { MutationFailure } from "./execute";
 import type { Settings } from "./types";
 
@@ -54,6 +54,7 @@ export function githubReader(config: Settings): Reader {
     let endpoint: string;
     if (request.kind === "issues") endpoint = `${base}/issues?state=all&sort=created&direction=asc&per_page=100`;
     else if (request.kind === "pulls") endpoint = `${base}/pulls?state=closed&sort=created&direction=asc&per_page=100`;
+    else if (request.kind === "labels") endpoint=`${base}/labels?per_page=100`;
     else if (request.kind === "comments" && Number.isSafeInteger(request.issue) && request.issue! > 0) endpoint = `${base}/issues/${request.issue}/comments?per_page=100`;
     else throw new Error("unsupported-read-request");
     if (repositoryId === null) {
@@ -103,7 +104,7 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
     actor = user.login;
     return actor;
   }
-  async function all(kind: "issues" | "comments", number?: number) {
+  async function all(kind: "issues" | "comments" | "labels", number?: number) {
     const result: unknown[] = []; let page = 1;
     while (true) {
       const response = await reader.page({ kind, ...(number ? { issue: number } : {}) }, page);
@@ -120,7 +121,8 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
     value.comments = (await all("comments", number)).map(normalizeComment);
     return value;
   }
-  return { issue,
+  async function labels(){return(await all("labels")).map(normalizeLabel);}
+  return { issue, labels,
     async receipt(key, action) {
       const login = identity(), marker = `<!-- vh-adlc-triage:${key} -->`;
       if (action.kind === "comment") {
@@ -144,25 +146,19 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
       }
       if (action.kind === "checklist") return (await issue(action.issue)).body === action.after ? {} : null;
       if (action.kind === "create-label") {
-        // Listing is paginated; a missing label and a denied read are distinct outcomes.
-        let page = 1;
-        while (true) {
-          const endpoint = `${base}/labels?per_page=100`, response = Bun.spawnSync(["gh", "api", "--hostname", config.hostname, "--method", "GET", "--include", `${endpoint}&page=${page}`], { stdout: "pipe", stderr: "pipe", timeout: 60_000 });
-          if (response.exitCode !== 0) throw new Error("label-inventory-unavailable");
-          const result = parsePage(response.stdout.toString(), { hostname: config.hostname, endpoint, page });
-          const value = result.items.find((item) => (item as { name: string }).name === action.name) as { color: string; description: string | null } | undefined;
-          if (value) {
-            if (value.color.toLowerCase() !== action.color.toLowerCase() || (value.description ?? "") !== action.description) throw new Error("existing-label-vocabulary-conflicts");
-            return {};
-          }
-          if (result.next === null) return null;
-          page = result.next;
-        }
+        const value=(await labels()).find(label=>label.name.toLowerCase()===action.name.toLowerCase());
+        if(!value)return null;
+        if(value.color!==action.color.toLowerCase()||value.description!==action.description)throw Error("existing-label-vocabulary-conflicts");
+        return {};
       }
       return null;
     },
     async mutate(action) {
       identity();
+      if(action.kind==="labels"||action.kind==="create"){
+        const existing=await labels();
+        if(action.labels.some(name=>!existing.some(label=>label.name.toLowerCase()===name.toLowerCase())))throw Error("implicit-label-creation-denied");
+      }
       if (action.kind === "comment") request("POST", `${base}/issues/${action.issue}/comments`, { body: action.body });
       else if (action.kind === "labels") request("POST", `${base}/issues/${action.issue}/labels`, { labels: action.labels });
       else if (action.kind === "close") request("PATCH", `${base}/issues/${action.issue}`, { state: "closed", state_reason: action.reason });

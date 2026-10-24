@@ -1,9 +1,9 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { relative, join, sep } from "node:path";
 import { git, resolveInside } from "./settings";
-import type { Comment, Coverage, Inventory, Issue, Mode, Plan, Pull, Settings } from "./types";
+import type { Comment, Coverage, Inventory, Issue, Label, Mode, Plan, Pull, Settings } from "./types";
 
-export type ReadRequest = { kind: "issues" | "pulls" | "comments"; issue?: number };
+export type ReadRequest = { kind: "issues" | "pulls" | "comments" | "labels"; issue?: number };
 export type Reader = { page(request: ReadRequest, page: number): Promise<{ items: unknown[]; next: number | null }> };
 function obj(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid-object");
@@ -31,6 +31,11 @@ function pull(value: unknown): Pull | null {
 function comment(value: unknown): Comment {
   const raw = obj(value);
   return { id: id(raw.id), author: author(raw.user), body: text(raw.body), created_at: date(raw.created_at) };
+}
+export function normalizeLabel(value:unknown):Label {
+  const raw=obj(value),color=text(raw.color);
+  if(!/^[a-f0-9]{6}$/i.test(color))throw Error("invalid-label-color");
+  return{id:id(raw.id),name:text(raw.name),color:color.toLowerCase(),description:raw.description===null?"":text(raw.description)};
 }
 function scalar(value: unknown): string | null {
   if (value === undefined || value === null) return null;
@@ -107,7 +112,7 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
   let fetched = 0;
   async function pages<T>(request: ReadRequest, normalize: (value: unknown) => T | null, key: (value: T) => number): Promise<T[]> {
     const name = request.kind === "comments" ? `comments:${request.issue}` : request.kind;
-    const entry: Coverage = { collection: name, scope: request.kind === "comments" ? String(request.issue) : request.kind === "issues" ? "all-states" : "all-closed-pulls", pages: 0, complete: false };
+    const entry: Coverage = { collection: name, scope: request.kind === "comments" ? String(request.issue) : request.kind === "issues" ? "all-states" : request.kind==="labels"?"repository-vocabulary":"all-closed-pulls", pages: 0, complete: false };
     coverage.push(entry);
     const items: T[] = [], seen = new Set<number>(), rawSeen=new Set<number>();
     let page = 1;
@@ -120,7 +125,7 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
       try {
         if (!response || !Array.isArray(response.items) || response.next !== null && (!Number.isSafeInteger(response.next) || response.next !== page + 1)) throw new Error("invalid-page");
         for (const raw of response.items) {
-          const rawId=id(obj(raw)[request.kind==="comments"?"id":"number"]);
+          const rawId=id(obj(raw)[["comments","labels"].includes(request.kind)?"id":"number"]);
           if(rawSeen.has(rawId))throw new Error("repeated-raw-item");
           rawSeen.add(rawId);
           const item = normalize(raw);
@@ -137,6 +142,7 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
   }
   const all = await pages({ kind: "issues" }, issue, (value) => value.number);
   const pulls = await pages({ kind: "pulls" }, pull, (value) => value.number);
+  const labels=await pages({kind:"labels"},normalizeLabel,value=>value.id);
   let selected = mode === "ids" ? all.filter((value) => requested.includes(value.number)) : all.filter((value) => value.state === "open");
   if (mode === "stale") {
     selected = selected.filter((value) => now - Date.parse(value.updated_at) > config.stale_days * 86_400_000);
@@ -147,7 +153,7 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
   if (git(config.root, "rev-parse", "HEAD") !== source) coverage.push({ collection: "source", scope: source, pages: 0, complete: false, error: "source-head-changed" });
   return { schema_version: 1, repository: config.repository, hostname: config.hostname, source_commit: source, mode,
     requested_ids: requested, collected_at: collectedAt, issues: all.filter((value) => value.state === "open"),
-    closed_issues: all.filter((value) => value.state === "closed"), pulls, plans: metadata.plans, coverage, plan_metadata: metadata.status };
+    closed_issues: all.filter((value) => value.state === "closed"), pulls, labels, plans: metadata.plans, coverage, plan_metadata: metadata.status };
 }
 
 export { issue as normalizeIssue, comment as normalizeComment };

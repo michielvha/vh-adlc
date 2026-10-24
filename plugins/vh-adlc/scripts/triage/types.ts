@@ -31,6 +31,7 @@ export type Issue = {
   created_at: string; updated_at: string; comments: Comment[];
 };
 export type Pull = { number: number; title: string; body: string; merged_at: string };
+export type Label = { id:number; name:string; color:string; description:string };
 export type Coverage = { collection: string; scope: string; pages: number; complete: boolean; error?: string };
 export type Plan = { path: string; issue: number | null; issue_ref: string | null; status: string | null; status_description: string | null; priority: string | null };
 export type Inventory = {
@@ -38,4 +39,5 @@ export type Inventory = {
   mode: Mode; requested_ids: number[]; collected_at: string;
   issues: Issue[]; closed_issues: Issue[]; pulls: Pull[]; plans: Plan[]; coverage: Coverage[];
   plan_metadata: "available" | "not-configured" | "incomplete";
+  labels?: Label[];
 };
