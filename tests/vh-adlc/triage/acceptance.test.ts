@@ -95,6 +95,15 @@ test("project command trials copy exact command bytes without owner hooks or set
   expect(()=>readFileSync(join(workspace.cwd,".claude/settings.json"))).toThrow();expect(workspace.model).toBe("fable");
 });
 
+test("the legacy analysis boundary cannot read the replacement shared implementation",()=>{
+  const f=setup();f.export();const requests=[
+    {jsonrpc:"2.0",id:1,method:"tools/call",params:{name:"read",arguments:{path:"source/src/app.ts"}}},
+    {jsonrpc:"2.0",id:2,method:"tools/call",params:{name:"read",arguments:{path:"plugin/scripts/triage/report.ts"}}}];
+  const child=Bun.spawnSync(["bun",resolve(import.meta.dir,"native.ts"),"launch","--legacy","--input",f.output,"--trace",join(f.root,"legacy-boundary.jsonl")],{stdin:Buffer.from(requests.map(request=>JSON.stringify(request)).join("\n")+"\n"),stdout:"pipe",stderr:"pipe",timeout:10_000});
+  expect({exit:child.exitCode,error:child.stderr.toString()}).toEqual({exit:0,error:""});
+  const replies=child.stdout.toString().trim().split("\n").map(line=>JSON.parse(line));expect(replies[0].result.content[0].text).toContain("answer");expect(replies[1].error.message).toContain("denied");
+});
+
 test("required probe failures, a readable outside canary or live mutation trace block acceptance",()=>{
   const f=setup();f.export();
   for(const route of ["file","environment","helper","keyring","socket","tools","egress","mutation"]){
