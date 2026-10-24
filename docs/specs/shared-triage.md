@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Copilot Opus R-12 returned no findings; awaiting renewed acceptance of refreshed coverage and trial proof."
+status: planned
+status_description: "Owner accepted R-12 on 2026-10-24; planned gate passed; documentation publication authorized."
 issue: null
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
@@ -392,8 +392,8 @@ is implemented by this specification request.
 None. The owner accepted the R-3 and R-4 choices and accepted R-9 with documentation publication
 on 2026-10-24. R-9 trial-proof obligations are now folded into the normative Design and Test Plan,
 not kept as a separate decision source. The only additional coverage change follows main's relocated
-workflow, compatibility and installation guides. That refreshed baseline is being independently
-reviewed before renewed acceptance; existing documentation publication authority remains in force.
+workflow, compatibility and installation guides. The owner accepted that refreshed baseline after clean R-12 on 2026-10-24; existing documentation
+publication authority remains in force.
 
 ## Review Log
 
@@ -413,6 +413,7 @@ reviewed before renewed acceptance; existing documentation publication authority
 | 2026-10-24 | R-10 | spec | `33b8070d2a2af192b00306bfb84b765e907f1cb5` | claude-opus-5.5 | procedural | Refresh after main documentation relocation: fold trial proof into the normative baseline, check installation/index coverage and correct the R-9 severity summary. |
 | 2026-10-24 | R-11 | spec | `1f769d91e7d662885b6854de3260b618f0101e35` | claude-opus-5.5 | procedural | One factual nit: make the trial probe pass condition explicit in AC-07 proof. |
 | 2026-10-24 | R-12 | spec | `68d2f1eabe959be346082859ad7ac105cdb23300` | claude-opus-5.5 | procedural | No findings after the documentation relocation and normative trial-proof refresh. |
+| 2026-10-24 | R-12 | spec | `68d2f1eabe959be346082859ad7ac105cdb23300` | n/a | n/a | accepted by owner |
 
 ### R-1
 
