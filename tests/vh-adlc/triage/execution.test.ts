@@ -505,3 +505,15 @@ test("a live kernel journal lock blocks effects and releases when its owner is k
   expect((await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal})).completed).toEqual(["explain"]);expect(f.log.length).toBe(1);
  }finally{child.kill();await child.exited;}
 });
+
+test("different journals and batches cannot race effects on one repository",async()=>{
+ const f=setup(),first=f.batch([f.actions[0]]),second=f.batch([{...f.actions[0],body:"Another exact approved comment"}]);
+ let started!:()=>void,release!:()=>void;const entered=new Promise<void>(resolve=>started=resolve),waiting=new Promise<void>(resolve=>release=resolve),mutate=f.adapter.mutate;
+ f.adapter.mutate=async(action,key)=>{started();await waiting;return mutate(action,key);};
+ const firstRun=executeBatch(f.config,first,approveBatch(first,["explain"],"First synthetic batch"),f.adapter,{journal:f.journal});
+ await entered;
+ const secondRun=executeBatch(f.config,second,approveBatch(second,["explain"],"Second synthetic batch"),f.adapter,{journal:join(f.root,".vh-adlc/other-journal.json")}).then(result=>({result}),error=>({error}));
+ try{const outcome=await Promise.race([secondRun,Bun.sleep(300).then(()=>({pending:true}))]);expect(String((outcome as any).error)).toContain("locked");expect(f.log).toEqual([]);}
+ finally{release();await firstRun;await secondRun;}
+ expect(f.log.length).toBe(1);
+});

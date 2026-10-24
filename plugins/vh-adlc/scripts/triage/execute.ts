@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import{executionLock}from"./execution-lock";
+import{executionLock,repositoryLockPath}from"./execution-lock";
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { git, loadSettings, ownership, resolveInside, sourcePath,workstreamPath } from "./settings";
@@ -193,8 +193,9 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(batch.report)))bad();
   const path = options.journal;
   mkdirSync(dirname(path), { recursive: true });
-  const releaseLock=await executionLock(`${path}.lock`);
+  const releaseRepository=await executionLock(repositoryLockPath(config));let releaseLock:(()=>Promise<void>)|undefined;
   try {
+    releaseLock=await executionLock(`${path}.lock`);
     let journal: Journal = { schema_version: 1, batch_hash: batch.hash, completed: [], started: null, results: {}, issues: Object.fromEntries(batch.issues.map((issue) => [issue.number, issue])), source_commit: batch.source_commit, uncertain: [] };
     if (existsSync(path)) {
       try { journal = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error("unreadable triage execution journal"); }
@@ -328,5 +329,5 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
       }
     }
     return { completed: journal.completed, blocked, failed };
-  } finally { await releaseLock(); }
+  } finally { try{if(releaseLock)await releaseLock();}finally{await releaseRepository();} }
 }
