@@ -8,6 +8,7 @@ import { basename, join, resolve } from "node:path";
 import { buildDiagnostic, DOCS_PIN, events, fingerprint, grade, isMaintenance, maintenancePaths, snapshot } from "./fixtures";
 import { verifyFeatureReview, verifyMaintenanceReview } from "./native-review";
 import { scenarioPlan } from "./scenario-plan";
+import { pluginPayloadHash } from "../triage/native";
 import { needsMaintenanceReview } from "./maintenance-fixture";
 
 const REPO = resolve(import.meta.dir, "../../..");
@@ -60,8 +61,10 @@ const version = run(["codex", "--version"], root).trim();
 run(["codex", "plugin", "marketplace", "add", market, "--json"], root, childEnv);
 const install = JSON.parse(run(["codex", "plugin", "add", "vh-adlc@vhco-lifecycle-evaluation", "--json"], root, childEnv));
 const packageHash = fingerprint(install.installedPath);
+const pluginHash=pluginPayloadHash(install.installedPath);
+const componentCommit=sourceRef?run(["git","rev-parse",sourceRef],REPO).trim():null;
 const results: any[] = [];
-console.log(JSON.stringify({ candidate, root, version, packageHash, docsPin: DOCS_PIN, surface: "native-cli-diagnostic" }));
+console.log(JSON.stringify({ candidate, root, version, packageHash, component_commit:componentCommit,plugin_hash:pluginHash,docsPin: DOCS_PIN, surface: "native-cli-diagnostic" }));
 
 for (const { id, trial, variant, prompt, prompts, phaseCase, seedReadOnlyWorkflow } of plan) {
   const trialRoot = join(root, trial);
@@ -114,7 +117,7 @@ for (const { id, trial, variant, prompt, prompts, phaseCase, seedReadOnlyWorkflo
   const unchangedPackage = fingerprint(install.installedPath) === packageHash;
   const result = {
     id, trial, variant, candidate, surface: "native-cli-diagnostic", host: version,
-    packageHash, graderHash, docsPin: DOCS_PIN, model: "unknown", configuration: "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
+    packageHash,component_commit:componentCommit,plugin_hash:pluginHash, graderHash, docsPin: DOCS_PIN, model: "unknown", configuration: "isolated profile default; retained session in disposable profile; workspace-write; automatic approval review; no model override",
     prompt: f.prompt, durationMs: Date.now() - started, exitCode, timeout,
     review, phases: prompts ? phases : undefined, phaseCase,
     hostConstraint: id === "L17-missing" ? "native multi_agent disabled for this trial; launching a replacement host is outside its request" : undefined,

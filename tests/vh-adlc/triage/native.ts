@@ -42,6 +42,7 @@ function files(root: string, allowSymlinks=false): Entry[] {
   if(existsSync(root)) walk("");
   return result;
 }
+export function pluginPayloadHash(root:string){return payloadHash(files(root));}
 function source(root: string, commit: string): { entries: Entry[]; content: Map<string, Buffer> } {
   const entries: Entry[] = [], content = new Map<string,Buffer>();
   const tree = git(root,"ls-tree","-r","-z","--full-tree",commit).toString().split("\0").filter(Boolean);
@@ -169,7 +170,7 @@ type Trace = {kind:string;route?:string;denied?:boolean;session?:string;method?:
 export function gradeTrial(options:{input:string;checkout:string;plugin:string;host:string;raw:string;trace:Trace[];installed:string|null;exit_code:number;kind?:"native-discovery"|"live-read-only";command?:string;commandModel?:string|null;legacy?:boolean}) {
   const failures=[...verifyInputs(options.input,{checkout:options.checkout,plugin:options.plugin}).failures];
   if(options.exit_code!==0) failures.push("native-exit");
-  if(!options.legacy&&(!options.installed||payloadHash(files(options.installed))!==payloadHash(files(options.plugin)))) failures.push("installed-payload");
+  if(!options.legacy&&(!options.installed||pluginPayloadHash(options.installed)!==pluginPayloadHash(options.plugin))) failures.push("installed-payload");
   const events:Record<string,unknown>[]=[];
   for(const line of options.raw.split("\n"))try{events.push(JSON.parse(line));}catch{}
   const calls=events.flatMap(event=>{
