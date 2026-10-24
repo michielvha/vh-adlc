@@ -124,7 +124,8 @@ honest capability rules; unrequested runs inherit the host's model.
 Parallel verification is optional. A serial host can verify the same issues and perform a second
 adversarial pass, explicitly described as serial verification rather than independent review. If a
 required test, source or permission is unavailable, affected claims remain unverified. Any incomplete
-required collection or verification input makes every closure in that report non-executable; the
+required collection or verification input blocks every executable closure and completion-asserting
+write in that report; the
 report may still present its observed findings and missing inputs. Missing optional parallelism does not make a report impossible.
 
 The existing feature gates and bounded-maintenance procedure remain intact. Triage ranks and routes
@@ -168,8 +169,8 @@ launch configuration as well as the observed tool trace. Its Claude counterpart 
 exclusive tool inventory and trace. The protocol and shared workflow require no particular model or
 harness. The currently shipped managed adapters require Linux, Bubblewrap, util-linux flock and an
 authenticated Codex or Claude CLI; this is a limitation of those adapters, not a substitute for testing
-other hosts. An unconfigured or incapable host must leave executable closure unavailable and can still
-produce a report. Required GUI discovery/read-only trials remain required under AC-01, even if that
+other hosts. An unconfigured or incapable host must leave executable closure and completion-asserting writes
+unavailable and can still produce a report. Required GUI discovery/read-only trials remain required under AC-01, even if that
 surface has no configured execution controller.
 
 For every batch containing an executable closure or completion-asserting write, the operator presents
@@ -365,8 +366,8 @@ remaining operations. No push, merge, release or implementation follows merely f
    not require saving one. Reports remain uncommitted unless requested. Record both intentional
    report differences and their scope-safe history comparison.
    Record the additional intentional difference `enforced-controller-execution`: legacy Claude could
-   execute an approved closure in its interactive session; shared triage permits closure only through
-   an enforced controller, with the current shipped adapters limited to Linux/Bubblewrap/flock and
+   execute approved closures and completion assertions in its interactive session; shared triage
+   permits these writes only through an enforced controller, with the current shipped adapters limited to Linux/Bubblewrap/flock and
    their supported CLIs. Other surfaces retain reports/proposals and permitted writes without completion assertions; closure
    and completion-asserting writes wait until their own controller is proved.
    The parity manifest and comparison must name this eighth difference explicitly.
