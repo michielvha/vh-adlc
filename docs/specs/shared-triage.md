@@ -590,6 +590,7 @@ publication authority remains in force.
 | 2026-10-24 | R-14 | implementation | `d0682cf89980c54da8b0f43f12e14357f0240243` | claude-opus-5.5 | procedural | Executed proof retains native behavior failures; GUI acceptance remains unverified. |
 | 2026-10-24 | R-15 | implementation | `cc84af85ee4f6db8045da6548cdb199c0f134e4c` | claude-opus-5.5 | procedural | Frozen proof observed checks and native failures; boundary implementation reviewed after the owner decision. |
 | 2026-10-24 | R-16 | implementation | `8f3ca635096fc663d473fe31389c77891b488dce` | claude-opus-5.5 | procedural | Local proof passes; twelve findings include readiness provenance, tool enforcement, controller resume and missing verification methods. |
+| 2026-10-24 | R-17 | spec | `a28ebbf4d6f1796434bca1407542aedf255f5908` | claude-opus-5.5 | procedural | Eight findings: clarify completion-write authority, analysis confinement, per-adapter proof and changed-evidence comments; one listing command exceeded the review tool procedure. |
 
 ### R-1
 
@@ -1311,6 +1312,63 @@ SEVERITY: nit
 WHERE: this review
 EVIDENCE: Two over-large glob/grep results were automatically saved by the tool runtime to /tmp/copilot-tool-output-*.txt outside the packet. I did not read either file. After finished.json existed I ran proof.sh twice more, which printed only the stored result. No edits or other commands were run.
 PROPOSAL: None.
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Enforced verification and recovery; Design / Stackweaver migration and rollback step 3; Test Plan / AC-01
+EVIDENCE: docs/specs/shared-triage.md:157 says, without qualification, "The operator presents and approves the exact batch through an independent channel." Lines 127-128 and 153 restrict the controller requirement to executable closures. Line 336 says other surfaces "retain reports/proposals", which implies they execute nothing. Test Plan AC-01 at line 442 still requires a "plain-chat approval fallback". plugins/vh-adlc/references/triage.md:249-262 lets any host collect approval in plain chat, save approval.json and run cli.ts execute for comment, label, create, checklist and plan-patch actions. triage-boundary.md:3 gates only closure execution. Two incompatible readings therefore satisfy the baseline: either every approved write needs the controller's independent channel, or only closure-bearing batches do.
+PROPOSAL: State which action kinds need the controller and its independent operator channel. Bring lines 157 and 336 into line with the owner's recorded decision at lines 49-51 (executable closures). Scope the AC-01 plain-chat approval fallback to the action kinds that stay allowed outside a controller, and add a Test Plan case showing that plain-chat approval cannot authorize a closure.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Enforced verification and recovery; Design / Owner-approved execution; AC-04; AC-06
+EVIDENCE: The owner's boundary covers every completion and blocker state before readiness (lines 131-133, AC-04 at line 431). However, AC-04 limits its effect to "dependency readiness or executable closure". Other writes also assert completion: umbrella checklist ticks, plan-status completion sync and resolution evidence comments. Outside a controller, these run through cli.ts execute with an approval file (triage.md:249-262). execute.ts:145 accepts a checklist patch when the row is a requested index and the base body matches, with no check that the ticked sub-items have observed proof. An unconfined agent shell can write that approval file itself, which is the self-created-authority pattern from R-14, applied to non-closure writes.
+PROPOSAL: Raise this as an Open Question for the owner. Option A: completion-asserting writes (checklist ticks, completion plan-status sync, resolution comments) need the same enforced boundary and observed proof as closure. Option B: exact owner approval of a visibly unverified state is enough outside a controller. Record the chosen option in Design and add a Test Plan case for it.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Enforced verification and recovery; Test Plan / AC-06
+EVIDENCE: The owner's boundary excludes analysis from the operator channel, owner files, credentials, sockets and direct GitHub egress. Design lines 137-139 list only "access tracker credentials" for analysis. The owner-home, credential, agent-socket, host-file and egress exclusions at lines 140-142 apply only to verification checks. Line 147 relies on "failed confinement probes", but the AC-06 Test Plan (line 447) tests canaries and network only for checks ("checks cannot read owner canaries/credentials or use network"). It has no probe of the analysis side in the managed controller. Observed code: controller-clients.ts:11 launches the analysis CLI with the owner's HOME and host network, and controller.ts:423 runs it on the host, so the shipped adapters enforce only the model's reachable tool surface.
+PROPOSAL: State the analysis exclusion explicitly in Design: no owner files, credentials, agent sockets, direct GitHub egress or operator channel. Name the layer that enforces it. If that layer is the model's reachable tool surface, record the authenticated CLI's own model-provider credential as the only permitted exception. Add an AC-06 Test Plan case that runs canary, credential-helper, socket and egress probes from the analysis tool surface of the managed controller, where any failed probe blocks execution.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan / AC-06
+EVIDENCE: Design lines 137-138, 147-150 and 163-164 add several requirements with no AC-06 proof row: analysis cannot choose an index exception, a changed installed payload blocks execution, Claude requires an exclusive tool inventory, uncertain outcomes survive resume, and a fresh attempt never overwrites prior evidence. Line 447 tests "missing restricted configuration" (a Codex launch property) and a single "actual shipped managed entry", but does not require both shipped adapters. Lines 151-152 ship Codex and Claude adapters. AC-06 could therefore pass on Codex alone while the Claude adapter can still close issues.
+PROPOSAL: Add AC-06 Test Plan cases for: an analysis-supplied index exception being denied, a changed installed payload blocking execution, a Claude run with an extra tool blocking execution, an uncertain outcome kept blocked across managed resume, and a fresh attempt leaving prior artifacts intact. Require the managed-entry cases on each shipped adapter, or require that an unproven adapter reports closure as unavailable.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Enforced verification and recovery; Design / Owner-approved execution
+EVIDENCE: Design lines 160-165 allow resume only when the original batch keeps its source, repository and payload bindings under fresh observations. They forbid a second evidence comment only for resume. If the source, actor or evidence changes after the comment is posted and before the closure, resume is refused and a new batch is needed. execute.ts planBatch requires a preceding comment action for every close (R-16 F-04 at shared-triage.md:1264). So the R-16 F-04 duplicate-comment outcome survives in exactly the case where resume fails closed.
+PROPOSAL: Raise this as an Open Question for the owner. Option A: a new batch may bind a previously posted, actor-attributed evidence comment instead of posting another. Option B: a visible second comment is acceptable after evidence changes. Record the choice in Design and add a matching AC-06 Test Plan case.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks / T33, T34
+EVIDENCE: Design lines 140-142 require checks to run inside the enforced boundary without owner home or configuration, credentials, agent sockets, unrelated host files or direct network egress. At the target, verification.ts:50-60 scrubs only environment variables. It runs argv in a temporary clone with no Bubblewrap and no network namespace, so host files and network stay reachable. T33 covers only producing removal and check receipts before report generation. T34 renews proof. No unchecked task names the confinement work that a future implementation review must observe.
+PROPOSAL: Add an unchecked task, failing test first, that runs operator-selected checks inside the enforced filesystem and network boundary, with canary and egress negatives (AC-04, AC-06). Leave checked tasks unchanged.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design / Enforced verification and recovery, closing paragraph
+EVIDENCE: shared-triage.md:170-171 cites "the executed R-16 gaps in report.ts:254-281, controller.ts:403-476 and controller-operator.ts:20-28" without a commit. At target a28ebbf, report.ts:263-268 contains the T26 authentication fix, and controller.ts:403-476 now spans the T27/T31 tool and process changes. Read at the current tree, those ranges point at corrected code, not at the gaps.
+PROPOSAL: Bind these citations to R-16's reviewed commit 8f3ca635096fc663d473fe31389c77891b488dce, or cite the R-16 finding IDs instead of current line ranges.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: this review
+EVIDENCE: Isolation was procedural. Before reading the protocol, I ran one command outside the permitted set: `ls -R /tmp/shared-triage-spec-review-r17 | head -100`. It listed packet paths only and changed nothing. I then ran proof.sh once with no arguments. It returned integrity true, the frozen manifest SHA256 cc513d3fdb282ee6c9469b98f8f7c6b44cb1e9b52198e3b2acace2b0940bbe99, all four expected targets, lint result pass with no findings, and lint_exit 0. All other reads used view, grep and glob inside the packet. I made no edits and no network calls.
+PROPOSAL: Record this review's isolation as procedural, noting the single out-of-protocol listing command.
 ## Sources
 
 - [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
