@@ -34,8 +34,8 @@ runtime releases are public; fetching them does not require GitHub credentials.
 For provider setup and day-to-day use, read the
 [auth-refresh documentation](https://github.com/michielvha/auth-refresh#readme).
 Before migrating an existing setup, check the
-[acceptance results and corporate-host handoff](../specs/portable-auth-refresh.md).
-Some phone MFA and corporate-provider acceptance checks remain outstanding.
+[acceptance results and Linux-host handoff](../specs/portable-auth-refresh.md).
+Some phone MFA and live-provider acceptance checks remain outstanding.
 
 ## github-app-registration
 
