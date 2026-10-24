@@ -1,3 +1,4 @@
+import{runOwnedClient}from"./owned-process";
 // Managed triage controller. Analysis has only the declared read adapter; the
 // parent process and its input belong to the trusted operator.
 import { createHash, randomUUID } from "node:crypto";
@@ -167,8 +168,20 @@ export function boundaryCommand(options:{input:string;driver:string;bun:string;c
     "--host-net-ns",readlinkSync("/proc/self/ns/net"),"--host-mount-ns",readlinkSync("/proc/self/ns/mnt"),"--host-pid-ns",readlinkSync("/proc/self/ns/pid")];
 }
 
+const CODEX_DISABLED=["shell_tool","apps","browser_use","browser_use_external","browser_use_full_cdp_access","computer_use","multi_agent","image_generation","view_image","workspace_dependencies"];
+type ToolConfiguration={argv:string[];codex_config:string};
+function restrictedCodex(configuration:ToolConfiguration|undefined){
+  if(!configuration)return false;
+  try{
+    const config=Bun.TOML.parse(configuration.codex_config)as any,args=configuration.argv,servers=config.mcp_servers;
+    const pairs=(flag:string)=>args.flatMap((value,index)=>value===flag?[args[index+1]]:[]);
+    return Object.keys(servers??{}).join(",")==="triage"&&JSON.stringify(servers.triage.enabled_tools)==='["read","list","search","probe"]'&&
+      pairs("--sandbox").join(",")==="read-only"&&JSON.stringify(pairs("--config"))===JSON.stringify(['approval_policy="never"','web_search="disabled"'])&&
+      CODEX_DISABLED.every(feature=>pairs("--disable").includes(feature))&&!args.includes("--enable");
+  }catch{return false;}
+}
 type Trace = {kind:string;route?:string;denied?:boolean;session?:string;method?:string;target?:string;[key:string]:unknown};
-export function gradeTrial(options:{input:string;checkout:string;plugin:string;host:string;raw:string;trace:Trace[];installed:string|null;exit_code:number;kind?:"native-discovery"|"live-read-only";command?:string;commandModel?:string|null;legacy?:boolean}) {
+export function gradeTrial(options:{input:string;checkout:string;plugin:string;host:string;raw:string;trace:Trace[];installed:string|null;exit_code:number;kind?:"native-discovery"|"live-read-only";toolConfiguration?:ToolConfiguration;command?:string;commandModel?:string|null;legacy?:boolean}) {
   const failures=[...verifyInputs(options.input,{checkout:options.checkout,plugin:options.plugin}).failures];
   if(options.exit_code!==0) failures.push("native-exit");
   if(!options.legacy&&(!options.installed||pluginPayloadHash(options.installed)!==pluginPayloadHash(options.plugin))) failures.push("installed-payload");
@@ -205,7 +218,13 @@ export function gradeTrial(options:{input:string;checkout:string;plugin:string;h
   }else if(!initialized || !canonicalRead&&!nativeSkill) failures.push("native-invocation");
   if(!events.some(event=>event.type==="result"&&event.is_error===false||event.type==="turn.completed")) failures.push("native-completion");
   const toolNames=events.find(event=>event.type==="system"&&event.subtype==="init")?.tools;
-  if(options.kind!=="native-discovery"&&(!Array.isArray(toolNames)||toolNames.some(name=>!["Skill","StructuredOutput","mcp__triage__read","mcp__triage__list","mcp__triage__search","mcp__triage__probe"].includes(String(name))))) failures.push("exclusive-read-only-tools");
+  const allowedTools=["Skill","StructuredOutput","mcp__triage__read","mcp__triage__list","mcp__triage__search","mcp__triage__probe"];
+  if(options.host==="codex-cli"){
+    if(!restrictedCodex(options.toolConfiguration)||events.some(event=>{
+      const item=event.item as{type?:string;server?:string;tool?:string}|undefined;
+      return item&&(!["agent_message","reasoning","mcp_tool_call"].includes(item.type??"")||item.type==="mcp_tool_call"&&(item.server!=="triage"||!["read","list","search","probe"].includes(item.tool??"")));
+    }))failures.push("exclusive-read-only-tools");
+  }else if(!Array.isArray(toolNames)||toolNames.some(name=>!allowedTools.includes(String(name))))failures.push("exclusive-read-only-tools");
   for(const page of manifest.engineering??[]){
     const total=readFileSync(join(options.input,"engineering",page.path),"utf8").split("\n").length,covered=new Set<number>();
     for(const entry of options.trace)if(entry.kind==="read"&&entry.path===`engineering/${page.path}`&&entry.run_id===manifest.run_id){
@@ -397,13 +416,12 @@ async function runNativeTrialWithinBoundary(options:{host:"codex"|"claude";input
     writeFileSync(configPath,prior+`\n[mcp_servers.triage]\ncommand = ${json(process.execPath)}\nargs = ${json(launch)}\nrequired = true\nstartup_timeout_sec = 30\ntool_timeout_sec = 90\nenabled_tools = ["read", "list", "search", "probe"]\ndefault_tools_approval_mode = "auto"\n`);
     const schemaPath=join(options.output,"schema.json");writeFileSync(schemaPath,json(schema));
     args=["codex","exec","--json","--color","never","--sandbox","read-only","--config",'approval_policy="never"',"--config",'web_search="disabled"',
-      ...["shell_tool","apps","browser_use","browser_use_external","browser_use_full_cdp_access","computer_use","multi_agent","image_generation","view_image","workspace_dependencies"].flatMap(feature=>["--disable",feature]),
+      ...CODEX_DISABLED.flatMap(feature=>["--disable",feature]),
       "--cd",join(resolve(options.input),"source"),"--skip-git-repo-check","--output-schema",schemaPath,"--output-last-message",last,prompt];
   }
-  const started=Date.now(),child=Bun.spawn(args,{cwd:analysisCwd,env:client.env,stdout:Bun.file(raw),stderr:Bun.file(error),stdin:"ignore",detached:true});
-  let timedOut=false;
-  const timer=setTimeout(()=>{timedOut=true;try{process.kill(-child.pid,"SIGTERM");}catch{}},12*60_000);
-  const exit=await child.exited;clearTimeout(timer);
+  const toolConfiguration=options.host==="codex"?{argv:args,codex_config:readFileSync(join(client.profile,"config.toml"),"utf8")}:undefined;
+  const started=Date.now(),processResult=await runOwnedClient(args,{cwd:analysisCwd,env:client.env,stdout:raw,stderr:error});
+  const exit=processResult.exit_code,timedOut=processResult.timed_out;
   const transcript=readFileSync(raw,"utf8"),events=transcript.split("\n").flatMap(line=>{try{return[JSON.parse(line)];}catch{return[];}});
   if(options.host==="claude"){
     const result=events.findLast(event=>event.type==="result");
@@ -413,7 +431,7 @@ async function runNativeTrialWithinBoundary(options:{host:"codex"|"claude";input
     }
   }
   const traces=existsSync(trace)?readFileSync(trace,"utf8").split("\n").flatMap(line=>{try{return[JSON.parse(line)];}catch{return[];}}):[];
-  const grade=gradeTrial({command:options.command,commandModel:project?.model,legacy:options.legacy,input:options.input,checkout:options.checkout,plugin:options.plugin,host:`${options.host}-cli`,raw:transcript,trace:traces,installed:client.installed,exit_code:exit,
+  const grade=gradeTrial({command:options.command,commandModel:project?.model,legacy:options.legacy,input:options.input,checkout:options.checkout,plugin:options.plugin,host:`${options.host}-cli`,raw:transcript,trace:traces,installed:client.installed,exit_code:exit,toolConfiguration,
     kind:options.host==="codex"?"native-discovery":"live-read-only"});
   let reportPath:string|null=null,verifiedReport:import("./report").Report|null=null;
   if(existsSync(last))try{
@@ -443,7 +461,7 @@ async function runNativeTrialWithinBoundary(options:{host:"codex"|"claude";input
   if(componentAudit&&componentCommit!==git(componentAudit.repo,"rev-parse","HEAD").toString().trim()||driverHash!==digest(readFileSync(driver)))grade.failures.push("trial-driver-changed");
   grade.pass=grade.failures.length===0;
   const result={schema_version:1,host:options.host,component_commit:componentCommit,source_commit:current.source_commit,
-    plugin_hash:current.plugin_hash,driver_hash:driverHash,installed:client.installed,output:options.output,report:reportPath,project_command:project,legacy_baseline:!!options.legacy,kind:options.host==="codex"?"native-discovery":"native-read-only-boundary",duration_ms:Date.now()-started,exit_code:exit,timed_out:timedOut,grade};
+    plugin_hash:current.plugin_hash,driver_hash:driverHash,tool_configuration:toolConfiguration,installed:client.installed,output:options.output,report:reportPath,project_command:project,legacy_baseline:!!options.legacy,kind:options.host==="codex"?"native-discovery":"native-read-only-boundary",duration_ms:Date.now()-started,exit_code:exit,timed_out:timedOut,process_cleanup:processResult,grade};
   writeFileSync(join(options.output,"result.json"),json(result)+"\n");process.stdout.write(json(result)+"\n");if(!grade.pass)process.exitCode=1;
   if(options.operator&&grade.pass&&verifiedReport){
     const{operatorController}=await import("./controller-operator"),{createInterface}=await import("node:readline"),{githubExecutor}=await import("./github");

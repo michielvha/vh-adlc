@@ -198,3 +198,12 @@ test("the installed controller rejects source-tree output before any collector c
  const run=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"start","--host","codex","--repo",f.root,"--output-dir",join(f.root,"controller-output")],{env:{...process.env,HOME:f.root,PATH:join(f.root,"tools")+":/usr/bin:/bin",PROBE_CALLS:marker},timeout:3000,stdout:"pipe",stderr:"pipe"});
  expect(run.exitCode).not.toBe(0);expect(run.stderr.toString()).toContain("outside the selected checkout");expect(existsSync(marker)).toBe(false);
 });
+
+test("managed Codex analysis rejects shell, file, web and unknown items",()=>{
+ const f=setup();f.export();
+ for(const type of["command_execution","file_change","web_search","future_unknown_tool"]){
+  const raw=[{type:"thread.started"},{type:"item.completed",item:{type,command:"unapproved"}},{type:"turn.completed"}].map(event=>JSON.stringify(event)).join("\n");
+  const grade=gradeTrial({input:f.output,checkout:f.root,plugin,host:"codex-cli",raw,trace:[],installed:plugin,exit_code:0,kind:"native-discovery"});
+  expect(grade.failures).toContain("exclusive-read-only-tools");
+ }
+});
