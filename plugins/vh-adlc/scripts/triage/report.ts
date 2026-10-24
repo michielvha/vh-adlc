@@ -14,6 +14,8 @@ export type Observation = {
   number: number; state: string; remaining?: string; evidence?: Evidence[]; adversarial?: Evidence[];
   duplicate_of?: number; total_overlap?: boolean; is_index?: boolean; index_evidence?: string;
   blockers?: { issue: number; missing: boolean; evidence: Evidence[] }[]; depends_on?: number[];
+  owned_by?: string; ownership_evidence?: Evidence[];
+  estimated_size?: string;
 };
 export type Row = {
   number: number; title: string; state: State; remaining: string; ownership: "protected" | "index" | "eligible";
@@ -21,6 +23,8 @@ export type Row = {
   closure_reason: "completed" | "not_planned" | null; close_executable: boolean;
   evidence: Evidence[]; adversarial: Evidence[]; duplicate_of: number | null; depends_on: number[];
   index_requested: boolean; index_evidence: string | null; warnings: string[];
+  owned_by: string | null; ownership_evidence: Evidence[];
+  plan_paths: string[]; estimated_size: string;
 };
 type Comparison = {
   status: "first" | "comparable" | "overlap-only" | "unavailable";
@@ -98,18 +102,48 @@ function cyclesFor(rows: Row[]) {
   return cycles;
 }
 
-function readHistory(config: Settings): { reports: Report[]; unavailable: boolean } {
+type Historical = Pick<Report, "repository" | "hostname" | "run_id" | "collected_at" | "created_at" | "scope" | "mode" | "completeness"> & { rows: { number: number; state: string }[] };
+function legacyHistory(config: Settings, file: string, text: string): Historical | null {
+  const date = file.match(/^(\d{4}-\d{2}-\d{2})-issue-triage\.md$/)?.[1];
+  if (!date || !Number.isFinite(Date.parse(date))) return null;
+  let stateColumn = -1;
+  const rows = new Map<number, { number: number; state: string }>();
+  for (const line of text.split("\n")) {
+    if (!line.startsWith("|")) { stateColumn = -1; continue; }
+    const columns = line.split(/(?<!\\)\|/).slice(1,-1).map((column) => column.replace(/[*`]/g, "").trim());
+    const header = columns.findIndex((column) => /^verified state$/i.test(column));
+    if (header >= 0) { stateColumn = header; continue; }
+    if (stateColumn < 0 || !/^#?[1-9]\d*$/.test(columns[0] ?? "")) continue;
+    const number = Number(columns[0].replace(/^#/, "")), value = columns[stateColumn]?.toLowerCase();
+    const state = value?.match(/^(resolved|partial|open|blocked|obsolete|duplicate|unverified)\b/)?.[1] ?? (value === "superseded" ? "obsolete" : null);
+    if (state && !rows.has(number)) rows.set(number, { number, state });
+  }
+  if (!rows.size) return null;
+  return { repository: config.repository, hostname: config.hostname, run_id: `legacy:${file.replace(/\.md$/, "")}`,
+    collected_at: `${date}T00:00:00.000Z`, created_at: `${date}T00:00:00.000Z`, scope: "legacy:unknown-selection-and-coverage",
+    mode: /\(close mode\)|close-mode/i.test(text.slice(0,3000)) ? "close" : "sweep",
+    rows: [...rows.values()], completeness: { inventory: false, verification: false, missing: ["legacy-scope-and-coverage"] } };
+}
+function readHistory(config: Settings): { reports: Historical[]; unavailable: boolean } {
   const directory = resolveInside(config.root, config.report_dir);
   if (!existsSync(directory)) return { reports: [], unavailable: config.report_dir_configured };
-  const reports: Report[] = []; let unavailable = false;
+  const reports: Historical[] = []; let unavailable = false;
   try {
     for (const file of readdirSync(directory).sort()) {
       if (!file.endsWith(".md")) continue;
       const path = resolveInside(config.root, join(config.report_dir, file));
       if (!statSync(path).isFile()) continue;
-      const text = readFileSync(path, "utf8"), match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+      const text = readFileSync(path, "utf8");
+      const encoded = /^triage:/m.test(text), legacy = /-issue-triage\.md$/.test(file);
+      if (!encoded && !legacy && (config.report_dir_configured || /^README\.md$/i.test(file))) continue;
+      const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
       if (!match) { unavailable = true; continue; }
       const data = Bun.YAML.parse(match[1]) as { triage?: Report };
+      if (!data?.triage && legacy) {
+        const previous = legacyHistory(config, file, text);
+        if (previous) reports.push(previous); else unavailable = true;
+        continue;
+      }
       if (!data?.triage || data.triage.schema_version !== 1 || !Array.isArray(data.triage.rows) ||
           !data.triage.rows.every((row) => Number.isSafeInteger(row.number) && typeof row.state === "string") ||
           typeof data.triage.repository !== "string" || typeof data.triage.run_id !== "string" || !Number.isFinite(Date.parse(data.triage.collected_at)) ||
@@ -158,8 +192,10 @@ export function buildReport(config: Settings, inventory: Inventory, observations
   const rows: Row[] = selected.map((issue) => {
     const observation = byId.get(issue.number), evidence = observation?.evidence ?? [], adversarial = observation?.adversarial ?? [];
     const indexRole = observation?.is_index === true || /(?:^|\b)(?:umbrella|milestone (?:index|tracker)|issue index)(?:\b|$)/i.test(`${issue.title}\n${issue.body}`);
-    const owner = ownership(issue, config, indexRole), indexRequested = (options.indexRequests ?? []).includes(issue.number);
+    const ownedBy = typeof observation?.owned_by === "string" && observation.owned_by.trim() ? observation.owned_by : null;
+    const owner = ownedBy ? "protected" : ownership(issue, config, indexRole), indexRequested = (options.indexRequests ?? []).includes(issue.number);
     const warnings: string[] = [];
+    if (ownedBy && !verified(config, inventory, observation?.ownership_evidence ?? [])) warnings.push("Other-workstream ownership needs canonical evidence; conservatively excluded pending verification.");
     let state: State = observation && ["resolved", "partial", "open", "blocked", "obsolete", "duplicate", "unverified"].includes(observation.state) ? observation.state as State : "unverified";
     const evidenceOK = verified(config, inventory, evidence), secondOK = verified(config, inventory, adversarial);
     if (!evidenceOK && state !== "unverified") { warnings.push("Verification evidence is absent or invalid."); state = "unverified"; }
@@ -187,7 +223,10 @@ export function buildReport(config: Settings, inventory: Inventory, observations
     return { number: issue.number, title: issue.title, state, remaining: observation?.remaining ?? "", ownership: owner, disposition,
       closure_reason: closure, close_executable: !!closure && allowed && issue.state === "open",
       evidence, adversarial, duplicate_of: observation?.duplicate_of ?? null, depends_on: [...new Set([...(observation?.depends_on ?? []), ...blockers.filter((blocker) => blocker.missing).map((blocker) => blocker.issue)])],
-      index_requested: indexRequested, index_evidence: indexRole ? observation?.index_evidence ?? "Observed index/umbrella role" : owner === "index" ? "Configured index rule" : null, warnings };
+      index_requested: indexRequested, index_evidence: indexRole ? observation?.index_evidence ?? "Observed index/umbrella role" : owner === "index" ? "Configured index rule" : null,
+      owned_by: ownedBy, ownership_evidence: observation?.ownership_evidence ?? [],
+      plan_paths: inventory.plans.filter((plan) => plan.issue === issue.number).map((plan) => plan.path),
+      estimated_size: typeof observation?.estimated_size === "string" ? observation.estimated_size : "unknown", warnings };
   });
   const cycles = cyclesFor(rows), cycleIds = new Set(cycles.flat()), unresolved = new Set<number>();
   for (const row of rows) for (const id of row.depends_on) {
@@ -207,12 +246,18 @@ export function buildReport(config: Settings, inventory: Inventory, observations
   const score = (row: Row) => {
     const issue = selected.find((issue) => issue.number === row.number)!;
     const priority = inventory.plans.find((plan) => plan.issue === row.number)?.priority ?? issue.labels.find((label) => config.priority_order.includes(label)) ?? null;
+    const planned = inventory.plans.some((plan) => plan.issue === row.number && ["planned", "in-progress"].includes(plan.status ?? ""));
+    const unblocks = rows.filter((other) => other.depends_on.includes(row.number)).length;
     return { milestone: issue.milestone && config.milestone_order.includes(issue.milestone) ? config.milestone_order.indexOf(issue.milestone) : config.milestone_order.length,
       priority: priority && config.priority_order.includes(priority) ? config.priority_order.indexOf(priority) : config.priority_order.length,
-      reasons: [`Milestone: ${issue.milestone ?? "unknown"}`, `Priority: ${priority ?? "unknown"}`, "Verified readiness; numeric issue ID breaks remaining ties"] };
+      unblocks, planned: Number(planned), partial: Number(row.state === "partial"),
+      reasons: [`Milestone: ${issue.milestone ?? "unknown"}`, `Priority: ${priority ?? "unknown"}`, `Prerequisite for ${unblocks} observed issues`,
+        planned ? "Existing planned/in-progress plan; verify design before implementation" : "No ready plan metadata; plan remaining work first",
+        row.state === "partial" ? "Verified partial work with explicit remaining scope" : "No partial-scope preference", "Numeric issue ID breaks remaining ties"] };
   };
   const ranked = ["sweep", "next"].includes(inventory.mode) ? rows.filter((row) => row.disposition === "ready")
-    .sort((a,b) => score(a).milestone - score(b).milestone || score(a).priority - score(b).priority || a.number - b.number)
+    .sort((a,b) => score(a).milestone - score(b).milestone || score(a).priority - score(b).priority || score(b).unblocks - score(a).unblocks ||
+      score(b).planned - score(a).planned || score(b).partial - score(a).partial || a.number - b.number)
     .map((row) => ({ number: row.number, reasons: score(row).reasons })) : [];
   const report: Report = {
     schema_version: 1, run_id: runId, repository: inventory.repository, hostname: inventory.hostname, source_commit: inventory.source_commit,
@@ -243,10 +288,10 @@ export function saveReport(config: Settings, report: Report, options: { output?:
   const lines = ["---", `triage: ${JSON.stringify(report)}`, "---", "", `# Triage: ${report.repository}`, "",
     `Run: ${report.run_id}. Source: ${report.source_commit}. Mode: ${report.mode}.`, "", report.counts.qualifier + ".",
     `Observed open: ${report.counts.observed_open}; reviewed: ${report.counts.reviewed}; closure candidates: ${report.counts.closure_candidates}; blocked: ${report.counts.blocked}; without plans: ${report.counts.without_plans ?? "unavailable"}.`, "",
-    "| Issue | State | Disposition | Remaining scope |", "| --- | --- | --- | --- |",
-    ...report.rows.map((row) => `| #${row.number} ${cell(row.title)} | ${row.state} | ${row.disposition} | ${cell(row.remaining)} |`), "",
-    "## Evidence", "", ...report.rows.flatMap((row) => [`### #${row.number}`, "", `Ownership: ${row.ownership}; index request: ${row.index_requested}; closure executable: ${row.close_executable}; reason: ${row.closure_reason ?? "none"}.`, "",
-      ...[...row.evidence.map((value) => ({ pass: "Verification", value })), ...row.adversarial.map((value) => ({ pass: "Adversarial", value }))].map(({ pass, value }) => `- ${pass}: ${cell(JSON.stringify(value))}`), ...row.warnings.map((warning) => `- ${warning}`), ""]),
+    "| Issue | State | Disposition | Remaining scope | Plan | Estimated size |", "| --- | --- | --- | --- | --- | --- |",
+    ...report.rows.map((row) => `| #${row.number} ${cell(row.title)} | ${row.state} | ${row.disposition} | ${cell(row.remaining)} | ${cell(row.plan_paths.join(", ") || "No plan; plan remaining work first")} | ${cell(row.estimated_size)} |`), "",
+    "## Evidence", "", ...report.rows.flatMap((row) => [`### #${row.number}`, "", `Ownership: ${row.ownership}; workstream: ${cell(row.owned_by ?? "none")}; index request: ${row.index_requested}; closure executable: ${row.close_executable}; reason: ${row.closure_reason ?? "none"}.`, "",
+      ...[...row.ownership_evidence.map((value) => ({ pass: "Ownership", value })), ...row.evidence.map((value) => ({ pass: "Verification", value })), ...row.adversarial.map((value) => ({ pass: "Adversarial", value }))].map(({ pass, value }) => `- ${pass}: ${cell(JSON.stringify(value))}`), ...row.warnings.map((warning) => `- ${warning}`), ""]),
     "## Ranking and blockers", "", ...report.ranked.map((row,index) => `${index+1}. #${row.number}: ${row.reasons.join("; ")}`), "", `Graph: ${JSON.stringify(report.graph)}`, "",
     "## Coverage and plan drift", "", `Completeness: ${JSON.stringify(report.completeness)}`, "", ...report.coverage.map((entry) => `- ${cell(JSON.stringify(entry))}`), "", `Plan drift: ${JSON.stringify(report.drift)}`, "",
     "## Previous run", "", report.comparison.status === "first" ? "No previous report exists in the configured history source." : JSON.stringify(report.comparison), "",

@@ -104,7 +104,10 @@ never the `completed` reason. Recheck every closure against the strongest contra
 
 Use `blockers: [{issue, missing, evidence}]` for verified predicates and `depends_on: [ids]` for
 prerequisites. Record `is_index: true` and concrete `index_evidence` for semantic umbrellas. Keep
-hard-protected, bot-owned and other-workstream issues visible but outside proposals. An index needs
+hard-protected, bot-owned and other-workstream issues visible but outside proposals. For other-owned
+work, record `owned_by` and canonical `ownership_evidence` from its ledger or project instructions;
+that exclusion never receives an index exception. Record an honest `estimated_size` when feasible,
+otherwise leave size unknown. An index needs
 a current explicit owner request before its checklist or closure can be proposed; even all children
 being shipped is insufficient. Only that request may supply `--index-requests 12,34`. It is separate
 from approval of the resulting exact batch. Hard ownership exclusions never get this exception.
@@ -131,6 +134,10 @@ Select the latest same repository/mode/declared scope, otherwise compare only co
 Incomplete/different/unknown scope cannot imply additions or removals. Malformed/unreadable or an
 explicitly configured missing history source is unavailable, never a first run. An absent implicit
 default directory, or an existing readable empty history directory, establishes the first run.
+Measured legacy dated issue-triage tables may supply historical observed states; their selection
+and pagination coverage remain unknown. Compare only shared observed IDs, never infer removals or
+use an old state as present-day closure proof. Unrelated snapshots in a shared status directory
+are not triage history.
 
 Any incomplete required collection or verification input blocks every closure in that report.
 Readiness ranking belongs only to sweep/next. Blocked/cyclic work is never ready; prerequisites
