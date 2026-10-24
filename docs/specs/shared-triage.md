@@ -659,6 +659,7 @@ changed context needs a new approved explanation while unchanged-batch resume do
 | 2026-10-24 | R-17 | spec | `a28ebbf4d6f1796434bca1407542aedf255f5908` | claude-opus-5.5 | procedural | Eight findings: clarify completion-write authority, analysis confinement, per-adapter proof and changed-evidence comments; one listing command exceeded the review tool procedure. |
 | 2026-10-24 | R-18 | spec | `f279246902847ba0fafccef7a5c61d735701ac6d` | claude-opus-5.5 | procedural | Six findings: verified-state write coverage, criterion end states and guide/task alignment; unread tool-runtime overflow file retained. |
 | 2026-10-24 | R-19 | spec | `781a009cde5d573651958c05871ba46999bb4cc6` | claude-opus-5.5 | procedural | Two factual findings: use one assertion term across gates and name its full scope in migration parity. |
+| 2026-10-24 | R-20 | spec | `cb9208adec2f1b4143eefa49ebaefb0fa5d3e1f4` | claude-opus-5.5 | procedural | Four findings: correct attribution, decide non-closure obsolete/duplicate scope and cover authority/routing edits; intact response recovered from durable session after stdout truncation. |
 
 ### R-1
 
@@ -1494,6 +1495,32 @@ SEVERITY: nit
 WHERE: Design / Stackweaver migration and rollback step 3; Test Plan / AC-07
 EVIDENCE: docs/specs/shared-triage.md:387-391 describes the eighth intentional difference `enforced-controller-execution` only as "approved closures and completion assertions". The frozen legacy playbook applies `ready` and `partial` labels. It also posts triage comments that state the verified state and the shipped scope (tests/vh-adlc/triage/fixtures/legacy/agents/issue-triage.md:164-166, :217-220, :224). Under the draft's candidate A (:154-157), those writes now also need the controller. The parity result "must name these differences" (:393), but the recorded difference does not cover readiness, partial-shipment or blocker-clearing writes. T30 (:595) updates guides for these writes, but the normative difference text and the AC-07 proof (:503) do not.
 PROPOSAL: Extend the eighth difference at :387-391 and the AC-07 proof to name ready/partial labels, blocked-label removal and comments that state the verified state or shipped phases. Have T30's manifest change record that scope.
+### R-20
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design / Enforced verification and recovery; Tasks / T36
+EVIDENCE: docs/specs/shared-triage.md:195-199 says "For every batch containing an executable closure or write asserting verified state, the operator presents and approves the exact batch ... This is the owner's explicit 2026-10-24 decision for R-17 F-02." It then lists "partial-shipment comments, readiness labels and blocker-clearing writes" with the completion writes. T36 (:601) says to "enforce the owner's R-17 F-02 rule for each asserted verified predicate". Both passages say the owner's resolved R-17 F-02 decision already covers readiness, partial-shipment and cleared-blocker writes. The document itself says otherwise. Q6 (:622-631) is still OPEN, and "R-18 F-01 distinguishes these writes from the examples in the earlier completion-write decision". Context (:66-70) also keeps that scope as an open choice. R-17 F-02 (:1396) named only checklist ticks, completion plan-status sync and resolution comments. In its current form, the draft attributes the answer to Q6 to an earlier owner decision.
+PROPOSAL: At :197 and in T36, say that the owner's R-17 F-02 decision covers completion assertions (checklist ticks, completion plan-status sync and resolution comments). Say that applying the same rule to partial-shipment, readiness and cleared-blocker writes is candidate A and awaits Q6. Keep the normative requirement as written.
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Enforced verification and recovery (definition of a write asserting verified state); Acceptance Criteria / AC-06; Test Plan / AC-06
+EVIDENCE: docs/specs/shared-triage.md:151-154 limits a write asserting verified state to "completion, partial shipped scope, readiness or a cleared blocker". :160-161 requires authenticated "resolved, obsolete and duplicate states", and :288-291 requires verified removal, supersession or total overlap for obsolete and duplicate. Under :200-204, a write that the helper can show asserts none of the four predicates may use exact plain-chat approval outside the controller. The frozen legacy playbook offers `obsolete` and `duplicate of #N` dispositions (tests/vh-adlc/triage/fixtures/legacy/agents/issue-triage.md:153-154). It posts one triage comment per issue stating the "verified state" (:217-218) and applies existing labels, including the GitHub defaults (:157-158). A standalone comment or `duplicate` label that presents a forged or attested obsolete or duplicate verdict as established, without closing the issue, is therefore permitted outside the boundary. That is the same published-attestation problem that the boundary addresses. This question is new and separate from Q6, which covers only readiness, partial-shipment and cleared-blocker assertions (:622-624). It does not reopen the resolved completion-write or changed-context decisions.
+PROPOSAL: Add a new Open Question, separate from Q6. Option A: obsolete or duplicate verdicts published without closure (comments or `duplicate` labels) are writes asserting verified state and need current enforced proof. Option B: they may use exact plain-chat approval only when visibly marked as unverified. Fold the answer into the definition at :151-154, AC-06, the AC-06 Test Plan case and, if A is chosen, the eighth migration difference.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks / T30, T36; Design / Canonical workflow and harness boundary
+EVIDENCE: Design :125-128 requires aligning `references/authority.md` and the lifecycle live-operation row, with "Authorization remains subject to the enforced boundary below". plugins/vh-adlc/references/authority.md:18 and :37-42 and references/lifecycle.md:50 and :78-79 describe exact batch approval with no controller requirement. SKILL.md:12 has every host read authority.md. The Stackweaver harness-neutral entry at the selected migration commit (stackweaver/agents/issue-triage.md:14 and :19) gates only "Closure execution", which suggests that other writes asserting verified state need no controller. T30 (:597) names only the Stackweaver `tests/agent-triage/README.md` and the shared boundary, installation, compatibility and workflow guides. T36 (:601) names only `references/triage.md`. No unchecked task updates authority.md, lifecycle.md or Stackweaver `agents/issue-triage.md`.
+PROPOSAL: Add `plugins/vh-adlc/references/authority.md`, `references/lifecycle.md` and Stackweaver `agents/issue-triage.md` to T30 or T36. Their done condition should be that the files state the controller requirement for executable closure and every write asserting verified state.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: this review
+EVIDENCE: Isolation was procedural. I inspected targets.json, source-manifest.json (by size check only, because it was too large to view), proof.py, proof.sh and proof-hashes.json. I then ran /tmp/shared-triage-spec-review-r20/proof.sh once with no arguments. It returned integrity true, the four expected targets and proof_manifest_sha256 a235ac1268bd36592e10b91658e0015d9c4a39d8a493935a9b19c08cdc52abd9. Lint passed with no findings, lint_exit was 0, and review check returned equal true for R-14 through R-19. Every other read used view, grep and glob inside the packet. One grep result was too large, and the tool runtime saved it automatically outside the packet at /tmp/copilot-tool-output-1792873409512-kvqhqw.txt. I did not read that file. I made no edits, network calls or other commands.
+PROPOSAL: Record isolation as procedural and note the unread overflow file that the tool runtime saved.
 ## Sources
 
 - [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
