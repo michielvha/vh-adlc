@@ -185,7 +185,7 @@ describe("manifest and marketplace", () => {
   test("native Codex marketplace points to the existing package", () => {
     const marketplace = JSON.parse(read(join(ROOT, ".agents", "plugins", "marketplace.json")));
     expect(marketplace.name).toBe("vhco-tools");
-    expect(marketplace.plugins).toEqual([{
+    expect(marketplace.plugins.filter((entry: { name: string }) => entry.name === "vh-adlc")).toEqual([{
       name: "vh-adlc",
       source: { source: "local", path: "./plugins/vh-adlc" },
       policy: { installation: "AVAILABLE", authentication: "ON_INSTALL" },

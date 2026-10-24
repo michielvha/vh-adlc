@@ -1,6 +1,8 @@
 {
   "name": "vhco-tools",
-  "owner": { "name": "Michiel VH" },
+  "owner": {
+    "name": "Michiel VH"
+  },
   "plugins": [
     {
       "name": "github-app-registration",
@@ -11,6 +13,15 @@
       "name": "vh-adlc",
       "source": "./plugins/vh-adlc",
       "description": "Explicit software lifecycle intake and bounded maintenance, with deterministic gates for the feature loop."
+    },
+    {
+      "name": "auth-refresh",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/michielvha/auth-refresh.git",
+        "sha": "3695e2c73df68d1b3bad8e21dbb204e431adcd3d"
+      },
+      "description": "Check and restore local SSO identities with isolated account lanes and Claude phone notifications."
     }
   ]
 }
