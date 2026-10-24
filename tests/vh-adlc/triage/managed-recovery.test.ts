@@ -1,0 +1,51 @@
+import{test,expect}from"bun:test";
+import{mkdirSync,mkdtempSync,rmSync,readFileSync,writeFileSync,chmodSync}from"node:fs";
+import{tmpdir}from"node:os";
+import{join,resolve}from"node:path";
+import{fixture,git}from"./fixtures";
+import{loadSettings}from"../../../plugins/vh-adlc/scripts/triage/settings";
+import{inspectSources,withVerificationBoundary}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{buildReport}from"../../../plugins/vh-adlc/scripts/triage/report";
+import{operatorController}from"../../../plugins/vh-adlc/scripts/triage/controller-operator";
+import{MutationFailure}from"../../../plugins/vh-adlc/scripts/triage/execute";
+import{exportInputs}from"./native";
+
+test("the shipped managed entry resumes the original journal with fresh reads and one comment total",async()=>{
+ const f=fixture(),control=mkdtempSync(join(tmpdir(),"triage-managed-recovery-"));try{
+  f.settings({schema_version:1,source_roots:["src"]});
+  const config=loadSettings(f.root),now=new Date().toISOString(),issue:any={number:1,title:"Answer export",body:"Export answer",state:"open",author:"owner",labels:[],milestone:null,created_at:now,updated_at:now,comments:[]};
+  const inventory:any={schema_version:1,repository:config.repository,hostname:config.hostname,source_commit:git(f.root,"rev-parse","HEAD"),mode:"ids",requested_ids:[1],collected_at:now,actor:"operator",issues:[structuredClone(issue)],closed_issues:[],pulls:[],plans:[],plan_metadata:"not-configured",labels:[],coverage:["identity","labels","issues","pulls","plans","comments:1"].map(collection=>({collection,scope:collection==="issues"?"all-states":collection==="pulls"?"all-closed-pulls":"fixture",pages:1,complete:true}))};
+  const input=join(control,"input"),analysis=join(control,"analysis"),database=join(control,"api.json"),tools=join(control,"tools"),plugin=resolve(import.meta.dir,"../../../plugins/vh-adlc");mkdirSync(analysis,{recursive:true});mkdirSync(tools);
+  writeFileSync(join(control,"snapshot.json"),JSON.stringify(inventory));exportInputs({checkout:f.root,plugin,snapshot:join(control,"snapshot.json"),output:input});
+  process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE=join(analysis,"verification-cache");
+  const responses:any[]=[];let batch:any;
+  await withVerificationBoundary(async()=>{
+   const proof=(pass:"primary"|"adversarial")=>{const receipt=inspectSources(config,["src/app.ts"],pass).receipt;return[{kind:"source",path:"src/app.ts",line:1,detail:"Actual export",verified:true,receipt},{kind:"wiring",path:"src/app.ts",line:1,detail:"Public module export",verified:true,receipt}];};
+   const report=buildReport(config,inventory,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")}]);
+   const adapter:any={identity:async()=>"operator",labels:async()=>[],issue:async()=>structuredClone(issue),receipt:async()=>null,mutate:async(action:any)=>{if(action.kind==="close")throw new MutationFailure(false);issue.comments.push({id:1,author:"operator",body:action.body,created_at:now});return{issue:structuredClone(issue)};}};
+   async function* requests(){yield JSON.stringify({id:1,method:"batch",params:{actions:[{id:"explain",kind:"comment",issue:1,body:"Observed the actual public export."},{id:"close",kind:"close",issue:1,reason:"completed",duplicate_of:null,comment:"explain"}]}});batch=responses.at(-1).result;yield JSON.stringify({id:2,method:"execute",params:{approval:{batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Approve this exact fixture batch"}}});}
+   await operatorController({config,inventory,report,output:analysis,input:requests(),adapter,write:line=>responses.push(JSON.parse(line))});
+  });
+  expect(responses.at(-1).result.completed).toEqual(["explain"]);expect(issue.comments.length).toBe(1);
+  writeFileSync(join(analysis,"controller-state.json"),JSON.stringify({schema_version:1,checkout:f.root,plugin,input,verification:{},indexRequests:[]}));
+  writeFileSync(database,JSON.stringify({issue,trace:[]}));
+  writeFileSync(join(tools,"gh"),`#!/usr/bin/env bun
+import{readFileSync,writeFileSync}from"node:fs";
+const path=process.env.TRIAGE_RECOVERY_API,data=JSON.parse(readFileSync(path,"utf8")),args=process.argv.slice(2),method=args[args.indexOf("--method")+1],endpoint=args.find(x=>x==="user"||x.startsWith("repos/")),route=endpoint?.split("?")[0];data.trace.push({method,route});
+const issue=()=>({...data.issue,user:{login:data.issue.author},labels:[],milestone:null});let result;
+if(args.includes("--jq")){writeFileSync(path,JSON.stringify(data));console.log("42");process.exit(0);}
+if(route==="user"&&method==="GET")result={login:"operator"};
+else if(route?.endsWith("/comments")&&method==="GET")result=data.issue.comments.map(c=>({...c,user:{login:c.author}}));
+else if(route?.endsWith("/events")&&method==="GET")result=[];
+else if(route?.endsWith("/issues/1")&&method==="GET")result=issue();
+else if(route?.endsWith("/issues/1")&&method==="PATCH"){const payload=JSON.parse(await Bun.stdin.text());if(payload.state!=="closed")throw Error("Denied");data.issue.state="closed";result=issue();}
+else throw Error("Unapproved route");writeFileSync(path,JSON.stringify(data));console.log("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(result));
+`);chmodSync(join(tools,"gh"),0o700);
+  const approval=JSON.stringify({batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Resume this exact approved fixture batch"}),attempt=join(control,"attempt");
+  const run=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"resume","--run-dir",analysis,"--batch-hash",batch.hash,"--output-dir",attempt],{env:{...process.env,PATH:tools+":"+process.env.PATH,TRIAGE_RECOVERY_API:database},stdin:Buffer.from(approval+"\n"),stdout:"pipe",stderr:"pipe",timeout:15_000});
+  expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});
+  const result=JSON.parse(run.stdout.toString());expect(result.completed).toEqual(["explain","close"]);
+  const state=JSON.parse(readFileSync(database,"utf8"));expect(state.issue.comments.length).toBe(1);expect(state.issue.state).toBe("closed");expect(state.trace.filter((event:any)=>event.method!=="GET")).toEqual([{method:"PATCH",route:"repos/example/project/issues/1"}]);
+  expect(JSON.parse(readFileSync(join(attempt,"result.json"),"utf8")).completed).toEqual(["explain","close"]);
+ }finally{f.dispose();rmSync(control,{recursive:true,force:true});}
+});

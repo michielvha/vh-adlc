@@ -1,4 +1,4 @@
-import{existsSync}from"node:fs";
+import{existsSync,readFileSync,writeFileSync}from"node:fs";
 import{join}from"node:path";
 import{executeBatch,planBatch}from"./execute";
 import type{Adapter,Approval,Batch}from"./execute";
@@ -16,7 +16,9 @@ export async function operatorController(options:{config:Settings;inventory:Inve
   try{
    const request=JSON.parse(line),args=request.params??{};id=request.id;let result:unknown;
    if(request.method==="batch"){
-    const batch=planBatch(config,inventory,report,args.actions);batches.set(batch.hash,batch);result=batch;
+    const batch=planBatch(config,inventory,report,args.actions);const path=join(options.output,`batch-${batch.hash}.json`),bytes=JSON.stringify(batch);
+    if(existsSync(path)){if(readFileSync(path,"utf8")!==bytes)throw Error("prior batch artifact differs");}else writeFileSync(path,bytes,{flag:"wx",mode:0o600});
+    batches.set(batch.hash,batch);result=batch;
    }else if(request.method==="execute"||request.method==="resume"){
     const approval=args.approval as Approval,batch=request.method==="resume"?args.batch as Batch:batches.get(approval?.batch_hash);
     if(!batch||!/^[a-f0-9]{64}$/.test(approval?.batch_hash??""))throw Error("unowned batch");

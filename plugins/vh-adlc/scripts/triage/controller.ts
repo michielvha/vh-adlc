@@ -1,3 +1,4 @@
+import{resumeController}from"./controller-recovery";
 import{prepareVerification,type VerificationSelection}from"./controller-preparation";
 export{prepareVerification}from"./controller-preparation";
 import{runOwnedClient}from"./owned-process";
@@ -477,6 +478,7 @@ async function runNativeTrialWithinBoundary(options:{host:"codex"|"claude";input
   writeFileSync(join(options.output,"result.json"),json(result)+"\n");process.stdout.write(json(result)+"\n");if(!grade.pass)process.exitCode=1;
   if(options.operator&&grade.pass&&verifiedReport){
     const{operatorController}=await import("./controller-operator"),{createInterface}=await import("node:readline"),{githubExecutor}=await import("./github");
+    writeFileSync(join(options.output,"controller-state.json"),json({schema_version:1,checkout:resolve(options.checkout),plugin:resolve(options.plugin),input:resolve(options.input),verification:options.verification??{},indexRequests:options.indexRequests??[]}),{flag:"wx",mode:0o600});
     await operatorController({config:loadSettings(options.checkout),inventory:JSON.parse(readFileSync(join(options.input,"snapshot.json"),"utf8")),report:verifiedReport,output:options.output,input:createInterface({input:process.stdin,crlfDelay:Infinity}),adapter:githubExecutor(loadSettings(options.checkout)),write:line=>process.stdout.write(line+"\n")});
   }
 }
@@ -486,6 +488,14 @@ export async function controllerMain(audit?:ComponentAudit) {
   const command=process.argv[2];
   if(command==="capabilities"){
     process.stdout.write(json({protocol_version:1,host_adapters:["codex","claude"],analysis_writes:false,operator_approval_required:true,platform:process.platform,execution_lock_available:!!Bun.which("flock"),isolated_read_adapter_available:process.platform==="linux"&&!!Bun.which("bwrap")})+"\n");return;
+  }
+  if(command==="resume"){
+    const allowed=new Set(["--run-dir","--batch-hash","--output-dir"]),seen=new Set<string>();
+    for(let at=3;at<process.argv.length;at+=2){const key=process.argv[at];if(!allowed.has(key)||seen.has(key)||!process.argv[at+1]||process.argv[at+1].startsWith("--"))throw Error("invalid managed resume argument");seen.add(key);}
+    const run=flag("--run-dir"),hash=flag("--batch-hash"),output=flag("--output-dir");if(!run||!hash||!output)throw Error("resume requires original run, batch and fresh attempt output");
+    if(process.platform!=="linux"||!Bun.which("bwrap")||!Bun.which("flock"))throw Error("enforced controller unavailable");
+    const approval=JSON.parse(await Bun.stdin.text());
+    const result=await resumeController(resolve(run),hash,resolve(output),approval,verifyInputs,resolve(import.meta.dir,"../.."));process.stdout.write(json(result)+"\n");if(result.blocked.length||result.failed.length)process.exitCode=1;return;
   }
   if(command==="start"){
     const allowed=new Set(["--host","--repo","--mode","--ids","--output-dir","--command","--index-requests","--checks","--removals"]),seen=new Set<string>();
