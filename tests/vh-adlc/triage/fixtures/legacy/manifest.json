@@ -13,5 +13,11 @@
     "all-modes-save-report",
     "report-commit-opt-in",
     "scope-safe-history"
-  ]
+  ],
+  "history": {
+    "docs/internal/status/2026-09-26-issue-triage.md": {
+      "fixture": "status/2026-09-26-issue-triage.md",
+      "sha256": "c71d60d547a661a442242b8eb22bfafef893ff7ab3f4d5bc166ca645f0029b6c"
+    }
+  }
 }

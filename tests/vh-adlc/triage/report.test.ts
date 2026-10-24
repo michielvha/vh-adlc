@@ -222,3 +222,41 @@ test("the latest same-scope history is selected by run time rather than alphabet
   saveReport(f.config, buildReport(f.config, f.inventory, [f.open(1)], { runId: "a-second" }));
   expect(buildReport(f.config, f.inventory, [f.open(1)]).comparison.previous_run_id).toBe("a-second");
 });
+
+test("mixed status history reads a measured legacy triage table with explicitly unknown scope", () => {
+  const f = setup([50,68]);
+  f.settings({schema_version:1,source_roots:["src"],report_dir:"status"});
+  const config = loadSettings(f.root);
+  f.write("status/README.md","# Historical status index\n");
+  f.write("status/other-status.md","---\ndescription: Unrelated status snapshot\n---\n\n# Other work\n");
+  f.write("status/2026-09-26-issue-triage.md",readFileSync(join(import.meta.dir,"fixtures/legacy/status/2026-09-26-issue-triage.md"),"utf8"));
+  const report = buildReport(config,f.inventory,[f.resolved(50),f.open(68)]);
+  expect(report.comparison.status).toBe("overlap-only");
+  expect(report.comparison.previous_run_id).toContain("2026-09-26-issue-triage");
+  expect(report.comparison.previous_scope).toContain("unknown");
+  expect(report.comparison.changed).toContain(50); expect(report.comparison.changed).toContain(68);
+  expect(report.comparison.added).toEqual([]); expect(report.comparison.removed).toEqual([]);
+  expect(report.comparison.not_compared).toContain(63);
+});
+
+test("other-workstream ownership is visible and never gets an umbrella action exception", () => {
+  const f = setup([1]);
+  f.write("src/audit.ts", "// Finding AUD-1 and its remediation belong to the audit workflow.\n");
+  git(f.root,"add","src/audit.ts");git(f.root,"commit","-qm","test: seed ownership ledger");
+  f.inventory.source_commit=git(f.root,"rev-parse","HEAD");
+  const observation={...f.resolved(1),owned_by:"codebase-audit",ownership_evidence:[{kind:"source",path:"src/audit.ts",line:1,detail:git(f.root,"show","HEAD:src/audit.ts"),verified:true}],is_index:true};
+  const row=buildReport(f.config,f.inventory,[observation],{indexRequests:[1]}).rows[0];
+  expect(row.ownership).toBe("protected");expect(row.owned_by).toBe("codebase-audit");
+  expect(row.disposition).toBe("excluded");expect(row.close_executable).toBe(false);
+});
+
+test("readiness ranking retains prerequisite, designed-plan and partial-scope tie-breaks", () => {
+  const f = setup([1,2,3,4,5]);
+  f.inventory.plan_metadata="available";
+  for(const number of [2,3]) f.inventory.plans.push({path:`plans/${number}.md`,issue:number,issue_ref:String(number),status:"planned",status_description:"Designed remaining work",priority:null});
+  const observations=[f.open(1),f.open(2),{...f.open(3),state:"partial",remaining:"Only the final wiring slice remains"},f.open(4),{...f.open(5),state:"blocked",depends_on:[4],blockers:[{issue:4,missing:true,evidence:[f.search()]}]}];
+  const report=buildReport(f.config,f.inventory,observations);
+  expect(report.ranked.map(row=>row.number)).toEqual([4,3,2,1]);
+  expect(report.ranked.find(row=>row.number===2)!.reasons.join(" ")).toContain("plan");
+  expect(report.ranked.find(row=>row.number===3)!.reasons.join(" ")).toContain("partial");
+});
