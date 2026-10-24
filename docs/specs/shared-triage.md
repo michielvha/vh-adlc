@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Review clarifications now cover report-scope comparisons, conservative defaults and attributed read-only trials."
+status_description: "R-7 corrections preserve index protection and mode behavior and make the read-only trial confinement explicit."
 issue: null
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
@@ -111,7 +111,8 @@ state their runtime requirements; never rely on an untracked personal script.
 
 Settings describe the repository identity, canonical source roots and generated mirrors, plan roots
 and frontmatter field mapping, report directory, protected issue/tracker IDs, bot/workstream ownership,
-existing label mappings, milestone/priority order and stale-age threshold. They are data, not arbitrary
+existing label mappings, milestone/priority order and stale-age threshold. Protected-index rules may
+use declared labels or literal title prefixes in addition to IDs; never require an exhaustive ID list. They are data, not arbitrary
 shell programs. Existing repository instructions remain authoritative for verification commands and
 public interfaces. A repo without settings can use documented conservative defaults: no project-specific
 milestone preference or guessed tracker IDs; report absent plan metadata instead of claiming no backlog.
@@ -151,7 +152,11 @@ prior reports establishes the first run. The trial uses this override and verifi
 2. Keep bot-owned, protected umbrella and other-workstream issues visible in an excluded/owned section,
    outside automatic action proposals. An explicit owner request may surface an umbrella checklist
    update or closure proposal; its protected status remains visible and fresh batch approval is required.
-   This exception does not authorize actions on bot-owned or other-workstream issues.
+   This exception does not authorize actions on bot-owned or other-workstream issues. Inspect the
+   issue's role as well as configured IDs: milestone indexes and umbrella trackers remain protected
+   even when newly created or unlisted, and even without settings. All sub-items being shipped is
+   never enough to propose closing the index itself. Record the index-role evidence and require the
+   existing current owner request/approval exception before an index closure proposal.
    A merged `Refs` PR and a plan marked complete are leads, not
    closure proof. Recheck named blockers against current state; a closed prerequisite does not itself
    prove the dependent work complete. Detect dependency cycles and unresolved dependencies explicitly.
@@ -183,7 +188,8 @@ prior reports establishes the first run. The trial uses this override and verifi
    only to the report and the indexes they require, without changing documentation workflows.
 
 Preserve sweep, next, close, stale and explicit-issue modes. `next` verifies the shortlist rather than
-claiming full backlog verification. `close` proposes closures without executing them. Age alone is never
+claiming full backlog verification. `close` proposes closures without executing or ranking them. Only sweep and next produce a ranked
+shortlist; stale and explicit-ID runs verify their selected issues without readiness ranking. Age alone is never
 a closure reason. Default stale age is 90 days unless configured otherwise. Targeted reports name their
 subset and do not mark unrelated issues reviewed.
 
@@ -241,7 +247,8 @@ remaining operations. No push, merge, release or implementation follows merely f
 3. **Prove parity before routing:** use frozen, sanitized issue/PR/plan snapshots for the legacy and
    shared workflow. Cover partial `Refs` work, a false complete plan, a closed blocker, protected work,
    a duplicate and reverse drift. Include protected umbrellas both without an owner request and with an
-   explicit checklist/closure request. Compare scope, evidence, exclusions, ranking, report counts/diffs
+   explicit checklist/closure request, plus a newly opened unlisted umbrella whose sub-items all
+   shipped. Compare scope, evidence, exclusions, mode-appropriate ranking, report counts/diffs
    and proposed actions, including new-label descriptions/colors, missing-issue URL backfill and
    resulting plan-commit subject/path set. Verify retained plan commits separately from the report
    commit-on-request difference.
@@ -271,7 +278,15 @@ remaining operations. No push, merge, release or implementation follows merely f
    writes or report commits occur during the live trial. Use a write-denying, recording GitHub
    adapter for the entire trial; its trace must show only reads, and any attempted mutation fails the
    trial. Whole-tracker before/after snapshots are supporting context, not an equality gate: attribute
-   concurrent owner/bot changes separately and do not count them as trial actions. The checkout,
+   concurrent owner/bot changes separately and do not count them as trial actions. Confinement must
+   make the adapter the only live GitHub path: either use credentials that cannot write, or collect
+   through fixed GET-only calls outside the analysis agent, then analyze the snapshot with no GitHub
+   credentials, network/shell mutation path or connected write tool reachable. The latter route must
+   verify the host's source/credential isolation with a non-secret outside-packet canary and a denied
+   mutation probe; a renamed HOME or an instruction alone is insufficient. Record the actual adapter,
+   credentials' read-only capability or enforced isolation, negative probes and tool trace. Do not mint
+   or transfer credentials as part of this feature. If confinement cannot be established, the live
+   trial remains not verified. The checkout,
    including settings and index, must remain unchanged.
    Exercise the approved-write protocol in an owner-authorized disposable fixture repository, not the
    live Stackweaver backlog. Record exact component and adapter revisions before retiring duplicate prose.
@@ -320,12 +335,12 @@ surfaces until separately tested. No other harness support is implied.
 ## Acceptance Criteria
 
 - [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README accurately states the expanded operation set and tested support.
-- [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+- [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
 - [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
-- [ ] AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, ranks verified prerequisites before dependents with reasons, excludes blocked work from ready rankings, and leaves GitHub unchanged until exact actions are approved.
+- [ ] AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved.
 - [ ] AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves protected work except explicitly requested and approved umbrella checklist/closure actions and unrelated body content, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
-- [ ] AC-07: The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and proves through its write-denying adapter that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
+- [ ] AC-07: The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
 - [ ] AC-08: The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
 - [ ] AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
 
@@ -334,12 +349,12 @@ surfaces until separately tested. No other harness support is implied.
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Package/discovery tests and native Codex CLI, Claude CLI, Codex desktop and VS Code Local fixture invocation; compare installed canonical payload. Run a generic backlog-triage prompt plus existing investigation/docs/feature/maintenance boundary regression cases, and inspect README operation/support claims. Exercise serial verification and plain-chat approval fallback without fabricated capabilities. |
-| AC-02 | No-settings fixture verifies default report/history placement, first-run versus unavailable history and absent plan metadata; generic and Stackweaver config fixtures; malformed/unknown-version/conflicting-repo cases; expected ownership/ranking/report paths; inspect shared package for copied project constants. |
+| AC-02 | No-settings fixture verifies default report/history placement, first-run versus unavailable history and absent plan metadata; generic and Stackweaver config fixtures; malformed/unknown-version/conflicting-repo cases; expected ownership/ranking/report paths, including no-settings and unlisted-umbrella cases with all sub-items shipped; inspect shared package for copied project constants. |
 | AC-03 | Paginated fixtures beyond legacy caps, nested comment pagination, inaccessible page/permission/rate/network failure and budget exhaustion; a failed required page or verification input makes every closure in that report non-executable, including otherwise evidenced issues; cover failed closed-issue and merged-PR inventory as report-wide blockers. |
 | AC-04 | False-complete plan, merged Refs-only PR, unwired component, closed prerequisite with still-open dependent scope, missing source/test, removed/superseded scope, total duplicate of unfinished canonical work versus partial overlap, and dependency-cycle fixtures; inspect adversarial evidence and reason-correct closure proposals. |
-| AC-05 | Sweep/next/close/stale/explicit-ID fixtures, recording adapter asserts zero writes, same-day repeat preserves both reports, an external output override leaves settings unchanged and still reads configured history, counts and run-over-run differences match snapshots across mixed modes/scopes and incomplete coverage without false additions/removals, default reports remain uncommitted and explicit local commits follow repo rules; ranking reasons and completeness differ correctly by mode. |
+| AC-05 | Sweep/next/close/stale/explicit-ID fixtures, recording adapter asserts zero writes, same-day repeat preserves both reports, an external output override leaves settings unchanged and still reads configured history, counts and run-over-run differences match snapshots across mixed modes/scopes and incomplete coverage without false additions/removals, default reports remain uncommitted and explicit local commits follow repo rules; sweep/next ranking reasons and completeness match scope, while close/stale/explicit-ID reports contain no readiness ranking. |
 | AC-06 | Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch and retry. Explicitly request and approve an umbrella checklist patch/closure, then omit request or approval or change the patch's base body in negative cases; change an approved comment/label/closure/duplicate payload in negative cases. Inspect exact action log, preserved unrelated body content and other protected IDs. Include approved/unapproved plan-status patches and an attempted gated-completion sync; failed gates cannot change status. Bind new-label description/color and issue-URL backfill payloads; fail after issue creation and confirm retry backfills the same URL without another issue. Assert the approved plan commit subject/path set, unrelated index preservation and failed-commit retry state; intake-selected triage uses the same narrow authority reference and never shipping authority. |
-| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/index snapshots, a read-only adapter trace and tracker snapshots with unrelated concurrent actor changes attributed and an inspected ordered publication handoff; verify the explicit output override, unchanged settings and configured previous-report source, and inspect the durable handoff in `tests/agent-triage/README.md`; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
+| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/index snapshots, verified read-only credentials or isolation with denied mutation/outside-packet probes, a read-only adapter trace and tracker snapshots with unrelated concurrent actor changes attributed and an inspected ordered publication handoff; verify the explicit output override, unchanged settings and configured previous-report source, and inspect the durable handoff in `tests/agent-triage/README.md`; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
 | AC-08 | Rollback/reapply procedure in `tests/agent-triage/README.md` executed in a disposable Stackweaver checkout; compare unrelated agents, plan files, index/worktree state and verify no service/credential operations. |
 | AC-09 | Diff only the declared migration paths and shared triage paths; compare hashes of existing maintenance/audit/docs/domain workflows and automation; confirm deferred register retains D-01 through D-05. |
 
@@ -359,7 +374,9 @@ the already-approved `tests/agent-triage/` boundary. R-6 comparison/default/attr
 those approved outcomes testable without adding owner authority: all-mode reports compare only
 proven coverage, generic no-settings behavior uses framework-owned conservative paths, and a denying
 adapter proves trial reads despite independent tracker activity. Claude model metadata remains local
-and mandatory under the existing Stackweaver rules. No publication or main-cutover authority is inferred.
+and mandatory under the existing Stackweaver rules. R-7 preserves already-required umbrella
+protection for unlisted indexes, proves the selected no-write trial through actual confinement, and
+retains mode-specific ranking. No publication or main-cutover authority is inferred.
 
 ## Review Log
 
@@ -372,6 +389,7 @@ and mandatory under the existing Stackweaver rules. No publication or main-cutov
 | 2026-10-23 | R-4 | spec | `1e159d65aa8cbde4525de59a27439129a0efeaea` | claude-opus-5.5 | procedural | Five findings: delivery boundary, trial output, legacy report/write details, lifecycle regression coverage and a verdict-wording nit. |
 | 2026-10-24 | R-5 | spec | `61c94b53b41e831e5b37d8e24ccbc9058ea16778` | claude-opus-5.5 | procedural | Clarify approved trial override/history, authority alignment, retained plan commits and durable handoff paths; complete the source list. |
 | 2026-10-24 | R-6 | spec | `ea38a917ca8e804253e2f53fa682d67cebe1a339` | claude-opus-5.5 | procedural | Clarify comparable report history, no-settings output, read-only trial attribution and mandatory Claude model metadata. |
+| 2026-10-24 | R-7 | spec | `2ad7eebfb05723f8f4bf54b755f543abda6c71cc` | claude-opus-5.5 | procedural | Protect unlisted index issues, require trial confinement and keep ranking limited to ranking modes. |
 
 ### R-1
 
@@ -568,6 +586,29 @@ SEVERITY: nit
 WHERE: Design / Stackweaver migration and rollback step 4
 EVIDENCE: docs/specs/shared-triage.md:244-245 says to keep the host-specific model preference in the Claude adapter "if desired", which allows removing it. Stackweaver .claude/commands/triage.md:3 sets `model: fable`. Stackweaver CLAUDE.md:192 says each command's `model:` field must not be removed, and :194 places `/triage` on Fable. Line 115 of the spec keeps repository instructions authoritative only for verification commands and public interfaces.
 PROPOSAL: State that the `/triage` compatibility command keeps its existing `model:` frontmatter under Stackweaver's rules. Keep the point that this preference does not become a shared requirement.
+
+### R-7
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Repository settings; Design / Collection, verification and report step 2; Design / Stackweaver migration and rollback steps 1-3; Test Plan / AC-02, AC-07
+EVIDENCE: Stackweaver agents/issue-triage.md:50-53 protects "Milestone trackers and umbrella issues" by kind, giving #395 and #13 only as examples ("e.g."). It says they "are closed only when the user says the milestone is done, never because their sub-items shipped". docs/specs/shared-triage.md:113 lets settings carry only "protected issue/tracker IDs", and line 117 forbids guessed tracker IDs. Lines 121-122 leave every mapping empty when no settings file exists. Line 160 marks an issue resolved when its requested behavior is present and reachable. Suppose a new umbrella issue is opened after the adapter is written, or a repository has no settings file. That issue is not in the ID list, every checklist item has shipped, and the shared flow proposes it as an evidence-backed close candidate. Legacy triage would never propose that closure. The parity fixtures at lines 243-244 use known umbrellas, so they pass. The intentional differences at lines 248-253 do not record this change.
+PROPOSAL: Let settings and the conservative defaults classify protected index or umbrella issues by a declared rule, such as a label, milestone or tracker pattern, in addition to explicit IDs. Alternatively, never propose closing an index issue only because its sub-items shipped. Add a parity fixture with an unlisted umbrella whose sub-items have all shipped.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Stackweaver migration and rollback step 5; Acceptance Criteria / AC-07; Test Plan / AC-07
+EVIDENCE: docs/specs/shared-triage.md:271-273 proves the live trial wrote nothing because a write-denying, recording GitHub adapter shows only reads. Lines 273-274 make whole-tracker snapshots supporting context only and do not count owner or bot changes as trial actions. Line 265 runs the trial with "existing account access", which is the owner's GitHub identity. Lines 90-92 let the operation use any available CLI or connector adapter. The spec never requires the adapter to be the only GitHub path the trial agent can reach. A host agent that has a shell and the owner's `gh` credentials can post a comment or label directly. The adapter trace then shows only reads, and the write appears as a concurrent owner change, which is excluded. AC-07 passes even though the trial wrote to the tracker.
+PROPOSAL: Require the live trial to run with credentials that cannot write, for example a read-only token, or to confine every GitHub call to the denying adapter with no other credential reachable. Record that confinement in the AC-07 evidence. Alternatively, attribute tracker events to a trial-specific identity that is distinct from the owner.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria / AC-05; Design / Collection, verification and report; Design / Stackweaver migration and rollback step 3
+EVIDENCE: AC-05 at docs/specs/shared-triage.md:326 says "Every mode ... ranks verified prerequisites before dependents with reasons". Line 185 preserves the legacy modes. Stackweaver agents/issue-triage.md:253-255 defines `close` with "No ranking" and `#N` as deep verification of the named issues only. The intentional differences at lines 248-253 do not say that close and explicit-issue runs now rank. The AC-05 proof at line 340 says ranking "differ[s] correctly by mode", which conflicts with the criterion's wording.
+PROPOSAL: Limit the ranking clause in AC-05 to the modes that rank, such as sweep, next and stale. Alternatively, record ranking in close and explicit-issue runs as an intentional difference.
 
 ## Sources
 
