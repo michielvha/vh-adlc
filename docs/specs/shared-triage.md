@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-9 has no blocking findings; awaiting owner acceptance, with its trial-proof recommendations retained for tasks."
+status: planned
+status_description: "Owner accepted R-9 and documentation publication on 2026-10-24; planned gate passed."
 issue: null
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
@@ -406,6 +406,7 @@ No publication or main-cutover authority is inferred.
 | 2026-10-24 | R-7 | spec | `2ad7eebfb05723f8f4bf54b755f543abda6c71cc` | claude-opus-5.5 | procedural | Protect unlisted index issues, require trial confinement and keep ranking limited to ranking modes. |
 | 2026-10-24 | R-8 | spec | `838914d60955ec42280a2db6bc323c9d7eaef7c5` | claude-opus-5.5 | procedural | Remove the alternate-credential bypass in trial confinement and define its source-input boundary. |
 | 2026-10-24 | R-9 | spec | `5a4547da08407737a550a1e042a31b771d0bc226` | claude-opus-5.5 | procedural | No blocking findings; three should-fix recommendations on trial-environment probes, complete source/history input and collection metadata are implementation proof work under AC-03/AC-07. |
+| 2026-10-24 | R-9 | spec | `5a4547da08407737a550a1e042a31b771d0bc226` | n/a | n/a | accepted by owner |
 
 ### R-1
 
