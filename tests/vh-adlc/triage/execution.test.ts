@@ -184,6 +184,29 @@ test("owned gated patches remain retryable when their source path is in the cano
   expect(retry.completed).toContain("sync");expect(f.log).toHaveLength(1);
 });
 
+test("a status-sync commit preserves the shown binary gate line and a structured failed gate blocks it", async () => {
+  for(const pass of [false,true]){
+    const f=setup(),before="---\nstatus: in-progress\nstatus_description: Work remains\nissue: null\n---\n\n# Plan\n",after=before.replace("status: in-progress","status: complete"),line="vh-adlc gate complete: pass (fixture)";
+    f.write("plans/a.md",before);
+    const actions:Action[]=[{id:"sync",kind:"plan-patch",path:"plans/a.md",before,after,gate:{status:"complete",document:"plans/a.md"}},
+      {id:"commit",kind:"commit",subject:"docs: sync the approved plan",body:line,paths:["plans/a.md"],requires:["sync"]}];
+    const batch=f.batch(actions),approval=approveBatch(batch,["sync","commit"],"Approve the exact status patch and commit metadata");
+    const result=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal,gate:async()=>({pass,line})});
+    if(!pass){expect(result.completed).toEqual([]);expect(readFileSync(join(f.root,"plans/a.md"),"utf8")).toBe(before);}
+    else{expect(result.completed).toContain("commit");expect(git(f.root,"show","-s","--format=%b","HEAD")).toBe(line);}
+  }
+});
+
+test("changed gate metadata blocks the approved patch before its dependent commit",async()=>{
+  const f=setup(),before="---\nstatus: in-progress\nstatus_description: Work remains\nissue: null\n---\n\n# Plan\n",after=before.replace("status: in-progress","status: complete");
+  f.write("plans/a.md",before);
+  const actions:Action[]=[{id:"sync",kind:"plan-patch",path:"plans/a.md",before,after,gate:{status:"complete",document:"plans/a.md"}},
+    {id:"commit",kind:"commit",subject:"docs: sync the approved plan",body:"vh-adlc gate complete: pass (old evidence)",paths:["plans/a.md"],requires:["sync"]}];
+  const batch=f.batch(actions),approval=approveBatch(batch,["sync","commit"],"Approve exact patch and shown commit");
+  const result=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal,gate:async()=>({pass:true,line:"vh-adlc gate complete: pass (changed evidence)"})});
+  expect(result.completed).toEqual([]);expect(readFileSync(join(f.root,"plans/a.md"),"utf8")).toBe(before);
+});
+
 test("creation/backfill retry reuses the created canonical URL and preserves unrelated plan content", async () => {
   const f = setup(), before = "---\nissue: null\nstatus: planned\n---\n\n# Missing issue\nKeep this text\n";
   f.write("plans/new.md", before);

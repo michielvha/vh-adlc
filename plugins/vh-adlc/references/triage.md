@@ -166,7 +166,9 @@ is part of the approved body. Show every payload and dependency, including:
 - Closure reason, canonical duplicate ID and the evidence-comment action that must precede closure.
 - An explicitly requested umbrella checklist's entire before/after body; preserve unrelated content.
 - Each plan patch's path and entire before/after text, status gate and any issue URL backfill template.
-- The local plan commit's exact conventional subject, explicit paths and required patch action IDs.
+- The local plan commit's exact conventional subject, body, explicit paths and required patch action IDs.
+  For status sync, show the applicable binary gate line in that body before approval. Execution
+  reruns the gate and requires the same line before committing; changed gate metadata needs fresh approval.
 
 Each action has a unique safe `id` and the following `kind` and payload. The packaged `execute.ts`
 exports the typed contract; reject unsupported fields/semantics rather than improvising a write.

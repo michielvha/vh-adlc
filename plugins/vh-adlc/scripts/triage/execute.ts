@@ -13,7 +13,7 @@ export type Action =
   | { id: string; kind: "close"; issue: number; reason: "completed" | "not_planned"; duplicate_of: number | null; comment: string }
   | { id: string; kind: "checklist"; issue: number; before: string; after: string }
   | { id: string; kind: "plan-patch"; path: string; before: string; after: string; gate?: { status: string; document: string }; created_by?: string }
-  | { id: string; kind: "commit"; subject: string; paths: string[]; requires: string[] };
+  | { id: string; kind: "commit"; subject: string; body?: string; paths: string[]; requires: string[] };
 export type MutationResult = { number?: number; url?: string; issue?: Issue };
 export class MutationFailure extends Error {
   constructor(readonly uncertain: boolean) { super(uncertain ? "github-write-outcome-unknown" : "github-write-denied"); }
@@ -33,6 +33,7 @@ type Journal = {
   results: Record<string, MutationResult>; issues: Record<string, Issue>; source_commit: string;
   uncertain: string[];
   gated?: string[];
+  gate_lines?: Record<string,string>;
 };
 function canonical(value: unknown): string {
   return JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -135,7 +136,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
       case "close": if (!["completed", "not_planned"].includes(action.reason) || !nonempty(action.comment)) bad(); break;
       case "checklist": break;
       case "plan-patch": validatePatch(config, action); break;
-      case "commit": if (!/^(?:docs|chore)(?:\([^\r\n]+\))?: [^\r\n]+$/.test(action.subject) || !strings(action.paths) || !action.paths.length || !strings(action.requires) || !action.requires.length) bad(); break;
+      case "commit": if (!/^(?:docs|chore)(?:\([^\r\n]+\))?: [^\r\n]+$/.test(action.subject) || action.body!==undefined && (!nonempty(action.body)||action.body!==action.body.trim()) || !strings(action.paths) || !action.paths.length || !strings(action.requires) || !action.requires.length) bad(); break;
       default: bad();
     }
   }
@@ -164,7 +165,7 @@ function saveJournal(path: string, journal: Journal) {
 }
 
 export async function executeBatch(config: Settings, batch: Batch, approval: Approval, adapter: Adapter, options: {
-  journal: string; gate?: (gate: { status: string; document: string }) => Promise<boolean>;
+  journal: string; gate?: (gate: { status: string; document: string }) => Promise<boolean | {pass:boolean;line:string}>;
 }): Promise<{ completed: string[]; blocked: string[]; failed: string[] }> {
   if (batch.hash !== batchHash(batch) || approval.batch_hash !== batch.hash || hash(config) !== batch.settings_hash ||
       !nonempty(approval.owner_statement) || new Set(approval.action_ids).size !== approval.action_ids.length ||
@@ -189,6 +190,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
       const paths = git(config.root, "diff-tree", "--no-commit-id", "--name-only", "-r", head).split("\n").filter(Boolean).sort();
       const exact = git(config.root, "show", "-s", "--format=%P", head) === journal.source_commit &&
         git(config.root, "show", "-s", "--format=%s", head) === pendingCommit.subject && hash(paths) === hash([...pendingCommit.paths].sort()) &&
+        git(config.root, "show", "-s", "--format=%b", head) === (pendingCommit.body??"") &&
         pendingCommit.requires.every((id) => journal.completed.includes(id)) && pendingCommit.paths.every((path) => {
           const patch = batch.actions.find((action) => action.kind === "plan-patch" && action.path === path) as Extract<Action, { kind: "plan-patch" }>;
           const expected = patch.created_by ? patch.after.replace("{{created_issue_url}}", journal.results[patch.created_by].url!) : patch.after;
@@ -242,19 +244,28 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
           const content = readFileSync(target, "utf8");
           if (content===after && action.gate && !journal.gated?.includes(action.id)) { blocked.push(action.id); continue; }
           if (content !== after) {
-            if (content !== action.before || action.gate && (!options.gate || !await options.gate(action.gate))) { blocked.push(action.id); continue; }
+            if(content!==action.before){blocked.push(action.id);continue;}
+            if(action.gate){
+              const checked=options.gate?await options.gate(action.gate):false;
+              if(checked!==true && (!checked || typeof checked!=="object" || checked.pass!==true || !nonempty(checked.line) || /[\r\n]/.test(checked.line))){blocked.push(action.id);continue;}
+              const commits=batch.actions.filter(candidate=>candidate.kind==="commit" && candidate.requires.includes(action.id) && approval.action_ids.includes(candidate.id)) as Extract<Action,{kind:"commit"}>[];
+              if(commits.some(commit=>typeof checked!=="object" || !commit.body?.split("\n").includes(checked.line))){blocked.push(action.id);continue;}
+              if(typeof checked==="object"){journal.gate_lines={...(journal.gate_lines??{}),[action.id]:checked.line};}
+            }
             if (readFileSync(target, "utf8") !== action.before) { blocked.push(action.id); continue; }
             if(action.gate){journal.gated=[...new Set([...(journal.gated??[]),action.id])];saveJournal(path,journal);}
             writeFileSync(target, after);
           }
         } else if (action.kind === "commit") {
+          const gated=action.requires.filter(id=>batch.actions.some(patch=>patch.id===id && patch.kind==="plan-patch" && patch.gate));
+          if(gated.some(id=>!journal.gate_lines?.[id] || !action.body?.split("\n").includes(journal.gate_lines[id]))){blocked.push(action.id);continue;}
           for (const selected of action.paths) {
             const patch = batch.actions.find((prior) => prior.kind === "plan-patch" && prior.path === selected) as Extract<Action, { kind: "plan-patch" }>;
             const after = patch.created_by ? patch.after.replace("{{created_issue_url}}", journal.results[patch.created_by].url!) : patch.after;
             if (readFileSync(resolveInside(config.root, selected), "utf8") !== after) throw new Error("approved patch changed before commit");
           }
           git(config.root, "add", "--", ...action.paths);
-          git(config.root, "commit", "-m", action.subject, "--", ...action.paths);
+          git(config.root, "commit", "--cleanup=verbatim", "-m", action.subject, ...(action.body?["-m",action.body]:[]), "--", ...action.paths);
           journal.source_commit = git(config.root, "rev-parse", "HEAD");
         } else {
           mutationAttempted = true;

@@ -49,7 +49,10 @@ async function main() {
         if (Bun.spawnSync(["git", "-C", config.root, "fetch", "origin", branch], { stdout: "pipe", stderr: "pipe" }).exitCode !== 0) return false;
         const check = Bun.spawnSync([binary, "gate", gate.status, gate.document, "--repo", config.root, "--plugin-pin", pins[0]], { stdout: "pipe", stderr: "pipe" });
         if (check.exitCode !== 0) return false;
-        try { return JSON.parse(check.stdout.toString()).result === "pass"; } catch { return false; }
+        try {
+          const result=JSON.parse(check.stdout.toString());
+          return result.result==="pass" && typeof result.data?.line==="string" ? {pass:true,line:result.data.line} : false;
+        } catch { return false; }
       } });
     if (result.blocked.length || result.failed.length) process.exitCode = 1;
     return result;
