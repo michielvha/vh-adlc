@@ -109,7 +109,7 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
     const name = request.kind === "comments" ? `comments:${request.issue}` : request.kind;
     const entry: Coverage = { collection: name, scope: request.kind === "comments" ? String(request.issue) : request.kind === "issues" ? "all-states" : "all-closed-pulls", pages: 0, complete: false };
     coverage.push(entry);
-    const items: T[] = [], seen = new Set<number>();
+    const items: T[] = [], seen = new Set<number>(), rawSeen=new Set<number>();
     let page = 1;
     while (true) {
       if (config.page_budget !== null && fetched >= config.page_budget) { entry.error = "page-budget-exhausted"; break; }
@@ -120,6 +120,9 @@ export async function collect(config: Settings, reader: Reader, options: { mode?
       try {
         if (!response || !Array.isArray(response.items) || response.next !== null && (!Number.isSafeInteger(response.next) || response.next !== page + 1)) throw new Error("invalid-page");
         for (const raw of response.items) {
+          const rawId=id(obj(raw)[request.kind==="comments"?"id":"number"]);
+          if(rawSeen.has(rawId))throw new Error("repeated-raw-item");
+          rawSeen.add(rawId);
           const item = normalize(raw);
           if (item === null) continue;
           const identity = key(item);

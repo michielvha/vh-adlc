@@ -69,6 +69,18 @@ test("malformed pages, repeated page cursors and repeated IDs cannot claim compl
   }
 });
 
+test("replayed filtered PR records cannot hide an unstable issue or pull inventory",async()=>{
+  const f=project();
+  const reader:Reader={async page(request,page){
+    if(request.kind==="comments")return{items:[],next:null};
+    const filtered=request.kind==="issues"?{...issue(42),pull_request:{}}:{number:42,merged_at:null};
+    return{items:[filtered],next:page===1?2:null};
+  }};
+  const result=await collect(loadSettings(f.root),reader);
+  expect(result.coverage.find(entry=>entry.collection==="issues")?.complete).toBe(false);
+  expect(result.coverage.find(entry=>entry.collection==="pulls")?.complete).toBe(false);
+});
+
 test("a configured page budget is incomplete coverage, never a successful empty inventory", async () => {
   const f = project(); f.settings({ schema_version: 1, page_budget: 1 });
   const source = pages({ issues: Array.from({ length: 101 }, (_, i) => issue(i + 1)) });
@@ -144,6 +156,7 @@ test("GitHub numeric repository links retain their validated cursor without chan
   const raw = `HTTP/2.0 200 OK\r\nLink: <${url}>; rel="next"\r\n\r\n[]`;
   expect(parsePage(raw, expected)).toEqual({ items: [], next: 2 });
   expect(target).toBe(url);
+  expect(parsePage(raw.replace("&page=2", ""), expected)).toEqual({items:[],next:2});
   expect(() => parsePage(raw.replace("/42/", "/43/"), expected)).toThrow();
   expect(() => parsePage(raw.replace("state=all", "state=closed"), expected)).toThrow();
   expect(() => parsePage(raw.replace("after=opaque%3D%3D", "after="), expected)).toThrow();

@@ -38,7 +38,9 @@ export function parsePage(raw: string, expected: { hostname: string; endpoint: s
   if (next.searchParams.has("after") && next.searchParams.has("before")) throw new Error("ambiguous-next-cursor");
   for (const key of keys) if (JSON.stringify(base.searchParams.getAll(key)) !== JSON.stringify(next.searchParams.getAll(key))) throw new Error("next-page-scope-changed");
   const value = next.searchParams.get("page");
-  if (next.searchParams.getAll("page").length !== 1 || !value || !/^\d+$/.test(value) || Number(value) !== expected.page + 1) throw new Error("invalid-next-page");
+  const cursorBased=next.searchParams.has("after")||next.searchParams.has("before");
+  if (next.searchParams.getAll("page").length>1 || value!==null && (!/^[1-9]\d*$/.test(value)||!Number.isSafeInteger(Number(value))) ||
+    !cursorBased && (value===null || Number(value)!==expected.page+1)) throw new Error("invalid-next-page");
   expected.onNext?.(next.href);
   return { items, next: expected.page + 1 };
 }
