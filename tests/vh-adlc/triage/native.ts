@@ -67,7 +67,8 @@ function snapshotMetadata(snapshot: Inventory, config: Settings) {
   return {coverage_hash:digest(json(snapshot.coverage)),collections:snapshot.coverage.map(entry=>({name:entry.collection,sha256:digest(json(entry))})),complete:snapshot.coverage.every(entry=>entry.complete && !entry.error)};
 }
 export function exportInputs(options: { checkout: string; plugin: string; snapshot: string; output: string }): InputManifest {
-  const config=loadSettings(options.checkout), snapshotBytes=readFileSync(options.snapshot), snapshot=JSON.parse(snapshotBytes.toString()) as Inventory;
+  const config=loadSettings(options.checkout), snapshot=JSON.parse(readFileSync(options.snapshot,"utf8")) as Inventory;
+  const snapshotBytes=Buffer.from(JSON.stringify(snapshot,null,2)+"\n");
   const commit=git(config.root,"rev-parse","HEAD").toString().trim();
   if(snapshot.repository!==config.repository || snapshot.hostname!==config.hostname || snapshot.source_commit!==commit) throw Error("snapshot does not match fixed repository source");
   const metadata=snapshotMetadata(snapshot,config), tracked=source(config.root,commit), historyRoot=join(config.root,config.report_dir);
@@ -88,7 +89,7 @@ export function exportInputs(options: { checkout: string; plugin: string; snapsh
   writeFileSync(join(options.output,"settings.json"),settings,{mode:0o600});
   const manifest: InputManifest={schema_version:1,run_id:randomUUID(),repository:config.repository,hostname:config.hostname,source_commit:commit,source:tracked.entries,history,plugin,
     plugin_hash:payloadHash(plugin),settings_hash:digest(settings),snapshot:{sha256:digest(snapshotBytes),...metadata}};
-  writeFileSync(join(options.output,"manifest.json"),json(manifest)+"\n",{mode:0o600});return manifest;
+  writeFileSync(join(options.output,"manifest.json"),JSON.stringify(manifest,null,2)+"\n",{mode:0o600});return manifest;
 }
 export function verifyInputs(input: string, expected: {checkout:string;plugin:string}): {pass:boolean;failures:string[]} {
   const failures:string[]=[];
@@ -129,7 +130,7 @@ export async function engineeringInputs(input:string,checkout:string,plugin:stri
   for(const page of pages){const path=join(input,"engineering",page);mkdirSync(dirname(path),{recursive:true});writeFileSync(path,readFileSync(join(cache,"vh-adlc/docs",revision,page)));}
   const bytes=json({command,result:record,pages,revision});writeFileSync(join(input,"knowledge.json"),bytes);
   const path=join(input,"manifest.json"),manifest=JSON.parse(readFileSync(path,"utf8")) as InputManifest;
-  manifest.engineering=files(join(input,"engineering"));manifest.knowledge_hash=digest(bytes);writeFileSync(path,json(manifest)+"\n");
+  manifest.engineering=files(join(input,"engineering"));manifest.knowledge_hash=digest(bytes);writeFileSync(path,JSON.stringify(manifest,null,2)+"\n");
 }
 export function boundaryCommand(options:{input:string;driver:string;bun:string;canary?:string;egressIp?:string}):string[]{
   return ["bwrap","--unshare-all","--unshare-net","--new-session","--die-with-parent",
@@ -204,12 +205,13 @@ async function serveReadOnly() {
   const inputReadOnly=!!mount?.split(" ")[3]?.split(",").includes("ro");
   const log=(entry:Record<string,unknown>)=>process.stderr.write(`TRIAGE_TRACE ${json({session,run_id:manifest.run_id,namespaces,host_namespaces:hostNamespaces,input_read_only:inputReadOnly,...entry})}\n`);
   const properties={path:{type:"string"},start_line:{type:"integer",minimum:1},limit:{type:"integer",minimum:1,maximum:2000}};
+  const annotations={readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false};
   const tools=[
     {name:"read",description:"Read a declared source, history, snapshot, settings or plugin input by relative path and line range. No other host paths are readable.",inputSchema:{type:"object",properties,required:["path"],additionalProperties:false}},
     {name:"list",description:"List every declared input path and hash, with cursor pagination. Complete manifests are available at manifest.json.",inputSchema:{type:"object",properties:{prefix:{type:"string"},cursor:{type:"integer",minimum:0},limit:{type:"integer",minimum:1,maximum:2000}},additionalProperties:false}},
     {name:"search",description:"Search literal text across all declared text inputs in a prefix. Returns scanned/skipped scope and complete match pagination; never executes source or commands.",inputSchema:{type:"object",properties:{query:{type:"string"},prefix:{type:"string"},cursor:{type:"integer",minimum:0},limit:{type:"integer",minimum:1,maximum:2000}},required:["query"],additionalProperties:false}},
     {name:"probe",description:"Run a fixed negative probe inside this actual analysis boundary. No live mutation target exists. Supply the run_id from manifest.json.",inputSchema:{type:"object",properties:{route:{type:"string",enum:PROBE_ROUTES},run_id:{type:"string"}},required:["route","run_id"],additionalProperties:false}},
-  ];
+  ].map(tool=>({...tool,annotations}));
   const entries=[...manifest.source.map(entry=>({...entry,path:`source/${entry.path}`})),...manifest.history.map(entry=>({...entry,path:`history/${entry.path}`})),...manifest.plugin.map(entry=>({...entry,path:`plugin/${entry.path}`})),
     ...(manifest.engineering??[]).map(entry=>({...entry,path:`engineering/${entry.path}`})),...(manifest.knowledge_hash?[{path:"knowledge.json",sha256:manifest.knowledge_hash,mode:0o600}]:[]),
     {path:"snapshot.json",sha256:manifest.snapshot.sha256,mode:0o600},{path:"settings.json",sha256:manifest.settings_hash,mode:0o600},{path:"manifest.json",sha256:digest(readFileSync(join(input,"manifest.json"))),mode:0o600}];
@@ -323,7 +325,7 @@ async function runNativeTrial(options:{host:"codex"|"claude";input:string;checko
   if(options.host==="claude")args=["claude","--print",prompt,"--output-format","stream-json","--verbose","--restricted","--tools","Skill","--allowedTools","Skill,mcp__triage__read,mcp__triage__list,mcp__triage__search,mcp__triage__probe","--permission-mode","dontAsk","--strict-mcp-config","--mcp-config",mcp,"--plugin-dir",client.installed,"--setting-sources","","--json-schema",json(schema)];
   else{
     const configPath=join(client.profile,"config.toml"),prior=existsSync(configPath)?readFileSync(configPath,"utf8"):"";
-    writeFileSync(configPath,prior+`\n[mcp_servers.triage]\ncommand = ${json(process.execPath)}\nargs = ${json(launch)}\nrequired = true\nstartup_timeout_sec = 30\ntool_timeout_sec = 90\n`);
+    writeFileSync(configPath,prior+`\n[mcp_servers.triage]\ncommand = ${json(process.execPath)}\nargs = ${json(launch)}\nrequired = true\nstartup_timeout_sec = 30\ntool_timeout_sec = 90\nenabled_tools = ["read", "list", "search", "probe"]\ndefault_tools_approval_mode = "auto"\n`);
     const schemaPath=join(options.output,"schema.json");writeFileSync(schemaPath,json(schema));
     args=["codex","exec","--json","--color","never","--sandbox","read-only","--config",'approval_policy="never"',"--config",'web_search="disabled"',
       ...["shell_tool","apps","browser_use","browser_use_external","browser_use_full_cdp_access","computer_use","multi_agent","image_generation","view_image","workspace_dependencies"].flatMap(feature=>["--disable",feature]),

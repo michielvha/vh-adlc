@@ -26,6 +26,8 @@ test("input export contains the fixed complete source, full nested history, plug
   expect(manifest.history.map(entry=>entry.path)).toEqual(["README.md","nested/old.md"]);
   expect(manifest.snapshot.coverage_hash).toMatch(/^[a-f0-9]{64}$/);
   expect(manifest.plugin_hash).toMatch(/^[a-f0-9]{64}$/);
+  expect(readFileSync(join(f.output,"snapshot.json"),"utf8").split("\n").length).toBeGreaterThan(10);
+  expect(readFileSync(join(f.output,"manifest.json"),"utf8").split("\n").length).toBeGreaterThan(10);
   expect(verifyInputs(f.output,{checkout:f.root,plugin}).pass).toBe(true);
 });
 
