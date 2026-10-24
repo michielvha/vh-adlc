@@ -8,12 +8,14 @@ does not establish support for a newer workflow. Installation instructions are i
 
 ## Shared triage
 
-Shared triage is being verified on plugin 0.4.0. Its packaged settings, collection, report, execution
-and discovery checks pass locally; these checks do not establish native invocation. Codex CLI,
-Claude Code CLI, Codex desktop and VS Code Local are required trials and remain unverified until
-their actual results are recorded in the [feature evidence](../specs/shared-triage.md). No triage
-support is claimed yet for other GUI surfaces. The historical results below retain their original
-operation/version scope and do not establish the new operation.
+Shared triage is an unpublished local candidate on plugin 0.4.0. Bounded Codex CLI and Claude Code
+CLI native trials have passed; the current Claude follow-up also passes a private read-only trial
+and synthetic legacy/shared analysis comparison. The [feature evidence](../specs/shared-triage.md)
+records the exact commits, payload hashes and limits. Codex desktop and VS Code Local trials remain
+unverified. Migration is still blocked by the receipt-trust decision, remaining closure-provenance
+work and a fresh final review. Do not treat these intermediate results as release readiness.
+No triage support is claimed for other GUI surfaces. The historical results below retain their
+original operation/version scope.
 
 ## Support matrix
 
