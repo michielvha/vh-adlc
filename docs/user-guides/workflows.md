@@ -12,7 +12,7 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 Lifecycle intake inspects the request and repository, then selects a procedure.
-It uses the existing seven skills. Check
+It uses the existing eight skills. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -21,6 +21,7 @@ on your host.
 | Work | What happens |
 | --- | --- |
 | A question | Inspect the source and answer. A saved artifact needs a request. |
+| Backlog triage | Verify issues against source and observed checks, rank ready work, and save a report. Approve an exact batch before any tracker change. |
 | Diagnosis | Investigate and report. A report-only request does not authorize a fix. |
 | Documentation | Edit the requested document and check it. A prose edit does not need a feature spec. |
 | Small maintenance | Preserve the public contract, keep a short task record, run appropriate checks, and obtain an independent review. |
@@ -36,6 +37,7 @@ see [installation](../get-started/installation.md).
 
 | Operation | Invocation name | Purpose |
 | --- | --- | --- |
+| Triage | `vh-adlc-triage` | Sweep a backlog, verify a shortlist, propose closures, or inspect stale/explicit issues; apply only approved exact actions. |
 | Investigate | `vh-adlc-investigate` | Measure an issue or failure and report; never fixes. |
 | Spec | `vh-adlc-spec` | Write or revise the feature document. Add `review <path>` for an independent spec review. |
 | Tasks | `vh-adlc-tasks` | Break accepted scope into one-commit tasks, or replan unfinished tasks. |
@@ -43,6 +45,11 @@ see [installation](../get-started/installation.md).
 | Review | `vh-adlc-review` | Dispatch an independent implementation review of an exact commit. |
 | Ship | `vh-adlc-ship` | On an explicit request, push the branch, open or update the PR, and update the issue. Never merges. |
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
+
+Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
+labels, waits for the report and approval of the exact batch. Local plan patches and their commit
+are shown separately and retain lifecycle checks. Triage does not implement the selected issues.
+Repository settings are optional; see the [settings contract](../../plugins/vh-adlc/references/triage-settings.md).
 
 For a walkthrough, see [your first feature](../get-started/first-feature.md).
 

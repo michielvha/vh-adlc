@@ -29,6 +29,7 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 - Check review freshness and completion with deterministic commands.
 - Get independent spec and implementation reviews before completing a feature.
 - Handle documentation and small maintenance tasks without creating a feature spec.
+- Triage backlog issues against source and observed checks, then approve exact tracker changes.
 
 ## Get started
 
@@ -63,6 +64,7 @@ Host coverage varies by plugin version and operation; check
 | I want to… | Read |
 | --- | --- |
 | Build a feature from spec to PR | [Your first feature](docs/get-started/first-feature.md) |
+| Triage and prioritize a backlog | [Workflows](docs/user-guides/workflows.md) |
 | Choose an operation or resume work | [Workflows](docs/user-guides/workflows.md) |
 | Update or remove the plugin | [Managing plugins](docs/user-guides/managing-plugins.md) |
 | Check which hosts have been tested | [Compatibility](docs/reference/compatibility.md) |

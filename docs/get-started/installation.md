@@ -78,7 +78,7 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains seven skills and a reviewer definition. Its first operation
+The package contains eight skills and a reviewer definition. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
 It verifies the archive and binary hashes before execution and writes downloads
@@ -88,6 +88,12 @@ The first operation may ask permission to read the installed plugin's references
 and its pinned public documentation cache. The plugin uses your repository's
 engineering conventions pin when present, otherwise its
 [own pin](../../plugins/vh-adlc/knowledge.md).
+
+Shared triage uses Bun for its packaged helpers, Git for source verification, and the GitHub CLI
+(`gh`) for its GitHub adapter. Authenticate that CLI for the intended repository using your normal
+account setup before running triage; the plugin does not provision credentials or switch accounts.
+Another host read adapter must preserve the same pagination and error contract. The other feature
+operations continue to use the verified binary without requiring Bun.
 
 The other marketplace plugins install separately. Bun is required for the
 GitHub App registration scripts; installing vh-adlc does not install those scripts

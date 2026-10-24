@@ -15,7 +15,8 @@ additional execution or publication permission.
 | Edit code, tests and docs, and commit on the feature branch | Accepted feature scope |
 | Edit, check, record and commit eligible bounded maintenance locally | The owner's explicit maintenance request, eligibility under `references/lifecycle.md`, and local instructions that permit it |
 | Complete a maintenance task locally | Observed required checks, a current independent maintenance review with no open findings, and preserved task scope |
-| Create a tracking issue | Included in acceptance, or requested |
+| Execute a presented exact triage batch | Current owner approval of its exact repository, IDs, action payloads, evidence, separately shown local patches and local plan commit; revalidate each item through `references/triage.md` |
+| Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
 | Merge, tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action |
 | Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
@@ -31,6 +32,13 @@ A green suite, an earlier approval or "continue" never stands in for a missing a
 scope, do not ask again for each edit or commit. Host permission prompts are the host's business. A
 request to investigate or draft is never permission to build, and an issue comment never changes a
 status. An instruction not to use the loop always wins.
+
+Triage analysis is read-only on GitHub, including comments and existing labels. A current explicit
+owner request may surface an index checklist/closure proposal; fresh exact batch approval is still
+required. Bot-owned, protected-ID and other-workstream exclusions never get that exception.
+Changed evidence or payload invalidates its item. Separately approved plan patches retain lifecycle
+checks and the shown local plan commit; report commits remain opt-in. Triage grants no issue
+implementation, feature shipment, merge, release or credential authority.
 
 ## Identity
 

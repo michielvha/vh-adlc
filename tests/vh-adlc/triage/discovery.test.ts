@@ -38,7 +38,7 @@ test("public guides agree on eight operations, runtime needs and unverified new 
   const install = readFileSync(resolve(root, "docs/get-started/installation.md"), "utf8");
   const compatibility = readFileSync(resolve(root, "docs/reference/compatibility.md"), "utf8");
   expect(guide).toContain("eight skills"); expect(guide).toContain("`vh-adlc-triage`"); expect(guide).toMatch(/exact.*batch/i);
-  expect(install).toContain("eight skills"); expect(install).toMatch(/Bun.*triage/i); expect(install).toContain("GitHub CLI");
+  expect(install).toContain("eight skills"); expect(install).toMatch(/(?:Bun[^\n]*triage|triage[^\n]*Bun)/i); expect(install).toContain("GitHub CLI");
   expect(compatibility).toContain("Shared triage"); expect(compatibility).toMatch(/triage[\s\S]*unverified/i);
   expect(readFileSync(resolve(root, "README.md"), "utf8")).toMatch(/triage/i);
 });

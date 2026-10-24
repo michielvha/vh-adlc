@@ -6,6 +6,15 @@ Check the plugin version as well as the host: a successful run on an older versi
 does not establish support for a newer workflow. Installation instructions are in
 [Install vh-adlc](../get-started/installation.md).
 
+## Shared triage
+
+Shared triage is being verified on plugin 0.4.0. Its packaged settings, collection, report, execution
+and discovery checks pass locally; these checks do not establish native invocation. Codex CLI,
+Claude Code CLI, Codex desktop and VS Code Local are required trials and remain unverified until
+their actual results are recorded in the [feature evidence](../specs/shared-triage.md). No triage
+support is claimed yet for other GUI surfaces. The historical results below retain their original
+operation/version scope and do not establish the new operation.
+
 ## Support matrix
 
 Supported means the scenario run in `tests/vh-adlc/evidence/` passed on that host. Everything else is
