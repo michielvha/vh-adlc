@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import * as native from "./native";
 import { boundaryCommand, commandWorkspace, committedComponent, engineeringInputs, exportInputs, gradeTrial, verifyInputs } from "./native";
 import { fixture, git } from "./fixtures";
 import{verificationRecord}from"../../../plugins/vh-adlc/scripts/triage/verification";
@@ -168,3 +169,15 @@ test("native knowledge input uses the released binary's answered contract and ve
   expect(readFileSync(join(f.output,"engineering/guides/humanize-prose.md"),"utf8")).toContain("prose");
   expect(verifyInputs(f.output,{checkout:f.root,plugin}).pass).toBe(true);
 },15_000);
+
+test("legacy native input carries only its frozen workflow and a neutral report contract",()=>{
+  const build=(native as Record<string,any>).nativeContract;
+  expect(typeof build).toBe("function");
+  const legacy=build({legacy:true,routing:"Invoke the frozen project command.",installed:"/unused/plugin"});
+  expect(legacy.pluginArgs).toEqual([]);
+  expect(Object.keys(legacy.schema.properties).sort()).toEqual(["mode","notes"]);
+  expect(legacy.prompt).not.toMatch(/verification_pass|canonical_source|both proof passes|observations|leads/);
+  const shared=build({legacy:false,routing:"Invoke shared triage.",installed:"/candidate/plugin"});
+  expect(shared.pluginArgs).toEqual(["--plugin-dir","/candidate/plugin"]);
+  expect(shared.schema.properties.observations.items.properties).toHaveProperty("leads");
+});

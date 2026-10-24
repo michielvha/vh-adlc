@@ -31,7 +31,7 @@ export function fixture() {
 }
 
 /** Native control-plane profile. Its auth never enters the exported analysis input or MCP process. */
-export async function nativeClient(host: "codex" | "claude", plugin: string, output: string) {
+export async function nativeClient(host: "codex" | "claude", plugin: string, output: string, install=true) {
   const fs=await import("node:fs"),{homedir}=await import("node:os"),{resolve}=await import("node:path");
   if(fs.existsSync(output)&&fs.readdirSync(output).length)throw Error("native profile output is not empty");
   const market=join(output,"market"),profile=join(output,"control-profile"),name="vhco-triage-evaluation";
@@ -68,10 +68,11 @@ export async function nativeClient(host: "codex" | "claude", plugin: string, out
     if(result.exitCode!==0)throw Error(`native ${host} installation failed; inspect its local command log`);
     return result.stdout.toString();
   };
-  let installed:string;
+  let installed:string|null=null;
   try{
     run([host,"--version"]);
-    if(host==="codex"){
+    if(!install){ /* Legacy baseline: no replacement plugin is installed or registered. */ }
+    else if(host==="codex"){
       run(["codex","plugin","marketplace","add",market,"--json"]);
       installed=JSON.parse(run(["codex","plugin","add",`vh-adlc@${name}`,"--json"])).installedPath;
     }else{

@@ -456,6 +456,8 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Evidence: the new Refs-only context regression fails because report rows omit the separate lead data (`/tmp/shared-triage-r14-leads-red-host.log`: 23 pass, 1 fail). The earlier constrained run also hit the known nested-process restriction and is retained separately. The lead/proof regression now passes: context is retained in reports but never supplies classification or closure proof, while failed required checks still block verification. Full plugin suite: 338 pass, 1258 assertions (`/tmp/shared-triage-r14-leads-suite.log`). Native renewals remain open.
 - [x] T18 `github.ts` and execution tests - reproduce and fix pre-request denials being journaled as uncertain outcomes after R-14 F-08 (AC-06).
       Evidence: the disappearing-vocabulary fake-API regression fails on the unexpected uncertain journal entry while confirming zero writes (`/tmp/shared-triage-r14-denial-red.log`: 32 pass, 1 fail). The same fake-API test now passes, with no uncertain entry after a pre-request denial and zero writes. Full plugin suite: 339 pass, 1263 assertions (`/tmp/shared-triage-r14-denial-suite.log`).
+- [x] T19 native driver and acceptance tests - remove replacement plugin registration, receipt policy and observation schema from the legacy baseline after R-14 F-05; require a neutral report contract before renewing native parity (AC-07).
+      Evidence: the neutral-contract regression fails before implementation (`/tmp/shared-triage-r14-neutral-legacy-red.log`). The earlier file-isolated run remains diagnostic because its prompt still imposed replacement rules. The new neutral-contract test passes: legacy has mode/notes only, no replacement policy or plugin arguments, and its isolated profile skips plugin installation. Full plugin suite: 340 pass, 1269 assertions (`/tmp/shared-triage-r14-neutral-legacy-suite.log`); fresh native comparison remains T15.
 - [ ] T15 `tests/vh-adlc/evidence/triage/` and this document's evidence - actual Codex/Claude CLI invocation, existing-route regressions, frozen legacy parity, bounded live read-only trial and rollback/reapply have observed pass results tied to exact component/adapter commits; retain failures and unavailable proof honestly (AC-01, AC-03, AC-07, AC-08, AC-09).
       Live collection: the first run failed closed on valid numeric/cursor GitHub pagination and legacy metadata. Focused regressions reproduced both failures and passed after fixes (`/tmp/shared-triage-live-collection-regressions.log`). The retry collected 10 issue pages, 6 PR pages, all three selected comment collections and 380 plans with complete coverage, preserving the complete checkout and index (`/tmp/shared-triage-live-fQqFQh`, adapter `4532b929286c1af9df5cfac3b37fddec6004a4a9`). This is collection proof only; analysis, parity and native trials remain open.
       Evidence hardening: focused red/green tests cover legacy prose-only close reports, merged closing references bound to the current issue, verified-cleared prerequisites, externally preapplied gated status, source changes on unapproved plan paths, owned-patch retry and GitHub account changes immediately before effects. The 42 report/execution tests pass (`/tmp/shared-triage-binding-suite.log`). Full plugin suite: 309 pass, 1104 assertions (`/tmp/shared-triage-binding-full-suite.log`); both CLI and native-driver builds pass. No remote effects were used for these tests.
@@ -472,7 +474,22 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
 
 ## Open Questions
 
-None. The owner accepted the R-3 and R-4 choices and accepted R-9 with documentation publication
+### Q2: Should normal-host cache attestations permit owner-approved closure execution?
+
+**Recommendation:** Require an enforced verification boundary for executable closures. Keep reports
+and proposals available on other harnesses, with normal cache records labeled as attestations.
+R-14 F-04 found that a shell-capable agent can create a self-consistent cache record without running
+its claimed check. Its hash checks content integrity, not who observed the check.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Enforced proof before closure execution** | Cache fabrication alone cannot authorize a closure through the helper. | A trusted boundary must be available for closure execution; reports remain portable. |
+| **B. Owner-reviewed attestations on normal hosts** | The normal-host execution path remains usable after exact approval. | Cache records cannot establish authenticity against an agent with the same user's shell access. |
+
+**Why this is yours:** This chooses the trust boundary and installation burden across your harnesses.
+The owner question is pending in this session; neither option has been applied.
+
+The owner accepted the R-3 and R-4 choices and accepted R-9 with documentation publication
 on 2026-10-24. R-9 trial-proof obligations are now folded into the normative Design and Test Plan,
 not kept as a separate decision source. The only additional coverage change follows main's relocated
 workflow, compatibility and installation guides. The owner accepted that refreshed baseline after clean R-12 on 2026-10-24; existing documentation
