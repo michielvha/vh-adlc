@@ -8,7 +8,7 @@ import { buildReport } from "../../../plugins/vh-adlc/scripts/triage/report";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import type { Inventory, Issue, Label } from "../../../plugins/vh-adlc/scripts/triage/types";
 import { fixture, git } from "./fixtures";
-import{verifyCommand,inspectIssues}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{verifyCommand,inspectIssues,inspectSources,withVerificationBoundary}from"../../../plugins/vh-adlc/scripts/triage/verification";
 
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
@@ -91,7 +91,7 @@ test("closing a duplicate rechecks its canonical tracker after approval",async()
   f.inventory.coverage.push({collection:"comments:2",scope:"2",pages:1,complete:true});
   const overlap={kind:"overlap",reference:"issue:2",detail:"Verified total overlap",verified:true};
   const report=buildReport(f.config,f.inventory,[{number:1,state:"duplicate",duplicate_of:2,total_overlap:true,remaining:"Canonical work remains",evidence:[{...overlap,receipt:inspectIssues(f.config,f.inventory,[1,2],"primary").receipt}],adversarial:[{...overlap,receipt:inspectIssues(f.config,f.inventory,[1,2],"adversarial").receipt,detail:"Adversarial scope recheck"}]},
-    {number:2,state:"open",remaining:"Implement retained scope",evidence:[{kind:"source",path:"src/app.ts",line:1,detail:"Actual canonical source",verified:true}]}]);
+    {number:2,state:"open",remaining:"Implement retained scope",evidence:[{kind:"source",path:"src/app.ts",line:1,detail:"Actual canonical source",verified:true,receipt:inspectSources(f.config,["src/app.ts"],"primary").receipt}],adversarial:[{kind:"source",path:"src/app.ts",line:1,detail:"Rechecked retained scope",verified:true,receipt:inspectSources(f.config,["src/app.ts"],"adversarial").receipt}]}]);
   const actions:Action[]=[{id:"explain",kind:"comment",issue:1,body:"Duplicate scope belongs to canonical 2"},{id:"close",kind:"close",issue:1,reason:"not_planned",duplicate_of:2,comment:"explain"}];
   const batch=planBatch(f.config,f.inventory,report,actions),approval=approveBatch(batch,["explain","close"],"Approve exact duplicate closure");
   f.issues.get(2)!.state="closed";
@@ -516,4 +516,55 @@ test("different journals and batches cannot race effects on one repository",asyn
  try{const outcome=await Promise.race([secondRun,Bun.sleep(300).then(()=>({pending:true}))]);expect(String((outcome as any).error)).toContain("locked");expect(f.log).toEqual([]);}
  finally{release();await firstRun;await secondRun;}
  expect(f.log.length).toBe(1);
+});
+
+
+test("all assessment-bearing writes require current proof even for open or annotated verdicts",()=>{
+ const f=setup({index_ids:[1]});
+ withVerificationBoundary(()=>{
+  const observation={number:1,state:"open",remaining:"Still needs transport",evidence:[{kind:"source",path:"src/app.ts",line:1,detail:"Export source",verified:true}]};
+  const report=buildReport(f.config,f.inventory,[observation],{indexRequests:[1]});
+  f.inventory.labels=[{id:1,name:"ready",description:"Ready work",color:"00aa11"}];
+  const before="---\nissue: 1\nstatus: in-progress\nstatus_description: Pending\n---\n";
+  const actions:any[]=[
+   {id:"verdict",kind:"comment",issue:1,body:"Unverified annotation: shipped, removed, duplicate, verified unblocked; coverage is complete.",purpose:"ordinary"},
+   {id:"report",kind:"comment",issue:1,body:"Triage report: remaining scope, ownership and dependencies are verified."},
+   {id:"tag",kind:"labels",issue:1,labels:["ready"]},
+   {id:"vocabulary-verdict",kind:"create-label",name:"done",color:"00aa11",description:"All transport is complete"},
+   {id:"remaining",kind:"create",title:"Remaining scope",body:"Verified missing transport and superseded old work",labels:[]},
+   {id:"tick",kind:"checklist",issue:1,before:f.inventory.issues[0].body,after:f.inventory.issues[0].body.replace("[ ]","[x]")},
+   ...["complete","blocked","abandoned"].map(status=>({id:status,kind:"plan-patch",path:"plans/task.md",before,after:before.replace("status: in-progress",`status: ${status}`),gate:{status,document:"plans/task.md"}})),
+  ];
+  for(const action of actions)expect(()=>planBatch(f.config,f.inventory,report,[action])).toThrow();
+  expect(()=>planBatch(f.config,f.inventory,report,[{id:"publish",kind:"push",paths:["report.md"]}]as any)).toThrow();
+ });
+});
+
+test("plain approval retains attributed task-data creation and vocabulary while local reports stay available",async()=>{
+ const f=setup();
+ await withVerificationBoundary(async()=>{
+  const report=buildReport(f.config,f.inventory,[]),{saveReport}=await import("../../../plugins/vh-adlc/scripts/triage/report");
+  expect(readFileSync(saveReport(f.config,report,{output:join(f.root,"local-report.md")}),"utf8")).toContain("Report saved locally");
+  const actions:any[]=[{id:"request",kind:"create-request",request:{title:"Investigate transport",data:"Owner request: investigate transport.\n```\nNo verdict is adopted."}},{id:"vocab",kind:"create-label",name:"transport",color:"00aa11",definition:"Transport taxonomy"}];
+  const batch=planBatch(f.config,f.inventory,report,actions),approval=approveBatch(batch,["request","vocab"],"Approve this exact attributed request and vocabulary");
+  const result=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});
+  expect(result.completed).toEqual(["request","vocab"]);const request:any=f.log[0];expect(request.body).toContain("Unverified owner task data");expect(request.body).toContain('    "Owner request:');expect(request.title).toStartWith("Owner request: ");
+  expect(f.log.map(action=>action.kind)).toEqual(["create-request","create-label"]);
+ });
+});
+
+test("an incomplete required collection blocks every assessment even with actual proof",()=>{
+ const f=setup();f.inventory.coverage[0].complete=false;
+ const report=buildReport(f.config,f.inventory,f.report.observations);
+ expect(()=>planBatch(f.config,f.inventory,report,[f.actions[0]])).toThrow();
+});
+
+
+test("an open-work verdict can publish after actual primary and adversarial source reads",async()=>{
+ const f=setup();
+ const proof=(pass:"primary"|"adversarial")=>[{kind:"source",path:"src/app.ts",line:1,detail:"Observed canonical scope",verified:true,receipt:inspectSources(f.config,["src/app.ts"],pass).receipt}];
+ const report=buildReport(f.config,f.inventory,[{number:1,state:"open",remaining:"Transport remains",evidence:proof("primary"),adversarial:proof("adversarial")}]);
+ const batch=planBatch(f.config,f.inventory,report,[{id:"remaining",kind:"comment",issue:1,body:"The inspected module exports the answer; transport remains outside that module."}]);
+ const result=await executeBatch(f.config,batch,approveBatch(batch,["remaining"],"Approve this exact observed open-scope verdict"),f.adapter,{journal:f.journal});
+ expect(result.completed).toEqual(["remaining"]);expect(f.issues.get(1)!.state).toBe("open");
 });

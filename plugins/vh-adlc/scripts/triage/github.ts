@@ -138,9 +138,9 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
         if (matches.length > 1 || matches.some((comment) => comment.body !== action.body)) throw new Error("conflicting-comment-receipt");
         return matches.length ? {} : null;
       }
-      if (action.kind === "create") {
+      if ((action.kind === "create"||action.kind === "create-request")) {
         const matches = (await all("issues")).map(normalizeIssue).filter((value) => value && value.body.includes(marker) && value.author.toLowerCase() === login.toLowerCase());
-        if (matches.length > 1 || matches.some((value) => value!.body !== action.body || value!.title !== action.title || JSON.stringify([...value!.labels].sort()) !== JSON.stringify([...action.labels].sort()))) throw new Error("conflicting-creation-receipt");
+        if (matches.length > 1 || matches.some((value) => value!.body !== action.body || value!.title !== action.title || JSON.stringify([...value!.labels].sort()) !== JSON.stringify([...(action.kind==="create"?action.labels:[])].sort()))) throw new Error("conflicting-creation-receipt");
         return matches.length ? { number: matches[0]!.number, url: `https://${config.hostname}/${config.repository}/issues/${matches[0]!.number}` } : null;
       }
       if (action.kind === "labels") {
@@ -180,8 +180,8 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
       else if (action.kind === "close") request("PATCH", `${base}/issues/${action.issue}`, { state: "closed", state_reason: action.reason });
       else if (action.kind === "checklist") request("PATCH", `${base}/issues/${action.issue}`, { body: action.after });
       else if (action.kind === "create-label") request("POST", `${base}/labels`, { name: action.name, color: action.color, description: action.description });
-      else if (action.kind === "create") {
-        const result = request("POST", `${base}/issues`, { title: action.title, body: action.body, labels: action.labels }) as { number: number; html_url: string };
+      else if ((action.kind === "create"||action.kind === "create-request")) {
+        const result = request("POST", `${base}/issues`, { title: action.title, body: action.body, labels: action.kind==="create"?action.labels:[] }) as { number: number; html_url: string };
         if (!Number.isSafeInteger(result.number) || result.number <= 0 || result.html_url !== `https://${config.hostname}/${config.repository}/issues/${result.number}`) throw new Error("invalid-created-issue-identity");
         return { number: result.number, url: result.html_url };
       } else throw new Error("unsupported-github-mutation");

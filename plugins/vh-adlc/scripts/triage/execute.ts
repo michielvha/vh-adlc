@@ -3,13 +3,14 @@ import{executionLock,repositoryLockPath}from"./execution-lock";
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { git, loadSettings, ownership, resolveInside, sourcePath,workstreamPath } from "./settings";
-import {buildReport,type Report} from "./report";
+import {buildReport,publicationVerified,type Report} from "./report";
 import type { Inventory, Issue, Label, Settings } from "./types";
 
 export type Action =
+  | {id:string;kind:"create-request";request:{title:string;data:string};title?:string;body?:string}
   | { id: string; kind: "comment"; issue: number; body: string }
   | { id: string; kind: "labels"; issue: number; labels: string[] }
-  | { id: string; kind: "create-label"; name: string; color: string; description: string }
+  | { id: string; kind: "create-label"; name: string; color: string; description: string;definition?:string }
   | { id: string; kind: "create"; title: string; body: string; labels: string[] }
   | { id: string; kind: "close"; issue: number; reason: "completed" | "not_planned"; duplicate_of: number | null; comment: string }
   | { id: string; kind: "checklist"; issue: number; before: string; after: string }
@@ -118,6 +119,26 @@ function validatePatch(config: Settings, action: Extract<Action, { kind: "plan-p
   } else if (!action.gate || action.gate.document !== action.path || action.gate.status !== after[fields.status] || !nonempty(action.gate.status)) bad();
 }
 
+function requestPayload(report:Report,action:Extract<Action,{kind:"create-request"}>){
+  if(!action.request||Object.keys(action.request).sort().join(",")!=="data,title"||!nonempty(action.request.title)||/[\r\n]/.test(action.request.title)||action.request.title.length>200||!nonempty(action.request.data)||Object.keys(action).some(key=>!["id","kind","request","title","body"].includes(key)))bad();
+  return{title:`Owner request: ${action.request.title}`,body:`Unverified owner task data. This issue records a request and makes no triage assessment.\n\n    ${JSON.stringify(action.request.data)}\n\n${marker(report,action.id)}`};
+}
+function vocabularyDescription(action:Extract<Action,{kind:"create-label"}>){
+  if(typeof action.definition!=="string"||!/^[-a-z0-9:]{1,63}$/.test(action.name)||!nonempty(action.definition)||Object.keys(action).some(key=>!["id","kind","name","color","description","definition"].includes(key)))return null;
+  return `Owner-selected taxonomy; unverified definition: ${JSON.stringify(action.definition)}`;
+}
+function publicationActions(config:Settings,inventory:Inventory,report:Report,actions:Action[]){
+  const neutral=(action:Action):boolean=>{
+    if(action.kind==="create-request"){requestPayload(report,action);return true;}
+    if(action.kind==="create-label")return vocabularyDescription(action)!==null;
+    if(action.kind==="plan-patch"&&action.created_by)return actions.some(prior=>prior.id===action.created_by&&prior.kind==="create-request");
+    if(action.kind==="commit")return Array.isArray(action.requires)&&action.requires.length>0&&action.requires.every(id=>actions.some(prior=>prior.id===id&&prior.kind==="plan-patch"&&neutral(prior)));
+    return false;
+  };
+  if(actions.some(action=>!neutral(action))&&!publicationVerified(config,inventory,report))bad();
+  for(const action of actions)if(!["comment","labels","create-label","create-request","create","close","checklist","plan-patch","commit"].includes(action.kind))bad();
+}
+
 export function planBatch(config: Settings, inventory: Inventory, report: Report, requested: Action[]): Batch {
   if (report.repository !== config.repository || inventory.repository !== config.repository || report.hostname !== config.hostname ||
       report.source_commit !== inventory.source_commit || git(config.root, "rev-parse", "HEAD") !== report.source_commit || !Array.isArray(requested)) bad();
@@ -125,6 +146,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
   const rebuilt=buildReport(config,inventory,report.observations,{runId:report.run_id,indexRequests:report.index_requests});
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(report)))bad();
   const actions = structuredClone(requested), ids = new Set<string>();
+  publicationActions(config,inventory,report,actions);
   if(actions.some(action=>!["plan-patch","commit"].includes(action.kind))&&(!nonempty(inventory.actor)||!inventory.coverage.some(entry=>entry.collection==="identity"&&entry.complete&&!entry.error)))bad();
   for (const action of actions) {
     if(action.kind==="create-label" || (action.kind==="labels"||action.kind==="create")&&action.labels.length){
@@ -145,12 +167,13 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
       if (action.kind === "checklist" && (row.ownership !== "index" || !row.index_requested || action.before !== issue.body || !checklist(action.before, action.after))) bad();
     }
     switch (action.kind) {
+      case "create-request":Object.assign(action,requestPayload(report,action));break;
       case "comment": case "create": {
         if (!nonempty(action.body) || action.kind === "create" && (!nonempty(action.title) || !strings(action.labels))) bad();
         action.body += `\n\n${marker(report, action.id)}`; break;
       }
       case "labels": if (!strings(action.labels) || !action.labels.length) bad(); break;
-      case "create-label": if (!nonempty(action.name) || !/^[0-9a-f]{6}$/i.test(action.color) || typeof action.description !== "string") bad(); break;
+      case "create-label": if(action.definition!==undefined){const description=vocabularyDescription(action);if(description===null)bad();action.description=description;}if (!nonempty(action.name) || !/^[0-9a-f]{6}$/i.test(action.color) || typeof action.description !== "string") bad(); break;
       case "close": if (!["completed", "not_planned"].includes(action.reason) || !nonempty(action.comment)) bad(); break;
       case "checklist": break;
       case "plan-patch": validatePatch(config, action); break;
@@ -161,7 +184,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
   for (const action of actions) {
     if (action.kind === "close" && !actions.some((prior) => prior.id === action.comment && prior.kind === "comment" && prior.issue === action.issue && actions.indexOf(prior) < actions.indexOf(action))) bad();
     if(action.kind==="close" && action.duplicate_of!==null && (!inventory.issues.some(issue=>issue.number===action.duplicate_of&&issue.state==="open") || actions.some(other=>other.kind==="close"&&other.issue===action.duplicate_of)))bad();
-    if (action.kind === "plan-patch" && action.created_by && !actions.some((prior) => prior.id === action.created_by && prior.kind === "create" && actions.indexOf(prior) < actions.indexOf(action))) bad();
+    if (action.kind === "plan-patch" && action.created_by && !actions.some((prior) => prior.id === action.created_by && ["create","create-request"].includes(prior.kind) && actions.indexOf(prior) < actions.indexOf(action))) bad();
     if (action.kind === "commit") {
       const patches = actions.filter((prior) => action.requires.includes(prior.id));
       if (patches.length !== action.requires.length || patches.some((prior) => prior.kind !== "plan-patch" || actions.indexOf(prior) > actions.indexOf(action)) ||
@@ -191,6 +214,9 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
       approval.action_ids.some((id) => !batch.actions.some((action) => action.id === id))) bad();
   const rebuilt=buildReport(config,batch.inventory,batch.report.observations,{runId:batch.report.run_id,indexRequests:batch.report.index_requests,fixedHead:batch.source_commit});
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(batch.report)))bad();
+  publicationActions(config,batch.inventory,batch.report,batch.actions);
+  for(const action of batch.actions)if(action.kind==="create-request"){const expected=requestPayload(batch.report,action);if(action.title!==expected.title||action.body!==expected.body)bad();}
+  for(const action of batch.actions)if(action.kind==="create-label"&&action.definition!==undefined&&action.description!==vocabularyDescription(action))bad();
   const path = options.journal;
   mkdirSync(dirname(path), { recursive: true });
   const releaseRepository=await executionLock(repositoryLockPath(config));let releaseLock:(()=>Promise<void>)|undefined;

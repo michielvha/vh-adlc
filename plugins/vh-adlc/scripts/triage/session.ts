@@ -38,12 +38,7 @@ async function sessionWithinBoundary(options:{config:Settings;inventory:Inventor
      const batch=planBatch(config,inventory,report,args.actions);batches.set(batch.hash,batch);result=batch;
     }else throw Error("analysis operation denied");
    }else{
-    if(!["execute","resume"].includes(request.method))throw Error("operator operation denied");
-    const approval=args.approval as Approval,batch=request.method==="resume"?args.batch as Batch:batches.get(approval?.batch_hash);
-    if(!batch)throw Error("batch is not owned by this session");
-    const journal=join(options.output,`journal-${approval?.batch_hash}.json`);
-    if(request.method==="resume"&&(!/^[a-f0-9]{64}$/.test(approval?.batch_hash??"")||!existsSync(journal)))throw Error("resume requires the original journal");
-    result=await executeBatch(config,batch,approval,options.adapter,{journal,gate:options.gate});
+    throw Error("the raw session protocol is report-only; execution requires a validated confined host adapter");
    }
    options.write(JSON.stringify({id,result,channel:operator?"operator":"analysis"}));
   }catch{options.write(JSON.stringify({id,error:"verification session request denied",channel:operator?"operator":"analysis"}));}

@@ -210,6 +210,21 @@ Unattributed uncertain checklist or vocabulary writes remain blocked for fresh r
 
 ## Exact batch approval
 
+Every published triage verdict requires fresh proof in a confined managed controller. This includes
+comments, labels, new issues and local status patches about open, partial, blocked, ready, completed,
+obsolete or duplicate work, ownership, dependencies and coverage. An unverified annotation or a
+caller-provided purpose never exempts an assessment. Incomplete required collection or verification
+blocks all such writes. Local reports and proposals remain available through any harness.
+
+The plain-chat path supports only structurally attributed task data and neutral vocabulary. A
+`create-request` action renders a fixed owner-request title and a JSON-quoted, indented body that
+adopts no triage verdict. For neutral vocabulary, supply `create-label.definition`: the helper renders
+an attributed, unverified definition for a simple taxonomy identifier. Read those final rendered
+payloads before approval. Arbitrary `create`, `comment` and `description` prose require current
+proof; unknown content receives the same treatment. These exceptions grant no report publication
+or push authority. The raw session protocol is report-only. Managed recovery runs a fresh confined
+native trial before it can reobserve and execute an unchanged original batch.
+
 Present the report first. Propose only justified actions. Use the packaged `batch` command with the
 inventory, the JSON report object, an actions JSON array and a new `--batch-output` file. It seals the
 repository, source, settings, evidence, target IDs and exact payloads into `hash`. Read the generated
@@ -231,7 +246,8 @@ exports the typed contract; reject unsupported fields/semantics rather than impr
 | --- | --- |
 | `comment` | `issue`, `body` |
 | `labels` | `issue`, `labels` array; adds the shown labels only |
-| `create-label` | `name`, six-digit hex `color`, `description` |
+| `create-label` | `name`, six-digit hex `color`, `description`; neutral vocabulary may instead supply `definition` for an attributed rendered description |
+| `create-request` | `request: {title, data}`; final `title` and JSON-quoted `body` are rendered and shown in the batch |
 | `create` | `title`, `body`, `labels` array |
 | `close` | `issue`, `reason`, `duplicate_of` (ID or null), `comment` (preceding evidence action ID) |
 | `checklist` | `issue`, entire `before` and `after` body |

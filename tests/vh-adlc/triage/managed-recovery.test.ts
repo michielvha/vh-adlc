@@ -8,9 +8,10 @@ import{inspectSources,withVerificationBoundary}from"../../../plugins/vh-adlc/scr
 import{buildReport}from"../../../plugins/vh-adlc/scripts/triage/report";
 import{operatorController}from"../../../plugins/vh-adlc/scripts/triage/controller-operator";
 import{MutationFailure}from"../../../plugins/vh-adlc/scripts/triage/execute";
-import{exportInputs}from"./native";
+import{exportInputs,verifyInputs}from"./native";
+import{resumeController}from"../../../plugins/vh-adlc/scripts/triage/controller-recovery";
 
-test("the shipped managed entry resumes the original journal with fresh reads and one comment total",async()=>{
+test("managed recovery reobserves the original batch and journal with one comment total",async()=>{
  const f=fixture(),control=mkdtempSync(join(tmpdir(),"triage-managed-recovery-"));try{
   f.settings({schema_version:1,source_roots:["src"]});
   const config=loadSettings(f.root),now=new Date().toISOString(),issue:any={number:1,title:"Answer export",body:"Export answer",state:"open",author:"owner",labels:[],milestone:null,created_at:now,updated_at:now,comments:[]};
@@ -42,9 +43,13 @@ else if(route?.endsWith("/issues/1")&&method==="PATCH"){const payload=JSON.parse
 else throw Error("Unapproved route");writeFileSync(path,JSON.stringify(data));console.log("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(result));
 `);chmodSync(join(tools,"gh"),0o700);
   const approval=JSON.stringify({batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Resume this exact approved fixture batch"}),attempt=join(control,"attempt");
-  const run=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"resume","--run-dir",analysis,"--batch-hash",batch.hash,"--output-dir",attempt],{env:{...process.env,PATH:tools+":"+process.env.PATH,TRIAGE_RECOVERY_API:database},stdin:Buffer.from(approval+"\n"),stdout:"pipe",stderr:"pipe",timeout:15_000});
-  expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});
-  const result=JSON.parse(run.stdout.toString());expect(result.completed).toEqual(["explain","close"]);
+  // The public CLI additionally requires a fresh confined native trial; missing
+  // that adapter must not turn archived files into execution authority.
+  const denied=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"resume","--run-dir",analysis,"--batch-hash",batch.hash,"--output-dir",attempt],{env:{...process.env,PATH:tools+":"+process.env.PATH,TRIAGE_RECOVERY_API:database},stdin:Buffer.from(approval+"\n"),stdout:"pipe",stderr:"pipe",timeout:15_000});
+  expect(denied.exitCode).toBe(1);expect(denied.stderr.toString()).toContain("configured confined native adapter");expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
+  const priorPath=process.env.PATH,priorApi=process.env.TRIAGE_RECOVERY_API;process.env.PATH=tools+":"+priorPath;process.env.TRIAGE_RECOVERY_API=database;
+  let result;try{result=await resumeController(analysis,batch.hash,attempt,JSON.parse(approval),verifyInputs,plugin);}finally{process.env.PATH=priorPath;if(priorApi===undefined)delete process.env.TRIAGE_RECOVERY_API;else process.env.TRIAGE_RECOVERY_API=priorApi;}
+  expect(result.completed).toEqual(["explain","close"]);
   const state=JSON.parse(readFileSync(database,"utf8"));expect(state.issue.comments.length).toBe(1);expect(state.issue.state).toBe("closed");expect(state.trace.filter((event:any)=>event.method!=="GET")).toEqual([{method:"PATCH",route:"repos/example/project/issues/1"}]);
   expect(JSON.parse(readFileSync(join(attempt,"result.json"),"utf8")).completed).toEqual(["explain","close"]);
  }finally{f.dispose();rmSync(control,{recursive:true,force:true});}

@@ -107,6 +107,16 @@ function observedProof(config:Settings,inventory:Inventory,values:Evidence[],pha
       return true;
     });
 }
+// Local reports retain observations. Publication additionally requires actual
+// current proof for every assessment carried by this report, including open work.
+export function publicationVerified(config:Settings,inventory:Inventory,report:Report){
+  return report.completeness.inventory&&report.completeness.verification&&!hasRequiredVerificationFailure(config)&&report.observations.length>0&&report.observations.every(value=>{
+    const row=report.rows.find(row=>row.number===value.number);
+    return row&&row.state!=="unverified"&&observedProof(config,inventory,value.evidence??[],"primary",value.number)&&observedProof(config,inventory,value.adversarial??[],"adversarial",value.number)&&
+      (value.blockers??[]).every(blocker=>verified(config,inventory,blocker.evidence)&&observedProof(config,inventory,blocker.evidence))&&
+      (!value.owned_by||!!config.workstream_ownership[value.number]||verified(config,inventory,value.ownership_evidence??[])&&observedProof(config,inventory,value.ownership_evidence??[]));
+  });
+}
 function selection(inventory: Inventory, config: Settings, observations: Observation[]): Issue[] {
   if (inventory.mode === "ids") return [...inventory.issues, ...inventory.closed_issues].filter((issue) => inventory.requested_ids.includes(issue.number));
   if (inventory.mode === "stale") return inventory.issues.filter((issue) => Date.parse(issue.updated_at) <= Date.parse(inventory.collected_at) - config.stale_days * 86400000);

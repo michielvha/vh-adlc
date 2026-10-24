@@ -27,17 +27,7 @@ test("the session keeps analysis requests separate from exact operator approval"
   async function* control(){await ready;yield request("execute",{approval:{batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Operator approves these exact actions"}});}
   const adapter={async identity(){return"operator";},async labels(){return[];},async issue(){return structuredClone(issue);},async receipt(){return null;},async mutate(action:any){effects.push(action.kind);if(action.kind==="comment")issue.comments.push({id:1,author:"operator",body:action.body});else if(action.kind==="close")issue.state="closed";return{issue:structuredClone(issue)};}};
   await verificationSession({config,inventory,checks:{},indexRequests:[1],output:join(f.root,"output"),analysis:analysis(),control:control(),write:line=>responses.push(JSON.parse(line)),adapter});
-  expect(effects).toEqual(["comment","close"]);expect(responses.at(-1).result.completed).toEqual(["explain","close"]);
-  const approval={batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Operator approves these exact actions"};
-  async function* none(){}
-  async function* resume(){yield request("resume",{batch,approval});}
-  await verificationSession({config,inventory,checks:{},output:join(f.root,"output"),analysis:none(),control:resume(),write:line=>responses.push(JSON.parse(line)),adapter});
-  expect(responses.at(-1).error).toBeDefined();expect(effects).toEqual(["comment","close"]);
-  let resumedReady:()=>void=()=>{};const canResume=new Promise<void>(resolve=>resumedReady=resolve);
-  async function* reobserve(){yield request("inspect",{paths:["src/app.ts"],pass:"primary"});yield request("inspect",{paths:["src/app.ts"],pass:"adversarial"});resumedReady();}
-  async function* approvedResume(){await canResume;yield request("resume",{batch,approval});}
-  await verificationSession({config,inventory,checks:{},output:join(f.root,"output"),analysis:reobserve(),control:approvedResume(),write:line=>responses.push(JSON.parse(line)),adapter});
-  expect(responses.at(-1).result?.completed).toEqual(["explain","close"]);expect(effects).toEqual(["comment","close"]);
+  expect(effects).toEqual([]);expect(responses.at(-1).error).toBeDefined();
 
  }finally{f.dispose();}
 });
