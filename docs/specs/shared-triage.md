@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-7 corrections preserve index protection and mode behavior and make the read-only trial confinement explicit."
+status_description: "The live-trial input boundary and credential/tool isolation are explicit; awaiting independent review."
 issue: null
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
@@ -279,13 +279,19 @@ remaining operations. No push, merge, release or implementation follows merely f
    adapter for the entire trial; its trace must show only reads, and any attempted mutation fails the
    trial. Whole-tracker before/after snapshots are supporting context, not an equality gate: attribute
    concurrent owner/bot changes separately and do not count them as trial actions. Confinement must
-   make the adapter the only live GitHub path: either use credentials that cannot write, or collect
-   through fixed GET-only calls outside the analysis agent, then analyze the snapshot with no GitHub
-   credentials, network/shell mutation path or connected write tool reachable. The latter route must
-   verify the host's source/credential isolation with a non-secret outside-packet canary and a denied
-   mutation probe; a renamed HOME or an instruction alone is insufficient. Record the actual adapter,
-   credentials' read-only capability or enforced isolation, negative probes and tool trace. Do not mint
-   or transfer credentials as part of this feature. If confinement cannot be established, the live
+   make the adapter the only live GitHub path for the entire trial. Use a trusted collector with fixed
+   GET-only calls outside the analysis agent, then give that agent an explicit input set: the collected
+   tracker snapshot, the source files required for the bounded issue scope at the fixed Stackweaver
+   HEAD, canonical plugin/settings and relevant configured report history. Record those input paths
+   and hashes. No GitHub credential, connected write tool, shell/network mutation path or access to an
+   owner's alternate keyring/profile is reachable from the analysis agent. Collector credentials stay
+   outside that input set and are never passed to the agent. Instructions or a renamed HOME alone
+   are insufficient isolation. Verify the actual enforced boundary with a non-secret canary outside
+   the declared input set and a mutation probe against the offline denying adapter or an authorized
+   disposable fixture, never against live Stackweaver. Credential metadata checks may support the
+   proof but a read-only token alone never establishes confinement. Record enforced isolation,
+   negative probes and the complete tool/adapter trace. Do not mint or transfer credentials as part
+   of this feature. If confinement cannot be established, the live
    trial remains not verified. The checkout,
    including settings and index, must remain unchanged.
    Exercise the approved-write protocol in an owner-authorized disposable fixture repository, not the
@@ -354,7 +360,7 @@ surfaces until separately tested. No other harness support is implied.
 | AC-04 | False-complete plan, merged Refs-only PR, unwired component, closed prerequisite with still-open dependent scope, missing source/test, removed/superseded scope, total duplicate of unfinished canonical work versus partial overlap, and dependency-cycle fixtures; inspect adversarial evidence and reason-correct closure proposals. |
 | AC-05 | Sweep/next/close/stale/explicit-ID fixtures, recording adapter asserts zero writes, same-day repeat preserves both reports, an external output override leaves settings unchanged and still reads configured history, counts and run-over-run differences match snapshots across mixed modes/scopes and incomplete coverage without false additions/removals, default reports remain uncommitted and explicit local commits follow repo rules; sweep/next ranking reasons and completeness match scope, while close/stale/explicit-ID reports contain no readiness ranking. |
 | AC-06 | Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch and retry. Explicitly request and approve an umbrella checklist patch/closure, then omit request or approval or change the patch's base body in negative cases; change an approved comment/label/closure/duplicate payload in negative cases. Inspect exact action log, preserved unrelated body content and other protected IDs. Include approved/unapproved plan-status patches and an attempted gated-completion sync; failed gates cannot change status. Bind new-label description/color and issue-URL backfill payloads; fail after issue creation and confirm retry backfills the same URL without another issue. Assert the approved plan commit subject/path set, unrelated index preservation and failed-commit retry state; intake-selected triage uses the same narrow authority reference and never shipping authority. |
-| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/index snapshots, verified read-only credentials or isolation with denied mutation/outside-packet probes, a read-only adapter trace and tracker snapshots with unrelated concurrent actor changes attributed and an inspected ordered publication handoff; verify the explicit output override, unchanged settings and configured previous-report source, and inspect the durable handoff in `tests/agent-triage/README.md`; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
+| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/index snapshots, enforced analysis-input/credential/tool isolation with denied outside-input-set and offline mutation probes, a read-only adapter trace and tracker snapshots with unrelated concurrent actor changes attributed and an inspected ordered publication handoff; verify the explicit output override, unchanged settings and configured previous-report source, and inspect the durable handoff in `tests/agent-triage/README.md`; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
 | AC-08 | Rollback/reapply procedure in `tests/agent-triage/README.md` executed in a disposable Stackweaver checkout; compare unrelated agents, plan files, index/worktree state and verify no service/credential operations. |
 | AC-09 | Diff only the declared migration paths and shared triage paths; compare hashes of existing maintenance/audit/docs/domain workflows and automation; confirm deferred register retains D-01 through D-05. |
 
@@ -376,7 +382,9 @@ proven coverage, generic no-settings behavior uses framework-owned conservative 
 adapter proves trial reads despite independent tracker activity. Claude model metadata remains local
 and mandatory under the existing Stackweaver rules. R-7 preserves already-required umbrella
 protection for unlisted indexes, proves the selected no-write trial through actual confinement, and
-retains mode-specific ranking. No publication or main-cutover authority is inferred.
+retains mode-specific ranking. R-8 removes any alternate-credential path from that same confinement
+requirement, names the bounded source input set and keeps mutation probes off the live tracker.
+No publication or main-cutover authority is inferred.
 
 ## Review Log
 
@@ -390,6 +398,7 @@ retains mode-specific ranking. No publication or main-cutover authority is infer
 | 2026-10-24 | R-5 | spec | `61c94b53b41e831e5b37d8e24ccbc9058ea16778` | claude-opus-5.5 | procedural | Clarify approved trial override/history, authority alignment, retained plan commits and durable handoff paths; complete the source list. |
 | 2026-10-24 | R-6 | spec | `ea38a917ca8e804253e2f53fa682d67cebe1a339` | claude-opus-5.5 | procedural | Clarify comparable report history, no-settings output, read-only trial attribution and mandatory Claude model metadata. |
 | 2026-10-24 | R-7 | spec | `2ad7eebfb05723f8f4bf54b755f543abda6c71cc` | claude-opus-5.5 | procedural | Protect unlisted index issues, require trial confinement and keep ranking limited to ranking modes. |
+| 2026-10-24 | R-8 | spec | `838914d60955ec42280a2db6bc323c9d7eaef7c5` | claude-opus-5.5 | procedural | Remove the alternate-credential bypass in trial confinement and define its source-input boundary. |
 
 ### R-1
 
@@ -609,6 +618,22 @@ SEVERITY: nit
 WHERE: Acceptance Criteria / AC-05; Design / Collection, verification and report; Design / Stackweaver migration and rollback step 3
 EVIDENCE: AC-05 at docs/specs/shared-triage.md:326 says "Every mode ... ranks verified prerequisites before dependents with reasons". Line 185 preserves the legacy modes. Stackweaver agents/issue-triage.md:253-255 defines `close` with "No ranking" and `#N` as deep verification of the named issues only. The intentional differences at lines 248-253 do not say that close and explicit-issue runs now rank. The AC-05 proof at line 340 says ranking "differ[s] correctly by mode", which conflicts with the criterion's wording.
 PROPOSAL: Limit the ranking clause in AC-05 to the modes that rank, such as sweep, next and stale. Alternatively, record ranking in close and explicit-issue runs as an intentional difference.
+
+### R-8
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Stackweaver migration and rollback step 5; Acceptance Criteria / AC-07; Test Plan / AC-07
+EVIDENCE: docs/specs/shared-triage.md:282-283 says confinement "must make the adapter the only live GitHub path: either use credentials that cannot write, or collect through fixed GET-only calls outside the analysis agent". Only the second route must have "no GitHub credentials, network/shell mutation path or connected write tool reachable" (lines 283-286). The first route only requires that the adapter's credentials cannot write. It does not require other write-capable credentials or tools to be unreachable. AC-07 at line 343 requires an "exclusively reachable read-only GitHub path", and the AC-07 proof at line 357 accepts "verified read-only credentials or isolation". Lines 280-282 attribute concurrent owner changes separately and do not count them as trial actions. Counterexample: the adapter uses an existing read-only token, while the owner's write-capable `gh` keyring login or a connected GitHub write tool can still be reached from the agent's shell (authority.md:37-39 prefers command-scoped credentials but does not remove others). The agent posts a comment with `gh issue comment`. The adapter trace shows only reads, the comment is attributed to the owner as a concurrent change, and AC-07 passes. This is the R-7 F-02 gap again, now on the first route. The spec also does not say where a negative mutation probe for the first route runs. A probe against the live Stackweaver tracker would write to it if the credential can in fact write.
+PROPOSAL: Under the read-only-credential route, also require that no write-capable GitHub credential, connector or other write path is reachable from the trial, and record that check together with the adapter trace. Verify the credential's read-only capability without risking a live write, for example by inspecting its permissions or probing only a disposable fixture repository.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design / Stackweaver migration and rollback step 5; Test Plan / AC-07
+EVIDENCE: docs/specs/shared-triage.md:285 requires "a non-secret outside-packet canary", and the AC-07 proof at line 357 requires "denied mutation/outside-packet probes". The document never defines "packet". The second route at line 283-284 analyzes "the snapshot", but resolved verdicts also need the Stackweaver source at HEAD (lines 165-166). So the boundary that the canary must sit outside of cannot be determined, and a reviewer cannot tell what a passing probe shows.
+PROPOSAL: Replace "packet" with the defined input set for the analysis agent, such as the collected tracker snapshot plus the Stackweaver checkout. State that the canary sits outside that set and must not be readable.
 
 ## Sources
 
