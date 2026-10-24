@@ -63,12 +63,11 @@ one fake comment and one fake closure. This does not renew private/legacy parity
 old quota failure is preserved. F-09's constant real-call count is still uncorrected and is not used
 as measured proof; fake adapter effects and source identity are the observed facts.
 
-R-18 F-01 is covered by the owner's enforced-proof choice for completion assertions and the existing
-rule that completion and cleared-blocker predicates need actual proof before readiness. Partial
-shipped scope asserts completion of that slice; readiness labels and blocker-removal writes publish
-the same verified predicates. This draft applies that rule consistently to those actions rather than
-creating an attestation exception. The explicit negative cases and T36 make that interpretation
-reviewable before acceptance.
+R-18 F-01 identifies readiness, partial-shipment and blocker-clearing writes as additional published
+verification assertions. The draft applies the recommended proof boundary consistently to those
+cases. Q6 keeps this explicit scope choice open for the owner's final acceptance of the reviewed
+spec; no implementation of that extension starts before acceptance. The earlier decisions on
+completion assertions and fresh comments after changed evidence remain resolved.
 
 The main-integration gate at `f279246902847ba0fafccef7a5c61d735701ac6d` passed 360 tests and 1395
 assertions using workspace-disk temporary files. Its first run failed with a tmpfs user-quota copy
@@ -618,10 +617,19 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
 
 ## Open Questions
 
-None. The owner resolved R-17 F-02 and F-05 on 2026-10-24: completion-asserting writes require the
-same enforced proof as closure; a materially changed context requires a new approved explanation
-comment, while unchanged original-batch resume does not duplicate completed actions. These choices
-are folded into Design, Acceptance Criteria, Test Plan and the unchecked implementation tasks.
+### Q6: Does the proof boundary also cover published readiness, partial-shipment and cleared-blocker assertions?
+
+**Recommendation:** A. Apply the same rule to ready/partial labels, blocked-label removal and comments that assert shipped phases or verified-unblocked status. The current draft's Design and tests specify A, pending explicit owner acceptance.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| A. Enforced proof | Published verification predicates have the same trust as completion assertions. | These labels/comments need the controller even without closure. |
+| B. Visible unverified attestations | Exact approval can publish these predicates outside the controller with an unverified annotation. | Readiness and partial-shipment writes keep weaker proof than completion assertions. |
+
+**Why this is yours:** R-18 F-01 distinguishes these writes from the examples in the earlier completion-write decision. Final acceptance of the reviewed draft can explicitly resolve Q6 as A without another normative edit.
+
+Earlier questions are resolved: completion-asserting writes require enforced proof, and a materially
+changed context needs a new approved explanation while unchanged-batch resume does not repeat it.
 
 ## Review Log
 
