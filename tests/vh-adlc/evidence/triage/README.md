@@ -1,6 +1,6 @@
 # Shared triage evidence
 
-The JSON records summarize actual observations and retain source and payload hashes. Native runs used disposable client profiles and a synthetic repository. The trusted Stackweaver collector made GET requests only; its raw private inputs remain in local temporary artifacts. Collection is separate from agent analysis.
+The JSON records summarize actual observations and retain source and payload hashes. The final clean-commit Claude/Codex runs share component `f1f1810fc24f2f6e586676a931cca30d7c78cddb` and the same canonical plugin hash; both passed native invocation, complete engineering-page reads, eight actual-session probes and external report rendering. No actions executed. The final disposable rollback/index rehearsal passed against adapter `4532b929286c1af9df5cfac3b37fddec6004a4a9`. Native runs used disposable client profiles and a synthetic repository. The trusted Stackweaver collector made GET requests only; its raw private inputs remain in local temporary artifacts. Collection is separate from agent analysis.
 
 The synthetic migration matrix in `tests/vh-adlc/triage/parity.test.ts` checks retained behavior and intentional differences across every mode. It does not establish a native run of the frozen legacy agent.
 

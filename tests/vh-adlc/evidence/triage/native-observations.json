@@ -85,5 +85,107 @@
         ]
       }
     }
+  ],
+  "final_verified_runs": [
+    {
+      "name": "claude-7",
+      "eligibility": "Clean committed component; actual native invocation and boundary probes observed.",
+      "schema_version": 1,
+      "host": "claude",
+      "component_commit": "f1f1810fc24f2f6e586676a931cca30d7c78cddb",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "567d1ed810e77d60feba42fa30e56241001664dc180d7ca9cd1da03d0a8cfd62",
+      "driver_hash": "2e5350c55b06b419205a7c75d446c241f1329afeb211d9e7b894705b819a4bd3",
+      "kind": "live-read-only-boundary",
+      "duration_ms": 42862,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "report_sha256": "63c720d4deee64f5cbed146a3129870c7f34a7c7d8d2b941269e3c611a414515",
+      "summary": {
+        "inventory_complete": true,
+        "verification_complete": true,
+        "rows": [
+          {
+            "number": 1,
+            "state": "resolved",
+            "disposition": "close-candidate",
+            "close_executable": true
+          },
+          {
+            "number": 2,
+            "state": "partial",
+            "disposition": "ready",
+            "close_executable": false
+          },
+          {
+            "number": 3,
+            "state": "open",
+            "disposition": "excluded",
+            "close_executable": false
+          },
+          {
+            "number": 4,
+            "state": "unverified",
+            "disposition": "excluded",
+            "close_executable": false
+          }
+        ],
+        "executed_actions": 0
+      }
+    },
+    {
+      "name": "codex-8",
+      "eligibility": "Clean committed component; actual native invocation and boundary probes observed.",
+      "schema_version": 1,
+      "host": "codex",
+      "component_commit": "f1f1810fc24f2f6e586676a931cca30d7c78cddb",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "567d1ed810e77d60feba42fa30e56241001664dc180d7ca9cd1da03d0a8cfd62",
+      "driver_hash": "2e5350c55b06b419205a7c75d446c241f1329afeb211d9e7b894705b819a4bd3",
+      "kind": "native-discovery",
+      "duration_ms": 83427,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "report_sha256": "cb36c35e436f9eabe4b8971c11dc9d7c9f87d7b8f4889cd052b6c4c157e5fd7a",
+      "summary": {
+        "inventory_complete": true,
+        "verification_complete": true,
+        "rows": [
+          {
+            "number": 1,
+            "state": "resolved",
+            "disposition": "close-candidate",
+            "close_executable": true
+          },
+          {
+            "number": 2,
+            "state": "partial",
+            "disposition": "ready",
+            "close_executable": false
+          },
+          {
+            "number": 3,
+            "state": "unverified",
+            "disposition": "excluded",
+            "close_executable": false
+          },
+          {
+            "number": 4,
+            "state": "unverified",
+            "disposition": "excluded",
+            "close_executable": false
+          }
+        ],
+        "executed_actions": 0
+      }
+    }
   ]
 }
