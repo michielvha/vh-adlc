@@ -304,15 +304,14 @@ remaining operations. No push, merge, release or implementation follows merely f
    environment-variable access, credential helpers, keyrings/agent sockets, connected tools and direct
    GitHub egress as well as file access. A mutation probe must originate there and target only the
    offline denying adapter or an authorized disposable fixture, never live Stackweaver. An offline
-   adapter unit test alone does not prove the analysis environment is confined. Credential metadata checks may support the
-   proof but a read-only token alone never establishes confinement. Record enforced isolation,
+   adapter unit test alone does not prove the analysis environment is confined. Credential metadata
+   checks may support the proof but a read-only token alone never establishes confinement. Record enforced isolation,
    negative probes and the complete tool/adapter trace. The trusted collector must include hashed
    per-collection pagination/completeness/error records in the snapshot; the operation validates and
    applies them under the existing report-wide incomplete-coverage rule, rather than trusting an
-   unqualified snapshot to be complete. Do not mint or transfer credentials as part
-   of this feature. If confinement cannot be established, the live
-   trial remains not verified. The checkout,
-   including settings and index, must remain unchanged.
+   unqualified snapshot to be complete. Do not mint or transfer credentials as part of this feature.
+   If confinement cannot be established, the live trial remains not verified. The checkout, including
+   settings and index, must remain unchanged.
    Exercise the approved-write protocol in an owner-authorized disposable fixture repository, not the
    live Stackweaver backlog. Record exact component and adapter revisions before retiring duplicate prose.
 6. **Rollback:** store the exact baseline/pair, restoration/reapplication commands and the ordered
@@ -364,7 +363,7 @@ surfaces until separately tested. No other harness support is implied.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
 - [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
 - [ ] AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved.
-- [ ] AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves protected work except explicitly requested and approved umbrella checklist/closure actions and unrelated body content, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
+- [ ] AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
 - [ ] AC-07: The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
 - [ ] AC-08: The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
 - [ ] AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
