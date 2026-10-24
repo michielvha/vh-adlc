@@ -455,3 +455,30 @@ process.stdout.write("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(value));
     expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});expect(JSON.parse(run.stdout.toString())).toEqual(expected);
   }
 });
+
+test("a vocabulary denial before the write is failed, not an uncertain remote outcome",async()=>{
+  const f=setup(),label={id:1,name:"existing",color:"00aa11",description:"Existing vocabulary"};
+  f.inventory.labels=[label];
+  const action:Action={id:"tag",kind:"labels",issue:1,labels:["existing"]},batch=f.batch([action]),approval=approveBatch(batch,["tag"],"Use this existing label only");
+  f.write(".vh-adlc/batch.json",JSON.stringify(batch));f.write(".vh-adlc/approval.json",JSON.stringify(approval));
+  f.write(".vh-adlc/github.json",JSON.stringify({label_reads:0,writes:0,issue:f.inventory.issues[0]}));
+  f.write("tools/gh",`#!/usr/bin/env bun
+import{readFileSync,writeFileSync}from"node:fs";
+const path=process.env.TRIAGE_FIXTURE_DB,data=JSON.parse(readFileSync(path,"utf8")),args=process.argv.slice(2),method=args[args.indexOf("--method")+1],endpoint=args.find(a=>a.startsWith("repos/"))??"user";
+if(args.includes("--jq")){process.stdout.write("42\\n");process.exit(0);}
+let response;
+if(endpoint==="user")response={login:"operator"};
+else if(endpoint.includes("/labels?")){data.label_reads++;response=data.label_reads===1?[${JSON.stringify(label)}]:[];}
+else if(endpoint.includes("/comments?"))response=[];
+else if(method==="GET")response={...data.issue,user:{login:data.issue.author},milestone:null};
+else{data.writes++;response={};}
+writeFileSync(path,JSON.stringify(data));process.stdout.write("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(response));
+`);
+  const{chmodSync}=await import("node:fs");chmodSync(join(f.root,"tools/gh"),0o700);
+  const code=`import{readFileSync}from"node:fs";import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{executeBatch}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/execute.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};const root=${JSON.stringify(f.root)},config=loadSettings(root),read=p=>JSON.parse(readFileSync(root+p,"utf8"));console.log(JSON.stringify(await executeBatch(config,read("/.vh-adlc/batch.json"),read("/.vh-adlc/approval.json"),githubExecutor(config),{journal:root+"/.vh-adlc/live-journal.json"})));`;
+  const run=Bun.spawnSync(["bun","-e",code],{env:{...process.env,PATH:`${join(f.root,"tools")}:${process.env.PATH}`,TRIAGE_FIXTURE_DB:join(f.root,".vh-adlc/github.json")},stdout:"pipe",stderr:"pipe"});
+  expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});
+  expect(JSON.parse(run.stdout.toString())).toEqual({completed:[],blocked:[],failed:["tag"]});
+  expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/github.json"),"utf8")).writes).toBe(0);
+  expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/live-journal.json"),"utf8")).uncertain).toEqual([]);
+});

@@ -168,11 +168,13 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
       return null;
     },
     async mutate(action) {
-      identity();
-      if(action.kind==="labels"||action.kind==="create"){
-        const existing=await labels();
-        if(action.labels.some(name=>!existing.some(label=>label.name.toLowerCase()===name.toLowerCase())))throw Error("implicit-label-creation-denied");
-      }
+      try {
+        identity();
+        if(action.kind==="labels"||action.kind==="create"){
+          const existing=await labels();
+          if(action.labels.some(name=>!existing.some(label=>label.name.toLowerCase()===name.toLowerCase())))throw Error("implicit-label-creation-denied");
+        }
+      } catch { throw new MutationFailure(false); }
       if (action.kind === "comment") request("POST", `${base}/issues/${action.issue}/comments`, { body: action.body });
       else if (action.kind === "labels") request("POST", `${base}/issues/${action.issue}/labels`, { labels: action.labels });
       else if (action.kind === "close") request("PATCH", `${base}/issues/${action.issue}`, { state: "closed", state_reason: action.reason });
