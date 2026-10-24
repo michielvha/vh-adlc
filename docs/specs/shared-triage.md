@@ -360,14 +360,23 @@ surfaces until separately tested. No other harness support is implied.
 ## Acceptance Criteria
 
 - [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support.
+      Evidence: R-13 returned `not verified`; its executed subset does not establish the composite criterion.
 - [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+      Evidence: R-13 returned `not verified`; its executed subset does not establish the composite criterion.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
+      Evidence: R-13 returned `untested`; its executed subset does not establish the composite criterion.
 - [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
+      Evidence: R-13 returned `untested`; its executed subset does not establish the composite criterion.
 - [ ] AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved.
+      Evidence: R-13 returned `untested`; its executed subset does not establish the composite criterion.
 - [ ] AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
+      Evidence: R-13 returned `untested`; its executed subset does not establish the composite criterion.
 - [ ] AC-07: The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
+      Evidence: R-13 returned `not verified`; its executed subset does not establish the composite criterion.
 - [ ] AC-08: The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
+      Evidence: R-13 returned `not verified`; its executed subset does not establish the composite criterion.
 - [ ] AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
+      Evidence: R-13 returned `not verified`; its executed subset does not establish the composite criterion.
 
 ## Test Plan
 
@@ -431,6 +440,12 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Completed native proof: clean component `f1f1810fc24f2f6e586676a931cca30d7c78cddb` passed Claude CLI (`/tmp/shared-triage-native-Qa6oBi/claude-7`) and Codex CLI generic intake (`codex-8`) against the same plugin hash `567d1ed810e77d60feba42fa30e56241001664dc180d7ca9cd1da03d0a8cfd62`. Both installed the native marketplace payload, read engineering pages and canonical triage, passed all eight actual-session probes, and saved valid external reports. The reports retain resolved/partial scope and exclude protected/index work; no actions executed. Claude also verifies the exclusively reachable restricted tool set. This is synthetic-fixture proof, not the private live trial. Sanitized records are in `tests/vh-adlc/evidence/triage/native-observations.json`.
       History cleanup: the owner approved rewriting only unpublished feature history. Cleanup removed the private status-report blob from every commit reachable through that feature suffix, preserved the final source tree and index bytes, and left published main refs unchanged. The current fixture is synthetic. See `tests/vh-adlc/evidence/triage/history-cleanup.json` for the old/new commit mapping. Original observed native commit IDs are retained with verified rewritten equivalents; they are not fabricated reruns. No code push or force push occurred, and publication still needs its separate authority.
       Native follow-up: Codex exposed MCP tools but its second run was denied by the noninteractive approval policy. The driver now declares only four bounded read-only adapter tools and scopes their automatic approval to that server; the next actual invocation must prove this works. Input manifests and snapshots are line-paginated JSON rather than single huge lines.
+- [ ] T14a `collect.ts`, `github.ts`, `execute.ts` and triage tests - reproduce and fix R-13 F-01/F-08: collect verified paginated label vocabulary, gate missing labels on exact approved completed creation, and prevent implicit vocabulary creation during issue creation or label assignment (AC-03, AC-06).
+- [ ] T14b `report.ts`, `execute.ts` and triage tests - reproduce and fix R-13 F-02/F-04: rebuild action eligibility from the original observations/inventory, require an open retained canonical issue, block duplicate chains/cycles and revalidate the canonical before closure (AC-03, AC-04, AC-06).
+- [ ] T14c `github.ts`, `execute.ts` and triage tests - reproduce and fix R-13 F-05: bind the approved actor across retries and attribute action receipts; external changes are blocked rather than credited to this batch (AC-06).
+- [ ] T14d `collect.ts`, `github.ts` and collection tests - reproduce and fix R-13 F-06: detect unstable offset pagination without silent omissions or inferred removals (AC-03, AC-05).
+- [ ] T14e settings, report/execution and Stackweaver migration paths - reproduce and fix R-13 F-07 with data-driven local workstream sources, enforced despite omitted agent ownership fields (AC-02, AC-06, AC-09).
+- [ ] T14f report/native evidence and triage tests - reproduce and fix R-13 F-03: require distinct adversarial verification and observed provenance for executable closure evidence; unproven claims remain non-executable (AC-04).
 - [ ] T15 `tests/vh-adlc/evidence/triage/` and this document's evidence - actual Codex/Claude CLI invocation, existing-route regressions, frozen legacy parity, bounded live read-only trial and rollback/reapply have observed pass results tied to exact component/adapter commits; retain failures and unavailable proof honestly (AC-01, AC-03, AC-07, AC-08, AC-09).
       Live collection: the first run failed closed on valid numeric/cursor GitHub pagination and legacy metadata. Focused regressions reproduced both failures and passed after fixes (`/tmp/shared-triage-live-collection-regressions.log`). The retry collected 10 issue pages, 6 PR pages, all three selected comment collections and 380 plans with complete coverage, preserving the complete checkout and index (`/tmp/shared-triage-live-fQqFQh`, adapter `4532b929286c1af9df5cfac3b37fddec6004a4a9`). This is collection proof only; analysis, parity and native trials remain open.
       Evidence hardening: focused red/green tests cover legacy prose-only close reports, merged closing references bound to the current issue, verified-cleared prerequisites, externally preapplied gated status, source changes on unapproved plan paths, owned-patch retry and GitHub account changes immediately before effects. The 42 report/execution tests pass (`/tmp/shared-triage-binding-suite.log`). Full plugin suite: 309 pass, 1104 assertions (`/tmp/shared-triage-binding-full-suite.log`); both CLI and native-driver builds pass. No remote effects were used for these tests.
@@ -440,7 +455,7 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Final local pair: component `f1f1810fc24f2f6e586676a931cca30d7c78cddb`, adapter `4532b929286c1af9df5cfac3b37fddec6004a4a9`. The exact-checkout migration test passed 5 tests/74 assertions (`/tmp/shared-triage-paired-migration-final.log`). Rollback, reapplication, byte-preserved index and normal report/index placement passed in disposable clone `/tmp/stack-triage-rehearsal-6a36p5`; original adapter remains clean. See `tests/vh-adlc/evidence/triage/rollback-observation.json`. The remaining T15 obligations are private live analysis, native frozen-legacy/shared parity and compatibility-command invocation; none is replaced by the synthetic matrix.
 - [ ] T16 `tests/vh-adlc/evidence/triage/` and this document's evidence - required Codex desktop and VS Code Local discovery/read-only invocation are observed; full relevant checks and a fresh independent committed implementation review establish every criterion or an owner-approved durable residual before the complete gate (AC-01 through AC-09).
 
-      review pending: the owner approved the bounded paired Copilot Opus packet on 2026-10-24. Refresh it to the cleaned committed pair and invoke the review; no implementation-review records have yet been returned or stored.
+      Independent R-13 returned from Copilot Opus 5.5 at the committed pair. Its records are stored verbatim below. No criterion was independently verified; execute the corrective tasks and repeat the review with direct native/rollback proof before completion.
       GUI availability check: this host exposes neither DISPLAY nor WAYLAND_DISPLAY, and the connected document-control service reports no sessions. Codex desktop and VS Code Local native invocation remain unverified; CLI proof does not satisfy them. No GUI residual has been approved.
 
 ## Open Questions
@@ -470,6 +485,7 @@ publication authority remains in force.
 | 2026-10-24 | R-11 | spec | `1f769d91e7d662885b6854de3260b618f0101e35` | claude-opus-5.5 | procedural | One factual nit: make the trial probe pass condition explicit in AC-07 proof. |
 | 2026-10-24 | R-12 | spec | `68d2f1eabe959be346082859ad7ac105cdb23300` | claude-opus-5.5 | procedural | No findings after the documentation relocation and normative trial-proof refresh. |
 | 2026-10-24 | R-12 | spec | `68d2f1eabe959be346082859ad7ac105cdb23300` | n/a | n/a | accepted by owner |
+| 2026-10-24 | R-13 | implementation | `3dab874f7372b3cf8c35be12c4aa483084e9a7f2` | claude-opus-5.5 | procedural | One blocking execution finding and eight further findings; no criterion independently verified. |
 
 ### R-1
 
@@ -764,6 +780,108 @@ PROPOSAL: Restore the pass condition in the AC-07 proof. For example: every prob
 ### R-12
 
 NO FINDINGS
+
+### R-13
+
+
+CRITERION: AC-01 The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support.
+VERDICT: not verified
+EVIDENCE: proof.sh (no arguments) at component 3dab874f7372b3cf8c35be12c4aa483084e9a7f2 with tree clean: bun test tests/vh-adlc exited 0 with 314 pass, including discovery.test.ts (eight skills, lifecycle row, guide text). Those are structural text checks: discovery.test.ts:19-26 only checks that route rows exist, and :36-44 only checks for phrases. I observed no native invocation. tests/vh-adlc/evidence/triage/native-observations.json records Claude and Codex CLI runs at f1f1810 (rewritten to 2cfcb49), not at the reviewed component, and this review did not run them. No Codex desktop or VS Code Local discovery or invocation is recorded (shared-triage.md:444). docs/reference/compatibility.md and docs/get-started/installation.md are not in the packet, so I could not inspect them.
+
+CRITERION: AC-02 Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+VERDICT: not verified
+EVIDENCE: proof.sh at 3dab874 and adapter 4532b92: settings.test.ts (23), the report ownership, ranking and index tests, and migration.test.ts "project settings retain source, priority, plan, history and hard ownership behavior" all pass. A grep of plugins/ for Stackweaver IDs, mirror, milestone, bot and model constants found none. However, stackweaver/.vh-adlc/triage.json:14 sets owned_labels to [] and encodes no other-workstream ownership. The RBAC, TFE and audit exclusions exist only as prose in stackweaver/agents/issue-triage.md:18-20 and depend on an agent-supplied owned_by (see F-07). The live Stackweaver analysis that would show repository-correct output is still pending and I did not observe it.
+
+CRITERION: AC-03 Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
+VERDICT: untested
+EVIDENCE: proof.sh: collection.test.ts (14) and report.test.ts pass for page caps, failed pages, repeated cursors and IDs, budgets and report-wide closure blocking. No check covers offset-page shift during collection. In that case an item is silently skipped while coverage stays complete (F-06). No check covers planBatch accepting report-supplied completeness and close_executable flags without recomputing them (F-04). tests/vh-adlc/evidence/triage/live-collection.json is an author record of a trusted GET-only collection. I did not observe that run.
+
+CRITERION: AC-04 Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
+VERDICT: untested
+EVIDENCE: proof.sh: report.test.ts closure cases pass. Reading report.ts:209-213, a duplicate closure is accepted when the canonical issue is closed, and when two issues name each other as canonical. No test covers either case (F-02). In report.test.ts:86 the adversarial pass is the same evidence object as the first pass, and report.ts:51-80 accepts self-reported test exit codes and any existing file as wiring (F-03). So no adequate check establishes adversarial verification or a canonical issue that retains the work.
+
+CRITERION: AC-05 Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved.
+VERDICT: untested
+EVIDENCE: proof.sh: report.test.ts and execution.test.ts pass for history selection, same-day preservation, the external output override, mode-limited ranking, blocked exclusion and zero writes before approval. Nothing implements or tests the "commit a report on request under repository rules" path. The helper's commit action accepts only plan-patch paths (execute.ts:146-149), and the only coverage is phrase checks in discovery.test.ts:33. The run-over-run removal accuracy depends on the pagination gap in F-06. I observed no native or live run that reports every mode.
+
+CRITERION: AC-06 Execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
+VERDICT: untested
+EVIDENCE: proof.sh: execution.test.ts (25) passes against recording adapters. That covers payload binding, stale source and issue checks, gate lines, commit subject, body and paths, retries, lost receipts and the packaged CLI with an offline GitHub process. execution.test.ts:127-131 approves a labels action for "ready" while the create-label action stays unapproved, and asserts that the write succeeds. Against live GitHub that write creates the unapproved label (F-01). Close, labels and checklist receipts accept effects made by another actor as completed approved actions (F-05). No owner-authorized disposable repository run was observed.
+
+CRITERION: AC-07 The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
+VERDICT: not verified
+EVIDENCE: proof.sh: the Stackweaver HEAD equals 4532b92, the tree is clean, and the only changes from 129581f are in the allowed migration paths. migration.test.ts (5) and the adapter contract tests (2) pass. I read stackweaver/.claude/commands/triage.md (model: fable kept, forwards, no fallback) and agents/issue-triage.md. The criterion also needs native frozen legacy/shared parity, compatibility-command invocation and the bounded live read-only analysis trial with in-environment probes. T15 (shared-triage.md:434-440) records all of these as pending, and I observed none. parity.test.ts is a synthetic matrix, not native parity.
+
+CRITERION: AC-08 The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
+VERDICT: not verified
+EVIDENCE: stackweaver/tests/agent-triage/rehearse.ts and README.md exist at the adapter commit, and migration.test.ts checks the handoff text. The disposable rollback and reapply rehearsal is recorded only as an author claim (tests/vh-adlc/evidence/triage/rollback-observation.json, shared-triage.md:440). proof.sh does not run it, and this review did not observe its execution.
+
+CRITERION: AC-09 Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
+VERDICT: not verified
+EVIDENCE: proof.sh observed `git diff --name-only 129581f..4532b92` in Stackweaver, limited to AGENTS.md, .vh-adlc/triage.json, .claude/commands/triage.md, agents/issue-triage.md and tests/agent-triage/. So the Stackweaver maintenance, audit, docs, TFE and provider-fork workflows and automation are unchanged. stackweaver/AGENTS.md:12-23 still routes those workflows locally. shared-triage.md:80-86 retains D-01 through D-05. The shared-side diff and hash comparison in the Test Plan was not observed. discovery.test.ts:19-26 only checks that route row labels exist, not that existing contracts are unchanged.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Owner-approved execution; plugins/vh-adlc/scripts/triage/execute.ts planBatch; scripts/triage/github.ts mutate; AC-06
+EVIDENCE: execute.ts:134 accepts any non-empty label names for a labels action, and execute.ts:131 does the same for create. Neither checks the names against the repository's existing labels or requires an approved create-label action to come first. github.ts:167 and :172 send the names directly to POST issues/N/labels and POST issues. GitHub creates a missing label when one is added this way, using a default color and no description. references/triage.md:165 limits label actions to "existing-label additions", and Design lines 212-213 and 228-229 bind new-label descriptions and colors to approval. execution.test.ts:127-131 approves only "tag" (labels ["ready"]) and leaves "vocab" (create-label "ready") unapproved. It then asserts that the labels write executes, which on live GitHub would create the unapproved label.
+PROPOSAL: Collect the label inventory, and reject at both planning and execution any labels or create entry that names a label missing from it unless an approved create-label action for that exact name comes first and has completed. Replace the test expectation with that negative case.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Collection, verification and report step 3; scripts/triage/report.ts buildReport; execute.ts planBatch and executeBatch; AC-04
+EVIDENCE: report.ts:211 accepts any canonical issue found in inventory.issues or inventory.closed_issues, and only rejects a canonical equal to the issue itself. Design line 179 and references/triage.md:104 require "an identified canonical issue that retains the remaining work". Counterexample 1: #5 is marked a total duplicate of #4, which is already closed as not_planned. #5 becomes close_executable, and the remaining work is left with no open tracker. Counterexample 2: #6 is a duplicate of #7 and #7 is a duplicate of #6. Both become close candidates, and one batch can close both. executeBatch (execute.ts:216-232) rechecks only the target issue, never the canonical, so a canonical closed after approval is not detected. report.test.ts:83-90 covers only an open canonical.
+PROPOSAL: Require the canonical issue to be open, outside the batch's own close set, and not itself a duplicate or close candidate. Recheck its state before the duplicate closure executes, and add tests for a closed canonical and for mutual duplicates.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: report.ts validEvidence and completed; AC-04
+EVIDENCE: report.ts:59 accepts `test` evidence on a claimed command string and exit_code 0, and executes nothing. report.ts:61 accepts `wiring` for any path that exists at the source commit. report.ts:200-204 requires the adversarial array to validate, but it may be byte-identical to the first pass. report.test.ts:86 passes the same `overlap` object as both evidence and adversarial. So a report closes "resolved" work when the agent supplies one existing source line plus a claimed test or any existing file, copied into both passes. "Adversarially verified" then has no structural meaning beyond restating the claim.
+PROPOSAL: Require the adversarial pass to include at least one item that differs from the first pass, and record test execution provenance the driver observed, such as a log hash, instead of a self-reported exit code. Alternatively, mark such closures as serial claims and keep them out of executable closure.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: execute.ts planBatch; scripts/triage/cli.ts batch; Owner-approved execution; AC-03, AC-06
+EVIDENCE: cli.ts:32-33 loads `--report` as arbitrary JSON. execute.ts:116-127 trusts that JSON's row.close_executable, row.ownership, row.index_requested, closure_reason, duplicate_of and report.completeness. It checks only identity and source_commit against the inventory and HEAD. It never recomputes buildReport from the inventory and observations, and never binds to the hash of the saved report file the owner read. A report JSON edited or generated outside buildReport can have close_executable true despite incomplete coverage or an unverified state. planBatch then accepts it, which bypasses the report-wide closure block in Design line 160-161.
+PROPOSAL: In planBatch, rebuild the report from the inventory and the recorded observations, or verify a hash of the saved report file, and reject any mismatch before hashing the batch.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: github.ts receipt and identity; execute.ts executeBatch receipt path and Batch type; AC-06
+EVIDENCE: github.ts:141-145 returns a close receipt whenever the issue is closed with the same state_reason, and a checklist receipt whenever the body equals `after`. :137-139 does the same for labels when they are present. None of these checks who made the change, unlike the comment and create receipts at :128 and :133. execute.ts:223-229 checks receipts before the material-change guard, so a concurrent closure by another account is journaled as this batch's completed approved closure. The Batch type (execute.ts:26-29) and Approval record no GitHub account. identity() (github.ts:99-105) only pins the first login seen in each process, so a retry under a different account passes. references/triage.md:11-12 requires confirming the account before presenting the batch.
+PROPOSAL: Record the confirmed actor in the batch hash and reject execution under any other login. For close, labels and checklist receipts, require timeline or event attribution to that actor, otherwise treat the change as a material change and block.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Collection step 1; github.ts githubReader; collect.ts pages; report.ts compare; AC-03, AC-05
+EVIDENCE: github.ts:55-56 pages issues (state=all) and closed pulls by page number, sorted by created date ascending, and collect.ts:121-133 only detects repeated IDs. If an issue earlier in the order is deleted, transferred or converted to a discussion between page reads, one item shifts onto an already-read page and is never seen. The same happens to a closed unmerged pull that is reopened. No ID repeats, so the entry stays complete:true. report.ts:163-168 then treats both inventories as complete and comparable and lists the skipped open issue under `removed`. Design line 194 says incomplete coverage never implies removal.
+PROPOSAL: Verify each collection after paging, for example by rereading page 1 and the last page, or by checking total counts or a since/updated_at window, and mark coverage incomplete on any discrepancy. Add a fixture that removes an item between pages.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Repository settings; Stackweaver .vh-adlc/triage.json and agents/issue-triage.md; settings.ts ownership; execute.ts planBatch; AC-02
+EVIDENCE: Design line 124 says settings describe bot and workstream ownership. stackweaver/.vh-adlc/triage.json:14 has owned_labels [] and no other workstream data. stackweaver/agents/issue-triage.md:18-20 tells the agent to read the audit ledger, TFE directory and RBAC_MASTER_PLAN to identify other-owned work. settings.ts:133-138 cannot express this, so report.ts:195-196 protects such an issue only when the agent supplies owned_by. execute.ts:124 rechecks only settings ownership. Counterexample: an RBAC-plan issue whose observation omits owned_by is eligible, and a close or label batch for it passes planBatch and executeBatch.
+PROPOSAL: Add a data-driven workstream rule to the settings schema, such as plan-path or issue-reference sources, populate it for Stackweaver, and apply it in buildReport, planBatch and executeBatch.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: github.ts receipt for create-label
+EVIDENCE: github.ts:150-152 lists labels by calling parsePage without repositoryId and spawns gh without GH_PROMPT_DISABLED. The issue and comment reader at :74 passes repositoryId because live GitHub returns /repositories/<id>/ next links (shared-triage.md:435, collection.test.ts "GitHub numeric repository links"). In a repository with more than 100 labels, parsePage throws next-page-target-changed, so the approved create-label action always fails before it is attempted. This fails closed but cannot execute.
+PROPOSAL: Route label listing through the same validated reader chain with repositoryId and the same environment, and add a multi-page label fixture.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks T14 evidence; tests/vh-adlc/evidence/triage/native-observations.json
+EVIDENCE: shared-triage.md:431 states that Claude and Codex both "passed all eight actual-session probes" at f1f1810. In native-observations.json:147-157, codex-8 has kind "native-discovery", while claude-7 has "live-read-only-boundary". Line 433 then says Codex's next invocation "must prove" the MCP approval scoping works, so the Codex probe claim is unclear. Both final runs target f1f1810 (rewritten to 2cfcb49 per history-cleanup.json:29), not the reviewed component 3dab874. T14 also requires native proofs rerun against the final payload (line 429). The synthetic runs are also labeled "live-read-only-boundary" although the file's own scope says they are not live proof.
+PROPOSAL: Re-run both CLI native trials at the final reviewed component and record the probe results for each host explicitly. Rename the synthetic run kind so that it is not confused with the pending live trial.
 
 ## Sources
 
