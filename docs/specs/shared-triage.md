@@ -389,7 +389,8 @@ One commit per task. Test tasks preserve their observed expected failure; the fo
 task makes them pass. Every task records its command and result when performed. Runtime helpers use
 Bun, the repository's existing scripting runtime; they are packaged with the canonical component.
 
-- [ ] T1 `tests/vh-adlc/triage/settings.test.ts`, `tests/vh-adlc/triage/fixtures.ts` - settings fixtures fail because the shared validator does not exist; cover no settings, bad versions/shape, identity conflicts, path escapes, protected/index roles and Stackweaver-independent defaults (AC-02, AC-09).
+- [x] T1 `tests/vh-adlc/triage/settings.test.ts`, `tests/vh-adlc/triage/fixtures.ts` - settings fixtures fail because the shared validator does not exist; cover no settings, bad versions/shape, identity conflicts, path escapes, protected/index roles and Stackweaver-independent defaults (AC-02, AC-09).
+      Evidence: `bun test tests/vh-adlc/triage/settings.test.ts` failed as expected: missing canonical settings module; raw output `/tmp/shared-triage-t1-red.log`. No implementation or criterion pass is claimed.
 - [ ] T2 `plugins/vh-adlc/scripts/triage/settings.ts`, `plugins/vh-adlc/scripts/triage/types.ts`, `plugins/vh-adlc/references/triage-settings.md` - T1 passes with one validated settings and normalized data contract, documented runtime requirements and no project constants in defaults (AC-02).
 - [ ] T3 `tests/vh-adlc/triage/collection.test.ts` - pagination/error/plan-inventory fixtures fail because the collector is missing; include collections beyond old limits and per-collection scope, completion and sanitized error metadata (AC-03, AC-02).
 - [ ] T4 `plugins/vh-adlc/scripts/triage/collect.ts`, `plugins/vh-adlc/scripts/triage/github.ts`, `plugins/vh-adlc/scripts/triage/cli.ts` - T3 passes through the same structured collector used by the CLI, with fixed read requests, paginated comments and explicit incomplete coverage (AC-03).
