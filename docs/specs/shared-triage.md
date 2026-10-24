@@ -518,6 +518,7 @@ publication authority remains in force.
 | 2026-10-24 | R-12 | spec | `68d2f1eabe959be346082859ad7ac105cdb23300` | n/a | n/a | accepted by owner |
 | 2026-10-24 | R-13 | implementation | `3dab874f7372b3cf8c35be12c4aa483084e9a7f2` | claude-opus-5.5 | procedural | One blocking execution finding and eight further findings; no criterion independently verified. |
 | 2026-10-24 | R-14 | implementation | `d0682cf89980c54da8b0f43f12e14357f0240243` | claude-opus-5.5 | procedural | Executed proof retains native behavior failures; GUI acceptance remains unverified. |
+| 2026-10-24 | R-15 | implementation | `cc84af85ee4f6db8045da6548cdb199c0f134e4c` | claude-opus-5.5 | procedural | Frozen proof observed checks and native failures; boundary implementation reviewed after the owner decision. |
 
 ### R-1
 
@@ -915,65 +916,6 @@ WHERE: Tasks T14 evidence; tests/vh-adlc/evidence/triage/native-observations.jso
 EVIDENCE: shared-triage.md:431 states that Claude and Codex both "passed all eight actual-session probes" at f1f1810. In native-observations.json:147-157, codex-8 has kind "native-discovery", while claude-7 has "live-read-only-boundary". Line 433 then says Codex's next invocation "must prove" the MCP approval scoping works, so the Codex probe claim is unclear. Both final runs target f1f1810 (rewritten to 2cfcb49 per history-cleanup.json:29), not the reviewed component 3dab874. T14 also requires native proofs rerun against the final payload (line 429). The synthetic runs are also labeled "live-read-only-boundary" although the file's own scope says they are not live proof.
 PROPOSAL: Re-run both CLI native trials at the final reviewed component and record the probe results for each host explicitly. Rename the synthetic run kind so that it is not confused with the pending live trial.
 
-## Sources
-
-- [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
-- [Stackweaver command adapter](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/.claude/commands/triage.md): current Claude routing and conflicting early-label versus report-first instructions.
-- [Shared lifecycle procedure](https://github.com/michielvha/vh-adlc/blob/9b68b56292416da212910c62e133e09a49cd5258/plugins/vh-adlc/references/lifecycle.md): existing intake, bounded maintenance and generic-request publication boundaries.
-- [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md): draft, independent review, acceptance, test mapping and one living feature document.
-
-- [Stackweaver harness-neutral entry](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/AGENTS.md): local playbook and Claude-command routing.
-
-- [Stackweaver project rules](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/CLAUDE.md): isolation, verification, documentation and local delivery requirements.
-
-- [Stackweaver maintenance playbook](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/maintenance.md): deferred dependency workflow and satellite-protection behavior.
-
-- [Stackweaver maintenance command](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/.claude/commands/maintenance.md): the deferred wrapper/playbook protection-policy conflict.
-
-- [Stackweaver audit playbook](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/codebase-audit.md): persistent findings and the deferred auto-merge authority decision.
-
-- [Stackweaver docs impact](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-impact.md): the deferred scope-change documentation workflow.
-
-- [Stackweaver docs drift audit](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-drift-audit.md): the deferred corpus-wide drift workflow.
-
-- [Stackweaver docs drift resolver](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-drift-resolver.md): the deferred drift resolution workflow.
-
-- [Stackweaver docs truth](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-truth.md): the deferred live truth verification workflow.
-
-- [Stackweaver TFE compatibility](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/tfe-compat.md): the retained domain-specific compatibility contract.
-
-- [Stackweaver provider fork](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/provider-fork.md): the retained domain-specific fork workflow.
-
-- [Pinned engineering entry](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md): the repository task routes.
-
-- [Pinned coding conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/coding.md): helper runtime, structured parsing and meaningful verification.
-
-- [Pinned documentation conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/documentation.md): source attribution and one authoritative artifact.
-
-- [Pinned delivery conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/delivery.md): feature claims, branches, commits and separate publication.
-
-- [Pinned feature template](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/feature-document-template.md): the feature structure and task/evidence sections.
-
-- [Pinned prose guide](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): reader-facing prose and verbatim review records.
-
-- [GitHub CLI API manual](https://cli.github.com/manual/gh_api): explicit HTTP methods, included response headers and pagination behavior used by the read adapter.
-
-- [Repository issues API](https://docs.github.com/en/rest/issues/issues#list-repository-issues): repository issue inventory and the pull-request marker in issue results.
-
-- [Issue comments API](https://docs.github.com/en/rest/issues/comments#list-issue-comments): paginated issue comments and actor provenance.
-
-- [Pull requests API](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests): closed pull inventory for merged implementation references.
-
-- [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference): native command-tool switches and MCP allowlists/settings; actual installed CLI help remains the tested capability source.
-
-- [OpenAI Docs MCP](https://developers.openai.com/resources/docs-mcp): documentation-only MCP scope; it does not supply the required native tool-isolation proof.
-
-- [GitHub pagination guide](https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api): follow validated Link URLs, including numeric repository routes and cursor parameters.
-
-- [GitHub issue events API](https://docs.github.com/en/rest/issues/events#list-issue-events): issue-scoped event pagination used to reconcile uncertain closure and label writes.
-
-- [GitHub issue event types](https://docs.github.com/en/rest/using-the-rest-api/issue-event-types): event actor, timestamp, closure/reopening and label-change fields used for attribution.
-
 
 ### R-14
 
@@ -1068,3 +1010,190 @@ SEVERITY: nit
 WHERE: github.ts githubExecutor.mutate; execute.ts executeBatch catch path; AC-06
 EVIDENCE: execute.ts:310-311 sets mutationAttempted before calling adapter.mutate. The pre-write vocabulary check in github.ts:172-175 throws a plain Error("implicit-label-creation-denied") before any request is sent. execute.ts:320-322 treats any non-MutationFailure as an uncertain outcome. The action is then journaled uncertain and permanently blocked (:270), even though nothing was sent. This fails closed but mislabels a denial as an unknown remote effect.
 PROPOSAL: Throw MutationFailure(false) for pre-request denials, or run the live vocabulary check before marking the action attempted, and add a test that the action is recorded as failed, not uncertain.
+
+
+### R-15
+
+**Proof outcome.** `proof.sh` printed digest `2a1b1ec4bb3fef99dacb7d57b4fed5f92f04c70ddd15c60e86d4d58c2508dd02`, which matches the pin. Integrity checks were all true: committed packet hashes, clean owning trees, and only allowed Stackweaver paths changed. Lint exited 0. The plugin suite exited 0 with 346 pass and 0 fail. Adapter contracts exited 0. The rollback rehearsal exited 0 against adapter 52ebfdd, with rollback, reapply and index bytes preserved.
+
+The final worker state is **PROOF FAILED**. The legacy trial's `result.json` has `report:null` and grade failure `native-report-validation`. `recheck.ts:42` then threw ENOENT on `/tmp/shared-triage-r15/legacy/legacy-report.md`. Because of that crash, the shared, index, codex, claude and private trials were never regraded or copied into the packet, the existing-route cases were never checked, and `native-checks.json` is empty.
+
+**Legacy output.** The legacy trial did not use any plugin path. Its only grade failure was report validation, so the contamination and plugin-registration checks did not fire. In its notes (`final.json`) it:
+- proposes closing #50 on code evidence only, which it flags as weak;
+- proposes closing #70 as a duplicate of #63;
+- proposes closing #13 only after the owner confirms;
+- ranks #63, #68, #69 (blocked), #71, #50;
+- treats #999 as an index issue inferred from its body.
+
+Because no shared report was produced into the packet, I could not compare the two reports or map the seven intentional-difference IDs. The legacy gh collection, write and commit paths were not executed: the trial had no command tool.
+
+CRITERION: AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support.
+VERDICT: not verified
+EVIDENCE: Codex desktop and VS Code Local remain unavailable and there is no approved residual. The native codex and claude trials and the existing-route cases were not regraded because recheck aborted on the legacy trial (proof-state/failed.txt). `compatibility.md:11-16` is suitably conservative.
+
+CRITERION: AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+VERDICT: not verified
+EVIDENCE: The suite and adapter contracts pass. However, the shared ranking check ([63,68,71]), the index exception (#13 and #999 not excluded) and the other exclusions (#395, #332, #334, #81, #82, #83) were never asserted, because recheck crashed before reaching those trials. The session `report` method also accepts index requests from the analysis channel (F-04).
+
+CRITERION: AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
+VERDICT: met
+EVIDENCE: The plugin suite passed, including the two-pass stable pagination tests, the numeric label-page tests, and the completeness gating in `report.ts:266-284`. The failed native recheck does not affect this criterion.
+
+CRITERION: AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
+VERDICT: not verified
+EVIDENCE: Unit tests enforce observed receipts in both passes, open retained canonicals, and method-appropriate removal and supersession reads. Native transcript and receipt regrading did not run. The boundary can be self-granted by any caller (F-02), and no shipped host controller exists, so the observed-verification guarantee is unproven on real hosts.
+
+CRITERION: AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved.
+VERDICT: met
+EVIDENCE: The plugin suite passed (report, collection and execution tests with disposable repositories and fake APIs). The no-write behavior on the live read-only trial was not re-observed this round (the private trial's preservation checks did not run). The criterion rests on the suite.
+
+CRITERION: AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
+VERDICT: met
+EVIDENCE: The suite passed, including `execution.test.ts`. `executeBatch` revalidates the actor, settings, source hash, live labels, ownership and canonical state. Resume, the fake GitHub closure, cross-session replay and cache-forgery tests all executed. The possible resume blocker is noted in F-07.
+
+CRITERION: AC-07: The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
+VERDICT: not met
+EVIDENCE: The parity proof failed: the legacy baseline produced no gradable report and the recheck aborted. The private trial's preservation and GET-only checks were never evaluated. The migrated route also cannot execute approved closures, and that difference is undeclared (F-03).
+
+CRITERION: AC-08: The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
+VERDICT: met
+EVIDENCE: The rollback command exited 0 and observed adapter 52ebfdd149d74231399266f71f9eaf3b5aea5c01, rollback and reapply true, index and index bytes preserved, and only the four allowed runtime paths changed.
+
+CRITERION: AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
+VERDICT: not verified
+EVIDENCE: The binding of existing-route cases L01, L02, L05 and L16-public to this component was never checked because recheck aborted. No diff of the shared-side workflows was executed.
+
+FINDING: F-01 Proof failed: the legacy baseline was ungradable and the recheck aborted
+KIND: factual
+SEVERITY: blocking
+WHERE: proof-state/failed.txt; synthetic-native/legacy/result.json; native.ts:416,425,436; recheck.ts:42
+EVIDENCE: The legacy trial returned mode `"sweep (legacy playbook, report-only; no execution)"`, which differs from the snapshot mode. The check at `native.ts:416` threw before `legacy-report.md` was written. `recheck.ts:42` then hit ENOENT, so no other trial, the existing routes, or private preservation were evaluated.
+PROPOSAL: Constrain the legacy response mode with a schema enum, or write the legacy notes before validating them. Make recheck record each trial's failure and continue, then exit non-zero once at the end. Then rerun a fresh fixed proof.
+
+FINDING: F-02 The verification boundary can be self-granted
+KIND: judgement
+SEVERITY: should-fix
+WHERE: verification.ts (exported `withVerificationBoundary`); execution.test.ts:406-408,482; session.test.ts:53-67
+EVIDENCE: Any process that imports the helpers can open a "current invocation", run `verifyCommand` with arbitrary argv, and call `executeBatch` with a self-written approval file. The closure test uses exactly this pattern. No host controller or adapter ships for any harness.
+PROPOSAL: Ship and test a real controller entry for at least one host, or document that enforcement is a host assumption and mark it unverified.
+
+FINDING: F-03 Migrated /triage can never execute closures, and this difference is undeclared
+KIND: factual
+SEVERITY: should-fix
+WHERE: report.ts:280; triage.md:131-259; stackweaver tests/agent-triage/README.md:34-42; fixtures/legacy/manifest.json
+EVIDENCE: Without a controller, every closure gets `verification-boundary missing`. Legacy could close issues once approved. This difference is not among the seven recorded intentional differences.
+PROPOSAL: Record it as an intentional difference, or provide the controller.
+
+FINDING: F-04 The analysis channel supplies index requests
+KIND: judgement
+SEVERITY: should-fix
+WHERE: session.ts:31-33; triage.md:125-127
+EVIDENCE: The session `report` method takes `index_requests` from the analysis stream. That contradicts the rule that only the current owner request supplies `--index-requests`.
+PROPOSAL: Accept index requests only from the operator or controller stream.
+
+FINDING: F-05 Repository checks inherit controller credentials
+KIND: judgement
+SEVERITY: should-fix
+WHERE: verification.ts:53
+EVIDENCE: `verifyCommand` runs repository check code with the controller's full `process.env` and `HOME`, which exposes the GitHub token and gh configuration. The boundary document says the controller retains credentials.
+PROPOSAL: Run checks with a scrubbed environment and a temporary `HOME`.
+
+FINDING: F-06 Proof harness gaps
+KIND: judgement
+SEVERITY: should-fix
+WHERE: proof.py:31-49,55; recheck.ts
+EVIDENCE:
+- `proof.py` ignores child exit codes and proceeds after the 1500-second cap.
+- The "started" message claims native trials were "already executing".
+- `recheck.ts` aborts on the first missing file.
+- There is no automated legacy-to-shared parity diff.
+- A change in the tracker collections is reported but not asserted.
+PROPOSAL: Fix each of these in the next frozen proof.
+
+FINDING: F-07 A stale journal lock can block resume
+KIND: judgement
+SEVERITY: nit
+WHERE: execute.ts:195,330
+EVIDENCE: The `${journal}.lock` file is created with `wx` and is removed only on normal exit. After a SIGKILL it would remain and block resume. I inferred this from reading the code; it was not executed.
+PROPOSAL: Detect stale locks by checking the owner PID, and add a test.
+
+FINDING: F-08 Forged attestations still render as resolved rows
+KIND: judgement
+SEVERITY: nit
+WHERE: report.test.ts:67-78
+EVIDENCE: Forged cache records produce `resolved` / close-candidate rows. They are not executable, but they still appear as resolved. The test runs outside any boundary.
+PROPOSAL: Downgrade unobserved claims to `not verified`, and test this inside a boundary.
+
+FINDING: F-09 R-14 record is misplaced in the spec
+KIND: factual
+SEVERITY: nit
+WHERE: shared-triage.md:978
+EVIDENCE: The R-14 subsection sits after `## Sources` rather than in the Review Log.
+PROPOSAL: Move it into the Review Log.
+
+FINDING: F-10 Reviewer procedural deviations
+KIND: factual
+SEVERITY: nit
+WHERE: this review
+EVIDENCE: One `proof.sh` poll was piped through `tail -c 600`. One grep targeted a path outside the packet and was denied by the tool. No edits were made and no other shell commands were run.
+PROPOSAL: None.
+
+
+## Sources
+
+- [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
+- [Stackweaver command adapter](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/.claude/commands/triage.md): current Claude routing and conflicting early-label versus report-first instructions.
+- [Shared lifecycle procedure](https://github.com/michielvha/vh-adlc/blob/9b68b56292416da212910c62e133e09a49cd5258/plugins/vh-adlc/references/lifecycle.md): existing intake, bounded maintenance and generic-request publication boundaries.
+- [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md): draft, independent review, acceptance, test mapping and one living feature document.
+
+- [Stackweaver harness-neutral entry](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/AGENTS.md): local playbook and Claude-command routing.
+
+- [Stackweaver project rules](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/CLAUDE.md): isolation, verification, documentation and local delivery requirements.
+
+- [Stackweaver maintenance playbook](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/maintenance.md): deferred dependency workflow and satellite-protection behavior.
+
+- [Stackweaver maintenance command](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/.claude/commands/maintenance.md): the deferred wrapper/playbook protection-policy conflict.
+
+- [Stackweaver audit playbook](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/codebase-audit.md): persistent findings and the deferred auto-merge authority decision.
+
+- [Stackweaver docs impact](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-impact.md): the deferred scope-change documentation workflow.
+
+- [Stackweaver docs drift audit](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-drift-audit.md): the deferred corpus-wide drift workflow.
+
+- [Stackweaver docs drift resolver](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-drift-resolver.md): the deferred drift resolution workflow.
+
+- [Stackweaver docs truth](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/docs-truth.md): the deferred live truth verification workflow.
+
+- [Stackweaver TFE compatibility](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/tfe-compat.md): the retained domain-specific compatibility contract.
+
+- [Stackweaver provider fork](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/provider-fork.md): the retained domain-specific fork workflow.
+
+- [Pinned engineering entry](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md): the repository task routes.
+
+- [Pinned coding conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/coding.md): helper runtime, structured parsing and meaningful verification.
+
+- [Pinned documentation conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/documentation.md): source attribution and one authoritative artifact.
+
+- [Pinned delivery conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/delivery.md): feature claims, branches, commits and separate publication.
+
+- [Pinned feature template](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/feature-document-template.md): the feature structure and task/evidence sections.
+
+- [Pinned prose guide](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): reader-facing prose and verbatim review records.
+
+- [GitHub CLI API manual](https://cli.github.com/manual/gh_api): explicit HTTP methods, included response headers and pagination behavior used by the read adapter.
+
+- [Repository issues API](https://docs.github.com/en/rest/issues/issues#list-repository-issues): repository issue inventory and the pull-request marker in issue results.
+
+- [Issue comments API](https://docs.github.com/en/rest/issues/comments#list-issue-comments): paginated issue comments and actor provenance.
+
+- [Pull requests API](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests): closed pull inventory for merged implementation references.
+
+- [Codex configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference): native command-tool switches and MCP allowlists/settings; actual installed CLI help remains the tested capability source.
+
+- [OpenAI Docs MCP](https://developers.openai.com/resources/docs-mcp): documentation-only MCP scope; it does not supply the required native tool-isolation proof.
+
+- [GitHub pagination guide](https://docs.github.com/en/rest/using-the-rest-api/using-pagination-in-the-rest-api): follow validated Link URLs, including numeric repository routes and cursor parameters.
+
+- [GitHub issue events API](https://docs.github.com/en/rest/issues/events#list-issue-events): issue-scoped event pagination used to reconcile uncertain closure and label writes.
+
+- [GitHub issue event types](https://docs.github.com/en/rest/using-the-rest-api/issue-event-types): event actor, timestamp, closure/reopening and label-change fields used for attribution.
