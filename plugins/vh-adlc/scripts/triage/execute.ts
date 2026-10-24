@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import{executionLock}from"./execution-lock";
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { git, loadSettings, ownership, resolveInside, sourcePath,workstreamPath } from "./settings";
 import {buildReport,type Report} from "./report";
@@ -192,7 +193,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(batch.report)))bad();
   const path = options.journal;
   mkdirSync(dirname(path), { recursive: true });
-  const lock = `${path}.lock`, descriptor = openSync(lock, "wx", 0o600);
+  const releaseLock=await executionLock(`${path}.lock`);
   try {
     let journal: Journal = { schema_version: 1, batch_hash: batch.hash, completed: [], started: null, results: {}, issues: Object.fromEntries(batch.issues.map((issue) => [issue.number, issue])), source_commit: batch.source_commit, uncertain: [] };
     if (existsSync(path)) {
@@ -327,5 +328,5 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
       }
     }
     return { completed: journal.completed, blocked, failed };
-  } finally { closeSync(descriptor); unlinkSync(lock); }
+  } finally { await releaseLock(); }
 }

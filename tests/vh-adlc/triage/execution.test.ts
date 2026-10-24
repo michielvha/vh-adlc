@@ -486,3 +486,22 @@ writeFileSync(path,JSON.stringify(data));process.stdout.write("HTTP/2.0 200 OK\\
   expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/github.json"),"utf8")).writes).toBe(0);
   expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/live-journal.json"),"utf8")).uncertain).toEqual([]);
 });
+
+test("an abandoned journal lock file does not prevent a safe retry",async()=>{
+ const f=setup();f.write(".vh-adlc/execution.json.lock","Abandoned lock from a stopped process\n");
+ const batch=f.batch([f.actions[0]]),approval=approveBatch(batch,["explain"],"Approve this synthetic comment");
+ const result=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});
+ expect(result.completed).toEqual(["explain"]);expect(f.log.length).toBe(1);
+});
+
+test("a live kernel journal lock blocks effects and releases when its owner is killed",async()=>{
+ const f=setup(),path=f.journal+".lock";
+ const child=Bun.spawn(["flock","--exclusive","--no-fork",path,process.execPath,"-e",'process.stdout.write("ready\\n");await Bun.stdin.text();'],{stdin:"pipe",stdout:"pipe",stderr:"pipe"});
+ try{
+  const reader=child.stdout.getReader();expect(new TextDecoder().decode((await reader.read()).value)).toBe("ready\n");reader.releaseLock();
+  const batch=f.batch([f.actions[0]]),approval=approveBatch(batch,["explain"],"Approve this synthetic comment");
+  await expect(executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal})).rejects.toThrow("locked");expect(f.log).toEqual([]);
+  child.kill("SIGKILL");await child.exited;
+  expect((await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal})).completed).toEqual(["explain"]);expect(f.log.length).toBe(1);
+ }finally{child.kill();await child.exited;}
+});
