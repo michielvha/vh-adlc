@@ -20,3 +20,10 @@ test("local settings and handoff preserve protection, project priorities and def
   expect(read("tests/agent-triage/README.md")).toContain("129581f6dbe4df71200af8f67d7bc017d35e89ad");
   expect(read("tests/agent-triage/README.md")).toContain("D-01 through D-05");
 });
+
+test("triage migration retains a usable managed-controller handoff",()=>{
+  const entry=read("agents/issue-triage.md"),handoff=read("tests/agent-triage/README.md");
+  expect(entry).toContain("controller.ts");expect(entry).toContain("--command triage");
+  expect(handoff).toContain("Managed controller");expect(handoff).toContain("operator");
+  expect(read(".claude/commands/triage.md")).toMatch(/^model: fable$/m);
+});

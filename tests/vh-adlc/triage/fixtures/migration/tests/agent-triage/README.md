@@ -46,6 +46,24 @@ actual legacy/shared results, native installation/payload checks, the bounded li
 and its enforced-boundary probes, and the disposable rollback/reapplication result. GUI trials
 remain required there; an unavailable host is recorded as unverified, never inferred from CLI proof.
 
+## Managed controller
+
+The shared package supplies `scripts/triage/controller.ts`, with optional Codex and Claude CLI
+adapters around one protected analysis protocol. The trusted operator starts it outside analysis
+and keeps its approval input. Cached reports or receipts cannot grant execution authority. The
+shared boundary guide owns setup and protocol details; verify the actual controller capability
+report on the intended host before claiming closure support.
+
+For the Claude compatibility entry, select the Claude adapter and `--command triage`; the source
+command still declares `model: fable`. Other harnesses invoke the shared operation through their
+supported adapter. Linux/Bubblewrap is the first managed runtime; unconfigured hosts can report
+but must leave closure execution unavailable. Do not silently route to ordinary helper execution.
+
+This is an enforcement prerequisite, not a removal of approved triage closures. Preserve exact
+batch approval, source/account checks, protected work, local gates and journals. Provider quota
+failures and missing GUI proof remain visible blockers; a successful install is not acceptance.
+All Stackweaver settings, ownership ledgers and documentation rules remain in this repository.
+
 ## Local checks
 
 Run `bun test tests/agent-triage` here. To verify the exact paired snapshot, set

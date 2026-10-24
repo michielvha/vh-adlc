@@ -166,7 +166,10 @@ Ordinary cache receipts are attestations. They can accompany a report, but canno
 execution. The helper requires actual operations observed in its current trusted invocation for
 both proof passes. Rehashing a file, supplying an old report/batch, or changing receipt text does
 not restore that authority. A missing boundary blocks every executable closure in that report.
-Read [the boundary protocol](triage-boundary.md) before enabling closure execution on a host.
+Use the shipped `scripts/triage/controller.ts start` from a trusted operator context for managed
+Codex or Claude CLI analysis. The operator retains the exact batch/approval channel; analysis has
+only bounded reads. On other hosts, report closure execution as unavailable until an adapter proves
+that separation. Read [the controller and boundary protocol](triage-boundary.md) before enabling it.
 
 ## Record verification
 

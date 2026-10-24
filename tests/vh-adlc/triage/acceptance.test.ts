@@ -173,11 +173,28 @@ test("native knowledge input uses the released binary's answered contract and ve
 test("legacy native input carries only its frozen workflow and a neutral report contract",()=>{
   const build=(native as Record<string,any>).nativeContract;
   expect(typeof build).toBe("function");
-  const legacy=build({legacy:true,routing:"Invoke the frozen project command.",installed:"/unused/plugin"});
-  expect(legacy.pluginArgs).toEqual([]);
+  const legacy=build({legacy:true,mode:"sweep",routing:"Invoke the frozen project command.",installed:"/unused/plugin"});
+  expect(legacy.pluginArgs).toEqual([]);expect(legacy.schema.properties.mode.enum).toEqual(["sweep"]);
   expect(Object.keys(legacy.schema.properties).sort()).toEqual(["mode","notes"]);
   expect(legacy.prompt).not.toMatch(/verification_pass|canonical_source|both proof passes|observations|leads/);
   const shared=build({legacy:false,routing:"Invoke shared triage.",installed:"/candidate/plugin"});
   expect(shared.pluginArgs).toEqual(["--plugin-dir","/candidate/plugin"]);
   expect(shared.schema.properties.observations.items.properties).toHaveProperty("leads");
+});
+
+test("the installed package ships its actual isolated controller entry",()=>{
+ const controller=join(plugin,"scripts/triage/controller.ts");
+ const run=Bun.spawnSync([process.execPath,controller,"capabilities"],{stdout:"pipe",stderr:"pipe"});
+ expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});
+ const capabilities=JSON.parse(run.stdout.toString());
+ expect(capabilities.protocol_version).toBe(1);expect(capabilities.host_adapters).toEqual(["codex","claude"]);
+ expect(capabilities.analysis_writes).toBe(false);expect(capabilities.operator_approval_required).toBe(true);
+});
+
+test("the installed controller rejects source-tree output before any collector call",async()=>{
+ const f=fixture();projects.push(f);
+ f.write("tools/gh","#!/bin/sh\nprintf called >> \"$PROBE_CALLS\"\nexit 1\n");const{chmodSync,existsSync}=await import("node:fs");chmodSync(join(f.root,"tools/gh"),0o700);
+ const marker=join(f.root,"calls");
+ const run=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"start","--host","codex","--repo",f.root,"--output-dir",join(f.root,"controller-output")],{env:{...process.env,HOME:f.root,PATH:join(f.root,"tools")+":/usr/bin:/bin",PROBE_CALLS:marker},timeout:3000,stdout:"pipe",stderr:"pipe"});
+ expect(run.exitCode).not.toBe(0);expect(run.stderr.toString()).toContain("outside the selected checkout");expect(existsSync(marker)).toBe(false);
 });
