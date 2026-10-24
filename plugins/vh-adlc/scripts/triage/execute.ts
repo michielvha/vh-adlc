@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { git, loadSettings, ownership, resolveInside, sourcePath } from "./settings";
-import type { Report } from "./report";
+import {buildReport,type Report} from "./report";
 import type { Inventory, Issue, Label, Settings } from "./types";
 
 export type Action =
@@ -116,6 +116,10 @@ function validatePatch(config: Settings, action: Extract<Action, { kind: "plan-p
 export function planBatch(config: Settings, inventory: Inventory, report: Report, requested: Action[]): Batch {
   if (report.repository !== config.repository || inventory.repository !== config.repository || report.hostname !== config.hostname ||
       report.source_commit !== inventory.source_commit || git(config.root, "rev-parse", "HEAD") !== report.source_commit || !Array.isArray(requested)) bad();
+  if(!Array.isArray(report.observations)||!Array.isArray(report.index_requests))bad();
+  const rebuilt=buildReport(config,inventory,report.observations,{runId:report.run_id,indexRequests:report.index_requests});
+  const eligibility=(value:Report)=>{const{created_at:_created,comparison:_comparison,...facts}=value;return facts;};
+  if(hash(eligibility(rebuilt))!==hash(eligibility(report)))bad();
   const actions = structuredClone(requested), ids = new Set<string>();
   for (const action of actions) {
     if(action.kind==="create-label" || (action.kind==="labels"||action.kind==="create")&&action.labels.length){
@@ -151,6 +155,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
   }
   for (const action of actions) {
     if (action.kind === "close" && !actions.some((prior) => prior.id === action.comment && prior.kind === "comment" && prior.issue === action.issue && actions.indexOf(prior) < actions.indexOf(action))) bad();
+    if(action.kind==="close" && action.duplicate_of!==null && (!inventory.issues.some(issue=>issue.number===action.duplicate_of&&issue.state==="open") || actions.some(other=>other.kind==="close"&&other.issue===action.duplicate_of)))bad();
     if (action.kind === "plan-patch" && action.created_by && !actions.some((prior) => prior.id === action.created_by && prior.kind === "create" && actions.indexOf(prior) < actions.indexOf(action))) bad();
     if (action.kind === "commit") {
       const patches = actions.filter((prior) => action.requires.includes(prior.id));
@@ -239,6 +244,11 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
           current = await adapter.issue(action.issue);
           const row = batch.report.rows.find((row) => row.number === action.issue)!;
           if (ownership(current, config, row.ownership === "index") === "protected") { blocked.push(action.id); continue; }
+          if(row.duplicate_of!==null){
+            const canonical=await adapter.issue(row.duplicate_of),before=batch.issues.find(issue=>issue.number===row.duplicate_of);
+            const context=(issue:Issue)=>{const{comments:_comments,...rest}=material(issue);return rest;};
+            if(!before||canonical.state!=="open"||hash(context(canonical))!==hash(context(before))){blocked.push(action.id);continue;}
+          }
         }
         // A receipt reconciles a completed remote request whose response/journal write was lost.
         const receipt = !["plan-patch", "commit"].includes(action.kind) ? await adapter.receipt(actionKey(batch, action), action) : null;

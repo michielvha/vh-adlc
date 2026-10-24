@@ -100,6 +100,16 @@ test("obsolete and total duplicate closures use their own evidence and not-plann
   expect(obsolete.rows[0].closure_reason).toBe("not_planned");
 });
 
+test("a duplicate must retain open canonical work and cannot form a duplicate cycle",()=>{
+  const f=setup([1,2]);
+  const duplicate=(number:number,canonical:number)=>({number,state:"duplicate",duplicate_of:canonical,total_overlap:true,remaining:`Tracked by ${canonical}`,
+    evidence:[{kind:"overlap",reference:`issue:${canonical}`,detail:"Verified total overlap",verified:true}],adversarial:[{kind:"overlap",reference:`issue:${canonical}`,detail:"Rechecked distinct acceptance criteria",verified:true}]});
+  f.inventory.closed_issues=[{...f.inventory.issues[1],state:"closed"}];f.inventory.issues=[f.inventory.issues[0]];
+  expect(buildReport(f.config,f.inventory,[duplicate(1,2)]).rows[0].close_executable).toBe(false);
+  f.inventory.issues.push({...f.inventory.closed_issues[0],state:"open"});f.inventory.closed_issues=[];
+  expect(buildReport(f.config,f.inventory,[duplicate(1,2),duplicate(2,1)]).rows.every(row=>!row.close_executable)).toBe(true);
+});
+
 test("any incomplete required collection or missing verification blocks every closure", () => {
   const f = setup(), observations = [f.resolved(1), f.open(2)];
   f.inventory.coverage[0] = { ...f.inventory.coverage[0], complete: false, error: "read-failed" };

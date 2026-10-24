@@ -74,6 +74,25 @@ test("changing any approved payload, target or report invalidates execution", as
   }
 });
 
+test("batch planning rebuilds eligibility instead of trusting edited report flags",()=>{
+  const f=setup();f.inventory.coverage[0].complete=false;
+  expect(()=>f.batch()).toThrow();
+});
+
+test("closing a duplicate rechecks its canonical tracker after approval",async()=>{
+  const f=setup();const canonical={...structuredClone(f.inventory.issues[0]),number:2,title:"Retained canonical scope"};
+  f.inventory.issues.push(canonical);f.issues.set(2,structuredClone(canonical));
+  f.inventory.coverage.push({collection:"comments:2",scope:"2",pages:1,complete:true});
+  const overlap={kind:"overlap",reference:"issue:2",detail:"Verified total overlap",verified:true};
+  const report=buildReport(f.config,f.inventory,[{number:1,state:"duplicate",duplicate_of:2,total_overlap:true,remaining:"Canonical work remains",evidence:[overlap],adversarial:[{...overlap,detail:"Adversarial scope recheck"}]},
+    {number:2,state:"open",remaining:"Implement retained scope",evidence:[{kind:"source",path:"src/app.ts",line:1,detail:"Actual canonical source",verified:true}]}]);
+  const actions:Action[]=[{id:"explain",kind:"comment",issue:1,body:"Duplicate scope belongs to canonical 2"},{id:"close",kind:"close",issue:1,reason:"not_planned",duplicate_of:2,comment:"explain"}];
+  const batch=planBatch(f.config,f.inventory,report,actions),approval=approveBatch(batch,["explain","close"],"Approve exact duplicate closure");
+  f.issues.get(2)!.state="closed";
+  const result=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});
+  expect(result.blocked).toContain("close");expect(f.log).toEqual([]);
+});
+
 test("source or material issue changes block writes and issue content is never executed", async () => {
   for (const change of ["source", "body", "title", "labels"] as const) {
     const f = setup(), batch = f.batch(), approval = approveBatch(batch, ["explain", "close"], "Approve shown batch");

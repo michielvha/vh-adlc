@@ -32,6 +32,7 @@ type Comparison = {
   added: number[]; removed: number[]; changed: number[]; not_compared: number[]; limits: string[];
 };
 export type Report = {
+  observations:Observation[]; index_requests:number[];
   schema_version: 1; run_id: string; repository: string; hostname: string; source_commit: string;
   collected_at: string; created_at: string; mode: Mode; requested_ids: number[]; scope: string;
   completeness: { inventory: boolean; verification: boolean; missing: string[] };
@@ -208,7 +209,9 @@ export function buildReport(config: Settings, inventory: Inventory, observations
       else { state = "unverified"; warnings.push("Removed or superseded scope needs verification in both passes."); }
     } else if (state === "duplicate") {
       const canonical = observation?.duplicate_of;
-      if (canonical !== issue.number && observation?.total_overlap === true && secondOK && [...inventory.issues, ...inventory.closed_issues].some((other) => other.number === canonical) &&
+      const retained=inventory.issues.find(other=>other.number===canonical&&other.state==="open");
+      const canonicalState=canonical?byId.get(canonical)?.state:undefined;
+      if (canonical !== issue.number && observation?.total_overlap === true && secondOK && retained && !["resolved","obsolete","duplicate"].includes(canonicalState??"") &&
           [evidence, adversarial].every((pass) => pass.some((item) => item.kind === "overlap" && item.reference === `issue:${canonical}`))) closure = "not_planned";
       else { state = "unverified"; warnings.push("Total overlap and a canonical issue require both verification passes."); }
     }
@@ -261,6 +264,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
       score(b).planned - score(a).planned || score(b).partial - score(a).partial || a.number - b.number)
     .map((row) => ({ number: row.number, reasons: score(row).reasons })) : [];
   const report: Report = {
+    observations:structuredClone(observations),index_requests:[...(options.indexRequests??[])],
     schema_version: 1, run_id: runId, repository: inventory.repository, hostname: inventory.hostname, source_commit: inventory.source_commit,
     collected_at: inventory.collected_at, created_at: new Date().toISOString(), mode: inventory.mode, requested_ids: inventory.requested_ids, scope: scopeFor(config, inventory, selected),
     completeness: { inventory: missing.filter((name) => name !== "verification").length === 0, verification: verificationComplete, missing: [...new Set(missing)] },
