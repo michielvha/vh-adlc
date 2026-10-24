@@ -97,11 +97,12 @@ test("the real boundary process denies outside input, credentials, egress and mu
   for(const route of routes)expect(events.find(event=>event.kind==="probe"&&event.route===route).denied).toBe(true);
   expect(events.every(event=>event.input_read_only)).toBe(true);
   expect(readFileSync(canary,"utf8")).toBe("Non-secret host canary\n");
-  const toolNames=["Skill",...(["read","list","search","probe"].map(name=>`mcp__triage__${name}`))];
+  const toolNames=["Skill","StructuredOutput",...(["read","list","search","probe"].map(name=>`mcp__triage__${name}`))];
   // Synthetic native envelopes test the grader; only the boundary execution above is real here.
   const nativeEvents=[{type:"system",subtype:"init",session_id:"unit-native-envelope",tools:toolNames},
-    {type:"assistant",message:{content:[{type:"tool_use",name:"mcp__triage__read",input:{path:"plugin/skills/vh-adlc-triage/SKILL.md"}},
+    {type:"assistant",message:{content:[{type:"tool_use",id:"native-skill",name:"Skill",input:{skill:"vh-adlc:vh-adlc-triage"}},
       ...routes.map(route=>({type:"tool_use",name:"mcp__triage__probe",input:{route,run_id:manifest.run_id}}))]}},
+    {type:"user",message:{content:[{type:"tool_result",tool_use_id:"native-skill",content:"Launching skill: vh-adlc:vh-adlc-triage"}]}},
     {type:"result",subtype:"success",is_error:false,session_id:"unit-native-envelope",result:"Read-only fixture complete"}];
   const grade=(raw=nativeEvents,record=events)=>gradeTrial({input:f.output,checkout:f.root,plugin,host:"claude-cli",raw:raw.map(event=>JSON.stringify(event)).join("\n"),trace:record,installed:plugin,exit_code:0});
   expect(grade().pass).toBe(true);

@@ -96,11 +96,19 @@ perform and inspect the actual verification that supports each attestation.
 
 Classify as `resolved`, `partial`, `open`, `blocked`, `obsolete`, `duplicate` or `unverified`.
 Resolved requires canonical source plus observed behavior, real wiring or merged implementation,
-and an adversarial second pass that checks the requested scope again. Partial work keeps explicit
+and an adversarial second pass that checks the requested scope again. Each completed proof pass
+includes canonical `source` evidence and its behavior support. Use actual wiring when it establishes
+the requested behavior and local rules permit that proof. A resolved entry has `remaining: ""`;
+record verification limitations in the run notes. Partial work keeps explicit
 remaining scope. Obsolete needs verified removal/supersession in both passes. Duplicate needs total
 overlap in both passes, `duplicate_of`, `total_overlap: true` and an existing canonical issue retaining
 remaining work; partial overlap cannot justify closure. Obsolete and duplicate use `not_planned`,
 never the `completed` reason. Recheck every closure against the strongest contrary interpretation.
+
+Evidence paths and search scopes are repository-relative, without a read adapter's export prefix.
+Respect configured `source_roots`. Put issue/settings/plan context and out-of-scope documentation
+in notes or role evidence; a contextual read is not canonical implementation proof. Inspect the
+report helper's warnings and preserve `unverified` when required proof is still missing.
 
 Use `blockers: [{issue, missing, evidence}]` for verified predicates and `depends_on: [ids]` for
 prerequisites. Record `is_index: true` and concrete `index_evidence` for semantic umbrellas. Keep
