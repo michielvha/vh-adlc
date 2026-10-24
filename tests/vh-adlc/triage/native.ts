@@ -344,7 +344,7 @@ async function serveReadOnly() {
     }
   }
 }
-async function runNativeTrial(options:{host:"codex"|"claude";input:string;checkout:string;plugin:string;output:string;prompt?:string;command?:string;legacy?:boolean;expected?:string}) {
+async function runNativeTrial(options:{host:"codex"|"claude";input:string;checkout:string;plugin:string;output:string;prompt?:string;command?:string;legacy?:boolean;expected?:string;indexRequests?:number[]}) {
   const {nativeClient}=await import("./fixtures"),{resolve4}=await import("node:dns/promises");
   const componentCommit=committedComponent(resolve(import.meta.dir,"../../.."),resolve(options.plugin),import.meta.path),driverHash=digest(readFileSync(import.meta.path));
   const initial=verifyInputs(options.input,{checkout:options.checkout,plugin:options.plugin});if(!initial.pass)throw Error(`input preflight failed: ${initial.failures.join(", ")}`);
@@ -399,7 +399,7 @@ async function runNativeTrial(options:{host:"codex"|"claude";input:string;checko
     const {buildReport,saveReport}=await import("../../../plugins/vh-adlc/scripts/triage/report");
     const config=loadSettings(options.checkout);
     if(options.legacy){reportPath=join(options.output,"legacy-report.md");writeFileSync(reportPath,response.notes+"\n");}
-    else{const report=buildReport(config,snapshot,response.observations);reportPath=saveReport(config,report,{output:join(options.output,"triage-report.md")});writeFileSync(join(options.output,"report.json"),json(report)+"\n");
+    else{const report=buildReport(config,snapshot,response.observations,{indexRequests:options.indexRequests});reportPath=saveReport(config,report,{output:join(options.output,"triage-report.md")});writeFileSync(join(options.output,"report.json"),json(report)+"\n");
       if(options.expected){
         const expected=JSON.parse(readFileSync(options.expected,"utf8")) as {rows:Record<string,Record<string,unknown>>;complete?:boolean};
         for(const[number,fields]of Object.entries(expected.rows)){
@@ -423,7 +423,7 @@ async function main() {
   if(command==="run"){
     const host=flag("--host"),input=flag("--input"),checkout=flag("--checkout"),plugin=flag("--plugin"),output=flag("--output"),promptFile=flag("--prompt-file");
     if(!["codex","claude"].includes(host??"")||!input||!checkout||!plugin||!output)throw Error("run requires host, input, checkout, plugin and output");
-    return runNativeTrial({host:host as "codex"|"claude",input,checkout,plugin,output,prompt:promptFile?readFileSync(promptFile,"utf8"):undefined,command:flag("--command")??undefined,legacy:process.argv.includes("--legacy"),expected:flag("--expected")??undefined});
+    return runNativeTrial({host:host as "codex"|"claude",input,checkout,plugin,output,prompt:promptFile?readFileSync(promptFile,"utf8"):undefined,command:flag("--command")??undefined,legacy:process.argv.includes("--legacy"),expected:flag("--expected")??undefined,indexRequests:flag("--index-requests")?.split(",").map(Number)});
   }
   if(command==="launch") {
     const {spawn}=await import("node:child_process"),{appendFileSync}=await import("node:fs"),{createInterface}=await import("node:readline");
