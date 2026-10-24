@@ -19,6 +19,7 @@ additional execution or publication permission.
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
 | Merge, tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action |
 | Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
+| Enabling automatic merged-branch deletion or cleaning stale merged branches | Owner-authorized repository configuration or branch cleanup; verify current tips are merged and preserve active worktrees |
 | Another repository, account or feature | A new scope decision |
 
 A lifecycle-selected operation inherits only the underlying task's authority.

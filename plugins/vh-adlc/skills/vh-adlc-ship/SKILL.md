@@ -65,6 +65,23 @@ the completion update, and say in the PR what remains.
 
 Never merge, and never bypass branch protection or rewrite a pushed commit.
 
+## After an authorized merge
+
+Use trunk-based development. A separate owner-authorized merge ends the remote
+PR branch's lifetime. Enable GitHub's `delete_branch_on_merge` repository setting
+when the owner authorizes repository configuration, and verify that GitHub
+removed the merged branch. If it remains, fetch the default branch and compare
+the remote branch's current tip: delete it only when that tip is reachable from
+the default branch. A merged PR is insufficient if new commits were pushed to
+its branch afterward.
+
+Never delete the default branch, a protected branch, an active PR branch, or
+unmerged work. Delete local merged branches only with `git branch -d`, after
+checking `git worktree list --porcelain` and confirming none owns that branch.
+Do not remove worktrees or force-delete branches to finish cleanup. Report
+preserved branches and the reason. A ship request alone does not authorize a
+merge or repository-setting changes.
+
 ## Report
 
 The knowledge line; the gate result, quoted; the branch, the pushed commit, the PR and its linkage, the
