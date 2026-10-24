@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Owner accepted R-9 and documentation publication on 2026-10-24; planned gate passed."
+status: draft
+status_description: "Main relocated public workflow/compatibility guides; refreshing coverage and review before the claim."
 issue: null
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
