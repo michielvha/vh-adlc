@@ -384,8 +384,26 @@ surfaces until separately tested. No other harness support is implied.
 
 ## Tasks
 
-None yet; written after independent review and owner acceptance. No shared skill or Stackweaver adapter
-is implemented by this specification request.
+One commit per task. Test tasks preserve their observed expected failure; the following implementation
+task makes them pass. Every task records its command and result when performed. Runtime helpers use
+Bun, the repository's existing scripting runtime; they are packaged with the canonical component.
+
+- [ ] T1 `tests/vh-adlc/triage/settings.test.ts`, `tests/vh-adlc/triage/fixtures.ts` - settings fixtures fail because the shared validator does not exist; cover no settings, bad versions/shape, identity conflicts, path escapes, protected/index roles and Stackweaver-independent defaults (AC-02, AC-09).
+- [ ] T2 `plugins/vh-adlc/scripts/triage/settings.ts`, `plugins/vh-adlc/scripts/triage/types.ts`, `plugins/vh-adlc/references/triage-settings.md` - T1 passes with one validated settings and normalized data contract, documented runtime requirements and no project constants in defaults (AC-02).
+- [ ] T3 `tests/vh-adlc/triage/collection.test.ts` - pagination/error/plan-inventory fixtures fail because the collector is missing; include collections beyond old limits and per-collection scope, completion and sanitized error metadata (AC-03, AC-02).
+- [ ] T4 `plugins/vh-adlc/scripts/triage/collect.ts`, `plugins/vh-adlc/scripts/triage/github.ts`, `plugins/vh-adlc/scripts/triage/cli.ts` - T3 passes through the same structured collector used by the CLI, with fixed read requests, paginated comments and explicit incomplete coverage (AC-03).
+- [ ] T5 `tests/vh-adlc/triage/report.test.ts` - verdict/report fixtures fail because report helpers are absent; cover every evidence trap, dependency cycle, mode, comparable/incomplete history, explicit output override and report preservation (AC-04, AC-05).
+- [ ] T6 `plugins/vh-adlc/scripts/triage/report.ts`, `plugins/vh-adlc/scripts/triage/cli.ts` - T5 passes with reason-correct evidence requirements, report-wide closure guards, mode-correct ranking and history-safe reports (AC-04, AC-05).
+- [ ] T7 `tests/vh-adlc/triage/execution.test.ts` - recording-adapter and local-Git fixtures fail because execution helpers are absent; cover exact subset/payload approval, stale evidence, index exceptions, comment-before-close, gated plan patches, issue backfill, partial failure and retry (AC-06).
+- [ ] T8 `plugins/vh-adlc/scripts/triage/execute.ts`, `plugins/vh-adlc/scripts/triage/github.ts`, `plugins/vh-adlc/scripts/triage/cli.ts` - T7 passes with narrow approved execution, preserved unrelated Git/body content and retry without duplicate comments, issues or commits (AC-06).
+- [ ] T9 `tests/vh-adlc/triage/discovery.test.ts`, `tests/vh-adlc/check.test.ts` - discovery/routing tests fail because the new canonical operation is missing; preserve original operation contracts and verify the triage authority boundary (AC-01, AC-09).
+- [ ] T10 `plugins/vh-adlc/skills/vh-adlc-triage/SKILL.md`, `plugins/vh-adlc/references/triage.md`, `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/references/authority.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, `README.md`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md`, `docs/get-started/installation.md` - T9 and the full plugin checker pass; discovery, generic routing, runtime setup and support claims agree with the actual package (AC-01, AC-09).
+- [ ] T11 `tests/vh-adlc/triage/migration.test.ts`, `tests/vh-adlc/triage/fixtures/` - frozen legacy/shared parity and rollback checks fail until the Stackweaver adapter exists; include unlisted protected indexes and every recorded intentional difference (AC-07, AC-08, AC-09).
+- [ ] T12 Stackweaver `.vh-adlc/triage.json`, `AGENTS.md`, `.claude/commands/triage.md`, `agents/issue-triage.md`, `tests/agent-triage/` - T11 passes at an exact isolated migration commit; model metadata, project settings, missing-plugin diagnostics and durable rollback/publication handoff are preserved (AC-02, AC-07, AC-08, AC-09).
+- [ ] T13 `tests/vh-adlc/triage/acceptance.test.ts` - acceptance-grader and isolation fixtures fail until the native driver exists; reject fabricated discovery, missing full-source/history inputs, incomplete snapshot metadata and unproven environment/helper/keyring/socket/tool/egress isolation (AC-01, AC-03, AC-07; R-9 F-01 through F-03).
+- [ ] T14 `tests/vh-adlc/triage/native.ts`, `tests/vh-adlc/triage/fixtures.ts` - T13 passes with disposable native profiles, hashed complete source/history inputs and a trial-specific enforced read-only boundary verified from its actual analysis environment; probes never target live writes (AC-01, AC-03, AC-07).
+- [ ] T15 `tests/vh-adlc/evidence/triage/` and this document's evidence - actual Codex/Claude CLI invocation, existing-route regressions, frozen legacy parity, bounded live read-only trial and rollback/reapply have observed pass results tied to exact component/adapter commits; retain failures and unavailable proof honestly (AC-01, AC-03, AC-07, AC-08, AC-09).
+- [ ] T16 `tests/vh-adlc/evidence/triage/` and this document's evidence - required Codex desktop and VS Code Local discovery/read-only invocation are observed; full relevant checks and a fresh independent committed implementation review establish every criterion or an owner-approved durable residual before the complete gate (AC-01 through AC-09).
 
 ## Open Questions
 
