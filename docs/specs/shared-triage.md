@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner-requested normative boundary revision awaits fresh spec review and acceptance; runtime recovery and external trials remain open."
+status_description: "Owner resolved proof for every published verdict; fresh spec review and acceptance precede remaining runtime work."
 issue: null
 branch: feat/shared-triage
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
@@ -65,8 +65,8 @@ as measured proof; fake adapter effects and source identity are the observed fac
 
 R-18 F-01 identifies readiness, partial-shipment and blocker-clearing writes as additional published
 verification assertions. The draft applies the recommended proof boundary consistently to those
-cases. Q6 keeps this explicit scope choice open for the owner's final acceptance of the reviewed
-spec; no implementation of that extension starts before acceptance. The earlier decisions on
+cases. The owner resolved this scope on 2026-10-25 by requiring enforced proof for every published
+triage verdict; the revised specification still needs a fresh review and acceptance. The earlier decisions on
 completion assertions and fresh comments after changed evidence remain resolved.
 
 The main-integration gate at `f279246902847ba0fafccef7a5c61d735701ac6d` passed 360 tests and 1395
@@ -77,10 +77,10 @@ hash-verified and relocated to the workspace disk with their old paths preserved
 records, raw trials and proof helpers were retained. The first R-18 Copilot startup produced no
 model response and no review record; its fresh-context retry returned the stored review below.
 
-R-20 F-02 adds non-closure obsolete/duplicate verdicts to the remaining scope decision. Candidate A
-for Q6/Q7 now covers all published factual triage assessments, so another state name cannot create
-an exception. The owner was asked one combined policy question; both choices remain pending until
-the reply is recorded. Completion assertions and fresh comments after material changes remain the
+R-20 F-02 identified non-closure obsolete/duplicate verdicts as another case. On 2026-10-25 the
+owner resolved Q6/Q7 together: every published triage verdict requires enforced proof, including
+readiness, partial shipment, cleared blockers and obsolete/duplicate conclusions. Another verdict
+name, label, annotation or action kind cannot create an exception. Completion assertions and fresh comments after material changes remain the
 earlier resolved decisions. R-20's original stdout was truncated by the tmpfs quota; the complete
 final message was recovered verbatim from the matching durable Copilot session with model identity
 and event-file hashes recorded. Review output now lives on the workspace disk, with old paths retained.
@@ -156,8 +156,8 @@ work; it never treats a selected issue as an accepted feature or starts implemen
 
 Reports and proposals remain available through any harness that has the read capabilities above.
 Executable closures and writes asserting verified state additionally require a trusted controller
-that confines analysis and separates it from operator approval. A write asserting verified state is a tracker write or local plan/status patch that publishes or
-applies a factual triage assessment. It covers every conclusion about implementation, shipped scope,
+that confines analysis and separates it from operator approval. A write asserting verified state is any remote publication or tracker mutation that presents or
+applies a factual triage assessment, or a local plan/status patch that applies that assessment. It covers every conclusion about implementation, shipped scope,
 removal/supersession, duplicate/overlap, open/blocked or ready/unblocked work, dependencies, ownership
 and coverage. Examples include checklist ticks, completion plan patches, triage verdict comments,
 state/verdict labels and their removal. Non-closure obsolete or duplicate comments/labels are covered
@@ -166,10 +166,12 @@ kind/purpose cannot exempt a published or applied assessment. Missing proof keep
 in the local report/proposal rather than changing tracker or plan state.
 
 Saving or explicitly committing a local report remains report-only and grants no tracker/state
-mutation or push authority. Clearly attributed task data or owner-selected neutral metadata is not
+mutation or push authority. Remotely publishing a report is subject to the same proof requirement
+and separate publication authority; the local-report exception does not permit it. Clearly
+attributed task data or owner-selected neutral metadata is not
 itself the helper's triage verdict. If the helper cannot establish that a proposed effect is free
-of such an assessment, require the boundary. Candidate A for Q6/Q7 specifies this complete scope;
-it is pending owner acceptance, including the additional non-closure verdicts identified by R-20.
+of such an assessment, require the boundary. This complete scope follows the owner's 2026-10-25
+decision for Q6/Q7, including the additional non-closure verdicts identified by R-20.
 
 Ordinary cache records are attestations. A cache file, serialized receipt,
 imported report, environment flag or unrestricted analysis shell cannot create execution authority.
@@ -211,8 +213,8 @@ surface has no configured execution controller.
 For every batch containing an executable closure or write asserting verified state, the operator presents
 and approves the exact batch through a channel independent of analysis. The owner's resolved R-17 F-02 decision requires this for completion assertions:
 checklist ticks, completion plan-status patches and resolution comments. Applying the same rule to
-all other published triage assessments is candidate A for Q6/Q7 and awaits their explicit resolution.
-The candidate requires current observed proof appropriate to each assessed predicate, even when the
+all other published triage assessments follows the owner's 2026-10-25 resolution of Q6/Q7.
+Every such assessment requires current observed proof appropriate to each assessed predicate, even when the
 issue stays open. Exact approval of a visibly unverified assertion cannot waive that requirement. A caller cannot exempt an assertion of verified state by labeling it an ordinary comment or
 another action kind. If the helper cannot establish that a write asserts none of these verified
 predicates, it requires the boundary.
@@ -615,7 +617,7 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
 - [ ] T32 `tests/vh-adlc/triage/controller-e2e.ts` and evidence rechecker - measure fake GitHub resolution instead of presenting a constant as an observed real-call count after R-16 F-09 (AC-06, AC-07).
 - [ ] T33 `plugins/vh-adlc/scripts/triage/controller.ts`, startup checks and `tests/vh-adlc/triage/acceptance.test.ts` - produce actual removal receipts and operator-selected fixed check receipts before report generation, preserving serial primary/adversarial proof after R-16 F-11 (AC-04, AC-06).
 - [ ] T35 `plugins/vh-adlc/scripts/triage/verification.ts` and `tests/vh-adlc/triage/verification.test.ts` - first observe actual operator-selected checks reaching an outside-input canary or egress, then confine filesystem/network and owner credentials for those checks; retain missing-dependency and failed-check blockers after R-17 F-06 (AC-04, AC-06).
-- [ ] T36 `plugins/vh-adlc/scripts/triage/report.ts`, `plugins/vh-adlc/scripts/triage/execute.ts`, `plugins/vh-adlc/references/triage.md` and execution tests - first observe completion checklist/plan/comment, partial-shipment, ready-label and blocker-clearing actions bypassing current-proof requirements, then enforce the owner's completion-assertion decision and, after Q6/Q7 acceptance, candidate A for all other published triage assessments without a caller-controlled purpose exemption; plain-chat metadata/new-issue writes that assert none of those predicates retain exact approval (AC-03, AC-04, AC-06).
+- [ ] T36 `plugins/vh-adlc/scripts/triage/report.ts`, `plugins/vh-adlc/scripts/triage/execute.ts`, `plugins/vh-adlc/references/triage.md` and execution tests - first observe completion checklist/plan/comment, partial-shipment, ready-label and blocker-clearing actions bypassing current-proof requirements, then enforce the owner's completion-assertion decision and the owner's 2026-10-25 rule for every other published triage assessment without a caller-controlled purpose exemption; plain-chat metadata/new-issue writes that assert none of those predicates retain exact approval (AC-03, AC-04, AC-06).
 - [ ] T37 `plugins/vh-adlc/scripts/triage/execute.ts` and managed recovery tests - distinguish unchanged original-batch retry from materially changed context: reject old source/actor/evidence, require a new approved batch and fresh explanation, and preserve uncertain-outcome blocks after R-17 F-05 (AC-06).
 - [ ] T34 `tests/vh-adlc/triage/controller-e2e.ts` and `tests/vh-adlc/evidence/triage/` - after fresh spec acceptance, renew the required CLI controller, removal/check, crash recovery, concurrency, uncertain-outcome, artifact-preservation, bounded owned-process cleanup and fail-closed host cases; store actual observed evidence and repeat independent implementation review (AC-01, AC-04, AC-06, AC-07).
 - [ ] T15 `tests/vh-adlc/evidence/triage/` and this document's evidence - actual Codex/Claude CLI invocation, existing-route regressions, frozen legacy parity, bounded live read-only trial and rollback/reapply have observed pass results tied to exact component/adapter commits; retain failures and unavailable proof honestly (AC-01, AC-03, AC-07, AC-08, AC-09).
@@ -636,30 +638,11 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
 
 ## Open Questions
 
-### Q6: Does the proof boundary also cover published readiness, partial-shipment and cleared-blocker assertions?
-
-**Recommendation:** A. Apply the same rule to ready/partial labels, blocked-label removal and comments that assert shipped phases or verified-unblocked status. The current draft's Design and tests specify A, pending explicit owner acceptance.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| A. Enforced proof | Published verification predicates have the same trust as completion assertions. | These labels/comments need the controller even without closure. |
-| B. Visible unverified attestations | Exact approval can publish these predicates outside the controller with an unverified annotation. | Readiness and partial-shipment writes keep weaker proof than completion assertions. |
-
-**Why this is yours:** R-18 F-01 distinguishes these writes from the examples in the earlier completion-write decision. Final acceptance of the reviewed draft can explicitly resolve Q6 as A without another normative edit.
-
-### Q7: Must every other published triage assessment, including obsolete/duplicate verdicts without closure, require enforced proof?
-
-**Recommendation:** A. Require the boundary for every helper assessment of factual triage state, not only the examples already named. Candidate A is fully specified in the draft; the owner can resolve Q6 and Q7 together without another normative edit.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| A. All published triage assessments | Obsolete/duplicate and other verdicts cannot bypass proof through comments, labels or an unverified annotation. | Unproved assessments stay in local reports/proposals; publishing or applying them needs the controller. |
-| B. Unverified non-completion verdicts | Exact approval can publish these verdicts outside the controller when visibly marked unverified. | Published verdicts retain weaker proof than completion assertions. |
-
-**Why this is yours:** R-20 F-02 identifies a separate case beyond Q6. A comprehensive rule prevents one policy exception per verdict while preserving ordinary task data and neutral metadata.
-
-Earlier questions are resolved: completion-asserting writes require enforced proof, and a materially
-changed context needs a new approved explanation while unchanged-batch resume does not repeat it.
+None. On 2026-10-25 the owner resolved Q6 and Q7 together: every published triage verdict requires
+enforced proof. This includes readiness, partial-shipment, cleared-blocker and obsolete/duplicate
+verdicts and all other factual triage assessments. The earlier completion-proof and changed-evidence
+comment decisions remain in force. These choices are folded into Design, criteria, tests and tasks;
+the complete revised specification still awaits its fresh review and owner acceptance.
 
 ## Review Log
 
