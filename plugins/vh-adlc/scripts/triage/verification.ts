@@ -11,9 +11,11 @@ export type VerificationRecord={schema_version:1;kind:"command"|"inspection"|"is
 const digest=(value:string|Buffer)=>createHash("sha256").update(value).digest("hex");
 // Only actual operations in this trusted invocation enter this map. Disk records are
 // attestations; importing or rehashing one never grants this process's authority.
-const boundary=new AsyncLocalStorage<Map<string,string>>();
-const observed=()=>boundary.getStore();
-export function withVerificationBoundary<T>(operation:()=>T):T{return boundary.run(new Map(),operation);}
+const boundary=new AsyncLocalStorage<{records:Map<string,string>;failed:Set<string>}>();
+const observed=()=>boundary.getStore()?.records;
+export function requiredVerificationFailed(config:Settings){boundary.getStore()?.failed.add(`${config.hostname}/${config.repository}`);}
+export function hasRequiredVerificationFailure(config:Settings){return boundary.getStore()?.failed.has(`${config.hostname}/${config.repository}`)??false;}
+export function withVerificationBoundary<T>(operation:()=>T):T{return boundary.run({records:new Map(),failed:new Set()},operation);}
 export function verificationReceipt(record:VerificationRecord){
   const{nonce:_nonce,started_at:_started,finished_at:_finished,...content}=record;
   const canonical=(value:unknown):string=>JSON.stringify(value,(_key,item)=>item&&typeof item==="object"&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
@@ -66,8 +68,9 @@ export function verifyCommand(config:Settings,argv:string[],pass:"primary"|"adve
     const record:VerificationRecord={schema_version:1,kind:"command",repository:config.repository,hostname:config.hostname,source_commit:commit,pass,argv,
       exit_code:run.exitCode??-1,stdout_sha256:digest(run.stdout),stderr_sha256:digest(run.stderr),source_unchanged:unchanged,nonce:randomUUID(),started_at:started,finished_at:new Date().toISOString(),reads:[]};
     const receipt=persistObserved(config,record);
-    return{kind:"test",detail:unchanged?`Observed command exit ${record.exit_code} in a disposable checkout of the fixed source commit`:"Verification changed its disposable source checkout; no implementation proof",verified:record.exit_code===0&&unchanged,command:JSON.stringify(argv),exit_code:record.exit_code,receipt};
-  }finally{rmSync(scratch,{recursive:true,force:true});}
+    if(record.exit_code!==0||!unchanged)requiredVerificationFailed(config);
+    return{stdout:run.stdout.toString(),stderr:run.stderr.toString(),kind:"test",detail:unchanged?`Observed command exit ${record.exit_code} in a disposable checkout of the fixed source commit`:"Verification changed its disposable source checkout; no implementation proof",verified:record.exit_code===0&&unchanged,command:JSON.stringify(argv),exit_code:record.exit_code,receipt};
+  }catch(error){requiredVerificationFailed(config);throw error;}finally{rmSync(scratch,{recursive:true,force:true});}
 }
 
 export function verificationRecord(config:Settings,sourceCommit:string,receipt:string|undefined):VerificationRecord|null{

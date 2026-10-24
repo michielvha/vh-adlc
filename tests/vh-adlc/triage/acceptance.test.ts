@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import * as native from "./native";
-import { boundaryCommand, commandWorkspace, committedComponent, engineeringInputs, exportInputs, gradeTrial, verifyInputs } from "./native";
+import { boundaryCommand, commandWorkspace, committedComponent, engineeringInputs, exportInputs, gradeTrial, verifyInputs, prepareVerification } from "./native";
 import { fixture, git } from "./fixtures";
 import{verificationRecord}from"../../../plugins/vh-adlc/scripts/triage/verification";
 const projects: ReturnType<typeof fixture>[]=[];
@@ -206,4 +206,31 @@ test("managed Codex analysis rejects shell, file, web and unknown items",()=>{
   const grade=gradeTrial({input:f.output,checkout:f.root,plugin,host:"codex-cli",raw,trace:[],installed:plugin,exit_code:0,kind:"native-discovery"});
   expect(grade.failures).toContain("exclusive-read-only-tools");
  }
+});
+
+
+test("managed preparation supplies actual fixed checks and removal content before analysis",async()=>{
+  const f=setup(),config=(await import("../../../plugins/vh-adlc/scripts/triage/settings")).loadSettings(f.root);
+  f.write("src/retired.ts","export const retired=true;\n");git(f.root,"add","src/retired.ts");git(f.root,"commit","-qm","test: prior source");const before=git(f.root,"rev-parse","HEAD");
+  git(f.root,"rm","src/retired.ts");git(f.root,"commit","-qm","test: current source");
+  f.snapshot.source_commit=git(f.root,"rev-parse","HEAD");f.write("snapshot.json",JSON.stringify(f.snapshot));f.export();
+  const {withVerificationBoundary,observedVerification}=await import("../../../plugins/vh-adlc/scripts/triage/verification");
+  withVerificationBoundary(()=>{
+    const prepared=prepareVerification(config,f.output,{checks:{behavior:["bun","-e","import {answer} from './src/app.ts'; console.log(answer); if(answer!==42)process.exit(1)"]},removals:[{path:"src/retired.ts",before_commit:before}]});
+    expect(prepared.complete).toBe(true);expect(prepared.operations.map((op:any)=>op.pass)).toEqual(["primary","primary","adversarial","adversarial"]);
+    for(const op of prepared.operations)expect(observedVerification(config,f.snapshot.source_commit,op.result.receipt)?.pass).toBe(op.pass);
+    expect(prepared.operations[0].result.stdout.trim()).toBe("42");expect(prepared.operations[1].result.before_content).toContain("retired=true");
+    expect(verifyInputs(f.output,{checkout:f.root,plugin}).pass).toBe(true);
+    writeFileSync(join(f.output,"verification.json"),"{}");expect(verifyInputs(f.output,{checkout:f.root,plugin}).failures).toContain("prepared-verification-hash");
+  });
+});
+
+test("a failed operator-selected check blocks report verification even when analysis omits it",async()=>{
+  const f=setup(),{loadSettings}=await import("../../../plugins/vh-adlc/scripts/triage/settings"),{withVerificationBoundary}=await import("../../../plugins/vh-adlc/scripts/triage/verification"),{buildReport}=await import("../../../plugins/vh-adlc/scripts/triage/report");f.export();
+  withVerificationBoundary(()=>{
+    const config=loadSettings(f.root),prepared=prepareVerification(config,f.output,{checks:{required:["bun","-e","console.error('fixture-required-failure');process.exit(3)"]}});
+    expect(prepared.complete).toBe(false);expect(prepared.operations[0].result.stderr).toContain("fixture-required-failure");
+    const report=buildReport(config,f.snapshot as any,[]);
+    expect(report.completeness.verification).toBe(false);expect(report.completeness.missing).toContain("required-verification");
+  });
 });

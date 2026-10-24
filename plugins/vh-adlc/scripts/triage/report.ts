@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { git, ownership, resolveInside, sourcePath } from "./settings";
 import type { Inventory, Issue, Mode, Settings } from "./types";
-import{observedVerification,verificationRecord}from"./verification";
+import{observedVerification,verificationRecord,hasRequiredVerificationFailure}from"./verification";
 
 export type State = "resolved" | "partial" | "open" | "blocked" | "obsolete" | "duplicate" | "unverified";
 export type Evidence = {
@@ -214,6 +214,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
   const required = ["issues", "pulls", "plans", ...selected.map((issue) => `comments:${issue.number}`)];
   const missing = required.filter((name) => inventory.coverage.filter((entry) => entry.collection === name && entry.complete === true && !entry.error && Number.isSafeInteger(entry.pages) && entry.pages >= 0 && !!entry.scope).length !== 1);
   for (const entry of inventory.coverage) if (!entry.complete || entry.error) missing.push(entry.collection);
+  if(hasRequiredVerificationFailure(config))missing.push("required-verification");
   if (inventory.plan_metadata === "incomplete") missing.push("plans");
   try { if ((options.fixedHead??git(config.root, "rev-parse", "HEAD")) !== inventory.source_commit) missing.push("source-head"); } catch { missing.push("source-head"); }
   if (inventory.mode === "ids") for (const id of inventory.requested_ids) if (!selected.some((issue) => issue.number === id)) missing.push(`issue:${id}`);
@@ -278,7 +279,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
       row.warnings.push("A cyclic or unresolved prerequisite prevents closure.");
     }
   }
-  const verificationComplete = !missing.includes("verification-boundary")&&rows.every((row) => row.ownership === "protected" || row.disposition === "excluded" || row.state !== "unverified");
+  const verificationComplete = !missing.includes("required-verification")&&!missing.includes("verification-boundary")&&rows.every((row) => row.ownership === "protected" || row.disposition === "excluded" || row.state !== "unverified");
   if (!verificationComplete) missing.push("verification");
   for (const row of rows) row.close_executable &&= missing.length === 0;
   const score = (row: Row) => {
@@ -301,7 +302,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
     observations:structuredClone(observations),index_requests:[...(options.indexRequests??[])],
     schema_version: 1, run_id: runId, repository: inventory.repository, hostname: inventory.hostname, source_commit: inventory.source_commit,
     collected_at: inventory.collected_at, created_at: new Date().toISOString(), mode: inventory.mode, requested_ids: inventory.requested_ids, scope: scopeFor(config, inventory, selected),
-    completeness: { inventory: missing.filter((name) => !["verification","verification-boundary"].includes(name)).length === 0, verification: verificationComplete, missing: [...new Set(missing)] },
+    completeness: { inventory: missing.filter((name) => !["verification","verification-boundary","required-verification"].includes(name)).length === 0, verification: verificationComplete, missing: [...new Set(missing)] },
     plan_metadata: inventory.plan_metadata, coverage: inventory.coverage,
     counts: { observed_open: selected.filter((issue) => issue.state === "open").length, reviewed: byId.size,
       closure_candidates: rows.filter((row) => row.disposition === "close-candidate").length, blocked: rows.filter((row) => row.disposition === "blocked").length,
