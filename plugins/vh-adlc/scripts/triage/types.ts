@@ -30,9 +30,10 @@ export type Issue = {
 };
 export type Pull = { number: number; title: string; body: string; merged_at: string };
 export type Coverage = { collection: string; scope: string; pages: number; complete: boolean; error?: string };
-export type Plan = { path: string; issue: number | null; status: string | null; status_description: string | null; priority: string | null };
+export type Plan = { path: string; issue: number | null; issue_ref: string | null; status: string | null; status_description: string | null; priority: string | null };
 export type Inventory = {
   schema_version: 1; repository: string; hostname: string; source_commit: string;
   mode: Mode; requested_ids: number[]; collected_at: string;
   issues: Issue[]; closed_issues: Issue[]; pulls: Pull[]; plans: Plan[]; coverage: Coverage[];
+  plan_metadata: "available" | "not-configured" | "incomplete";
 };

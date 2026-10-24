@@ -132,4 +132,22 @@ test("the CLI page parser follows validated Link metadata and rejects failed/non
   expect(() => parsePage(response.replace("state=all", "state=closed"), expected)).toThrow();
   expect(() => parsePage("HTTP/2.0 403 Forbidden\n\n{}", expected)).toThrow();
   expect(() => parsePage("HTTP/2.0 200 OK\n\n{}", expected)).toThrow();
+  expect(parsePage(response.replace('rel="next"', 'rel="NEXT"'), expected).next).toBe(2);
+  expect(() => parsePage(response.replace('rel="next"', 'broken-next-link'), expected)).toThrow();
+});
+
+test("a plan-file alias cannot turn generated metadata into the canonical plan spine", async () => {
+  const f = project();
+  f.write("plans/README.md", "Plan directory\n");
+  f.write("generated/plan.md", "---\nissue: 1\nstatus: complete\n---\n");
+  symlinkSync(join(f.root, "generated", "plan.md"), join(f.root, "plans", "alias.md"));
+  f.settings({ schema_version: 1, plan_roots: ["plans"], generated_mirrors: ["generated"] });
+  const result = await collect(loadSettings(f.root), pages({}).reader);
+  expect(result.plans).toEqual([]);
+});
+
+test("an invalid run timestamp fails before any API call", async () => {
+  const source = pages({});
+  await expect(collect(loadSettings(project().root), source.reader, { now: "not-a-date" })).rejects.toThrow();
+  expect(source.calls).toHaveLength(0);
 });
