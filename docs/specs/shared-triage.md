@@ -676,6 +676,7 @@ the complete revised specification still awaits its fresh review and owner accep
 | 2026-10-24 | R-19 | spec | `781a009cde5d573651958c05871ba46999bb4cc6` | claude-opus-5.5 | procedural | Two factual findings: use one assertion term across gates and name its full scope in migration parity. |
 | 2026-10-24 | R-20 | spec | `cb9208adec2f1b4143eefa49ebaefb0fa5d3e1f4` | claude-opus-5.5 | procedural | Four findings: correct attribution, decide non-closure obsolete/duplicate scope and cover authority/routing edits; intact response recovered from durable session after stdout truncation. |
 | 2026-10-25 | R-21 | spec | `90f3a92719d9390dc2aabd3569d11c3aecb4cd6a` | claude-opus-5.5 | procedural | Four factual findings: remove narrow approval examples, test all local status/report publication paths and cover every instruction entry; one wc listing deviation retained. |
+| 2026-10-25 | R-22 | spec | `c252339aaf32462ad435045a38c01cc6138b72e7` | claude-opus-5.5 | procedural | No blocking findings; task file/mapping omissions to correct, with a no-op echo and two unread tool overflows recorded. |
 
 ### R-1
 
@@ -1566,6 +1567,26 @@ SEVERITY: nit
 WHERE: this review
 EVIDENCE: Isolation was procedural. I viewed targets.json, proof.sh, proof.py and proof-hashes.json. source-manifest.json was too large to view whole, so I did not read its contents. I ran /home/m/code/.triage-review-archive/shared-triage-spec-review-r21/proof.sh once with no arguments. It returned integrity true, the four expected targets and proof_manifest_sha256 f5d3f7724aedd2ae8b530ff3c1eb443995b1ccb9224729b86ea04c796a6ac2ae. Lint passed with no findings, lint_exit was 0, and review check returned equal true for R-14 through R-20. I also ran one command outside the permitted set: `wc -l` on the packet copy of docs/specs/shared-triage.md. It returned a line count and changed nothing. All other reads used view, grep and glob inside the packet. I made no edits and no network calls.
 PROPOSAL: Record isolation as procedural and note the single out-of-protocol `wc -l` read command.
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Tasks / T30
+EVIDENCE: docs/specs/shared-triage.md:620 (T30) lists legacy manifest.json, Stackweaver tests/agent-triage/README.md and agents/issue-triage.md, references/authority.md, references/lifecycle.md, references/triage-boundary.md, docs/get-started/installation.md, docs/reference/compatibility.md and docs/user-guides/workflows.md. It does not name plugins/vh-adlc/skills/vh-adlc-triage/SKILL.md or README.md. It refers only to "shared authority/lifecycle/skill guides". This is the same omission R-21 F-03 reported (:1560-1561), so that correction was not applied at c252339. AC-01 (:508) and its proof (:522) now require SKILL.md and every public guide, README included, to state the controller requirement. However, SKILL.md:18-22 still says "Every remote change needs the presented exact batch and owner approval" and "A host without native questions can present the batch in plain chat", and README.md:32 says "approve exact tracker changes". Neither mentions the controller, and no unchecked task changes either file.
+PROPOSAL: Add `plugins/vh-adlc/skills/vh-adlc-triage/SKILL.md` and `README.md` to T30's file list. Make its done condition that every listed instruction and guide file states the controller requirement for executable closure and every write asserting verified state, while local report-only output stays available.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks / T36
+EVIDENCE: The AC-05 proof (docs/specs/shared-triage.md:526) now requires a remote report publication attempt, by tracker comment and by a requested report-commit push without proof or publication authority, to be denied. The AC-01 proof (:522) requires that a plain-chat approval file cannot authorize an assessment-bearing new issue. T36 (:624) is the unchecked task that first observes and then enforces these denials, but it advances only AC-03, AC-04 and AC-06. No other unchecked task names AC-05 apart from the catch-all T16 (:638). As a result, no task's done condition creates the AC-05 publication-denial check.
+PROPOSAL: Add AC-01 and AC-05 to T36's criterion list. State in T36 that its execution tests include the denied remote report comment and the denied requested report-commit push, with local report saving still available.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: this review
+EVIDENCE: Isolation was procedural. I viewed targets.json, proof.sh, proof.py and proof-hashes.json. source-manifest.json was too large to view whole. I then ran /home/m/code/.triage-review-archive/shared-triage-spec-review-r22/proof.sh once with no arguments. It returned integrity true, the four expected targets and proof_manifest_sha256 d9f915c8e5140ef1c46138b267dac2502d4844721c539f1db6c14453effe6d35. Lint passed with no findings, lint_exit was 0, and review check returned equal true for R-14 through R-21. I also ran one command outside the permitted set, `echo skip`, which read nothing and changed nothing. Two oversized grep results were saved automatically by the tool runtime outside the packet under /tmp/copilot-tool-output-*. I did not read either file. I made no edits and no network calls.
+PROPOSAL: Record isolation as procedural. Note the single out-of-protocol no-op echo command and the two unread tool-runtime overflow files.
 ## Sources
 
 - [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
