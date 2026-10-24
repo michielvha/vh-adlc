@@ -1,6 +1,7 @@
+import{randomUUID}from"node:crypto";
 import{test}from"./boundary-test";
 import{expect}from"bun:test";
-import{readFileSync,existsSync}from"node:fs";
+import{readFileSync}from"node:fs";
 import{join}from"node:path";
 import{fixture,git}from"./fixtures";
 import{loadSettings}from"../../../plugins/vh-adlc/scripts/triage/settings";
@@ -22,11 +23,11 @@ test("verification observes failure and source mutation without changing the cal
 test("an owned verification command cannot leave its spawned process group running",()=>{
   if(process.platform!=="linux")return;
   const f=fixture();try{
-    const pidFile=join(f.root,"owned-child.pid"),code=`const child=Bun.spawn(["/usr/bin/sleep","60"],{stdout:"ignore",stderr:"ignore"});await Bun.write(${JSON.stringify(pidFile)},String(child.pid));process.exit(0);`;
+    const marker="triage-owned-child-"+randomUUID(),code=`Bun.spawn(["bun","-e",${JSON.stringify('setTimeout(()=>{},2500); // '+marker)}],{stdout:"ignore",stderr:"ignore"});process.exit(0);`;
     const result=verifyCommand(loadSettings(f.root),["bun","-e",code],"primary");expect(result.verified).toBe(true);
-    const pid=Number(readFileSync(pidFile,"utf8")),stat=`/proc/${pid}/stat`;
-    // A dead descendant can briefly remain as an init-owned zombie before reaping.
-    expect(!existsSync(stat)||readFileSync(stat,"utf8").split(" ")[2]==="Z").toBe(true);
+    // Read-only observation by a unique marker: never kill processes by name.
+    // The PID namespace also prevents a check from reporting host process IDs.
+    const observed=Bun.spawnSync(["pgrep","-f",marker],{stdout:"pipe",stderr:"pipe"});expect(observed.exitCode).toBe(1);
   }finally{f.dispose();}
 });
 
@@ -44,4 +45,30 @@ test("repository checks receive a temporary home and no controller environment c
   const code=`if(process.env.TRIAGE_CONTROLLER_CANARY||process.env.HOME===${JSON.stringify(process.env.HOME)})process.exit(9);`;
   expect(verifyCommand(loadSettings(f.root),["bun","-e",code],"primary").verified).toBe(true);
  }finally{if(previous===undefined)delete process.env.TRIAGE_CONTROLLER_CANARY;else process.env.TRIAGE_CONTROLLER_CANARY=previous;f.dispose();}
+});
+
+
+test("fixed-source checks cannot read a host file outside their declared checkout",()=>{
+ const f=fixture();try{
+  const canary=join(f.root,"outside-input-canary");f.write("outside-input-canary","NON_SECRET_OUTSIDE_INPUT_CANARY");
+  const code=`import{readFileSync}from"node:fs";import{answer}from"./src/app.ts";if(answer!==42)process.exit(3);try{readFileSync(${JSON.stringify(canary)});process.exit(19);}catch(error){if(!["ENOENT","EACCES","EPERM"].includes(error.code))process.exit(20);}`;
+  expect(verifyCommand(loadSettings(f.root),["bun","-e",code],"primary").verified).toBe(true);
+ }finally{f.dispose();}
+});
+
+test("fixed-source checks cannot reach the controller host network",()=>{
+ const f=fixture(),server=Bun.listen({hostname:"127.0.0.1",port:0,socket:{data(){}}});
+ try{
+  const code=`import{answer}from"./src/app.ts";if(answer!==42)process.exit(3);setTimeout(()=>process.exit(0),500);Bun.connect({hostname:"127.0.0.1",port:${server.port},socket:{open(socket){socket.end();process.exit(19);},data(){},error(){process.exit(0);}}}).catch(()=>process.exit(0));`;
+  expect(verifyCommand(loadSettings(f.root),["bun","-e",code],"primary").verified).toBe(true);
+ }finally{server.stop(true);f.dispose();}
+});
+
+test("a fixed-source check receives only the selected commit, not unrelated ancestor blobs",()=>{
+ const f=fixture();try{
+  f.write("src/retired.ts","NON_SECRET_OLD_COMMIT_CANARY");git(f.root,"add","src/retired.ts");git(f.root,"commit","-qm","test: seed historical canary");const before=git(f.root,"rev-parse","HEAD");
+  git(f.root,"rm","src/retired.ts");git(f.root,"commit","-qm","test: remove historical canary");
+  const code=`import{answer}from"./src/app.ts";if(answer!==42)process.exit(3);const result=Bun.spawnSync(["git","show",${JSON.stringify(before+":src/retired.ts")}],{stdout:"pipe",stderr:"pipe"});if(result.exitCode===0)process.exit(19);`;
+  expect(verifyCommand(loadSettings(f.root),["bun","-e",code],"primary").verified).toBe(true);
+ }finally{f.dispose();}
 });

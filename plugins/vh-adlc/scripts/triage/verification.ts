@@ -1,3 +1,4 @@
+import{checkBoundary}from"./check-boundary";
 import{AsyncLocalStorage}from"node:async_hooks";
 import {createHash,randomUUID} from "node:crypto";
 import {mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from "node:fs";
@@ -53,11 +54,12 @@ export function verifyCommand(config:Settings,argv:string[],pass:"primary"|"adve
   const home=join(scratch,"home"),temporary=join(scratch,"tmp");mkdirSync(home);mkdirSync(temporary);
   const environment={PATH:process.env.PATH??"/usr/bin:/bin",LANG:"C.UTF-8",HOME:home,XDG_CONFIG_HOME:join(home,".config"),XDG_CACHE_HOME:join(home,".cache"),TMPDIR:temporary,GIT_CONFIG_NOSYSTEM:"1",GIT_CONFIG_GLOBAL:"/dev/null",GIT_TERMINAL_PROMPT:"0"};
   try{
-    for(const args of [["clone","--no-hardlinks","--no-checkout",config.root,checkout],["-C",checkout,"-c","core.hooksPath=/dev/null","checkout","--detach",commit]]){
-      const setup=Bun.spawnSync(["git",...args],{env:environment,stdout:"pipe",stderr:"pipe",timeout:60_000});
+    for(const args of [["clone","--no-local","--depth","1","--single-branch","--no-tags","--no-checkout",config.root,checkout],["-C",checkout,"-c","core.hooksPath=/dev/null","checkout","--detach",commit]]){
+      const setup=Bun.spawnSync(["git",...args],{env:environment,stdout:"pipe",stderr:"pipe",timeout:60_000,detached:true});
+      if(process.platform!=="win32")try{process.kill(-setup.pid,"SIGKILL");}catch{}
       if(setup.exitCode!==0)throw Error("verification checkout unavailable");
     }
-    const started=new Date().toISOString(),run=Bun.spawnSync(argv,{cwd:checkout,env:environment,stdout:"pipe",stderr:"pipe",timeout:120_000,detached:true});
+    const started=new Date().toISOString(),run=Bun.spawnSync(checkBoundary(checkout,argv),{cwd:checkout,env:environment,stdin:"ignore",stdout:"pipe",stderr:"pipe",timeout:120_000,detached:true});
     // The command owns this process group; descendants must not survive a test or timeout.
     if(process.platform!=="win32")try{process.kill(-run.pid,"SIGKILL");}catch{}
     const unchanged=git(checkout,"rev-parse","HEAD")===commit&&!git(checkout,"diff","HEAD","--name-only");
