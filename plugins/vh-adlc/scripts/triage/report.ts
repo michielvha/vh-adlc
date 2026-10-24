@@ -48,7 +48,7 @@ function blob(config: Settings, commit: string, path: string): string | null {
   const normalized = relative(config.root, resolveInside(config.root, path)).split("\\").join("/");
   try { return git(config.root, "show", `${commit}:${normalized}`); } catch { return null; }
 }
-function validEvidence(config: Settings, inventory: Inventory, evidence: Evidence): boolean {
+function validEvidence(config: Settings, inventory: Inventory, evidence: Evidence, issueNumber?: number): boolean {
   if (!evidence || evidence.verified !== true || typeof evidence.detail !== "string" || !evidence.detail.trim()) return false;
   switch (evidence.kind) {
     case "source": {
@@ -60,7 +60,7 @@ function validEvidence(config: Settings, inventory: Inventory, evidence: Evidenc
     case "search": return !!evidence.scope?.length && evidence.scope.every((path) => sourcePath(config, path)) && ["empty", "found"].includes(evidence.result ?? "");
     case "wiring": return !!evidence.path && blob(config, inventory.source_commit, evidence.path) !== null;
     case "merged-pr": return inventory.pulls.some((pull) => pull.number === evidence.pull_number && !!pull.merged_at &&
-      new RegExp(`(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+(?:${inventory.repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}#|#)\\d+`, "i").test(pull.body));
+      new RegExp(`\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+(?:${inventory.repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}#|#)${issueNumber ?? "[1-9]\\d*"}(?!\\d)`, "i").test(pull.body));
     case "removal": {
       if (!evidence.path || !evidence.before_commit || evidence.reference !== `commit:${inventory.source_commit}`) return false;
       if (blob(config, evidence.before_commit, evidence.path) === null || blob(config, inventory.source_commit, evidence.path) !== null) return false;
@@ -71,8 +71,8 @@ function validEvidence(config: Settings, inventory: Inventory, evidence: Evidenc
     default: return false;
   }
 }
-function completed(config: Settings, inventory: Inventory, values: Evidence[]) {
-  const valid = values.filter((value) => validEvidence(config, inventory, value));
+function completed(config: Settings, inventory: Inventory, values: Evidence[], issueNumber: number) {
+  const valid = values.filter((value) => validEvidence(config, inventory, value, issueNumber));
   // Test failures and invalid claimed proof are never discarded to manufacture a pass.
   return valid.length === values.length && valid.some((value) => value.kind === "source") && valid.some((value) => ["test", "wiring", "merged-pr"].includes(value.kind));
 }
@@ -118,11 +118,11 @@ function legacyHistory(config: Settings, file: string, text: string): Historical
     const state = value?.match(/^(resolved|partial|open|blocked|obsolete|duplicate|unverified)\b/)?.[1] ?? (value === "superseded" ? "obsolete" : null);
     if (state && !rows.has(number)) rows.set(number, { number, state });
   }
-  if (!rows.size) return null;
+  if (!rows.size && !new RegExp(`^# Issue triage[^\\n]*${date}[^\\n]*$`,"im").test(text)) return null;
   return { repository: config.repository, hostname: config.hostname, run_id: `legacy:${file.replace(/\.md$/, "")}`,
     collected_at: `${date}T00:00:00.000Z`, created_at: `${date}T00:00:00.000Z`, scope: "legacy:unknown-selection-and-coverage",
     mode: /\(close mode\)|close-mode/i.test(text.slice(0,3000)) ? "close" : "sweep",
-    rows: [...rows.values()], completeness: { inventory: false, verification: false, missing: ["legacy-scope-and-coverage"] } };
+    rows: [...rows.values()], completeness: { inventory: false, verification: false, missing: ["legacy-scope-and-coverage",...(!rows.size?["legacy-per-issue-states-unavailable"]:[])] } };
 }
 function readHistory(config: Settings): { reports: Historical[]; unavailable: boolean } {
   const directory = resolveInside(config.root, config.report_dir);
@@ -201,7 +201,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
     if (!evidenceOK && state !== "unverified") { warnings.push("Verification evidence is absent or invalid."); state = "unverified"; }
     let closure: Row["closure_reason"] = null;
     if (state === "resolved") {
-      if (completed(config, inventory, evidence) && completed(config, inventory, adversarial) && !observation?.remaining) closure = "completed";
+      if (completed(config, inventory, evidence, issue.number) && completed(config, inventory, adversarial, issue.number) && !observation?.remaining) closure = "completed";
       else { state = "unverified"; warnings.push("Completed behavior needs canonical source and observed behavior/wiring in both passes."); }
     } else if (state === "obsolete") {
       if (secondOK && [evidence, adversarial].every((pass) => pass.some((item) => ["removal", "supersession"].includes(item.kind)))) closure = "not_planned";
@@ -222,7 +222,8 @@ export function buildReport(config: Settings, inventory: Inventory, observations
     const disposition: Row["disposition"] = !allowed ? "excluded" : closure ? "close-candidate" : state === "blocked" ? "blocked" : ["open", "partial"].includes(state) ? "ready" : "needs-decision";
     return { number: issue.number, title: issue.title, state, remaining: observation?.remaining ?? "", ownership: owner, disposition,
       closure_reason: closure, close_executable: !!closure && allowed && issue.state === "open",
-      evidence, adversarial, duplicate_of: observation?.duplicate_of ?? null, depends_on: [...new Set([...(observation?.depends_on ?? []), ...blockers.filter((blocker) => blocker.missing).map((blocker) => blocker.issue)])],
+      evidence, adversarial, duplicate_of: observation?.duplicate_of ?? null, depends_on: [...new Set([...(observation?.depends_on ?? []), ...blockers.filter((blocker) => blocker.missing).map((blocker) => blocker.issue)])]
+        .filter(id=>!blockers.some(blocker=>blocker.issue===id && !blocker.missing && verified(config,inventory,blocker.evidence)) || blockers.some(blocker=>blocker.issue===id && blocker.missing)),
       index_requested: indexRequested, index_evidence: indexRole ? observation?.index_evidence ?? "Observed index/umbrella role" : owner === "index" ? "Configured index rule" : null,
       owned_by: ownedBy, ownership_evidence: observation?.ownership_evidence ?? [],
       plan_paths: inventory.plans.filter((plan) => plan.issue === issue.number).map((plan) => plan.path),

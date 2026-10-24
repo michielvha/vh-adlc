@@ -151,6 +151,39 @@ test("local status patches require separate approval and a successful lifecycle 
   expect(readFileSync(join(f.root, "plans/a.md"), "utf8")).toBe(after);
 });
 
+test("an externally preapplied plan status cannot bypass its lifecycle gate", async () => {
+  const f=setup(),before="---\nstatus: in-progress\nstatus_description: Work remains\nissue: null\n---\n\n# Plan\n",after=before.replace("status: in-progress","status: complete");
+  f.write("plans/a.md",before);
+  const action:Action={id:"sync",kind:"plan-patch",path:"plans/a.md",before,after,gate:{status:"complete",document:"plans/a.md"}};
+  const batch=f.batch([action]),approval=approveBatch(batch,["sync"],"Approve exact gated patch");
+  f.write("plans/a.md",after);
+  const result=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal,gate:async()=>false});
+  expect(result.completed).not.toContain("sync");expect(result.blocked).toContain("sync");
+});
+
+test("a changed unapproved plan cannot invalidate source evidence while another action executes", async () => {
+  const f=setup({source_roots:["."]}),before="---\nstatus: in-progress\nstatus_description: Work remains\nissue: null\n---\n\n# Plan\n",after=before.replace("status: in-progress","status: complete");
+  f.write("plans/a.md",before);
+  const action:Action={id:"sync",kind:"plan-patch",path:"plans/a.md",before,after,gate:{status:"complete",document:"plans/a.md"}};
+  const batch=f.batch([...f.actions,action]),approval=approveBatch(batch,["explain"],"Approve only the comment");
+  f.write("plans/a.md",before+"Changed implementation context\n");
+  const result=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});
+  expect(result.blocked).toContain("explain");expect(f.log).toEqual([]);
+});
+
+test("owned gated patches remain retryable when their source path is in the canonical tree", async () => {
+  const f=setup({source_roots:["."]}),before="---\nstatus: in-progress\nstatus_description: Work remains\nissue: null\n---\n\n# Plan\n",after=before.replace("status: in-progress","status: complete");
+  f.write("plans/a.md",before);
+  const action:Action={id:"sync",kind:"plan-patch",path:"plans/a.md",before,after,gate:{status:"complete",document:"plans/a.md"}};
+  const batch=f.batch([action,...f.actions]),approval=approveBatch(batch,["sync","explain"],"Approve exact patch and comment");
+  const first=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal,gate:async()=>true});
+  expect(first.completed).toContain("sync");expect(first.completed).toContain("explain");
+  const journal=JSON.parse(readFileSync(f.journal,"utf8"));journal.completed=journal.completed.filter((id:string)=>id!=="sync");journal.started="sync";
+  f.write(".vh-adlc/execution.json",JSON.stringify(journal));
+  const retry=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal,gate:async()=>false});
+  expect(retry.completed).toContain("sync");expect(f.log).toHaveLength(1);
+});
+
 test("creation/backfill retry reuses the created canonical URL and preserves unrelated plan content", async () => {
   const f = setup(), before = "---\nissue: null\nstatus: planned\n---\n\n# Missing issue\nKeep this text\n";
   f.write("plans/new.md", before);
@@ -297,4 +330,24 @@ test("an interrupted process with no confirmed remote receipt cannot blindly rep
   f.write(".vh-adlc/execution.json", JSON.stringify(journal)); f.failures.clear();
   const retry = await executeBatch(f.config, batch, approval, f.adapter, { journal: f.journal });
   expect(retry.blocked).toContain("explain"); expect(f.log).toEqual([]);
+});
+
+test("the GitHub adapter rechecks its account immediately before an effect", async () => {
+  const f=setup();
+  f.write(".vh-adlc/github.json",JSON.stringify({identity_reads:0,writes:0,issue:f.issues.get(1)}));
+  f.write("tools/gh",`#!/usr/bin/env bun
+import{readFileSync,writeFileSync}from"node:fs";
+const path=process.env.TRIAGE_FIXTURE_DB,data=JSON.parse(readFileSync(path,"utf8")),args=process.argv.slice(2),method=args[args.indexOf("--method")+1],endpoint=args.find(arg=>arg.startsWith("repos/"))??"user";
+let response;
+if(endpoint==="user"){data.identity_reads++;response={login:data.identity_reads===1?"operator":"other-account"};}
+else if(endpoint==="repos/example/project"&&args.includes("--jq")){writeFileSync(path,JSON.stringify(data));process.stdout.write("42\\n");process.exit(0);}
+else if(method==="GET"&&endpoint.includes("/comments?"))response=[];
+else if(method==="GET"){const i=data.issue;response={...i,user:{login:i.author},milestone:null};}
+else{data.writes++;response={};}
+writeFileSync(path,JSON.stringify(data));process.stdout.write("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(response));
+`);
+  const {chmodSync}=await import("node:fs");chmodSync(join(f.root,"tools/gh"),0o700);
+  const script=`import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};const adapter=githubExecutor(loadSettings(${JSON.stringify(f.root)}));await adapter.issue(1);try{await adapter.mutate({id:"comment",kind:"comment",issue:1,body:"Approved"},"key");}catch{};`;
+  const run=Bun.spawnSync(["bun","-e",script],{env:{...process.env,PATH:`${join(f.root,"tools")}:${process.env.PATH}`,TRIAGE_FIXTURE_DB:join(f.root,".vh-adlc/github.json")},stdout:"pipe",stderr:"pipe"});
+  expect(run.exitCode).toBe(0);expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/github.json"),"utf8")).writes).toBe(0);
 });

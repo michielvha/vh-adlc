@@ -95,11 +95,10 @@ export function githubExecutor(config: Settings): import("./execute").Adapter {
   }
   let actor: string | null = null;
   function identity() {
-    if (actor === null) {
-      const user = request("GET", "user") as { login?: string };
-      if (typeof user.login !== "string" || !user.login) throw new Error("github-actor-unavailable");
-      actor = user.login;
-    }
+    const user = request("GET", "user") as { login?: string };
+    if (typeof user.login !== "string" || !user.login) throw new Error("github-actor-unavailable");
+    if (actor !== null && actor.toLowerCase() !== user.login.toLowerCase()) throw new Error("github-actor-changed");
+    actor = user.login;
     return actor;
   }
   async function all(kind: "issues" | "comments", number?: number) {

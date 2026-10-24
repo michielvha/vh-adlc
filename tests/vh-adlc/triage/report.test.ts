@@ -57,6 +57,16 @@ test("complete plans and merged Refs-only PRs are leads rather than closure evid
   expect(report.rows[0].close_executable).toBe(false);
 });
 
+test("a merged PR closes only the issue its closing reference names", () => {
+  const f=setup([1]), source=f.resolved(1).evidence.filter(value=>value.kind==="source");
+  f.inventory.pulls.push({number:50,title:"Other work",body:"Closes #12",merged_at:"2026-10-01T00:00:00Z"});
+  const proof=[...source,{kind:"merged-pr",pull_number:50,detail:"Verified merged implementation",verified:true}];
+  const observation={number:1,state:"resolved",remaining:"",evidence:proof,adversarial:proof};
+  expect(buildReport(f.config,f.inventory,[observation]).rows[0].close_executable).toBe(false);
+  f.inventory.pulls[0].body="Closes example/project#1";
+  expect(buildReport(f.config,f.inventory,[observation]).rows[0].close_executable).toBe(true);
+});
+
 test("partial work keeps its remaining scope and mirrors cannot establish resolution", () => {
   const f = setup([1]), good = f.resolved(1);
   const partial = buildReport(f.config, f.inventory, [{ ...good, state: "partial", remaining: "Wire the exported behavior into the route" }]);
@@ -119,7 +129,7 @@ test("blockers are verified predicates, not stale issue-state comments, and cycl
   expect(cycles.ranked).toEqual([]);
   f.inventory.issues = [f.inventory.issues[0]];
   f.inventory.closed_issues = [{ ...f.inventory.issues[0], number: 2, state: "closed" }];
-  const unblocked = { ...blocked, blockers: [{ issue: 2, missing: false, evidence: f.resolved(1).evidence }] };
+  const unblocked = { ...blocked, depends_on:[2], blockers: [{ issue: 2, missing: false, evidence: f.resolved(1).evidence }] };
   expect(buildReport(f.config, f.inventory, [unblocked]).rows[0].disposition).toBe("ready");
   expect(buildReport(f.config, f.inventory, [unblocked]).rows[0].state).not.toBe("resolved");
 });
@@ -229,6 +239,7 @@ test("mixed status history reads a measured legacy triage table with explicitly 
   const config = loadSettings(f.root);
   f.write("status/README.md","# Historical status index\n");
   f.write("status/other-status.md","---\ndescription: Unrelated status snapshot\n---\n\n# Other work\n");
+  f.write("status/2026-09-13-issue-triage.md","---\ndescription: Close-mode issue triage\nstatus: complete\n---\n\n# Issue triage - 2026-09-13 (close mode)\n\n## Verified fully landed\n\n### #50\n\nLegacy prose without a verified-state table.\n");
   f.write("status/2026-09-26-issue-triage.md",readFileSync(join(import.meta.dir,"fixtures/legacy/status/2026-09-26-issue-triage.md"),"utf8"));
   const report = buildReport(config,f.inventory,[f.resolved(50),f.open(68)]);
   expect(report.comparison.status).toBe("overlap-only");

@@ -32,6 +32,7 @@ type Journal = {
   schema_version: 1; batch_hash: string; completed: string[]; started: string | null;
   results: Record<string, MutationResult>; issues: Record<string, Issue>; source_commit: string;
   uncertain: string[];
+  gated?: string[];
 };
 function canonical(value: unknown): string {
   return JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -44,16 +45,22 @@ function nonempty(value: unknown): value is string { return typeof value === "st
 function strings(value: unknown): value is string[] { return Array.isArray(value) && value.every(nonempty); }
 function marker(report: Report, id: string) { return `<!-- vh-adlc-triage:${report.run_id}:${id} -->`; }
 export function actionKey(batch: Batch, action: Action) { return `${batch.report.run_id}:${action.id}`; }
-function sourceHash(config: Settings, actions: Action[]) {
-  const ignored = actions.filter((action) => action.kind === "plan-patch").map((action) => action.path);
+function sourceHash(config: Settings, actions: Action[], journal?: Journal) {
   const paths = git(config.root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0")
-    .filter((path) => path && sourcePath(config, path) && !ignored.includes(path)).sort();
+    .filter((path) => path && sourcePath(config, path)).sort();
   return hash(paths.map((path) => {
     const absolute = resolveInside(config.root, path);
     try {
       const stat = lstatSync(absolute);
       if (!stat.isFile()) return [path, "non-file"];
-      return [path, stat.mode & 0o777, createHash("sha256").update(readFileSync(absolute)).digest("hex")];
+      let bytes=readFileSync(absolute);
+      for(const action of actions) if(action.kind==="plan-patch" && action.path===path && journal &&
+        (journal.completed.includes(action.id)||journal.started===action.id) && (!action.gate||journal.gated?.includes(action.id))) {
+        const created=action.created_by?journal.results[action.created_by]?.url:undefined;
+        const after=action.created_by&&created?action.after.replace("{{created_issue_url}}",created):action.after;
+        if(bytes.toString()===after)bytes=Buffer.from(action.before);
+      }
+      return [path, stat.mode & 0o777, createHash("sha256").update(bytes).digest("hex")];
     } catch { return [path, "missing"]; }
   }));
 }
@@ -188,7 +195,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
           const stored = Bun.spawnSync(["git", "-C", config.root, "show", `${head}:${path}`], { stdout: "pipe", stderr: "pipe" });
           return stored.exitCode === 0 && stored.stdout.toString() === expected && readFileSync(resolveInside(config.root, path), "utf8") === expected;
         });
-      if (exact && sourceHash(config, batch.actions) === batch.source_hash) {
+      if (exact && sourceHash(config, batch.actions, journal) === batch.source_hash) {
         journal.source_commit = head; journal.completed.push(pendingCommit.id); journal.started = null; saveJournal(path, journal);
       }
     }
@@ -201,7 +208,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
       if (!approval.action_ids.includes(action.id) || journal.completed.includes(action.id)) continue;
       let mutationAttempted = false;
       try {
-        if (!liveConfig() || git(config.root, "rev-parse", "HEAD") !== journal.source_commit || sourceHash(config, batch.actions) !== batch.source_hash) { blocked.push(action.id); continue; }
+        if (!liveConfig() || git(config.root, "rev-parse", "HEAD") !== journal.source_commit || sourceHash(config, batch.actions, journal) !== batch.source_hash) { blocked.push(action.id); continue; }
         const dependencies = action.kind === "close" ? [action.comment] : action.kind === "plan-patch" && action.created_by ? [action.created_by] : action.kind === "commit" ? action.requires : [];
         if (dependencies.some((id) => !journal.completed.includes(id))) { blocked.push(action.id); continue; }
         let current: Issue | undefined;
@@ -233,9 +240,11 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
             after = after.replace("{{created_issue_url}}", expected);
           }
           const content = readFileSync(target, "utf8");
+          if (content===after && action.gate && !journal.gated?.includes(action.id)) { blocked.push(action.id); continue; }
           if (content !== after) {
             if (content !== action.before || action.gate && (!options.gate || !await options.gate(action.gate))) { blocked.push(action.id); continue; }
             if (readFileSync(target, "utf8") !== action.before) { blocked.push(action.id); continue; }
+            if(action.gate){journal.gated=[...new Set([...(journal.gated??[]),action.id])];saveJournal(path,journal);}
             writeFileSync(target, after);
           }
         } else if (action.kind === "commit") {
