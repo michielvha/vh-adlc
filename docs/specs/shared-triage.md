@@ -627,6 +627,7 @@ are folded into Design, Acceptance Criteria, Test Plan and the unchecked impleme
 | 2026-10-24 | R-15 | implementation | `cc84af85ee4f6db8045da6548cdb199c0f134e4c` | claude-opus-5.5 | procedural | Frozen proof observed checks and native failures; boundary implementation reviewed after the owner decision. |
 | 2026-10-24 | R-16 | implementation | `8f3ca635096fc663d473fe31389c77891b488dce` | claude-opus-5.5 | procedural | Local proof passes; twelve findings include readiness provenance, tool enforcement, controller resume and missing verification methods. |
 | 2026-10-24 | R-17 | spec | `a28ebbf4d6f1796434bca1407542aedf255f5908` | claude-opus-5.5 | procedural | Eight findings: clarify completion-write authority, analysis confinement, per-adapter proof and changed-evidence comments; one listing command exceeded the review tool procedure. |
+| 2026-10-24 | R-18 | spec | `f279246902847ba0fafccef7a5c61d735701ac6d` | claude-opus-5.5 | procedural | Six findings: verified-state write coverage, criterion end states and guide/task alignment; unread tool-runtime overflow file retained. |
 
 ### R-1
 
@@ -1405,6 +1406,49 @@ SEVERITY: nit
 WHERE: this review
 EVIDENCE: Isolation was procedural. Before reading the protocol, I ran one command outside the permitted set: `ls -R /tmp/shared-triage-spec-review-r17 | head -100`. It listed packet paths only and changed nothing. I then ran proof.sh once with no arguments. It returned integrity true, the frozen manifest SHA256 cc513d3fdb282ee6c9469b98f8f7c6b44cb1e9b52198e3b2acace2b0940bbe99, all four expected targets, lint result pass with no findings, and lint_exit 0. All other reads used view, grep and glob inside the packet. I made no edits and no network calls.
 PROPOSAL: Record this review's isolation as procedural, noting the single out-of-protocol listing command.
+### R-18
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design / Enforced verification and recovery; AC-04; Test Plan / AC-06
+EVIDENCE: The owner boundary covers every completion and blocker state before readiness (docs/specs/shared-triage.md:141-143, AC-04 at :467). The list of completion-asserting writes at :138-139 and :178-180 names only checklist ticks, completion plan-status patches and resolution comments. Line :183-185 permits plain-chat approval for "label-vocabulary changes or new issues". The frozen legacy playbook (tests/vh-adlc/triage/fixtures/legacy/agents/issue-triage.md:162-166) proposes a `ready` label meaning "Verified unblocked" and a `partial` label meaning "Some phases shipped". It also posts per-issue triage comments that state the verified state and the shipped phases (:217-220). These writes publish a cleared blocker, readiness or partial completion, and are not closure or resolution. AC-04 limits blocker proof to "dependency readiness, executable closure or a completion-asserting write". The AC-06 Test Plan (:483) tests only checklist, plan-status and resolution-comment denials. The fail-closed rule at :182 could catch these writes, but nothing requires or tests that. This question is separate from the resolved R-17 F-02 choice: R-17 F-02 decided completion-asserting writes, not readiness or blocker-clearing writes.
+PROPOSAL: Raise an Open Question. Option A: writes that assert readiness, a cleared blocker or partial shipped scope (readiness labels, `blocked` label removal, triage comments that state shipped phases) are treated as completion-asserting and need the boundary. Option B: these writes may use exact plain-chat approval if the published text visibly marks them as unverified. Record the choice in Design and AC-04 or AC-06, and add a matching AC-06 Test Plan case.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria / AC-06; Tasks / T27, T31
+EVIDENCE: Design requires these behaviours: effects serialized per hostname/repository across batches (docs/specs/shared-triage.md:186-188); uncertain prior outcomes reconciled or kept blocked, and never bypassed by a new batch (:198-199); fresh attempts that never overwrite prior evidence (:191-192); checks confined without owner files, credentials or network (:159-161); bounded owned process-group cleanup, with recorded outcomes (:201-202). The AC-06 Test Plan exercises each of them (:483). AC-06's text (:469) states none of these end states. A future implementation review gives verdicts against criterion text, and feature-documents.md:183-185 defines `not met` only as executed evidence that contradicts the criterion. A leaked process group, overlapping effects or a bypassed uncertain outcome therefore need not make any criterion fail. T31 and T27 map process cleanup and tool rejection to AC-07 (:571, :573), but the Test Plan places that proof under AC-06.
+PROPOSAL: Amend AC-06 to state these end states: repository-wide effect serialization, uncertain outcomes kept blocked across resume and new batches, prior artifacts preserved, checks confined to the fixed-source boundary, and bounded owned process cleanup. Map the related unchecked and future tasks to AC-06.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design / Canonical workflow; Design / Collection step 1; Design / Enforced verification; Test Plan / AC-06
+EVIDENCE: docs/specs/shared-triage.md:252-254 says missing required input "blocks every executable closure in that report". :127-128 and AC-03 also block completion-asserting writes. :483 says missing platform confinement "fails closed for closure" and does not mention completion-asserting writes. :112-113 says "a presented exact batch authorizes only its tracker actions", with no reference to the boundary that :180 says exact approval cannot waive. :184 calls plain-chat-eligible new issues "verified remaining scope", but outside the controller every verification is an attestation (:139-140).
+PROPOSAL: Add "and completion-asserting write" to :252-254 and to the AC-06 platform case. Qualify :112-113 with "subject to the enforced boundary below". Replace "verified remaining scope" with "remaining scope that asserts no completion".
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design / Validation surfaces
+EVIDENCE: docs/specs/shared-triage.md:456 says "Unavailable required GUI execution leaves AC-01 unverified". :172-174 says GUI discovery and read-only trials are required "even if that surface has no configured execution controller". After this revision, "execution" usually means closure execution, so :456 can be read as also requiring GUI closure execution.
+PROPOSAL: Change :456 to "Unavailable required GUI discovery or read-only invocation leaves AC-01 unverified".
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks / T30, T36
+EVIDENCE: The public and reference guides at the target describe only closure. docs/get-started/installation.md:95-99 says "Executable closures also need the managed verification controller" and "Missing confinement leaves closure execution unavailable". plugins/vh-adlc/references/triage-boundary.md:3 and :8 gate only "closure execution". AC-01 requires these guides to be accurate. T36 (docs/specs/shared-triage.md:580) names only execute.ts, references/triage.md and execution tests. T30 (:576) was written for R-16 F-06/F-07, before the R-17 F-02 decision.
+PROPOSAL: Name triage-boundary.md, installation.md and the compatibility/workflow guides in T36 or T30. State that they must extend the controller requirement to completion-asserting writes.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: this review
+EVIDENCE: Isolation was procedural. I first inspected proof.sh and proof.py. They only read Git state, hash files and run the pinned lint. I then ran /tmp/shared-triage-spec-review-r18/proof.sh once, with no arguments. It returned integrity true, all four expected targets, proof_manifest_sha256 b9c4a669c1980f63e1fb899653800747209be9e9c28799af8f30844a627b6826, lint result pass with no findings, and lint_exit 0. Every other read used view, grep and glob inside the packet. One grep result was too large, and the tool runtime saved it automatically to /tmp/copilot-tool-output-1792872254490-lj6l1v.txt, outside the packet. I did not read that file. I made no edits, network calls or other commands.
+PROPOSAL: Record isolation as procedural and note the unread overflow file that the tool runtime saved.
 ## Sources
 
 - [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
