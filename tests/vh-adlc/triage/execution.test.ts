@@ -1,4 +1,5 @@
-import { afterEach, expect, test } from "bun:test";
+import{test}from"./boundary-test";
+import { afterEach, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { approveBatch, executeBatch, MutationFailure, planBatch } from "../../../plugins/vh-adlc/scripts/triage/execute";
@@ -7,7 +8,7 @@ import { buildReport } from "../../../plugins/vh-adlc/scripts/triage/report";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import type { Inventory, Issue, Label } from "../../../plugins/vh-adlc/scripts/triage/types";
 import { fixture, git } from "./fixtures";
-import{verifyCommand}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{verifyCommand,inspectIssues}from"../../../plugins/vh-adlc/scripts/triage/verification";
 
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
@@ -89,7 +90,7 @@ test("closing a duplicate rechecks its canonical tracker after approval",async()
   f.inventory.issues.push(canonical);f.issues.set(2,structuredClone(canonical));
   f.inventory.coverage.push({collection:"comments:2",scope:"2",pages:1,complete:true});
   const overlap={kind:"overlap",reference:"issue:2",detail:"Verified total overlap",verified:true};
-  const report=buildReport(f.config,f.inventory,[{number:1,state:"duplicate",duplicate_of:2,total_overlap:true,remaining:"Canonical work remains",evidence:[overlap],adversarial:[{...overlap,detail:"Adversarial scope recheck"}]},
+  const report=buildReport(f.config,f.inventory,[{number:1,state:"duplicate",duplicate_of:2,total_overlap:true,remaining:"Canonical work remains",evidence:[{...overlap,receipt:inspectIssues(f.config,f.inventory,[1,2],"primary").receipt}],adversarial:[{...overlap,receipt:inspectIssues(f.config,f.inventory,[1,2],"adversarial").receipt,detail:"Adversarial scope recheck"}]},
     {number:2,state:"open",remaining:"Implement retained scope",evidence:[{kind:"source",path:"src/app.ts",line:1,detail:"Actual canonical source",verified:true}]}]);
   const actions:Action[]=[{id:"explain",kind:"comment",issue:1,body:"Duplicate scope belongs to canonical 2"},{id:"close",kind:"close",issue:1,reason:"not_planned",duplicate_of:2,comment:"explain"}];
   const batch=planBatch(f.config,f.inventory,report,actions),approval=approveBatch(batch,["explain","close"],"Approve exact duplicate closure");
@@ -400,8 +401,11 @@ process.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n\
   const env = { ...process.env, PATH: `${join(f.root, "tools")}:${process.env.PATH}`, TRIAGE_FIXTURE_DB: join(f.root, ".vh-adlc/github.json") };
   const run = () => Bun.spawnSync(["bun", join(import.meta.dir, "../../../plugins/vh-adlc/scripts/triage/cli.ts"), "execute", "--repo", f.root,
     "--batch", join(f.root, ".vh-adlc/batch.json"), "--approval", join(f.root, ".vh-adlc/approval.json"), "--journal", f.journal], { env, stdout: "pipe", stderr: "pipe" });
-  const first = run(); expect({ exit: first.exitCode, error: first.stderr.toString(), trace: JSON.parse(readFileSync(join(f.root, ".vh-adlc/github.json"), "utf8")).trace.length > 0 }).toEqual({ exit: 0, error: "", trace: true });
-  expect(run().exitCode).toBe(0);
+  const unconfined=run();expect(unconfined.exitCode).toBe(1);
+  expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/github.json"),"utf8")).trace).toEqual([]);
+  const trustedCode=`import{readFileSync}from"node:fs";import{verifyCommand,withVerificationBoundary}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/verification.ts"))};import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{executeBatch}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/execute.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};await withVerificationBoundary(async()=>{const root=${JSON.stringify(f.root)},config=loadSettings(root),argv=["bun","-e",'import{answer}from"./src/app.ts";if(answer!==42)process.exit(1);'];for(const pass of["primary","adversarial"])verifyCommand(config,argv,pass);console.log(JSON.stringify(await executeBatch(config,JSON.parse(readFileSync(root+"/.vh-adlc/batch.json","utf8")),JSON.parse(readFileSync(root+"/.vh-adlc/approval.json","utf8")),githubExecutor(config),{journal:${JSON.stringify(f.journal)}})));});`;
+  const trusted=()=>Bun.spawnSync(["bun","-e",trustedCode],{env,stdout:"pipe",stderr:"pipe"});
+  const first=trusted();expect({exit:first.exitCode,error:first.stderr.toString()}).toEqual({exit:0,error:""});expect(trusted().exitCode).toBe(0);
   const data = JSON.parse(readFileSync(join(f.root, ".vh-adlc/github.json"), "utf8"));
   expect(data.trace.filter((call: { method: string }) => call.method !== "GET")).toEqual([
     { method: "POST", endpoint: "repos/example/project/issues/1/comments", payload: { body: (batch.actions[0] as { body: string }).body } },
@@ -475,7 +479,7 @@ else{data.writes++;response={};}
 writeFileSync(path,JSON.stringify(data));process.stdout.write("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(response));
 `);
   const{chmodSync}=await import("node:fs");chmodSync(join(f.root,"tools/gh"),0o700);
-  const code=`import{readFileSync}from"node:fs";import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{executeBatch}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/execute.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};const root=${JSON.stringify(f.root)},config=loadSettings(root),read=p=>JSON.parse(readFileSync(root+p,"utf8"));console.log(JSON.stringify(await executeBatch(config,read("/.vh-adlc/batch.json"),read("/.vh-adlc/approval.json"),githubExecutor(config),{journal:root+"/.vh-adlc/live-journal.json"})));`;
+  const code=`import{readFileSync}from"node:fs";import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{executeBatch}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/execute.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};const root=${JSON.stringify(f.root)},config=loadSettings(root);const{verifyCommand,withVerificationBoundary}=await import(${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/verification.ts"))});await withVerificationBoundary(async()=>{for(const pass of["primary","adversarial"])verifyCommand(config,["bun","-e",'import{answer}from"./src/app.ts";if(answer!==42)process.exit(1);'],pass);const read=p=>JSON.parse(readFileSync(root+p,"utf8"));console.log(JSON.stringify(await executeBatch(config,read("/.vh-adlc/batch.json"),read("/.vh-adlc/approval.json"),githubExecutor(config),{journal:root+"/.vh-adlc/live-journal.json"})));});`;
   const run=Bun.spawnSync(["bun","-e",code],{env:{...process.env,PATH:`${join(f.root,"tools")}:${process.env.PATH}`,TRIAGE_FIXTURE_DB:join(f.root,".vh-adlc/github.json")},stdout:"pipe",stderr:"pipe"});
   expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});
   expect(JSON.parse(run.stdout.toString())).toEqual({completed:[],blocked:[],failed:["tag"]});

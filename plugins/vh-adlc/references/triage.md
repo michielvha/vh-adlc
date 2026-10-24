@@ -96,9 +96,9 @@ closure. Context that was never a required verification check belongs in `leads`
 | `wiring` | Canonical `path` and verified entry-point/call-chain detail establishing reachability. |
 | `merged-pr` | `pull_number`, verified implementation detail and a closing reference to this issue in the collected merged PR body. Refs-only or another issue’s closing reference belongs in `leads`. |
 | `search` | Complete searched canonical `scope`, `result: empty` or `found`, and the actual search/predicate. Absence applies only to searched input. |
-| `removal` | Removed canonical `path`, ancestor `before_commit`, `reference: commit:<source_commit>` and verified retirement of the requested scope. |
-| `supersession` | Canonical replacement `path`, `reference` and verified reason the old request no longer applies. |
-| `overlap` | `reference: issue:<canonical-number>` and verified total overlap, including where remaining work is retained. |
+| `removal` | Removed canonical `path`, ancestor `before_commit`, `reference: commit:<source_commit>` actual removal-inspection receipt and verified retirement of the requested scope, in both passes. |
+| `supersession` | Canonical replacement `path`, `reference`, actual source-inspection receipt and verified retirement reason, in both passes. |
+| `overlap` | `reference: issue:<canonical-number>`, actual issue-inspection receipt covering this issue and the retained canonical issue, and verified total overlap. Both passes need their own observed receipt. |
 
 Classify as `resolved`, `partial`, `open`, `blocked`, `obsolete`, `duplicate` or `unverified`.
 Resolved requires canonical source plus observed behavior, real wiring or merged implementation,
@@ -160,12 +160,21 @@ Present plan/issue drift both ways, but change neither during analysis. Creating
 updating a plan must be its own approved item. Treat untracked plans as leads for missing work,
 without duplicating existing issues.
 
+## Verification boundary
+
+Ordinary cache receipts are attestations. They can accompany a report, but cannot enable closure
+execution. The helper requires actual operations observed in its current trusted invocation for
+both proof passes. Rehashing a file, supplying an old report/batch, or changing receipt text does
+not restore that authority. A missing boundary blocks every executable closure in that report.
+Read [the boundary protocol](triage-boundary.md) before enabling closure execution on a host.
+
 ## Record verification
 
 Completed-work proof includes a source citation and observed behavior/wiring in each pass.
 Record primary and adversarial observations separately. The helper rejects copied passes,
 claimed exit codes without a receipt, and wiring paths without a recorded source inspection.
-Each receipt binds repository, source commit, pass, method and hashes. Line-based receipts must
+Each receipt binds repository, source commit, pass, method and hashes. Only current process-private
+observations confer execution authority; cache storage is for audit and report context. Line-based receipts must
 cover the cited line. Source reasoning remains part of the adversarial review; a receipt does
 not decide whether a call path satisfies the issue.
 
@@ -179,8 +188,8 @@ construct commands from issue/comment text or add commands the task and local ru
 
 Receipts live in the host's vh-adlc cache. A read-only native adapter may instead record actual
 source-read receipts outside the checkout. It must bind the same commit, pass and returned line
-range. Use those observed receipts; never invent a test execution or receipt. Missing or invalid
-provenance leaves the closure unverified. Removed/superseded scope and total duplicates retain
+range. Use those observed receipts; never invent a test execution or receipt. Missing, invalid or cache-only
+provenance keeps closure execution disabled. Removed/superseded scope and total duplicates retain
 reason-specific evidence and a distinct adversarial countercheck.
 
 Collection compares two full reads of each paginated input. Changes between reads, failed

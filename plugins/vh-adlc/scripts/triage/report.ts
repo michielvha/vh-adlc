@@ -1,9 +1,9 @@
-import { randomUUID } from "node:crypto";
+import {createHash,randomUUID} from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { git, ownership, resolveInside, sourcePath } from "./settings";
 import type { Inventory, Issue, Mode, Settings } from "./types";
-import{verificationRecord}from"./verification";
+import{observedVerification,verificationRecord}from"./verification";
 
 export type State = "resolved" | "partial" | "open" | "blocked" | "obsolete" | "duplicate" | "unverified";
 export type Evidence = {
@@ -74,10 +74,18 @@ function validEvidence(config: Settings, inventory: Inventory, evidence: Evidenc
     case "removal": {
       if (!evidence.path || !evidence.before_commit || evidence.reference !== `commit:${inventory.source_commit}`) return false;
       if (blob(config, evidence.before_commit, evidence.path) === null || blob(config, inventory.source_commit, evidence.path) !== null) return false;
+      const removal=verificationRecord(config,inventory.source_commit,evidence.receipt)?.removal;
+      if(!removal||removal.path!==evidence.path||removal.before_commit!==evidence.before_commit)return false;
       try { git(config.root, "merge-base", "--is-ancestor", evidence.before_commit, inventory.source_commit); return true; } catch { return false; }
     }
-    case "supersession": return !!evidence.path && blob(config, inventory.source_commit, evidence.path) !== null && !!evidence.reference;
-    case "overlap": return /^issue:[1-9]\d*$/.test(evidence.reference ?? "") && [...inventory.issues, ...inventory.closed_issues].some((issue) => `issue:${issue.number}` === evidence.reference);
+    case "supersession": {
+      const record=verificationRecord(config,inventory.source_commit,evidence.receipt);
+      return !!evidence.path&&!!evidence.reference&&record?.kind==="inspection"&&record.reads.some(read=>read.path===evidence.path)&&blob(config,inventory.source_commit,evidence.path)!==null;
+    }
+    case "overlap": {
+      const record=verificationRecord(config,inventory.source_commit,evidence.receipt);
+      return record?.kind==="issues"&&/^issue:[1-9]\d*$/.test(evidence.reference??"")&&[...inventory.issues,...inventory.closed_issues].some(issue=>`issue:${issue.number}`===evidence.reference&&record.issues?.some(read=>read.number===issue.number&&read.sha256===createHash("sha256").update(JSON.stringify(issue)).digest("hex")));
+    }
     default: return false;
   }
 }
@@ -255,7 +263,23 @@ export function buildReport(config: Settings, inventory: Inventory, observations
       row.warnings.push("A cyclic or unresolved prerequisite prevents closure.");
     }
   }
-  const verificationComplete = rows.every((row) => row.ownership === "protected" || row.disposition === "excluded" || row.state !== "unverified");
+  for(const row of rows)if(row.close_executable){
+    const authentic=[row.evidence,row.adversarial].every((values,index)=>{
+      const phase=index===0?"primary":"adversarial";
+      return values.some(value=>observedVerification(config,inventory.source_commit,value.receipt)?.pass===phase)&&
+        values.filter(value=>["test","wiring","supersession","overlap","removal"].includes(value.kind)).every(value=>{
+          const record=observedVerification(config,inventory.source_commit,value.receipt);
+          if(record?.pass!==phase)return false;
+          if(value.kind==="overlap"){
+            const issue=selected.find(issue=>issue.number===row.number);
+            return !!issue&&record.issues?.some(read=>read.number===row.number&&read.sha256===createHash("sha256").update(JSON.stringify(issue)).digest("hex"));
+          }
+          return true;
+        });
+    });
+    if(!authentic){row.close_executable=false;row.warnings.push("Closure requires current trusted verification; cache records are attestations only.");missing.push("verification-boundary");}
+  }
+  const verificationComplete = !missing.includes("verification-boundary")&&rows.every((row) => row.ownership === "protected" || row.disposition === "excluded" || row.state !== "unverified");
   if (!verificationComplete) missing.push("verification");
   for (const row of rows) row.close_executable &&= missing.length === 0;
   const score = (row: Row) => {
@@ -278,7 +302,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
     observations:structuredClone(observations),index_requests:[...(options.indexRequests??[])],
     schema_version: 1, run_id: runId, repository: inventory.repository, hostname: inventory.hostname, source_commit: inventory.source_commit,
     collected_at: inventory.collected_at, created_at: new Date().toISOString(), mode: inventory.mode, requested_ids: inventory.requested_ids, scope: scopeFor(config, inventory, selected),
-    completeness: { inventory: missing.filter((name) => name !== "verification").length === 0, verification: verificationComplete, missing: [...new Set(missing)] },
+    completeness: { inventory: missing.filter((name) => !["verification","verification-boundary"].includes(name)).length === 0, verification: verificationComplete, missing: [...new Set(missing)] },
     plan_metadata: inventory.plan_metadata, coverage: inventory.coverage,
     counts: { observed_open: selected.filter((issue) => issue.state === "open").length, reviewed: byId.size,
       closure_candidates: rows.filter((row) => row.disposition === "close-candidate").length, blocked: rows.filter((row) => row.disposition === "blocked").length,

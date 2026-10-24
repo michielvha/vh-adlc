@@ -1,10 +1,11 @@
-import {expect,test} from "bun:test";
+import{test}from"./boundary-test";
+import {expect} from "bun:test";
 import {readFileSync} from "node:fs";
 import {join} from "node:path";
 import {fixture,git} from "./fixtures";
 import {loadSettings} from "../../../plugins/vh-adlc/scripts/triage/settings";
 import {buildReport,saveReport,type Observation} from "../../../plugins/vh-adlc/scripts/triage/report";
-import{inspectSources}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{inspectSources,inspectIssues}from"../../../plugins/vh-adlc/scripts/triage/verification";
 import type {Inventory,Issue,Mode} from "../../../plugins/vh-adlc/scripts/triage/types";
 
 // This deterministic matrix checks retained rules and explicit differences against
@@ -34,7 +35,7 @@ test("the synthetic migration matrix retains scope across modes and records inte
     const overlap={kind:"overlap",reference:"issue:2",detail:"Entire duplicate request belongs to unfinished canonical issue 2",verified:true};
     const observations:Observation[]=[done(1),{number:2,state:"open",remaining:"Implement the route",evidence:[missing]},
       {number:3,state:"partial",remaining:"Wire serializer into HTTP endpoint",evidence:[{...source,path:"src/serializer.ts"}]},
-      {number:4,state:"duplicate",duplicate_of:2,total_overlap:true,remaining:"Canonical scope remains in issue 2",evidence:[overlap],adversarial:[{...overlap,detail:"Rechecked full retained canonical scope"}]},
+      {number:4,state:"duplicate",duplicate_of:2,total_overlap:true,remaining:"Canonical scope remains in issue 2",evidence:[{...overlap,receipt:inspectIssues(config,inventory,[4,2],"primary").receipt}],adversarial:[{...overlap,receipt:inspectIssues(config,inventory,[4,2],"adversarial").receipt,detail:"Rechecked full retained canonical scope"}]},
       {number:5,state:"blocked",remaining:"Needs the HTTP endpoint",evidence:[missing],blockers:[{issue:3,missing:true,evidence:[missing]}]},done(99),done(100),done(101)];
     const first=buildReport(config,inventory,observations);
     expect(first.rows.filter(r=>r.disposition==="close-candidate").map(r=>r.number)).toEqual([1,4]);

@@ -1,11 +1,12 @@
-import { afterEach, expect, test } from "bun:test";
+import{test}from"./boundary-test";
+import { afterEach, expect } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildReport, saveReport } from "../../../plugins/vh-adlc/scripts/triage/report";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import type { Inventory, Issue } from "../../../plugins/vh-adlc/scripts/triage/types";
 import { fixture, git } from "./fixtures";
-import{inspectSources,verifyCommand,verificationDirectory}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{inspectSources,verifyCommand,verificationDirectory,persistVerification,inspectIssues,inspectRemoval}from"../../../plugins/vh-adlc/scripts/triage/verification";
 
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
@@ -63,6 +64,19 @@ test("claimed successful commands and a copied primary receipt cannot authorize 
   expect(buildReport(f.config,f.inventory,[observation]).rows[0].close_executable).toBe(false);
 });
 
+test("fabricated cache attestations cannot enable closure execution",()=>{
+  const f=setup([1]),now=new Date().toISOString(),empty="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+  const proof=(pass:"primary"|"adversarial")=>{
+    const argv=["THIS_COMMAND_WAS_NEVER_EXECUTED"];
+    const receipt=persistVerification(f.config,{schema_version:1,kind:"command",repository:f.config.repository,hostname:f.config.hostname,source_commit:f.inventory.source_commit,pass,argv,exit_code:0,stdout_sha256:empty,stderr_sha256:empty,source_unchanged:true,nonce:"fabricated-"+pass,started_at:now,finished_at:now,reads:[]});
+    return[{kind:"source",path:"src/app.ts",line:1,detail:"Existing fixture source",verified:true},{kind:"test",detail:"Claim only",verified:true,command:JSON.stringify(argv),exit_code:0,receipt}];
+  };
+  const report=buildReport(f.config,f.inventory,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")}]);
+  expect(report.rows[0].close_executable).toBe(false);
+  expect(report.completeness.missing).toContain("verification-boundary");
+  expect(report.completeness.inventory).toBe(true);expect(report.completeness.verification).toBe(false);
+});
+
 test("complete plans and merged Refs-only PRs are leads rather than closure evidence", () => {
   const f = setup([1]);
   f.inventory.plans.push({ path: "plans/a.md", issue: 1, issue_ref: "1", status: "complete", status_description: null, priority: "high" });
@@ -113,10 +127,11 @@ test("partial work keeps its remaining scope and mirrors cannot establish resolu
 test("obsolete and total duplicate closures use their own evidence and not-planned reason", () => {
   const f = setup([1, 2]);
   const overlap = { kind: "overlap", reference: "issue:2", detail: "The complete requested scope belongs to canonical issue 2", verified: true };
-  const duplicate = { number: 1, state: "duplicate", duplicate_of: 2, total_overlap: true, remaining: "Canonical issue 2 remains open", evidence: [overlap], adversarial: [{...overlap,detail:"Adversarial full-scope comparison against the canonical issue"}] };
+  const duplicate = { number: 1, state: "duplicate", duplicate_of: 2, total_overlap: true, remaining: "Canonical issue 2 remains open", evidence: [{...overlap,receipt:inspectIssues(f.config,f.inventory,[1,2],"primary").receipt}], adversarial: [{...overlap,receipt:inspectIssues(f.config,f.inventory,[1,2],"adversarial").receipt,detail:"Adversarial full-scope comparison against the canonical issue"}] };
   const report = buildReport(f.config, f.inventory, [duplicate, f.open(2)]);
   expect(report.rows[0].closure_reason).toBe("not_planned");
   expect(report.rows[0].close_executable).toBe(true);
+  expect(buildReport(f.config,f.inventory,[{...duplicate,adversarial:duplicate.evidence.map(value=>({...value,detail:"Changed prose only"}))},f.open(2)]).rows[0].close_executable).toBe(false);
   expect(buildReport(f.config, f.inventory, [{ ...duplicate, total_overlap: false }, f.open(2)]).rows[0].close_executable).toBe(false);
   f.write("src/legacy.ts", "export const legacy = true;\n");
   git(f.root, "add", "src/legacy.ts"); git(f.root, "commit", "-qm", "test: seed former mode");
@@ -125,7 +140,7 @@ test("obsolete and total duplicate closures use their own evidence and not-plann
   f.inventory.source_commit = git(f.root, "rev-parse", "HEAD");
   f.inventory.issues[0].body = "Extend the retired legacy mode";
   const removal = { kind: "removal", path: "src/legacy.ts", before_commit: beforeRemoval, reference: `commit:${f.inventory.source_commit}`, detail: "The former product scope was removed", verified: true };
-  const obsolete = buildReport(f.config, f.inventory, [{ number: 1, state: "obsolete", evidence: [removal], adversarial: [{...removal,detail:"Adversarial ancestor/current-tree removal check"}] }, f.open(2)]);
+  const obsolete = buildReport(f.config, f.inventory, [{ number: 1, state: "obsolete", evidence: [{...removal,receipt:inspectRemoval(f.config,"src/legacy.ts",beforeRemoval,"primary").receipt}], adversarial: [{...removal,receipt:inspectRemoval(f.config,"src/legacy.ts",beforeRemoval,"adversarial").receipt,detail:"Adversarial ancestor/current-tree removal check"}] }, f.open(2)]);
   expect(obsolete.rows[0].close_executable).toBe(true);
   expect(obsolete.rows[0].closure_reason).toBe("not_planned");
 });
@@ -331,4 +346,14 @@ test("readiness ranking retains prerequisite, designed-plan and partial-scope ti
   expect(report.ranked.map(row=>row.number)).toEqual([4,3,2,1]);
   expect(report.ranked.find(row=>row.number===2)!.reasons.join(" ")).toContain("plan");
   expect(report.ranked.find(row=>row.number===3)!.reasons.join(" ")).toContain("partial");
+});
+
+test("supersession needs actual replacement reads in both passes, not rewritten prose",()=>{
+ const f=setup([1]),base={kind:"supersession",path:"src/app.ts",reference:"Replacement behavior",detail:"Requested scope is superseded",verified:true};
+ const observation={number:1,state:"obsolete",remaining:"",evidence:[base],adversarial:[{...base,detail:"Different description"}]};
+ expect(buildReport(f.config,f.inventory,[observation]).rows[0].close_executable).toBe(false);
+ const primary=inspectSources(f.config,["src/app.ts"],"primary"),adversarial=inspectSources(f.config,["src/app.ts"],"adversarial");
+ const good={...observation,evidence:[{...base,receipt:primary.receipt}],adversarial:[{...base,receipt:adversarial.receipt}]};
+ expect(buildReport(f.config,f.inventory,[good]).rows[0].close_executable).toBe(true);
+ expect(buildReport(f.config,f.inventory,[{...good,adversarial:[{...base,receipt:primary.receipt,detail:"Changed prose"}]}]).rows[0].close_executable).toBe(false);
 });

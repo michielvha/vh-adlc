@@ -12,8 +12,8 @@ Shared triage is an unpublished local candidate on plugin 0.4.0. Bounded Codex C
 CLI native trials have passed; the current Claude follow-up also passes a private read-only trial
 and synthetic legacy/shared analysis comparison. The [feature evidence](../specs/shared-triage.md)
 records the exact commits, payload hashes and limits. Codex desktop and VS Code Local trials remain
-unverified. Migration is still blocked by the receipt-trust decision, remaining closure-provenance
-work and a fresh final review. Do not treat these intermediate results as release readiness.
+unverified. The enforced verification boundary is under test; fresh native proof, final review and GUI
+acceptance still block migration. Do not treat these intermediate results as release readiness.
 No triage support is claimed for other GUI surfaces. The historical results below retain their
 original operation/version scope.
 

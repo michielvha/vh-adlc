@@ -1,4 +1,5 @@
-import{expect,test}from"bun:test";
+import{test}from"./boundary-test";
+import{expect}from"bun:test";
 import{readFileSync,existsSync}from"node:fs";
 import{join}from"node:path";
 import{fixture,git}from"./fixtures";
@@ -27,4 +28,11 @@ test("an owned verification command cannot leave its spawned process group runni
     // A dead descendant can briefly remain as an init-owned zombie before reaping.
     expect(!existsSync(stat)||readFileSync(stat,"utf8").split(" ")[2]==="Z").toBe(true);
   }finally{f.dispose();}
+});
+
+test("ordinary helper calls outside a boundary remain attestations",()=>{
+ const f=fixture();try{
+  const code=`import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};import{inspectSources,observedVerification}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/verification.ts"))};const config=loadSettings(${JSON.stringify(f.root)}),receipt=inspectSources(config,["src/app.ts"],"primary").receipt;console.log(Boolean(observedVerification(config,${JSON.stringify(git(f.root,"rev-parse","HEAD"))},receipt)));`;
+  const run=Bun.spawnSync(["bun","-e",code],{stdout:"pipe",stderr:"pipe"});expect(run.exitCode).toBe(0);expect(run.stdout.toString().trim()).toBe("false");
+ }finally{f.dispose();}
 });
