@@ -393,7 +393,8 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Evidence: `bun test tests/vh-adlc/triage/settings.test.ts` failed as expected: missing canonical settings module; raw output `/tmp/shared-triage-t1-red.log`. No implementation or criterion pass is claimed.
 - [x] T2 `plugins/vh-adlc/scripts/triage/settings.ts`, `plugins/vh-adlc/scripts/triage/types.ts`, `plugins/vh-adlc/references/triage-settings.md`, both plugin manifests - T1 passes with one validated settings and normalized data contract, documented runtime requirements and no project constants in defaults (AC-02).
       Evidence: settings suite passed 23 tests after the observed missing-module and alias-path failures; `bun test tests/vh-adlc` passed 231 tests, 608 assertions. Package version 0.4.0 was moved forward to satisfy the existing version guard; no release was published. Logs: `/tmp/shared-triage-t2-green.log`, `/tmp/shared-triage-t2-suite.log`.
-- [ ] T3 `tests/vh-adlc/triage/collection.test.ts` - pagination/error/plan-inventory fixtures fail because the collector is missing; include collections beyond old limits and per-collection scope, completion and sanitized error metadata (AC-03, AC-02).
+- [x] T3 `tests/vh-adlc/triage/collection.test.ts` - pagination/error/plan-inventory fixtures fail because the collector is missing; include collections beyond old limits and per-collection scope, completion and sanitized error metadata (AC-03, AC-02).
+      Evidence: `bun test tests/vh-adlc/triage/collection.test.ts` failed as expected because the collector module is missing (`/tmp/shared-triage-t3-red.log`); cases cover 201 open issues, 101 closed issues, 301 PRs, 101 comments, partial pages, metadata and source drift.
 - [ ] T4 `plugins/vh-adlc/scripts/triage/collect.ts`, `plugins/vh-adlc/scripts/triage/github.ts`, `plugins/vh-adlc/scripts/triage/cli.ts` - T3 passes through the same structured collector used by the CLI, with fixed read requests, paginated comments and explicit incomplete coverage (AC-03).
 - [ ] T5 `tests/vh-adlc/triage/report.test.ts` - verdict/report fixtures fail because report helpers are absent; cover every evidence trap, dependency cycle, mode, comparable/incomplete history, explicit output override and report preservation (AC-04, AC-05).
 - [ ] T6 `plugins/vh-adlc/scripts/triage/report.ts`, `plugins/vh-adlc/scripts/triage/cli.ts` - T5 passes with reason-correct evidence requirements, report-wide closure guards, mode-correct ranking and history-safe reports (AC-04, AC-05).
@@ -770,3 +771,11 @@ NO FINDINGS
 - [Pinned feature template](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/feature-document-template.md): the feature structure and task/evidence sections.
 
 - [Pinned prose guide](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): reader-facing prose and verbatim review records.
+
+- [GitHub CLI API manual](https://cli.github.com/manual/gh_api): explicit HTTP methods, included response headers and pagination behavior used by the read adapter.
+
+- [Repository issues API](https://docs.github.com/en/rest/issues/issues#list-repository-issues): repository issue inventory and the pull-request marker in issue results.
+
+- [Issue comments API](https://docs.github.com/en/rest/issues/comments#list-issue-comments): paginated issue comments and actor provenance.
+
+- [Pull requests API](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests): closed pull inventory for merged implementation references.
