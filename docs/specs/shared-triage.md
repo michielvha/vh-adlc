@@ -9,6 +9,7 @@ covers:
   - README.md
   - docs/user-guides/workflows.md
   - docs/reference/compatibility.md
+  - docs/get-started/installation.md
 ---
 
 # Plan: Shared triage and Stackweaver migration
@@ -55,7 +56,9 @@ verified and ready to publish; it does not mean either default branch has adopte
 
 The `covers` paths above apply to vh-adlc. Main commit `ff0830c` relocated public workflow and
 compatibility guidance from the README; update those authoritative guides while keeping the README
-short. This documentation alignment adds no triage behavior or Stackweaver documentation workflow.
+short. The installation guide also states the package skill count and runtime requirements, so cover
+and update it for the added operation. `docs/README.md` is navigation only and needs no change.
+This documentation alignment adds no triage behavior or Stackweaver documentation workflow.
 The feature's public operation/support claims must agree across the README and linked guides.
 
 The same feature's Stackweaver migration affects only
@@ -288,16 +291,25 @@ remaining operations. No push, merge, release or implementation follows merely f
    concurrent owner/bot changes separately and do not count them as trial actions. Confinement must
    make the adapter the only live GitHub path for the entire trial. Use a trusted collector with fixed
    GET-only calls outside the analysis agent, then give that agent an explicit input set: the collected
-   tracker snapshot, the source files required for the bounded issue scope at the fixed Stackweaver
-   HEAD, canonical plugin/settings and relevant configured report history. Record those input paths
+   tracker snapshot, the complete canonical source tree at the fixed Stackweaver HEAD and the complete configured
+   report-history directory, plus canonical plugin/settings. Exclude credentials and host configuration
+   from the read-only input export; the full source/history is needed to verify absences and choose
+   the comparison report. Any unavoidable omission limits those claims explicitly to observed scope
+   and leaves absence/removal claims outside that scope unverified, never executable closures. Record those input paths
    and hashes. No GitHub credential, connected write tool, shell/network mutation path or access to an
    owner's alternate keyring/profile is reachable from the analysis agent. Collector credentials stay
    outside that input set and are never passed to the agent. Instructions or a renamed HOME alone
    are insufficient isolation. Verify the actual enforced boundary with a non-secret canary outside
-   the declared input set and a mutation probe against the offline denying adapter or an authorized
-   disposable fixture, never against live Stackweaver. Credential metadata checks may support the
+   the declared input set. Run the negative probes from inside the actual analysis environment: test
+   environment-variable access, credential helpers, keyrings/agent sockets, connected tools and direct
+   GitHub egress as well as file access. A mutation probe must originate there and target only the
+   offline denying adapter or an authorized disposable fixture, never live Stackweaver. An offline
+   adapter unit test alone does not prove the analysis environment is confined. Credential metadata checks may support the
    proof but a read-only token alone never establishes confinement. Record enforced isolation,
-   negative probes and the complete tool/adapter trace. Do not mint or transfer credentials as part
+   negative probes and the complete tool/adapter trace. The trusted collector must include hashed
+   per-collection pagination/completeness/error records in the snapshot; the operation validates and
+   applies them under the existing report-wide incomplete-coverage rule, rather than trusting an
+   unqualified snapshot to be complete. Do not mint or transfer credentials as part
    of this feature. If confinement cannot be established, the live
    trial remains not verified. The checkout,
    including settings and index, must remain unchanged.
@@ -347,7 +359,7 @@ surfaces until separately tested. No other harness support is implied.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility guides accurately state the expanded operation set and tested support.
+- [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support.
 - [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
 - [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
@@ -361,13 +373,13 @@ surfaces until separately tested. No other harness support is implied.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Package/discovery tests and native Codex CLI, Claude CLI, Codex desktop and VS Code Local fixture invocation; compare installed canonical payload. Run a generic backlog-triage prompt plus existing investigation/docs/feature/maintenance boundary regression cases, and inspect README and relocated workflow/compatibility operation/support claims. Exercise serial verification and plain-chat approval fallback without fabricated capabilities. |
+| AC-01 | Package/discovery tests and native Codex CLI, Claude CLI, Codex desktop and VS Code Local fixture invocation; compare installed canonical payload. Run a generic backlog-triage prompt plus existing investigation/docs/feature/maintenance boundary regression cases, and inspect README and relocated workflow/compatibility/installation operation, support, skill-count and runtime claims; confirm the docs index remains navigation-only. Exercise serial verification and plain-chat approval fallback without fabricated capabilities. |
 | AC-02 | No-settings fixture verifies default report/history placement, first-run versus unavailable history and absent plan metadata; generic and Stackweaver config fixtures; malformed/unknown-version/conflicting-repo cases; expected ownership/ranking/report paths, including no-settings and unlisted-umbrella cases with all sub-items shipped; inspect shared package for copied project constants. |
-| AC-03 | Paginated fixtures beyond legacy caps, nested comment pagination, inaccessible page/permission/rate/network failure and budget exhaustion; a failed required page or verification input makes every closure in that report non-executable, including otherwise evidenced issues; cover failed closed-issue and merged-PR inventory as report-wide blockers. |
+| AC-03 | Paginated fixtures beyond legacy caps, nested comment pagination, inaccessible page/permission/rate/network failure and budget exhaustion; a failed required page or verification input makes every closure in that report non-executable, including otherwise evidenced issues; cover failed closed-issue and merged-PR inventory as report-wide blockers; inspect per-collection completion/error metadata in collected snapshots and reject missing or inconsistent records. |
 | AC-04 | False-complete plan, merged Refs-only PR, unwired component, closed prerequisite with still-open dependent scope, missing source/test, removed/superseded scope, total duplicate of unfinished canonical work versus partial overlap, and dependency-cycle fixtures; inspect adversarial evidence and reason-correct closure proposals. |
 | AC-05 | Sweep/next/close/stale/explicit-ID fixtures, recording adapter asserts zero writes, same-day repeat preserves both reports, an external output override leaves settings unchanged and still reads configured history, counts and run-over-run differences match snapshots across mixed modes/scopes and incomplete coverage without false additions/removals, default reports remain uncommitted and explicit local commits follow repo rules; sweep/next ranking reasons and completeness match scope, while close/stale/explicit-ID reports contain no readiness ranking. |
 | AC-06 | Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch and retry. Explicitly request and approve an umbrella checklist patch/closure, then omit request or approval or change the patch's base body in negative cases; change an approved comment/label/closure/duplicate payload in negative cases. Inspect exact action log, preserved unrelated body content and other protected IDs. Include approved/unapproved plan-status patches and an attempted gated-completion sync; failed gates cannot change status. Bind new-label description/color and issue-URL backfill payloads; fail after issue creation and confirm retry backfills the same URL without another issue. Assert the approved plan commit subject/path set, unrelated index preservation and failed-commit retry state; intake-selected triage uses the same narrow authority reference and never shipping authority. |
-| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/index snapshots, enforced analysis-input/credential/tool isolation with denied outside-input-set and offline mutation probes, a read-only adapter trace and tracker snapshots with unrelated concurrent actor changes attributed and an inspected ordered publication handoff; verify the explicit output override, unchanged settings and configured previous-report source, and inspect the durable handoff in `tests/agent-triage/README.md`; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
+| AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception and report-first approval difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/index snapshots, complete canonical source/history inputs, validated per-collection coverage metadata, and probes from the actual analysis environment covering file/environment/helper/keyring/socket/tool/direct-egress routes with mutation attempts confined to offline/disposable targets, a read-only adapter trace and tracker snapshots with unrelated concurrent actor changes attributed and an inspected ordered publication handoff; verify the explicit output override, unchanged settings and configured previous-report source, and inspect the durable handoff in `tests/agent-triage/README.md`; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
 | AC-08 | Rollback/reapply procedure in `tests/agent-triage/README.md` executed in a disposable Stackweaver checkout; compare unrelated agents, plan files, index/worktree state and verify no service/credential operations. |
 | AC-09 | Diff only the declared migration paths and shared triage paths; compare hashes of existing maintenance/audit/docs/domain workflows and automation; confirm deferred register retains D-01 through D-05. |
 
@@ -378,28 +390,11 @@ is implemented by this specification request.
 
 ## Open Questions
 
-None. The owner accepted the five R-3 recommendations on 2026-10-23 and all four R-4
-recommendations on 2026-10-24. R-5 clarifications apply those existing decisions: Q7's external trial
-uses a per-run override and Q8's preserved report comparison reads configured history; the authority
-reference must express the already-approved exact-batch policy; legacy plan commits remain intact
-because the selected commit-default change applies to reports; and the rollback/handoff lives inside
-the already-approved `tests/agent-triage/` boundary. R-6 comparison/default/attribution details make
-those approved outcomes testable without adding owner authority: all-mode reports compare only
-proven coverage, generic no-settings behavior uses framework-owned conservative paths, and a denying
-adapter proves trial reads despite independent tracker activity. Claude model metadata remains local
-and mandatory under the existing Stackweaver rules. R-7 preserves already-required umbrella
-protection for unlisted indexes, proves the selected no-write trial through actual confinement, and
-retains mode-specific ranking. R-8 removes any alternate-credential path from that same confinement
-requirement, names the bounded source input set and keeps mutation probes off the live tracker.
-R-9's remaining trial-proof recommendations do not choose a new owner policy: the current
-AC-03/AC-07 already require complete coverage and no reachable mutation path. Implementation must
-test the actual analysis environment's credential/helper/keyring/socket/tool/egress routes, provide the
-complete canonical source and configured history needed for the trial's searches/selection, and retain
-per-collection pagination/error metadata. These recommendations remain visible in R-9 and must be
-covered by tasks and observed implementation evidence before those criteria can pass.
-The owner authorized documentation publication on 2026-10-24. The covered guide paths now follow
-main's documentation relocation; this metadata revision is being re-reviewed before implementation.
-Feature-code publication and main-cutover authority are not inferred.
+None. The owner accepted the R-3 and R-4 choices and accepted R-9 with documentation publication
+on 2026-10-24. R-9 trial-proof obligations are now folded into the normative Design and Test Plan,
+not kept as a separate decision source. The only additional coverage change follows main's relocated
+workflow, compatibility and installation guides. That refreshed baseline is being independently
+reviewed before renewed acceptance; existing documentation publication authority remains in force.
 
 ## Review Log
 
@@ -414,8 +409,9 @@ Feature-code publication and main-cutover authority are not inferred.
 | 2026-10-24 | R-6 | spec | `ea38a917ca8e804253e2f53fa682d67cebe1a339` | claude-opus-5.5 | procedural | Clarify comparable report history, no-settings output, read-only trial attribution and mandatory Claude model metadata. |
 | 2026-10-24 | R-7 | spec | `2ad7eebfb05723f8f4bf54b755f543abda6c71cc` | claude-opus-5.5 | procedural | Protect unlisted index issues, require trial confinement and keep ranking limited to ranking modes. |
 | 2026-10-24 | R-8 | spec | `838914d60955ec42280a2db6bc323c9d7eaef7c5` | claude-opus-5.5 | procedural | Remove the alternate-credential bypass in trial confinement and define its source-input boundary. |
-| 2026-10-24 | R-9 | spec | `5a4547da08407737a550a1e042a31b771d0bc226` | claude-opus-5.5 | procedural | No blocking findings; three should-fix recommendations on trial-environment probes, complete source/history input and collection metadata are implementation proof work under AC-03/AC-07. |
+| 2026-10-24 | R-9 | spec | `5a4547da08407737a550a1e042a31b771d0bc226` | claude-opus-5.5 | procedural | No blocking findings; three nonblocking recommendations on trial-environment probes, complete source/history input and collection metadata are implementation proof work under AC-03/AC-07. |
 | 2026-10-24 | R-9 | spec | `5a4547da08407737a550a1e042a31b771d0bc226` | n/a | n/a | accepted by owner |
+| 2026-10-24 | R-10 | spec | `33b8070d2a2af192b00306bfb84b765e907f1cb5` | claude-opus-5.5 | procedural | Refresh after main documentation relocation: fold trial proof into the normative baseline, check installation/index coverage and correct the R-9 severity summary. |
 
 ### R-1
 
@@ -674,6 +670,29 @@ SEVERITY: nit
 WHERE: Design / Stackweaver migration and rollback step 5; Design / Canonical workflow and harness boundary; Test Plan / AC-07
 EVIDENCE: docs/specs/shared-triage.md:282-286 has a trusted collector make "fixed GET-only calls" and give the agent a tracker snapshot, recorded by path and hash. Lines 90-91 require adapters with equivalent completeness and error behavior. Lines 144-151 make a missing page, permission error or budget limit explicit incomplete coverage, and that blocks every closure. The live trial at line 272 "checks report scope". Nothing requires the collector to record pagination completeness and errors in the snapshot, or requires the operation to read that record. A collector that silently stops after a fixed number of pages produces a snapshot that the agent cannot tell apart from a full one. The trial report then claims a complete sweep, and the AC-07 proof at line 363 does not check this.
 PROPOSAL: Require the collector to record, for each collection, whether every page was fetched and any errors, and include that record in the hashed input set. Require the operation to apply the existing incomplete-coverage rules to it, and add this check to the AC-07 proof.
+
+### R-10
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design / Stackweaver migration and rollback step 5; Test Plan / AC-03, AC-07
+EVIDENCE: The way R-9 was resolved now contradicts the normative baseline. docs/specs/shared-triage.md:394-399, in Open Questions, says implementation "must" test the analysis environment's credential, helper, keyring, socket, tool and egress routes. It also says implementation must provide "the complete canonical source and configured history" and keep per-collection pagination and error metadata. The normative Design still says something different. Lines 290-292 limit the input set to "the source files required for the bounded issue scope" and "relevant configured report history". Lines 296-298 still accept a mutation probe "against the offline denying adapter". The AC-07 proof at line 370 still names only "denied outside-input-set and offline mutation probes", and the AC-03 proof at line 366 says nothing about collector metadata. The pinned standard at feature-documents.md:70 makes only Scope, Design, Acceptance Criteria, Test Plan and `covers` normative. Line 135 says an answered question is folded into the document and removed. So the R-9 commitments sit outside the baseline that `fresh` tracks and that tasks and the implementation review check. Counterexample: tasks are written from the AC-07 proof row and Design step 5. The trial gives the agent a preselected source subset and runs only the offline adapter probe. Every Test Plan proof passes, and changing or deleting the Open Questions paragraph never makes a review stale. This applies decisions that were already made. It needs no new owner policy.
+PROPOSAL: Move the three R-9 proof obligations into Design step 5 and the AC-03 and AC-07 Test Plan rows. Replace "source files required for the bounded issue scope" with the complete canonical source and configured history directory. Then reduce the Open Questions paragraph to a pointer.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope; frontmatter `covers`; Acceptance Criteria / AC-01; Test Plan / AC-01
+EVIDENCE: Lines 56-59 require the feature's public operation and support claims to agree across the README and its linked guides. AC-01 at line 350 and its proof at line 364 check only the README and the workflow and compatibility guides. `covers` at lines 9-11 lists only those three documentation paths. docs/user-guides/workflows.md:34-35 sends readers to the installation guide for client-specific invocation syntax ("Slash syntax differs between clients; see installation"). README.md:56-57 links that guide for desktop and VS Code instructions, and CONTRIBUTING.md:58-59 makes it the home for installation steps. A new operation needs an invocation form on each of the four required clients. The packet does not export docs/get-started/installation.md or docs/README.md, so I could not check whether they list operations. If they do, the triage operation stays missing from them, the AC-01 proof does not catch it, and their changes fall outside `covers`.
+PROPOSAL: Check whether docs/get-started/installation.md, and the docs/README.md index, list operations or their invocation names. If they do, add them to `covers` and to the AC-01 proof. If they do not, record that they need no change.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Review Log
+EVIDENCE: The R-9 row at docs/specs/shared-triage.md:417 summarizes "three should-fix recommendations". The stored R-9 records show F-01 and F-02 as `SEVERITY: should-fix`, and F-03 (line 673) as `SEVERITY: nit`.
+PROPOSAL: Change the outcome to "two should-fix recommendations and one nit", or to "three nonblocking recommendations".
 
 ## Sources
 
