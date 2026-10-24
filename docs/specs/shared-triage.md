@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Owner accepted R-12 on 2026-10-24; planned gate passed; documentation publication authorized."
+status: in-progress
+status_description: "Implementation claimed on feat/shared-triage; owner acceptance and documentation publication recorded."
 issue: null
+branch: feat/shared-triage
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
   - plugins/vh-adlc/
