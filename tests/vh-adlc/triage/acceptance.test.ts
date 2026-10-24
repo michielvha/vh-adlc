@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { boundaryCommand, committedComponent, engineeringInputs, exportInputs, gradeTrial, verifyInputs } from "./native";
+import { boundaryCommand, commandWorkspace, committedComponent, engineeringInputs, exportInputs, gradeTrial, verifyInputs } from "./native";
 import { fixture, git } from "./fixtures";
 import{verificationRecord}from"../../../plugins/vh-adlc/scripts/triage/verification";
 const projects: ReturnType<typeof fixture>[]=[];
@@ -78,6 +78,21 @@ test("a prose-only discovery claim and unit-only adapter trace cannot pass a nat
   const f=setup();f.export();
   const grade=gradeTrial({input:f.output,checkout:f.root,plugin,host:"codex-cli",raw:"I discovered triage and all probes passed",trace:[],installed:plugin,exit_code:0});
   expect(grade.pass).toBe(false);expect(grade.failures).toContain("native-invocation");expect(grade.failures).toContain("analysis-boundary-probes");
+});
+
+test("compatibility proof requires the native project command, not a slash-shaped prompt",()=>{
+  const f=setup();f.export();
+  const grade=gradeTrial({input:f.output,checkout:f.root,plugin,host:"claude-cli",raw:"/triage succeeded",trace:[],installed:plugin,exit_code:0,command:"triage"});
+  expect(grade.failures).toContain("native-project-command");
+});
+
+test("project command trials copy exact command bytes without owner hooks or settings",()=>{
+  const f=setup(),command="---\ndescription: Fixture triage\nmodel: fable\n---\nRead agents/issue-triage.md.\n";
+  f.write(".claude/commands/triage.md",command);f.write(".claude/settings.json",'{"hooks":{"dangerous":"never load"}}');
+  git(f.root,"add",".claude");git(f.root,"commit","-qm","test: seed isolated command discovery");f.snapshot.source_commit=git(f.root,"rev-parse","HEAD");f.write("snapshot.json",JSON.stringify(f.snapshot));f.export();
+  const workspace=commandWorkspace(f.output,join(f.root,"control"),"triage");
+  expect(readFileSync(join(workspace.cwd,".claude/commands/triage.md"),"utf8")).toBe(command);
+  expect(()=>readFileSync(join(workspace.cwd,".claude/settings.json"))).toThrow();expect(workspace.model).toBe("fable");
 });
 
 test("required probe failures, a readable outside canary or live mutation trace block acceptance",()=>{
