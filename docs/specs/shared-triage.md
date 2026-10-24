@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Owner resolved proof for every published verdict; fresh spec review and acceptance precede remaining runtime work."
+status: planned
+status_description: "Owner accepted R-22; resuming remaining runtime implementation and acceptance tests."
 issue: null
 branch: feat/shared-triage
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
@@ -677,6 +677,7 @@ the complete revised specification still awaits its fresh review and owner accep
 | 2026-10-24 | R-20 | spec | `cb9208adec2f1b4143eefa49ebaefb0fa5d3e1f4` | claude-opus-5.5 | procedural | Four findings: correct attribution, decide non-closure obsolete/duplicate scope and cover authority/routing edits; intact response recovered from durable session after stdout truncation. |
 | 2026-10-25 | R-21 | spec | `90f3a92719d9390dc2aabd3569d11c3aecb4cd6a` | claude-opus-5.5 | procedural | Four factual findings: remove narrow approval examples, test all local status/report publication paths and cover every instruction entry; one wc listing deviation retained. |
 | 2026-10-25 | R-22 | spec | `c252339aaf32462ad435045a38c01cc6138b72e7` | claude-opus-5.5 | procedural | No blocking findings; task file/mapping omissions to correct, with a no-op echo and two unread tool overflows recorded. |
+| 2026-10-25 | R-22 | spec | `c252339aaf32462ad435045a38c01cc6138b72e7` | n/a | n/a | accepted by owner |
 
 ### R-1
 
