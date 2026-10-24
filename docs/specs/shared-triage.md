@@ -1168,7 +1168,7 @@ CRITERION: AC-03: Collection includes every requested page and reports incomplet
 VERDICT: met
 EVIDENCE: The plugin suite passed, including the two-pass stable pagination tests, the numeric label-page tests, and the completeness gating in `report.ts:266-284`. The failed native recheck does not affect this criterion.
 
-CRITERION: AC-04: Completion states and cleared blockers use proof actually observed inside the current enforced verification boundary before affecting dependency readiness or executable closure; closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
+CRITERION: AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
 VERDICT: not verified
 EVIDENCE: Unit tests enforce observed receipts in both passes, open retained canonicals, and method-appropriate removal and supersession reads. Native transcript and receipt regrading did not run. The boundary can be self-granted by any caller (F-02), and no shipped host controller exists, so the observed-verification guarantee is unproven on real hosts.
 
@@ -1176,7 +1176,7 @@ CRITERION: AC-05: Every mode reports its source commit, requested issue subset a
 VERDICT: met
 EVIDENCE: The plugin suite passed (report, collection and execution tests with disposable repositories and fake APIs). The no-write behavior on the live read-only trial was not re-observed this round (the private trial's preservation checks did not run). The criterion rests on the suite.
 
-CRITERION: AC-06: A confined managed controller separates analysis from operator approval, rejects unexpected tools and forged or replayed proof, and permits executable closure only with fresh observed verification; execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
+CRITERION: AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
 VERDICT: met
 EVIDENCE: The suite passed, including `execution.test.ts`. `executeBatch` revalidates the actor, settings, source hash, live labels, ownership and canonical state. Resume, the fake GitHub closure, cross-session replay and cache-forgery tests all executed. The possible resume blocker is noted in F-07.
 
@@ -1266,7 +1266,6 @@ SEVERITY: nit
 WHERE: this review
 EVIDENCE: One `proof.sh` poll was piped through `tail -c 600`. One grep targeted a path outside the packet and was denied by the tool. No edits were made and no other shell commands were run.
 PROPOSAL: None.
-
 
 ### R-16
 
