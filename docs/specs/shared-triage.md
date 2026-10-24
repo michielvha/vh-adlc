@@ -7,6 +7,8 @@ covers:
   - plugins/vh-adlc/
   - tests/vh-adlc/
   - README.md
+  - docs/user-guides/workflows.md
+  - docs/reference/compatibility.md
 ---
 
 # Plan: Shared triage and Stackweaver migration
@@ -51,7 +53,12 @@ Include the Stackweaver settings, compatibility entry points, parity trial, revi
 cutover sequence and rollback. Local completion means the shared operation and migration branch are
 verified and ready to publish; it does not mean either default branch has adopted the change.
 
-The `covers` paths above apply to vh-adlc. The same feature's Stackweaver migration affects only
+The `covers` paths above apply to vh-adlc. Main commit `ff0830c` relocated public workflow and
+compatibility guidance from the README; update those authoritative guides while keeping the README
+short. This documentation alignment adds no triage behavior or Stackweaver documentation workflow.
+The feature's public operation/support claims must agree across the README and linked guides.
+
+The same feature's Stackweaver migration affects only
 `.vh-adlc/triage.json`, `AGENTS.md`, `.claude/commands/triage.md`, `agents/issue-triage.md` and
 `tests/agent-triage/`. Verify that repository separately at its exact migration commit.
 
@@ -340,7 +347,7 @@ surfaces until separately tested. No other harness support is implied.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README accurately states the expanded operation set and tested support.
+- [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility guides accurately state the expanded operation set and tested support.
 - [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
 - [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
@@ -354,7 +361,7 @@ surfaces until separately tested. No other harness support is implied.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Package/discovery tests and native Codex CLI, Claude CLI, Codex desktop and VS Code Local fixture invocation; compare installed canonical payload. Run a generic backlog-triage prompt plus existing investigation/docs/feature/maintenance boundary regression cases, and inspect README operation/support claims. Exercise serial verification and plain-chat approval fallback without fabricated capabilities. |
+| AC-01 | Package/discovery tests and native Codex CLI, Claude CLI, Codex desktop and VS Code Local fixture invocation; compare installed canonical payload. Run a generic backlog-triage prompt plus existing investigation/docs/feature/maintenance boundary regression cases, and inspect README and relocated workflow/compatibility operation/support claims. Exercise serial verification and plain-chat approval fallback without fabricated capabilities. |
 | AC-02 | No-settings fixture verifies default report/history placement, first-run versus unavailable history and absent plan metadata; generic and Stackweaver config fixtures; malformed/unknown-version/conflicting-repo cases; expected ownership/ranking/report paths, including no-settings and unlisted-umbrella cases with all sub-items shipped; inspect shared package for copied project constants. |
 | AC-03 | Paginated fixtures beyond legacy caps, nested comment pagination, inaccessible page/permission/rate/network failure and budget exhaustion; a failed required page or verification input makes every closure in that report non-executable, including otherwise evidenced issues; cover failed closed-issue and merged-PR inventory as report-wide blockers. |
 | AC-04 | False-complete plan, merged Refs-only PR, unwired component, closed prerequisite with still-open dependent scope, missing source/test, removed/superseded scope, total duplicate of unfinished canonical work versus partial overlap, and dependency-cycle fixtures; inspect adversarial evidence and reason-correct closure proposals. |
@@ -390,7 +397,9 @@ test the actual analysis environment's credential/helper/keyring/socket/tool/egr
 complete canonical source and configured history needed for the trial's searches/selection, and retain
 per-collection pagination/error metadata. These recommendations remain visible in R-9 and must be
 covered by tasks and observed implementation evidence before those criteria can pass.
-No publication or main-cutover authority is inferred.
+The owner authorized documentation publication on 2026-10-24. The covered guide paths now follow
+main's documentation relocation; this metadata revision is being re-reviewed before implementation.
+Feature-code publication and main-cutover authority are not inferred.
 
 ## Review Log
 
