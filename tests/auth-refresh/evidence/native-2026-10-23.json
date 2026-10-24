@@ -913,10 +913,10 @@
       }
     ],
     "remaining_inputs": {
-      "corporate_github_account": "Not logged in; personal account unchanged.",
+      "configured_github_account": "Not logged in; personal account unchanged.",
       "manual_token_files_missing": 3,
       "registry_authenticated_access": "Not verified; IPv4 unauthenticated v2 endpoint returned 401.",
-      "managed_work_host": "Existing SSH route refused authorization and requested SSM Connect Reconnect Existing Workspace; no bypass attempted."
+      "remote_host": "Existing SSH route refused authorization and requested reconnection; no bypass attempted."
     },
     "cleanup": {
       "real_challenges_active": false,

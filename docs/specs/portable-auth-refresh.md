@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "All PRs merged; signed v0.2.0-rc.2 pinned; corporate-host logins and review pass; owner reports phone push works. Desktop GUI invocation handed over (#25)."
+status_description: "All PRs merged; signed v0.2.0-rc.2 pinned; Linux-host logins and review pass; owner reports phone push works. Desktop GUI invocation handed over (#25)."
 issue: 25
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -71,7 +71,7 @@ tests reproduce the acceptance failures without editing the canonical component.
 uses fixture credentials and local HTTP servers only. Native installs use disposable client profiles.
 
 Real-provider gaps remain: Azure login, both required live host routes, normal-lane IdP login,
-AKS/EKS identity on configured contexts, the configured corporate GitHub account, registry access,
+AKS/EKS identity on configured contexts, the configured GitHub account, registry access,
 PAT/Sonar validation, phone notification arrival, stale-challenge cleanup and post-MFA continuation
 through Remote Control. Missing local PAT/Sonar files and the configured AKS context remain missing;
 they were not created or replaced. The existing admin lane was left parked, and the normal lane stopped.
@@ -139,7 +139,7 @@ Initial migration blockers before release authorization:
   committed runtime lock remains intentionally empty; invoking the new release-backed skill reports
   provisioning pending. No release, tag, push, installed-plugin cutover or old-setup removal was done.
 - Required real-provider acceptance where this host lacks a healthy Azure request path, configured
-  Kubernetes context, corporate GitHub login, registry reachability, or manual PAT/Sonar files.
+  Kubernetes context, configured GitHub login, registry reachability, or manual PAT/Sonar files.
 - Native Codex desktop and VS Code Local invocation plus update/uninstall/rollback acceptance. CLI
   installation and fixture tests do not establish these client behaviors.
 - Claude Remote Control phone delivery, failed-delivery cleanup and continuation on another host.
@@ -391,7 +391,7 @@ invocation therefore remains open.
 
 The verified production runtime's live-host `doctor` passed, including Chromium startup. Its
 read-only provider check reported Azure WARN (timeout), the configured AKS context WARN (absent),
-AWS DEAD (expired SSO token), the configured corporate GitHub identity DEAD (not logged in), registry
+AWS DEAD (expired SSO token), the configured GitHub identity DEAD (not logged in), registry
 and service-health WARN, and the two PATs plus Sonar token MISSING. These unavailable inputs remain
 open; no tokens were minted and no account was switched. Passive lane status showed the admin lane
 parked and the normal lane stopped; `lane whoami admin` reported an invalid session. No live
@@ -433,8 +433,8 @@ classifier rejected `whoami` as PII Data Handling and tenant navigation as Real-
 No security setting was changed and no new MFA was sent. The later fake-challenge cleanup used an
 isolated local provider and state directory, without retrying those rejected real-account actions.
 
-The existing managed SSH route to the work host also refused authorization and requested SSM Connect
-Reconnect Existing Workspace. Its authorization was not bypassed. Corporate GitHub remains logged
+The existing SSH route to the remote host also refused authorization and required reconnection.
+Its authorization was not bypassed. The configured GitHub account remains logged
 out, the three manual token files remain absent, and registry restoration through the cluster secret
 could not be exercised while Kubernetes access was unavailable. Default kubeconfig bytes were
 preserved during both AKS and EKS checks.
@@ -447,9 +447,9 @@ AC-08 now has rollback and legacy-invocation evidence as well as the eight insta
 cases. T5 remains open for the complete phone MFA flow, required GUI routes, normal-lane login,
 Kubernetes identity and the remaining real-provider rows. The shared-catalog repair remains local.
 
-### Corporate-host handoff, 2026-10-23
+### Linux-host handoff, 2026-10-23
 
-The owner authorized publishing the in-progress work for continuation on the corporate host.
+The owner authorized publishing the in-progress work for continuation on the Linux host.
 Marketplace merge `02e862d2feb16d88f5703d07b70267fca9968707` includes main
 `9b68b56292416da212910c62e133e09a49cd5258`, preserving its vh-adlc 0.3.0 lifecycle content and the
 auth-refresh catalog entry. Its verification passed `go test ./...`, `go vet ./...`,
@@ -479,13 +479,13 @@ Do not treat the source correction as a released runtime or close AC-05 until de
 
 Continue from this feature branch and PR #24, reading this document before starting new work. Reuse
 the recorded passing checks unless new changes, failures or an outstanding criterion justify a rerun.
-Use the corporate host's local configuration and credentials; do not copy private files between hosts.
+Use the Linux host's local configuration and credentials; do not copy private files between hosts.
 
-1. Reconnect the managed workspace through SSM Connect if its existing SSH route still refuses access.
+1. Reconnect the remote workspace if its existing SSH route still refuses access.
    Inspect the owning worktree with `git status --short` and `git worktree list --porcelain`, fetch
    `origin/feat/portable-auth-refresh`, and update a clean checkout without replacing unrelated work.
 2. Read the host notes and run the configured read-only provider check. Verify private AKS/EKS and
-   service DNS, `kubelogin`, the exact corporate GitHub identity and the three manual token files.
+   service DNS, `kubelogin`, the exact configured GitHub identity and the three manual token files.
    Use existing valid tokens; token issuance remains a manual operation. Keep personal GitHub state.
 3. Review and test auth-refresh `fix/provider-probe-failures`. A binary built from that source is a
    development test candidate, not the plugin's signed runtime. Coordinate a verified runtime release
@@ -496,15 +496,15 @@ Use the corporate host's local configuration and credentials; do not copy privat
    host's normal approval path; do not disable its protections. Keep one outstanding MFA challenge,
    park on delivery failure or timeout, and suppress retries.
 5. Run read-only AKS/EKS identity and registry checks using temporary kubeconfigs when needed. Verify
-   GitHub, PAT/Sonar and service health from the corporate network. Check plain Azure operation without
+   GitHub, PAT/Sonar and service health from the host network. Check plain Azure operation without
    the earlier temporary IPv4 wrapper. Finish the outstanding desktop and shared-route GUI invocation.
 6. Record sanitized outcomes here, obtain fresh exact-commit reviews and run the completion gate only
    after all criteria are met or owner-approved residuals have durable trackers. Keep this feature
    in progress until then; do not infer a production cutover from the branch push.
 
-### Corporate-host run, 2026-10-24
+### Linux-host run, 2026-10-24
 
-Run on the corporate Linux host against marketplace `eaa7b22` and the development candidate built
+Run on the Linux host against marketplace `eaa7b22` and the development candidate built
 from auth-refresh `babe4dba267f1183417b9474ac276ad231b78749`. This was not the signed runtime. The
 host's private config was copied to a temporary path with only the two removed browser keys dropped.
 The live config, credentials and old setup were left unchanged.
@@ -515,7 +515,7 @@ The live config, credentials and old setup were left unchanged.
 | Marketplace `go test ./...`, `go vet ./...` | Passed | |
 | `bun test tests/auth-refresh tests/vh-adlc` with Codex CLI 0.164.0 and `AUTH_REFRESH_SOURCE` at the pinned main component | 217 passed, 579 assertions | Against the fix branch checkout, the pin test fails by design because the catalogs still pin main |
 | Candidate `setup` and `doctor` | Driver 1.62.1 and Chromium 151 started; all checks ok | |
-| Read-only provider check | Azure DEAD (sign-in frequency expiry), AWS DEAD (expired SSO token), AKS WARN (timeout, not a login offer), corporate GitHub identity, both PATs, Sonar, registry and service health OK | Kubernetes identity depends on the dead parents |
+| Read-only provider check | Azure DEAD (sign-in frequency expiry), AWS DEAD (expired SSO token), AKS WARN (timeout, not a login offer), configured GitHub identity, both PATs, Sonar, registry and service health OK | Kubernetes identity depends on the dead parents |
 | Private AKS/EKS DNS and `kubelogin` | All configured cluster hostnames resolve; kubelogin v0.2.19 present | Identity unverified until az and AWS are live |
 | Normal-lane Okta login | Password login with no MFA prompt; session saved; deliberate stop/start; `whoami` matched the expected account | Okta did not challenge, so this proves no phone flow |
 | Plain Azure device-code start without the IPv4 wrapper | Device code printed within one second | Login not completed (see next row) |
@@ -524,7 +524,7 @@ The live config, credentials and old setup were left unchanged.
 | AWS SSO device login on the same admin lane | Okta required a second number-match for the AWS app (no warm-session reuse across these apps). After the tap, a cookie banner blocked Confirm until declined; Allow access then completed and `aws sso login` exited 0 | Workflow should mention the AWS cookie banner and the second Okta tap |
 | STS for every configured SSO profile | 9/9 returned an identity | Read-only |
 | AKS/EKS `kubectl auth whoami` on all 25 configured contexts, via a temporary kubeconfig copy | 25/25 returned an identity; default kubeconfig hash unchanged | Read-only |
-| Candidate `check` after logins | All nine identities OK, including AKS through kubelogin and corporate GitHub | |
+| Candidate `check` after logins | All nine identities OK, including AKS through kubelogin and configured GitHub | |
 | Admin saved session after deliberate stop/start | `whoami` matched without MFA; no lane left on a live challenge; both lanes stopped afterwards | |
 
 The owner then asked to merge the open auth-refresh work. PRs #3 and #2 merged, superseded #1 closed,
@@ -543,13 +543,13 @@ with every identity OK. The host's Claude now has `auth-refresh@vhco-tools` inst
 the old agent file and setup remain. The live config dropped the two removed keys, with a mode-0600
 backup kept. An independent exact-commit review of `1b35928..3695e2c` reported no findings.
 
-On 2026-10-24 the owner reported that the Claude Remote Control phone push works. The corporate host
+On 2026-10-24 the owner reported that the Claude Remote Control phone push works. The Linux host
 holds no log of a plugin login after 23:14 on 2026-10-23, and its AWS SSO cache was not refreshed.
 That run therefore happened on another host or through another flow, and only the owner's report
 supports it.
 
 Still open and tracked in [issue #25](https://github.com/michielvha/vh-adlc/issues/25): desktop and
-standalone GUI invocation. The corporate host cannot reach the owner's MacBook, so this moves to the
+standalone GUI invocation. The Linux host cannot reach the owner's MacBook, so this moves to the
 desktop handover below.
 
 ### Desktop handover, 2026-10-24
