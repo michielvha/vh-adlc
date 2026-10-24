@@ -480,12 +480,13 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Evidence: stale-file and live-kernel-lock regressions fail before the fix (`/tmp/shared-triage-kernel-lock-red.log`: 33 pass, 2 fail), then execution/session checks pass (`/tmp/shared-triage-kernel-lock-green.log`: 39 pass). The paired full plugin gate passes 353 tests, 1343 assertions (`/tmp/shared-triage-managed-controller-full-gate.log`). Actual disposable lock owners are killed by handle; no unrelated process is targeted. A retained lock inode cannot block a retry after its kernel owner exits.
 - [x] T22 external paired-review proof packet - freeze and verify proof-script hashes before dispatching the next fresh Copilot Opus 5.5 review after R-14 F-06, with no proof code edited during that review (AC-01 through AC-09).
       Evidence: R-16 observed the frozen manifest `052f5b4eab3d2ccbce5a35c9f9b5877c1aa0f7ff9c50d5d5bcc145670598d3d7`, both clean exact repository commits, helper/input hash verification, independent command exits/time caps and summaries that retain missing or failed proof. Full plugin suite: 353 pass. Contracts, rollback/reapply, committed Codex controller regrade and four exact intake routes pass. Lint retains only malformed historical R-15; this valid latest review supersedes its formatting diagnostic. Claude/private/legacy renewal and GUI tests remain unavailable. R-16 records the two unused tool-runtime overflow files and repeated proof reads; no helper or input was edited.
-- [ ] T26 `scripts/triage/report.ts` and report tests - authenticate all completion and blocker states before dependency/ranking decisions, including excluded, index and closed rows; observe the R-16 F-01/F-02 regressions before correction (AC-02, AC-04, AC-05).
+- [x] T26 `scripts/triage/report.ts` and report tests - authenticate all completion and blocker states before dependency/ranking decisions, including excluded, index and closed rows; observe the R-16 F-01/F-02 regressions before correction (AC-02, AC-04, AC-05).
+      Evidence: Three observed regressions fail before correction (26 pass, 3 fail; /tmp/shared-triage-r16-state-red.log), then all 29 report tests pass. Protected, index and closed completion states and cleared blockers now require live observations before dependency decisions. Full plugin gate: 360 pass, 1388 assertions (/tmp/shared-triage-r16-corrections-full-gate.log). Fresh native renewal and independent review remain required.
+- [ ] T29 `scripts/triage/execute.ts` and concurrency tests - serialize the entire effect phase for one repository across separate batch/journal paths after R-16 F-05; a competing batch must have zero effects (AC-06).
+- [ ] T31 controller subprocess helper and actual process tests - bound termination and escalate for stubborn owned process groups, including normal-exit descendants, after R-16 F-08 (AC-07).
 - [ ] T27 `scripts/triage/controller.ts` and acceptance tests - reject unexpected Codex tools and unknown item types before operator execution; require the fixed tool configuration, and preserve an observed shell-item negative case after R-16 F-03 (AC-01, AC-04, AC-07).
 - [ ] T28 managed controller and real fixture driver - resume an interrupted prior run with its exact original journal/batch and fresh observations, completing closure without another evidence comment after R-16 F-04 (AC-06).
-- [ ] T29 `scripts/triage/execute.ts` and concurrency tests - serialize the entire effect phase for one repository across separate batch/journal paths after R-16 F-05; a competing batch must have zero effects (AC-06).
 - [ ] T30 migration parity manifest, Stackweaver handoff and shared docs - track the enforced-controller execution/platform difference, preserve deferred workflows and clarify the spec treatment chosen by the owner after R-16 F-06/F-07 (AC-01, AC-07, AC-09).
-- [ ] T31 controller subprocess helper and actual process tests - bound termination and escalate for stubborn owned process groups, including normal-exit descendants, after R-16 F-08 (AC-07).
 - [ ] T32 `tests/vh-adlc/triage/controller-e2e.ts` and evidence rechecker - measure fake GitHub resolution instead of presenting a constant as an observed real-call count after R-16 F-09 (AC-06, AC-07).
 - [ ] T33 managed read adapter, startup checks and native tests - produce actual removal receipts and operator-selected fixed check receipts before report generation, preserving serial primary/adversarial proof after R-16 F-11 (AC-04, AC-06).
 - [ ] T15 `tests/vh-adlc/evidence/triage/` and this document's evidence - actual Codex/Claude CLI invocation, existing-route regressions, frozen legacy parity, bounded live read-only trial and rollback/reapply have observed pass results tied to exact component/adapter commits; retain failures and unavailable proof honestly (AC-01, AC-03, AC-07, AC-08, AC-09).
@@ -506,16 +507,7 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
 
 ## Open Questions
 
-### Q3: How should the enforced-verification decision enter the normative baseline?
-
-**Recommendation:** Revise Design and Test Plan to require the boundary and its negative cases, then obtain a fresh spec review and owner acceptance.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| A. Normative revision | The accepted baseline explicitly requires and tests enforced closure proof. | Draft/review/acceptance before the revised design is claimed accepted. |
-| B. Accepted interpretation | The owner explicitly binds the existing observed-proof criteria to the boundary. | Context records that interpretation; the normative text remains unchanged. |
-
-**Why this is yours:** R-16 F-07 found that the current normative sections do not explicitly name this requirement; only the owner can choose how their earlier decision binds the accepted baseline.
+None. The owner chose a normative Design/Test Plan revision for the enforced boundary on 2026-10-24. A fresh spec review and acceptance follow after the current factual fixes are committed.
 
 Earlier questions are resolved. The owner accepted the R-3 and R-4 choices and accepted R-9 with documentation publication
 on 2026-10-24. R-9 trial-proof obligations are now folded into the normative Design and Test Plan,

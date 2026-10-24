@@ -98,6 +98,15 @@ function completed(config: Settings, inventory: Inventory, values: Evidence[], i
 function verified(config: Settings, inventory: Inventory, values: Evidence[]) {
   return values.length > 0 && values.every((value) => validEvidence(config, inventory, value));
 }
+function observedProof(config:Settings,inventory:Inventory,values:Evidence[],phase?:"primary"|"adversarial",issueNumber?:number){
+  const receipt=(value:Evidence)=>observedVerification(config,inventory.source_commit,value.receipt);
+  return values.some(value=>{const record=receipt(value);return !!record&&(!phase||record.pass===phase);})&&
+    values.filter(value=>["test","wiring","supersession","overlap","removal"].includes(value.kind)||value.receipt).every(value=>{
+      const record=receipt(value);if(!record||phase&&record.pass!==phase)return false;
+      if(value.kind==="overlap"&&issueNumber){const issue=[...inventory.issues,...inventory.closed_issues].find(issue=>issue.number===issueNumber);return !!issue&&record.issues?.some(read=>read.number===issueNumber&&read.sha256===createHash("sha256").update(JSON.stringify(issue)).digest("hex"));}
+      return true;
+    });
+}
 function selection(inventory: Inventory, config: Settings, observations: Observation[]): Issue[] {
   if (inventory.mode === "ids") return [...inventory.issues, ...inventory.closed_issues].filter((issue) => inventory.requested_ids.includes(issue.number));
   if (inventory.mode === "stale") return inventory.issues.filter((issue) => Date.parse(issue.updated_at) <= Date.parse(inventory.collected_at) - config.stale_days * 86400000);
@@ -235,7 +244,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
       else { state = "unverified"; warnings.push("Total overlap and a canonical issue require both verification passes."); }
     }
     const blockers = observation?.blockers ?? [];
-    const unknownBlocker = blockers.some((blocker) => !verified(config, inventory, blocker.evidence));
+    const unknownBlocker = blockers.some((blocker) => !verified(config, inventory, blocker.evidence)||!blocker.missing&&!observedProof(config,inventory,blocker.evidence));
     const blocked = blockers.some((blocker) => blocker.missing) || unknownBlocker;
     if (state === "blocked" && !blocked && blockers.length) state = "open";
     if (blocked && !closure) state = unknownBlocker ? "unverified" : "blocked";
@@ -245,12 +254,18 @@ export function buildReport(config: Settings, inventory: Inventory, observations
     return { number: issue.number, title: issue.title, state, remaining: observation?.remaining ?? "", ownership: owner, disposition,
       closure_reason: closure, close_executable: !!closure && allowed && issue.state === "open",
       evidence, adversarial, leads: observation?.leads ?? [], duplicate_of: observation?.duplicate_of ?? null, depends_on: [...new Set([...(observation?.depends_on ?? []), ...blockers.filter((blocker) => blocker.missing).map((blocker) => blocker.issue)])]
-        .filter(id=>!blockers.some(blocker=>blocker.issue===id && !blocker.missing && verified(config,inventory,blocker.evidence)) || blockers.some(blocker=>blocker.issue===id && blocker.missing)),
+        .filter(id=>!blockers.some(blocker=>blocker.issue===id && !blocker.missing && verified(config,inventory,blocker.evidence)&&observedProof(config,inventory,blocker.evidence)) || blockers.some(blocker=>blocker.issue===id && blocker.missing)),
       index_requested: indexRequested, index_evidence: indexRole ? observation?.index_evidence ?? "Observed index/umbrella role" : owner === "index" ? "Configured index rule" : null,
       owned_by: ownedBy, ownership_evidence: configuredOwner?configuredOwner.sources.map(path=>({kind:"ownership",path,reference:`issue:${issue.number}`,detail:`Declared workstream source ${config.workstream_sources[path]}`,verified:true})):observation?.ownership_evidence ?? [],
       plan_paths: inventory.plans.filter((plan) => plan.issue === issue.number).map((plan) => plan.path),
       estimated_size: typeof observation?.estimated_size === "string" ? observation.estimated_size : "unknown", warnings };
   });
+  // Authenticate every completion state before it can clear a prerequisite, even
+  // when protection or issue state makes the row ineligible for execution.
+  for(const row of rows)if(["resolved","obsolete","duplicate"].includes(row.state)){
+    const authentic=observedProof(config,inventory,row.evidence,"primary",row.number)&&observedProof(config,inventory,row.adversarial,"adversarial",row.number);
+    if(!authentic){row.close_executable=false;row.state="unverified";if(row.disposition!=="excluded")row.disposition="needs-decision";row.closure_reason=null;row.remaining||="Remaining scope is unverified.";row.warnings.push("Completion requires current trusted verification; cache records are attestations only.");missing.push("verification-boundary");}
+  }
   const cycles = cyclesFor(rows), cycleIds = new Set(cycles.flat()), unresolved = new Set<number>();
   for (const row of rows) for (const id of row.depends_on) {
     const prerequisite = rows.find((other) => other.number === id);
@@ -262,22 +277,6 @@ export function buildReport(config: Settings, inventory: Inventory, observations
       row.close_executable = false; row.state = "unverified";
       row.warnings.push("A cyclic or unresolved prerequisite prevents closure.");
     }
-  }
-  for(const row of rows)if(row.close_executable){
-    const authentic=[row.evidence,row.adversarial].every((values,index)=>{
-      const phase=index===0?"primary":"adversarial";
-      return values.some(value=>observedVerification(config,inventory.source_commit,value.receipt)?.pass===phase)&&
-        values.filter(value=>["test","wiring","supersession","overlap","removal"].includes(value.kind)).every(value=>{
-          const record=observedVerification(config,inventory.source_commit,value.receipt);
-          if(record?.pass!==phase)return false;
-          if(value.kind==="overlap"){
-            const issue=selected.find(issue=>issue.number===row.number);
-            return !!issue&&record.issues?.some(read=>read.number===row.number&&read.sha256===createHash("sha256").update(JSON.stringify(issue)).digest("hex"));
-          }
-          return true;
-        });
-    });
-    if(!authentic){row.close_executable=false;row.state="unverified";row.disposition="needs-decision";row.closure_reason=null;row.remaining||="Remaining scope is unverified.";row.warnings.push("Closure requires current trusted verification; cache records are attestations only.");missing.push("verification-boundary");}
   }
   const verificationComplete = !missing.includes("verification-boundary")&&rows.every((row) => row.ownership === "protected" || row.disposition === "excluded" || row.state !== "unverified");
   if (!verificationComplete) missing.push("verification");

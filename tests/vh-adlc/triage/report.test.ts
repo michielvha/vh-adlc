@@ -6,7 +6,7 @@ import { buildReport, saveReport } from "../../../plugins/vh-adlc/scripts/triage
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import type { Inventory, Issue } from "../../../plugins/vh-adlc/scripts/triage/types";
 import { fixture, git } from "./fixtures";
-import{inspectSources,verifyCommand,verificationDirectory,persistVerification,inspectIssues,inspectRemoval}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{withVerificationBoundary,inspectSources,verifyCommand,verificationDirectory,persistVerification,inspectIssues,inspectRemoval}from"../../../plugins/vh-adlc/scripts/triage/verification";
 
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
@@ -357,4 +357,30 @@ test("supersession needs actual replacement reads in both passes, not rewritten 
  const good={...observation,evidence:[{...base,receipt:primary.receipt}],adversarial:[{...base,receipt:adversarial.receipt}]};
  expect(buildReport(f.config,f.inventory,[good]).rows[0].close_executable).toBe(true);
  expect(buildReport(f.config,f.inventory,[{...good,adversarial:[{...base,receipt:primary.receipt,detail:"Changed prose"}]}]).rows[0].close_executable).toBe(false);
+});
+
+
+test("unobserved prerequisites never clear dependent readiness",()=>{
+ const f=setup(),completed=f.resolved(1),dependent={...f.open(2),depends_on:[1]};
+ const report=withVerificationBoundary(()=>buildReport(f.config,f.inventory,[completed,dependent]));
+ expect(report.rows[0].state).toBe("unverified");expect(report.rows[1].disposition).toBe("blocked");expect(report.ranked.map(row=>row.number)).not.toContain(2);
+});
+
+test("unobserved completion stays unverified for protected, index and closed rows",()=>{
+ for(const role of["protected","index","closed"]){
+  const f=setup([1]),observation=f.resolved(1);let config=f.config;
+  if(role==="protected"){f.settings({schema_version:1,protected_ids:[1]});config=loadSettings(f.root);}
+  if(role==="index")f.inventory.issues[0].title="Milestone tracker";
+  if(role==="closed"){f.inventory.mode="ids";f.inventory.requested_ids=[1];f.inventory.closed_issues=[{...f.inventory.issues[0],state:"closed"}];f.inventory.issues=[];}
+  const row=withVerificationBoundary(()=>buildReport(config,f.inventory,[observation])).rows[0];
+  expect(row.state).toBe("unverified");expect(row.closure_reason).toBeNull();expect(row.remaining).not.toBe("");
+  if(role!=="closed")expect(row.disposition).toBe("excluded");
+ }
+});
+
+test("unobserved cleared blocker evidence retains unknown scope and its dependency",()=>{
+ const f=setup(),proof=f.resolved(1).evidence,dependent={...f.open(1),depends_on:[2],blockers:[{issue:2,missing:false,evidence:proof}]};
+ f.inventory.closed_issues=[{...f.inventory.issues[1],state:"closed"}];f.inventory.issues=[f.inventory.issues[0]];
+ const report=withVerificationBoundary(()=>buildReport(f.config,f.inventory,[dependent]));
+ expect(report.rows[0].state).toBe("unverified");expect(report.rows[0].depends_on).toEqual([2]);expect(report.ranked).toEqual([]);
 });
