@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vh-adlc",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Explicit software lifecycle intake, bounded maintenance and the existing gated feature operations; framework procedure lives in this package and engineering conventions remain pinned external inputs.",
   "author": {
     "name": "Michiel VH"
