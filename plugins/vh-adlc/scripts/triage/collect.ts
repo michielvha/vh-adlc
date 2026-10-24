@@ -39,7 +39,7 @@ function scalar(value: unknown): string | null {
 }
 function planIssue(value: unknown, config: Settings): { issue: number | null; issue_ref: string | null } {
   const ref = scalar(value);
-  if (ref === null) return { issue: null, issue_ref: null };
+  if (ref === null || !ref.trim()) return { issue: null, issue_ref: null };
   const numeric = ref.match(/^#?([1-9]\d*)$/);
   if (numeric) return { issue: id(Number(numeric[1])), issue_ref: ref };
   let url: URL;
@@ -73,7 +73,19 @@ function plans(config: Settings): { plans: Plan[]; coverage: Coverage; status: I
       if (!body.startsWith("---\n") && !body.startsWith("---\r\n")) return;
       const fm = body.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
       if (!fm) throw new Error("incomplete-frontmatter");
-      const data = obj(Bun.YAML.parse(fm[1])), fields = config.plan_fields;
+      const fields = config.plan_fields;
+      let data: Record<string, unknown>;
+      try { data = obj(Bun.YAML.parse(fm[1])); }
+      catch (error) {
+        // Broad document roots contain prose frontmatter as well as plans. A malformed
+        // header is relevant if it could contain either configured plan key.
+        const hasPlanKey = [fields.issue, fields.status].some(key => {
+          const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          return new RegExp(`(?:^|[\\s{,])["']?${escaped}["']?\\s*:`, "m").test(fm[1]);
+        });
+        if (!hasPlanKey) return;
+        throw error;
+      }
       if (!(fields.issue in data) && !(fields.status in data)) return;
       result.push({ path: relative(config.root, resolved).split(sep).join("/"), ...planIssue(data[fields.issue], config),
         status: scalar(data[fields.status]), status_description: scalar(data[fields.status_description]), priority: scalar(data[fields.priority]) });

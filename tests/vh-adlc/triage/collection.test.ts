@@ -136,6 +136,33 @@ test("the CLI page parser follows validated Link metadata and rejects failed/non
   expect(() => parsePage(response.replace('rel="next"', 'broken-next-link'), expected)).toThrow();
 });
 
+test("GitHub numeric repository links retain their validated cursor without changing collection scope", () => {
+  let target = "";
+  const expected = { hostname: "github.com", endpoint: "repos/example/project/issues?state=all&per_page=100", page: 1,
+    repositoryId: 42, onNext: (url: string) => { target = url; } };
+  const url = "https://api.github.com/repositories/42/issues?state=all&per_page=100&page=2&after=opaque%3D%3D";
+  const raw = `HTTP/2.0 200 OK\r\nLink: <${url}>; rel="next"\r\n\r\n[]`;
+  expect(parsePage(raw, expected)).toEqual({ items: [], next: 2 });
+  expect(target).toBe(url);
+  expect(() => parsePage(raw.replace("/42/", "/43/"), expected)).toThrow();
+  expect(() => parsePage(raw.replace("state=all", "state=closed"), expected)).toThrow();
+  expect(() => parsePage(raw.replace("after=opaque%3D%3D", "after="), expected)).toThrow();
+});
+
+test("non-plan descriptions do not break plan coverage and blank issue fields remain untracked", async () => {
+  const f = project();
+  f.write("plans/analysis.md", "---\ndescription: “Analysis: details”\n---\nContext\n");
+  f.write("plans/untracked.md", '---\nissue: ""\nstatus: planned\n---\n');
+  f.settings({ schema_version: 1, plan_roots: ["plans"] });
+  const result = await collect(loadSettings(f.root), pages({}).reader);
+  expect(result.plan_metadata).toBe("available");
+  expect(result.plans).toHaveLength(1);
+  expect(result.plans[0].issue).toBeNull();
+  expect(result.plans[0].issue_ref).toBeNull();
+  f.write("plans/broken.md", '---\n"issue": [invalid\n---\n');
+  expect((await collect(loadSettings(f.root), pages({}).reader)).plan_metadata).toBe("incomplete");
+});
+
 test("a plan-file alias cannot turn generated metadata into the canonical plan spine", async () => {
   const f = project();
   f.write("plans/README.md", "Plan directory\n");

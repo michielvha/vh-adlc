@@ -266,6 +266,7 @@ const issue = data.issue;
 function rawIssue() { return {...issue, user:{login:issue.author}, labels:issue.labels.map(name=>({name})), milestone:null}; }
 let response;
 if (endpoint === "user" && method === "GET") response={login:"operator"};
+else if (endpoint === "repos/example/project" && method === "GET" && args.includes("--jq")) { writeFileSync(path,JSON.stringify(data)); process.stdout.write("42\\n"); process.exit(0); }
 else if (method === "GET" && endpoint.includes("/comments?")) response=issue.comments.map(c=>({...c,user:{login:c.author}}));
 else if (method === "GET" && endpoint.endsWith("/issues/1")) response=rawIssue();
 else if (method === "POST" && endpoint.endsWith("/issues/1/comments")) { issue.comments.push({id:100,author:"operator",body:payload.body,created_at:"2026-10-24T11:00:00Z"}); response={id:100}; }
