@@ -27,7 +27,7 @@ export type Adapter = {
 };
 export type Batch = {
   schema_version: 1; hash: string; repository: string; hostname: string; settings_hash: string;
-  source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[]; labels:Label[];actor:string|null;
+  source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[]; labels:Label[];actor:string|null;inventory:Inventory;
 };
 export type Approval = { batch_hash: string; action_ids: string[]; owner_statement: string };
 type Journal = {
@@ -44,6 +44,7 @@ function canonical(value: unknown): string {
 }
 function hash(value: unknown) { return createHash("sha256").update(canonical(value)).digest("hex"); }
 function batchHash(batch: Omit<Batch, "hash"> | Batch) { const { hash: _hash, ...content } = batch as Batch; return hash(content); }
+function reportFacts(value:Report){const{created_at:_created,comparison:_comparison,...facts}=value;return facts;}
 function bad(): never { throw new Error("invalid triage action batch or approval"); }
 function nonempty(value: unknown): value is string { return typeof value === "string" && !!value.trim(); }
 function strings(value: unknown): value is string[] { return Array.isArray(value) && value.every(nonempty); }
@@ -121,8 +122,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
       report.source_commit !== inventory.source_commit || git(config.root, "rev-parse", "HEAD") !== report.source_commit || !Array.isArray(requested)) bad();
   if(!Array.isArray(report.observations)||!Array.isArray(report.index_requests))bad();
   const rebuilt=buildReport(config,inventory,report.observations,{runId:report.run_id,indexRequests:report.index_requests});
-  const eligibility=(value:Report)=>{const{created_at:_created,comparison:_comparison,...facts}=value;return facts;};
-  if(hash(eligibility(rebuilt))!==hash(eligibility(report)))bad();
+  if(hash(reportFacts(rebuilt))!==hash(reportFacts(report)))bad();
   const actions = structuredClone(requested), ids = new Set<string>();
   if(actions.some(action=>!["plan-patch","commit"].includes(action.kind))&&(!nonempty(inventory.actor)||!inventory.coverage.some(entry=>entry.collection==="identity"&&entry.complete&&!entry.error)))bad();
   for (const action of actions) {
@@ -169,7 +169,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
   }
   const batch: Batch = { schema_version: 1, hash: "", repository: config.repository, hostname: config.hostname,
     settings_hash: hash(config), source_commit: report.source_commit, source_hash: sourceHash(config, actions),
-    report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), labels:structuredClone(inventory.labels??[]),actor:inventory.actor??null, actions };
+    report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), labels:structuredClone(inventory.labels??[]),actor:inventory.actor??null,inventory:structuredClone(inventory), actions };
   batch.hash = batchHash(batch); return batch;
 }
 export function approveBatch(batch: Batch, actionIds: string[], ownerStatement: string): Approval {
@@ -188,6 +188,8 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
   if (batch.hash !== batchHash(batch) || approval.batch_hash !== batch.hash || hash(config) !== batch.settings_hash ||
       !nonempty(approval.owner_statement) || new Set(approval.action_ids).size !== approval.action_ids.length ||
       approval.action_ids.some((id) => !batch.actions.some((action) => action.id === id))) bad();
+  const rebuilt=buildReport(config,batch.inventory,batch.report.observations,{runId:batch.report.run_id,indexRequests:batch.report.index_requests,fixedHead:batch.source_commit});
+  if(hash(reportFacts(rebuilt))!==hash(reportFacts(batch.report)))bad();
   const path = options.journal;
   mkdirSync(dirname(path), { recursive: true });
   const lock = `${path}.lock`, descriptor = openSync(lock, "wx", 0o600);

@@ -3,12 +3,14 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { git, ownership, resolveInside, sourcePath } from "./settings";
 import type { Inventory, Issue, Mode, Settings } from "./types";
+import{verificationRecord}from"./verification";
 
 export type State = "resolved" | "partial" | "open" | "blocked" | "obsolete" | "duplicate" | "unverified";
 export type Evidence = {
   kind: string; detail: string; verified: boolean; path?: string; line?: number; command?: string;
   exit_code?: number; scope?: string[]; result?: string; reference?: string; before_commit?: string;
   pull_number?: number;
+  receipt?:string;
 };
 export type Observation = {
   number: number; state: string; remaining?: string; evidence?: Evidence[]; adversarial?: Evidence[];
@@ -55,11 +57,18 @@ function validEvidence(config: Settings, inventory: Inventory, evidence: Evidenc
     case "source": {
       if (!evidence.path || !Number.isSafeInteger(evidence.line) || evidence.line! < 1) return false;
       const text = blob(config, inventory.source_commit, evidence.path);
-      return text !== null && evidence.line! <= text.split("\n").length;
+      const receipt=evidence.receipt?verificationRecord(config,inventory.source_commit,evidence.receipt):null;
+      return text !== null && evidence.line! <= text.split("\n").length&&(!evidence.receipt||receipt?.kind==="inspection"&&receipt.reads.some(read=>read.path===evidence.path&&evidence.line!>=read.start_line&&evidence.line!<=read.end_line));
     }
-    case "test": return typeof evidence.command === "string" && !!evidence.command.trim() && evidence.exit_code === 0;
+    case "test": {
+      const record=verificationRecord(config,inventory.source_commit,evidence.receipt);
+      return record?.kind==="command"&&evidence.command===JSON.stringify(record.argv)&&evidence.exit_code===0;
+    }
     case "search": return !!evidence.scope?.length && evidence.scope.every((path) => sourcePath(config, path)) && ["empty", "found"].includes(evidence.result ?? "");
-    case "wiring": return !!evidence.path && blob(config, inventory.source_commit, evidence.path) !== null;
+    case "wiring": {
+      const record=verificationRecord(config,inventory.source_commit,evidence.receipt);
+      return !!evidence.path&&Number.isSafeInteger(evidence.line)&&record?.kind==="inspection"&&record.reads.some(read=>read.path===evidence.path&&evidence.line!>=read.start_line&&evidence.line!<=read.end_line)&&blob(config,inventory.source_commit,evidence.path)!==null;
+    }
     case "merged-pr": return inventory.pulls.some((pull) => pull.number === evidence.pull_number && !!pull.merged_at &&
       new RegExp(`\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+(?:${inventory.repository.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}#|#)${issueNumber ?? "[1-9]\\d*"}(?!\\d)`, "i").test(pull.body));
     case "removal": {
@@ -72,10 +81,11 @@ function validEvidence(config: Settings, inventory: Inventory, evidence: Evidenc
     default: return false;
   }
 }
-function completed(config: Settings, inventory: Inventory, values: Evidence[], issueNumber: number) {
+function completed(config: Settings, inventory: Inventory, values: Evidence[], issueNumber: number,pass:"primary"|"adversarial") {
   const valid = values.filter((value) => validEvidence(config, inventory, value, issueNumber));
   // Test failures and invalid claimed proof are never discarded to manufacture a pass.
-  return valid.length === values.length && valid.some((value) => value.kind === "source") && valid.some((value) => ["test", "wiring", "merged-pr"].includes(value.kind));
+  return valid.length === values.length && valid.some((value) => value.kind === "source") && valid.some((value) => ["test", "wiring", "merged-pr"].includes(value.kind))&&
+    valid.some(value=>verificationRecord(config,inventory.source_commit,value.receipt)?.pass===pass);
 }
 function verified(config: Settings, inventory: Inventory, values: Evidence[]) {
   return values.length > 0 && values.every((value) => validEvidence(config, inventory, value));
@@ -172,7 +182,7 @@ function compare(config: Settings, report: Report): Comparison {
     limits: comparable ? [] : ["Different scope or incomplete inventory: only shared observed issue IDs are compared."] };
 }
 
-export function buildReport(config: Settings, inventory: Inventory, observations: Observation[], options: { runId?: string; indexRequests?: number[] } = {}): Report {
+export function buildReport(config: Settings, inventory: Inventory, observations: Observation[], options: { runId?: string; indexRequests?: number[]; fixedHead?:string } = {}): Report {
   if (inventory.schema_version !== 1 || inventory.repository.toLowerCase() !== config.repository.toLowerCase() || inventory.hostname !== config.hostname ||
       !/^[0-9a-f]{40,64}$/.test(inventory.source_commit) || !Number.isFinite(Date.parse(inventory.collected_at)) ||
       !["sweep", "next", "close", "stale", "ids"].includes(inventory.mode)) throw new Error("invalid triage inventory identity");
@@ -188,7 +198,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
   const missing = required.filter((name) => inventory.coverage.filter((entry) => entry.collection === name && entry.complete === true && !entry.error && Number.isSafeInteger(entry.pages) && entry.pages >= 0 && !!entry.scope).length !== 1);
   for (const entry of inventory.coverage) if (!entry.complete || entry.error) missing.push(entry.collection);
   if (inventory.plan_metadata === "incomplete") missing.push("plans");
-  try { if (git(config.root, "rev-parse", "HEAD") !== inventory.source_commit) missing.push("source-head"); } catch { missing.push("source-head"); }
+  try { if ((options.fixedHead??git(config.root, "rev-parse", "HEAD")) !== inventory.source_commit) missing.push("source-head"); } catch { missing.push("source-head"); }
   if (inventory.mode === "ids") for (const id of inventory.requested_ids) if (!selected.some((issue) => issue.number === id)) missing.push(`issue:${id}`);
   const rows: Row[] = selected.map((issue) => {
     const observation = byId.get(issue.number), evidence = observation?.evidence ?? [], adversarial = observation?.adversarial ?? [];
@@ -203,16 +213,16 @@ export function buildReport(config: Settings, inventory: Inventory, observations
     if (!evidenceOK && state !== "unverified") { warnings.push("Verification evidence is absent or invalid."); state = "unverified"; }
     let closure: Row["closure_reason"] = null;
     if (state === "resolved") {
-      if (completed(config, inventory, evidence, issue.number) && completed(config, inventory, adversarial, issue.number) && !observation?.remaining) closure = "completed";
+      if (completed(config, inventory, evidence, issue.number,"primary") && completed(config, inventory, adversarial, issue.number,"adversarial") && !observation?.remaining) closure = "completed";
       else { state = "unverified"; warnings.push("Completed behavior needs canonical source and observed behavior/wiring in both passes."); }
     } else if (state === "obsolete") {
-      if (secondOK && [evidence, adversarial].every((pass) => pass.some((item) => ["removal", "supersession"].includes(item.kind)))) closure = "not_planned";
+      if (secondOK && JSON.stringify(evidence)!==JSON.stringify(adversarial) && [evidence, adversarial].every((pass) => pass.some((item) => ["removal", "supersession"].includes(item.kind)))) closure = "not_planned";
       else { state = "unverified"; warnings.push("Removed or superseded scope needs verification in both passes."); }
     } else if (state === "duplicate") {
       const canonical = observation?.duplicate_of;
       const retained=inventory.issues.find(other=>other.number===canonical&&other.state==="open");
       const canonicalState=canonical?byId.get(canonical)?.state:undefined;
-      if (canonical !== issue.number && observation?.total_overlap === true && secondOK && retained && !["resolved","obsolete","duplicate"].includes(canonicalState??"") &&
+      if (canonical !== issue.number && observation?.total_overlap === true && secondOK && JSON.stringify(evidence)!==JSON.stringify(adversarial) && retained && !["resolved","obsolete","duplicate"].includes(canonicalState??"") &&
           [evidence, adversarial].every((pass) => pass.some((item) => item.kind === "overlap" && item.reference === `issue:${canonical}`))) closure = "not_planned";
       else { state = "unverified"; warnings.push("Total overlap and a canonical issue require both verification passes."); }
     }

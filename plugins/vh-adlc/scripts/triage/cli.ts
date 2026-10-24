@@ -8,13 +8,14 @@ import { executeBatch, planBatch } from "./execute";
 import type { Action, Approval, Batch } from "./execute";
 import { writeFileSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import{inspectSources,verifyCommand}from"./verification";
 
 function argumentsFor(command: string, values: string[]) {
   const result: Record<string, string> = {};
   const allowed = ["--repo", "--settings", ...(command === "collect" ? ["--mode", "--ids"] :
     command === "report" ? ["--inventory", "--observations", "--index-requests", "--run-id", "--report-output"] :
     command === "batch" ? ["--inventory", "--report", "--actions", "--batch-output"] :
-    command === "execute" ? ["--batch", "--approval", "--journal"] : [])];
+    command === "execute" ? ["--batch", "--approval", "--journal"] : command==="verify"?["--argv","--pass"]:command==="inspect"?["--paths","--pass"]:[])];
   for (let index = 0; index < values.length; index += 2) {
     const key = values[index], value = values[index + 1];
     if (!allowed.includes(key) || !value || value.startsWith("--") || key in result) throw new Error("invalid-triage-argument");
@@ -24,9 +25,15 @@ function argumentsFor(command: string, values: string[]) {
 }
 async function main() {
   const [command, ...values] = process.argv.slice(2), args = argumentsFor(command, values);
-  if (!["settings", "collect", "report", "batch", "execute"].includes(command)) throw new Error("expected settings, collect, report, batch or execute");
+  if (!["settings", "collect", "report", "batch", "execute","verify","inspect"].includes(command)) throw new Error("expected settings, collect, report, batch, execute, verify or inspect");
   const config = loadSettings(args["--repo"] ?? process.cwd(), args["--settings"] ? { settingsPath: args["--settings"] } : {});
   if (command === "settings") return config;
+  if(command==="verify"||command==="inspect"){
+    const phase=args["--pass"];if(!["primary","adversarial"].includes(phase))throw Error("verification requires primary or adversarial pass");
+    const values=await Bun.file(args[command==="verify"?"--argv":"--paths"]??"").json();
+    if(!Array.isArray(values)||!values.length||values.some(value=>typeof value!=="string"))throw Error("verification requires a JSON string array");
+    return command==="verify"?verifyCommand(config,values,phase as "primary"|"adversarial"):inspectSources(config,values,phase as "primary"|"adversarial");
+  }
   if (command === "batch") {
     if (!["--inventory", "--report", "--actions", "--batch-output"].every((key) => args[key])) throw new Error("batch requires inventory, report, actions and batch-output files");
     const batch = planBatch(config, await Bun.file(args["--inventory"]).json() as Inventory,

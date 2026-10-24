@@ -7,6 +7,7 @@ import { buildReport } from "../../../plugins/vh-adlc/scripts/triage/report";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import type { Inventory, Issue, Label } from "../../../plugins/vh-adlc/scripts/triage/types";
 import { fixture, git } from "./fixtures";
+import{verifyCommand}from"../../../plugins/vh-adlc/scripts/triage/verification";
 
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
@@ -16,8 +17,11 @@ function setup(extra: Record<string, unknown> = {}) {
   const inventory: Inventory = { schema_version: 1, repository: config.repository, hostname: config.hostname, source_commit: git(f.root, "rev-parse", "HEAD"), mode: "sweep", requested_ids: [], collected_at: "2026-10-24T10:00:00Z", issues: [structuredClone(issue)], closed_issues: [], pulls: [], plans: [], plan_metadata: "not-configured", coverage: ["issues", "pulls", "plans", "comments:1"].map((collection) => ({ collection, scope: "fixture", pages: 1, complete: true })) };
   const behavior = Bun.spawnSync(["bun", "-e", 'import {answer} from "./src/app.ts"; if(answer !== 42) process.exit(1);'], { cwd: f.root, stdout: "pipe", stderr: "pipe" });
   expect(behavior.exitCode).toBe(0);
-  const proof = [{ kind: "source", path: "src/app.ts", line: 1, detail: git(f.root, "show", "HEAD:src/app.ts"), verified: true }, { kind: "test", command: "bun: observed exported answer", exit_code: behavior.exitCode, detail: "Export returns 42", verified: true }];
-  const report = buildReport(config, inventory, [{ number: 1, state: "resolved", evidence: proof, adversarial: proof, is_index: extra.index === true }], { runId: "execution", indexRequests: extra.index_ids ? [1] : [] });
+  const source={kind:"source",path:"src/app.ts",line:1,detail:git(f.root,"show","HEAD:src/app.ts"),verified:true};
+  const argv=["bun","-e",'import{answer}from"./src/app.ts";if(answer!==42)process.exit(1);'];
+  const observation=()=>({number:1,state:"resolved",evidence:[source,verifyCommand(config,argv,"primary")],adversarial:[{...source,detail:"Adversarially checked the export"},verifyCommand(config,argv,"adversarial")],is_index:extra.index===true});
+  const report=buildReport(config,inventory,[observation()],{runId:"execution",indexRequests:extra.index_ids?[1]:[]});
+  const reverify=()=>{inventory.source_commit=git(f.root,"rev-parse","HEAD");Object.assign(report,buildReport(config,inventory,[observation()],{runId:"execution",indexRequests:extra.index_ids?[1]:[]}));};
   inventory.actor="operator";inventory.coverage.push({collection:"identity",scope:"current-account",pages:1,complete:true});inventory.labels=[];inventory.coverage.push({collection:"labels",scope:"repository-vocabulary",pages:1,complete:true});
   const issues = new Map([[1, structuredClone(issue)]]), receipts = new Map<string, MutationResult>(), log: Action[] = [], failures = new Set<string>(),vocabulary=new Map<string,Label>();
   const adapter: Adapter = {
@@ -49,7 +53,7 @@ function setup(extra: Record<string, unknown> = {}) {
   ];
   const journal = join(f.root, ".vh-adlc/execution.json");
   const batch = (selected = actions) => planBatch(config, inventory, report, selected);
-  return { ...f, config, inventory, report, issues, adapter, log, failures, actions, batch, journal };
+  return { ...f, config, inventory, report, issues, adapter, log, failures, actions, batch, journal,reverify };
 }
 
 test("analysis and unapproved actions make no writes; approval binds an exact subset", async () => {
@@ -200,7 +204,7 @@ test("local status patches require separate approval and a successful lifecycle 
   const before = "---\nstatus: in-progress\nstatus_description: Work remains\nissue: null\n---\n\n# Plan\nUnrelated content\n";
   const after = before.replace("status: in-progress", "status: complete");
   f.write("plans/a.md", before); git(f.root, "add", "plans/a.md"); git(f.root, "commit", "-qm", "test: seed plan");
-  f.inventory.source_commit = git(f.root, "rev-parse", "HEAD"); f.report.source_commit = f.inventory.source_commit;
+  f.reverify();
   const action: Action = { id: "sync", kind: "plan-patch", path: "plans/a.md", before, after, gate: { status: "complete", document: "plans/a.md" } };
   const batch = f.batch([action]);
   await executeBatch(f.config, batch, approveBatch(batch, [], "No local sync"), f.adapter, { journal: f.journal });

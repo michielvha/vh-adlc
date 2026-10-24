@@ -4,6 +4,7 @@ import {join} from "node:path";
 import {fixture,git} from "./fixtures";
 import {loadSettings} from "../../../plugins/vh-adlc/scripts/triage/settings";
 import {buildReport,saveReport,type Observation} from "../../../plugins/vh-adlc/scripts/triage/report";
+import{inspectSources}from"../../../plugins/vh-adlc/scripts/triage/verification";
 import type {Inventory,Issue,Mode} from "../../../plugins/vh-adlc/scripts/triage/types";
 
 // This deterministic matrix checks retained rules and explicit differences against
@@ -29,11 +30,11 @@ test("the synthetic migration matrix retains scope across modes and records inte
     const run=Bun.spawnSync(["bun","src/main.ts"],{cwd:f.root,stdout:"pipe",stderr:"pipe"});expect(run.exitCode).toBe(0);expect(run.stdout.toString()).toBe("42\n");
     const missing={kind:"search",scope:["src"],result:"empty",detail:"No /answer route in the complete canonical tree",verified:true};
     expect(Bun.spawnSync(["git","-C",f.root,"grep","-n","/answer",head,"--","src"],{stdout:"pipe",stderr:"pipe"}).exitCode).toBe(1);
-    const done=(number:number):Observation=>({number,state:"resolved",remaining:"",evidence:[source,wiring],adversarial:[source,wiring]});
+    const done=(number:number):Observation=>{const first=inspectSources(config,["src/main.ts"],"primary"),second=inspectSources(config,["src/main.ts"],"adversarial");return{number,state:"resolved",remaining:"",evidence:[source,{...wiring,line:1,receipt:first.receipt}],adversarial:[{...source,detail:"Rechecked export against entry-point use"},{...wiring,line:1,receipt:second.receipt}]};};
     const overlap={kind:"overlap",reference:"issue:2",detail:"Entire duplicate request belongs to unfinished canonical issue 2",verified:true};
     const observations:Observation[]=[done(1),{number:2,state:"open",remaining:"Implement the route",evidence:[missing]},
       {number:3,state:"partial",remaining:"Wire serializer into HTTP endpoint",evidence:[{...source,path:"src/serializer.ts"}]},
-      {number:4,state:"duplicate",duplicate_of:2,total_overlap:true,remaining:"Canonical scope remains in issue 2",evidence:[overlap],adversarial:[overlap]},
+      {number:4,state:"duplicate",duplicate_of:2,total_overlap:true,remaining:"Canonical scope remains in issue 2",evidence:[overlap],adversarial:[{...overlap,detail:"Rechecked full retained canonical scope"}]},
       {number:5,state:"blocked",remaining:"Needs the HTTP endpoint",evidence:[missing],blockers:[{issue:3,missing:true,evidence:[missing]}]},done(99),done(100),done(101)];
     const first=buildReport(config,inventory,observations);
     expect(first.rows.filter(r=>r.disposition==="close-candidate").map(r=>r.number)).toEqual([1,4]);

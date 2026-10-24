@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE??=join(tmpdir(),`vh-triage-verification-${process.pid}`);
 
 export function git(root: string, ...args: string[]): string {
   const result = Bun.spawnSync(["git", "-C", root, ...args], {

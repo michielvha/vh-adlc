@@ -3,6 +3,7 @@ import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { boundaryCommand, committedComponent, engineeringInputs, exportInputs, gradeTrial, verifyInputs } from "./native";
 import { fixture, git } from "./fixtures";
+import{verificationRecord}from"../../../plugins/vh-adlc/scripts/triage/verification";
 const projects: ReturnType<typeof fixture>[]=[];
 afterEach(()=>{for(const f of projects.splice(0)) f.dispose();});
 const plugin=resolve(import.meta.dir,"../../../plugins/vh-adlc");
@@ -91,19 +92,30 @@ test("required probe failures, a readable outside canary or live mutation trace 
 
 test("the real boundary process denies outside input, credentials, egress and mutation probes", async()=>{
   const f=setup(),manifest=f.export(),trace=join(f.root,"boundary.jsonl"),canary=join(f.root,"outside-canary");
+  const verificationCache=join(f.root,"proof-cache");
   writeFileSync(canary,"Non-secret host canary\n");
   const routes=["file","environment","helper","keyring","socket","tools","egress","mutation"];
   const requests=[{jsonrpc:"2.0",id:1,method:"initialize",params:{protocolVersion:"2024-11-05",capabilities:{},clientInfo:{name:"unit-boundary-client",version:"1"}}},
     {jsonrpc:"2.0",id:2,method:"tools/call",params:{name:"read",arguments:{path:"plugin/skills/vh-adlc-triage/SKILL.md"}}},
     ...routes.map((route,at)=>({jsonrpc:"2.0",id:at+3,method:"tools/call",params:{name:"probe",arguments:{route,run_id:manifest.run_id}}})),
-    {jsonrpc:"2.0",id:20,method:"tools/call",params:{name:"read",arguments:{path:canary}}}];
+    {jsonrpc:"2.0",id:20,method:"tools/call",params:{name:"read",arguments:{path:canary}}},
+    ...(["primary","adversarial"]as const).map((pass,at)=>({jsonrpc:"2.0",id:21+at,method:"tools/call",params:{name:"read",arguments:{path:"source/src/app.ts",start_line:1,limit:1,verification_pass:pass}}}))];
   const {resolve4}=await import("node:dns/promises"); const [ip]=await resolve4("api.github.com");
-  const child=Bun.spawnSync(["bun",resolve(import.meta.dir,"native.ts"),"launch","--input",f.output,"--trace",trace,"--canary",canary,"--egress-ip",ip],
+  const child=Bun.spawnSync(["bun",resolve(import.meta.dir,"native.ts"),"launch","--input",f.output,"--trace",trace,"--canary",canary,"--egress-ip",ip,"--verification-cache",verificationCache],
     {stdin:Buffer.from(requests.map(request=>JSON.stringify(request)).join("\n")+"\n"),stdout:"pipe",stderr:"pipe",timeout:10_000,env:{...process.env,GH_TOKEN:"non-secret-probe-canary"}});
   expect({exit:child.exitCode,error:child.stderr.toString()}).toEqual({exit:0,error:""});
   const replies=child.stdout.toString().trim().split("\n").map(line=>JSON.parse(line));
   expect(replies.find(reply=>reply.id===2).result.content[0].text).toContain("vh-adlc-triage");
   expect(replies.find(reply=>reply.id===20).error.message).toContain("denied");
+  const previousCache=process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE;
+  try{
+    process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE=verificationCache;
+    const config=(await import("../../../plugins/vh-adlc/scripts/triage/settings")).loadSettings(f.root);
+    for(const[id,pass]of[[21,"primary"],[22,"adversarial"]]as const){
+      const receipt=JSON.parse(replies.find(reply=>reply.id===id).result.content[0].text).verification_receipt;
+      const record=verificationRecord(config,manifest.source_commit,receipt);expect(record?.pass).toBe(pass);expect(record?.reads[0]).toMatchObject({path:"src/app.ts",start_line:1,end_line:1});
+    }
+  }finally{process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE=previousCache;}
   const events=readFileSync(trace,"utf8").trim().split("\n").map(line=>JSON.parse(line));
   expect(events.find(event=>event.kind==="boundary-start").isolated).toBe(true);
   for(const route of routes)expect(events.find(event=>event.kind==="probe"&&event.route===route).denied).toBe(true);

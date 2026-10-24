@@ -1,10 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { buildReport, saveReport } from "../../../plugins/vh-adlc/scripts/triage/report";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import type { Inventory, Issue } from "../../../plugins/vh-adlc/scripts/triage/types";
 import { fixture, git } from "./fixtures";
+import{inspectSources,verifyCommand,verificationDirectory}from"../../../plugins/vh-adlc/scripts/triage/verification";
 
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
@@ -18,16 +19,16 @@ function setup(numbers = [1, 2]) {
     source_commit: git(f.root, "rev-parse", "HEAD"), mode: "sweep", requested_ids: [], collected_at: "2026-10-24T10:00:00Z",
     issues, closed_issues: [], pulls: [], plans: [], plan_metadata: "not-configured",
     coverage: ["issues", "pulls", "plans", ...numbers.map((n) => `comments:${n}`)].map((collection) => ({ collection, scope: "fixture", pages: collection === "plans" ? 0 : 1, complete: true })) };
-  function pass() {
+  function pass(phase:"primary"|"adversarial"="primary") {
     const source = git(f.root, "show", "HEAD:src/app.ts");
     const result = Bun.spawnSync(["bun", "-e", 'import {answer} from "./src/app.ts"; if(answer !== 42) process.exit(1);'], { cwd: f.root, stdout: "pipe", stderr: "pipe" });
     expect(result.exitCode).toBe(0);
     return [
       { kind: "source", path: "src/app.ts", line: 1, detail: source, verified: true },
-      { kind: "test", command: 'bun -e import-and-check-answer', exit_code: result.exitCode, detail: "Observed exported behavior", verified: true },
+      verifyCommand(config,["bun","-e",'import {answer} from "./src/app.ts"; if(answer !== 42) process.exit(1);'],phase),
     ];
   }
-  const resolved = (number: number) => ({ number, state: "resolved", remaining: "", evidence: pass(), adversarial: pass() });
+  const resolved = (number: number) => ({ number, state: "resolved", remaining: "", evidence: pass("primary"), adversarial: pass("adversarial") });
   const search = () => {
     const result = Bun.spawnSync(["git", "-C", f.root, "grep", "-n", "missingFunction", "HEAD", "--", "src"], { stdout: "pipe", stderr: "pipe" });
     expect(result.exitCode).toBe(1);
@@ -48,6 +49,20 @@ test("resolved closure needs reachable source/test proof and a second verified p
   expect(buildReport(f.config, f.inventory, [failed]).rows[0].close_executable).toBe(false);
 });
 
+test("claimed successful commands and a copied primary receipt cannot authorize closure",()=>{
+  const f=setup([1]),observed=f.resolved(1);
+  const strip=(values:typeof observed.evidence)=>values.map(({receipt:_receipt,...claim})=>claim);
+  const claimed={...observed,evidence:strip(observed.evidence),adversarial:strip(observed.adversarial)};
+  expect(buildReport(f.config,f.inventory,[claimed]).rows[0].close_executable).toBe(false);
+  const argv=["bun","-e",'import{answer}from"./src/app.ts";if(answer!==42)process.exit(1);'];
+  const primary=verifyCommand(f.config,argv,"primary"),adversarial=verifyCommand(f.config,argv,"adversarial");
+  const source=claimed.evidence[0],observation={...claimed,evidence:[source,primary],adversarial:[{...source,detail:"Rechecked the canonical export"},adversarial]};
+  expect(buildReport(f.config,f.inventory,[{...observation,adversarial:observation.evidence}]).rows[0].close_executable).toBe(false);
+  expect(buildReport(f.config,f.inventory,[observation]).rows[0].close_executable).toBe(true);
+  writeFileSync(join(verificationDirectory(f.config),`${primary.receipt}.json`),"{}");
+  expect(buildReport(f.config,f.inventory,[observation]).rows[0].close_executable).toBe(false);
+});
+
 test("complete plans and merged Refs-only PRs are leads rather than closure evidence", () => {
   const f = setup([1]);
   f.inventory.plans.push({ path: "plans/a.md", issue: 1, issue_ref: "1", status: "complete", status_description: null, priority: "high" });
@@ -61,7 +76,8 @@ test("a merged PR closes only the issue its closing reference names", () => {
   const f=setup([1]), source=f.resolved(1).evidence.filter(value=>value.kind==="source");
   f.inventory.pulls.push({number:50,title:"Other work",body:"Closes #12",merged_at:"2026-10-01T00:00:00Z"});
   const proof=[...source,{kind:"merged-pr",pull_number:50,detail:"Verified merged implementation",verified:true}];
-  const observation={number:1,state:"resolved",remaining:"",evidence:proof,adversarial:proof};
+  const first=inspectSources(f.config,["src/app.ts"],"primary"),second=inspectSources(f.config,["src/app.ts"],"adversarial");
+  const observation={number:1,state:"resolved",remaining:"",evidence:proof.map(item=>item.kind==="source"?{...item,receipt:first.receipt}:item),adversarial:proof.map(item=>item.kind==="source"?{...item,receipt:second.receipt,detail:"Rechecked canonical source"}:item)};
   expect(buildReport(f.config,f.inventory,[observation]).rows[0].close_executable).toBe(false);
   f.inventory.pulls[0].body="Closes example/project#1";
   expect(buildReport(f.config,f.inventory,[observation]).rows[0].close_executable).toBe(true);
@@ -83,7 +99,7 @@ test("partial work keeps its remaining scope and mirrors cannot establish resolu
 test("obsolete and total duplicate closures use their own evidence and not-planned reason", () => {
   const f = setup([1, 2]);
   const overlap = { kind: "overlap", reference: "issue:2", detail: "The complete requested scope belongs to canonical issue 2", verified: true };
-  const duplicate = { number: 1, state: "duplicate", duplicate_of: 2, total_overlap: true, remaining: "Canonical issue 2 remains open", evidence: [overlap], adversarial: [overlap] };
+  const duplicate = { number: 1, state: "duplicate", duplicate_of: 2, total_overlap: true, remaining: "Canonical issue 2 remains open", evidence: [overlap], adversarial: [{...overlap,detail:"Adversarial full-scope comparison against the canonical issue"}] };
   const report = buildReport(f.config, f.inventory, [duplicate, f.open(2)]);
   expect(report.rows[0].closure_reason).toBe("not_planned");
   expect(report.rows[0].close_executable).toBe(true);
@@ -95,7 +111,7 @@ test("obsolete and total duplicate closures use their own evidence and not-plann
   f.inventory.source_commit = git(f.root, "rev-parse", "HEAD");
   f.inventory.issues[0].body = "Extend the retired legacy mode";
   const removal = { kind: "removal", path: "src/legacy.ts", before_commit: beforeRemoval, reference: `commit:${f.inventory.source_commit}`, detail: "The former product scope was removed", verified: true };
-  const obsolete = buildReport(f.config, f.inventory, [{ number: 1, state: "obsolete", evidence: [removal], adversarial: [removal] }, f.open(2)]);
+  const obsolete = buildReport(f.config, f.inventory, [{ number: 1, state: "obsolete", evidence: [removal], adversarial: [{...removal,detail:"Adversarial ancestor/current-tree removal check"}] }, f.open(2)]);
   expect(obsolete.rows[0].close_executable).toBe(true);
   expect(obsolete.rows[0].closure_reason).toBe("not_planned");
 });
@@ -241,6 +257,18 @@ test("the latest same-scope history is selected by run time rather than alphabet
   await Bun.sleep(5);
   saveReport(f.config, buildReport(f.config, f.inventory, [f.open(1)], { runId: "a-second" }));
   expect(buildReport(f.config, f.inventory, [f.open(1)]).comparison.previous_run_id).toBe("a-second");
+});
+
+test("an explicitly requested report commit includes only its approved artifact and preserves unrelated staging",()=>{
+  const f=setup([1]),report=buildReport(f.config,f.inventory,[f.open(1)]),path=saveReport(f.config,report);
+  f.write("unrelated-staged.txt","Keep this staged work\n");git(f.root,"add","unrelated-staged.txt");
+  const entry=git(f.root,"ls-files","--stage","--","unrelated-staged.txt"),relativePath=path.slice(f.root.length+1);
+  // The fixture represents an explicit owner request for this shown subject/path.
+  git(f.root,"add","--",relativePath);git(f.root,"commit","-m","docs: retain the requested triage report","--",relativePath);
+  expect(git(f.root,"diff-tree","--no-commit-id","--name-only","-r","HEAD")).toBe(relativePath);
+  expect(git(f.root,"show","-s","--format=%s","HEAD")).toBe("docs: retain the requested triage report");
+  expect(git(f.root,"ls-files","--stage","--","unrelated-staged.txt")).toBe(entry);
+  expect(git(f.root,"diff","--cached","--name-only")).toBe("unrelated-staged.txt");
 });
 
 test("mixed status history reads a measured legacy triage table with explicitly unknown scope", () => {
