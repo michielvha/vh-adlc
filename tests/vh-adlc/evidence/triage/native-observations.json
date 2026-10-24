@@ -15,7 +15,8 @@
       "grade": {
         "pass": true,
         "failures": []
-      }
+      },
+      "history_cleanup_equivalent_commit": "a05b40c09b86e8528ada68363bfc7259cb4a3720"
     },
     {
       "schema_version": 1,
@@ -31,7 +32,8 @@
       "grade": {
         "pass": true,
         "failures": []
-      }
+      },
+      "history_cleanup_equivalent_commit": "b17f311f81550c236cba475d9b2e8a3e45074581"
     },
     {
       "schema_version": 1,
@@ -47,7 +49,8 @@
       "grade": {
         "pass": true,
         "failures": []
-      }
+      },
+      "history_cleanup_equivalent_commit": "108866649dea8d331815f88370e6849df446c286"
     }
   ],
   "diagnostic_runs": [
@@ -66,7 +69,8 @@
           "canonical-plugin",
           "installed-payload"
         ]
-      }
+      },
+      "history_cleanup_equivalent_commit": "108866649dea8d331815f88370e6849df446c286"
     },
     {
       "name": "codex-6",
@@ -83,7 +87,8 @@
           "canonical-plugin",
           "installed-payload"
         ]
-      }
+      },
+      "history_cleanup_equivalent_commit": "108866649dea8d331815f88370e6849df446c286"
     }
   ],
   "final_verified_runs": [
@@ -135,7 +140,8 @@
           }
         ],
         "executed_actions": 0
-      }
+      },
+      "history_cleanup_equivalent_commit": "2cfcb49c66f1bb6b84a3770dfce7c09d8d20eaa5"
     },
     {
       "name": "codex-8",
@@ -185,7 +191,8 @@
           }
         ],
         "executed_actions": 0
-      }
+      },
+      "history_cleanup_equivalent_commit": "2cfcb49c66f1bb6b84a3770dfce7c09d8d20eaa5"
     }
   ]
 }

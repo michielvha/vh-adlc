@@ -6,10 +6,10 @@ The synthetic migration matrix in `tests/vh-adlc/triage/parity.test.ts` checks r
 
 Outstanding acceptance proof:
 
-- Private Stackweaver analysis through Claude awaits explicit data-transfer approval. No live analysis or tracker effect is claimed.
-- The bounded Copilot implementation-review packet awaits explicit approval for its selected private migration files.
+- Private Stackweaver analysis through Claude is authorized for the fixed input set; its execution remains pending. No tracker effect is authorized.
+- The bounded Copilot paired implementation-review packet is authorized; its returned review remains pending.
 - Native legacy/shared parity and Claude compatibility-command invocation remain pending.
 - Codex desktop and VS Code Local have no observed native invocation here. They still block AC-01; no residual was approved.
-- A private status report remains in unpublished branch history. The current fixture is synthetic. Publication remains blocked pending owner-authorized local history cleanup.
+- The owner-authorized local history cleanup removed the private status-report blob from feature-reachable history while preserving the final tree, index and published main refs. `history-cleanup.json` records the mapping; no push occurred.
 
 Raw temporary client profiles contain existing-login access paths and must never be committed or copied into a review packet. Claude phone notifications and other deferred workflows were not changed.

@@ -1,0 +1,42 @@
+{
+  "old_head": "76519349ec37a5e4c1350c7ee585080565ba8c5b",
+  "new_head": "eb35b2ecc60d015b817d313165b8faba2f603c72",
+  "published_base": "9f98814f54308c4d77cbc493edda76627827bb11",
+  "published_refs_preserved": {
+    "refs/remotes/origin/main": "9f98814f54308c4d77cbc493edda76627827bb11",
+    "refs/heads/main": "9f98814f54308c4d77cbc493edda76627827bb11"
+  },
+  "final_tree": "2f24b19e3db5092963d2114f18f6a80dbc60d1ba",
+  "final_tree_preserved": true,
+  "index_bytes_preserved": true,
+  "private_blob_absent_from_feature_history": true,
+  "path": "tests/vh-adlc/triage/fixtures/legacy/status/2026-09-26-issue-triage.md",
+  "rewritten_commits": {
+    "8bfb7a04201ceb12f1d8eadafbdfd651a7de455a": "dc850021645286a669a039da9297cf28f247a8bf",
+    "722d293f007f0e680ff146221fa3e53b65b3b953": "6ddee05ef0f0f43515f6e0449f098e5751484a6f",
+    "c7c47bee03fbfb7651d8e62ecb6bc508a0eb11f8": "9b51b2625613ed689438dcd36fc58b1017044d10",
+    "85b10d14a05198b7a954501a602d80016d665358": "892abb04df7f82a3a3edabf62e4b58c5286ac4bc",
+    "234734db46bd54e8325ac4346a29fc398007d143": "fba4f37a4007dc7fc212ea4929bb8edd4cce6445",
+    "afb10652fc11d0141b49d10d1331051261ada44c": "a05b40c09b86e8528ada68363bfc7259cb4a3720",
+    "3cdedfeb6ab5e92c1d0b89e1292fc854f7c9ea47": "8619389caf4753fb1509a43fc727ba51d7755ea2",
+    "24aad5ec0e5c69347b9ee78d5a804773cb7c9264": "84364cef0d979a8872a55127bcfd70b7f1aede84",
+    "a9615b390ba676adf60264463fac48b03ebb2044": "f89be56766f51cbf88dfbe5b358d006c56c329bb",
+    "c3b664e37e83c41ef7c442bd7d6814c4239c85df": "b17f311f81550c236cba475d9b2e8a3e45074581",
+    "15802ef302f2efd1da1d5f5b7e2bb7dee3d1a819": "108866649dea8d331815f88370e6849df446c286",
+    "655f7e4644ef9cefc02d6b1fc65b37a20bbb1fe9": "cef333accc8c3d8ec820f0b40d0390c5f075fcdc",
+    "e447b818612bfbb270da460f89adfeb89e85678f": "a9946b7e3872d83d8ca1e8e80d0558106c692bdd",
+    "c942d897340276185dde21d9af8b324c553c6944": "79fb20419bc2b14a15dea1997bbfb6bc829f7bb8",
+    "f1f1810fc24f2f6e586676a931cca30d7c78cddb": "2cfcb49c66f1bb6b84a3770dfce7c09d8d20eaa5",
+    "76519349ec37a5e4c1350c7ee585080565ba8c5b": "eb35b2ecc60d015b817d313165b8faba2f603c72"
+  },
+  "trees_sanitized": [
+    "8bfb7a04201ceb12f1d8eadafbdfd651a7de455a",
+    "722d293f007f0e680ff146221fa3e53b65b3b953",
+    "c7c47bee03fbfb7651d8e62ecb6bc508a0eb11f8",
+    "85b10d14a05198b7a954501a602d80016d665358",
+    "234734db46bd54e8325ac4346a29fc398007d143",
+    "afb10652fc11d0141b49d10d1331051261ada44c",
+    "3cdedfeb6ab5e92c1d0b89e1292fc854f7c9ea47"
+  ],
+  "scope": "Only the owner-approved unpublished feature suffix; no push, force push, worktree switch, main modification or object garbage collection."
+}
