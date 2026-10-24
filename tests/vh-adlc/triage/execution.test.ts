@@ -2,7 +2,7 @@ import{test}from"./boundary-test";
 import { afterEach, expect } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { approveBatch, executeBatch, MutationFailure, planBatch } from "../../../plugins/vh-adlc/scripts/triage/execute";
+import { approveBatch, executeBatch, MutationFailure, planBatch,actionKey } from "../../../plugins/vh-adlc/scripts/triage/execute";
 import type { Action, Adapter, MutationResult } from "../../../plugins/vh-adlc/scripts/triage/execute";
 import { buildReport } from "../../../plugins/vh-adlc/scripts/triage/report";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
@@ -567,4 +567,42 @@ test("an open-work verdict can publish after actual primary and adversarial sour
  const batch=planBatch(f.config,f.inventory,report,[{id:"remaining",kind:"comment",issue:1,body:"The inspected module exports the answer; transport remains outside that module."}]);
  const result=await executeBatch(f.config,batch,approveBatch(batch,["remaining"],"Approve this exact observed open-scope verdict"),f.adapter,{journal:f.journal});
  expect(result.completed).toEqual(["remaining"]);expect(f.issues.get(1)!.state).toBe("open");
+});
+
+
+test("a replacement batch cannot bypass an unresolved outcome in another journal",async()=>{
+ const f=setup(),original=f.batch();let attempted=0;
+ const adapter={...f.adapter,mutate:async()=>{attempted++;throw new MutationFailure(true);}};
+ await executeBatch(f.config,original,approveBatch(original,["explain"],"Approve exact first explanation"),adapter,{journal:f.journal});
+ const report=buildReport(f.config,f.inventory,f.report.observations,{runId:"replacement"}),replacement=planBatch(f.config,f.inventory,report,[f.actions[0]]);
+ const result=await executeBatch(f.config,replacement,approveBatch(replacement,["explain"],"Approve exact replacement explanation"),adapter,{journal:join(f.root,".vh-adlc/replacement.json")});
+ expect(result.blocked).toEqual(["explain"]);expect(attempted).toBe(1);expect(f.log).toEqual([]);
+});
+
+test("materially changed source requires a new batch and a fresh explanation identity",async()=>{
+ const f=setup(),original=f.batch(),approval=approveBatch(original,["explain","close"],"Approve exact original batch");
+ await executeBatch(f.config,original,approveBatch(original,["explain"],"Approve original explanation only"),f.adapter,{journal:f.journal});
+ f.write("src/next.ts","export const next=true;\n");git(f.root,"add","src/next.ts");git(f.root,"commit","-qm","test: changed fixed source");
+ const refused=await executeBatch(f.config,original,approval,f.adapter,{journal:f.journal});expect(refused.blocked).toContain("close");
+ f.inventory.issues=[structuredClone(f.issues.get(1)!)];f.reverify();const replacement=f.batch();
+ expect(actionKey(replacement,replacement.actions[0])).not.toBe(actionKey(original,original.actions[0]));
+ expect((replacement.actions[0]as any).body).not.toBe((original.actions[0]as any).body);
+ const result=await executeBatch(f.config,replacement,approveBatch(replacement,["explain","close"],"Approve new source and fresh explanation"),f.adapter,{journal:join(f.root,".vh-adlc/new-context.json")});
+ expect(result.completed).toEqual(["explain","close"]);expect(f.log.map(action=>action.kind)).toEqual(["comment","comment","close"]);
+});
+
+test("an actor change produces a different explanation identity even with the same report run ID",()=>{
+ const f=setup(),original=f.batch();f.inventory.actor="second-operator";
+ const replacement=f.batch();expect(actionKey(replacement,replacement.actions[0])).not.toBe(actionKey(original,original.actions[0]));expect((replacement.actions[0]as any).body).not.toBe((original.actions[0]as any).body);
+});
+
+
+test("reconciliation in the original journal releases a replacement without repeating its old comment",async()=>{
+ const f=setup(),original=f.batch(),mutate=f.adapter.mutate;
+ const uncertain={...f.adapter,mutate:async(action:Action,key:string)=>{await mutate(action,key);throw new MutationFailure(true);}};
+ await executeBatch(f.config,original,approveBatch(original,["explain"],"Approve original explanation"),uncertain,{journal:f.journal});expect(f.log.length).toBe(1);
+ f.inventory.issues=[structuredClone(f.issues.get(1)!)];const report=buildReport(f.config,f.inventory,f.report.observations,{runId:"after-reconciliation"}),replacement=planBatch(f.config,f.inventory,report,[{id:"new-explanation",kind:"comment",issue:1,body:"Fresh approved explanation for the replacement batch."}]),approval=approveBatch(replacement,["new-explanation"],"Approve exact replacement explanation"),journal=join(f.root,".vh-adlc/replacement.json");
+ expect((await executeBatch(f.config,replacement,approval,f.adapter,{journal})).blocked).toEqual(["new-explanation"]);
+ expect((await executeBatch(f.config,original,approveBatch(original,["explain"],"Reconcile the original attempt only"),f.adapter,{journal:f.journal})).completed).toEqual(["explain"]);expect(f.log.length).toBe(1);
+ expect((await executeBatch(f.config,replacement,approval,f.adapter,{journal})).completed).toEqual(["new-explanation"]);expect(f.log.length).toBe(2);
 });

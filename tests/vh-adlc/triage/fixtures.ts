@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync,readFileSync,readdirSync,existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 process.env.VH_ADLC_TRIAGE_LOCK_ROOT??=join(tmpdir(),`vh-triage-locks-${process.pid}`);
@@ -28,7 +28,16 @@ export function fixture() {
   write("src/app.ts", "export const answer = 42;\n");
   git(root, "add", "src/app.ts");
   git(root, "commit", "-qm", "test: seed project");
-  return { root, write, settings: (value: unknown) => write(".vh-adlc/triage.json", JSON.stringify(value)), dispose: () => rmSync(root, { recursive: true, force: true }) };
+  return { root, write, settings: (value: unknown) => write(".vh-adlc/triage.json", JSON.stringify(value)), dispose: () => {
+    // Intentional uncertain-outcome tests own these temporary journals. Retire
+    // only this disposed fixture's entries, preserving all other registry data.
+    const locks=process.env.VH_ADLC_TRIAGE_LOCK_ROOT;
+    if(locks&&existsSync(locks))for(const name of readdirSync(locks).filter(name=>name.endsWith(".pending.json"))){
+      const path=join(locks,name),data=JSON.parse(readFileSync(path,"utf8"));
+      data.pending=data.pending.filter((entry:{journal:string})=>!entry.journal.startsWith(root+"/"));writeFileSync(path,JSON.stringify(data));
+    }
+    rmSync(root, { recursive: true, force: true });
+  } };
 }
 
 /** Native control-plane profile. Its auth never enters the exported analysis input or MCP process. */

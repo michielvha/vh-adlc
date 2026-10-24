@@ -1,3 +1,4 @@
+import{executionHistory}from"./execution-history";
 import { createHash } from "node:crypto";
 import{executionLock,repositoryLockPath}from"./execution-lock";
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
@@ -28,7 +29,7 @@ export type Adapter = {
   mutate(action: Action, key: string): Promise<MutationResult>;
 };
 export type Batch = {
-  schema_version: 1; hash: string; repository: string; hostname: string; settings_hash: string;
+  schema_version: 1; hash: string; context_id:string;repository: string; hostname: string; settings_hash: string;
   source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[]; labels:Label[];actor:string|null;inventory:Inventory;
 };
 export type Approval = { batch_hash: string; action_ids: string[]; owner_statement: string };
@@ -50,8 +51,8 @@ function reportFacts(value:Report){const{created_at:_created,comparison:_compari
 function bad(): never { throw new Error("invalid triage action batch or approval"); }
 function nonempty(value: unknown): value is string { return typeof value === "string" && !!value.trim(); }
 function strings(value: unknown): value is string[] { return Array.isArray(value) && value.every(nonempty); }
-function marker(report: Report, id: string) { return `<!-- vh-adlc-triage:${report.run_id}:${id} -->`; }
-export function actionKey(batch: Batch, action: Action) { return `${batch.report.run_id}:${action.id}`; }
+function marker(namespace:string, id: string) { return `<!-- vh-adlc-triage:${namespace}:${id} -->`; }
+export function actionKey(batch: Batch, action: Action) { return `${batch.context_id}:${action.id}`; }
 function sourceHash(config: Settings, actions: Action[], journal?: Journal) {
   const paths = git(config.root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0")
     .filter((path) => path && sourcePath(config, path)).sort();
@@ -119,9 +120,9 @@ function validatePatch(config: Settings, action: Extract<Action, { kind: "plan-p
   } else if (!action.gate || action.gate.document !== action.path || action.gate.status !== after[fields.status] || !nonempty(action.gate.status)) bad();
 }
 
-function requestPayload(report:Report,action:Extract<Action,{kind:"create-request"}>){
+function requestPayload(namespace:string,action:Extract<Action,{kind:"create-request"}>){
   if(!action.request||Object.keys(action.request).sort().join(",")!=="data,title"||!nonempty(action.request.title)||/[\r\n]/.test(action.request.title)||action.request.title.length>200||!nonempty(action.request.data)||Object.keys(action).some(key=>!["id","kind","request","title","body"].includes(key)))bad();
-  return{title:`Owner request: ${action.request.title}`,body:`Unverified owner task data. This issue records a request and makes no triage assessment.\n\n    ${JSON.stringify(action.request.data)}\n\n${marker(report,action.id)}`};
+  return{title:`Owner request: ${action.request.title}`,body:`Unverified owner task data. This issue records a request and makes no triage assessment.\n\n    ${JSON.stringify(action.request.data)}\n\n${marker(namespace,action.id)}`};
 }
 function vocabularyDescription(action:Extract<Action,{kind:"create-label"}>){
   if(typeof action.definition!=="string"||!/^[-a-z0-9:]{1,63}$/.test(action.name)||!nonempty(action.definition)||Object.keys(action).some(key=>!["id","kind","name","color","description","definition"].includes(key)))return null;
@@ -129,7 +130,7 @@ function vocabularyDescription(action:Extract<Action,{kind:"create-label"}>){
 }
 function publicationActions(config:Settings,inventory:Inventory,report:Report,actions:Action[]){
   const neutral=(action:Action):boolean=>{
-    if(action.kind==="create-request"){requestPayload(report,action);return true;}
+    if(action.kind==="create-request"){requestPayload("proposal",action);return true;}
     if(action.kind==="create-label")return vocabularyDescription(action)!==null;
     if(action.kind==="plan-patch"&&action.created_by)return actions.some(prior=>prior.id===action.created_by&&prior.kind==="create-request");
     if(action.kind==="commit")return Array.isArray(action.requires)&&action.requires.length>0&&action.requires.every(id=>actions.some(prior=>prior.id===id&&prior.kind==="plan-patch"&&neutral(prior)));
@@ -145,6 +146,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
   if(!Array.isArray(report.observations)||!Array.isArray(report.index_requests))bad();
   const rebuilt=buildReport(config,inventory,report.observations,{runId:report.run_id,indexRequests:report.index_requests});
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(report)))bad();
+  const contextId=hash({config,inventory,report:reportFacts(report)});
   const actions = structuredClone(requested), ids = new Set<string>();
   publicationActions(config,inventory,report,actions);
   if(actions.some(action=>!["plan-patch","commit"].includes(action.kind))&&(!nonempty(inventory.actor)||!inventory.coverage.some(entry=>entry.collection==="identity"&&entry.complete&&!entry.error)))bad();
@@ -167,10 +169,10 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
       if (action.kind === "checklist" && (row.ownership !== "index" || !row.index_requested || action.before !== issue.body || !checklist(action.before, action.after))) bad();
     }
     switch (action.kind) {
-      case "create-request":Object.assign(action,requestPayload(report,action));break;
+      case "create-request":Object.assign(action,requestPayload(contextId,action));break;
       case "comment": case "create": {
         if (!nonempty(action.body) || action.kind === "create" && (!nonempty(action.title) || !strings(action.labels))) bad();
-        action.body += `\n\n${marker(report, action.id)}`; break;
+        action.body += `\n\n${marker(contextId, action.id)}`; break;
       }
       case "labels": if (!strings(action.labels) || !action.labels.length) bad(); break;
       case "create-label": if(action.definition!==undefined){const description=vocabularyDescription(action);if(description===null)bad();action.description=description;}if (!nonempty(action.name) || !/^[0-9a-f]{6}$/i.test(action.color) || typeof action.description !== "string") bad(); break;
@@ -191,7 +193,7 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
           hash([...action.paths].sort()) !== hash(patches.map((prior) => (prior as Extract<Action, { kind: "plan-patch" }>).path).sort())) bad();
     }
   }
-  const batch: Batch = { schema_version: 1, hash: "", repository: config.repository, hostname: config.hostname,
+  const batch: Batch = { schema_version: 1, hash: "", context_id:contextId,repository: config.repository, hostname: config.hostname,
     settings_hash: hash(config), source_commit: report.source_commit, source_hash: sourceHash(config, actions),
     report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), labels:structuredClone(inventory.labels??[]),actor:inventory.actor??null,inventory:structuredClone(inventory), actions };
   batch.hash = batchHash(batch); return batch;
@@ -212,10 +214,11 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
   if (batch.hash !== batchHash(batch) || approval.batch_hash !== batch.hash || hash(config) !== batch.settings_hash ||
       !nonempty(approval.owner_statement) || new Set(approval.action_ids).size !== approval.action_ids.length ||
       approval.action_ids.some((id) => !batch.actions.some((action) => action.id === id))) bad();
+  if(batch.context_id!==hash({config,inventory:batch.inventory,report:reportFacts(batch.report)}))bad();
   const rebuilt=buildReport(config,batch.inventory,batch.report.observations,{runId:batch.report.run_id,indexRequests:batch.report.index_requests,fixedHead:batch.source_commit});
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(batch.report)))bad();
   publicationActions(config,batch.inventory,batch.report,batch.actions);
-  for(const action of batch.actions)if(action.kind==="create-request"){const expected=requestPayload(batch.report,action);if(action.title!==expected.title||action.body!==expected.body)bad();}
+  for(const action of batch.actions)if(action.kind==="create-request"){const expected=requestPayload(batch.context_id,action);if(action.title!==expected.title||action.body!==expected.body)bad();}
   for(const action of batch.actions)if(action.kind==="create-label"&&action.definition!==undefined&&action.description!==vocabularyDescription(action))bad();
   const path = options.journal;
   mkdirSync(dirname(path), { recursive: true });
@@ -231,6 +234,8 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
         journal.uncertain.push(interrupted.id); saveJournal(path, journal);
       }
     }
+    const history=executionHistory(config,path,batch.hash);
+    if(history.blocked)return{completed:journal.completed,blocked:approval.action_ids.filter(id=>!journal.completed.includes(id)),failed:[]};
     const blocked: string[] = [], failed: string[] = [];
     const pendingCommit = batch.actions.find((action) => action.id === journal.started && action.kind === "commit") as Extract<Action, { kind: "commit" }> | undefined;
     const head = git(config.root, "rev-parse", "HEAD");
@@ -293,7 +298,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
           journal.results[action.id] = receipt;
           if (current) journal.issues[current.number] = current;
           journal.uncertain = journal.uncertain.filter((id) => id !== action.id);
-          journal.completed.push(action.id); journal.started = null; saveJournal(path, journal); continue;
+          journal.completed.push(action.id); journal.started = null; saveJournal(path, journal); history.resolve(action.id);continue;
         }
         if (journal.uncertain.includes(action.id)) { blocked.push(action.id); continue; }
         if (current && hash(material(current)) !== hash(material(journal.issues[current.number]))) { blocked.push(action.id); continue; }
@@ -335,6 +340,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
           git(config.root, "commit", "--cleanup=verbatim", "-m", action.subject, ...(action.body?["-m",action.body]:[]), "--", ...action.paths);
           journal.source_commit = git(config.root, "rev-parse", "HEAD");
         } else {
+          history.register(action.id);
           mutationAttempted = true;
           result = await adapter.mutate(action, actionKey(batch, action));
           if (current) {
@@ -343,13 +349,13 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
             journal.issues[current.number] = after;
           }
         }
-        journal.results[action.id] = result; journal.completed.push(action.id); journal.started = null; saveJournal(path, journal);
+        journal.results[action.id] = result; journal.completed.push(action.id); journal.started = null; saveJournal(path, journal);history.resolve(action.id);
       } catch (error) {
         if (mutationAttempted && (!(error instanceof MutationFailure) || error.uncertain)) {
           if (!journal.uncertain.includes(action.id)) journal.uncertain.push(action.id);
           saveJournal(path, journal);
         } else if (mutationAttempted) {
-          journal.started = null; saveJournal(path, journal);
+          journal.started = null; saveJournal(path, journal);history.resolve(action.id);
         }
         failed.push(action.id);
       }
