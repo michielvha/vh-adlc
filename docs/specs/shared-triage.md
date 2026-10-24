@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Main relocated public workflow/compatibility guides; refreshing coverage and review before the claim."
+status_description: "Copilot Opus R-12 returned no findings; awaiting renewed acceptance of refreshed coverage and trial proof."
 issue: null
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
 covers:
@@ -412,6 +412,7 @@ reviewed before renewed acceptance; existing documentation publication authority
 | 2026-10-24 | R-9 | spec | `5a4547da08407737a550a1e042a31b771d0bc226` | n/a | n/a | accepted by owner |
 | 2026-10-24 | R-10 | spec | `33b8070d2a2af192b00306bfb84b765e907f1cb5` | claude-opus-5.5 | procedural | Refresh after main documentation relocation: fold trial proof into the normative baseline, check installation/index coverage and correct the R-9 severity summary. |
 | 2026-10-24 | R-11 | spec | `1f769d91e7d662885b6854de3260b618f0101e35` | claude-opus-5.5 | procedural | One factual nit: make the trial probe pass condition explicit in AC-07 proof. |
+| 2026-10-24 | R-12 | spec | `68d2f1eabe959be346082859ad7ac105cdb23300` | claude-opus-5.5 | procedural | No findings after the documentation relocation and normative trial-proof refresh. |
 
 ### R-1
 
@@ -702,6 +703,10 @@ SEVERITY: nit
 WHERE: Test Plan / AC-07
 EVIDENCE: The pinned feature-documents standard at line 105 requires each Proof to name "a test, a scenario with a pass condition, or a written manual procedure". At 5a4547d the AC-07 proof required "denied outside-input-set and offline mutation probes". That row now reads "probes from the actual analysis environment covering file/environment/helper/keyring/socket/tool/direct-egress routes with mutation attempts confined to offline/disposable targets" (docs/specs/shared-triage.md:381, diff r11-diff.txt:88-89). It says where probes run and what they target, but it no longer states that each probe must be denied or find nothing reachable. Design step 5 (lines 299-306) implies that pass condition through "No GitHub credential ... is reachable", "negative probes" and "Verify the actual enforced boundary". Read alone, the Test Plan row passes when the probes merely run and are recorded.
 PROPOSAL: Restore the pass condition in the AC-07 proof. For example: every probe from the analysis environment finds no readable outside-input canary, no credential in the environment or a helper, keyring or socket, no connected write tool and no direct GitHub egress, and each mutation attempt is denied by the offline adapter or disposable fixture.
+
+### R-12
+
+NO FINDINGS
 
 ## Sources
 
