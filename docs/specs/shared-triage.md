@@ -55,6 +55,14 @@ state and separates analysis input from operator approval. Host adapters must pr
 supervisor, its code and operator channel (`verification.ts:13-29`, `session.ts`); this is not a claim that a stdio server confines an
 otherwise unrestricted host. Native trial confinement remains separately tested.
 
+On 2026-10-24, after the provider's reported reset time, the isolated Claude availability check
+succeeded. Both current managed-controller synthetic trials then passed at component
+`a28ebbf4d6f1796434bca1407542aedf255f5908`: Claude at `/tmp/triage-controller-e2e-claude-38x5T6`
+and Codex at `/tmp/triage-controller-e2e-codex-luejjm`. Each retained its exact component and recorded
+one fake comment and one fake closure. This does not renew private/legacy parity or GUI proof. The
+old quota failure is preserved. F-09's constant real-call count is still uncorrected and is not used
+as measured proof; fake adapter effects and source identity are the observed facts.
+
 ## Scope
 
 Deliver a shared triage operation for feature, bug and technical-debt backlogs, including evidence
@@ -132,6 +140,15 @@ Authenticate resolved, obsolete and duplicate states, including excluded/index/c
 blockers, before using them to clear prerequisites or rank dependents. Unobserved completion remains
 unverified and cannot establish that dependent work is ready.
 
+Analysis is confined at the model's reachable tool surface: it cannot read owner files, tracker
+credentials or agent sockets, access the operator channel, or reach GitHub directly. The isolated
+read/check adapter enforces filesystem and network exclusions, while the host adapter restricts
+the model to those declared tools and validates their actual inventory/configuration and trace.
+The authenticated CLI's own model-provider credential and provider connection remain in its trusted
+control plane; model tools cannot read that credential or use it for another service. A host-networked
+CLI process is not itself an OS-isolated analysis environment. These are separate control and tool
+boundaries, and both must be tested before claiming confinement.
+
 The controller owns the fixed source commit, complete collected inventory, installed procedure,
 report destination and operator-selected named checks. Analysis can request bounded source, issue,
 ancestor/removal inspections and those fixed checks; it cannot supply executable argv, choose an index
@@ -154,7 +171,10 @@ other hosts. An unconfigured or incapable host must leave executable closure una
 produce a report. Required GUI discovery/read-only trials remain required under AC-01, even if that
 surface has no configured execution controller.
 
-The operator presents and approves the exact batch through an independent channel. Effects are
+For every batch containing an executable closure, the operator presents and approves the exact batch
+through a channel independent of analysis. Outside a controller, plain-chat approval is available
+only for the non-closure action kinds allowed by the owner-approved execution policy; it never
+authorizes a closure. Open Question Q4 resolves completion-asserting non-closure writes. Effects are
 serialized for one hostname/repository across batches and output directories controlled by this host
 user, in addition to each original journal's lock. No lock grants authority for another machine or
 prevents unrelated remote actors; live issue, actor and payload revalidation still applies. After an
@@ -167,8 +187,8 @@ from cached records are never replayed; any required check must match the operat
 Owned analysis/driver process groups have a bounded timeout, termination grace and forced cleanup,
 including descendants left after normal parent exit. Record actual exit, timeout and cleanup outcomes.
 
-This revision follows the owner's 2026-10-24 decision and the executed R-16 gaps in `report.ts:254-281`,
-`controller.ts:403-476` and `controller-operator.ts:20-28`. R-16 observed that all 353 prior tests passed
+This revision follows the owner's 2026-10-24 decision and the executed R-16 findings F-01 through
+F-04, F-08 and F-11 at component `8f3ca635096fc663d473fe31389c77891b488dce`. R-16 observed that all 353 prior tests passed
 while these provenance, tool and crash-recovery paths remained untested; their absence is not acceptance.
 
 ### Repository settings
@@ -333,7 +353,8 @@ remaining operations. No push, merge, release or implementation follows merely f
    Record the additional intentional difference `enforced-controller-execution`: legacy Claude could
    execute an approved closure in its interactive session; shared triage permits closure only through
    an enforced controller, with the current shipped adapters limited to Linux/Bubblewrap/flock and
-   their supported CLIs. Other surfaces retain reports/proposals until their own controller is proved.
+   their supported CLIs. Other surfaces retain reports/proposals and permitted non-closure actions; executable closure waits
+   until their own controller is proved.
    The parity manifest and comparison must name this eighth difference explicitly.
    The parity result must name these differences. Neither run posts comments or applies labels.
 4. **Integrate deliberately:** install the exact local shared plugin commit in disposable client
@@ -439,12 +460,12 @@ surfaces until separately tested. No other harness support is implied.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Package/discovery tests and native Codex CLI, Claude CLI, Codex desktop and VS Code Local fixture invocation; compare installed canonical payload. Run a generic backlog-triage prompt plus existing investigation/docs/feature/maintenance boundary regression cases, and inspect README and relocated workflow/compatibility/installation operation, support, skill-count and runtime claims; confirm the docs index remains navigation-only. Exercise serial verification and plain-chat approval fallback without fabricated capabilities. |
+| AC-01 | Package/discovery tests and native Codex CLI, Claude CLI, Codex desktop and VS Code Local fixture invocation; compare installed canonical payload. Run a generic backlog-triage prompt plus existing investigation/docs/feature/maintenance boundary regression cases, and inspect README and relocated workflow/compatibility/installation operation, support, skill-count and runtime claims; confirm the docs index remains navigation-only. Exercise serial verification and plain-chat approval for action kinds permitted outside the controller; prove that a plain-chat approval file cannot authorize closure. Never fabricate unavailable capabilities. |
 | AC-02 | No-settings fixture verifies default report/history placement, first-run versus unavailable history and absent plan metadata; generic and Stackweaver config fixtures; malformed/unknown-version/conflicting-repo cases; expected ownership/ranking/report paths, including no-settings and unlisted-umbrella cases with all sub-items shipped; inspect shared package for copied project constants. |
 | AC-03 | Paginated fixtures beyond legacy caps, nested comment pagination, inaccessible page/permission/rate/network failure and budget exhaustion; a failed required page or verification input makes every closure in that report non-executable, including otherwise evidenced issues; cover failed closed-issue and merged-PR inventory as report-wide blockers; inspect per-collection completion/error metadata in collected snapshots and reject missing or inconsistent records. |
 | AC-04 | Attested-only/forged/replayed completion and cleared-blocker fixtures for eligible, excluded, protected, index and closed issues; dependent work stays blocked/unranked until proof is observed in the current boundary. Actual managed source, named-check, ancestor/removal, supersession and issue-comparison receipts in both passes, including denied/unavailable operations and required-check failure. False-complete plan, merged Refs-only PR, unwired component, closed prerequisite with still-open dependent scope, missing source/test, removed/superseded scope, total duplicate of unfinished canonical work versus partial overlap, and dependency-cycle fixtures; inspect adversarial evidence and reason-correct closure proposals. |
 | AC-05 | Sweep/next/close/stale/explicit-ID fixtures, recording adapter asserts zero writes, same-day repeat preserves both reports, an external output override leaves settings unchanged and still reads configured history, counts and run-over-run differences match snapshots across mixed modes/scopes and incomplete coverage without false additions/removals, default reports remain uncommitted and explicit local commits follow repo rules; sweep/next ranking reasons and completeness match scope, while close/stale/explicit-ID reports contain no readiness ranking. |
-| AC-06 | Run the actual shipped managed entry against a disposable fake tracker. Test shell/file/web/unknown tool items, missing restricted configuration, forged receipts and aliased approval streams; every case must block before effects. Missing Linux/Bubblewrap/flock or another adapter's confinement fails closed for closure while report-only remains available. Execute an approved comment, interrupt before closure, restart with the original exact batch/journal and fresh actual observations, and finish with one comment and one closure total. Distinct batch/journal paths on the same controlled repository cannot overlap effects. Run a trusted named check and actual ancestor/removal inspection before report generation; checks cannot read owner canaries/credentials or use network, and changed argv or unselected checks are denied. Kill stubborn owned process groups within the cap and clean descendants after normal exit. Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch and retry. Explicitly request and approve an umbrella checklist patch/closure, then omit request or approval or change the patch's base body in negative cases; change an approved comment/label/closure/duplicate payload in negative cases. Inspect exact action log, preserved unrelated body content and other protected IDs. Include approved/unapproved plan-status patches and an attempted gated-completion sync; failed gates cannot change status. Bind new-label description/color and issue-URL backfill payloads; fail after issue creation and confirm retry backfills the same URL without another issue. Assert the approved plan commit subject/path set, unrelated index preservation and failed-commit retry state; intake-selected triage uses the same narrow authority reference and never shipping authority. |
+| AC-06 | Run the actual shipped managed entry on both shipped CLI adapters against a disposable fake tracker. From each actual analysis tool surface, attempt outside-input canary/credential-helper/socket reads and direct GitHub egress; failed probes block execution. Reject an analysis-supplied index exception, changed installed payload and extra Claude tool. Preserve prior artifacts when starting a fresh attempt, and keep an uncertain outcome blocked across managed resume. Test shell/file/web/unknown tool items, missing restricted configuration, forged receipts and aliased approval streams; every case must block before effects. Missing Linux/Bubblewrap/flock or another adapter's confinement fails closed for closure while report-only remains available. Execute an approved comment, interrupt before closure, restart with the original exact batch/journal and fresh actual observations, and finish with one comment and one closure total. Distinct batch/journal paths on the same controlled repository cannot overlap effects. Run a trusted named check and actual ancestor/removal inspection before report generation; checks cannot read owner canaries/credentials or use network, and changed argv or unselected checks are denied. Kill stubborn owned process groups within the cap and clean descendants after normal exit. Owner-authorized disposable repository/recording adapter: approve a subset, attempt body-injected commands, change issue/source after approval, deny comment before close, fail mid-batch and retry. Explicitly request and approve an umbrella checklist patch/closure, then omit request or approval or change the patch's base body in negative cases; change an approved comment/label/closure/duplicate payload in negative cases. Inspect exact action log, preserved unrelated body content and other protected IDs. Include approved/unapproved plan-status patches and an attempted gated-completion sync; failed gates cannot change status. Bind new-label description/color and issue-URL backfill payloads; fail after issue creation and confirm retry backfills the same URL without another issue. Assert the approved plan commit subject/path set, unrelated index preservation and failed-commit retry state; intake-selected triage uses the same narrow authority reference and never shipping authority. |
 | AC-07 | Frozen legacy/shared Stackweaver parity comparison including protected-umbrella exception, report-first approval and the eighth enforced-controller execution/platform difference; exact local install and adapter commits independently inspected in the paired-repository review; bounded real read-only trial with external uncommitted report, unchanged complete checkout/index snapshots, complete canonical source/history inputs, validated per-collection coverage metadata, and probes from the actual analysis environment covering file/environment/helper/keyring/socket/tool/direct-egress routes with mutation attempts confined to offline/disposable targets: every probe must establish no readable outside-input canary, no reachable GitHub credential via environment/helper/keyring/socket, no connected write tool and no direct GitHub egress, and every mutation attempt must be denied; a read-only adapter trace and tracker snapshots with unrelated concurrent actor changes attributed and an inspected ordered publication handoff; verify the explicit output override, unchanged settings and configured previous-report source, and inspect the durable handoff in `tests/agent-triage/README.md`; separately verify normal report placement in a disposable fixture; missing-plugin negative case. |
 | AC-08 | Rollback/reapply procedure in `tests/agent-triage/README.md` executed in a disposable Stackweaver checkout; compare unrelated agents, plan files, index/worktree state and verify no service/credential operations. |
 | AC-09 | Diff only the declared migration paths and shared triage paths; compare hashes of existing maintenance/audit/docs/domain workflows and automation; confirm deferred register retains D-01 through D-05. |
@@ -536,11 +557,12 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Evidence: The new helper tests first fail because the implementation is missing (/tmp/shared-triage-r16-process-red.log); both actual process-group scenarios then pass (/tmp/shared-triage-r16-process-green.log), including a SIGTERM-ignoring client and descendants after normal exit. T27 integrates the helper into the shipped entry and records cleanup outcomes. Full plugin gate: 360 pass, 1388 assertions (/tmp/shared-triage-r16-corrections-full-gate.log). Fresh native renewal and independent review remain required.
 - [x] T27 `scripts/triage/controller.ts` and acceptance tests - reject unexpected Codex tools and unknown item types before operator execution; require the fixed tool configuration, and preserve an observed shell-item negative case after R-16 F-03 (AC-01, AC-04, AC-07).
       Evidence: The unexpected-tool regression fails before correction (16 pass, 1 fail; /tmp/shared-triage-r16-tools-red.log), then all 17 acceptance tests pass. The grader now requires the actual restricted Codex configuration and denies shell/file/web/unknown items for every Codex analysis kind. The shipped entry also uses the owned process helper from T31 and records signals, timeout and reap state. Full plugin gate: 360 pass, 1388 assertions (/tmp/shared-triage-r16-corrections-full-gate.log). Fresh native renewal and independent review remain required.
-- [ ] T28 managed controller and real fixture driver - resume an interrupted prior run with its exact original journal/batch and fresh observations, completing closure without another evidence comment after R-16 F-04 (AC-06).
-- [ ] T30 migration parity manifest, Stackweaver handoff and shared docs - track the enforced-controller execution/platform difference, preserve deferred workflows and clarify the spec treatment chosen by the owner after R-16 F-06/F-07 (AC-01, AC-07, AC-09).
+- [ ] T28 `plugins/vh-adlc/scripts/triage/controller.ts` and `tests/vh-adlc/triage/controller-e2e.ts` - resume an interrupted prior run with its exact original journal/batch and fresh observations, completing closure without another evidence comment after R-16 F-04 (AC-06).
+- [ ] T30 `tests/vh-adlc/triage/fixtures/legacy/manifest.json`, Stackweaver `tests/agent-triage/README.md` and shared triage guides - track the enforced-controller execution/platform difference, preserve deferred workflows and clarify the spec treatment chosen by the owner after R-16 F-06/F-07 (AC-01, AC-07, AC-09).
 - [ ] T32 `tests/vh-adlc/triage/controller-e2e.ts` and evidence rechecker - measure fake GitHub resolution instead of presenting a constant as an observed real-call count after R-16 F-09 (AC-06, AC-07).
-- [ ] T33 managed read adapter, startup checks and native tests - produce actual removal receipts and operator-selected fixed check receipts before report generation, preserving serial primary/adversarial proof after R-16 F-11 (AC-04, AC-06).
-- [ ] T34 updated normative boundary and managed acceptance proof - after fresh spec acceptance, renew the required CLI controller, removal/check, crash recovery, concurrency and fail-closed host cases; store actual observed evidence and repeat independent implementation review (AC-01, AC-04, AC-06, AC-07).
+- [ ] T33 `plugins/vh-adlc/scripts/triage/controller.ts`, startup checks and `tests/vh-adlc/triage/acceptance.test.ts` - produce actual removal receipts and operator-selected fixed check receipts before report generation, preserving serial primary/adversarial proof after R-16 F-11 (AC-04, AC-06).
+- [ ] T35 `plugins/vh-adlc/scripts/triage/verification.ts` and `tests/vh-adlc/triage/verification.test.ts` - first observe actual operator-selected checks reaching an outside-input canary or egress, then confine filesystem/network and owner credentials for those checks; retain missing-dependency and failed-check blockers after R-17 F-06 (AC-04, AC-06).
+- [ ] T34 `tests/vh-adlc/triage/controller-e2e.ts` and `tests/vh-adlc/evidence/triage/` - after fresh spec acceptance, renew the required CLI controller, removal/check, crash recovery, concurrency and fail-closed host cases; store actual observed evidence and repeat independent implementation review (AC-01, AC-04, AC-06, AC-07).
 - [ ] T15 `tests/vh-adlc/evidence/triage/` and this document's evidence - actual Codex/Claude CLI invocation, existing-route regressions, frozen legacy parity, bounded live read-only trial and rollback/reapply have observed pass results tied to exact component/adapter commits; retain failures and unavailable proof honestly (AC-01, AC-03, AC-07, AC-08, AC-09).
       Live collection: the first run failed closed on valid numeric/cursor GitHub pagination and legacy metadata. Focused regressions reproduced both failures and passed after fixes (`/tmp/shared-triage-live-collection-regressions.log`). The retry collected 10 issue pages, 6 PR pages, all three selected comment collections and 380 plans with complete coverage, preserving the complete checkout and index (`/tmp/shared-triage-live-fQqFQh`, adapter `4532b929286c1af9df5cfac3b37fddec6004a4a9`). This is collection proof only; analysis, parity and native trials remain open.
       Evidence hardening: focused red/green tests cover legacy prose-only close reports, merged closing references bound to the current issue, verified-cleared prerequisites, externally preapplied gated status, source changes on unapproved plan paths, owned-patch retry and GitHub account changes immediately before effects. The 42 report/execution tests pass (`/tmp/shared-triage-binding-suite.log`). Full plugin suite: 309 pass, 1104 assertions (`/tmp/shared-triage-binding-full-suite.log`); both CLI and native-driver builds pass. No remote effects were used for these tests.
@@ -559,13 +581,27 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
 
 ## Open Questions
 
-None. The owner chose a normative Design/Test Plan revision for the enforced boundary on 2026-10-24. The normative draft now includes it; fresh review and owner acceptance are required before remaining implementation resumes.
+### Q4: Do completion-asserting non-closure writes require enforced proof?
 
-Earlier questions are resolved. The owner accepted the R-3 and R-4 choices and accepted R-9 with documentation publication
-on 2026-10-24. R-9 trial-proof obligations are now folded into the normative Design and Test Plan,
-not kept as a separate decision source. The only additional coverage change follows main's relocated
-workflow, compatibility and installation guides. The owner accepted that refreshed baseline after clean R-12 on 2026-10-24; existing documentation
-publication authority remains in force.
+**Recommendation:** A. Apply the same proof boundary to umbrella checklist ticks, completion plan-status syncs and resolution comments.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| A. Enforced proof | Completion assertions cannot bypass the closure boundary through another action kind. | These actions need the controller even when the issue stays open. |
+| B. Exact approval of an unverified state | The owner can approve a visibly unverified completion assertion outside a controller. | These writes retain attestation-level trust and must show that limit. |
+
+**Why this is yours:** The earlier decision named executable closure. R-17 F-02 identified completion assertions in other writes; extending the authority boundary is an owner policy choice.
+
+### Q5: Does a new batch after material evidence changes need a fresh explanation comment?
+
+**Recommendation:** B. Present and approve a fresh explanation when the source, actor or evidence changes; unchanged original-batch resume still never repeats a completed comment.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| A. Reuse an attributed comment | A new batch can bind an existing comment after proving its author, payload and continued relevance. | Reuse needs another exact binding and stale-comment validation path. |
+| B. Fresh approved explanation | The changed context and new proof are visible on the issue. | A materially changed batch may post another explicitly approved comment. |
+
+**Why this is yours:** R-17 F-05 distinguishes recovery of one unchanged batch from a new decision after changed evidence. The owner chooses the visible-comment policy.
 
 ## Review Log
 
