@@ -369,23 +369,23 @@ surfaces until separately tested. No other harness support is implied.
 ## Acceptance Criteria
 
 - [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support.
-      Evidence: R-14 returned `not verified` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
-- [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
-      Evidence: R-14 returned `not met` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
+      Evidence: R-16 returned `not verified` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
+- [x] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+      Evidence: R-16 returned `met` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
 - [x] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
-      Evidence: R-14 returned `met` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
+      Evidence: R-16 returned `met` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
 - [ ] AC-04: Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
-      Evidence: R-14 returned `untested` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
-- [x] AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved.
-      Evidence: R-14 returned `met` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
-- [x] AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
-      Evidence: R-14 returned `met` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
+      Evidence: R-16 returned `untested` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
+- [ ] AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved.
+      Evidence: R-16 returned `untested` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
+- [ ] AC-06: Execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
+      Evidence: R-16 returned `untested` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
 - [ ] AC-07: The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
-      Evidence: R-14 returned `not met` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
+      Evidence: R-16 returned `not verified` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
 - [x] AC-08: The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
-      Evidence: R-14 returned `met` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
-- [ ] AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
-      Evidence: R-14 returned `not verified` at `d0682cf89980c54da8b0f43f12e14357f0240243`; the reviewer executed the fixed proof command and recorded its scope and limits below.
+      Evidence: R-16 returned `met` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
+- [x] AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
+      Evidence: R-16 returned `met` at `8f3ca635096fc663d473fe31389c77891b488dce`; the reviewer observed the frozen paired checks, native controller evidence and remaining limitations recorded below.
 
 ## Test Plan
 
@@ -478,8 +478,16 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Actual WIP Codex controller trial `/tmp/triage-controller-e2e-codex-3ZaJDI/result.json` passes analysis and exact approved comment/closure against an offline fake API, with two fake effects and no real tracker calls. A preceding fake-actor fixture mismatch is preserved and correctly produced zero effects. Claude `/tmp/triage-controller-e2e-claude-SQpw9b/result.json` is blocked by HTTP 429 `usage_limit_reached`; no credential or account changes are authorized. New tracked `controller-e2e.ts` repeats the real product path on a retained synthetic source checkout and checks an exact clean component before and after. Committed-pair renewal, private Claude/legacy parity and GUI tests remain T15/T16.
 - [x] T25 execution lock helper and interruption tests - replace existence-only journal locks with kernel ownership so live writers block concurrency and killed owners do not leave stale locks; observe R-15 F-07 regressions (AC-06).
       Evidence: stale-file and live-kernel-lock regressions fail before the fix (`/tmp/shared-triage-kernel-lock-red.log`: 33 pass, 2 fail), then execution/session checks pass (`/tmp/shared-triage-kernel-lock-green.log`: 39 pass). The paired full plugin gate passes 353 tests, 1343 assertions (`/tmp/shared-triage-managed-controller-full-gate.log`). Actual disposable lock owners are killed by handle; no unrelated process is targeted. A retained lock inode cannot block a retry after its kernel owner exits.
-- [ ] T22 external paired-review proof packet - freeze and verify proof-script hashes before dispatching the next fresh Copilot Opus 5.5 review after R-14 F-06, with no proof code edited during that review (AC-01 through AC-09).
-      Evidence: the R-14 records explicitly retain the observed mid-review proof-script change; its results are not relabeled as a frozen proof run.
+- [x] T22 external paired-review proof packet - freeze and verify proof-script hashes before dispatching the next fresh Copilot Opus 5.5 review after R-14 F-06, with no proof code edited during that review (AC-01 through AC-09).
+      Evidence: R-16 observed the frozen manifest `052f5b4eab3d2ccbce5a35c9f9b5877c1aa0f7ff9c50d5d5bcc145670598d3d7`, both clean exact repository commits, helper/input hash verification, independent command exits/time caps and summaries that retain missing or failed proof. Full plugin suite: 353 pass. Contracts, rollback/reapply, committed Codex controller regrade and four exact intake routes pass. Lint retains only malformed historical R-15; this valid latest review supersedes its formatting diagnostic. Claude/private/legacy renewal and GUI tests remain unavailable. R-16 records the two unused tool-runtime overflow files and repeated proof reads; no helper or input was edited.
+- [ ] T26 `scripts/triage/report.ts` and report tests - authenticate all completion and blocker states before dependency/ranking decisions, including excluded, index and closed rows; observe the R-16 F-01/F-02 regressions before correction (AC-02, AC-04, AC-05).
+- [ ] T27 `scripts/triage/controller.ts` and acceptance tests - reject unexpected Codex tools and unknown item types before operator execution; require the fixed tool configuration, and preserve an observed shell-item negative case after R-16 F-03 (AC-01, AC-04, AC-07).
+- [ ] T28 managed controller and real fixture driver - resume an interrupted prior run with its exact original journal/batch and fresh observations, completing closure without another evidence comment after R-16 F-04 (AC-06).
+- [ ] T29 `scripts/triage/execute.ts` and concurrency tests - serialize the entire effect phase for one repository across separate batch/journal paths after R-16 F-05; a competing batch must have zero effects (AC-06).
+- [ ] T30 migration parity manifest, Stackweaver handoff and shared docs - track the enforced-controller execution/platform difference, preserve deferred workflows and clarify the spec treatment chosen by the owner after R-16 F-06/F-07 (AC-01, AC-07, AC-09).
+- [ ] T31 controller subprocess helper and actual process tests - bound termination and escalate for stubborn owned process groups, including normal-exit descendants, after R-16 F-08 (AC-07).
+- [ ] T32 `tests/vh-adlc/triage/controller-e2e.ts` and evidence rechecker - measure fake GitHub resolution instead of presenting a constant as an observed real-call count after R-16 F-09 (AC-06, AC-07).
+- [ ] T33 managed read adapter, startup checks and native tests - produce actual removal receipts and operator-selected fixed check receipts before report generation, preserving serial primary/adversarial proof after R-16 F-11 (AC-04, AC-06).
 - [ ] T15 `tests/vh-adlc/evidence/triage/` and this document's evidence - actual Codex/Claude CLI invocation, existing-route regressions, frozen legacy parity, bounded live read-only trial and rollback/reapply have observed pass results tied to exact component/adapter commits; retain failures and unavailable proof honestly (AC-01, AC-03, AC-07, AC-08, AC-09).
       Live collection: the first run failed closed on valid numeric/cursor GitHub pagination and legacy metadata. Focused regressions reproduced both failures and passed after fixes (`/tmp/shared-triage-live-collection-regressions.log`). The retry collected 10 issue pages, 6 PR pages, all three selected comment collections and 380 plans with complete coverage, preserving the complete checkout and index (`/tmp/shared-triage-live-fQqFQh`, adapter `4532b929286c1af9df5cfac3b37fddec6004a4a9`). This is collection proof only; analysis, parity and native trials remain open.
       Evidence hardening: focused red/green tests cover legacy prose-only close reports, merged closing references bound to the current issue, verified-cleared prerequisites, externally preapplied gated status, source changes on unapproved plan paths, owned-patch retry and GitHub account changes immediately before effects. The 42 report/execution tests pass (`/tmp/shared-triage-binding-suite.log`). Full plugin suite: 309 pass, 1104 assertions (`/tmp/shared-triage-binding-full-suite.log`); both CLI and native-driver builds pass. No remote effects were used for these tests.
@@ -498,7 +506,18 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
 
 ## Open Questions
 
-None. The owner accepted the R-3 and R-4 choices and accepted R-9 with documentation publication
+### Q3: How should the enforced-verification decision enter the normative baseline?
+
+**Recommendation:** Revise Design and Test Plan to require the boundary and its negative cases, then obtain a fresh spec review and owner acceptance.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| A. Normative revision | The accepted baseline explicitly requires and tests enforced closure proof. | Draft/review/acceptance before the revised design is claimed accepted. |
+| B. Accepted interpretation | The owner explicitly binds the existing observed-proof criteria to the boundary. | Context records that interpretation; the normative text remains unchanged. |
+
+**Why this is yours:** R-16 F-07 found that the current normative sections do not explicitly name this requirement; only the owner can choose how their earlier decision binds the accepted baseline.
+
+Earlier questions are resolved. The owner accepted the R-3 and R-4 choices and accepted R-9 with documentation publication
 on 2026-10-24. R-9 trial-proof obligations are now folded into the normative Design and Test Plan,
 not kept as a separate decision source. The only additional coverage change follows main's relocated
 workflow, compatibility and installation guides. The owner accepted that refreshed baseline after clean R-12 on 2026-10-24; existing documentation
@@ -526,6 +545,7 @@ publication authority remains in force.
 | 2026-10-24 | R-13 | implementation | `3dab874f7372b3cf8c35be12c4aa483084e9a7f2` | claude-opus-5.5 | procedural | One blocking execution finding and eight further findings; no criterion independently verified. |
 | 2026-10-24 | R-14 | implementation | `d0682cf89980c54da8b0f43f12e14357f0240243` | claude-opus-5.5 | procedural | Executed proof retains native behavior failures; GUI acceptance remains unverified. |
 | 2026-10-24 | R-15 | implementation | `cc84af85ee4f6db8045da6548cdb199c0f134e4c` | claude-opus-5.5 | procedural | Frozen proof observed checks and native failures; boundary implementation reviewed after the owner decision. |
+| 2026-10-24 | R-16 | implementation | `8f3ca635096fc663d473fe31389c77891b488dce` | claude-opus-5.5 | procedural | Local proof passes; twelve findings include readiness provenance, tool enforcement, controller resume and missing verification methods. |
 
 ### R-1
 
@@ -1146,6 +1166,107 @@ EVIDENCE: One `proof.sh` poll was piped through `tail -c 600`. One grep targeted
 PROPOSAL: None.
 
 
+### R-16
+
+CRITERION: AC-01 The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support.
+VERDICT: not verified
+EVIDENCE: I ran the frozen proof.sh (manifest digest 052f5b4e...d3d7) at component 8f3ca635096fc663d473fe31389c77891b488dce. Integrity checks were true before and after the run. The plugin suite exited 0 with 353 pass, 0 fail and 1343 expect() calls, including discovery.test.ts (eight operations, intake routing, public guides). native-recheck exited 0. It regraded the committed Codex managed-controller transcript with grade pass, exact plugin hash cf388be1...78b7 and exact component. It also confirmed that the four existing native routes L01, L02, L05 and L16-public exited 0 with status pass, bound to this component and plugin hash. I read compatibility.md:11-20 and installation.md:92-96; both state the limits accurately. Limitations: Claude CLI was not observed at this component (HTTP 429 usage_limit_reached). Actual Codex desktop and VS Code Local invocation was not observed, and there is no owner residual. CLI success does not substitute for them.
+CRITERION: AC-02 Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+VERDICT: met
+EVIDENCE: The plugin suite passed, including settings.test.ts (no-settings defaults, malformed and unknown versions, identity conflicts, path escapes, an unlisted index protected without settings, workstream sources) and report.test.ts (an unlisted index needs a current request, ranking only in sweep/next, report and history placement). migration.test.ts passed with STACKWEAVER_TRIAGE_CHECKOUT bound to adapter 3b62ee4868a3eed12f8fcecd4542429f8e036b3e, and parity.test.ts passed the synthetic matrix. The adapter contract exited 0 with 3 pass. The rollback rehearsal exited 0, and rehearse.ts:58-64 asserts normal report and index placement in a disposable clone. A grep of plugins/vh-adlc for stackweaver, fable, 332, 334, Public Go Live, RBAC and distribution/ found nothing. Limitation: no current native run against Stackweaver settings was observed; the Claude/private renewal is blocked.
+CRITERION: AC-03 Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure in that report, and partial data never establishes exhaustive triage.
+VERDICT: met
+EVIDENCE: The plugin suite passed collection.test.ts (17 cases: beyond-legacy pagination, failed or malformed pages, offset shift, budget exhaustion, label pages, numeric links) and report.test.ts ("any incomplete required collection or missing verification blocks every closure"). I inspected report.ts:205-210 and 280-284: a missing verification boundary adds a report-wide blocker, and every close_executable flag is then cleared. controller.ts:82-92 rejects inconsistent snapshot coverage. In the regraded managed-controller report, all coverage records are complete. Limitation: no live tracker collection was renewed at this pair.
+CRITERION: AC-04 Closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
+VERDICT: untested
+EVIDENCE: The suite passed the forged-cache, Refs-only, obsolete/duplicate, supersession, canonical-cycle and provenance cases. The regraded Codex managed-controller run closed #1 only after the controller re-observed both passes (controller.ts:424-429, report.ts:266-281). Inspection of report.ts:266 shows the observed-receipt check runs only for rows that are still close_executable. Excluded, protected, unrequested-index and closed rows keep state resolved with an empty remaining scope even when they rest only on cache attestations. No test covers this path (report.test.ts:67-79 covers only an open eligible row); see F-02. The shipped read adapter cannot produce removal receipts (F-11). Claude was not observed.
+CRITERION: AC-05 Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved.
+VERDICT: untested
+EVIDENCE: The suite passed report.test.ts (history, same-day repeat, external output, mixed scopes, ranking only in sweep/next, explicit commit) and execution.test.ts (no writes before approval). In the regraded synthetic report, ids mode has ranked [] and complete coverage. Inspection of report.ts:254-265 shows unresolved prerequisites are computed before report.ts:266-281 downgrades unauthenticated resolved rows. A dependent of a prerequisite backed only by attestations therefore stays ready and is ranked at report.ts:297-300. No check covers this (F-01), so the prerequisite clause is not established.
+CRITERION: AC-06 Execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes after partial failure without duplicate completed actions or duplicate issue creation; local plan commits contain only the approved successful patches and shown commit metadata.
+VERDICT: untested
+EVIDENCE: The suite passed 35 execution.test.ts cases, including exact payload binding, revalidation, umbrella checklist, gated patches, creation/backfill retry, lost responses, interruption and a kernel lock released when its owner is killed. It also passed session.test.ts journal-bound resume in the session protocol. The regraded managed-controller run applied exactly POST comment and PATCH close against the offline fake. However, the managed controller, which is the only shipped enforced closure entry, cannot reach its documented resume after a crash (F-04). Completing an interrupted closure there needs a new batch with a new mandatory evidence comment, which duplicates a completed action. No check covers this.
+CRITERION: AC-07 The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
+VERDICT: not verified
+EVIDENCE: Integrity checks confirmed both clean HEADs, the exact component and adapter, and only allowed Stackweaver paths changed since baseline 129581f6. The adapter contract and migration tests passed. historical-parity/comparison.json is component ae833c1 only, and recheck labels it current_acceptance false. These were not observed at this pair: current legacy/shared native parity, the Claude command route and the bounded private live read-only trial (blocked by HTTP 429, not retried). The new enforced-closure difference is not recorded as an intentional difference (F-06).
+CRITERION: AC-08 The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
+VERDICT: met
+EVIDENCE: The proof rollback command (bun tests/agent-triage/rehearse.ts) exited 0 and observed adapter 3b62ee4868a3eed12f8fcecd4542429f8e036b3e. rollback, reapply, index_preserved and rollback_index_bytes_preserved were all true, with only the four runtime paths changed. rehearse.ts:25-45 also asserts unrelated staged and untracked work is preserved and no unrelated tracked file changed. Limitation: this is disposable-clone proof only. No service or credential operation exists in the script.
+CRITERION: AC-09 Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
+VERDICT: met
+EVIDENCE: proof.py verify() ran a git diff of baseline 129581f6 against adapter 3b62ee4 before and after the checks. Only AGENTS.md, .vh-adlc/triage.json, .claude/commands/triage.md, agents/issue-triage.md and tests/agent-triage/ changed, so maintenance, audit, docs, TFE and provider-fork agents are byte-unchanged. Shared side: direct-operation-compatibility and discovery tests passed, and the four existing native routes passed at this exact component and plugin hash. The spec lines 89-95 retain D-01 through D-05. Limitation: no workflow automation was run.
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/triage/report.ts:254-265, 266-281, 297-300
+EVIDENCE: The unresolved-prerequisite set is built from row.state === "resolved" (lines 255-258) before the observed-receipt check (lines 266-281). That check later sets the prerequisite to unverified and records missing verification-boundary. The dependent's disposition stays ready, and lines 297-300 rank it in sweep/next. Outside a controller, every resolved row is downgraded, so all dependents of attested-only prerequisites appear ready. Closed, excluded or unrequested-index prerequisites are never checked at all and keep clearing their dependents.
+PROPOSAL: Apply the observed-receipt authentication to row state before computing prerequisites, cycles and readiness. Then recompute unresolved and dispositions. Add a regression in which an attested-only prerequisite leaves its dependent blocked and unranked.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/triage/report.ts:211-252, 266; tests/vh-adlc/triage/report.test.ts:67-79; docs/specs/shared-triage.md:475 (T23)
+EVIDENCE: T23 says "Unobserved caches render unverified". The guard at report.ts:266 runs only for close_executable rows. Rows that are excluded, protected, an unrequested index, or a closed issue in ids mode keep state resolved, closure_reason completed and remaining "" when backed only by forged or ordinary cache records via verificationRecord (lines 60-87, 95-96). Blocker clearance (lines 238 and 248) also accepts cache-level validity. The only regression covers an open eligible row. R-15 F-08 is therefore only partially resolved.
+PROPOSAL: Downgrade every resolved, obsolete or duplicate row and every cleared blocker whose receipts are not observed in the current invocation, whatever its executability. Add tests for excluded, index, closed and blocker cases, and correct the T23 evidence wording.
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/triage/controller.ts:208, 416-417, 448-450; references/triage-boundary.md:20-22
+EVIDENCE: The guide says the analysis client's only tools are the read adapter and "Unexpected tools ... block execution". For host codex, runNativeTrial grades with kind native-discovery, and gradeTrial skips the exclusive-read-only-tools check for that kind. Nothing rejects Codex command_execution, file_change or web_search items. The operator controller then proceeds to execution when grade.pass is true. The committed transcript happens to contain 78 mcp_tool_call items and none of those other types (grep count), but the shipped code does not enforce this. The Codex client also runs on the host with the real HOME (controller-clients.ts:11).
+PROPOSAL: Grade managed Codex runs as live-read-only. Fail on any non-triage-MCP tool item or any unknown item type, and require an observed tool inventory or an equivalent configuration attestation before operator execution. Add a negative test with a synthetic Codex shell item.
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/triage/controller.ts:468-473, 476; controller-clients.ts:4; controller-operator.ts:20-25; references/triage-boundary.md:38-39, 96-100
+EVIDENCE: start rejects any non-empty output directory, and nativeClient rejects a non-empty analysis directory. The operator resume then looks for join(options.output, "journal-<hash>.json") inside that brand-new directory, so after a crashed controller the documented original-journal resume can never succeed through the shipped entry. A rerun creates a new run_id and marker, and planBatch (execute.ts:162) requires a comment before any close, so completing the closure duplicates the already-posted evidence comment. No test exercises managed-controller resume.
+PROPOSAL: Let start accept an explicit prior run directory or journal for resume, bound to its batch hash and lock, with fresh re-observation. Add an interrupted managed-controller test that finishes the close without a second comment.
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/triage/execute.ts:194-196; session.ts:44; controller-operator.ts:23
+EVIDENCE: The kernel lock is keyed to the journal path, which lives under each invocation's own output directory. Two controller or session invocations, or two batches, that touch the same repository or issues hold different locks and can apply effects at the same time. Their only protection is a live recheck before each write, which is time-of-check/time-of-use. The passing test covers only contention on one journal path.
+PROPOSAL: Also take a repository-scoped kernel lock, for example keyed by hostname/repository in the user cache or the Git common directory, for the whole effect phase. Add a test with two concurrent batches on one issue in which the second is denied.
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Stackweaver tests/agent-triage/README.md:34-42, 49-65; historical-parity/comparison.json; tests/vh-adlc/triage/fixtures/legacy/manifest.json
+EVIDENCE: Legacy /triage executed approved closures from the Claude session. Closure execution now needs an operator-run managed controller on Linux with Bubblewrap and flock. The interactive /triage entry and other hosts can only report. The README describes this in prose, but none of the seven intentional-difference IDs records it, and recheck maps exactly seven IDs. R-15 F-03 is only partly addressed.
+PROPOSAL: Add an intentional-difference ID for enforced managed-controller closure execution and its platform requirement. Include it in the parity fixtures and comparison checks.
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: docs/specs/shared-triage.md:49-56 (Context), 110-114, 216-255 (Design), 399 (Test Plan AC-06)
+EVIDENCE: The owner's enforced-verification decision, and its practical effect that closures can execute only through a Linux, Bubblewrap and flock controller with the Codex or Claude CLI adapters, appear only in Context and Tasks T21/T24. The normative Design lists required capabilities without it, and Owner-approved execution and the AC-06 Test Plan contain no enforced-boundary or platform negative cases. The standard treats only Scope, Design, AC and Test Plan as normative, so the accepted R-12 baseline neither requires nor tests the decision. A later change could drop it and still pass every criterion.
+PROPOSAL: Ask the owner to choose one of two options. A: record explicitly that this is the accepted interpretation of observed verification under R-12, with no revision. B: make a normative revision that adds the boundary to Design and the Test Plan, followed by a fresh spec review and acceptance.
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: plugins/vh-adlc/scripts/triage/controller.ts:403-406
+EVIDENCE: On the 12-minute cap, the controller sends only SIGTERM to the detached client group and then awaits child.exited with no SIGKILL escalation or bounded wait. A client that ignores SIGTERM hangs the controller indefinitely. After a normal exit, leftover members of the group are not reaped.
+PROPOSAL: Escalate to SIGKILL on the process group after a short grace period. Kill the group after normal exit, and record the timeout and kill outcome in result.json.
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/triage/controller-e2e.ts:46; recheck.ts:10
+EVIDENCE: controller-e2e.ts writes real_tracker_calls:0 as a constant, and recheck reports no_real_tracker_calls:true as an observed fact. The absence of real calls actually rests on the fake gh being first in PATH; nothing counted or blocked other routes.
+PROPOSAL: Measure it, for example by running the controller's gh resolution in a namespace without egress or by asserting the resolved gh path, or describe it as a design assumption rather than an observation.
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: docs/specs/shared-triage.md:372-388
+EVIDENCE: The AC evidence lines still cite R-14 verdicts, for example "R-14 returned not met" for AC-02, although R-15 is the latest stored implementation review and returned not verified for AC-02. review-protocol.md:79-80 requires evidence lines that name the latest review and its verdict.
+PROPOSAL: After storing this review, untick every criterion not returned as met and rewrite each evidence line to name this review and its verdict.
+FINDING: F-11
+KIND: judgement
+SEVERITY: should-fix
+WHERE: plugins/vh-adlc/scripts/triage/controller.ts:315-327, 474-476; controller-operator.ts:26-28; references/triage-boundary.md:82
+EVIDENCE: The managed read adapter issues only inspection and issue receipts. start selects no checks, so test receipts are impossible. The operator's inspect-removal runs only after the report is fixed and cannot change it. Through the only enforced closure path, obsolete closures backed by removal, and test-backed completed closures, can therefore never become executable, although the procedure describes removal proof.
+PROPOSAL: Add removal inspection, and operator-selected fixed checks at start, to the controller and re-observe them like inspections. Otherwise, record the limitation as an intentional difference and in the guide.
+FINDING: F-12
+KIND: factual
+SEVERITY: nit
+WHERE: this review
+EVIDENCE: Two over-large glob/grep results were automatically saved by the tool runtime to /tmp/copilot-tool-output-*.txt outside the packet. I did not read either file. After finished.json existed I ran proof.sh twice more, which printed only the stored result. No edits or other commands were run.
+PROPOSAL: None.
 ## Sources
 
 - [Stackweaver triage source](https://github.com/michielvha/stackweaver/blob/7c3790f187b2d3286248dbf8f2fa310749dfb322/agents/issue-triage.md): evidence tiers, modes, report shape and project-specific ownership/ranking rules.
