@@ -42,6 +42,9 @@ export async function nativeClient(host: "codex" | "claude", plugin: string, out
   const env:Record<string,string>={PATH:process.env.PATH??"/usr/bin",HOME:homedir(),LANG:"C.UTF-8",TERM:"dumb",XDG_CACHE_HOME:join(output,"cache")};
   for(const name of ["HTTP_PROXY","HTTPS_PROXY","ALL_PROXY","NO_PROXY","SSL_CERT_FILE","SSL_CERT_DIR","NODE_EXTRA_CA_CERTS"])if(process.env[name])env[name]=process.env[name]!;
   if(host==="codex"){
+    const executable=Bun.which("codex",{PATH:env.PATH});if(!executable)throw Error("Codex CLI is unavailable");
+    const runtimeDirectory=dirname(fs.realpathSync(executable));env.PATH=`${runtimeDirectory}:${env.PATH}`;
+    if(!Bun.which("codex-code-mode-host",{PATH:env.PATH}))throw Error("the installed Codex CLI's tool-routing runtime is unavailable");
     const auth=join(homedir(),".codex/auth.json");if(!fs.existsSync(auth))throw Error("existing Codex login is unavailable");
     fs.symlinkSync(auth,join(profile,"auth.json"));env.CODEX_HOME=profile;
   }else{
