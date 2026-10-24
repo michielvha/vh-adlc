@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Signed runtime v0.2.0-rc.2 pinned, all PRs merged, corporate-host logins and exact-commit review pass. Remote Control phone push and GUI invocation remain open (#25)."
+status_description: "All PRs merged; signed v0.2.0-rc.2 pinned; corporate-host logins and review pass; owner reports phone push works. Desktop GUI invocation handed over (#25)."
 issue: 25
 branch: feat/portable-auth-refresh
 goal: "Install and use the same auth-refresh workflow independently or from vhco-tools across supported harnesses, preserving Claude phone notifications."
@@ -543,8 +543,36 @@ with every identity OK. The host's Claude now has `auth-refresh@vhco-tools` inst
 the old agent file and setup remain. The live config dropped the two removed keys, with a mode-0600
 backup kept. An independent exact-commit review of `1b35928..3695e2c` reported no findings.
 
-Still open and tracked in [issue #25](https://github.com/michielvha/vh-adlc/issues/25): the Claude Remote
-Control phone-push flow from a new phone session, and desktop and standalone GUI invocation.
+On 2026-10-24 the owner reported that the Claude Remote Control phone push works. The corporate host
+holds no log of a plugin login after 23:14 on 2026-10-23, and its AWS SSO cache was not refreshed.
+That run therefore happened on another host or through another flow, and only the owner's report
+supports it.
+
+Still open and tracked in [issue #25](https://github.com/michielvha/vh-adlc/issues/25): desktop and
+standalone GUI invocation. The corporate host cannot reach the owner's MacBook, so this moves to the
+desktop handover below.
+
+### Desktop handover, 2026-10-24
+
+Run on the MacBook in the Claude desktop app (Code tab) and in VS Code Local with the Claude
+extension. Use a disposable project folder and no private config. The macOS runtime has no managed
+browser (`verified browser runtime unavailable for darwin/arm64`), so this tests discovery and
+read-only invocation only, not a login.
+
+1. Standalone route: in the desktop app run `/plugin marketplace add michielvha/auth-refresh`, then
+   install `auth-refresh`. Confirm that `/auth-refresh:auth-refresh` and the `auth-refresh` skill appear.
+2. Shared route: remove the standalone install, add `michielvha/vh-adlc`, then install
+   `auth-refresh@vhco-tools`. Confirm the same entries appear.
+3. For each route, invoke `check` with `AUTH_REFRESH_CONFIG` pointing at a fixture config (mode 600)
+   that has only one identity: the `sonar` `http_token` entry from `config.example.json`, with `file`
+   pointing at a path that does not exist. Expect the agent to provision `0.2.0-rc.2`, report the
+   identity as MISSING with manual renewal, and start no login or notification.
+4. Repeat steps 1 to 3 in VS Code Local.
+5. Uninstall both routes. Confirm that any existing user plugins and private files are unchanged.
+
+Record the client versions and pass or fail for each route and client here, and tick issue #25. If
+both clients pass on both routes, request the completion gate, then publish stable `v0.2.0` and
+repin both catalogs.
 
 ## Scope
 
