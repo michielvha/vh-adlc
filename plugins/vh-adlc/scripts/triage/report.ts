@@ -277,7 +277,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
           return true;
         });
     });
-    if(!authentic){row.close_executable=false;row.warnings.push("Closure requires current trusted verification; cache records are attestations only.");missing.push("verification-boundary");}
+    if(!authentic){row.close_executable=false;row.state="unverified";row.disposition="needs-decision";row.closure_reason=null;row.remaining||="Remaining scope is unverified.";row.warnings.push("Closure requires current trusted verification; cache records are attestations only.");missing.push("verification-boundary");}
   }
   const verificationComplete = !missing.includes("verification-boundary")&&rows.every((row) => row.ownership === "protected" || row.disposition === "excluded" || row.state !== "unverified");
   if (!verificationComplete) missing.push("verification");

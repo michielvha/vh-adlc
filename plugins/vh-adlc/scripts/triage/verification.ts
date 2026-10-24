@@ -50,7 +50,8 @@ export function inspectSources(config:Settings,paths:string[],pass:"primary"|"ad
 export function verifyCommand(config:Settings,argv:string[],pass:"primary"|"adversarial"){
   if(!Array.isArray(argv)||!argv.length||argv.some(arg=>typeof arg!=="string"||arg.includes("\0"))||!argv[0]||!["primary","adversarial"].includes(pass))throw Error("invalid verification command or pass");
   const commit=git(config.root,"rev-parse","HEAD"),scratch=mkdtempSync(join(tmpdir(),"vh-triage-verify-")),checkout=join(scratch,"checkout");
-  const environment={...process.env,GIT_CONFIG_NOSYSTEM:"1",GIT_CONFIG_GLOBAL:"/dev/null"};
+  const home=join(scratch,"home"),temporary=join(scratch,"tmp");mkdirSync(home);mkdirSync(temporary);
+  const environment={PATH:process.env.PATH??"/usr/bin:/bin",LANG:"C.UTF-8",HOME:home,XDG_CONFIG_HOME:join(home,".config"),XDG_CACHE_HOME:join(home,".cache"),TMPDIR:temporary,GIT_CONFIG_NOSYSTEM:"1",GIT_CONFIG_GLOBAL:"/dev/null",GIT_TERMINAL_PROMPT:"0"};
   try{
     for(const args of [["clone","--no-hardlinks","--no-checkout",config.root,checkout],["-C",checkout,"-c","core.hooksPath=/dev/null","checkout","--detach",commit]]){
       const setup=Bun.spawnSync(["git",...args],{env:environment,stdout:"pipe",stderr:"pipe",timeout:60_000});
@@ -107,5 +108,5 @@ export function inspectRemoval(config:Settings,path:string,before:string,pass:"p
   const old=Bun.spawnSync(["git","-C",config.root,"show",`${before}:${path}`],{stdout:"pipe",stderr:"pipe"});
   if(old.exitCode!==0||git(config.root,"ls-tree","-r","--name-only",record.source_commit,"--",path))throw Error("retired source is not absent");
   record.removal={path,before_commit:before,sha256:digest(old.stdout)};
-  return{receipt:persistObserved(config,record),path,before_commit:before,source_commit:record.source_commit};
+  return{receipt:persistObserved(config,record),path,before_commit:before,source_commit:record.source_commit,before_content:old.stdout.toString()};
 }

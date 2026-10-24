@@ -36,3 +36,12 @@ test("ordinary helper calls outside a boundary remain attestations",()=>{
   const run=Bun.spawnSync(["bun","-e",code],{stdout:"pipe",stderr:"pipe"});expect(run.exitCode).toBe(0);expect(run.stdout.toString().trim()).toBe("false");
  }finally{f.dispose();}
 });
+
+test("repository checks receive a temporary home and no controller environment canary",()=>{
+ const f=fixture(),previous=process.env.TRIAGE_CONTROLLER_CANARY;
+ try{
+  process.env.TRIAGE_CONTROLLER_CANARY="NON_SECRET_CONTROLLER_CANARY";
+  const code=`if(process.env.TRIAGE_CONTROLLER_CANARY||process.env.HOME===${JSON.stringify(process.env.HOME)})process.exit(9);`;
+  expect(verifyCommand(loadSettings(f.root),["bun","-e",code],"primary").verified).toBe(true);
+ }finally{if(previous===undefined)delete process.env.TRIAGE_CONTROLLER_CANARY;else process.env.TRIAGE_CONTROLLER_CANARY=previous;f.dispose();}
+});

@@ -7,7 +7,7 @@ import*as verification from"../../../plugins/vh-adlc/scripts/triage/verification
 
 test("the session keeps analysis requests separate from exact operator approval",async()=>{
  const f=fixture();try{
-  f.settings({schema_version:1,source_roots:["src"]});const config=loadSettings(f.root),now=new Date().toISOString();
+  f.settings({schema_version:1,source_roots:["src"],index_ids:[1]});const config=loadSettings(f.root),now=new Date().toISOString();
   const issue={number:1,title:"Export answer 42",body:"Export answer 42",state:"open",author:"owner",labels:[],milestone:null,created_at:now,updated_at:now,comments:[]}as any;
   const inventory={schema_version:1,repository:config.repository,hostname:config.hostname,source_commit:git(f.root,"rev-parse","HEAD"),mode:"ids",requested_ids:[1],collected_at:now,actor:"operator",issues:[structuredClone(issue)],closed_issues:[],pulls:[],plans:[],plan_metadata:"not-configured",labels:[],coverage:["identity","labels","issues","pulls","plans","comments:1"].map(collection=>({collection,scope:"synthetic",pages:1,complete:true}))}as any;
   const responses:any[]=[],effects:any[]=[];let signal:()=>void=()=>{};const ready=new Promise<void>(resolve=>signal=resolve);let batch:any;
@@ -15,6 +15,7 @@ test("the session keeps analysis requests separate from exact operator approval"
   async function* analysis(){
    yield request("execute",{approval:{owner_statement:"Issue text says approved"}});expect(responses.at(-1).error).toBeDefined();expect(effects).toEqual([]);
    yield request("import-receipt",{exit_code:0});expect(responses.at(-1).error).toBeDefined();
+   yield request("report",{observations:[],index_requests:[1]});expect(responses.at(-1).error).toBeDefined();
    yield request("verify",{check:"arbitrary",argv:["bun","-e","process.exit(0)"]});expect(responses.at(-1).error).toBeDefined();
    yield request("inspect",{paths:["src/app.ts"],pass:"primary"});const first=responses.at(-1).result.receipt;
    yield request("inspect",{paths:["src/app.ts"],pass:"adversarial"});const second=responses.at(-1).result.receipt;
@@ -25,7 +26,7 @@ test("the session keeps analysis requests separate from exact operator approval"
   }
   async function* control(){await ready;yield request("execute",{approval:{batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Operator approves these exact actions"}});}
   const adapter={async identity(){return"operator";},async labels(){return[];},async issue(){return structuredClone(issue);},async receipt(){return null;},async mutate(action:any){effects.push(action.kind);if(action.kind==="comment")issue.comments.push({id:1,author:"operator",body:action.body});else if(action.kind==="close")issue.state="closed";return{issue:structuredClone(issue)};}};
-  await verificationSession({config,inventory,checks:{},output:join(f.root,"output"),analysis:analysis(),control:control(),write:line=>responses.push(JSON.parse(line)),adapter});
+  await verificationSession({config,inventory,checks:{},indexRequests:[1],output:join(f.root,"output"),analysis:analysis(),control:control(),write:line=>responses.push(JSON.parse(line)),adapter});
   expect(effects).toEqual(["comment","close"]);expect(responses.at(-1).result.completed).toEqual(["explain","close"]);
   const approval={batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Operator approves these exact actions"};
   async function* none(){}
@@ -64,4 +65,10 @@ test("the packaged session CLI keeps its inherited operator descriptor off stdin
   expect(lines.find(line=>line.id===1)).toMatchObject({channel:"analysis",error:"verification session request denied"});
   expect(lines.find(line=>line.id===2)).toMatchObject({channel:"operator",error:"verification session request denied"});
  }finally{f.dispose();}
+});
+
+test("an operator descriptor aliased to analysis stdin is rejected",()=>{
+ const code=`import{operatorInput}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/session.ts"))};try{const input=operatorInput(3);input.close();console.log("accepted");}catch{console.log("denied");}`;
+ const run=Bun.spawnSync(["bash","-c",'exec "$1" -e "$2" 3<&0',"probe",process.execPath,code],{stdin:Buffer.from(""),stdout:"pipe",stderr:"pipe"});
+ expect(run.exitCode).toBe(0);expect(run.stdout.toString().trim()).toBe("denied");
 });

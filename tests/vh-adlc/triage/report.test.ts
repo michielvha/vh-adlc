@@ -73,6 +73,7 @@ test("fabricated cache attestations cannot enable closure execution",()=>{
   };
   const report=buildReport(f.config,f.inventory,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")}]);
   expect(report.rows[0].close_executable).toBe(false);
+  expect(report.rows[0].state).toBe("unverified");expect(report.rows[0].disposition).toBe("needs-decision");
   expect(report.completeness.missing).toContain("verification-boundary");
   expect(report.completeness.inventory).toBe(true);expect(report.completeness.verification).toBe(false);
 });

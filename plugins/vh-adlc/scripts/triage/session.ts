@@ -1,5 +1,5 @@
 import{createInterface}from"node:readline";
-import{createReadStream,mkdirSync,existsSync}from"node:fs";
+import{createReadStream,mkdirSync,existsSync,fstatSync}from"node:fs";
 import{join}from"node:path";
 import{git}from"./settings";
 import{inspectIssues,inspectRemoval,inspectSources,verifyCommand,withVerificationBoundary}from"./verification";
@@ -12,7 +12,8 @@ import type{Report}from"./report";
 /** Trusted controller owns this process. Analysis and operator input are distinct streams.
  * No receipt-import or trust-flag operation exists. Cache bytes never enter live authority.
  */
-async function sessionWithinBoundary(options:{config:Settings;inventory:Inventory;checks:Record<string,string[]>;output:string;analysis:AsyncIterable<string>;control?:AsyncIterable<string>;write:(line:string)=>void;adapter:Adapter;gate?:Parameters<typeof executeBatch>[4]["gate"]}){
+async function sessionWithinBoundary(options:{config:Settings;inventory:Inventory;checks:Record<string,string[]>;indexRequests?:number[];output:string;analysis:AsyncIterable<string>;control?:AsyncIterable<string>;write:(line:string)=>void;adapter:Adapter;gate?:Parameters<typeof executeBatch>[4]["gate"]}){
+ if(options.indexRequests?.some(number=>!Number.isSafeInteger(number)||number<1))throw Error("invalid operator index request");
  const{config,inventory}=options,reports=new Map<string,Report>(),batches=new Map<string,Batch>();
  if(inventory.schema_version!==1||inventory.repository!==config.repository||inventory.hostname!==config.hostname||inventory.source_commit!==git(config.root,"rev-parse","HEAD")||[inventory.issues,inventory.closed_issues,inventory.pulls,inventory.plans,inventory.coverage].some(value=>!Array.isArray(value)))throw Error("invalid fixed session inventory");
  mkdirSync(options.output,{recursive:true});
@@ -29,7 +30,8 @@ async function sessionWithinBoundary(options:{config:Settings;inventory:Inventor
      if(typeof args.check!=="string"||!Object.hasOwn(options.checks,args.check))throw Error("check was not selected by the trusted controller");
      result=verifyCommand(config,options.checks[args.check],args.pass);
     }else if(request.method==="report"){
-     const report=buildReport(config,inventory,args.observations,{indexRequests:args.index_requests});
+     if(Object.hasOwn(args,"index_requests"))throw Error("index requests belong to the operator");
+     const report=buildReport(config,inventory,args.observations,{indexRequests:options.indexRequests});
      const path=saveReport(config,report,{output:join(options.output,`${report.run_id}.md`)});reports.set(report.run_id,report);result={report,path};
     }else if(request.method==="batch"){
      const report=reports.get(args.run_id);if(!report)throw Error("report is not owned by this session");
@@ -53,6 +55,7 @@ async function sessionWithinBoundary(options:{config:Settings;inventory:Inventor
 }
 export function operatorInput(fd:number){
  if(!Number.isSafeInteger(fd)||fd<3)throw Error("operator input must be a separate inherited descriptor");
+ const analysis=fstatSync(0),operator=fstatSync(fd);if(analysis.dev===operator.dev&&analysis.ino===operator.ino)throw Error("operator input aliases analysis input");
  return createInterface({input:createReadStream("",{fd,autoClose:false}),crlfDelay:Infinity});
 }
 
