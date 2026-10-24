@@ -46,3 +46,17 @@ alone do not establish that the index should close.
 
 Settings contain data only. Put verification commands in repository instructions
 and provide credentials through the host's existing account access.
+
+`workstreams` adds hard ownership from repository-local data. Each rule has an
+`owner` and nonempty `plan_roots` or `reference_files` arrays. Plan roots extract
+the configured issue field from tracked Markdown frontmatter. Reference files
+also assign bare local `#N` references and local GitHub issue URLs to that owner;
+choose files whose references belong to that workflow. Foreign issue URLs do not
+assign local ownership. Source files remain in the consuming repository.
+
+Declared sources must be tracked, present and committed. Missing sources, edits,
+untracked additions or invalid issue metadata block the run. Derived source hashes
+and issue ownership are included in normalized settings and rechecked before
+effects. Such work never receives an umbrella exception, and triage cannot patch
+plans belonging to another configured workstream. Agent-observed ownership adds
+conservative exclusions; omitting it never removes these configured protections.

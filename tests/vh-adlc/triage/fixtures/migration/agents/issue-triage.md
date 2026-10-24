@@ -15,6 +15,10 @@ Project data and report rules:
 
 - The settings retain plan roots, milestone/priority order, generated mirror exclusions, hard
   ownership and index IDs. Inspect unlisted index roles as the shared procedure requires.
+- The local `workstreams` settings derive hard ownership from the canonical plan/issue-reference
+  sources below, even when an observation omits `owned_by`. Bare issue references in a declared
+  reference file are protected by that file's owner. Missing or uncommitted declared sources block
+  triage rather than silently dropping exclusions. Keep these source files in Stackweaver.
 - Read the audit ledger at `docs/internal/codebase-audit-2026-06-analysis.md`,
   `docs/internal/tfe-compatibility/` and `docs/internal/plans/features/RBAC_MASTER_PLAN.md`
   to identify other-owned work; keep those workflows and their work outside triage execution.

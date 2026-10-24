@@ -151,6 +151,16 @@ test("hard protected issues never get an exception and closure reasons follow ev
   expect(() => other.batch()).toThrow();
 });
 
+test("configured workstreams block tracker actions and plan patches without agent ownership fields",()=>{
+  const f=setup(),before="---\nissue: 1\nstatus: in-progress\nstatus_description: Specialist scope\n---\n\n# Owned plan\n";
+  f.write("docs/owned.md",before);git(f.root,"add","docs/owned.md");git(f.root,"commit","-qm","test: seed owned plan");
+  f.settings({schema_version:1,source_roots:["src"],workstreams:[{owner:"specialist",plan_roots:["docs"]}]});
+  const config=loadSettings(f.root);f.inventory.source_commit=git(f.root,"rev-parse","HEAD");
+  const report=buildReport(config,f.inventory,f.report.observations);
+  expect(()=>planBatch(config,f.inventory,report,f.actions)).toThrow();
+  expect(()=>planBatch(config,f.inventory,report,[{id:"sync",kind:"plan-patch",path:"docs/owned.md",before,after:before.replace("status: in-progress","status: complete"),gate:{status:"complete",document:"docs/owned.md"}}])).toThrow();
+});
+
 test("umbrella checklist changes require the current request, exact approval and unchanged base", async () => {
   const f = setup({ index_ids: [1] });
   const action: Action = { id: "check", kind: "checklist", issue: 1, before: f.inventory.issues[0].body, after: f.inventory.issues[0].body.replace("[ ]", "[x]") };

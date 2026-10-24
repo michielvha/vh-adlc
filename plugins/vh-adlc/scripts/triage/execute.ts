@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
-import { git, loadSettings, ownership, resolveInside, sourcePath } from "./settings";
+import { git, loadSettings, ownership, resolveInside, sourcePath,workstreamPath } from "./settings";
 import {buildReport,type Report} from "./report";
 import type { Inventory, Issue, Label, Settings } from "./types";
 
@@ -96,6 +96,7 @@ function frontmatter(text: string) {
 }
 function validatePatch(config: Settings, action: Extract<Action, { kind: "plan-patch" }>) {
   resolveInside(config.root, action.path);
+  if(workstreamPath(config,action.path))bad();
   if (!action.path.endsWith(".md") || action.path.startsWith(".vh-adlc/") || !nonempty(action.before) || !nonempty(action.after) || action.before === action.after) bad();
   const placeholder = "https://triage.invalid/created-issue";
   const before = frontmatter(action.before), after = frontmatter(action.after.replace("{{created_issue_url}}", placeholder)), fields = config.plan_fields;

@@ -17,6 +17,9 @@ export type Settings = {
   index_rules: { labels: string[]; title_prefixes: string[] };
   bot_authors: string[];
   owned_labels: string[];
+  workstreams:{owner:string;plan_roots:string[];reference_files:string[]}[];
+  workstream_ownership:Record<number,{owners:string[];sources:string[]}>;
+  workstream_sources:Record<string,string>;
   label_map: Record<string, string>;
   priority_order: string[];
   milestone_order: string[];

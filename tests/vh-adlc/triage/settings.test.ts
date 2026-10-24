@@ -50,12 +50,27 @@ test("an evidenced unlisted index stays protected even without settings", () => 
   expect(ownership(issue, config, false)).toBe("eligible");
 });
 
+test("declared workstream sources protect issue references even when observations omit ownership",()=>{
+  const f=project();
+  f.write("docs/owned/plan.md","---\nissue: 11\n---\n");
+  f.write("docs/ledger.md","Owned #12 and https://github.com/example/project/issues/14; foreign other/project#13 is contextual.\n");
+  git(f.root,"add","docs");git(f.root,"commit","-qm","test: seed workstream sources");
+  f.settings({schema_version:1,workstreams:[{owner:"specialist",plan_roots:["docs/owned"],reference_files:["docs/ledger.md"]}]});
+  const config=loadSettings(f.root);
+  for(const number of [11,12,14])expect(ownership({number,author:"owner",title:"Scope",labels:[]},config)).toBe("protected");
+  expect(ownership({number:13,author:"owner",title:"Other scope",labels:[]},config)).toBe("eligible");
+  expect(config.workstream_ownership[11].sources).toContain("docs/owned/plan.md");
+  f.write("docs/ledger.md","Changed owner scope #15\n");expect(()=>loadSettings(f.root)).toThrow();
+});
+
 test.each([
   null, [], { schema_version: 2 }, { schema_version: 1, unexpected: "private-value" },
   { schema_version: 1, stale_days: -1 }, { schema_version: 1, page_budget: 0 },
   { schema_version: 1, protected_ids: ["8"] }, { schema_version: 1, source_roots: "src" },
   { schema_version: 1, index_rules: { executable: "echo bad" } },
   { schema_version: 1, plan_fields: { issue: "same", status: "same" } },
+  {schema_version:1,workstreams:"wrong"},{schema_version:1,workstreams:[{owner:"specialist"}]},
+  {schema_version:1,workstreams:[{owner:"specialist",reference_files:["missing.md"]}]},
 ].map((input) => [input]))("malformed/unknown settings are rejected before collection: %j", (input) => {
   const f = project(); f.settings(input);
   expect(() => loadSettings(f.root)).toThrow();

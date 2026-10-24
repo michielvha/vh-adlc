@@ -193,10 +193,11 @@ export function buildReport(config: Settings, inventory: Inventory, observations
   const rows: Row[] = selected.map((issue) => {
     const observation = byId.get(issue.number), evidence = observation?.evidence ?? [], adversarial = observation?.adversarial ?? [];
     const indexRole = observation?.is_index === true || /(?:^|\b)(?:umbrella|milestone (?:index|tracker)|issue index)(?:\b|$)/i.test(`${issue.title}\n${issue.body}`);
-    const ownedBy = typeof observation?.owned_by === "string" && observation.owned_by.trim() ? observation.owned_by : null;
+    const configuredOwner=config.workstream_ownership[issue.number];
+    const ownedBy = configuredOwner?.owners.join(", ") ?? (typeof observation?.owned_by === "string" && observation.owned_by.trim() ? observation.owned_by : null);
     const owner = ownedBy ? "protected" : ownership(issue, config, indexRole), indexRequested = (options.indexRequests ?? []).includes(issue.number);
     const warnings: string[] = [];
-    if (ownedBy && !verified(config, inventory, observation?.ownership_evidence ?? [])) warnings.push("Other-workstream ownership needs canonical evidence; conservatively excluded pending verification.");
+    if (ownedBy && !configuredOwner && !verified(config, inventory, observation?.ownership_evidence ?? [])) warnings.push("Other-workstream ownership needs canonical evidence; conservatively excluded pending verification.");
     let state: State = observation && ["resolved", "partial", "open", "blocked", "obsolete", "duplicate", "unverified"].includes(observation.state) ? observation.state as State : "unverified";
     const evidenceOK = verified(config, inventory, evidence), secondOK = verified(config, inventory, adversarial);
     if (!evidenceOK && state !== "unverified") { warnings.push("Verification evidence is absent or invalid."); state = "unverified"; }
@@ -228,7 +229,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
       evidence, adversarial, duplicate_of: observation?.duplicate_of ?? null, depends_on: [...new Set([...(observation?.depends_on ?? []), ...blockers.filter((blocker) => blocker.missing).map((blocker) => blocker.issue)])]
         .filter(id=>!blockers.some(blocker=>blocker.issue===id && !blocker.missing && verified(config,inventory,blocker.evidence)) || blockers.some(blocker=>blocker.issue===id && blocker.missing)),
       index_requested: indexRequested, index_evidence: indexRole ? observation?.index_evidence ?? "Observed index/umbrella role" : owner === "index" ? "Configured index rule" : null,
-      owned_by: ownedBy, ownership_evidence: observation?.ownership_evidence ?? [],
+      owned_by: ownedBy, ownership_evidence: configuredOwner?configuredOwner.sources.map(path=>({kind:"ownership",path,reference:`issue:${issue.number}`,detail:`Declared workstream source ${config.workstream_sources[path]}`,verified:true})):observation?.ownership_evidence ?? [],
       plan_paths: inventory.plans.filter((plan) => plan.issue === issue.number).map((plan) => plan.path),
       estimated_size: typeof observation?.estimated_size === "string" ? observation.estimated_size : "unknown", warnings };
   });

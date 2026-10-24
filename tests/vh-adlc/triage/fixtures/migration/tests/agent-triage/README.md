@@ -20,6 +20,11 @@ plans, product source, credentials and runtime resources remain outside this cha
 Plan frontmatter remains the roadmap, with `Public Go Live` first, then high/medium/low priority,
 verified readiness and prerequisites. `distribution/` remains a mirror. Protected #332 and #334,
 configured bot identities, semantic indexes and other-owned work stay outside normal actions.
+The local `workstreams` rules name the audit ledger, TFE plan root and RBAC master plan. These
+files remain in Stackweaver; the shared plugin contains only the generic parser. A missing, changed
+or uncommitted declared ownership source blocks a run. Bare issue references in a configured
+reference file are deliberately assigned to its named owner.
+
 The compatibility command retains `model: fable`; other harnesses use the shared operation without
 that local model requirement. No report commits, tracker actions or implementation start implicitly.
 

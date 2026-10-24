@@ -271,6 +271,15 @@ test("other-workstream ownership is visible and never gets an umbrella action ex
   expect(row.disposition).toBe("excluded");expect(row.close_executable).toBe(false);
 });
 
+test("repository workstream data excludes an omitted ownership field and cannot receive an index exception",()=>{
+  const f=setup([1]);f.write("docs/owned.md","---\nissue: 1\n---\nSpecialist-owned scope\n");
+  git(f.root,"add","docs/owned.md");git(f.root,"commit","-qm","test: seed independent ownership source");
+  f.settings({schema_version:1,source_roots:["src"],workstreams:[{owner:"specialist",plan_roots:["docs"]}]});
+  f.inventory.source_commit=git(f.root,"rev-parse","HEAD");
+  const row=buildReport(loadSettings(f.root),f.inventory,[{...f.resolved(1),is_index:true}],{indexRequests:[1]}).rows[0];
+  expect(row.owned_by).toBe("specialist");expect(row.disposition).toBe("excluded");expect(row.close_executable).toBe(false);
+});
+
 test("readiness ranking retains prerequisite, designed-plan and partial-scope tie-breaks", () => {
   const f = setup([1,2,3,4,5]);
   f.inventory.plan_metadata="available";

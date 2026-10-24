@@ -15,6 +15,8 @@ test("local settings and handoff preserve protection, project priorities and def
   expect(settings.repository).toBe("michielvha/stackweaver"); expect(settings.protected_ids).toEqual([332,334]);
   expect(settings.generated_mirrors).toContain("distribution"); expect(settings.report_dir).toBe("docs/internal/status");
   expect(settings.priority_order).toEqual(["high","medium","low"]); expect(settings.milestone_order).toEqual(["Public Go Live"]);
+  expect(settings.workstreams.map((rule:{owner:string})=>rule.owner)).toEqual(["codebase-audit","tfe-compat","rbac"]);
+  expect(settings.workstreams.flatMap((rule:{reference_files?:string[]})=>rule.reference_files??[])).toContain("docs/internal/plans/features/RBAC_MASTER_PLAN.md");
   expect(read("tests/agent-triage/README.md")).toContain("129581f6dbe4df71200af8f67d7bc017d35e89ad");
   expect(read("tests/agent-triage/README.md")).toContain("D-01 through D-05");
 });

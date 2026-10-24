@@ -41,11 +41,19 @@ test("project settings retain source, priority, plan, history and hard ownership
   const f = fixture();
   try {
     git(f.root, "remote", "set-url", "origin", "https://github.com/michielvha/stackweaver.git");
-    f.write("docs/internal/status/.keep", ""); f.settings(JSON.parse(read(".vh-adlc/triage.json")));
+    f.write("docs/internal/status/.keep", "");
+    const settings=JSON.parse(read(".vh-adlc/triage.json"));
+    for(const rule of settings.workstreams){
+      for(const path of rule.reference_files??[])f.write(path,"# Synthetic ownership ledger\n");
+      for(const path of rule.plan_roots??[])f.write(`${path}/fixture.md`,"---\nissue: 900\n---\n");
+    }
+    git(f.root,"add","docs");git(f.root,"commit","-qm","test: seed canonical ownership fixtures");f.settings(settings);
     const config = loadSettings(f.root);
     expect(config.generated_mirrors).toContain("distribution"); expect(config.plan_roots).toEqual(["docs/internal"]);
     expect(config.report_dir).toBe("docs/internal/status"); expect(config.milestone_order[0]).toBe("Public Go Live");
     expect(config.priority_order).toEqual(["high", "medium", "low"]); expect(config.stale_days).toBe(90);
+    expect(config.workstreams.map(rule=>rule.owner)).toEqual(["codebase-audit","tfe-compat","rbac"]);
+    expect(ownership({number:900,author:"owner",labels:[],title:"Specialist scope"},config)).toBe("protected");
     const issue = {number: 999, author: "owner", labels: [], title: "New unlisted umbrella"};
     expect(ownership(issue, config, true)).toBe("index");
     for (const number of [332,334]) expect(ownership({...issue,number},config)).toBe("protected");

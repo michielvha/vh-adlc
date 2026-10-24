@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import type { Settings } from "./types";
+import {createHash} from "node:crypto";
 
 function fail(field: string): never { throw new Error(`invalid triage settings: ${field}`); }
 function object(value: unknown, field: string): Record<string, unknown> {
@@ -81,7 +82,7 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   } else if (options.settingsPath !== undefined) fail("requested settings file is missing");
   keys(input, ["schema_version", "repository", "hostname", "source_roots", "generated_mirrors", "plan_roots", "plan_fields",
     "report_dir", "protected_ids", "index_ids", "index_rules", "bot_authors", "owned_labels", "label_map",
-    "priority_order", "milestone_order", "stale_days", "page_budget"], "settings");
+    "priority_order", "milestone_order", "stale_days", "page_budget","workstreams"], "settings");
   if (configured && input.schema_version !== 1) fail("schema_version must be 1");
   if (input.repository !== undefined && string(input.repository, "repository").toLowerCase() !== identity.repository.toLowerCase()) fail("repository conflicts with origin");
   if (input.hostname !== undefined && string(input.hostname, "hostname").toLowerCase() !== identity.hostname) fail("hostname conflicts with origin");
@@ -95,6 +96,12 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   const labels = input.label_map === undefined ? {} : object(input.label_map, "label_map");
   const label_map: Record<string, string> = {};
   for (const [name, value] of Object.entries(labels)) label_map[name] = string(value, "label_map");
+  if(input.workstreams!==undefined&&!Array.isArray(input.workstreams))fail("workstreams");
+  const workstreams=(input.workstreams as unknown[]??[]).map(value=>{
+    const rule=object(value,"workstreams");keys(rule,["owner","plan_roots","reference_files"],"workstreams");
+    const parsed={owner:string(rule.owner,"workstreams.owner"),plan_roots:strings(rule.plan_roots,[],"workstreams.plan_roots"),reference_files:strings(rule.reference_files,[],"workstreams.reference_files")};
+    if(!parsed.plan_roots.length&&!parsed.reference_files.length)fail("workstream requires a declared source");return parsed;
+  });
   const config: Settings = {
     schema_version: 1, root, configured, settings_path: relative(root, path).split(sep).join("/"), ...identity,
     source_roots: strings(input.source_roots, ["."], "source_roots"), generated_mirrors: strings(input.generated_mirrors, [], "generated_mirrors"),
@@ -104,6 +111,7 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
     protected_ids: ids(input.protected_ids, "protected_ids"), index_ids: ids(input.index_ids, "index_ids"),
     index_rules: { labels: strings(rules.labels, [], "index_rules.labels"), title_prefixes: strings(rules.title_prefixes, [], "index_rules.title_prefixes") },
     bot_authors: strings(input.bot_authors, [], "bot_authors"), owned_labels: strings(input.owned_labels, [], "owned_labels"), label_map,
+    workstreams,workstream_ownership:{},workstream_sources:{},
     priority_order: strings(input.priority_order, [], "priority_order"), milestone_order: strings(input.milestone_order, [], "milestone_order"),
     stale_days: input.stale_days === undefined ? 90 : positive(input.stale_days, "stale_days"),
     page_budget: input.page_budget === undefined ? null : positive(input.page_budget, "page_budget"),
@@ -116,7 +124,49 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   config.generated_mirrors = config.generated_mirrors.map(canonical);
   config.plan_roots = config.plan_roots.map(canonical);
   config.report_dir = canonical(config.report_dir);
+  for(const rule of config.workstreams){rule.plan_roots=rule.plan_roots.map(canonical);rule.reference_files=rule.reference_files.map(canonical);}
+  loadWorkstreams(config);
   return config;
+}
+
+function loadWorkstreams(config:Settings){
+  if(!config.workstreams.length)return;
+  const tracked=git(config.root,"ls-tree","-r","--name-only","-z","HEAD").split("\0").filter(Boolean);
+  function reference(value:unknown):number|null{
+    if(value===null||value===undefined||value==="")return null;
+    if(typeof value!=="string"&&typeof value!=="number")fail("workstream issue reference");
+    const raw=String(value).trim(),match=raw.match(/^#?([1-9]\d*)$/);
+    if(match)return positive(Number(match[1]),"workstream issue reference");
+    let url:URL;try{url=new URL(raw);}catch{fail("workstream issue reference");}
+    if(url.protocol!=="https:"||url.username||url.password||url.search||url.hash)fail("workstream issue reference");
+    const issue=url.pathname.match(/^\/([^/]+\/[^/]+)\/issues\/([1-9]\d*)\/?$/);
+    return issue&&url.hostname===config.hostname&&issue[1].toLowerCase()===config.repository.toLowerCase()?positive(Number(issue[2]),"workstream issue reference"):null;
+  }
+  for(const rule of config.workstreams){
+    for(const declared of [...rule.plan_roots,...rule.reference_files]){
+      if(!existsSync(resolveInside(config.root,declared))||!tracked.some(path=>under(path,declared)))fail("missing canonical workstream source");
+      if(rule.reference_files.includes(declared)&&(!lstatSync(resolveInside(config.root,declared)).isFile()||!declared.toLowerCase().endsWith(".md")))fail("workstream reference file");
+      if(config.generated_mirrors.some(path=>under(declared,path)))fail("generated workstream source");
+      if(git(config.root,"diff","HEAD","--name-only","--",`:(literal)${declared}`)||git(config.root,"ls-files","--others","--exclude-standard","--",`:(literal)${declared}`))fail("uncommitted workstream source");
+    }
+    const paths=tracked.filter(path=>path.toLowerCase().endsWith(".md")&&(rule.reference_files.includes(path)||rule.plan_roots.some(root=>under(path,root))));
+    for(const path of paths){
+      const raw=Bun.spawnSync(["git","-C",config.root,"show",`HEAD:${path}`],{stdout:"pipe",stderr:"pipe"});
+      if(raw.exitCode!==0)fail("canonical workstream source");
+      const text=raw.stdout.toString(),numbers=new Set<number>();
+      config.workstream_sources[path]=createHash("sha256").update(raw.stdout).digest("hex");
+      const fm=text.match(/^---\r?\n([\s\S]*?)\r?\n---/),field=config.plan_fields.issue.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+      if(fm&&new RegExp(`^\\s*["']?${field}["']?\\s*:`,"m").test(fm[1])){
+        let data:Record<string,unknown>;try{data=object(Bun.YAML.parse(fm[1]),"workstream frontmatter");}catch{fail("workstream frontmatter");}
+        const issue=reference(data[config.plan_fields.issue]);if(issue!==null)numbers.add(issue);
+      }
+      if(rule.reference_files.includes(path)){
+        for(const match of text.matchAll(/https:\/\/[^\s)<>"']+\/issues\/[1-9]\d*\/?/g)){const issue=reference(match[0]);if(issue!==null)numbers.add(issue);}
+        for(const match of text.matchAll(/(?<![A-Za-z0-9_/])#([1-9]\d*)\b/g))numbers.add(positive(Number(match[1]),"workstream issue reference"));
+      }
+      for(const number of numbers){const previous=config.workstream_ownership[number]??{owners:[],sources:[]};config.workstream_ownership[number]={owners:[...new Set([...previous.owners,rule.owner])],sources:[...new Set([...previous.sources,path])]};}
+    }
+  }
 }
 
 function under(path: string, directory: string): boolean {
@@ -131,9 +181,15 @@ export function sourcePath(config: Settings, path: string): boolean {
 }
 
 export function ownership(issue: { number: number; author: string; labels: string[]; title: string }, config: Settings, evidencedIndex = false): "protected" | "index" | "eligible" {
+  if(config.workstream_ownership[issue.number])return "protected";
   if (config.protected_ids.includes(issue.number) || config.bot_authors.some((author) => author.toLowerCase() === issue.author.toLowerCase()) ||
       issue.labels.some((label) => config.owned_labels.includes(label))) return "protected";
   if (evidencedIndex || config.index_ids.includes(issue.number) || issue.labels.some((label) => config.index_rules.labels.includes(label)) ||
       config.index_rules.title_prefixes.some((prefix) => issue.title.startsWith(prefix))) return "index";
   return "eligible";
+}
+
+export function workstreamPath(config:Settings,path:string):boolean{
+  const canonical=relative(config.root,resolveInside(config.root,path)).split(sep).join("/");
+  return config.workstreams.some(rule=>rule.reference_files.includes(canonical)||rule.plan_roots.some(root=>under(canonical,root)));
 }
