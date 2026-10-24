@@ -100,6 +100,7 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
     source_roots: strings(input.source_roots, ["."], "source_roots"), generated_mirrors: strings(input.generated_mirrors, [], "generated_mirrors"),
     plan_roots: strings(input.plan_roots, [], "plan_roots"), plan_fields,
     report_dir: input.report_dir === undefined ? ".vh-adlc/reports/triage" : string(input.report_dir, "report_dir"),
+    report_dir_configured: input.report_dir !== undefined,
     protected_ids: ids(input.protected_ids, "protected_ids"), index_ids: ids(input.index_ids, "index_ids"),
     index_rules: { labels: strings(rules.labels, [], "index_rules.labels"), title_prefixes: strings(rules.title_prefixes, [], "index_rules.title_prefixes") },
     bot_authors: strings(input.bot_authors, [], "bot_authors"), owned_labels: strings(input.owned_labels, [], "owned_labels"), label_map,

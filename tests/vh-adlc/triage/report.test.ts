@@ -178,3 +178,47 @@ test("malformed history is unavailable, not a first run, and evidence commands n
   expect(existsSync(marker)).toBe(false);
   expect(report.rows[0].close_executable).toBe(false);
 });
+
+test("explicit missing history is unavailable and relative outputs use the selected checkout", () => {
+  const f = setup([1]);
+  f.settings({ schema_version: 1, report_dir: "reports/not-created" });
+  const config = loadSettings(f.root), report = buildReport(config, f.inventory, [f.open(1)]);
+  expect(report.comparison.status).toBe("unavailable");
+  const path = saveReport(config, report, { output: "reports/explicit.md" });
+  expect(path).toBe(join(f.root, "reports/explicit.md"));
+  expect(existsSync(path)).toBe(true);
+});
+
+test("contradictory or repeated coverage cannot become complete and unresolved dependencies cannot close", () => {
+  const f = setup([1]);
+  f.inventory.coverage.push({ ...f.inventory.coverage[0], complete: false, error: "denied" });
+  expect(buildReport(f.config, f.inventory, [f.resolved(1)]).rows[0].close_executable).toBe(false);
+  f.inventory.coverage.pop();
+  const report = buildReport(f.config, f.inventory, [{ ...f.resolved(1), depends_on: [999] }]);
+  expect(report.rows[0].close_executable).toBe(false);
+  expect(report.graph.unresolved).toContain(1);
+});
+
+test("next verifies its declared shortlist and report CLI saves exactly that offline input", () => {
+  const f = setup(), inventory = { ...f.inventory, mode: "next" as const };
+  const observations = [f.open(2)];
+  const report = buildReport(f.config, inventory, observations);
+  expect(report.rows.map((row) => row.number)).toEqual([2]);
+  expect(report.counts.reviewed).toBe(1);
+  expect(report.scope).toContain('"ids":[2]');
+  f.write("inventory.json", JSON.stringify(inventory)); f.write("observations.json", JSON.stringify(observations));
+  const cli = Bun.spawnSync(["bun", join(import.meta.dir, "../../../plugins/vh-adlc/scripts/triage/cli.ts"), "report", "--repo", f.root,
+    "--inventory", join(f.root, "inventory.json"), "--observations", join(f.root, "observations.json"), "--report-output", "out/report.md"], { stdout: "pipe", stderr: "pipe" });
+  expect({ exit: cli.exitCode, error: cli.stderr.toString() }).toEqual({ exit: 0, error: "" });
+  const result = JSON.parse(cli.stdout.toString());
+  expect(result.report.rows.map((row: { number: number }) => row.number)).toEqual([2]);
+  expect(result.path).toBe(join(f.root, "out/report.md"));
+});
+
+test("the latest same-scope history is selected by run time rather than alphabetic run ID", async () => {
+  const f = setup([1]);
+  saveReport(f.config, buildReport(f.config, f.inventory, [f.open(1)], { runId: "z-first" }));
+  await Bun.sleep(5);
+  saveReport(f.config, buildReport(f.config, f.inventory, [f.open(1)], { runId: "a-second" }));
+  expect(buildReport(f.config, f.inventory, [f.open(1)]).comparison.previous_run_id).toBe("a-second");
+});

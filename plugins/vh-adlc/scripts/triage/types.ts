@@ -10,6 +10,7 @@ export type Settings = {
   plan_roots: string[];
   plan_fields: { issue: string; status: string; status_description: string; priority: string };
   report_dir: string;
+  report_dir_configured: boolean;
   protected_ids: number[];
   index_ids: number[];
   index_rules: { labels: string[]; title_prefixes: string[] };
