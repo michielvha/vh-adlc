@@ -72,6 +72,20 @@ test("complete plans and merged Refs-only PRs are leads rather than closure evid
   expect(report.rows[0].close_executable).toBe(false);
 });
 
+test("Refs-only context is preserved separately from open/partial proof and cannot establish closure",()=>{
+  const f=setup([1,2]);
+  f.inventory.pulls.push({number:50,title:"Partial work",body:"Refs #1 and Refs #2",merged_at:"2026-10-01T00:00:00Z"});
+  const leads=[{kind:"merged-pr",pull_number:50,detail:"Locate work only; no closing reference",verified:false}];
+  const report=buildReport(f.config,f.inventory,[{...f.open(1),leads},{number:2,state:"partial",remaining:"Implement transport",evidence:[f.search()],leads}]);
+  expect(report.rows.map(row=>row.state)).toEqual(["open","partial"]);
+  expect(report.rows.map(row=>row.leads)).toEqual([leads,leads]);
+  expect(report.completeness.verification).toBe(true);
+  const saved=readFileSync(saveReport(f.config,report),"utf8");expect(saved).toContain("Context (not proof)");
+  expect(buildReport(f.config,f.inventory,[{number:1,state:"resolved",remaining:"",evidence:[],adversarial:[],leads},f.open(2)]).rows[0].close_executable).toBe(false);
+  const failed={...f.open(1),evidence:[f.search(),{kind:"test",detail:"Required test failed",verified:false,command:"trusted-check",exit_code:1}],leads};
+  expect(buildReport(f.config,f.inventory,[failed,f.open(2)]).completeness.verification).toBe(false);
+});
+
 test("a merged PR closes only the issue its closing reference names", () => {
   const f=setup([1]), source=f.resolved(1).evidence.filter(value=>value.kind==="source");
   f.inventory.pulls.push({number:50,title:"Other work",body:"Closes #12",merged_at:"2026-10-01T00:00:00Z"});

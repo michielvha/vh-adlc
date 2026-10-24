@@ -13,7 +13,7 @@ export type Evidence = {
   receipt?:string;
 };
 export type Observation = {
-  number: number; state: string; remaining?: string; evidence?: Evidence[]; adversarial?: Evidence[];
+  number: number; state: string; remaining?: string; evidence?: Evidence[]; adversarial?: Evidence[]; leads?: Evidence[];
   duplicate_of?: number; total_overlap?: boolean; is_index?: boolean; index_evidence?: string;
   blockers?: { issue: number; missing: boolean; evidence: Evidence[] }[]; depends_on?: number[];
   owned_by?: string; ownership_evidence?: Evidence[];
@@ -23,7 +23,7 @@ export type Row = {
   number: number; title: string; state: State; remaining: string; ownership: "protected" | "index" | "eligible";
   disposition: "excluded" | "close-candidate" | "ready" | "blocked" | "needs-decision";
   closure_reason: "completed" | "not_planned" | null; close_executable: boolean;
-  evidence: Evidence[]; adversarial: Evidence[]; duplicate_of: number | null; depends_on: number[];
+  evidence: Evidence[]; adversarial: Evidence[]; leads: Evidence[]; duplicate_of: number | null; depends_on: number[];
   index_requested: boolean; index_evidence: string | null; warnings: string[];
   owned_by: string | null; ownership_evidence: Evidence[];
   plan_paths: string[]; estimated_size: string;
@@ -236,7 +236,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
     const disposition: Row["disposition"] = !allowed ? "excluded" : closure ? "close-candidate" : state === "blocked" ? "blocked" : ["open", "partial"].includes(state) ? "ready" : "needs-decision";
     return { number: issue.number, title: issue.title, state, remaining: observation?.remaining ?? "", ownership: owner, disposition,
       closure_reason: closure, close_executable: !!closure && allowed && issue.state === "open",
-      evidence, adversarial, duplicate_of: observation?.duplicate_of ?? null, depends_on: [...new Set([...(observation?.depends_on ?? []), ...blockers.filter((blocker) => blocker.missing).map((blocker) => blocker.issue)])]
+      evidence, adversarial, leads: observation?.leads ?? [], duplicate_of: observation?.duplicate_of ?? null, depends_on: [...new Set([...(observation?.depends_on ?? []), ...blockers.filter((blocker) => blocker.missing).map((blocker) => blocker.issue)])]
         .filter(id=>!blockers.some(blocker=>blocker.issue===id && !blocker.missing && verified(config,inventory,blocker.evidence)) || blockers.some(blocker=>blocker.issue===id && blocker.missing)),
       index_requested: indexRequested, index_evidence: indexRole ? observation?.index_evidence ?? "Observed index/umbrella role" : owner === "index" ? "Configured index rule" : null,
       owned_by: ownedBy, ownership_evidence: configuredOwner?configuredOwner.sources.map(path=>({kind:"ownership",path,reference:`issue:${issue.number}`,detail:`Declared workstream source ${config.workstream_sources[path]}`,verified:true})):observation?.ownership_evidence ?? [],
@@ -307,7 +307,7 @@ export function saveReport(config: Settings, report: Report, options: { output?:
     "| Issue | State | Disposition | Remaining scope | Plan | Estimated size |", "| --- | --- | --- | --- | --- | --- |",
     ...report.rows.map((row) => `| #${row.number} ${cell(row.title)} | ${row.state} | ${row.disposition} | ${cell(row.remaining)} | ${cell(row.plan_paths.join(", ") || "No plan; plan remaining work first")} | ${cell(row.estimated_size)} |`), "",
     "## Evidence", "", ...report.rows.flatMap((row) => [`### #${row.number}`, "", `Ownership: ${row.ownership}; workstream: ${cell(row.owned_by ?? "none")}; index request: ${row.index_requested}; closure executable: ${row.close_executable}; reason: ${row.closure_reason ?? "none"}.`, "",
-      ...[...row.ownership_evidence.map((value) => ({ pass: "Ownership", value })), ...row.evidence.map((value) => ({ pass: "Verification", value })), ...row.adversarial.map((value) => ({ pass: "Adversarial", value }))].map(({ pass, value }) => `- ${pass}: ${cell(JSON.stringify(value))}`), ...row.warnings.map((warning) => `- ${warning}`), ""]),
+      ...[...row.ownership_evidence.map((value) => ({ pass: "Ownership", value })), ...row.evidence.map((value) => ({ pass: "Verification", value })), ...row.adversarial.map((value) => ({ pass: "Adversarial", value })), ...row.leads.map((value) => ({ pass: "Context (not proof)", value }))].map(({ pass, value }) => `- ${pass}: ${cell(JSON.stringify(value))}`), ...row.warnings.map((warning) => `- ${warning}`), ""]),
     "## Ranking and blockers", "", ...report.ranked.map((row,index) => `${index+1}. #${row.number}: ${row.reasons.join("; ")}`), "", `Graph: ${JSON.stringify(report.graph)}`, "",
     "## Coverage and plan drift", "", `Completeness: ${JSON.stringify(report.completeness)}`, "", ...report.coverage.map((entry) => `- ${cell(JSON.stringify(entry))}`), "", `Plan drift: ${JSON.stringify(report.drift)}`, "",
     "## Previous run", "", report.comparison.status === "first" ? "No previous report exists in the configured history source." : JSON.stringify(report.comparison), "",

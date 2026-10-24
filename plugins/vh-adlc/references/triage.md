@@ -79,16 +79,22 @@ an unobserved command as successful. The report helper records evidence attestat
 execute their `command` strings or independently establish their semantics.
 
 Write an observations JSON array. Each entry contains `number`, `state`, `remaining`, `evidence`,
-and, for closure proposals, `adversarial`. Evidence includes its `kind`, concrete `detail`, observed
+and, for closure proposals, `adversarial`. Optional `leads` preserves contextual evidence, including
+Refs-only PRs and unverified suggestions. Leads never support classification, readiness or closure
+and never satisfy verification. Put reference-only and wrong-issue PRs there, rather than in either
+proof array. Evidence includes its `kind`, concrete `detail`, observed
 `verified` result and the fields below. A false claim in this input is not proof. The agent must
-perform and inspect the actual verification that supports each attestation.
+perform and inspect the actual verification that supports each attestation. Every entry in a proof
+array must be valid observed proof; a `verified: false` item makes that verification incomplete.
+Keep failed required tests in proof as failures; never relabel a failure as a lead to obtain a
+closure. Context that was never a required verification check belongs in `leads`.
 
 | Evidence | Required fields and meaning |
 | --- | --- |
 | `source` | Canonical repository-relative `path`, positive `line`, exact source/behavior detail at `source_commit`. |
 | `test` | Trusted observed `command`, `exit_code: 0` and behavior established. Never fabricate a pass. |
 | `wiring` | Canonical `path` and verified entry-point/call-chain detail establishing reachability. |
-| `merged-pr` | `pull_number` and verified implementation detail. A reference alone is insufficient. |
+| `merged-pr` | `pull_number`, verified implementation detail and a closing reference to this issue in the collected merged PR body. Refs-only or another issue’s closing reference belongs in `leads`. |
 | `search` | Complete searched canonical `scope`, `result: empty` or `found`, and the actual search/predicate. Absence applies only to searched input. |
 | `removal` | Removed canonical `path`, ancestor `before_commit`, `reference: commit:<source_commit>` and verified retirement of the requested scope. |
 | `supersession` | Canonical replacement `path`, `reference` and verified reason the old request no longer applies. |
