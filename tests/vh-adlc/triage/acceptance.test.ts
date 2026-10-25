@@ -274,3 +274,19 @@ test("the actual read adapter emits source search receipts that reobserve with e
  },{cacheRoot:cache});
  expect(replies[2].error).toBeDefined();
 },15_000);
+
+test("managed recovery declares hash-bound prior verdict context without granting proof",async()=>{
+ const{prepareRecoveryContext,recoveryVerdicts}=await import("../../../plugins/vh-adlc/scripts/triage/recovery-context");
+ const f=setup();f.export();const report:any={rows:[{number:1,state:"partial",remaining:"Wire the existing serializer into GET /answer.",ownership:"eligible",disposition:"retain",depends_on:[],duplicate_of:null,closure_reason:null}]};
+ const context=prepareRecoveryContext(f.output,"a".repeat(64),report);
+ const{hasManagedProofAuthority}=await import("../../../plugins/vh-adlc/scripts/triage/controller");expect(hasManagedProofAuthority()).toBe(false);
+ expect(context.verdicts).toEqual(recoveryVerdicts(report));expect(context.batch_hash).toBe("a".repeat(64));expect(context.trusted_as_proof).toBe(false);
+ expect(verifyInputs(f.output,{checkout:f.root,plugin}).pass).toBe(true);
+ const grader={input:f.output,checkout:f.root,plugin,host:"codex-cli",raw:"",trace:[]as any[],installed:null,exit_code:1};
+ expect(gradeTrial(grader).failures).toContain("required-recovery-context");
+ const manifest=JSON.parse(readFileSync(join(f.output,"manifest.json"),"utf8"));grader.trace.push({kind:"read",path:"recovery-context.json",run_id:manifest.run_id,start_line:1,limit:2000});
+ expect(gradeTrial(grader).failures).not.toContain("required-recovery-context");
+ const changed=structuredClone(report);changed.rows[0].remaining="A differently approved scope";expect(recoveryVerdicts(changed)).not.toEqual(context.verdicts);
+ writeFileSync(join(f.output,"recovery-context.json"),JSON.stringify({...context,batch_hash:"b".repeat(64)}));
+ expect(verifyInputs(f.output,{checkout:f.root,plugin}).failures).toContain("recovery-context-hash");
+});

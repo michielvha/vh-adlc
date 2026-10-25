@@ -89,7 +89,10 @@ bun "<plugin>/scripts/triage/controller.ts" resume \
 ```
 
 Recovery validates the original fixed input and current installed payload, runs a fresh confined
-native trial and requires the fresh verdicts to agree. It then makes fresh actual bounded observations,
+native trial and requires the fresh verdicts to agree exactly. The original verdict text is supplied
+as hash-bound untrusted context. Analysis must read it fully, seek contrary current evidence and
+retain its wording only when independently supported; that context grants no proof or approval.
+A changed verdict still requires a new approved batch. Recovery then makes fresh actual bounded observations,
 re-runs only original operator-selected checks and uses the original exact batch/journal. Archive
 files alone grant no execution authority. Prior artifacts are preserved. Completed comments, closures
 and creations are never repeated within the unchanged original batch.
