@@ -1,3 +1,6 @@
+import{loadSettings}from"../../../plugins/vh-adlc/scripts/triage/settings";
+import{verificationRecord,withVerificationBoundary}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{originalVerificationSelection}from"../../../plugins/vh-adlc/scripts/triage/controller-preparation";
 import{createHash}from"node:crypto";
 import{readFileSync,readdirSync,lstatSync,readlinkSync,realpathSync}from"node:fs";
 import{join}from"node:path";
@@ -21,14 +24,29 @@ export function controllerArtifactProof(root:string,checkout:string,phases:strin
   const before=read("checkout-before.json"),after=read("checkout-after.json"),current=captureControllerCheckout(checkout);
   const valid=(snapshot:any)=>snapshot.schema_version===1&&snapshot.checkout===realpathSync(checkout)&&snapshot.index?.sha256===sha(Buffer.from(snapshot.index.base64,"base64"));
   preserved=valid(before)&&valid(after)&&JSON.stringify(before)===JSON.stringify(after)&&JSON.stringify(after)===JSON.stringify(current);
-  const checks=read("checks.json"),removals=read("removals.json");
-  prepared=phases.length>0&&phases.every(phase=>{
-   const verification=read(phase+"/input/verification.json");
-   return verification.complete===true&&Array.isArray(verification.operations)&&["primary","adversarial"].every(pass=>
-    Object.entries(checks).every(([name,argv])=>verification.operations.some((entry:any)=>entry.kind==="check"&&entry.name===name&&entry.pass===pass&&entry.result?.verified===true&&entry.result.exit_code===0&&entry.result.command===JSON.stringify(argv)&&/^[a-f0-9]{64}$/.test(entry.result.receipt)))&&
-    removals.every((removal:any)=>verification.operations.some((entry:any)=>entry.kind==="removal"&&entry.name===removal.path&&entry.pass===pass&&entry.result?.path===removal.path&&entry.result.before_commit===removal.before_commit&&entry.result.source_commit===before.head&&/^[a-f0-9]{64}$/.test(entry.result.receipt))));
-  });
+  const checks=read("checks.json"),removals=read("removals.json"),config=loadSettings(checkout);
+  prepared=phases.length>0&&phases.every(phase=>withVerificationBoundary(()=>{
+   const input=join(root,phase,"input"),verification=read(phase+"/input/verification.json");originalVerificationSelection(input,{checks,removals});
+   const record=(entry:any)=>verificationRecord(config,before.head,entry.result?.receipt);
+   return verification.complete===true&&Array.isArray(verification.operations)&&verification.operations.length===2*(Object.keys(checks).length+removals.length)&&["primary","adversarial"].every(pass=>
+    Object.entries(checks).every(([name,argv])=>verification.operations.some((entry:any)=>{
+     if(entry.kind!=="check"||entry.name!==name||entry.pass!==pass)return false;const cached=record(entry);
+     return cached?.kind==="command"&&cached.pass===pass&&JSON.stringify(cached.argv)===JSON.stringify(argv)&&entry.result.verified===true&&entry.result.exit_code===cached.exit_code&&entry.result.command===JSON.stringify(argv)&&typeof entry.result.stdout==="string"&&typeof entry.result.stderr==="string"&&sha(entry.result.stdout)===cached.stdout_sha256&&sha(entry.result.stderr)===cached.stderr_sha256;
+    }))&&removals.every((removal:any)=>verification.operations.some((entry:any)=>{
+     if(entry.kind!=="removal"||entry.name!==removal.path||entry.pass!==pass)return false;const cached=record(entry);
+     return cached?.kind==="removal"&&cached.pass===pass&&cached.removal?.path===removal.path&&cached.removal.before_commit===removal.before_commit&&entry.result.path===removal.path&&entry.result.before_commit===removal.before_commit&&entry.result.source_commit===before.head&&typeof entry.result.before_content==="string"&&sha(entry.result.before_content)===cached.removal.sha256&&!current.entries.some((entry:any)=>entry[0]===removal.path);
+    })));
+  },{cacheRoot:join(root,phase,"analysis/verification-cache")}));
  }catch{failures.push("missing-or-invalid-controller-artifact");}
  if(!preserved)failures.push("checkout-or-index-not-preserved");if(!prepared)failures.push("required-preparation-not-observed");
  return{pass:failures.length===0,preserved,prepared,failures};
+}
+
+export function controllerOutcomeFacts(events:{first:any[];final:any[]},api:any){
+ const phase=(rows:any[],recovery:boolean)=>{
+  const exits=rows.filter(event=>event.kind==="owned-controller-exit");if(exits.length!==1)throw Error("owned controller exit unavailable");
+  const exited=exits[0],execution=recovery?rows.find(event=>event.recovery)?.recovery:rows.find(event=>event.id==="execute")?.result;
+  return{exit:exited.code,signal:exited.signal,interrupted:exited.code===null&&exited.signal==="SIGKILL",stage:execution&&exited.code===0?"finished":"interrupted",grade:rows.find(event=>event.grade)?.grade?.pass===true,completed:execution?.completed,failed:execution?.failed,blocked:execution?.blocked};
+ };
+ return{first:phase(events.first,false),final:phase(events.final,events.final.some(event=>event.recovery)),effects:api.trace.filter((event:any)=>event.method!=="GET").map(({method,endpoint,payload}:any)=>({method,endpoint,payload})),approved_comment:events.first.find(event=>event.id==="batch")?.result?.actions.find((action:any)=>action.id==="explain")?.body,issue_closed:api.issues.find((issue:any)=>issue.number===1)?.state==="closed"};
 }

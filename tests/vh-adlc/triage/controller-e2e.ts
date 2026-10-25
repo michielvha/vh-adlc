@@ -1,4 +1,4 @@
-import{captureControllerCheckout,controllerArtifactProof}from"./controller-artifacts";
+import{captureControllerCheckout,controllerArtifactProof,controllerOutcomeFacts}from"./controller-artifacts";
 import{controllerTrialPass}from"./controller-trial-proof";
 import{captureFakeExecutable,fakeTrackerProof}from"./fake-tracker-proof";
 import{tmpdir}from"node:os";
@@ -71,6 +71,7 @@ async function phase(resuming:boolean){
  if(resuming)child.stdin.end(JSON.stringify({batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Approve resuming only these original exact synthetic fixture actions"}));
  let forced:ReturnType<typeof setTimeout>|undefined;const timer=setTimeout(()=>{signal('SIGTERM');forced=setTimeout(()=>signal('SIGKILL'),2000);},900000);
  const ended=await new Promise<{code:number|null;signal:NodeJS.Signals|null}>((resolve,reject)=>{child.on('error',reject);child.on('exit',(code,signal)=>resolve({code,signal}));});clearTimeout(timer);clearTimeout(forced);
+ events.push({kind:"owned-controller-exit",pid:child.pid,code:ended.code,signal:ended.signal});
  signal("SIGTERM");await Bun.sleep(100);signal("SIGKILL");
  return{exit:ended.code,signal:ended.signal,interrupted:stage==="interrupted"&&ended.signal==="SIGKILL",stage,error,events,grade:events.find(e=>e.grade)?.grade,completed:execution?.completed,blocked:execution?.blocked,failed:execution?.failed};
 }
@@ -79,5 +80,6 @@ const data=JSON.parse(readFileSync(database,'utf8')),effects=data.trace.filter((
 writeFileSync(join(root,"checkout-after.json"),JSON.stringify(captureControllerCheckout(source.root),null,2)+"\n");
 const artifacts=controllerArtifactProof(root,source.root,scenario!=="normal"&&first.interrupted?["run","recovery-attempt"]:["run"]);
 const result={root,source_checkout:source.root,component_commit:component,component_unchanged:committedComponent(repository,plugin,import.meta.path)===component,host,scenario,preserved:artifacts.preserved,prepared:artifacts.prepared,artifacts,first,final,gh_resolution_proof:ghProof,fake_effects:effects.map((r:any)=>({method:r.method,endpoint:r.endpoint,payload:r.payload})),analysis_report:join(output,'analysis/report.json')};
-const pass=controllerTrialPass({...result,gh_proof:ghProof.pass,first:{...first,grade:first.grade?.pass},final:{...final,grade:final.grade?.pass},effects:result.fake_effects,approved_comment:batch?.actions[0]?.body,issue_closed:data.issues.find((i:any)=>i.number===1).state==='closed'});
+const outcome=controllerOutcomeFacts({first:first.events,final:final.events},data);
+const pass=controllerTrialPass({...result,...outcome,gh_proof:ghProof.pass,component_unchanged:committedComponent(repository,plugin,import.meta.path)===component});
 writeFileSync(join(root,'events.json'),JSON.stringify({first:first.events,final:final.events},null,2));writeFileSync(join(root,'result.json'),JSON.stringify({...result,pass},null,2));console.log(JSON.stringify({...result,pass}));if(!pass)process.exitCode=1;
