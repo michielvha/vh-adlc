@@ -2,7 +2,7 @@ import{hasManagedControllerAuthority}from"./controller-authority";
 import{executionHistory}from"./execution-history";
 import { createHash } from "node:crypto";
 import{executionLock,repositoryLockPath}from"./execution-lock";
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, relative } from "node:path";
 import { git, loadSettings, ownership, resolveInside, sourcePath,workstreamPath } from "./settings";
 import {buildReport,publicationVerified,type Report} from "./report";
@@ -215,10 +215,6 @@ export function approveBatch(batch: Batch, actionIds: string[], ownerStatement: 
       actionIds.some((id) => !batch.actions.some((action) => action.id === id)) || !nonempty(ownerStatement)) bad();
   return { batch_hash: batch.hash, action_ids: [...actionIds], owner_statement: ownerStatement };
 }
-function saveJournal(path: string, journal: Journal) {
-  const temporary = `${path}.tmp`;
-  writeFileSync(temporary, JSON.stringify(journal), { mode: 0o600 }); renameSync(temporary, path);
-}
 
 export async function executeBatch(config: Settings, batch: Batch, approval: Approval, adapter: Adapter, options: {
   journal: string; gate?: (gate: { status: string; document: string }) => Promise<boolean | {pass:boolean;line:string}>;
@@ -251,14 +247,16 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
   try {
     releaseLock=await executionLock(`${path}.lock`);
     const history=executionHistory(config,path,batch.hash,historyCapability);
-    const save=()=>{saveJournal(path,journal);history.checkpoint();};
+    const save=()=>history.save(JSON.stringify(journal));
     let journal: Journal = { schema_version: 1, batch_hash: batch.hash, completed: [], started: null, results: {}, issues: Object.fromEntries(batch.issues.map((issue) => [issue.number, issue])), source_commit: batch.source_commit, uncertain: [] };
     if (existsSync(path)) {
       try { journal = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error("unreadable triage execution journal"); }
       if (journal.schema_version !== 1 || journal.batch_hash !== batch.hash || !Array.isArray(journal.completed) || !Array.isArray(journal.uncertain) || !journal.results || !journal.issues) bad();
       const interrupted = batch.actions.find((action) => action.id === journal.started);
       if (interrupted && !["plan-patch", "commit"].includes(interrupted.kind) && !journal.completed.includes(interrupted.id) && !journal.uncertain.includes(interrupted.id)) {
-        journal.uncertain.push(interrupted.id); save();
+        if(history.attempted(interrupted.id))journal.uncertain.push(interrupted.id);
+        else{journal.started=null;journal.denied=[...new Set([...(journal.denied??[]),interrupted.id])];}
+        save();
       }
     }
     else save();
@@ -353,7 +351,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
               if(typeof checked==="object"){journal.gate_lines={...(journal.gate_lines??{}),[action.id]:checked.line};}
             }
             if (readFileSync(target, "utf8") !== action.before) { blocked.push(action.id); continue; }
-            if(action.gate){journal.gated=[...new Set([...(journal.gated??[]),action.id])];saveJournal(path,journal);}
+            if(action.gate){journal.gated=[...new Set([...(journal.gated??[]),action.id])];save();}
             writeFileSync(target, after);
           }
         } else if (action.kind === "commit") {

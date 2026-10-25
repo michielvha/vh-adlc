@@ -1,65 +1,102 @@
-import{existsSync,readFileSync,renameSync,writeFileSync,realpathSync,appendFileSync,openSync,closeSync,fsyncSync}from"node:fs";
+import{existsSync,readFileSync,renameSync,writeFileSync,realpathSync,appendFileSync,openSync,closeSync,fsyncSync,truncateSync}from"node:fs";
 import{dirname,join,basename}from"node:path";
 import{createHash,randomUUID}from"node:crypto";
 import{repositoryLockPath}from"./execution-lock";
 import{isExecutionHistoryCapability}from"./execute";
 import type{Settings}from"./types";
 type Pending={batch_hash:string;action_id:string;journal:string};
-type Checkpoint={batch_hash:string;digest:string};
+type Checkpoint={batch_hash:string;digest:string|null;next?:{digest:string;payload:string}};
 type State={pending:Pending[];journals:Record<string,Checkpoint>};
-const digest=(bytes:string)=>createHash("sha256").update(bytes).digest("hex");
+const digest=(bytes:string)=>createHash("sha256").update(bytes).digest("hex"),hex=(value:unknown)=>typeof value==="string"&&/^[a-f0-9]{64}$/.test(value);
 function sync(path:string){const fd=openSync(path,"r");try{fsyncSync(fd);}finally{closeSync(fd);}}
 function corrupt():never{throw Error("unreadable or changed repository outcome history");}
-// Only the engine, while holding the repository kernel lock, may append outcomes.
-// The persistent lock inode anchors an append-only chain and its latest head.
-// This detects missing/edited artifacts, not an administrator rewriting all of
-// the trusted control plane. Analysis tools cannot access any of these files.
+function atomic(path:string,bytes:string){writeFileSync(path+".tmp",bytes,{mode:0o600});sync(path+".tmp");renameSync(path+".tmp",path);sync(dirname(path));}
+function validState(state:State){
+ return state&&Array.isArray(state.pending)&&state.journals&&typeof state.journals==="object"&&!Array.isArray(state.journals)&&
+ state.pending.every(entry=>entry&&hex(entry.batch_hash)&&typeof entry.action_id==="string"&&typeof entry.journal==="string")&&
+ Object.values(state.journals).every(entry=>entry&&hex(entry.batch_hash)&&(entry.digest===null||hex(entry.digest))&&(!entry.next||hex(entry.next.digest)&&typeof entry.next.payload==="string"&&digest(entry.next.payload)===entry.next.digest));
+}
+// Engine-only, under the repository kernel lock. The persistent inode anchors
+// the chain. Hashes detect damaged state, not an administrator replacing the
+// trusted control plane; confined analysis tools cannot access these files.
 export function executionHistory(config:Settings,journal:string,batchHash:string,capability?:unknown){
  if(!isExecutionHistoryCapability(capability))throw Error("repository outcome history is engine-private");
  const lock=repositoryLockPath(config),log=lock+".history.jsonl",head=lock+".history-head.json",original=join(realpathSync(dirname(journal)),basename(journal));
  if(existsSync(lock+".pending.json"))corrupt();
- let anchor=readFileSync(lock,"utf8"),state:State={pending:[],journals:{}},previous="",sequence=0;
- const persist=()=>{
-  const payload=JSON.stringify({sequence:++sequence,previous,state}),hash=digest(payload);
-  appendFileSync(log,JSON.stringify({payload,hash})+"\n",{mode:0o600});sync(log);
-  writeFileSync(head+".tmp",JSON.stringify({anchor,sequence,hash}),{mode:0o600});sync(head+".tmp");renameSync(head+".tmp",head);sync(dirname(head));previous=hash;
- };
- if(!anchor){
+ let anchor:any;const marker=readFileSync(lock,"utf8");
+ if(!marker){
   if(existsSync(log)||existsSync(head))corrupt();
-  anchor=JSON.stringify({schema_version:1,genesis:randomUUID()});writeFileSync(lock,anchor,{mode:0o600});sync(lock);previous=digest(anchor);persist();
- }else{
+  anchor={schema_version:2,genesis:randomUUID(),phase:"initializing"};writeFileSync(lock,JSON.stringify(anchor),{mode:0o600});sync(lock);
+ }else{try{anchor=JSON.parse(marker);}catch{corrupt();}}
+ if(anchor.schema_version!==2||typeof anchor.genesis!=="string"||!["initializing","ready"].includes(anchor.phase))corrupt();
+ let state:State={pending:[],journals:{}},sequence=0,previous=digest(anchor.genesis),bytes=0,poisoned=false;
+ const saveHead=()=>atomic(head,JSON.stringify({anchor:anchor.genesis,sequence,hash:previous,bytes}));
+ const persist=()=>{
+  if(poisoned)throw Error("repository outcome history requires reload");
   try{
-   const genesis=JSON.parse(anchor);if(genesis.schema_version!==1||typeof genesis.genesis!=="string"||!existsSync(log)||!existsSync(head))corrupt();
-   previous=digest(anchor);
-   const bytes=readFileSync(log,"utf8");if(!bytes.endsWith("\n"))corrupt();
-   for(const line of bytes.slice(0,-1).split("\n")){
+   const payload=JSON.stringify({sequence:sequence+1,previous,state}),hash=digest(payload),line=JSON.stringify({payload,hash})+"\n";
+   appendFileSync(log,line,{mode:0o600});sync(log);sequence++;previous=hash;bytes+=Buffer.byteLength(line);saveHead();
+  }catch(error){poisoned=true;throw error;}
+ };
+ if(existsSync(log)){
+  try{
+   const content=readFileSync(log,"utf8"),last=content.lastIndexOf("\n"),complete=last<0?"":content.slice(0,last+1),tail=content.slice(last+1),records:{sequence:number;hash:string;bytes:number}[]=[];
+   for(const line of complete.split("\n").slice(0,-1)){
     const record=JSON.parse(line);if(typeof record.payload!=="string"||digest(record.payload)!==record.hash)corrupt();
-    const event=JSON.parse(record.payload);if(event.sequence!==++sequence||event.previous!==previous||!Array.isArray(event.state?.pending)||!event.state?.journals)corrupt();
-    state=event.state;previous=record.hash;
+    const event=JSON.parse(record.payload);if(event.sequence!==sequence+1||event.previous!==previous||!validState(event.state))corrupt();
+    sequence++;previous=record.hash;bytes+=Buffer.byteLength(line+"\n");state=event.state;records.push({sequence,hash:previous,bytes});
    }
-   const latest=JSON.parse(readFileSync(head,"utf8"));if(latest.anchor!==anchor||latest.sequence!==sequence||latest.hash!==previous)corrupt();
+   if(anchor.phase==="initializing"){
+    if(sequence>1||state.pending.length||Object.keys(state.journals).length)corrupt();
+    if(!sequence){if(existsSync(head))corrupt();truncateSync(log,0);sync(log);persist();}
+    else{if(tail)corrupt();saveHead();}
+   }else{
+    if(!existsSync(head))corrupt();const saved=JSON.parse(readFileSync(head,"utf8")),committed=records.find(record=>record.sequence===saved.sequence);
+    if(saved.anchor!==anchor.genesis||!committed||committed.hash!==saved.hash||committed.bytes!==saved.bytes||sequence-saved.sequence>1)corrupt();
+    // A partial append after the committed head never authorized an effect.
+    // A complete valid successor is an interrupted head publication.
+    if(tail){if(saved.sequence!==sequence)corrupt();truncateSync(log,bytes);sync(log);}
+    if(saved.sequence!==sequence)saveHead();
+   }
   }catch{corrupt();}
+ }else{
+  if(anchor.phase!=="initializing"||existsSync(head))corrupt();persist();
  }
+ if(anchor.phase==="initializing"){anchor.phase="ready";writeFileSync(lock,JSON.stringify(anchor),{mode:0o600});sync(lock);}
  if(Object.entries(state.journals).some(([path,checkpoint])=>path!==original&&checkpoint.batch_hash===batchHash))throw Error("batch requires its original triage execution journal");
- const checkpoint=state.journals[original];
+ let checkpoint=state.journals[original];
+ if(checkpoint&&checkpoint.batch_hash!==batchHash)throw Error("changed triage execution journal batch");
+ if(checkpoint?.next){
+  const current=existsSync(original)?digest(readFileSync(original,"utf8")):null;
+  if(current!==checkpoint.digest&&current!==checkpoint.next.digest)throw Error("unreadable or changed triage execution journal");
+  if(current!==checkpoint.next.digest)atomic(original,checkpoint.next.payload);
+  checkpoint.digest=checkpoint.next.digest;delete checkpoint.next;persist();
+ }
  if(existsSync(original)){
-  if(!checkpoint||checkpoint.batch_hash!==batchHash||checkpoint.digest!==digest(readFileSync(original,"utf8")))throw Error("unreadable or changed triage execution journal");
+  if(!checkpoint||checkpoint.digest!==digest(readFileSync(original,"utf8")))throw Error("unreadable or changed triage execution journal");
  }else if(checkpoint)throw Error("missing original triage execution journal");
- // Crash recovery may retire only outcomes already checkpointed by this engine.
+ const saved=()=>JSON.parse(readFileSync(original,"utf8"));
+ const matches=(entry:Pending,actionId?:string)=>entry.batch_hash===batchHash&&entry.journal===original&&(actionId===undefined||entry.action_id===actionId);
  if(checkpoint){
-  const saved=JSON.parse(readFileSync(original,"utf8"));
-  const remaining=state.pending.filter(entry=>entry.journal!==original||entry.batch_hash!==batchHash||!saved.completed.includes(entry.action_id)&&!saved.denied?.includes(entry.action_id));
+  const data=saved(),remaining=state.pending.filter(entry=>!matches(entry)||!data.completed.includes(entry.action_id)&&!data.denied?.includes(entry.action_id));
   if(remaining.length!==state.pending.length){state.pending=remaining;persist();}
  }
  return{
-  blocked:state.pending.some(entry=>entry.batch_hash!==batchHash||entry.journal!==original),
-  checkpoint(){state.journals[original]={batch_hash:batchHash,digest:digest(readFileSync(original,"utf8"))};persist();},
-  resolve(actionId:string){
-   const saved=JSON.parse(readFileSync(original,"utf8"));
-   if(state.journals[original]?.digest!==digest(readFileSync(original,"utf8"))||!saved.completed.includes(actionId)&&!saved.denied?.includes(actionId))throw Error("outcome lacks an engine checkpoint");
-   const pending=state.pending.filter(entry=>entry.batch_hash!==batchHash||entry.action_id!==actionId||entry.journal!==original);
-   if(pending.length!==state.pending.length){state.pending=pending;persist();}
+  blocked:state.pending.some(entry=>!matches(entry)),
+  attempted(actionId:string){return state.pending.some(entry=>matches(entry,actionId));},
+  save(payload:string){
+   if(poisoned)throw Error("repository outcome history requires reload");
+   const data=JSON.parse(payload);if(data.schema_version!==1||data.batch_hash!==batchHash)throw Error("invalid engine journal checkpoint");
+   checkpoint??={batch_hash:batchHash,digest:null};state.journals[original]=checkpoint;
+   checkpoint.next={digest:digest(payload),payload};persist();
+   try{atomic(original,payload);}catch(error){poisoned=true;throw error;}
+   checkpoint.digest=checkpoint.next.digest;delete checkpoint.next;persist();
   },
-  register(actionId:string){const entry={batch_hash:batchHash,action_id:actionId,journal:original};if(!state.pending.some(old=>old.batch_hash===batchHash&&old.action_id===actionId&&old.journal===original)){state.pending.push(entry);persist();}},
+  resolve(actionId:string){
+   if(poisoned)throw Error("repository outcome history requires reload");const data=saved();
+   if(state.journals[original]?.digest!==digest(readFileSync(original,"utf8"))||!data.completed.includes(actionId)&&!data.denied?.includes(actionId))throw Error("outcome lacks an engine checkpoint");
+   const pending=state.pending.filter(entry=>!matches(entry,actionId));if(pending.length!==state.pending.length){state.pending=pending;persist();}
+  },
+  register(actionId:string){if(!state.pending.some(entry=>matches(entry,actionId))){state.pending.push({batch_hash:batchHash,action_id:actionId,journal:original});persist();}},
  };
 }
