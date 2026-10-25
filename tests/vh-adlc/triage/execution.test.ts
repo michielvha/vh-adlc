@@ -1,7 +1,7 @@
 import{test}from"./boundary-test";
 import { afterEach, expect } from "bun:test";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync,unlinkSync,readdirSync,writeFileSync,chmodSync,mkdirSync } from "node:fs";
+import { join,dirname,basename } from "node:path";
 import { approveBatch, executeBatch, MutationFailure, planBatch,actionKey } from "../../../plugins/vh-adlc/scripts/triage/execute";
 import type { Action, Adapter, MutationResult } from "../../../plugins/vh-adlc/scripts/triage/execute";
 import { buildReport } from "../../../plugins/vh-adlc/scripts/triage/report";
@@ -244,8 +244,6 @@ test("owned gated patches remain retryable when their source path is in the cano
   const batch=f.batch([action,...f.actions]),approval=approveBatch(batch,["sync","explain"],"Approve exact patch and comment");
   const first=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal,gate:async()=>true});
   expect(first.completed).toContain("sync");expect(first.completed).toContain("explain");
-  const journal=JSON.parse(readFileSync(f.journal,"utf8"));journal.completed=journal.completed.filter((id:string)=>id!=="sync");journal.started="sync";
-  f.write(".vh-adlc/execution.json",JSON.stringify(journal));
   const retry=await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal,gate:async()=>false});
   expect(retry.completed).toContain("sync");expect(f.log).toHaveLength(1);
 });
@@ -354,10 +352,11 @@ test("a completed commit with a lost journal update is reconciled without creati
     { id: "backfill", kind: "plan-patch", path: "plans/new.md", before, after: before.replace("issue: null", "issue: {{created_issue_url}}"), created_by: "new" },
     { id: "commit", kind: "commit", subject: "docs: link approved plan issue", paths: ["plans/new.md"], requires: ["backfill"] }];
   const batch = f.batch(actions), approval = approveBatch(batch, actions.map((action) => action.id), "Approve exact patches and commit");
-  await executeBatch(f.config, batch, approval, f.adapter, { journal: f.journal });
-  const journal = JSON.parse(readFileSync(f.journal, "utf8"));
-  journal.completed = journal.completed.filter((id: string) => id !== "commit"); journal.started = "commit"; journal.source_commit = batch.source_commit;
-  f.write(".vh-adlc/execution.json", JSON.stringify(journal));
+  const hooks=join(f.root,"owned-hooks");mkdirSync(hooks);
+  writeFileSync(join(hooks,"post-commit"),'#!/bin/sh\nkill -KILL "$PPID"\n');chmodSync(join(hooks,"post-commit"),0o700);
+  git(f.root,"config","core.hooksPath",hooks);
+  const interrupted=await executeBatch(f.config, batch, approval, f.adapter, { journal: f.journal });
+  expect(interrupted.failed).toContain("commit");git(f.root,"config","core.hooksPath","/dev/null");
   expect((await executeBatch(f.config, batch, approval, f.adapter, { journal: f.journal })).completed).toContain("commit");
   expect(git(f.root, "rev-list", "--count", "HEAD")).toBe("2");
   expect(f.log.filter((action) => action.kind === "create")).toHaveLength(1);
@@ -422,10 +421,9 @@ process.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n\
 
 test("an interrupted process with no confirmed remote receipt cannot blindly repeat its pending write", async () => {
   const f = setup(), batch = f.batch(), approval = approveBatch(batch, ["explain", "close"], "Approve exact fixture batch");
-  f.failures.add("explain");
+  const mutate=f.adapter.mutate;f.adapter.mutate=async()=>{throw new MutationFailure(true);};
   await executeBatch(f.config, batch, approval, f.adapter, { journal: f.journal });
-  const journal = JSON.parse(readFileSync(f.journal, "utf8")); journal.started = "explain";
-  f.write(".vh-adlc/execution.json", JSON.stringify(journal)); f.failures.clear();
+  f.adapter.mutate=mutate;
   const retry = await executeBatch(f.config, batch, approval, f.adapter, { journal: f.journal });
   expect(retry.blocked).toContain("explain"); expect(f.log).toEqual([]);
 });
@@ -627,4 +625,57 @@ test("an explicitly unassessed protected row cannot block verified eligible writ
 test("direct verification API imports cannot mint confined proof or protected execution authority",()=>{
  const run=Bun.spawnSync([process.execPath,join(import.meta.dir,"unconfined-execution.ts")],{env:process.env,stdout:"pipe",stderr:"pipe",timeout:15_000});
  expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});const result=JSON.parse(run.stdout.toString());expect(result.denied).toBe(true);expect(result.effects).toEqual([]);expect(result.recoveryDenied).toBe(true);expect(result.operatorDenied).toBe(true);
+});
+
+
+test("editing journal flags cannot retire an uncertain attempt for a replacement batch",async()=>{
+ const f=setup(),original=f.batch(),uncertain={...f.adapter,mutate:async()=>{throw new MutationFailure(true);}};
+ await executeBatch(f.config,original,approveBatch(original,["explain"],"Approve fixture attempt"),uncertain,{journal:f.journal});
+ const journal=JSON.parse(readFileSync(f.journal,"utf8"));journal.started=null;journal.uncertain=[];journal.completed=["explain"];f.write(".vh-adlc/execution.json",JSON.stringify(journal));
+ const report=buildReport(f.config,f.inventory,f.report.observations,{runId:"after-forged-flags"}),replacement=planBatch(f.config,f.inventory,report,[f.actions[0]]);
+ const result=await executeBatch(f.config,replacement,approveBatch(replacement,["explain"],"Approve replacement fixture only"),f.adapter,{journal:join(f.root,".vh-adlc/replacement.json")});
+ expect(result.blocked).toEqual(["explain"]);expect(f.log).toEqual([]);
+});
+
+test("missing repository outcome files cannot reset uncertain history",async()=>{
+ const f=setup(),original=f.batch(),uncertain={...f.adapter,mutate:async()=>{throw new MutationFailure(true);}};
+ await executeBatch(f.config,original,approveBatch(original,["explain"],"Approve fixture attempt"),uncertain,{journal:f.journal});
+ const{repositoryLockPath}=await import("../../../plugins/vh-adlc/scripts/triage/execution-lock"),lock=repositoryLockPath(f.config);
+ for(const name of readdirSync(dirname(lock)).filter(name=>name.startsWith(basename(lock)+".")&&!name.endsWith(".lock")))unlinkSync(join(dirname(lock),name));
+ const report=buildReport(f.config,f.inventory,f.report.observations,{runId:"after-missing-history"}),replacement=planBatch(f.config,f.inventory,report,[f.actions[0]]);
+ await expect(executeBatch(f.config,replacement,approveBatch(replacement,["explain"],"Approve replacement fixture only"),f.adapter,{journal:join(f.root,".vh-adlc/replacement.json")})).rejects.toThrow();expect(f.log).toEqual([]);
+});
+
+test("an edited journal cannot adopt a material issue change into the old batch",async()=>{
+ const f=setup(),batch=f.batch();await executeBatch(f.config,batch,approveBatch(batch,["explain"],"Approve first fixture explanation"),f.adapter,{journal:f.journal});
+ f.issues.get(1)!.body="Different requested scope";const journal=JSON.parse(readFileSync(f.journal,"utf8"));journal.issues[1]=structuredClone(f.issues.get(1)!);f.write(".vh-adlc/execution.json",JSON.stringify(journal));
+ await expect(executeBatch(f.config,batch,approveBatch(batch,["close"],"Approve remaining fixture closure"),f.adapter,{journal:f.journal})).rejects.toThrow();expect(f.log.map(action=>action.kind)).toEqual(["comment"]);
+});
+
+test("deleting a known creation journal cannot repeat that creation",async()=>{
+ const f=setup(),batch=f.batch([{id:"create",kind:"create",title:"Fixture remaining scope",body:"Exact fixture scope",labels:[]}]),approval=approveBatch(batch,["create"],"Approve exact fixture creation");
+ await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});unlinkSync(f.journal);
+ await expect(executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal})).rejects.toThrow();expect(f.log.map(action=>action.kind)).toEqual(["create"]);
+});
+
+test("direct history imports cannot obtain a mutable engine history handle",async()=>{
+ const f=setup(),{executionHistory}=await import("../../../plugins/vh-adlc/scripts/triage/execution-history");expect(()=>executionHistory(f.config,f.journal,"a".repeat(64),{})).toThrow();
+});
+
+
+test("tampering with outcome records or their head fails closed",async()=>{
+ for(const suffix of [".history.jsonl",".history-head.json"]){
+  const f=setup(),batch=f.batch();await executeBatch(f.config,batch,approveBatch(batch,["explain"],"Approve original fixture explanation"),f.adapter,{journal:f.journal});
+  const{repositoryLockPath}=await import("../../../plugins/vh-adlc/scripts/triage/execution-lock"),path=repositoryLockPath(f.config)+suffix;
+  writeFileSync(path,readFileSync(path,"utf8").replace(/a/g,"b"));
+  await expect(executeBatch(f.config,batch,approveBatch(batch,["close"],"Approve remaining fixture closure"),f.adapter,{journal:f.journal})).rejects.toThrow();expect(f.log.map(action=>action.kind)).toEqual(["comment"]);
+  f.dispose();projects.splice(projects.indexOf(f),1);
+ }
+});
+
+
+test("a completed creation batch remains bound to its original journal path",async()=>{
+ const f=setup(),batch=f.batch([{id:"create",kind:"create",title:"Fixture scope",body:"Approved fixture scope",labels:[]}]),approval=approveBatch(batch,["create"],"Approve one fixture creation");
+ await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});
+ await expect(executeBatch(f.config,batch,approval,f.adapter,{journal:join(f.root,".vh-adlc/new-output.json")})).rejects.toThrow();expect(f.log.map(action=>action.kind)).toEqual(["create"]);
 });

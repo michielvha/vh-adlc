@@ -69,6 +69,13 @@ The parent revalidates current source, actor, settings, evidence and issue state
 serializes effects per hostname/repository under one host user's kernel lock, across batch and output
 paths. This does not serialize another machine or unrelated remote actors. Keep the lock inode;
 never delete a live lock file to force a retry.
+The control plane checkpoints the complete original journal in a hash-chained repository outcome log,
+anchored to that persistent lock inode and its latest head. Missing or edited journals, log records or
+heads block execution. A replacement batch cannot clear uncertainty by changing journal flags. Only
+engine-recorded completion, an attributable receipt or a confirmed denial retires a pending attempt.
+Keep this control-plane state with the original run; deleting it is not a recovery procedure. These
+integrity checks assume the trusted runtime and lock anchor remain intact. They do not protect against
+an administrator replacing all trusted files or a caller controlling the runtime itself.
 
 ## Managed recovery
 

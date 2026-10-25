@@ -8,6 +8,9 @@ import { git, loadSettings, ownership, resolveInside, sourcePath,workstreamPath 
 import {buildReport,publicationVerified,type Report} from "./report";
 import type { Inventory, Issue, Label, Settings } from "./types";
 
+const historyCapability=Object.freeze({});
+export function isExecutionHistoryCapability(value:unknown){return value===historyCapability;}
+
 export type Action =
   | {id:string;kind:"create-request";request:{title:string;data:string};title?:string;body?:string}
   | { id: string; kind: "comment"; issue: number; body: string }
@@ -38,6 +41,7 @@ type Journal = {
   schema_version: 1; batch_hash: string; completed: string[]; started: string | null;
   results: Record<string, MutationResult>; issues: Record<string, Issue>; source_commit: string;
   uncertain: string[];
+  denied?:string[];
   gated?: string[];
   gate_lines?: Record<string,string>;
   attempts?:Record<string,string>;
@@ -228,16 +232,18 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
   const releaseRepository=await executionLock(repositoryLockPath(config));let releaseLock:(()=>Promise<void>)|undefined;
   try {
     releaseLock=await executionLock(`${path}.lock`);
+    const history=executionHistory(config,path,batch.hash,historyCapability);
+    const save=()=>{saveJournal(path,journal);history.checkpoint();};
     let journal: Journal = { schema_version: 1, batch_hash: batch.hash, completed: [], started: null, results: {}, issues: Object.fromEntries(batch.issues.map((issue) => [issue.number, issue])), source_commit: batch.source_commit, uncertain: [] };
     if (existsSync(path)) {
       try { journal = JSON.parse(readFileSync(path, "utf8")); } catch { throw new Error("unreadable triage execution journal"); }
       if (journal.schema_version !== 1 || journal.batch_hash !== batch.hash || !Array.isArray(journal.completed) || !Array.isArray(journal.uncertain) || !journal.results || !journal.issues) bad();
       const interrupted = batch.actions.find((action) => action.id === journal.started);
       if (interrupted && !["plan-patch", "commit"].includes(interrupted.kind) && !journal.completed.includes(interrupted.id) && !journal.uncertain.includes(interrupted.id)) {
-        journal.uncertain.push(interrupted.id); saveJournal(path, journal);
+        journal.uncertain.push(interrupted.id); save();
       }
     }
-    const history=executionHistory(config,path,batch.hash);
+    else save();
     if(history.blocked)return{completed:journal.completed,blocked:approval.action_ids.filter(id=>!journal.completed.includes(id)),failed:[]};
     const blocked: string[] = [], failed: string[] = [];
     const pendingCommit = batch.actions.find((action) => action.id === journal.started && action.kind === "commit") as Extract<Action, { kind: "commit" }> | undefined;
@@ -254,7 +260,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
           return stored.exitCode === 0 && stored.stdout.toString() === expected && readFileSync(resolveInside(config.root, path), "utf8") === expected;
         });
       if (exact && sourceHash(config, batch.actions, journal) === batch.source_hash) {
-        journal.source_commit = head; journal.completed.push(pendingCommit.id); journal.started = null; saveJournal(path, journal);
+        journal.source_commit = head; journal.completed.push(pendingCommit.id); journal.started = null; save();
       }
     }
     const liveConfig = () => {
@@ -301,11 +307,12 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
           journal.results[action.id] = receipt;
           if (current) journal.issues[current.number] = current;
           journal.uncertain = journal.uncertain.filter((id) => id !== action.id);
-          journal.completed.push(action.id); journal.started = null; saveJournal(path, journal); history.resolve(action.id);continue;
+          journal.completed.push(action.id); journal.started = null; save(); history.resolve(action.id);continue;
         }
         if (journal.uncertain.includes(action.id)) { blocked.push(action.id); continue; }
         if (current && hash(material(current)) !== hash(material(journal.issues[current.number]))) { blocked.push(action.id); continue; }
-        journal.started = action.id;journal.attempts={...(journal.attempts??{}),[action.id]:new Date().toISOString()};saveJournal(path, journal);
+        journal.denied=journal.denied?.filter(id=>id!==action.id);
+        journal.started = action.id;journal.attempts={...(journal.attempts??{}),[action.id]:new Date().toISOString()};save();
         let result: MutationResult = {};
         if (action.kind === "plan-patch") {
           const target = resolveInside(config.root, action.path);
@@ -352,13 +359,13 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
             journal.issues[current.number] = after;
           }
         }
-        journal.results[action.id] = result; journal.completed.push(action.id); journal.started = null; saveJournal(path, journal);history.resolve(action.id);
+        journal.results[action.id] = result; journal.completed.push(action.id); journal.started = null;save();history.resolve(action.id);
       } catch (error) {
         if (mutationAttempted && (!(error instanceof MutationFailure) || error.uncertain)) {
           if (!journal.uncertain.includes(action.id)) journal.uncertain.push(action.id);
-          saveJournal(path, journal);
+          save();
         } else if (mutationAttempted) {
-          journal.started = null; saveJournal(path, journal);history.resolve(action.id);
+          journal.started = null;journal.denied=[...new Set([...(journal.denied??[]),action.id])];save();history.resolve(action.id);
         }
         failed.push(action.id);
       }

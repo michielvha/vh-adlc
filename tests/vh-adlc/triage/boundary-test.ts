@@ -15,5 +15,7 @@ export function test(name:string,operation:()=>any,timeout?:number){
  const run=()=>fixtureAuthority.run(true,()=>withVerificationBoundary(operation));
  // These fixtures launch isolated checkouts and kernel namespaces. Retain a
  // bounded test cap that accommodates several serial real checks.
- return nativeTest(name,run,timeout??15_000);
+ const hostCap=Number(process.env.VH_ADLC_TRIAGE_TEST_TIMEOUT_MS??15000);
+ if(!Number.isInteger(hostCap)||hostCap<15000||hostCap>60000)throw Error("invalid triage fixture timeout allowance");
+ return nativeTest(name,run,timeout??hostCap);
 }

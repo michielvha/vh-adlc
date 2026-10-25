@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync,readFileSync,readdirSync,existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync,readdirSync,existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 process.env.VH_ADLC_TRIAGE_LOCK_ROOT??=join(tmpdir(),`vh-triage-locks-${process.pid}`);
@@ -13,8 +13,10 @@ export function git(root: string, ...args: string[]): string {
   return result.stdout.toString().trim();
 }
 
+const activeFixtures=new Set<string>();
 export function fixture() {
   const root = mkdtempSync(join(tmpdir(), "vh-triage-"));
+  activeFixtures.add(root);
   const write = (path: string, content: string) => {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
@@ -29,12 +31,16 @@ export function fixture() {
   git(root, "add", "src/app.ts");
   git(root, "commit", "-qm", "test: seed project");
   return { root, write, settings: (value: unknown) => write(".vh-adlc/triage.json", JSON.stringify(value)), dispose: () => {
-    // Intentional uncertain-outcome tests own these temporary journals. Retire
-    // only this disposed fixture's entries, preserving all other registry data.
+    activeFixtures.delete(root);
+    // Reset only this process's quiescent test namespace. Child fixtures inherit
+    // the parent's lock root and cannot remove its controller history.
     const locks=process.env.VH_ADLC_TRIAGE_LOCK_ROOT;
-    if(locks&&existsSync(locks))for(const name of readdirSync(locks).filter(name=>name.endsWith(".pending.json"))){
-      const path=join(locks,name),data=JSON.parse(readFileSync(path,"utf8"));
-      data.pending=data.pending.filter((entry:{journal:string})=>!entry.journal.startsWith(root+"/"));writeFileSync(path,JSON.stringify(data));
+    if(!activeFixtures.size&&locks===join(tmpdir(),`vh-triage-locks-${process.pid}`)&&existsSync(locks)){
+      for(const name of readdirSync(locks)){
+        const path=join(locks,name);
+        if(name.endsWith(".lock"))writeFileSync(path,"");
+        else rmSync(path,{force:true});
+      }
     }
     rmSync(root, { recursive: true, force: true });
   } };
