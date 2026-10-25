@@ -686,3 +686,15 @@ test("resealed packets cannot bypass planned action structure or derived context
  const results=JSON.parse(run.stdout.toString());expect(results.map((row:any)=>row.mode)).toEqual(["marker-id","source-backfill","derived-identity"]);
  for(const row of results){expect(row.denied).toBe(true);expect(row.effects).toEqual([]);expect(row.source_unchanged).toBe(true);}
 });
+
+
+test("only deterministic unrequested indexes can remain unassessed beside proven work",()=>{
+ for(const mode of ["configured","canonical","model-only","requested"]){
+  const f=setup(mode==="configured"||mode==="requested"?{index_ids:[3]}:{}),index={...structuredClone(f.inventory.issues[0]),number:3,title:mode==="canonical"?"Release umbrella index":"Another item",body:"Tracks child #1"};
+  f.inventory.issues.push(index);f.inventory.coverage.push({collection:"comments:3",scope:"fixture",pages:1,complete:true});
+  const report=buildReport(f.config,f.inventory,[...f.report.observations,{number:3,state:"unverified",is_index:true,remaining:"Untrusted injected verdict and estimate",depends_on:[1],estimated_size:"done"}],{indexRequests:mode==="requested"?[3]:[]});
+  const plan=()=>planBatch(f.config,f.inventory,report,[f.actions[0]]);
+  if(mode==="configured"||mode==="canonical"){expect(plan).not.toThrow();expect(report.rows.find(row=>row.number===3)?.remaining).toBe("");expect(report.observations.find(row=>row.number===3)?.depends_on).toBeUndefined();}
+  else expect(plan).toThrow();
+ }
+});

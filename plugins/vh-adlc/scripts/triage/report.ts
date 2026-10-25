@@ -111,16 +111,17 @@ function observedProof(config:Settings,inventory:Inventory,values:Evidence[],pha
       return true;
     });
 }
-function configuredExclusion(config:Settings,inventory:Inventory,number:number){
+function canonicalIndexRole(issue:Issue){return /(?:^|\b)(?:umbrella|milestone (?:index|tracker)|issue index)(?:\b|$)/i.test(`${issue.title}\n${issue.body}`);}
+function configuredExclusion(config:Settings,inventory:Inventory,number:number,indexRequests:number[]=[]){
   const issue=[...inventory.issues,...inventory.closed_issues].find(issue=>issue.number===number);
-  return !!issue&&(!!config.workstream_ownership[number]||ownership(issue,config,false)==="protected");
+  return !!issue&&(!!config.workstream_ownership[number]||ownership(issue,config,false)==="protected"||ownership(issue,config,canonicalIndexRole(issue))==="index"&&!indexRequests.includes(number));
 }
 // Local reports retain observations. Publication additionally requires actual
 // current proof for every assessment carried by this report, including open work.
 export function publicationVerified(config:Settings,inventory:Inventory,report:Report){
   return report.completeness.inventory&&report.completeness.verification&&!hasRequiredVerificationFailure(config)&&report.observations.length>0&&report.observations.every(value=>{
     const row=report.rows.find(row=>row.number===value.number);
-    if(row?.state==="unverified"&&value.state==="unverified"&&configuredExclusion(config,inventory,value.number)&&!(value.evidence??[]).length&&!(value.adversarial??[]).length)return true;
+    if(row?.state==="unverified"&&value.state==="unverified"&&configuredExclusion(config,inventory,value.number,report.index_requests)&&!(value.evidence??[]).length&&!(value.adversarial??[]).length)return true;
     return row&&row.state!=="unverified"&&observedProof(config,inventory,value.evidence??[],"primary",value.number)&&observedProof(config,inventory,value.adversarial??[],"adversarial",value.number)&&
       (value.blockers??[]).every(blocker=>verified(config,inventory,blocker.evidence)&&observedProof(config,inventory,blocker.evidence))&&
       (!value.owned_by||!!config.workstream_ownership[value.number]||verified(config,inventory,value.ownership_evidence??[])&&observedProof(config,inventory,value.ownership_evidence??[]));
@@ -227,7 +228,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
   if (!Array.isArray(observations) || options.indexRequests?.some((id) => !Number.isSafeInteger(id) || id <= 0)) throw new Error("invalid triage observations or index requests");
   // An explicitly unassessed repository exclusion carries no model-authored
   // verdict, remaining-scope estimate or graph assertions into the report.
-  observations=observations.map(value=>value.state==="unverified"&&configuredExclusion(config,inventory,value.number)&&!(value.evidence??[]).length&&!(value.adversarial??[]).length?{number:value.number,state:"unverified"}:value);
+  observations=observations.map(value=>value.state==="unverified"&&configuredExclusion(config,inventory,value.number,options.indexRequests??[])&&!(value.evidence??[]).length&&!(value.adversarial??[]).length?{number:value.number,state:"unverified"}:value);
   const selected = selection(inventory, config, observations), byId = new Map<number, Observation>();
   for (const value of observations) {
     if (!selected.some((issue) => issue.number === value.number) || byId.has(value.number)) throw new Error("invalid or repeated triage observation target");
@@ -242,7 +243,7 @@ export function buildReport(config: Settings, inventory: Inventory, observations
   if (inventory.mode === "ids") for (const id of inventory.requested_ids) if (!selected.some((issue) => issue.number === id)) missing.push(`issue:${id}`);
   const rows: Row[] = selected.map((issue) => {
     const observation = byId.get(issue.number), evidence = observation?.evidence ?? [], adversarial = observation?.adversarial ?? [];
-    const indexRole = observation?.is_index === true || /(?:^|\b)(?:umbrella|milestone (?:index|tracker)|issue index)(?:\b|$)/i.test(`${issue.title}\n${issue.body}`);
+    const indexRole = observation?.is_index === true || canonicalIndexRole(issue);
     const configuredOwner=config.workstream_ownership[issue.number];
     const ownedBy = configuredOwner?.owners.join(", ") ?? (typeof observation?.owned_by === "string" && observation.owned_by.trim() ? observation.owned_by : null);
     const owner = ownedBy ? "protected" : ownership(issue, config, indexRole), indexRequested = (options.indexRequests ?? []).includes(issue.number);
