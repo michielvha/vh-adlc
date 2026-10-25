@@ -1,6 +1,6 @@
 import{AsyncLocalStorage}from"node:async_hooks";
 import{resumeController}from"./controller-recovery";
-import{prepareVerification,type VerificationSelection}from"./controller-preparation";
+import{prepareRunVerification,type VerificationSelection}from"./controller-preparation";
 export{prepareVerification}from"./controller-preparation";
 import{runOwnedClient}from"./owned-process";
 // Managed triage controller. Analysis has only the declared read adapter; the
@@ -10,7 +10,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSy
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { loadSettings, sourcePath } from "./settings";
 import type { Inventory, Settings } from "./types";
-import{persistVerification,verificationReceipt,inspectSources,inspectIssues,withVerificationBoundary,type VerificationRecord}from"./verification";
+import{persistVerification,verificationReceipt,inspectSources,inspectIssues,withVerificationBoundary,selectVerificationCache,type VerificationRecord}from"./verification";
 
 type Entry = { path: string; sha256: string; mode: number; symlink?: string };
 export type InputManifest = {
@@ -417,13 +417,13 @@ async function runNativeTrialWithinBoundary(options:{host:"codex"|"claude";input
   const initial=verifyInputs(options.input,{checkout:options.checkout,plugin:options.plugin});if(!initial.pass)throw Error(`input preflight failed: ${initial.failures.join(", ")}`);
   const current=JSON.parse(readFileSync(join(options.input,"manifest.json"),"utf8")) as InputManifest;
   if(!current.engineering)await engineeringInputs(options.input,options.checkout,options.plugin);
-  if(!options.legacy)prepareVerification(loadSettings(options.checkout),options.input,options.verification);
   const client=await nativeClient(options.host,options.plugin,options.output,!options.legacy),trace=join(options.output,"boundary.jsonl"),canary=join(options.output,"outside-canary");
   if((options.command||options.legacy)&&options.host!=="claude")throw Error("project command trials require Claude CLI");
   const project=options.command?commandWorkspace(options.input,options.output,options.command):null;
   if(options.legacy&&!project)throw Error("legacy parity requires the exact project command");
   const analysisCwd=project?.cwd??join(resolve(options.input),"source");
-  const verificationCache=join(options.output,"verification-cache");process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE=verificationCache;
+  const verificationCache=join(options.output,"verification-cache");
+  if(options.legacy)selectVerificationCache(verificationCache);else prepareRunVerification(loadSettings(options.checkout),options.input,options.output,options.verification);
   writeFileSync(canary,`Non-secret outside-input canary ${randomUUID()}\n`,{mode:0o600});
   const [ip]=await resolve4("api.github.com"),launch=[import.meta.path,"launch","--input",resolve(options.input),"--trace",trace,"--canary",canary,"--egress-ip",ip,"--verification-cache",verificationCache,...(options.legacy?["--legacy"]:[])];
   const mcp=join(options.output,"mcp.json");writeFileSync(mcp,json({mcpServers:{triage:{command:process.execPath,args:launch}}}));

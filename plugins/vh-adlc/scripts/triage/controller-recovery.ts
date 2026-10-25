@@ -22,7 +22,6 @@ export async function resumeController(run:string,batchHash:string,output:string
  if(!/^[a-f0-9]{64}$/.test(batchHash)||approval.batch_hash!==batchHash)throw Error("select the original exact batch");
  const state=JSON.parse(readFileSync(join(run,"controller-state.json"),"utf8"))as ControllerState;
  if(state.schema_version!==1||realpathSync(state.plugin)!==realpathSync(plugin))throw Error("prior controller state does not match the installed component");
- process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE=join(run,"verification-cache");
  const attempt=newControllerOutput(state.checkout,output),config=loadSettings(state.checkout),batch=JSON.parse(readFileSync(join(run,`batch-${batchHash}.json`),"utf8"))as Batch;
  const journal=join(run,`journal-${batchHash}.json`);
  writeFileSync(join(attempt,"prior-run.json"),JSON.stringify({run:resolve(run),batch_hash:batchHash,journal},null,2));
@@ -57,5 +56,5 @@ export async function resumeController(run:string,batchHash:string,output:string
   writeFileSync(join(attempt,"observations.json"),JSON.stringify(observations,null,2));
   const result=await executeBatch(config,batch,approval,githubExecutor(config),{journal,gate:gate=>lifecycleGate(config,gate)});
   writeFileSync(join(attempt,"result.json"),JSON.stringify(result,null,2));return result;
- });
+ },{cacheRoot:join(run,"verification-cache")});
 }

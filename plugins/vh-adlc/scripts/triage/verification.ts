@@ -4,7 +4,7 @@ import{AsyncLocalStorage}from"node:async_hooks";
 import {createHash,randomUUID} from "node:crypto";
 import {mkdirSync,mkdtempSync,readFileSync,rmSync,writeFileSync} from "node:fs";
 import {homedir,tmpdir} from "node:os";
-import {join} from "node:path";
+import {join,resolve} from "node:path";
 import {git,resolveInside,sourcePath} from "./settings";
 import type {Inventory,Settings} from "./types";
 
@@ -13,11 +13,12 @@ const digest=(value:string|Buffer)=>createHash("sha256").update(value).digest("h
 // Actual operations enter this invocation map. Trust additionally requires the
 // controller's private proof capability; the exported scope alone grants none.
 // Disk records remain attestations, including records copied into a new scope.
-const boundary=new AsyncLocalStorage<{records:Map<string,string>;failed:Set<string>}>();
+const boundary=new AsyncLocalStorage<{records:Map<string,string>;failed:Set<string>;cacheRoot?:string}>();
 const observed=()=>boundary.getStore()?.records;
+export function selectVerificationCache(root:string){const scope=boundary.getStore();if(!scope||typeof root!=="string"||!root||root.includes("\0"))throw Error("verification cache requires an invocation scope and valid path");scope.cacheRoot=resolve(root);}
 export function requiredVerificationFailed(config:Settings){boundary.getStore()?.failed.add(`${config.hostname}/${config.repository}`);}
 export function hasRequiredVerificationFailure(config:Settings){return boundary.getStore()?.failed.has(`${config.hostname}/${config.repository}`)??false;}
-export function withVerificationBoundary<T>(operation:()=>T):T{return boundary.run({records:new Map(),failed:new Set()},operation);}
+export function withVerificationBoundary<T>(operation:()=>T,options?:{cacheRoot:string}):T{return boundary.run({records:new Map(),failed:new Set(),cacheRoot:options?.cacheRoot},operation);}
 export function verificationReceipt(record:VerificationRecord){
   const{nonce:_nonce,started_at:_started,finished_at:_finished,...content}=record;
   const canonical=(value:unknown):string=>JSON.stringify(value,(_key,item)=>item&&typeof item==="object"&&!Array.isArray(item)?Object.fromEntries(Object.keys(item).sort().map(key=>[key,item[key]])):item);
@@ -34,7 +35,7 @@ export function observedVerification(config:Settings,commit:string,receipt:strin
   const actual=JSON.parse(stored) as VerificationRecord;
   return verificationReceipt(actual)===verificationReceipt(record)?actual:null;
 }
-export function verificationDirectory(config:Settings){return join(process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE??join(process.env.XDG_CACHE_HOME??join(homedir(),".cache"),"vh-adlc","triage-verification"),digest(`${config.hostname}/${config.repository}`));}
+export function verificationDirectory(config:Settings){return join(boundary.getStore()?.cacheRoot??process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE??join(process.env.XDG_CACHE_HOME??join(homedir(),".cache"),"vh-adlc","triage-verification"),digest(`${config.hostname}/${config.repository}`));}
 export function persistVerification(config:Settings,record:VerificationRecord){
   const bytes=JSON.stringify(record),receipt=verificationReceipt(record),directory=verificationDirectory(config);mkdirSync(directory,{recursive:true});
   try{writeFileSync(join(directory,`${receipt}.json`),bytes,{mode:0o600,flag:"wx"});}catch(error){if((error as NodeJS.ErrnoException).code!=="EEXIST")throw error;}

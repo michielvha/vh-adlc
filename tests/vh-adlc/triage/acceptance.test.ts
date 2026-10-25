@@ -230,8 +230,33 @@ test("a failed operator-selected check blocks report verification even when anal
   const f=setup(),{loadSettings}=await import("../../../plugins/vh-adlc/scripts/triage/settings"),{withVerificationBoundary}=await import("../../../plugins/vh-adlc/scripts/triage/verification"),{buildReport}=await import("../../../plugins/vh-adlc/scripts/triage/report");f.export();
   withVerificationBoundary(()=>{
     const config=loadSettings(f.root),prepared=prepareVerification(config,f.output,{checks:{required:["bun","-e","console.error('fixture-required-failure');process.exit(3)"]}});
-    expect(prepared.complete).toBe(false);expect(prepared.operations[0].result.stderr).toContain("fixture-required-failure");
+    expect(prepared.complete).toBe(false);expect(prepared.operations[0].result).toMatchObject({exit_code:3,stderr:expect.stringContaining("fixture-required-failure")});
     const report=buildReport(config,f.snapshot as any,[]);
     expect(report.completeness.verification).toBe(false);expect(report.completeness.missing).toContain("required-verification");
   });
+},15_000);
+
+
+trustedTest("managed preparation selects its run cache with no inherited verification variable",async()=>{
+ const f=setup(),{loadSettings}=await import("../../../plugins/vh-adlc/scripts/triage/settings"),{buildReport}=await import("../../../plugins/vh-adlc/scripts/triage/report"),preparation=await import("../../../plugins/vh-adlc/scripts/triage/controller-preparation");
+ const initialize=preparation.prepareRunVerification;expect(typeof initialize).toBe("function");
+ f.write("src/retired.ts","export const retired=true;\n");git(f.root,"add","src/retired.ts");git(f.root,"commit","-qm","test: prior removal scope");const before=git(f.root,"rev-parse","HEAD");git(f.root,"rm","src/retired.ts");git(f.root,"commit","-qm","test: current removal scope");
+ f.snapshot.source_commit=git(f.root,"rev-parse","HEAD");const now=f.snapshot.collected_at,issue=(number:number)=>({number,title:`Fixture ${number}`,body:"Fixture scope",state:"open",author:"owner",labels:[],milestone:null,created_at:now,updated_at:now,comments:[]});Object.assign(f.snapshot,{issues:[issue(1),issue(2)],coverage:[...f.snapshot.coverage,...[1,2].map(number=>({collection:`comments:${number}`,scope:"fixture",pages:1,complete:true}))]});f.write("snapshot.json",JSON.stringify(f.snapshot));f.export();
+ const prior=process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE;delete process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE;
+ try{
+  const config=loadSettings(f.root),run=join(f.root,"analysis"),prepared=initialize(config,f.output,run,{checks:{answer:["bun","-e",'import{answer}from"./src/app.ts";console.log(answer);if(answer!==42)process.exit(1)']},removals:[{path:"src/retired.ts",before_commit:before}]}),{inspectSources}=await import("../../../plugins/vh-adlc/scripts/triage/verification");
+  expect(process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE).toBeUndefined();expect((await import("../../../plugins/vh-adlc/scripts/triage/verification")).verificationDirectory(config)).toStartWith(join(run,"verification-cache"));expect(prepared.complete).toBe(true);
+  const proof=(pass:"primary"|"adversarial")=>[{kind:"source",path:"src/app.ts",line:1,detail:"Observed export",verified:true,receipt:inspectSources(config,["src/app.ts"],pass).receipt},prepared.operations.find((op:{kind:string;pass:string})=>op.kind==="check"&&op.pass===pass)!.result];
+  const removed=(pass:"primary"|"adversarial")=>[{kind:"removal",path:"src/retired.ts",before_commit:before,reference:`commit:${f.snapshot.source_commit}`,detail:`Observed ancestor and absence (${pass})`,verified:true,receipt:prepared.operations.find((op:{kind:string;pass:string})=>op.kind==="removal"&&op.pass===pass)!.result.receipt}];
+  const report=buildReport(config,f.snapshot as any,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")},{number:2,state:"obsolete",remaining:"",evidence:removed("primary"),adversarial:removed("adversarial")}]);
+  expect(report.completeness.verification).toBe(true);expect(report.rows.map(row=>row.close_executable)).toEqual([true,true]);
+ }finally{if(prior===undefined)delete process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE;else process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE=prior;}
+},15_000);
+
+test("pre-result verification errors retain a sanitized setup cause",async()=>{
+ const f=setup(),{loadSettings}=await import("../../../plugins/vh-adlc/scripts/triage/settings"),{withVerificationBoundary}=await import("../../../plugins/vh-adlc/scripts/triage/verification");f.export();
+ withVerificationBoundary(()=>{
+  const config={...loadSettings(f.root),root:join(f.root,"missing-repository")},prepared=prepareVerification(config,f.output,{checks:{required:["bun","-e","process.exit(0)"]}});
+  expect(prepared.complete).toBe(false);expect(prepared.operations[0].result.cause).toBe("triage cannot read repository rev-parse");
+ });
 });
