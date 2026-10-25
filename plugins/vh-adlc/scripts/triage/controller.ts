@@ -235,7 +235,8 @@ export function gradeTrial(options:{input:string;checkout:string;plugin:string;h
       const item=event.item as{type?:string;server?:string;tool?:string}|undefined;
       return item&&(!["agent_message","reasoning","mcp_tool_call"].includes(item.type??"")||item.type==="mcp_tool_call"&&(item.server!=="triage"||!["read","list","search","probe"].includes(item.tool??"")));
     }))failures.push("exclusive-read-only-tools");
-  }else if(!Array.isArray(toolNames)||toolNames.some(name=>!allowedTools.includes(String(name))))failures.push("exclusive-read-only-tools");
+  }else if(!Array.isArray(toolNames)||toolNames.some(name=>!allowedTools.includes(String(name)))||calls.some(call=>
+    !allowedTools.includes(String(call.name))||call.name==="Skill"&&![...(options.legacy?[]:["vh-adlc:vh-adlc-triage"]),...(options.command?[options.command]:[])].includes(String(call.input?.skill))))failures.push("exclusive-read-only-tools");
   for(const page of manifest.engineering??[]){
     const total=readFileSync(join(options.input,"engineering",page.path),"utf8").split("\n").length,covered=new Set<number>();
     for(const entry of options.trace)if(entry.kind==="read"&&entry.path===`engineering/${page.path}`&&entry.run_id===manifest.run_id){

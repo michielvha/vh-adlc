@@ -5,6 +5,14 @@ import{fixture,git}from"./fixtures";
 import{loadSettings}from"../../../plugins/vh-adlc/scripts/triage/settings";
 import{buildReport}from"../../../plugins/vh-adlc/scripts/triage/report";
 import{planBatch,approveBatch,executeBatch}from"../../../plugins/vh-adlc/scripts/triage/execute";
+import{executionLock,repositoryLockPath}from"../../../plugins/vh-adlc/scripts/triage/execution-lock";
+async function waitForOwnedLocks(paths:string[]){
+ const deadline=Date.now()+5000;
+ for(const path of paths)for(;;){
+  try{const release=await executionLock(path);await release();break;}
+  catch(error){if(!(error instanceof Error)||!error.message.includes("is locked")||Date.now()>=deadline)throw error;await Bun.sleep(10);}
+ }
+}
 for(const point of["init-anchor","init-log","journal-complete","journal-started","journal-gated","head-lag","partial-log"])test(`original journal recovers after owned kill at ${point}`,async()=>{
  const f=fixture();try{
   f.settings({schema_version:1,source_roots:["src"]});const config=loadSettings(f.root),before="---\nissue: null\nstatus: planned\n---\n\n# Owner request\n";f.write("plans/link.md",before);
@@ -13,6 +21,9 @@ for(const point of["init-anchor","init-log","journal-complete","journal-started"
   const journal=join(f.root,".vh-adlc/journal.json"),batchPath=join(f.root,".vh-adlc/batch.json"),effects=join(f.root,".vh-adlc/effects.json"),marker=join(f.root,".vh-adlc/killed");writeFileSync(batchPath,JSON.stringify(batch));
   const killed=Bun.spawnSync([process.execPath,join(import.meta.dir,"journal-crash.ts"),f.root,batchPath,journal,effects,point,marker],{env:process.env,stdout:"pipe",stderr:"pipe",timeout:15000,detached:true});
   expect(existsSync(marker)).toBe(true);expect(killed.exitCode).not.toBe(0);
+  // The main child can exit before its SIGKILLed lock keepers finish exiting.
+  // Wait for the owned locks without deleting or rewriting their anchored state.
+  await waitForOwnedLocks([repositoryLockPath(config),journal+".lock"]);
   const adapter:any={identity:async()=>"operator",labels:async()=>[],issue:async()=>{throw Error("No issue");},receipt:async(key:string)=>{try{return JSON.parse(readFileSync(effects,"utf8"))[key]??null;}catch{return null;}},mutate:async(_action:any,key:string)=>{let data:any={};try{data=JSON.parse(readFileSync(effects,"utf8"));}catch{}if(data[key])throw Error("Duplicate fixture creation");const result={number:10,url:`https://${config.hostname}/${config.repository}/issues/10`};data[key]=result;writeFileSync(effects,JSON.stringify(data));return result;}};
   const result=await executeBatch(config,batch,approveBatch(batch,["request","link"],"Resume this original exact test-only batch"),adapter,{journal,gate:async()=>true});
   expect(result).toEqual({completed:["request","link"],blocked:[],failed:[]});expect(Object.keys(JSON.parse(readFileSync(effects,"utf8")))).toHaveLength(1);expect(readFileSync(join(f.root,"plans/link.md"),"utf8")).toBe(before.replace("issue: null","issue: https://github.com/example/project/issues/10"));

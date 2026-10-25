@@ -154,11 +154,14 @@ test("the real boundary process denies outside input, credentials, egress and mu
       ...routes.map(route=>({type:"tool_use",name:"mcp__triage__probe",input:{route,run_id:manifest.run_id}}))]}},
     {type:"user",message:{content:[{type:"tool_result",tool_use_id:"native-skill",content:"Launching skill: vh-adlc:vh-adlc-triage"}]}},
     {type:"result",subtype:"success",is_error:false,session_id:"unit-native-envelope",result:"Read-only fixture complete"}];
-  const grade=(raw=nativeEvents,record=events)=>gradeTrial({input:f.output,checkout:f.root,plugin,host:"claude-cli",raw:raw.map(event=>JSON.stringify(event)).join("\n"),trace:record,installed:plugin,exit_code:0});
+  const grade=(raw:unknown[]=nativeEvents,record=events)=>gradeTrial({input:f.output,checkout:f.root,plugin,host:"claude-cli",raw:raw.map(event=>JSON.stringify(event)).join("\n"),trace:record,installed:plugin,exit_code:0});
   expect(grade().pass).toBe(true);
   expect(grade(nativeEvents,events.map(event=>({...event,namespaces:event.host_namespaces}))).pass).toBe(false);
   expect(grade(nativeEvents,events.map(event=>({...event,run_id:"other-run"}))).pass).toBe(false);
   expect(grade([{...nativeEvents[0],tools:[...toolNames,"Bash"]},...nativeEvents.slice(1)]).pass).toBe(false);
+  for(const call of [{name:"Bash",input:{command:"synthetic only"}},{name:"Read",input:{file_path:"synthetic only"}},{name:"mcp__other__read",input:{}},{name:"Skill",input:{skill:"vh-adlc:vh-adlc-ship"}}]){
+    expect(grade([...nativeEvents,{type:"assistant",message:{content:[{type:"tool_use",id:"unexpected-call",...call}]}}]).failures).toContain("exclusive-read-only-tools");
+  }
 },15_000);
 
 
