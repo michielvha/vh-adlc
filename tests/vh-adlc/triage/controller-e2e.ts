@@ -1,8 +1,8 @@
+import{captureControllerCheckout,controllerArtifactProof}from"./controller-artifacts";
 import{controllerTrialPass}from"./controller-trial-proof";
-import{createHash}from"node:crypto";
 import{captureFakeExecutable,fakeTrackerProof}from"./fake-tracker-proof";
 import{tmpdir}from"node:os";
-import{mkdtempSync,mkdirSync,writeFileSync,readFileSync,chmodSync,readdirSync,lstatSync,readlinkSync}from"node:fs";
+import{mkdtempSync,mkdirSync,writeFileSync,readFileSync,chmodSync}from"node:fs";
 import{join,resolve}from"node:path";
 import{fixture,git}from"./fixtures";
 import{committedComponent}from"./native";
@@ -41,13 +41,8 @@ else if(route==="/repos/example/project/issues/1"&&method==="PATCH"){if(Object.k
 else throw Error("Denied fake endpoint/method");
 writeFileSync(path,JSON.stringify(data));process.stdout.write("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(value));
 `);chmodSync(join(tools,'gh'),0o700);
-function checkoutSnapshot(){
- const entries:any[]=[];const walk=(directory:string,prefix="")=>{for(const name of readdirSync(directory).sort()){
-  if(!prefix&&name===".git")continue;const path=join(directory,name),relative=prefix+name,stat=lstatSync(path);
-  if(stat.isDirectory())walk(path,relative+"/");else entries.push([relative,stat.mode,stat.isSymbolicLink()?readlinkSync(path):createHash("sha256").update(readFileSync(path)).digest("hex")]);
- }};walk(source.root);return{head:git(source.root,"rev-parse","HEAD"),entries,index:createHash("sha256").update(readFileSync(join(source.root,".git/index"))).digest("hex")};
-}
-const before=checkoutSnapshot(),cli=join(plugin,'scripts/triage/controller.ts'),selectedPath=tools+':'+process.env.PATH,resolvedBefore=captureFakeExecutable(selectedPath);
+const before=captureControllerCheckout(source.root),cli=join(plugin,'scripts/triage/controller.ts'),selectedPath=tools+':'+process.env.PATH,resolvedBefore=captureFakeExecutable(selectedPath);
+writeFileSync(join(root,"checkout-before.json"),JSON.stringify(before,null,2)+"\n");
 let batch:any=null;
 async function phase(resuming:boolean){
  const phaseOutput=resuming?join(root,"recovery-attempt"):output;
@@ -81,7 +76,8 @@ async function phase(resuming:boolean){
 }
 const first=await phase(false),final=scenario!=="normal"&&first.interrupted?await phase(true):first;
 const data=JSON.parse(readFileSync(database,'utf8')),effects=data.trace.filter((r:any)=>r.method!=='GET'),ghProof=fakeTrackerProof(join(tools,'gh'),resolvedBefore,captureFakeExecutable(selectedPath),data.trace);
-let prepared=false;try{const verification=JSON.parse(readFileSync(join(output,"input/verification.json"),"utf8"));prepared=verification.complete===true&&["primary","adversarial"].every(pass=>verification.operations.some((entry:any)=>entry.kind==="check"&&entry.pass===pass&&entry.name==="answer-check"&&entry.result.verified===true)&&verification.operations.some((entry:any)=>entry.kind==="removal"&&entry.pass===pass&&entry.name==="src/retired.ts"&&entry.result.receipt));}catch{}
-const result={root,source_checkout:source.root,component_commit:component,component_unchanged:committedComponent(repository,plugin,import.meta.path)===component,host,scenario,preserved:JSON.stringify(before)===JSON.stringify(checkoutSnapshot()),prepared,first,final,gh_resolution_proof:ghProof,fake_effects:effects.map((r:any)=>({method:r.method,endpoint:r.endpoint,payload:r.payload})),analysis_report:join(output,'analysis/report.json')};
+writeFileSync(join(root,"checkout-after.json"),JSON.stringify(captureControllerCheckout(source.root),null,2)+"\n");
+const artifacts=controllerArtifactProof(root,source.root,scenario!=="normal"&&first.interrupted?["run","recovery-attempt"]:["run"]);
+const result={root,source_checkout:source.root,component_commit:component,component_unchanged:committedComponent(repository,plugin,import.meta.path)===component,host,scenario,preserved:artifacts.preserved,prepared:artifacts.prepared,artifacts,first,final,gh_resolution_proof:ghProof,fake_effects:effects.map((r:any)=>({method:r.method,endpoint:r.endpoint,payload:r.payload})),analysis_report:join(output,'analysis/report.json')};
 const pass=controllerTrialPass({...result,gh_proof:ghProof.pass,first:{...first,grade:first.grade?.pass},final:{...final,grade:final.grade?.pass},effects:result.fake_effects,approved_comment:batch?.actions[0]?.body,issue_closed:data.issues.find((i:any)=>i.number===1).state==='closed'});
 writeFileSync(join(root,'events.json'),JSON.stringify({first:first.events,final:final.events},null,2));writeFileSync(join(root,'result.json'),JSON.stringify({...result,pass},null,2));console.log(JSON.stringify({...result,pass}));if(!pass)process.exitCode=1;

@@ -13,6 +13,8 @@ test("fake tracker proof measures actual executable resolution and invocation by
   expect(fakeTrackerProof(executable,before,before,[]).pass).toBe(false);
   expect(fakeTrackerProof(executable,before,before,[{...trace[0],sha256:"a".repeat(64)}]).pass).toBe(false);
   expect(fakeTrackerProof(executable,{...before,path:join(root,"other-gh")},before,trace).pass).toBe(false);
-  writeFileSync(executable,"changed executable");expect(fakeTrackerProof(executable,before,captureFakeExecutable(path),trace).pass).toBe(false);
+  writeFileSync(executable,"changed executable");
+  expect(fakeTrackerProof(executable,before,before,trace).pass).toBe(false);
+  expect(fakeTrackerProof(executable,before,captureFakeExecutable(path),trace).pass).toBe(false);
  }finally{rmSync(root,{recursive:true,force:true});}
 });
