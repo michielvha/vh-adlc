@@ -1,7 +1,7 @@
 import{randomUUID}from"node:crypto";
 import{test}from"./boundary-test";
 import{expect}from"bun:test";
-import{readFileSync}from"node:fs";
+import{readFileSync,existsSync,chmodSync}from"node:fs";
 import{join}from"node:path";
 import{fixture,git}from"./fixtures";
 import{loadSettings}from"../../../plugins/vh-adlc/scripts/triage/settings";
@@ -69,6 +69,33 @@ test("a fixed-source check receives only the selected commit, not unrelated ance
   f.write("src/retired.ts","NON_SECRET_OLD_COMMIT_CANARY");git(f.root,"add","src/retired.ts");git(f.root,"commit","-qm","test: seed historical canary");const before=git(f.root,"rev-parse","HEAD");
   git(f.root,"rm","src/retired.ts");git(f.root,"commit","-qm","test: remove historical canary");
   const code=`import{answer}from"./src/app.ts";if(answer!==42)process.exit(3);const result=Bun.spawnSync(["git","show",${JSON.stringify(before+":src/retired.ts")}],{stdout:"pipe",stderr:"pipe"});if(result.exitCode===0)process.exit(19);`;
+  expect(verifyCommand(loadSettings(f.root),["bun","-e",code],"primary").verified).toBe(true);
+ }finally{f.dispose();}
+});
+
+
+test("a check cannot plant a Git hook for a later host-side metadata read",()=>{
+ const f=fixture();try{
+  const canary=join(f.root,"host-only-canary"),marker=join(f.root,"host-only-marker"),hook=join(f.root,"host-fsmonitor");f.write("host-only-canary","NON_SECRET_HOST_GIT_CANARY");
+  f.write("host-fsmonitor",`#!/usr/bin/env bun\nimport{readFileSync,writeFileSync}from"node:fs";writeFileSync(${JSON.stringify(marker)},readFileSync(${JSON.stringify(canary)}));process.stdout.write("token\\0/\\0");\n`);chmodSync(hook,0o700);
+  const code=`import{appendFileSync}from"node:fs";appendFileSync(".git/config",${JSON.stringify("\n[core]\n fsmonitor = "+JSON.stringify(hook)+"\n")});`;
+  let result;try{result=verifyCommand(loadSettings(f.root),["bun","-e",code],"primary");}catch{}
+  expect(existsSync(marker)).toBe(false);expect(result?.verified).not.toBe(true);
+ }finally{f.dispose();}
+});
+
+test("a new untracked source file cannot become fixed-commit check proof",()=>{
+ for(const ignored of [false,true]){const f=fixture();try{
+  if(ignored){f.write(".gitignore","src/injected.ts\n");git(f.root,"add",".gitignore");git(f.root,"commit","-qm","test: ignore generated source");}
+  const result=verifyCommand(loadSettings(f.root),["bun","-e",'import{writeFileSync}from"node:fs";writeFileSync("src/injected.ts","export const injected=true;\\n");'],"primary");
+  expect(result.verified).toBe(false);expect(existsSync(join(f.root,"src/injected.ts"))).toBe(false);
+ }finally{f.dispose();}}
+});
+
+
+test("a check cannot unmount its read-only Git metadata",()=>{
+ const f=fixture();try{
+  const code='import{appendFileSync}from"node:fs";const unmount=Bun.spawnSync(["umount","/work/.git"],{stdout:"pipe",stderr:"pipe"});if(unmount.exitCode===0)process.exit(9);try{appendFileSync(".git/config","\\n[core]\\n fsmonitor=true\\n");process.exit(10);}catch(error){if(error.code!=="EROFS")process.exit(11);}';
   expect(verifyCommand(loadSettings(f.root),["bun","-e",code],"primary").verified).toBe(true);
  }finally{f.dispose();}
 });

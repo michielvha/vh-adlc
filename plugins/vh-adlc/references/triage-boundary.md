@@ -41,7 +41,10 @@ Each check runs in a disposable shallow checkout of the fixed commit, inside iso
 network namespaces. It receives system tools, Bun, its checkout and private temporary directories.
 Owner home/configuration, credentials, agent sockets, unrelated host files, ancestor Git blobs and
 network egress are unavailable. A missing dependency or isolation facility is an explicit failure.
-The original checkout and index stay untouched. Commands cannot import cache receipts as proof.
+The original checkout and index stay untouched. The disposable Git metadata is read-only, and
+the source tree must remain byte-for-byte unchanged, including new or ignored files. Put check
+outputs in its private temporary directory. The parent compares files directly after cleanup and
+never runs host Git against mutable check output. Commands cannot import cache receipts as proof.
 
 The controller performs fixed GET-only collection and installs the exact local plugin into a
 disposable native profile. The model receives only declared read/list/search/probe tools. Their

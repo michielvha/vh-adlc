@@ -1,3 +1,4 @@
+import{checkSnapshot,checkUnchanged}from"./check-snapshot";
 import{scanSearch,searchProof,searchScope,inSearchScope,type SearchProof}from"./search";
 import{hasManagedProofAuthority}from"./controller-authority";
 import{checkBoundary}from"./check-boundary";
@@ -66,10 +67,12 @@ export function verifyCommand(config:Settings,argv:string[],pass:"primary"|"adve
       if(process.platform!=="win32")try{process.kill(-setup.pid,"SIGKILL");}catch{}
       if(setup.exitCode!==0)throw Error("verification checkout unavailable");
     }
+    const before=checkSnapshot(checkout);
     const started=new Date().toISOString(),run=Bun.spawnSync(checkBoundary(checkout,argv),{cwd:checkout,env:environment,stdin:"ignore",stdout:"pipe",stderr:"pipe",timeout:120_000,detached:true});
     // The command owns this process group; descendants must not survive a test or timeout.
     if(process.platform!=="win32")try{process.kill(-run.pid,"SIGKILL");}catch{}
-    const unchanged=git(checkout,"rev-parse","HEAD")===commit&&!git(checkout,"diff","HEAD","--name-only");
+    // Never execute host Git against output controlled by repository code.
+    const unchanged=checkUnchanged(checkout,before);
     const record:VerificationRecord={schema_version:1,kind:"command",repository:config.repository,hostname:config.hostname,source_commit:commit,pass,argv,
       exit_code:run.exitCode??-1,stdout_sha256:digest(run.stdout),stderr_sha256:digest(run.stderr),source_unchanged:unchanged,nonce:randomUUID(),started_at:started,finished_at:new Date().toISOString(),reads:[]};
     const receipt=persistObserved(config,record);
