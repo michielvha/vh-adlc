@@ -38,10 +38,11 @@ writeFileSync(path,JSON.stringify(data));process.stdout.write("HTTP/2.0 200 OK\\
 const cli=join(plugin,'scripts/triage/controller.ts'),selectedPath=tools+':'+process.env.PATH,resolvedBefore=captureFakeExecutable(selectedPath);
 const child=spawn(process.execPath,[cli,'start','--host',host,'--repo',source.root,'--mode','ids','--ids','1,2,3,4','--output-dir',output],{env:{...process.env,PATH:selectedPath,CONTROLLER_FAKE_API:database},stdio:['pipe','pipe','pipe']});
 let buffer='',error='',stage='analysis',batch:any=null;const events:any[]=[];
-child.stdout.on('data',chunk=>{buffer+=chunk;let at:number;while((at=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,at);buffer=buffer.slice(at+1);if(!line.trim())continue;const event=JSON.parse(line);events.push(event);
+child.stdout.on('data',chunk=>{buffer+=chunk;let at:number;while((at=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,at);buffer=buffer.slice(at+1);if(!line.trim())continue;try{const event=JSON.parse(line);events.push(event);
  if(event.grade){if(!event.grade.pass){child.stdin.end();continue;}const report=JSON.parse(readFileSync(join(output,'analysis/report.json'),'utf8'));if(report.rows.find((r:any)=>r.number===1)?.close_executable!==true)throw Error('No genuine completed proof');stage='batch';child.stdin.write(JSON.stringify({id:'batch',method:'batch',params:{actions:[{id:'explain',kind:'comment',issue:1,body:'Verified the canonical answer export and its entry point in this disposable fixture.'},{id:'close',kind:'close',issue:1,reason:'completed',comment:'explain',duplicate_of:null}]}})+'\n');}
  else if(event.id==='batch'){if(event.error)throw Error(event.error);batch=event.result;stage='execute';child.stdin.write(JSON.stringify({id:'execute',method:'execute',params:{approval:{batch_hash:batch.hash,action_ids:['explain','close'],owner_statement:'Approve these exact synthetic fixture actions only'}}})+'\n');}
  else if(event.id==='execute'){stage='finished';child.stdin.end();}
+ }catch(failure){stage='failed';error+=String(failure)+'\n';child.stdin.end();}
  }});child.stderr.on('data',chunk=>error+=chunk);
 const timer=setTimeout(()=>{child.kill('SIGTERM');},900000);const code=await new Promise<number|null>((resolve,reject)=>{child.on('error',reject);child.on('exit',resolve);});clearTimeout(timer);
 const data=JSON.parse(readFileSync(database,'utf8')),effects=data.trace.filter((r:any)=>r.method!=='GET');

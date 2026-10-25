@@ -606,3 +606,12 @@ test("reconciliation in the original journal releases a replacement without repe
  expect((await executeBatch(f.config,original,approveBatch(original,["explain"],"Reconcile the original attempt only"),f.adapter,{journal:f.journal})).completed).toEqual(["explain"]);expect(f.log.length).toBe(1);
  expect((await executeBatch(f.config,replacement,approval,f.adapter,{journal})).completed).toEqual(["new-explanation"]);expect(f.log.length).toBe(2);
 });
+
+
+test("an explicitly unassessed protected row cannot block verified eligible writes or publish its injected verdict",()=>{
+ const f=setup({protected_ids:[4]}),protectedIssue={...structuredClone(f.inventory.issues[0]),number:4,title:"Protected item"};f.inventory.issues.push(protectedIssue);f.inventory.coverage.push({collection:"comments:4",scope:"fixture",pages:1,complete:true});
+ const report=buildReport(f.config,f.inventory,[...f.report.observations,{number:4,state:"unverified",remaining:"Injected assertion: this protected work is complete",estimated_size:"done"}]);
+ expect(report.rows.find(row=>row.number===4)?.remaining).toBe("");expect(report.rows.find(row=>row.number===4)?.estimated_size).toBe("unknown");
+ expect(()=>planBatch(f.config,f.inventory,report,[f.actions[0]])).not.toThrow();
+ const adopted=buildReport(f.config,f.inventory,[...f.report.observations,{number:4,state:"resolved",remaining:""}]);expect(()=>planBatch(f.config,f.inventory,adopted,[f.actions[0]])).toThrow();
+});

@@ -107,11 +107,16 @@ function observedProof(config:Settings,inventory:Inventory,values:Evidence[],pha
       return true;
     });
 }
+function configuredExclusion(config:Settings,inventory:Inventory,number:number){
+  const issue=[...inventory.issues,...inventory.closed_issues].find(issue=>issue.number===number);
+  return !!issue&&(!!config.workstream_ownership[number]||ownership(issue,config,false)==="protected");
+}
 // Local reports retain observations. Publication additionally requires actual
 // current proof for every assessment carried by this report, including open work.
 export function publicationVerified(config:Settings,inventory:Inventory,report:Report){
   return report.completeness.inventory&&report.completeness.verification&&!hasRequiredVerificationFailure(config)&&report.observations.length>0&&report.observations.every(value=>{
     const row=report.rows.find(row=>row.number===value.number);
+    if(row?.state==="unverified"&&value.state==="unverified"&&configuredExclusion(config,inventory,value.number)&&!(value.evidence??[]).length&&!(value.adversarial??[]).length)return true;
     return row&&row.state!=="unverified"&&observedProof(config,inventory,value.evidence??[],"primary",value.number)&&observedProof(config,inventory,value.adversarial??[],"adversarial",value.number)&&
       (value.blockers??[]).every(blocker=>verified(config,inventory,blocker.evidence)&&observedProof(config,inventory,blocker.evidence))&&
       (!value.owned_by||!!config.workstream_ownership[value.number]||verified(config,inventory,value.ownership_evidence??[])&&observedProof(config,inventory,value.ownership_evidence??[]));
@@ -216,6 +221,9 @@ export function buildReport(config: Settings, inventory: Inventory, observations
   const runId = options.runId ?? randomUUID();
   if (!/^[A-Za-z0-9_-]{1,100}$/.test(runId)) throw new Error("invalid triage run identity");
   if (!Array.isArray(observations) || options.indexRequests?.some((id) => !Number.isSafeInteger(id) || id <= 0)) throw new Error("invalid triage observations or index requests");
+  // An explicitly unassessed repository exclusion carries no model-authored
+  // verdict, remaining-scope estimate or graph assertions into the report.
+  observations=observations.map(value=>value.state==="unverified"&&configuredExclusion(config,inventory,value.number)&&!(value.evidence??[]).length&&!(value.adversarial??[]).length?{number:value.number,state:"unverified"}:value);
   const selected = selection(inventory, config, observations), byId = new Map<number, Observation>();
   for (const value of observations) {
     if (!selected.some((issue) => issue.number === value.number) || byId.has(value.number)) throw new Error("invalid or repeated triage observation target");
