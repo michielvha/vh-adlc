@@ -1,3 +1,4 @@
+import{hasManagedControllerAuthority}from"./controller-authority";
 import{executionHistory}from"./execution-history";
 import { createHash } from "node:crypto";
 import{executionLock,repositoryLockPath}from"./execution-lock";
@@ -136,8 +137,10 @@ function publicationActions(config:Settings,inventory:Inventory,report:Report,ac
     if(action.kind==="commit")return Array.isArray(action.requires)&&action.requires.length>0&&action.requires.every(id=>actions.some(prior=>prior.id===id&&prior.kind==="plan-patch"&&neutral(prior)));
     return false;
   };
-  if(actions.some(action=>!neutral(action))&&!publicationVerified(config,inventory,report))bad();
+  const requires=actions.some(action=>!neutral(action));
+  if(requires&&!publicationVerified(config,inventory,report))bad();
   for(const action of actions)if(!["comment","labels","create-label","create-request","create","close","checklist","plan-patch","commit"].includes(action.kind))bad();
+  return requires;
 }
 
 export function planBatch(config: Settings, inventory: Inventory, report: Report, requested: Action[]): Batch {
@@ -217,7 +220,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
   if(batch.context_id!==hash({config,inventory:batch.inventory,report:reportFacts(batch.report)}))bad();
   const rebuilt=buildReport(config,batch.inventory,batch.report.observations,{runId:batch.report.run_id,indexRequests:batch.report.index_requests,fixedHead:batch.source_commit});
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(batch.report)))bad();
-  publicationActions(config,batch.inventory,batch.report,batch.actions);
+  if(publicationActions(config,batch.inventory,batch.report,batch.actions)&&!hasManagedControllerAuthority())bad();
   for(const action of batch.actions)if(action.kind==="create-request"){const expected=requestPayload(batch.context_id,action);if(action.title!==expected.title||action.body!==expected.body)bad();}
   for(const action of batch.actions)if(action.kind==="create-label"&&action.definition!==undefined&&action.description!==vocabularyDescription(action))bad();
   const path = options.journal;

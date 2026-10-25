@@ -1,3 +1,4 @@
+import{test as trustedTest}from"./boundary-test";
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -209,7 +210,7 @@ test("managed Codex analysis rejects shell, file, web and unknown items",()=>{
 });
 
 
-test("managed preparation supplies actual fixed checks and removal content before analysis",async()=>{
+trustedTest("managed preparation supplies actual fixed checks and removal content before analysis",async()=>{
   const f=setup(),config=(await import("../../../plugins/vh-adlc/scripts/triage/settings")).loadSettings(f.root);
   f.write("src/retired.ts","export const retired=true;\n");git(f.root,"add","src/retired.ts");git(f.root,"commit","-qm","test: prior source");const before=git(f.root,"rev-parse","HEAD");
   git(f.root,"rm","src/retired.ts");git(f.root,"commit","-qm","test: current source");

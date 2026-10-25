@@ -1,3 +1,4 @@
+import{hasManagedControllerAuthority}from"./controller-authority";
 import{existsSync,readFileSync,writeFileSync}from"node:fs";
 import{join}from"node:path";
 import{executeBatch,planBatch}from"./execute";
@@ -10,6 +11,7 @@ import{inspectIssues,inspectRemoval,inspectSources}from"./verification";
 // Only the controller's parent input reaches this function. Analysis runs in a
 // different client with stdin ignored and a fixed read-only tool transport.
 export async function operatorController(options:{config:Settings;inventory:Inventory;report:Report;output:string;input:AsyncIterable<string>;adapter:Adapter;write:(line:string)=>void}){
+ if(!hasManagedControllerAuthority())throw Error("managed operator requires current confined-controller authority");
  const{config,inventory,report}=options,batches=new Map<string,Batch>();
  for await(const line of options.input){
   if(!line.trim())continue;let id:unknown=null;

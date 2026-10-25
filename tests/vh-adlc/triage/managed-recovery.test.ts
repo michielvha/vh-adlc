@@ -1,4 +1,5 @@
-import{test,expect}from"bun:test";
+import{test}from"./boundary-test";
+import{expect}from"bun:test";
 import{mkdirSync,mkdtempSync,rmSync,readFileSync,writeFileSync,chmodSync}from"node:fs";
 import{tmpdir}from"node:os";
 import{join,resolve}from"node:path";
@@ -8,7 +9,7 @@ import{inspectSources,withVerificationBoundary}from"../../../plugins/vh-adlc/scr
 import{buildReport}from"../../../plugins/vh-adlc/scripts/triage/report";
 import{operatorController}from"../../../plugins/vh-adlc/scripts/triage/controller-operator";
 import{MutationFailure}from"../../../plugins/vh-adlc/scripts/triage/execute";
-import{exportInputs,verifyInputs}from"./native";
+import{exportInputs}from"./native";
 import{resumeController}from"../../../plugins/vh-adlc/scripts/triage/controller-recovery";
 
 test("managed recovery reobserves the original batch and journal with one comment total",async()=>{
@@ -43,12 +44,13 @@ else if(route?.endsWith("/issues/1")&&method==="PATCH"){const payload=JSON.parse
 else throw Error("Unapproved route");writeFileSync(path,JSON.stringify(data));console.log("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(result));
 `);chmodSync(join(tools,"gh"),0o700);
   const approval=JSON.stringify({batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Resume this exact approved fixture batch"}),attempt=join(control,"attempt");
-  // The public CLI additionally requires a fresh confined native trial; missing
+  // This unit fixture mocks already validated private authority. The actual
+  // child CLI still requires a fresh confined native trial; missing
   // that adapter must not turn archived files into execution authority.
   const denied=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"resume","--run-dir",analysis,"--batch-hash",batch.hash,"--output-dir",attempt],{env:{...process.env,PATH:tools+":"+process.env.PATH,TRIAGE_RECOVERY_API:database},stdin:Buffer.from(approval+"\n"),stdout:"pipe",stderr:"pipe",timeout:15_000});
   expect(denied.exitCode).toBe(1);expect(denied.stderr.toString()).toContain("configured confined native adapter");expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
   const priorPath=process.env.PATH,priorApi=process.env.TRIAGE_RECOVERY_API;process.env.PATH=tools+":"+priorPath;process.env.TRIAGE_RECOVERY_API=database;
-  let result;try{result=await resumeController(analysis,batch.hash,attempt,JSON.parse(approval),verifyInputs,plugin);}finally{process.env.PATH=priorPath;if(priorApi===undefined)delete process.env.TRIAGE_RECOVERY_API;else process.env.TRIAGE_RECOVERY_API=priorApi;}
+  let result;try{result=await resumeController(analysis,batch.hash,attempt,JSON.parse(approval),plugin);}finally{process.env.PATH=priorPath;if(priorApi===undefined)delete process.env.TRIAGE_RECOVERY_API;else process.env.TRIAGE_RECOVERY_API=priorApi;}
   expect(result.completed).toEqual(["explain","close"]);
   const state=JSON.parse(readFileSync(database,"utf8"));expect(state.issue.comments.length).toBe(1);expect(state.issue.state).toBe("closed");expect(state.trace.filter((event:any)=>event.method!=="GET")).toEqual([{method:"PATCH",route:"repos/example/project/issues/1"}]);
   expect(JSON.parse(readFileSync(join(attempt,"result.json"),"utf8")).completed).toEqual(["explain","close"]);

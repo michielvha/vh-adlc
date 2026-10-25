@@ -111,5 +111,9 @@ trust flag or execution operation exists on analysis input. A batch remains a pr
 Actual receipts establish observations, not the semantic conclusion that a request is implemented.
 Match source, behavior and reason-specific evidence to each predicate, preserve failures, and keep
 primary and adversarial observations distinct. Restarting loses invocation-private proof; disk
-records remain attestations. Host integrations must pass their own acceptance tests before claiming
+records remain attestations. Direct imports of verification, operator or recovery helpers cannot
+create the controller's private proof or effect capability. The controller establishes proof authority
+only after actual native tool validation, and effect authority only after report/recovery validation.
+Neither capability is an input flag, environment value, receipt or exported scope factory.
+Host integrations must pass their own acceptance tests before claiming
 execution support.

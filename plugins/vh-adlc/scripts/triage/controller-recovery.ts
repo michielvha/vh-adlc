@@ -1,3 +1,5 @@
+import{hasManagedControllerAuthority}from"./controller-authority";
+import{verifyInputs}from"./controller";
 import{existsSync,mkdirSync,readFileSync,readdirSync,realpathSync,writeFileSync}from"node:fs";
 import{dirname,isAbsolute,join,relative,resolve,sep}from"node:path";
 import{loadSettings}from"./settings";
@@ -15,7 +17,8 @@ export function newControllerOutput(checkout:string,path:string){
  if(existsSync(output)&&readdirSync(output).length)throw Error("controller output must be new; preserve prior evidence");
  mkdirSync(output,{recursive:true,mode:0o700});return output;
 }
-export async function resumeController(run:string,batchHash:string,output:string,approval:Approval,validate:(input:string,expected:{checkout:string;plugin:string})=>{pass:boolean;failures:string[]},plugin:string){
+export async function resumeController(run:string,batchHash:string,output:string,approval:Approval,plugin:string){
+ if(!hasManagedControllerAuthority())throw Error("managed recovery requires current confined-controller authority");
  if(!/^[a-f0-9]{64}$/.test(batchHash)||approval.batch_hash!==batchHash)throw Error("select the original exact batch");
  const state=JSON.parse(readFileSync(join(run,"controller-state.json"),"utf8"))as ControllerState;
  if(state.schema_version!==1||realpathSync(state.plugin)!==realpathSync(plugin))throw Error("prior controller state does not match the installed component");
@@ -23,7 +26,7 @@ export async function resumeController(run:string,batchHash:string,output:string
  const attempt=newControllerOutput(state.checkout,output),config=loadSettings(state.checkout),batch=JSON.parse(readFileSync(join(run,`batch-${batchHash}.json`),"utf8"))as Batch;
  const journal=join(run,`journal-${batchHash}.json`);
  writeFileSync(join(attempt,"prior-run.json"),JSON.stringify({run:resolve(run),batch_hash:batchHash,journal},null,2));
- if(!existsSync(journal)||batch.hash!==batchHash||!validate(state.input,{checkout:state.checkout,plugin:state.plugin}).pass)throw Error("original journal or unchanged fixed input unavailable");
+ if(!existsSync(journal)||batch.hash!==batchHash||!verifyInputs(state.input,{checkout:state.checkout,plugin:state.plugin}).pass)throw Error("original journal or unchanged fixed input unavailable");
  if(JSON.stringify(batch.report.index_requests)!==JSON.stringify(state.indexRequests))throw Error("original operator selection changed");
  const receipts=new Set<string>();
  function collect(value:unknown){if(Array.isArray(value)){for(const entry of value)collect(entry);}else if(value&&typeof value==="object"){for(const[key,item]of Object.entries(value)){if(key==="receipt"&&typeof item==="string")receipts.add(item);else collect(item);}}}

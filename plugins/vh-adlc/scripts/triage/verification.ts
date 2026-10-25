@@ -1,3 +1,4 @@
+import{hasManagedProofAuthority}from"./controller-authority";
 import{checkBoundary}from"./check-boundary";
 import{AsyncLocalStorage}from"node:async_hooks";
 import {createHash,randomUUID} from "node:crypto";
@@ -9,8 +10,9 @@ import type {Inventory,Settings} from "./types";
 
 export type VerificationRecord={schema_version:1;kind:"command"|"inspection"|"issues"|"removal";repository:string;hostname:string;source_commit:string;pass:"primary"|"adversarial";argv:string[];exit_code:number;stdout_sha256:string;stderr_sha256:string;source_unchanged:boolean;nonce:string;started_at:string;finished_at:string;reads:{path:string;sha256:string;start_line:number;end_line:number}[];issues?:{number:number;sha256:string}[];removal?:{path:string;before_commit:string;sha256:string}};
 const digest=(value:string|Buffer)=>createHash("sha256").update(value).digest("hex");
-// Only actual operations in this trusted invocation enter this map. Disk records are
-// attestations; importing or rehashing one never grants this process's authority.
+// Actual operations enter this invocation map. Trust additionally requires the
+// controller's private proof capability; the exported scope alone grants none.
+// Disk records remain attestations, including records copied into a new scope.
 const boundary=new AsyncLocalStorage<{records:Map<string,string>;failed:Set<string>}>();
 const observed=()=>boundary.getStore()?.records;
 export function requiredVerificationFailed(config:Settings){boundary.getStore()?.failed.add(`${config.hostname}/${config.repository}`);}
@@ -25,6 +27,7 @@ function persistObserved(config:Settings,record:VerificationRecord){
   const receipt=persistVerification(config,record);observed()?.set(`${config.hostname}/${config.repository}/${receipt}`,JSON.stringify(record));return receipt;
 }
 export function observedVerification(config:Settings,commit:string,receipt:string|undefined){
+  if(!hasManagedProofAuthority())return null;
   const record=verificationRecord(config,commit,receipt);
   const stored=observed()?.get(`${config.hostname}/${config.repository}/${receipt}`);
   if(!record||!stored)return null;

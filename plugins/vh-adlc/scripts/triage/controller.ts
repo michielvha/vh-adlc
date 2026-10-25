@@ -1,3 +1,4 @@
+import{AsyncLocalStorage}from"node:async_hooks";
 import{resumeController}from"./controller-recovery";
 import{prepareVerification,type VerificationSelection}from"./controller-preparation";
 export{prepareVerification}from"./controller-preparation";
@@ -401,6 +402,13 @@ export function nativeContract(options:{legacy?:boolean;mode?:string;routing:str
   return{prompt,schema,pluginArgs:options.installed?["--plugin-dir",options.installed]:[]};
 }
 
+// These capabilities never cross an input, environment, receipt or export.
+// Only this module's successful native validation enters their private scopes.
+const proofAuthority=new AsyncLocalStorage<object>(),effectAuthority=new AsyncLocalStorage<object>();
+const proofCapability=Object.freeze({}),effectCapability=Object.freeze({});
+export function hasManagedProofAuthority(){return proofAuthority.getStore()===proofCapability;}
+export function hasManagedControllerAuthority(){return effectAuthority.getStore()===effectCapability;}
+
 type ComponentAudit={repo:string;driver:string};
 let componentAudit:ComponentAudit|undefined;
 async function runNativeTrialWithinBoundary(options:{host:"codex"|"claude";input:string;checkout:string;plugin:string;output:string;prompt?:string;command?:string;legacy?:boolean;expected?:string;indexRequests?:number[];operator?:boolean;verification?:VerificationSelection;recovery?:{run:string;batchHash:string;approval:import("./execute").Approval;output:string}}) {
@@ -446,6 +454,7 @@ async function runNativeTrialWithinBoundary(options:{host:"codex"|"claude";input
   const traces=existsSync(trace)?readFileSync(trace,"utf8").split("\n").flatMap(line=>{try{return[JSON.parse(line)];}catch{return[];}}):[];
   const grade=gradeTrial({command:options.command,commandModel:project?.model,legacy:options.legacy,input:options.input,checkout:options.checkout,plugin:options.plugin,host:`${options.host}-cli`,raw:transcript,trace:traces,installed:client.installed,exit_code:exit,toolConfiguration,
     kind:options.host==="codex"?"native-discovery":"live-read-only"});
+  const finish=async()=>{
   let reportPath:string|null=null,verifiedReport:import("./report").Report|null=null;
   if(existsSync(last))try{
     const response=JSON.parse(readFileSync(last,"utf8")),snapshot=JSON.parse(readFileSync(join(options.input,"snapshot.json"),"utf8")) as Inventory;
@@ -481,14 +490,16 @@ async function runNativeTrialWithinBoundary(options:{host:"codex"|"claude";input
     const {publicationVerified}=await import("./report");
     const verdicts=(report:import("./report").Report)=>report.rows.map(({number,state,remaining,ownership,disposition,depends_on,duplicate_of,closure_reason})=>({number,state,remaining,ownership,disposition,depends_on,duplicate_of,closure_reason}));
     if(!publicationVerified(loadSettings(options.checkout),JSON.parse(readFileSync(join(options.input,"snapshot.json"),"utf8")),verifiedReport)||json(verdicts(verifiedReport))!==json(verdicts(prior.report)))throw Error("fresh analysis changed a verdict; a new approved batch is required");
-    const resumed=await resumeController(options.recovery.run,options.recovery.batchHash,options.recovery.output,options.recovery.approval,verifyInputs,resolve(options.plugin));
+    const resumed=await effectAuthority.run(effectCapability,()=>resumeController(options.recovery!.run,options.recovery!.batchHash,options.recovery!.output,options.recovery!.approval,resolve(options.plugin)));
     process.stdout.write(json({channel:"operator",recovery:resumed})+"\n");if(resumed.blocked.length||resumed.failed.length)process.exitCode=1;
   }
   if(options.operator&&grade.pass&&verifiedReport){
     const{operatorController}=await import("./controller-operator"),{createInterface}=await import("node:readline"),{githubExecutor}=await import("./github");
     writeFileSync(join(options.output,"controller-state.json"),json({schema_version:1,checkout:resolve(options.checkout),plugin:resolve(options.plugin),input:resolve(options.input),host:options.host,verification:options.verification??{},indexRequests:options.indexRequests??[]}),{flag:"wx",mode:0o600});
-    await operatorController({config:loadSettings(options.checkout),inventory:JSON.parse(readFileSync(join(options.input,"snapshot.json"),"utf8")),report:verifiedReport,output:options.output,input:createInterface({input:process.stdin,crlfDelay:Infinity}),adapter:githubExecutor(loadSettings(options.checkout)),write:line=>process.stdout.write(line+"\n")});
+    await effectAuthority.run(effectCapability,()=>operatorController({config:loadSettings(options.checkout),inventory:JSON.parse(readFileSync(join(options.input,"snapshot.json"),"utf8")),report:verifiedReport,output:options.output,input:createInterface({input:process.stdin,crlfDelay:Infinity}),adapter:githubExecutor(loadSettings(options.checkout)),write:line=>process.stdout.write(line+"\n")}));
   }
+  };
+  return grade.pass?proofAuthority.run(proofCapability,finish):finish();
 }
 async function runNativeTrial(options:Parameters<typeof runNativeTrialWithinBoundary>[0]){return withVerificationBoundary(()=>runNativeTrialWithinBoundary(options));}
 export async function controllerMain(audit?:ComponentAudit) {
@@ -559,4 +570,5 @@ export async function controllerMain(audit?:ComponentAudit) {
   }
   throw Error("expected export, run, launch or serve");
 }
-if(import.meta.main)await controllerMain();
+// Do not make this module async: authority queries form a function-only import cycle.
+if(import.meta.main)controllerMain().catch(error=>{process.stderr.write((error instanceof Error?error.message:"managed controller failed")+"\n");process.exitCode=1;});

@@ -405,7 +405,13 @@ process.stdout.write("HTTP/2.0 200 OK\\r\\nContent-Type: application/json\\r\\n\
   expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/github.json"),"utf8")).trace).toEqual([]);
   const trustedCode=`import{readFileSync}from"node:fs";import{verifyCommand,withVerificationBoundary}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/verification.ts"))};import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{executeBatch}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/execute.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};await withVerificationBoundary(async()=>{const root=${JSON.stringify(f.root)},config=loadSettings(root),argv=["bun","-e",'import{answer}from"./src/app.ts";if(answer!==42)process.exit(1);'];for(const pass of["primary","adversarial"])verifyCommand(config,argv,pass);console.log(JSON.stringify(await executeBatch(config,JSON.parse(readFileSync(root+"/.vh-adlc/batch.json","utf8")),JSON.parse(readFileSync(root+"/.vh-adlc/approval.json","utf8")),githubExecutor(config),{journal:${JSON.stringify(f.journal)}})));});`;
   const trusted=()=>Bun.spawnSync(["bun","-e",trustedCode],{env,stdout:"pipe",stderr:"pipe"});
-  const first=trusted();expect({exit:first.exitCode,error:first.stderr.toString()}).toEqual({exit:0,error:""});expect(trusted().exitCode).toBe(0);
+  // A second actual child importing the live scope still has no confined
+  // controller capability. Positive adapter behavior uses this trusted unit fixture.
+  const direct=trusted();expect(direct.exitCode).toBe(1);expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/github.json"),"utf8")).trace).toEqual([]);
+  const{githubExecutor}=await import("../../../plugins/vh-adlc/scripts/triage/github"),priorPath=process.env.PATH,priorDb=process.env.TRIAGE_FIXTURE_DB;
+  process.env.PATH=env.PATH;process.env.TRIAGE_FIXTURE_DB=env.TRIAGE_FIXTURE_DB;
+  try{await executeBatch(f.config,batch,approval,githubExecutor(f.config),{journal:f.journal});await executeBatch(f.config,batch,approval,githubExecutor(f.config),{journal:f.journal});}
+  finally{process.env.PATH=priorPath;if(priorDb===undefined)delete process.env.TRIAGE_FIXTURE_DB;else process.env.TRIAGE_FIXTURE_DB=priorDb;}
   const data = JSON.parse(readFileSync(join(f.root, ".vh-adlc/github.json"), "utf8"));
   expect(data.trace.filter((call: { method: string }) => call.method !== "GET")).toEqual([
     { method: "POST", endpoint: "repos/example/project/issues/1/comments", payload: { body: (batch.actions[0] as { body: string }).body } },
@@ -479,10 +485,11 @@ else{data.writes++;response={};}
 writeFileSync(path,JSON.stringify(data));process.stdout.write("HTTP/2.0 200 OK\\r\\n\\r\\n"+JSON.stringify(response));
 `);
   const{chmodSync}=await import("node:fs");chmodSync(join(f.root,"tools/gh"),0o700);
-  const code=`import{readFileSync}from"node:fs";import{githubExecutor}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/github.ts"))};import{executeBatch}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/execute.ts"))};import{loadSettings}from ${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/settings.ts"))};const root=${JSON.stringify(f.root)},config=loadSettings(root);const{verifyCommand,withVerificationBoundary}=await import(${JSON.stringify(join(import.meta.dir,"../../../plugins/vh-adlc/scripts/triage/verification.ts"))});await withVerificationBoundary(async()=>{for(const pass of["primary","adversarial"])verifyCommand(config,["bun","-e",'import{answer}from"./src/app.ts";if(answer!==42)process.exit(1);'],pass);const read=p=>JSON.parse(readFileSync(root+p,"utf8"));console.log(JSON.stringify(await executeBatch(config,read("/.vh-adlc/batch.json"),read("/.vh-adlc/approval.json"),githubExecutor(config),{journal:root+"/.vh-adlc/live-journal.json"})));});`;
-  const run=Bun.spawnSync(["bun","-e",code],{env:{...process.env,PATH:`${join(f.root,"tools")}:${process.env.PATH}`,TRIAGE_FIXTURE_DB:join(f.root,".vh-adlc/github.json")},stdout:"pipe",stderr:"pipe"});
-  expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});
-  expect(JSON.parse(run.stdout.toString())).toEqual({completed:[],blocked:[],failed:["tag"]});
+  const{githubExecutor}=await import("../../../plugins/vh-adlc/scripts/triage/github"),priorPath=process.env.PATH,priorDb=process.env.TRIAGE_FIXTURE_DB;
+  process.env.PATH=`${join(f.root,"tools")}:${priorPath}`;process.env.TRIAGE_FIXTURE_DB=join(f.root,".vh-adlc/github.json");
+  let result;try{result=await executeBatch(f.config,batch,approval,githubExecutor(f.config),{journal:join(f.root,".vh-adlc/live-journal.json")});}
+  finally{process.env.PATH=priorPath;if(priorDb===undefined)delete process.env.TRIAGE_FIXTURE_DB;else process.env.TRIAGE_FIXTURE_DB=priorDb;}
+  expect(result).toEqual({completed:[],blocked:[],failed:["tag"]});
   expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/github.json"),"utf8")).writes).toBe(0);
   expect(JSON.parse(readFileSync(join(f.root,".vh-adlc/live-journal.json"),"utf8")).uncertain).toEqual([]);
 });
@@ -614,4 +621,10 @@ test("an explicitly unassessed protected row cannot block verified eligible writ
  expect(report.rows.find(row=>row.number===4)?.remaining).toBe("");expect(report.rows.find(row=>row.number===4)?.estimated_size).toBe("unknown");
  expect(()=>planBatch(f.config,f.inventory,report,[f.actions[0]])).not.toThrow();
  const adopted=buildReport(f.config,f.inventory,[...f.report.observations,{number:4,state:"resolved",remaining:""}]);expect(()=>planBatch(f.config,f.inventory,adopted,[f.actions[0]])).toThrow();
+});
+
+
+test("direct verification API imports cannot mint confined proof or protected execution authority",()=>{
+ const run=Bun.spawnSync([process.execPath,join(import.meta.dir,"unconfined-execution.ts")],{env:process.env,stdout:"pipe",stderr:"pipe",timeout:15_000});
+ expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});const result=JSON.parse(run.stdout.toString());expect(result.denied).toBe(true);expect(result.effects).toEqual([]);expect(result.recoveryDenied).toBe(true);expect(result.operatorDenied).toBe(true);
 });
