@@ -103,6 +103,10 @@ re-runs only original operator-selected checks and uses the original exact batch
 files alone grant no execution authority. Prior artifacts are preserved. Completed comments, closures
 and creations are never repeated within the unchanged original batch.
 
+The complete original check/removal selection is stored in the hash-bound verification input.
+Editable controller state must match it, including checks the report did not cite. Dropping a check
+or changing its arguments stops recovery before fresh native analysis or tracker effects.
+
 Material source, actor or evidence changes stop the old batch. A replacement needs fresh proof,
 exact approval and a fresh explanation before closure. Explanation identities bind the source,
 actor, settings, report and fixed inventory. The repository's pending-outcome record prevents a

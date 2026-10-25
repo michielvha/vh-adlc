@@ -11,6 +11,7 @@ import{operatorController}from"../../../plugins/vh-adlc/scripts/triage/controlle
 import{MutationFailure}from"../../../plugins/vh-adlc/scripts/triage/execute";
 import{exportInputs}from"./native";
 import{resumeController}from"../../../plugins/vh-adlc/scripts/triage/controller-recovery";
+import{prepareVerification}from"../../../plugins/vh-adlc/scripts/triage/controller-preparation";
 
 test("managed recovery reobserves the original batch and journal with one comment total",async()=>{
  const f=fixture(),control=mkdtempSync(join(tmpdir(),"triage-managed-recovery-"));try{
@@ -21,7 +22,9 @@ test("managed recovery reobserves the original batch and journal with one commen
   writeFileSync(join(control,"snapshot.json"),JSON.stringify(inventory));exportInputs({checkout:f.root,plugin,snapshot:join(control,"snapshot.json"),output:input});
   process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE=join(analysis,"verification-cache");
   const responses:any[]=[];let batch:any;
+  const selection={checks:{"uncited-check":["bun","-e","process.exit(0)"]}};
   await withVerificationBoundary(async()=>{
+   prepareVerification(config,input,selection);
    const proof=(pass:"primary"|"adversarial")=>{const receipt=inspectSources(config,["src/app.ts"],pass).receipt;return[{kind:"source",path:"src/app.ts",line:1,detail:"Actual export",verified:true,receipt},{kind:"wiring",path:"src/app.ts",line:1,detail:"Public module export",verified:true,receipt}];};
    const report=buildReport(config,inventory,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")}]);
    const adapter:any={identity:async()=>"operator",labels:async()=>[],issue:async()=>structuredClone(issue),receipt:async()=>null,mutate:async(action:any)=>{if(action.kind==="close")throw new MutationFailure(false);issue.comments.push({id:1,author:"operator",body:action.body,created_at:now});return{issue:structuredClone(issue)};}};
@@ -29,7 +32,8 @@ test("managed recovery reobserves the original batch and journal with one commen
    await operatorController({config,inventory,report,output:analysis,input:requests(),adapter,write:line=>responses.push(JSON.parse(line))});
   });
   expect(responses.at(-1).result.completed).toEqual(["explain"]);expect(issue.comments.length).toBe(1);
-  writeFileSync(join(analysis,"controller-state.json"),JSON.stringify({schema_version:1,checkout:f.root,plugin,input,verification:{},indexRequests:[]}));
+  const controllerState={schema_version:1,checkout:f.root,plugin,input,verification:selection,indexRequests:[]};
+  writeFileSync(join(analysis,"controller-state.json"),JSON.stringify(controllerState));
   writeFileSync(database,JSON.stringify({issue,trace:[]}));
   writeFileSync(join(tools,"gh"),`#!/usr/bin/env bun
 import{readFileSync,writeFileSync}from"node:fs";
@@ -50,7 +54,13 @@ else throw Error("Unapproved route");writeFileSync(path,JSON.stringify(data));co
   const denied=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"resume","--run-dir",analysis,"--batch-hash",batch.hash,"--output-dir",attempt],{env:{...process.env,PATH:tools+":"+process.env.PATH,TRIAGE_RECOVERY_API:database},stdin:Buffer.from(approval+"\n"),stdout:"pipe",stderr:"pipe",timeout:15_000});
   expect(denied.exitCode).toBe(1);expect(denied.stderr.toString()).toContain("configured confined native adapter");expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
   const priorPath=process.env.PATH,priorApi=process.env.TRIAGE_RECOVERY_API;process.env.PATH=tools+":"+priorPath;process.env.TRIAGE_RECOVERY_API=database;
-  let result;try{result=await resumeController(analysis,batch.hash,attempt,JSON.parse(approval),plugin);}finally{process.env.PATH=priorPath;if(priorApi===undefined)delete process.env.TRIAGE_RECOVERY_API;else process.env.TRIAGE_RECOVERY_API=priorApi;}
+  let result;try{
+   writeFileSync(join(analysis,"controller-state.json"),JSON.stringify({...controllerState,verification:{}}));
+   await expect(resumeController(analysis,batch.hash,join(control,"tampered-attempt"),JSON.parse(approval),plugin)).rejects.toThrow("original operator verification selection changed");
+   expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
+   writeFileSync(join(analysis,"controller-state.json"),JSON.stringify(controllerState));
+   result=await resumeController(analysis,batch.hash,attempt,JSON.parse(approval),plugin);
+  }finally{process.env.PATH=priorPath;if(priorApi===undefined)delete process.env.TRIAGE_RECOVERY_API;else process.env.TRIAGE_RECOVERY_API=priorApi;}
   expect(result.completed).toEqual(["explain","close"]);
   const state=JSON.parse(readFileSync(database,"utf8"));expect(state.issue.comments.length).toBe(1);expect(state.issue.state).toBe("closed");expect(state.trace.filter((event:any)=>event.method!=="GET")).toEqual([{method:"PATCH",route:"repos/example/project/issues/1"}]);
   expect(JSON.parse(readFileSync(join(attempt,"result.json"),"utf8")).completed).toEqual(["explain","close"]);

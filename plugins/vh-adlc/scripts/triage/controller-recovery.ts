@@ -7,7 +7,7 @@ import{executeBatch,type Approval,type Batch}from"./execute";
 import{githubExecutor}from"./github";
 import{lifecycleGate}from"./lifecycle-gate";
 import{inspectIssues,inspectRemoval,inspectSources,inspectSearch,verifyCommand,verificationRecord,withVerificationBoundary,requiredVerificationFailed}from"./verification";
-import type{VerificationSelection}from"./controller-preparation";
+import{originalVerificationSelection,type VerificationSelection}from"./controller-preparation";
 export type ControllerState={schema_version:1;checkout:string;plugin:string;input:string;verification:VerificationSelection;indexRequests:number[]};
 
 export function newControllerOutput(checkout:string,path:string){
@@ -27,12 +27,13 @@ export async function resumeController(run:string,batchHash:string,output:string
  writeFileSync(join(attempt,"prior-run.json"),JSON.stringify({run:resolve(run),batch_hash:batchHash,journal},null,2));
  if(!existsSync(journal)||batch.hash!==batchHash||!verifyInputs(state.input,{checkout:state.checkout,plugin:state.plugin}).pass)throw Error("original journal or unchanged fixed input unavailable");
  if(JSON.stringify(batch.report.index_requests)!==JSON.stringify(state.indexRequests))throw Error("original operator selection changed");
+ const selection=originalVerificationSelection(state.input,state.verification);
  const receipts=new Set<string>();
  function collect(value:unknown){if(Array.isArray(value)){for(const entry of value)collect(entry);}else if(value&&typeof value==="object"){for(const[key,item]of Object.entries(value)){if(key==="receipt"&&typeof item==="string")receipts.add(item);else collect(item);}}}
  collect(batch.report.observations);
  return withVerificationBoundary(async()=>{
   // Re-run every selected required check, including failures omitted by analysis.
-  const checks=state.verification.checks??{},removals=state.verification.removals??[],observations=[];
+  const checks=selection.checks,removals=selection.removals,observations=[];
   for(const pass of ["primary","adversarial"]as const){
    for(const[name,argv]of Object.entries(checks)){const result=verifyCommand(config,argv,pass);observations.push({name,pass,result});if(!result.verified)requiredVerificationFailed(config);}
    for(const item of removals){const result=inspectRemoval(config,item.path,item.before_commit,pass);observations.push({name:item.path,pass,result});}
