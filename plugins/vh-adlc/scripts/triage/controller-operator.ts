@@ -1,7 +1,7 @@
 import{hasManagedControllerAuthority}from"./controller-authority";
 import{existsSync,readFileSync,writeFileSync}from"node:fs";
 import{join}from"node:path";
-import{executeBatch,planBatch}from"./execute";
+import{executeBatch,planBatch,VerificationRequiredError}from"./execute";
 import type{Adapter,Approval,Batch}from"./execute";
 import type{Report}from"./report";
 import type{Inventory,Settings}from"./types";
@@ -32,6 +32,6 @@ export async function operatorController(options:{config:Settings;inventory:Inve
    else if(request.method==="inspect-removal")result=inspectRemoval(config,args.path,args.before_commit,args.pass);
    else throw Error("unknown operator operation");
    options.write(JSON.stringify({id,channel:"operator",result}));
-  }catch{options.write(JSON.stringify({id,channel:"operator",error:"operator request denied; no unvalidated effect"}));}
+  }catch(error){options.write(JSON.stringify({id,channel:"operator",error:"operator request denied; no unvalidated effect",...(error instanceof VerificationRequiredError?{error_code:"verification-required"}:{})}));}
  }
 }

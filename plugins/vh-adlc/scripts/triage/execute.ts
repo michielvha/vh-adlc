@@ -55,6 +55,7 @@ function hash(value: unknown) { return createHash("sha256").update(canonical(val
 function batchHash(batch: Omit<Batch, "hash"> | Batch) { const { hash: _hash, ...content } = batch as Batch; return hash(content); }
 function reportFacts(value:Report){const{created_at:_created,comparison:_comparison,...facts}=value;return facts;}
 function bad(): never { throw new Error("invalid triage action batch or approval"); }
+export class VerificationRequiredError extends Error{constructor(){super("current observed triage verification is required");}}
 function nonempty(value: unknown): value is string { return typeof value === "string" && !!value.trim(); }
 function strings(value: unknown): value is string[] { return Array.isArray(value) && value.every(nonempty); }
 function marker(namespace:string, id: string) { return `<!-- vh-adlc-triage:${namespace}:${id} -->`; }
@@ -171,7 +172,7 @@ function publicationActions(config:Settings,inventory:Inventory,report:Report,ac
     return false;
   };
   const requires=actions.some(action=>!neutral(action));
-  if(requires&&!publicationVerified(config,inventory,report))bad();
+  if(requires&&!publicationVerified(config,inventory,report))throw new VerificationRequiredError();
   for(const action of actions)if(!["comment","labels","create-label","create-request","create","close","checklist","plan-patch","commit"].includes(action.kind))bad();
   return requires;
 }

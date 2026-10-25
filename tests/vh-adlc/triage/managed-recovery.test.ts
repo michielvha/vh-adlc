@@ -66,3 +66,20 @@ else throw Error("Unapproved route");writeFileSync(path,JSON.stringify(data));co
   expect(JSON.parse(readFileSync(join(attempt,"result.json"),"utf8")).completed).toEqual(["explain","close"]);
  }finally{f.dispose();rmSync(control,{recursive:true,force:true});}
 });
+
+test("operator distinguishes failed required verification from an unrelated batch error",async()=>{
+ const f=fixture(),control=mkdtempSync(join(tmpdir(),"triage-verification-denial-"));try{
+  f.settings({schema_version:1,source_roots:["src"]});const config=loadSettings(f.root),now=new Date().toISOString(),issue={number:1,title:"Answer export",body:"Export answer",state:"open",author:"owner",labels:[],milestone:null,created_at:now,updated_at:now,comments:[]};
+  const inventory:any={schema_version:1,repository:config.repository,hostname:config.hostname,source_commit:git(f.root,"rev-parse","HEAD"),mode:"ids",requested_ids:[1],collected_at:now,actor:"operator",issues:[issue],closed_issues:[],pulls:[],plans:[],plan_metadata:"not-configured",labels:[],coverage:["identity","labels","issues","pulls","plans","comments:1"].map(collection=>({collection,scope:collection==="issues"?"all-states":collection==="pulls"?"all-closed-pulls":"fixture",pages:1,complete:true}))};
+  writeFileSync(join(control,"snapshot.json"),JSON.stringify(inventory));
+  for(const exit of[0,1])await withVerificationBoundary(async()=>{
+   const input=join(control,`input-${exit}`),output=join(control,`output-${exit}`),plugin=resolve(import.meta.dir,"../../../plugins/vh-adlc");mkdirSync(output);exportInputs({checkout:f.root,plugin,snapshot:join(control,"snapshot.json"),output:input});
+   const{prepareRunVerification}=await import("../../../plugins/vh-adlc/scripts/triage/controller-preparation");prepareRunVerification(config,input,output,{checks:{"required-check":["bun","-e",`process.exit(${exit})`]}});
+   const proof=(pass:"primary"|"adversarial")=>{const receipt=inspectSources(config,["src/app.ts"],pass).receipt;return[{kind:"source",path:"src/app.ts",line:1,detail:"Actual public export",verified:true,receipt},{kind:"wiring",path:"src/app.ts",line:1,detail:"Export is the requested contract",verified:true,receipt}];};
+   const report=buildReport(config,inventory,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")}]),responses:any[]=[];
+   async function* request(){yield JSON.stringify({id:"batch",method:"batch",params:{actions:[{id:"explain",kind:"comment",issue:1,body:"Verified the public answer export."}]}});}
+   await operatorController({config,inventory,report,output,input:request(),adapter:{}as any,write:line=>responses.push(JSON.parse(line))});
+   if(exit===0)expect(responses[0].result.hash).toMatch(/^[a-f0-9]{64}$/);else expect(responses[0].error_code).toBe("verification-required");
+  });
+ }finally{f.dispose();rmSync(control,{recursive:true,force:true});}
+});
