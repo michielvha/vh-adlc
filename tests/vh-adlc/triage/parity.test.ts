@@ -5,7 +5,7 @@ import {join} from "node:path";
 import {fixture,git} from "./fixtures";
 import {loadSettings} from "../../../plugins/vh-adlc/scripts/triage/settings";
 import {buildReport,saveReport,type Observation} from "../../../plugins/vh-adlc/scripts/triage/report";
-import{inspectSources,inspectIssues}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{inspectSources,inspectIssues,inspectSearch}from"../../../plugins/vh-adlc/scripts/triage/verification";
 import type {Inventory,Issue,Mode} from "../../../plugins/vh-adlc/scripts/triage/types";
 
 // This deterministic matrix checks retained rules and explicit differences against
@@ -29,7 +29,7 @@ test("the synthetic migration matrix retains scope across modes and records inte
     const source={kind:"source",path:"src/app.ts",line:1,detail:git(f.root,"show",`${head}:src/app.ts`),verified:true};
     const wiring={kind:"wiring",path:"src/main.ts",detail:"Entry point imports and uses the exported answer",verified:true};
     const run=Bun.spawnSync(["bun","src/main.ts"],{cwd:f.root,stdout:"pipe",stderr:"pipe"});expect(run.exitCode).toBe(0);expect(run.stdout.toString()).toBe("42\n");
-    const missing={kind:"search",scope:["src"],result:"empty",detail:"No /answer route in the complete canonical tree",verified:true};
+    const searched=inspectSearch(config,"/answer",["src"],"primary"),missing={kind:"search",query:searched.query,scope:searched.scope,result:searched.result,receipt:searched.receipt,detail:"No /answer route in the complete canonical tree",verified:true};
     expect(Bun.spawnSync(["git","-C",f.root,"grep","-n","/answer",head,"--","src"],{stdout:"pipe",stderr:"pipe"}).exitCode).toBe(1);
     const done=(number:number):Observation=>{const first=inspectSources(config,["src/main.ts"],"primary"),second=inspectSources(config,["src/main.ts"],"adversarial");return{number,state:"resolved",remaining:"",evidence:[source,{...wiring,line:1,receipt:first.receipt}],adversarial:[{...source,detail:"Rechecked export against entry-point use"},{...wiring,line:1,receipt:second.receipt}]};};
     const overlap={kind:"overlap",reference:"issue:2",detail:"Entire duplicate request belongs to unfinished canonical issue 2",verified:true};

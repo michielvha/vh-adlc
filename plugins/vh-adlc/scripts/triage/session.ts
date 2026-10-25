@@ -2,7 +2,7 @@ import{createInterface}from"node:readline";
 import{createReadStream,mkdirSync,existsSync,fstatSync}from"node:fs";
 import{join}from"node:path";
 import{git}from"./settings";
-import{inspectIssues,inspectRemoval,inspectSources,verifyCommand,withVerificationBoundary}from"./verification";
+import{inspectIssues,inspectRemoval,inspectSources,inspectSearch,verifyCommand,withVerificationBoundary}from"./verification";
 import{buildReport,saveReport}from"./report";
 import{executeBatch,planBatch}from"./execute";
 import type{Adapter,Approval,Batch}from"./execute";
@@ -25,6 +25,7 @@ async function sessionWithinBoundary(options:{config:Settings;inventory:Inventor
    if(!operator){
     if(request.method==="inspect")result=inspectSources(config,args.paths,args.pass);
     else if(request.method==="inspect-issues")result=inspectIssues(config,inventory,args.numbers,args.pass);
+    else if(request.method==="inspect-search")result=inspectSearch(config,args.query,args.scope,args.pass);
     else if(request.method==="inspect-removal")result=inspectRemoval(config,args.path,args.before_commit,args.pass);
     else if(request.method==="verify"){
      if(typeof args.check!=="string"||!Object.hasOwn(options.checks,args.check))throw Error("check was not selected by the trusted controller");

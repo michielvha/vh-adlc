@@ -103,10 +103,17 @@ tracker actions. Separate descriptors alone do not establish model-tool confinem
 Requests are newline-delimited JSON with `id`, `method` and `params`; responses include that `id`,
 `result` or `error`, and the `analysis` or `operator` channel. Analysis methods are `inspect` with
 `paths` and `pass`, `inspect-issues` with `numbers` and `pass`, `inspect-removal` with `path`,
-`before_commit` and `pass`, `verify` with a selected `check` name and `pass`, `report` with
+`before_commit` and `pass`, `inspect-search` with a literal `query`, canonical `scope` and `pass`,
+`verify` with a selected `check` name and `pass`, `report` with
 `observations`, and `batch` with `run_id` and `actions`. Passes are `primary` and `adversarial`.
 Index exceptions come only from trusted startup selections. No receipt import, arbitrary argv,
 trust flag or execution operation exists on analysis input. A batch remains a proposal.
+
+The managed `search` tool accepts `verification_pass` for source-prefixed queries. Its receipt binds
+the query, exact canonical scope, complete scanned file hashes and matching lines. The controller
+reobserves that search before using it as proof; a different query, scope, result or pass fails.
+Skipped binary or unavailable source leaves search proof incomplete. Searches of context inputs
+remain readable and cannot mint source proof.
 
 Actual receipts establish observations, not the semantic conclusion that a request is implemented.
 Match source, behavior and reason-specific evidence to each predicate, preserve failures, and keep

@@ -2,11 +2,11 @@ import{test}from"./boundary-test";
 import { afterEach, expect } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildReport, saveReport } from "../../../plugins/vh-adlc/scripts/triage/report";
+import { buildReport, saveReport,publicationVerified } from "../../../plugins/vh-adlc/scripts/triage/report";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import type { Inventory, Issue } from "../../../plugins/vh-adlc/scripts/triage/types";
 import { fixture, git } from "./fixtures";
-import{withVerificationBoundary,inspectSources,verifyCommand,verificationDirectory,persistVerification,inspectIssues,inspectRemoval}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import{withVerificationBoundary,inspectSources,verifyCommand,verificationDirectory,persistVerification,inspectIssues,inspectRemoval,inspectSearch}from"../../../plugins/vh-adlc/scripts/triage/verification";
 
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
@@ -33,7 +33,8 @@ function setup(numbers = [1, 2]) {
   const search = () => {
     const result = Bun.spawnSync(["git", "-C", f.root, "grep", "-n", "missingFunction", "HEAD", "--", "src"], { stdout: "pipe", stderr: "pipe" });
     expect(result.exitCode).toBe(1);
-    return { kind: "search", scope: ["src"], result: "empty", detail: "No missingFunction implementation in canonical source", verified: true };
+    const observed=inspectSearch(config,"missingFunction",["src"],"primary");
+    return { kind: "search", query:observed.query,scope:observed.scope,result:observed.result,receipt:observed.receipt,detail: "No missingFunction implementation in canonical source", verified: true };
   };
   const open = (number: number) => ({ number, state: "open", remaining: "Implement missingFunction", evidence: [search()] });
   return { ...f, config, inventory, resolved, open, search };
@@ -383,4 +384,11 @@ test("unobserved cleared blocker evidence retains unknown scope and its dependen
  f.inventory.closed_issues=[{...f.inventory.issues[1],state:"closed"}];f.inventory.issues=[f.inventory.issues[0]];
  const report=withVerificationBoundary(()=>buildReport(f.config,f.inventory,[dependent]));
  expect(report.rows[0].state).toBe("unverified");expect(report.rows[0].depends_on).toEqual([2]);expect(report.ranked).toEqual([]);
+});
+
+
+test("an unobserved absence search cannot piggyback on real source receipts",()=>{
+ const f=setup([1]),proof=(pass:"primary"|"adversarial")=>[{kind:"source",path:"src/app.ts",line:1,detail:"Actual source",verified:true,receipt:inspectSources(f.config,["src/app.ts"],pass).receipt},{kind:"search",query:"missingFunction",scope:["src"],result:"empty",detail:"Unobserved absence claim",verified:true}];
+ const report=buildReport(f.config,f.inventory,[{number:1,state:"partial",remaining:"Implement missingFunction",evidence:proof("primary"),adversarial:proof("adversarial")}]);
+ expect(report.rows[0].state).toBe("unverified");expect(publicationVerified(f.config,f.inventory,report)).toBe(false);
 });

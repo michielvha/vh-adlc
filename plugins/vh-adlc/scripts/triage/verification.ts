@@ -1,3 +1,4 @@
+import{scanSearch,searchProof,searchScope,inSearchScope,type SearchProof}from"./search";
 import{hasManagedProofAuthority}from"./controller-authority";
 import{checkBoundary}from"./check-boundary";
 import{AsyncLocalStorage}from"node:async_hooks";
@@ -8,7 +9,7 @@ import {join,resolve} from "node:path";
 import {git,resolveInside,sourcePath} from "./settings";
 import type {Inventory,Settings} from "./types";
 
-export type VerificationRecord={schema_version:1;kind:"command"|"inspection"|"issues"|"removal";repository:string;hostname:string;source_commit:string;pass:"primary"|"adversarial";argv:string[];exit_code:number;stdout_sha256:string;stderr_sha256:string;source_unchanged:boolean;nonce:string;started_at:string;finished_at:string;reads:{path:string;sha256:string;start_line:number;end_line:number}[];issues?:{number:number;sha256:string}[];removal?:{path:string;before_commit:string;sha256:string}};
+export type VerificationRecord={schema_version:1;kind:"command"|"inspection"|"issues"|"removal"|"search";repository:string;hostname:string;source_commit:string;pass:"primary"|"adversarial";argv:string[];exit_code:number;stdout_sha256:string;stderr_sha256:string;source_unchanged:boolean;nonce:string;started_at:string;finished_at:string;reads:{path:string;sha256:string;start_line:number;end_line:number}[];issues?:{number:number;sha256:string}[];removal?:{path:string;before_commit:string;sha256:string};search?:SearchProof};
 const digest=(value:string|Buffer)=>createHash("sha256").update(value).digest("hex");
 // Actual operations enter this invocation map. Trust additionally requires the
 // controller's private proof capability; the exported scope alone grants none.
@@ -85,7 +86,7 @@ export function verificationRecord(config:Settings,sourceCommit:string,receipt:s
       !["primary","adversarial"].includes(record.pass)||!Array.isArray(record.argv)||record.argv.some(arg=>typeof arg!=="string")||record.exit_code!==0||!record.source_unchanged||
       !/^[a-f0-9]{64}$/.test(record.stdout_sha256)||!/^[a-f0-9]{64}$/.test(record.stderr_sha256)||typeof record.nonce!=="string")return null;
     if(!Number.isFinite(Date.parse(record.started_at))||!Number.isFinite(Date.parse(record.finished_at))||Date.parse(record.finished_at)<Date.parse(record.started_at))return null;
-    if(record.kind==="command"&&!record.argv.length||record.kind==="inspection"&&(!Array.isArray(record.reads)||!record.reads.length)||!["command","inspection","issues","removal"].includes(record.kind))return null;
+    if(record.kind==="command"&&!record.argv.length||record.kind==="inspection"&&(!Array.isArray(record.reads)||!record.reads.length)||!["command","inspection","issues","removal","search"].includes(record.kind))return null;
     if(record.kind==="inspection")for(const read of record.reads){
       if(!sourcePath(config,read.path))return null;
       const bytes=Bun.spawnSync(["git","-C",config.root,"show",`${sourceCommit}:${read.path}`],{stdout:"pipe",stderr:"pipe"});
@@ -94,6 +95,11 @@ export function verificationRecord(config:Settings,sourceCommit:string,receipt:s
     }
     if(record.kind==="issues"&&(!record.issues?.length||record.issues.some(issue=>!Number.isSafeInteger(issue.number)||issue.number<1||!/^[a-f0-9]{64}$/.test(issue.sha256))))return null;
     if(record.kind==="removal"&&(!record.removal||!sourcePath(config,record.removal.path)||!/^[a-f0-9]{40}$/.test(record.removal.before_commit)||!/^[a-f0-9]{64}$/.test(record.removal.sha256)))return null;
+    if(record.kind==="search"){
+      const search=record.search;
+      if(!search||typeof search.query!=="string"||!search.query||search.query.length>2000||search.query.includes("\0")||!Array.isArray(search.scope)||!search.scope.length||search.scope.some(path=>typeof path!=="string"||!sourcePath(config,path))||!Array.isArray(search.scanned)||!Array.isArray(search.skipped)||search.skipped.length||search.complete!==true||!Array.isArray(search.matches))return null;
+      if(search.scanned.some(file=>!file||!sourcePath(config,file.path)||!inSearchScope(file.path,search.scope)||!/^[a-f0-9]{64}$/.test(file.sha256))||new Set(search.scanned.map(file=>file.path)).size!==search.scanned.length||search.matches.some(match=>!match||!search.scanned.some(file=>file.path===match.path)||!Number.isSafeInteger(match.line)||match.line<1))return null;
+    }
     return record;
   }catch{return null;}
 }
@@ -118,4 +124,23 @@ export function inspectRemoval(config:Settings,path:string,before:string,pass:"p
   if(old.exitCode!==0||git(config.root,"ls-tree","-r","--name-only",record.source_commit,"--",path))throw Error("retired source is not absent");
   record.removal={path,before_commit:before,sha256:digest(old.stdout)};
   return{receipt:persistObserved(config,record),path,before_commit:before,source_commit:record.source_commit,before_content:old.stdout.toString()};
+}
+
+
+/** Observe one literal search of the fixed canonical Git blobs, with bounded query text. */
+export function inspectSearch(config:Settings,query:string,scope:string[],pass:"primary"|"adversarial"){
+ if(!Array.isArray(scope)||!scope.length||scope.some(path=>typeof path!=="string"||!sourcePath(config,path)))throw Error("invalid canonical search scope");
+ scope=searchScope(scope);const record=baseRecord(config,pass,"search");
+ const tree=Bun.spawnSync(["git","-C",config.root,"ls-tree","-r","-z","--full-tree",record.source_commit],{stdout:"pipe",stderr:"pipe"});if(tree.exitCode!==0)throw Error("fixed search tree unavailable");
+ const entries=tree.stdout.toString().split("\0").filter(Boolean).map(row=>{const match=row.match(/^(\d+) (blob|commit) ([a-f0-9]+)\t([\s\S]+)$/);if(!match)throw Error("unsupported canonical search entry");return{kind:match[2],oid:match[3],path:match[4]};}).filter(entry=>sourcePath(config,entry.path)&&inSearchScope(entry.path,scope));
+ if(entries.some(entry=>entry.kind!=="blob"))throw Error("canonical search contains unavailable source");
+ const files:{path:string;sha256:string;bytes:Buffer}[]=[];
+ if(entries.length){
+  // Batch object reads keep exhaustive scope verification linear in Git calls.
+  const batch=Bun.spawnSync(["git","-C",config.root,"cat-file","--batch"],{stdin:Buffer.from(entries.map(entry=>entry.oid).join("\n")+"\n"),stdout:"pipe",stderr:"pipe"});if(batch.exitCode!==0)throw Error("fixed search blobs unavailable");let offset=0;
+  for(const entry of entries){const end=batch.stdout.indexOf(10,offset),header=batch.stdout.subarray(offset,end).toString(),match=header.match(/^([a-f0-9]+) blob ([0-9]+)$/);if(end<0||!match||match[1]!==entry.oid)throw Error("invalid fixed search blob response");const size=Number(match[2]);offset=end+1;if(!Number.isSafeInteger(size)||size<0||offset+size>=batch.stdout.length||batch.stdout[offset+size]!==10)throw Error("incomplete fixed search blob response");const bytes=batch.stdout.subarray(offset,offset+size);files.push({path:entry.path,sha256:digest(bytes),bytes});offset+=size+1;}
+  if(offset!==batch.stdout.length)throw Error("unexpected fixed search blob data");
+ }
+ const scan=scanSearch(query,scope,files);record.search=searchProof(scan);record.exit_code=scan.complete?0:1;record.source_unchanged=git(config.root,"rev-parse","HEAD")===record.source_commit;record.finished_at=new Date().toISOString();
+ return{...scan,result:scan.matches.length?"found":"empty",receipt:persistObserved(config,record)};
 }

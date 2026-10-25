@@ -6,7 +6,7 @@ import{loadSettings}from"./settings";
 import{executeBatch,type Approval,type Batch}from"./execute";
 import{githubExecutor}from"./github";
 import{lifecycleGate}from"./lifecycle-gate";
-import{inspectIssues,inspectRemoval,inspectSources,verifyCommand,verificationRecord,withVerificationBoundary,requiredVerificationFailed}from"./verification";
+import{inspectIssues,inspectRemoval,inspectSources,inspectSearch,verifyCommand,verificationRecord,withVerificationBoundary,requiredVerificationFailed}from"./verification";
 import type{VerificationSelection}from"./controller-preparation";
 export type ControllerState={schema_version:1;checkout:string;plugin:string;input:string;verification:VerificationSelection;indexRequests:number[]};
 
@@ -43,6 +43,7 @@ export async function resumeController(run:string,batchHash:string,output:string
      if(record.reads.some(read=>read.start_line!==record.reads[0].start_line||read.end_line!==record.reads[0].end_line))throw Error("inconsistent original read range");
      actual=inspectSources(config,record.reads.map(read=>read.path),pass,{start_line:record.reads[0].start_line,limit:record.reads[0].end_line-record.reads[0].start_line+1});
     }else if(record.kind==="issues")actual=inspectIssues(config,batch.inventory,record.issues!.map(issue=>issue.number),pass);
+    else if(record.kind==="search")actual=inspectSearch(config,record.search!.query,record.search!.scope,pass);
     else if(record.kind==="command"){
      if(!Object.values(checks).some(argv=>JSON.stringify(argv)===JSON.stringify(record.argv)))throw Error("original check was not selected by the operator");
      actual=verifyCommand(config,record.argv,pass);

@@ -1,3 +1,4 @@
+import{searchScope}from"./search";
 import {createHash,randomUUID} from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -8,7 +9,7 @@ import{observedVerification,verificationRecord,hasRequiredVerificationFailure}fr
 export type State = "resolved" | "partial" | "open" | "blocked" | "obsolete" | "duplicate" | "unverified";
 export type Evidence = {
   kind: string; detail: string; verified: boolean; path?: string; line?: number; command?: string;
-  exit_code?: number; scope?: string[]; result?: string; reference?: string; before_commit?: string;
+  exit_code?: number; scope?: string[]; query?:string;result?: string; reference?: string; before_commit?: string;
   pull_number?: number;
   receipt?:string;
 };
@@ -64,7 +65,10 @@ function validEvidence(config: Settings, inventory: Inventory, evidence: Evidenc
       const record=verificationRecord(config,inventory.source_commit,evidence.receipt);
       return record?.kind==="command"&&evidence.command===JSON.stringify(record.argv)&&evidence.exit_code===0;
     }
-    case "search": return !!evidence.scope?.length && evidence.scope.every((path) => sourcePath(config, path)) && ["empty", "found"].includes(evidence.result ?? "");
+    case "search": {
+      const record=verificationRecord(config,inventory.source_commit,evidence.receipt),search=record?.kind==="search"?record.search:null;
+      return !!search&&search.complete&&evidence.query===search.query&&Array.isArray(evidence.scope)&&JSON.stringify(searchScope(evidence.scope))===JSON.stringify(search.scope)&&evidence.result===(search.matches.length?"found":"empty");
+    }
     case "wiring": {
       const record=verificationRecord(config,inventory.source_commit,evidence.receipt);
       return !!evidence.path&&Number.isSafeInteger(evidence.line)&&record?.kind==="inspection"&&record.reads.some(read=>read.path===evidence.path&&evidence.line!>=read.start_line&&evidence.line!<=read.end_line)&&blob(config,inventory.source_commit,evidence.path)!==null;
@@ -101,7 +105,7 @@ function verified(config: Settings, inventory: Inventory, values: Evidence[]) {
 function observedProof(config:Settings,inventory:Inventory,values:Evidence[],phase?:"primary"|"adversarial",issueNumber?:number){
   const receipt=(value:Evidence)=>observedVerification(config,inventory.source_commit,value.receipt);
   return values.some(value=>{const record=receipt(value);return !!record&&(!phase||record.pass===phase);})&&
-    values.filter(value=>["test","wiring","supersession","overlap","removal"].includes(value.kind)||value.receipt).every(value=>{
+    values.filter(value=>["test","wiring","supersession","overlap","removal","search"].includes(value.kind)||value.receipt).every(value=>{
       const record=receipt(value);if(!record||phase&&record.pass!==phase)return false;
       if(value.kind==="overlap"&&issueNumber){const issue=[...inventory.issues,...inventory.closed_issues].find(issue=>issue.number===issueNumber);return !!issue&&record.issues?.some(read=>read.number===issueNumber&&read.sha256===createHash("sha256").update(JSON.stringify(issue)).digest("hex"));}
       return true;

@@ -176,6 +176,10 @@ that separation. Read [the controller and boundary protocol](triage-boundary.md)
 Completed-work proof includes a source citation and observed behavior/wiring in each pass.
 Record primary and adversarial observations separately. The helper rejects copied passes,
 claimed exit codes without a receipt, and wiring paths without a recorded source inspection.
+Literal source searches used as proof must include the exact `query`, canonical `scope`,
+observed `result` and returned `receipt`. The receipt binds a complete scan of the fixed Git blobs,
+including file hashes and matched line identities. Missing, incomplete or copied search proof
+cannot establish absence or support publication. Context searches belong in `leads`.
 Each receipt binds repository, source commit, pass, method and hashes. Only current process-private
 observations confer execution authority; cache storage is for audit and report context. Line-based receipts must
 cover the cited line. Source reasoning remains part of the adversarial review; a receipt does

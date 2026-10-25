@@ -260,3 +260,17 @@ test("pre-result verification errors retain a sanitized setup cause",async()=>{
   expect(prepared.complete).toBe(false);expect(prepared.operations[0].result.cause).toBe("triage cannot read repository rev-parse");
  });
 });
+
+
+test("the actual read adapter emits source search receipts that reobserve with exact directory scope",async()=>{
+ const f=setup();f.settings({schema_version:1,source_roots:["src","src-other"],report_dir:"docs/history"});f.write("src-other/answer.ts","export const answer=7;\n");git(f.root,"add","src-other/answer.ts");git(f.root,"commit","-qm","test: sibling source prefix");f.snapshot.source_commit=git(f.root,"rev-parse","HEAD");f.write("snapshot.json",JSON.stringify(f.snapshot));f.export();
+ const cache=join(f.root,"search-cache"),requests=[...(["primary","adversarial"]as const).map((pass,index)=>({jsonrpc:"2.0",id:index+1,method:"tools/call",params:{name:"search",arguments:{query:"answer",prefix:"source/src",limit:1,verification_pass:pass}}})),{jsonrpc:"2.0",id:3,method:"tools/call",params:{name:"search",arguments:{query:"triage",prefix:"plugin/",verification_pass:"primary"}}}];
+ const run=Bun.spawnSync([process.execPath,resolve(import.meta.dir,"native.ts"),"launch","--input",f.output,"--trace",join(f.root,"search-trace.jsonl"),"--verification-cache",cache],{stdin:Buffer.from(requests.map(request=>JSON.stringify(request)).join("\n")+"\n"),stdout:"pipe",stderr:"pipe",timeout:10_000});expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});
+ const replies=run.stdout.toString().trim().split("\n").map(line=>JSON.parse(line)),{loadSettings}=await import("../../../plugins/vh-adlc/scripts/triage/settings"),{withVerificationBoundary,inspectSearch,observedVerification}=await import("../../../plugins/vh-adlc/scripts/triage/verification"),config=loadSettings(f.root);
+ withVerificationBoundary(()=>{
+  for(const[index,pass]of(["primary","adversarial"]as const).entries()){
+   const response=JSON.parse(replies[index].result.content[0].text),actual=inspectSearch(config,"answer",["src"],pass);expect(response.verification_receipt).toBe(actual.receipt);expect(response.canonical_scope).toEqual(["src"]);expect(response.scanned).toBe(2);expect(response.matches[0].canonical_path).toBe("src/app.ts");expect(observedVerification(config,f.snapshot.source_commit,actual.receipt)).toBeNull();
+  }
+ },{cacheRoot:cache});
+ expect(replies[2].error).toBeDefined();
+},15_000);
