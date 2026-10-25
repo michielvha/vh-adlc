@@ -679,3 +679,10 @@ test("a completed creation batch remains bound to its original journal path",asy
  await executeBatch(f.config,batch,approval,f.adapter,{journal:f.journal});
  await expect(executeBatch(f.config,batch,approval,f.adapter,{journal:join(f.root,".vh-adlc/new-output.json")})).rejects.toThrow();expect(f.log.map(action=>action.kind)).toEqual(["create"]);
 });
+
+test("resealed packets cannot bypass planned action structure or derived context",()=>{
+ const run=Bun.spawnSync([process.execPath,join(import.meta.dir,"resealed-batch.ts")],{env:process.env,stdout:"pipe",stderr:"pipe",timeout:60000});
+ expect({exit:run.exitCode,error:run.stderr.toString()}).toEqual({exit:0,error:""});
+ const results=JSON.parse(run.stdout.toString());expect(results.map((row:any)=>row.mode)).toEqual(["marker-id","source-backfill","derived-identity"]);
+ for(const row of results){expect(row.denied).toBe(true);expect(row.effects).toEqual([]);expect(row.source_unchanged).toBe(true);}
+});

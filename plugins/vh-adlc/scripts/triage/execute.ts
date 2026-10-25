@@ -147,13 +147,7 @@ function publicationActions(config:Settings,inventory:Inventory,report:Report,ac
   return requires;
 }
 
-export function planBatch(config: Settings, inventory: Inventory, report: Report, requested: Action[]): Batch {
-  if (report.repository !== config.repository || inventory.repository !== config.repository || report.hostname !== config.hostname ||
-      report.source_commit !== inventory.source_commit || git(config.root, "rev-parse", "HEAD") !== report.source_commit || !Array.isArray(requested)) bad();
-  if(!Array.isArray(report.observations)||!Array.isArray(report.index_requests))bad();
-  const rebuilt=buildReport(config,inventory,report.observations,{runId:report.run_id,indexRequests:report.index_requests});
-  if(hash(reportFacts(rebuilt))!==hash(reportFacts(report)))bad();
-  const contextId=hash({config,inventory,report:reportFacts(report)});
+function renderActions(config:Settings,inventory:Inventory,report:Report,requested:Action[],contextId:string){
   const actions = structuredClone(requested), ids = new Set<string>();
   publicationActions(config,inventory,report,actions);
   if(actions.some(action=>!["plan-patch","commit"].includes(action.kind))&&(!nonempty(inventory.actor)||!inventory.coverage.some(entry=>entry.collection==="identity"&&entry.complete&&!entry.error)))bad();
@@ -200,6 +194,17 @@ export function planBatch(config: Settings, inventory: Inventory, report: Report
           hash([...action.paths].sort()) !== hash(patches.map((prior) => (prior as Extract<Action, { kind: "plan-patch" }>).path).sort())) bad();
     }
   }
+  return actions;
+}
+
+export function planBatch(config: Settings, inventory: Inventory, report: Report, requested: Action[]): Batch {
+  if (report.repository !== config.repository || inventory.repository !== config.repository || report.hostname !== config.hostname ||
+      report.source_commit !== inventory.source_commit || git(config.root, "rev-parse", "HEAD") !== report.source_commit || !Array.isArray(requested)) bad();
+  if(!Array.isArray(report.observations)||!Array.isArray(report.index_requests))bad();
+  const rebuilt=buildReport(config,inventory,report.observations,{runId:report.run_id,indexRequests:report.index_requests});
+  if(hash(reportFacts(rebuilt))!==hash(reportFacts(report)))bad();
+  const contextId=hash({config,inventory,report:reportFacts(report)});
+  const actions=renderActions(config,inventory,report,requested,contextId);
   const batch: Batch = { schema_version: 1, hash: "", context_id:contextId,repository: config.repository, hostname: config.hostname,
     settings_hash: hash(config), source_commit: report.source_commit, source_hash: sourceHash(config, actions),
     report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), labels:structuredClone(inventory.labels??[]),actor:inventory.actor??null,inventory:structuredClone(inventory), actions };
@@ -222,6 +227,19 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
       !nonempty(approval.owner_statement) || new Set(approval.action_ids).size !== approval.action_ids.length ||
       approval.action_ids.some((id) => !batch.actions.some((action) => action.id === id))) bad();
   if(batch.context_id!==hash({config,inventory:batch.inventory,report:reportFacts(batch.report)}))bad();
+  if(batch.schema_version!==1||batch.repository!==config.repository||batch.hostname!==config.hostname||
+    batch.source_commit!==batch.report.source_commit||batch.source_commit!==batch.inventory.source_commit||
+    hash(batch.issues)!==hash([...batch.inventory.issues,...batch.inventory.closed_issues])||
+    hash(batch.labels)!==hash(batch.inventory.labels??[])||batch.actor!==(batch.inventory.actor??null))bad();
+  // A checksum is public and can be recomputed. Validate serialized actions with
+  // the same renderer as proposals, before consulting journals or any adapter.
+  const requested=structuredClone(batch.actions);
+  for(const action of requested)if(action.kind==="comment"||action.kind==="create"){
+    const suffix=`\n\n${marker(batch.context_id,action.id)}`;
+    if(typeof action.body!=="string"||!action.body.endsWith(suffix))bad();
+    action.body=action.body.slice(0,-suffix.length);
+  }
+  if(hash(renderActions(config,batch.inventory,batch.report,requested,batch.context_id))!==hash(batch.actions))bad();
   const rebuilt=buildReport(config,batch.inventory,batch.report.observations,{runId:batch.report.run_id,indexRequests:batch.report.index_requests,fixedHead:batch.source_commit});
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(batch.report)))bad();
   if(publicationActions(config,batch.inventory,batch.report,batch.actions)&&!hasManagedControllerAuthority())bad();
