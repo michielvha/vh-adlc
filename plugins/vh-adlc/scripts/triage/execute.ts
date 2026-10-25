@@ -2,8 +2,8 @@ import{hasManagedControllerAuthority}from"./controller-authority";
 import{executionHistory}from"./execution-history";
 import { createHash } from "node:crypto";
 import{executionLock,repositoryLockPath}from"./execution-lock";
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, relative } from "node:path";
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync,openSync,closeSync,fsyncSync,renameSync,unlinkSync,chmodSync } from "node:fs";
+import { dirname, relative,join,basename } from "node:path";
 import { git, loadSettings, ownership, resolveInside, sourcePath,workstreamPath } from "./settings";
 import {buildReport,publicationVerified,type Report} from "./report";
 import type { Inventory, Issue, Label, Settings } from "./types";
@@ -45,6 +45,7 @@ type Journal = {
   gated?: string[];
   gate_lines?: Record<string,string>;
   attempts?:Record<string,string>;
+  patch_temps?:Record<string,string>;
 };
 function canonical(value: unknown): string {
   return JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item)
@@ -58,6 +59,34 @@ function nonempty(value: unknown): value is string { return typeof value === "st
 function strings(value: unknown): value is string[] { return Array.isArray(value) && value.every(nonempty); }
 function marker(namespace:string, id: string) { return `<!-- vh-adlc-triage:${namespace}:${id} -->`; }
 export function actionKey(batch: Batch, action: Action) { return `${batch.context_id}:${action.id}`; }
+function patchTemporary(batch:Batch,action:Extract<Action,{kind:"plan-patch"}>){return join(dirname(action.path),`.${basename(action.path)}.vh-adlc-${hash([batch.hash,action.id])}.tmp`);}
+function patchAfter(batch:Batch,journal:Journal,action:Extract<Action,{kind:"plan-patch"}>){
+ if(!action.created_by)return action.after;const result=journal.results[action.created_by],expected=`https://${batch.hostname}/${batch.repository}/issues/${result?.number}`;
+ if(!result?.number||result.url!==expected)bad();return action.after.replace("{{created_issue_url}}",expected);
+}
+function recoverPlanTemporaries(config:Settings,batch:Batch,journal:Journal){
+ if(!journal.patch_temps)return false;
+ for(const[id,path]of Object.entries(journal.patch_temps)){
+  const action=batch.actions.find(action=>action.id===id);if(action?.kind!=="plan-patch"||path!==patchTemporary(batch,action))bad();
+  const temporary=resolveInside(config.root,path),expected=Buffer.from(patchAfter(batch,journal,action));
+  if(existsSync(temporary)){
+   const stat=lstatSync(temporary);if(!stat.isFile()||stat.size>expected.length)throw Error("changed owned plan temporary");
+   const bytes=readFileSync(temporary);if(!bytes.equals(expected.subarray(0,bytes.length)))throw Error("changed owned plan temporary");
+   unlinkSync(temporary);
+  }
+ }
+ delete journal.patch_temps;return true;
+}
+function writePlanAtomically(config:Settings,batch:Batch,journal:Journal,action:Extract<Action,{kind:"plan-patch"}>,after:string,save:()=>void){
+ const target=resolveInside(config.root,action.path),path=patchTemporary(batch,action),temporary=resolveInside(config.root,path);
+ if(existsSync(temporary))throw Error("unowned plan temporary already exists");
+ journal.patch_temps={...(journal.patch_temps??{}),[action.id]:path};save();
+ const mode=lstatSync(target).mode&0o777;writeFileSync(temporary,after,{flag:"wx",mode});chmodSync(temporary,mode);
+ const sync=(path:string)=>{const fd=openSync(path,"r");try{fsyncSync(fd);}finally{closeSync(fd);}};
+ sync(temporary);if(readFileSync(target,"utf8")!==action.before)throw Error("approved plan changed before atomic replacement");
+ renameSync(temporary,target);sync(dirname(target));delete journal.patch_temps[action.id];
+ if(!Object.keys(journal.patch_temps).length)delete journal.patch_temps;
+}
 function sourceHash(config: Settings, actions: Action[], journal?: Journal) {
   const paths = git(config.root, "ls-files", "-z", "--cached", "--others", "--exclude-standard").split("\0")
     .filter((path) => path && sourcePath(config, path)).sort();
@@ -261,6 +290,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
     }
     else save();
     if(history.blocked)return{completed:journal.completed,blocked:approval.action_ids.filter(id=>!journal.completed.includes(id)),failed:[]};
+    if(recoverPlanTemporaries(config,batch,journal))save();
     const blocked: string[] = [], failed: string[] = [];
     const pendingCommit = batch.actions.find((action) => action.id === journal.started && action.kind === "commit") as Extract<Action, { kind: "commit" }> | undefined;
     const head = git(config.root, "rev-parse", "HEAD");
@@ -352,7 +382,7 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
             }
             if (readFileSync(target, "utf8") !== action.before) { blocked.push(action.id); continue; }
             if(action.gate){journal.gated=[...new Set([...(journal.gated??[]),action.id])];save();}
-            writeFileSync(target, after);
+            writePlanAtomically(config,batch,journal,action,after,save);
           }
         } else if (action.kind === "commit") {
           const gated=action.requires.filter(id=>batch.actions.some(patch=>patch.id===id && patch.kind==="plan-patch" && patch.gate));

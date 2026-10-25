@@ -8,11 +8,17 @@ const completed=(record:any)=>{
 };
 const die=()=>{native.writeFileSync(marker,point);process.kill(-process.pid,"SIGKILL");};
 mock.module("node:fs",()=>({...native,
- writeFileSync(path:any,data:any,...rest:any[]){const result=(native.writeFileSync as any)(path,data,...rest);if(point==="init-anchor"&&String(path).endsWith(".lock")&&String(data).includes('"genesis"'))die();return result;},
+ writeFileSync(path:any,data:any,...rest:any[]){
+  const target=String(path),bytes=Buffer.isBuffer(data)?data:Buffer.from(String(data));
+  if(point==="anchor-partial"&&target.endsWith(".lock")&&bytes.toString().includes('"genesis"')){native.writeFileSync(path,bytes.subarray(0,Math.floor(bytes.length/2)));die();}
+  if(point==="phase-write"&&(target.endsWith(".lock")&&bytes.toString().includes('"phase":"ready"')||target.endsWith(".ready.json.tmp"))){native.writeFileSync(path,"");die();}
+  if(point==="plan-write"&&target.includes("plans/")&&target.includes("link.md")&&bytes.toString().includes("https://")){native.writeFileSync(path,bytes.subarray(0,Math.floor(bytes.length/2)));die();}
+  const result=(native.writeFileSync as any)(path,data,...rest);if(point==="init-anchor"&&String(path).endsWith(".lock")&&String(data).includes('"genesis"'))die();return result;},
  appendFileSync(path:any,data:any,...rest:any[]){
+  if(point==="phase-marker"&&String(path).endsWith(".lock")&&String(data)==="!")die();
   let record:any;try{record=JSON.parse(JSON.parse(String(data)).payload);}catch{}
   if(point==="partial-log"&&String(path).endsWith(".history.jsonl")&&completed(record)){(native.appendFileSync as any)(path,String(data).slice(0,Math.floor(String(data).length/2)),...rest);die();}
-  const result=(native.appendFileSync as any)(path,data,...rest);if(point==="init-log"&&String(path).endsWith(".history.jsonl")&&record?.sequence===1)die();return result;
+  const result=(native.appendFileSync as any)(path,data,...rest);if(point==="phase-marker-done"&&String(path).endsWith(".lock")&&String(data)==="!")die();if(point==="init-log"&&String(path).endsWith(".history.jsonl")&&record?.sequence===1)die();return result;
  },
  renameSync(from:any,to:any){
   if(point==="head-lag"&&String(to).endsWith(".history-head.json")&&completed(null))die();

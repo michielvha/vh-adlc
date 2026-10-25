@@ -21,14 +21,30 @@ function validState(state:State){
 // trusted control plane; confined analysis tools cannot access these files.
 export function executionHistory(config:Settings,journal:string,batchHash:string,capability?:unknown){
  if(!isExecutionHistoryCapability(capability))throw Error("repository outcome history is engine-private");
- const lock=repositoryLockPath(config),log=lock+".history.jsonl",head=lock+".history-head.json",original=join(realpathSync(dirname(journal)),basename(journal));
+ const lock=repositoryLockPath(config),log=lock+".history.jsonl",head=lock+".history-head.json",seed=lock+".init.json",ready=lock+".ready.json",original=join(realpathSync(dirname(journal)),basename(journal));
  if(existsSync(lock+".pending.json"))corrupt();
- let anchor:any;const marker=readFileSync(lock,"utf8");
+ let anchor:any;const stored=readFileSync(lock,"utf8"),committed=stored.endsWith("!"),marker=committed?stored.slice(0,-1):stored,initial=()=>!existsSync(log)&&!existsSync(head)&&!existsSync(ready);
+ const validAnchor=(value:any)=>value?.schema_version===2&&typeof value.genesis==="string"&&["initializing","ready"].includes(value.phase);
  if(!marker){
-  if(existsSync(log)||existsSync(head))corrupt();
-  anchor={schema_version:2,genesis:randomUUID(),phase:"initializing"};writeFileSync(lock,JSON.stringify(anchor),{mode:0o600});sync(lock);
- }else{try{anchor=JSON.parse(marker);}catch{corrupt();}}
- if(anchor.schema_version!==2||typeof anchor.genesis!=="string"||!["initializing","ready"].includes(anchor.phase))corrupt();
+  if(committed||!initial())corrupt();
+  if(existsSync(seed)){try{anchor=JSON.parse(readFileSync(seed,"utf8"));}catch{corrupt();}}
+  else{anchor={schema_version:2,genesis:randomUUID(),phase:"initializing"};atomic(seed,JSON.stringify(anchor));}
+  if(!validAnchor(anchor)||anchor.phase!=="initializing")corrupt();
+  writeFileSync(lock,JSON.stringify(anchor),{mode:0o600});sync(lock);
+ }else{try{anchor=JSON.parse(marker);}catch{
+  // Only an unfinished first anchor write can be completed from its durable
+  // seed. Once history exists, a damaged or missing anchor still fails closed.
+  if(committed||!initial()||!existsSync(seed))corrupt();const bytes=readFileSync(seed,"utf8");
+  try{anchor=JSON.parse(bytes);}catch{corrupt();}
+  if(!validAnchor(anchor)||anchor.phase!=="initializing"||!bytes.startsWith(marker))corrupt();
+  writeFileSync(lock,bytes,{mode:0o600});sync(lock);
+ }}
+ if(!validAnchor(anchor))corrupt();
+ if(existsSync(ready)){
+  let phase:any;try{phase=JSON.parse(readFileSync(ready,"utf8"));}catch{corrupt();}
+  if(phase.schema_version!==1||phase.genesis!==anchor.genesis)corrupt();
+ }
+ if(committed){if(!existsSync(ready))corrupt();anchor.phase="ready";}
  let state:State={pending:[],journals:{}},sequence=0,previous=digest(anchor.genesis),bytes=0,poisoned=false;
  const saveHead=()=>atomic(head,JSON.stringify({anchor:anchor.genesis,sequence,hash:previous,bytes}));
  const persist=()=>{
@@ -62,7 +78,12 @@ export function executionHistory(config:Settings,journal:string,batchHash:string
  }else{
   if(anchor.phase!=="initializing"||existsSync(head))corrupt();persist();
  }
- if(anchor.phase==="initializing"){anchor.phase="ready";writeFileSync(lock,JSON.stringify(anchor),{mode:0o600});sync(lock);}
+ if(anchor.phase==="initializing"){
+  atomic(ready,JSON.stringify({schema_version:1,genesis:anchor.genesis}));
+  // One appended commit byte cannot truncate the genesis. Its persistent inode
+  // also prevents deletion of every side file from masquerading as a new run.
+  appendFileSync(lock,"!");sync(lock);anchor.phase="ready";
+ }
  if(Object.entries(state.journals).some(([path,checkpoint])=>path!==original&&checkpoint.batch_hash===batchHash))throw Error("batch requires its original triage execution journal");
  let checkpoint=state.journals[original];
  if(checkpoint&&checkpoint.batch_hash!==batchHash)throw Error("changed triage execution journal batch");

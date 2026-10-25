@@ -83,6 +83,13 @@ Keep this control-plane state with the original run; deleting it is not a recove
 integrity checks assume the trusted runtime and lock anchor remain intact. They do not protect against
 an administrator replacing all trusted files or a caller controlling the runtime itself.
 
+Initialization saves its genesis seed before filling the lock inode. Phase publication uses an atomic
+side file and one appended commit byte; it never truncates the established anchor. Deleting the side
+files after that commit still blocks execution. Approved plan patches use a journal-owned temporary
+in the target directory and an atomic rename after checking the original content. Recovery discards
+only its recorded temporary with bytes matching a prefix of the approved final content. Changed
+temporary data is preserved and blocks recovery.
+
 ## Managed recovery
 
 Keep the original controller output, batch and journal. Select them explicitly and use a fresh
