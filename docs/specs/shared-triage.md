@@ -767,6 +767,9 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Evidence: Restoring the exact section separator makes R-22 fresh again (`t79-restored-fresh.json`), with the default-branch refs unchanged. The private helper now rejects empty collector/native arrays, requires the five canonical coverage categories (all-state issues include closed issues) plus each requested comment collection, and denies incomplete coverage. All 43 actual CLI exit cases and 24 metadata positive/negative cases pass; the actual private proof still passes (`t79-private-proof.json`). Runtime, driver and test bytes remain unchanged from R-30.
       R-30 records 432 tests and 1825 assertions, separately from the author's 1815. Its sole failed command is freshness: the evidence-edit script removed the blank line before Test Plan, so the machine baseline differs despite unchanged criterion text. Restoring that exact separator is a formatting correction to the accepted baseline, with no new requirement or owner decision. The fresh helper must print its observed JSON before its assertions. R-30 remains a blocking historical pass; its other fourteen commands, private trial and helper regressions pass. All deviations remain verbatim.
 
+- [ ] T80 frozen review packet and this document - include both immutable baseline diff files, preflight the entire frozen integrity check without starting its worker, then rerun independent review through all fifteen commands (R-31 F-01/F-02; AC-01 through AC-09).
+      R-31 stops before worker startup because the packet copied the baseline-diff manifest without its two referenced files. No runtime or private-trial command runs in that pass; every criterion remains not verified. The correction belongs to review packaging, with no plugin, driver, adapter or test change. Preserve its returned text and deviations verbatim.
+
 ## Open Questions
 
 None. On 2026-10-25 the owner resolved Q6 and Q7 together: every published triage verdict requires
@@ -813,6 +816,7 @@ R-22 reviewed the complete revised specification, and the owner accepted it on 2
 | 2026-10-26 | R-28 | implementation | `5dc86e7a0eb0995bcdebfcd651778ac6e246242f` | claude-opus-5.5 | procedural | Seven criteria met; GUI residual retained and private trial absent from the frozen packet. Strengthen Copilot result-content and actual probe checks before final migration acceptance. |
 | 2026-10-26 | R-29 | implementation | `a6697b564b74c695fb797e05566e76ab646eb9f7` | claude-opus-5.5 | procedural | Eight criteria met, including the private migration trial; GUI residual remains. Strengthen proof-helper exit checks and real-filesystem grading regressions before completion. |
 | 2026-10-26 | R-30 | implementation | `318b9fff6bf59a14bd1fbdfb73e690c846a76020` | claude-opus-5.5 | procedural | Eight criteria met and fourteen proof commands pass; completion blocked by a spec-baseline freshness mismatch. Runtime and private acceptance fixes pass. |
+| 2026-10-26 | R-31 | implementation | `1c04e06de858de43f215ad397e470ef84fd971d7` | claude-opus-5.5 | procedural | No criteria verified: two baseline-diff files missing from the bounded packet prevent its integrity precheck and worker startup. |
 
 ### R-1
 
@@ -2360,6 +2364,62 @@ EVIDENCE: Procedural deviations:
 6. I did not read every hash-listed input or review-prompt.txt manually.
 I ran no other shell commands, made no edits, used no network and did not use wc, list_bash or read_bash. Isolation was procedural.
 PROPOSAL: Record these deviations with this review.
+
+### R-31
+
+CRITERION: AC-01 The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support; the shared triage SKILL.md, authority.md, lifecycle.md, triage-boundary.md and public guides consistently require the controller for executable closure and every write asserting verified state while preserving local report-only output.
+VERDICT: not verified
+EVIDENCE: Ran the exact argument-free /home/m/code/.triage-review-archive/shared-triage-implementation-review-r31/proof.sh twice, target 1c04e06de858de43f215ad397e470ef84fd971d7. Both runs exited 1 with FileNotFoundError for baseline-diffs/lifecycle.md, raised in proof.py verify() at line 19 (proof.py:42 calls verify() before the worker branch). The worker never started, proof-state holds no started, progress.json, finished.json or command logs, and none of the fifteen fixed commands ran. GUI discovery is still unverified under the owner-approved residual https://github.com/michielvha/vh-adlc/issues/33. No CLI subset was observed, and a CLI subset could not upgrade this composite criterion anyway.
+
+CRITERION: AC-02 Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+VERDICT: not verified
+EVIDENCE: The plugin-suite and adapter-contract checks are defined in proof.py:46. They never ran because the integrity precondition failed on the missing baseline-diffs/lifecycle.md (proof.sh exit 1, twice, at 1c04e06). I observed no executed result in this review.
+
+CRITERION: AC-03 Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure and write asserting verified state in that report, and partial data never establishes exhaustive triage.
+VERDICT: not verified
+EVIDENCE: The plugin-suite and private-proof checks are defined in proof.py:46 but were not executed: proof.sh exited 1 twice at 1c04e06 because baseline-diffs/lifecycle.md is missing. I only inspected private-acceptance.ts:6-13 statically. collectorCoverageComplete requires exactly one each of the identity, issues (all-states), pulls, labels and plans records with complete true, plus one comments record per requested ID. Static inspection is not executed evidence.
+
+CRITERION: AC-04 Completion states and cleared blockers use proof actually observed inside the current enforced verification boundary before affecting dependency readiness, executable closure or a write asserting verified state; closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
+VERDICT: not verified
+EVIDENCE: The plugin-suite and native-recheck checks in proof.py:46 did not execute: proof.sh exited 1 twice at 1c04e06 on the missing baseline-diffs/lifecycle.md. I observed no execution in this review.
+
+CRITERION: AC-05 Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved; local report saving or committing cannot authorize remote publication, which remains unavailable without current enforced proof and separate publication authority.
+VERDICT: not verified
+EVIDENCE: The plugin-suite check in proof.py:46 did not execute: proof.sh exited 1 twice at 1c04e06 because the integrity precondition failed on the missing baseline-diffs/lifecycle.md. I observed no execution in this review.
+
+CRITERION: AC-06 A confined managed controller separates analysis from operator approval, rejects unexpected tools and forged or replayed proof, and permits executable closure and writes asserting verified state only with fresh observed verification; execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes an unchanged batch after partial failure without duplicate completed actions or duplicate issue creation; a materially changed context stops the old batch and requires a new approved batch with a fresh explanation comment; local plan commits contain only the approved successful patches and shown commit metadata. The controller serializes effects per hostname/repository across batches and output paths, keeps uncertain outcomes blocked across resume and replacement batches, preserves prior artifacts, confines checks to the fixed-source filesystem/network boundary without owner files or credentials, and bounds cleanup of owned process groups with recorded exit and cleanup outcomes.
+VERDICT: not verified
+EVIDENCE: The full Bun suite, native-recheck, extended-native-recheck, codex/claude lifecycle regrades and the two private-proof commands are defined in proof.py:46. None executed, because proof.sh exited 1 twice at 1c04e06 before the worker started (missing baseline-diffs/lifecycle.md). I observed neither the 432-test suite nor the controller regressions.
+
+CRITERION: AC-07 The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof, and both forward the controller requirement for executable closure and every write asserting verified state without a weaker plain-chat permission; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
+VERDICT: not verified
+EVIDENCE: The private-proof-exit-regressions, private-copilot-readonly-proof, migration-parity-false-prior and adapter-contract commands in proof.py:46 never executed, because proof.sh exited 1 twice at 1c04e06 (missing baseline-diffs/lifecycle.md). For the same reason the paired HEAD check (component 1c04e06, adapter ff38a71) and the private-component equality check at proof.py:12-25 were not reached. Static inspection of private-acceptance.ts:16 shows it pins component ac76e1d, adapter ff38a71, the singleton model claude-opus-5.5, all fourteen booleans, the thirteen probes and the five collections. Static inspection of private-acceptance-check.ts:13 shows it builds the positive case and the negative cases. I observed neither exit code, so I have no executed evidence for the private trial.
+
+CRITERION: AC-08 The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
+VERDICT: not verified
+EVIDENCE: The rollback command (bun tests/agent-triage/rehearse.ts in the Stackweaver checkout, proof.py:46) did not execute: proof.sh exited 1 twice at 1c04e06 on the missing baseline-diffs/lifecycle.md. No rollback.log exists in proof-state.
+
+CRITERION: AC-09 Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
+VERDICT: not verified
+EVIDENCE: The workflow-preservation command (external/check-workflow-preservation.py, proof.py:46) did not execute, and the baseline lifecycle.md and authority.md diff comparison at proof.py:18-19 is the step that failed. proof.sh exited 1 twice at 1c04e06. I observed no execution in this review.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Review packet proof harness (baseline-diff-hashes.json, proof.py:18-19, proof.py:42)
+EVIDENCE: baseline-diff-hashes.json lists baseline-diffs/lifecycle.md (sha256 6390087363d9854e99121c7455d27870f24240ae64bf4e46e1493cb28bd2f125) and baseline-diffs/authority.md (sha256 d9346ca80885e6ed46a0351c0d27f5d2ae8d0c8dd5f51cb5996a278b8d282a13). A glob of baseline-diffs/** inside the packet matched no files. Both invocations of the exact argument-free proof.sh failed with "FileNotFoundError: [Errno 2] No such file or directory: '.../shared-triage-implementation-review-r31/baseline-diffs/lifecycle.md'" and exit code 1, raised from verify() at proof.py:19. proof.py:42 calls verify() before the worker branch at proof.py:55-57, so no worker started. The glob of proof-state/* matched no files: there is no started, progress.json, finished.json, fresh-binding.log or any command log. None of the fifteen fixed commands ran, including fresh-binding, lint, the 432-test suite, both private-proof commands, rollback and gui-residual. I could not observe or confirm the R-30 fresh-binding fix, the R-30 F-03 metadata cases, the 43 predicate exit cases or the immutable private proof.
+PROPOSAL: Restore the two hash-listed baseline-diffs files into the packet, with bytes equal to the git diffs between 6ea0ce5 and 1c04e06 for plugins/vh-adlc/references/lifecycle.md and authority.md. Then dispatch a new independent implementation pass that runs the unchanged proof command to finished.json. This pass cannot clear any criterion and must not be relabelled clean.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Review procedure disclosure
+EVIDENCE: Deviations and actions in this pass, all inside the packet. (1) I ran the exact argument-free proof.sh twice; both exited 1 as F-01 describes. Running it necessarily created the empty proof-state directory (proof.py:3), which is a side effect of the authorized command and not a separate write. (2) My first unranged view of vhco-pro-docs/guides/humanize-prose.md was refused for size (33.3 KB) and returned no content. I then read the whole page with ranges [1,200] and [200,500]. (3) I read feature-documents.md completely in one view. (4) I used grep with an anchored pattern on the spec only for criterion lines and level-two headings, then a ranged view of lines 506-541. Line 527 is blank before "## Test Plan", but I could not confirm freshness by execution. (5) I used two narrow globs (baseline-diffs/** and proof-state/*) and one targeted grep of private-acceptance-check.ts. I used no wc, list_bash, read_bash, other shell commands, edits, network or reads outside the packet. Isolation is procedural.
+PROPOSAL: Record these deviations with this pass. The next pass should again use only the packet and the exact proof command.
+
+--
+
+The proof worker never started, so I could not verify any criterion. Both runs of `proof.sh` failed at its first integrity check because the packet is missing the two hash-listed files `baseline-diffs/lifecycle.md` and `baseline-diffs/authority.md`. That makes F-01 blocking, and a new independent pass is needed once those files are restored. I made no edits and no tracker writes.
 
 ## Sources
 
