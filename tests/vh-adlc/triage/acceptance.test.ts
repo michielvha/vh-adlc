@@ -156,6 +156,11 @@ test("the real boundary process denies outside input, credentials, egress and mu
     {type:"result",subtype:"success",is_error:false,session_id:"unit-native-envelope",result:"Read-only fixture complete"}];
   const grade=(raw:unknown[]=nativeEvents,record=events)=>gradeTrial({input:f.output,checkout:f.root,plugin,host:"claude-cli",raw:raw.map(event=>JSON.stringify(event)).join("\n"),trace:record,installed:plugin,exit_code:0});
   expect(grade().pass).toBe(true);
+  for(const type of["server_tool_use","mcp_tool_use","unknown_tool"]){
+    expect(grade([...nativeEvents,{type:"assistant",message:{content:[{type,id:"unrecognized-invocation",name:"Bash",input:{command:"synthetic only"}}]}}]).failures).toContain("exclusive-read-only-tools");
+  }
+  expect(grade([...nativeEvents,{type:"assistant",message:{content:[{type:"text",text:"Observed source"},{type:"thinking",thinking:"Review proof"},{type:"redacted_thinking",data:"opaque non-tool block"}]}}]).pass).toBe(true);
+  expect(grade([...nativeEvents,{type:"assistant",message:{content:{type:"server_tool_use",name:"Bash"}}}]).failures).toContain("exclusive-read-only-tools");
   expect(grade(nativeEvents,events.map(event=>({...event,namespaces:event.host_namespaces}))).pass).toBe(false);
   expect(grade(nativeEvents,events.map(event=>({...event,run_id:"other-run"}))).pass).toBe(false);
   expect(grade([{...nativeEvents[0],tools:[...toolNames,"Bash"]},...nativeEvents.slice(1)]).pass).toBe(false);

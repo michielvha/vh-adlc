@@ -200,7 +200,7 @@ export function gradeTrial(options:{input:string;checkout:string;plugin:string;h
   for(const line of options.raw.split("\n"))try{events.push(JSON.parse(line));}catch{}
   const calls=events.flatMap(event=>{
     const message=event.message as {content?:{type:string;name?:string;input?:Record<string,unknown>;id?:string}[]}|undefined;
-    const direct=(message?.content??[]).filter(block=>block.type==="tool_use");
+    const direct=(Array.isArray(message?.content)?message.content:[]).filter(block=>block?.type==="tool_use");
     const item=event.item as {type?:string;server?:string;tool?:string;arguments?:Record<string,unknown>|string}|undefined;
     if(item?.type==="mcp_tool_call"){
       let input=item.arguments;if(typeof input==="string")try{input=JSON.parse(input);}catch{input={};}
@@ -212,7 +212,10 @@ export function gradeTrial(options:{input:string;checkout:string;plugin:string;h
   const manifest=JSON.parse(readFileSync(join(options.input,"manifest.json"),"utf8")) as InputManifest;
   const skillPath="plugin/skills/vh-adlc-triage/SKILL.md";
   const canonicalRead=calls.some(call=>call.name==="mcp__triage__read"&&call.input?.path===skillPath)&&options.trace.some(entry=>entry.kind==="read"&&entry.path===skillPath&&entry.run_id===manifest.run_id);
-  const results=events.flatMap(event=>((event.message as {content?:{type:string;tool_use_id?:string;is_error?:boolean;content?:unknown}[]}|undefined)?.content??[]).filter(block=>block.type==="tool_result"));
+  const results=events.flatMap(event=>{
+    const content=(event.message as {content?:{type:string;tool_use_id?:string;is_error?:boolean;content?:unknown}[]}|undefined)?.content;
+    return(Array.isArray(content)?content:[]).filter(block=>block?.type==="tool_result");
+  });
   const nativeSkill=calls.some(call=>call.name==="Skill"&&call.input?.skill==="vh-adlc:vh-adlc-triage"&&call.id&&results.some(result=>result.tool_use_id===call.id&&result.is_error!==true&&result.content==="Launching skill: vh-adlc:vh-adlc-triage"));
   const projectCommand=options.command&&Array.isArray(events.find(event=>event.type==="system"&&event.subtype==="init")?.slash_commands)&&
     (events.find(event=>event.type==="system"&&event.subtype==="init")!.slash_commands as string[]).includes(options.command)&&
@@ -230,12 +233,17 @@ export function gradeTrial(options:{input:string;checkout:string;plugin:string;h
   if(!events.some(event=>event.type==="result"&&event.is_error===false||event.type==="turn.completed")) failures.push("native-completion");
   const toolNames=events.find(event=>event.type==="system"&&event.subtype==="init")?.tools;
   const allowedTools=["Skill","StructuredOutput","mcp__triage__read","mcp__triage__list","mcp__triage__search","mcp__triage__probe"];
+  const invalidClaudeContent=events.some(event=>{
+    if(event.type!=="assistant")return false;
+    const content=(event.message as {content?:unknown}|undefined)?.content;
+    return!Array.isArray(content)||content.some(block=>!block||typeof block!=="object"||!["text","thinking","redacted_thinking","tool_use"].includes(String(block.type)));
+  });
   if(options.host==="codex-cli"){
     if(!restrictedCodex(options.toolConfiguration)||events.some(event=>{
       const item=event.item as{type?:string;server?:string;tool?:string}|undefined;
       return item&&(!["agent_message","reasoning","mcp_tool_call"].includes(item.type??"")||item.type==="mcp_tool_call"&&(item.server!=="triage"||!["read","list","search","probe"].includes(item.tool??"")));
     }))failures.push("exclusive-read-only-tools");
-  }else if(!Array.isArray(toolNames)||toolNames.some(name=>!allowedTools.includes(String(name)))||calls.some(call=>
+  }else if(invalidClaudeContent||!Array.isArray(toolNames)||toolNames.some(name=>!allowedTools.includes(String(name)))||calls.some(call=>
     !allowedTools.includes(String(call.name))||call.name==="Skill"&&![...(options.legacy?[]:["vh-adlc:vh-adlc-triage"]),...(options.command?[options.command]:[])].includes(String(call.input?.skill))))failures.push("exclusive-read-only-tools");
   for(const page of manifest.engineering??[]){
     const total=readFileSync(join(options.input,"engineering",page.path),"utf8").split("\n").length,covered=new Set<number>();
