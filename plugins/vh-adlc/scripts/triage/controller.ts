@@ -197,7 +197,14 @@ export function gradeTrial(options:{input:string;checkout:string;plugin:string;h
   if(options.exit_code!==0) failures.push("native-exit");
   if(!options.legacy&&(!options.installed||pluginPayloadHash(options.installed)!==pluginPayloadHash(options.plugin))) failures.push("installed-payload");
   const events:Record<string,unknown>[]=[];
-  for(const line of options.raw.split("\n"))try{events.push(JSON.parse(line));}catch{}
+  for(const line of options.raw.split("\n")){
+    if(!line.trim())continue;
+    try{
+      const event=JSON.parse(line);
+      if(!event||typeof event!=="object"||Array.isArray(event))throw Error("invalid native event");
+      events.push(event);
+    }catch{failures.push("malformed-native-transcript");}
+  }
   const calls=events.flatMap(event=>{
     const message=event.message as {content?:{type:string;name?:string;input?:Record<string,unknown>;id?:string}[]}|undefined;
     const direct=(Array.isArray(message?.content)?message.content:[]).filter(block=>block?.type==="tool_use");
