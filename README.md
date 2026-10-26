@@ -52,7 +52,8 @@ claude plugin marketplace add michielvha/vh-adlc
 claude plugin install vh-adlc@vhco-tools
 ```
 
-Then start with `/vh-adlc:vh-adlc-spec` and describe a feature.
+Describe the work with `Use vh-adlc`, or choose an operation such as
+`/vh-adlc:vh-adlc-spec` to describe a feature.
 
 See [installation](docs/get-started/installation.md) for desktop and VS Code
 instructions, then follow [your first feature](docs/get-started/first-feature.md).

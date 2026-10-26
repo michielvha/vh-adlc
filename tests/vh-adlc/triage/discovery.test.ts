@@ -1,8 +1,17 @@
 import { expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve,dirname } from "node:path";
 const root = resolve(import.meta.dir, "../../.."), plugin = resolve(root, "plugins/vh-adlc");
 const read = (path: string) => readFileSync(resolve(plugin, path), "utf8");
+
+test("generic framework discovery resolves the existing canonical lifecycle and authority",()=>{
+  const path=resolve(plugin,"skills/vh-adlc/SKILL.md"),skill=readFileSync(path,"utf8"),header=skill.match(/^---\n([\s\S]*?)\n---\n/);
+  expect(header).not.toBeNull();const metadata=Bun.YAML.parse(header![1])as Record<string,unknown>;
+  expect(metadata.name).toBe("vh-adlc");expect(typeof metadata.description).toBe("string");expect(metadata).not.toHaveProperty("model");expect(metadata).not.toHaveProperty("allowed-tools");
+  const links=[...skill.matchAll(/\]\(([^)]+)\)/g)].map(match=>resolve(dirname(path),match[1]));
+  for(const name of["lifecycle.md","authority.md","loop.md"]){const target=resolve(plugin,"references",name);expect(links).toContain(target);expect(readFileSync(target,"utf8").length).toBeGreaterThan(0);}
+  expect(readdirSync(resolve(plugin,"skills"))).toHaveLength(9);
+});
 
 test("native skill discovery exposes triage with one harness-neutral canonical procedure", () => {
   const skill = read("skills/vh-adlc-triage/SKILL.md"), match = skill.match(/^---\n([\s\S]*?)\n---\n/);
@@ -37,8 +46,8 @@ test("public guides agree on eight operations, runtime needs and unverified new 
   const guide = readFileSync(resolve(root, "docs/user-guides/workflows.md"), "utf8");
   const install = readFileSync(resolve(root, "docs/get-started/installation.md"), "utf8");
   const compatibility = readFileSync(resolve(root, "docs/reference/compatibility.md"), "utf8");
-  expect(guide).toContain("eight skills"); expect(guide).toContain("`vh-adlc-triage`"); expect(guide).toMatch(/exact.*batch/i);
-  expect(install).toContain("eight skills"); expect(install).toMatch(/(?:Bun[^\n]*triage|triage[^\n]*Bun)/i); expect(install).toContain("GitHub CLI");
+  expect(guide).toContain("nine skills");expect(guide).toContain("eight named operations"); expect(guide).toContain("`vh-adlc-triage`"); expect(guide).toMatch(/exact.*batch/i);
+  expect(install).toContain("nine skills"); expect(install).toMatch(/(?:Bun[^\n]*triage|triage[^\n]*Bun)/i); expect(install).toContain("GitHub CLI");
   expect(compatibility).toContain("Shared triage"); expect(compatibility).toMatch(/triage[\s\S]*unverified/i);
   expect(readFileSync(resolve(root, "README.md"), "utf8")).toMatch(/triage/i);
 });

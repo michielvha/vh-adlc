@@ -11,8 +11,9 @@ Use vh-adlc to diagnose this failure; report only.
 Use vh-adlc to repair this regression and finish locally.
 ```
 
-Lifecycle intake inspects the request and repository, then selects a procedure.
-It uses the existing eight skills. Check
+The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
+repository and selects a procedure. The package has nine skills: this entry and
+eight named operations. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 

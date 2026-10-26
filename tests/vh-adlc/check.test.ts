@@ -221,9 +221,10 @@ describe("manifest and marketplace", () => {
 });
 
 describe("skills", () => {
-  test("every skill directory is one of the eight operations", () => {
+  test("every skill directory is the generic entry or one of the eight operations", () => {
     const dirs = existsSync(join(PKG, "skills")) ? readdirSync(join(PKG, "skills")).sort() : [];
-    for (const d of dirs) expect(ALL_OPERATIONS.map((op) => `vh-adlc-${op}`)).toContain(d);
+    expect(dirs).toContain("vh-adlc");
+    for (const d of dirs) expect(["vh-adlc",...ALL_OPERATIONS.map((op) => `vh-adlc-${op}`)]).toContain(d);
   });
 
   for (const op of SCHEDULED) {
