@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "All 430 local tests and the hardened private Copilot trial pass; final independent review remains. GUI checks are deferred in #33."
+status_description: "R-29 verifies eight criteria and the private trial; proof-helper and filesystem test follow-ups remain. GUI checks are deferred in #33."
 issue: null
 branch: feat/shared-triage
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
@@ -506,25 +506,24 @@ surfaces until separately tested. No other harness support is implied.
 ## Acceptance Criteria
 
 - [ ] AC-01: The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support; the shared triage SKILL.md, authority.md, lifecycle.md, triage-boundary.md and public guides consistently require the controller for executable closure and every write asserting verified state while preserving local report-only output.
-      Evidence: R-28 returned `not verified` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below. GUI discovery remains unverified under the owner-approved #33 residual.
+      Evidence: R-29 returned `not verified` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. GUI discovery remains unverified under the owner-approved #33 residual.
       Residual: https://github.com/michielvha/vh-adlc/issues/33
 - [ ] AC-02: Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
-      Evidence: R-28 returned `met` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below.
+      Evidence: R-29 returned `met` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. Final follow-up review remains pending for its two test-proof findings.
 - [ ] AC-03: Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure and write asserting verified state in that report, and partial data never establishes exhaustive triage.
-      Evidence: R-28 returned `met` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below.
+      Evidence: R-29 returned `met` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. Final follow-up review remains pending for its two test-proof findings.
 - [ ] AC-04: Completion states and cleared blockers use proof actually observed inside the current enforced verification boundary before affecting dependency readiness, executable closure or a write asserting verified state; closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
-      Evidence: R-28 returned `met` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below.
+      Evidence: R-29 returned `met` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. Final follow-up review remains pending for its two test-proof findings.
 - [ ] AC-05: Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved; local report saving or committing cannot authorize remote publication, which remains unavailable without current enforced proof and separate publication authority.
-      Evidence: R-28 returned `met` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below.
+      Evidence: R-29 returned `met` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. Final follow-up review remains pending for its two test-proof findings.
 - [ ] AC-06: A confined managed controller separates analysis from operator approval, rejects unexpected tools and forged or replayed proof, and permits executable closure and writes asserting verified state only with fresh observed verification; execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes an unchanged batch after partial failure without duplicate completed actions or duplicate issue creation; a materially changed context stops the old batch and requires a new approved batch with a fresh explanation comment; local plan commits contain only the approved successful patches and shown commit metadata. The controller serializes effects per hostname/repository across batches and output paths, keeps uncertain outcomes blocked across resume and replacement batches, preserves prior artifacts, confines checks to the fixed-source filesystem/network boundary without owner files or credentials, and bounds cleanup of owned process groups with recorded exit and cleanup outcomes.
-      Evidence: R-28 returned `met` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below.
+      Evidence: R-29 returned `met` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. Final follow-up review remains pending for its two test-proof findings.
 - [ ] AC-07: The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof, and both forward the controller requirement for executable closure and every write asserting verified state without a weaker plain-chat permission; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
-      Evidence: R-28 returned `not verified` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below. Its frozen packet predates the owner's explicit private-payload approval and the subsequently completed Copilot trial; that new trial still needs the strengthened output/probe regrade and fresh review.
+      Evidence: R-29 returned `met` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. Final follow-up review remains pending for its two test-proof findings.
 - [ ] AC-08: The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
-      Evidence: R-28 returned `met` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below.
+      Evidence: R-29 returned `met` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. Final follow-up review remains pending for its two test-proof findings.
 - [ ] AC-09: Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
-      Evidence: R-28 returned `met` at `5dc86e7a0eb0995bcdebfcd651778ac6e246242f`; its verbatim records and independently executed proof are below.
-
+      Evidence: R-29 returned `met` at `a6697b564b74c695fb797e05566e76ab646eb9f7`; its verbatim executed records are below. Final follow-up review remains pending for its two test-proof findings.
 ## Test Plan
 
 | Criterion | Proof |
@@ -756,6 +755,11 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Final live evidence: The approved Copilot Opus 5.5 retry at `ac76e1d56f27e9a7a7ecf4a5bfe261a3d01327ad`, paired with Stackweaver `ff38a71fae332d44995c52f5a59e999c67898528`, exits 0 and independently regrades with all thirteen actual probes passing, no canary leakage or outside result path, complete engineering-page reads, exact requested IDs/mode/source, valid complete export and bounded owned-process cleanup. The canonical report is external and uncommitted, with all executable closures disabled. The complete checkout/index remains byte-identical, both trusted collections are GET-only with complete coverage, and every before/after issue/closed-issue/PR/label/plan collection is identical. `tests/vh-adlc/evidence/triage/copilot-private-migration.json` records sanitized facts and hashes; raw private inputs, report and native logs stay local. Full trial source is the exact recorded commit; the later evidence-only commit does not change its plugin or driver bytes. The frozen final review must verify this binding independently before completion. Neither the first successful private run nor any earlier failed synthetic attempt was overwritten.
       Existing route evidence is complete for T59's required observations: current attribution checks regrade all five archived Claude outcomes and five Codex outcomes with actual independent reviewer provenance, and canonical procedure bytes are unchanged. The original partial Claude documentation-page read remains an observed omission in the deferred documentation workflow, not a claim of a complete read. The final Copilot triage trial enforces and observes complete required pages. GUI execution is still unverified under #33; no GUI pass is inferred.
 
+
+- [ ] T77 `tests/vh-adlc/triage/copilot-trial.test.ts` - exercise actual filesystem symlink escapes and safe glob metadata, relative reads, error-channel canary leakage and incomplete required-page coverage with task-owned fixtures; pass focused and full gates (R-29 F-02; AC-03, AC-07).
+- [ ] T78 frozen review proof helpers and this document - make every private acceptance fact fail the helper exit when false, test those denials without private data, obtain fresh Opus review and complete with the approved GUI residual; retain the adapter README residual-link nit for its next revision as requested by R-29 F-03 (AC-01 through AC-09).
+      R-29 independently passes all 14 commands, 430 tests with 1814 assertions, four adapter contracts, all thirteen private probes and strict before/after equality. The author run remains 430 tests with 1804 assertions. F-04 procedural deviations are stored verbatim. The unchanged paired adapter is not revised solely for the README nit, as the reviewer recommends; its next documentation revision should link #33. No source publication is authorized.
+
 ## Open Questions
 
 None. On 2026-10-25 the owner resolved Q6 and Q7 together: every published triage verdict requires
@@ -800,6 +804,7 @@ R-22 reviewed the complete revised specification, and the owner accepted it on 2
 | 2026-10-26 | R-26 | implementation | `52c68c519869c5d145eec673c69b44e909b270f1` | claude-opus-5.5 | procedural | Six criteria met; AC-01 untested and AC-06/AC-07 not verified. Bind approved verification input, reject unsupported invocation blocks and finish host/migration evidence. |
 | 2026-10-26 | R-27 | implementation | `cb943a937847ab6530d4ad370174d6144a2eeda6` | claude-opus-5.5 | procedural | Seven criteria met, including recovery and execution; AC-01/AC-07 not verified because GUI compatibility and the spend-limited current private trial remain open. Nonblocking oracle and defensive notes retained. |
 | 2026-10-26 | R-28 | implementation | `5dc86e7a0eb0995bcdebfcd651778ac6e246242f` | claude-opus-5.5 | procedural | Seven criteria met; GUI residual retained and private trial absent from the frozen packet. Strengthen Copilot result-content and actual probe checks before final migration acceptance. |
+| 2026-10-26 | R-29 | implementation | `a6697b564b74c695fb797e05566e76ab646eb9f7` | claude-opus-5.5 | procedural | Eight criteria met, including the private migration trial; GUI residual remains. Strengthen proof-helper exit checks and real-filesystem grading regressions before completion. |
 
 ### R-1
 
@@ -2188,6 +2193,86 @@ SEVERITY: nit
 WHERE: Reviewer procedure deviations
 EVIDENCE: Two of my glob calls (synthetic-native, patterns **/* and *) produced oversized output. The tool harness, not I, wrote it to /tmp/copilot-tool-output-1793050052758-grkf6m.txt and /tmp/copilot-tool-output-1793050057220-pbms8m.txt, outside the packet. I did not read them. I invoked proof.sh three times with no arguments. I used no other shell commands and made no edits.
 PROPOSAL: Record these deviations verbatim alongside the earlier F-09 deviations.
+
+### R-29
+
+CRITERION: AC-01 The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support; the shared triage SKILL.md, authority.md, lifecycle.md, triage-boundary.md and public guides consistently require the controller for executable closure and every write asserting verified state while preserving local report-only output.
+VERDICT: not verified
+EVIDENCE: Ran the argument-free proof.sh at a6697b564b74c695fb797e05566e76ab646eb9f7. finished.json shows all 14 commands with exit 0, and integrity before and after was clean. In plugin-suite (430 pass, 0 fail, 1814 expect calls), the registered-operation, discovery and guide-agreement tests passed. claude-lifecycle-recheck passed L01, L02, L04, L15 and L06. codex-lifecycle-recheck passed five cases and codex-reserved-recheck passed. extended-native-recheck passed both generic-backlog-intake cases. gui-residual shows issue #33 open, both GUI surfaces tracked and gui_execution_observed false. compatibility.md:26 says the Copilot runner is test-only. Limitations: I observed no Codex desktop or VS Code Local triage execution, so the composite stays not verified under the owner-approved residual https://github.com/michielvha/vh-adlc/issues/33. The Claude and Codex native cases are archived cb943a9 trials that were regraded, not invoked again. L02's partial read of the pinned page remains an observed omission.
+
+CRITERION: AC-02 Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+VERDICT: met
+EVIDENCE: plugin-suite at a6697b5 passed with 430 pass and 0 fail, including the settings, report, parity and migration tests ("project settings retain source, priority, plan, history and hard ownership behavior"). adapter-contract passed in Stackweaver ff38a71 with 4 pass and 24 expect calls. migration-parity-false-prior showed the legacy, shared and index grades passing, six classifications passing and actionable order [63,68,71] equal to the shared ready order. I inspected stackweaver/.vh-adlc/triage.json, which holds protected_ids 332 and 334, index_ids 13 and 395, and the workstreams. Limitations: legacy raw display parity is not claimed.
+
+CRITERION: AC-03 Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure and write asserting verified state in that report, and partial data never establishes exhaustive triage.
+VERDICT: met
+EVIDENCE: plugin-suite at a6697b5 passed the collection and acceptance tests, including the input export with hashed coverage. native-recheck showed the required-fail cases on both CLIs blocked with "required-preparation-failed". private-copilot-readonly-proof showed collector_coverage_complete true for both snapshots. Limitations: the private snapshots were checked only through sanitized booleans and hashes.
+
+CRITERION: AC-04 Completion states and cleared blockers use proof actually observed inside the current enforced verification boundary before affecting dependency readiness, executable closure or a write asserting verified state; closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
+VERDICT: met
+EVIDENCE: plugin-suite at a6697b5 passed the verification, acceptance and execution tests. native-recheck passed 20 core cases, including forged and cached on both CLIs. migration-parity-false-prior showed both Codex and Claude rejecting the planted false prior completion (state partial, close_executable false). The parity classifications kept partial #68, blocked #69 and duplicate #70. Limitations: the native analyses are cb943a9 archives that were regraded.
+
+CRITERION: AC-05 Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved; local report saving or committing cannot authorize remote publication, which remains unavailable without current enforced proof and separate publication authority.
+VERDICT: met
+EVIDENCE: plugin-suite at a6697b5 passed the report, session, parity and selection-approval tests. The parity test passed "retains scope across modes". extended-native-recheck generic intake showed fake_get_only and external_report true. The private proof showed external_report_saved true, collector_get_only true and all five collections equal. Limitations: I inspected no live publication denial against the real tracker; fixture coverage applies.
+
+CRITERION: AC-06 A confined managed controller separates analysis from operator approval, rejects unexpected tools and forged or replayed proof, and permits executable closure and writes asserting verified state only with fresh observed verification; execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes an unchanged batch after partial failure without duplicate completed actions or duplicate issue creation; a materially changed context stops the old batch and requires a new approved batch with a fresh explanation comment; local plan commits contain only the approved successful patches and shown commit metadata. The controller serializes effects per hostname/repository across batches and output paths, keeps uncertain outcomes blocked across resume and replacement batches, preserves prior artifacts, confines checks to the fixed-source filesystem/network boundary without owner files or credentials, and bounds cleanup of owned process groups with recorded exit and cleanup outcomes.
+VERDICT: met
+EVIDENCE: plugin-suite at a6697b5 passed with 430 pass, 0 fail and 1814 expect calls. The author recorded 1804, and I give no explanation for the difference. managed-recovery.test.ts:40-45 covers resume: a missing stored batch, changed stored bytes and a changed verification hash are each denied with no adapter call. An intact resume still produces exactly one comment. acceptance.test.ts:159-163 rejects malformed and non-object JSONL and accepts blank lines. native-recheck passed 20 core cases: recover, uncertain, payload-denial, required-fail, eight hostile cases, extra-tool and stubborn cleanup. extended-native-recheck passed concurrent, replacement, context and vocabulary crossbatch cases on both CLIs. native-runtime-delta.patch matched the proof.py byte check with exactly two changed production paths. Limitations: the native cases are cb943a9 archives that were regraded, and the two new guards are exercised only by current regressions.
+
+CRITERION: AC-07 The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof, and both forward the controller requirement for executable closure and every write asserting verified state without a weaker plain-chat permission; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
+VERDICT: met
+EVIDENCE: proof.sh integrity at a6697b5 and ff38a71 showed both trees clean and only allowed Stackweaver paths, and proof.py:25 confirmed no plugin or driver diff from ac76e1d. migration.test.ts passed 6 tests and adapter-contract passed 4. I inspected agents/issue-triage.md:14-22 (controller required, no plain-chat or legacy fallback) and .claude/commands/triage.md:6-8, which forwards to that entry. private-copilot-readonly-proof regraded the immutable private artifacts:
+- model claude-opus-5.5, native_exit 0, independent_grade true, failures empty
+- all 13 probes true, required_page_reads_complete true
+- source_and_index_preserved true, input_integrity true, only_native_read_tools true, analysis_github_tool_calls 0
+- collector_get_only true, all five collections equal
+- external_report_saved true, all_executable_closures_disabled true, response_exact_scope true, owned_process_reaped true
+Its hashes equal the committed copilot-private-migration.json. The README ordered handoff keeps main cutover separate. Limitations: the environment, helper, keyring and socket probes use outside-file stand-ins. Provider login and network remain a trusted control plane. GUI is excluded.
+
+CRITERION: AC-08 The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
+VERDICT: met
+EVIDENCE: The rollback command (bun tests/agent-triage/rehearse.ts at ff38a71) exited 0. It observed rollback true, reapply true, index_preserved true and rollback_index_bytes_preserved true, with runtime paths limited to the four entry and settings files. Limitations: the private rehearsal output beyond those fields is excluded from the packet.
+
+CRITERION: AC-09 Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
+VERDICT: met
+EVIDENCE: workflow-preservation at a6697b5 passed. All 15 existing workflow, skill and reference hashes equal the baseline, stack_changes_only_allowed_migration_paths is true and deferred_register_unchanged is true (sha256 158b7a04). Limitations: this is static byte and hash preservation only.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: private-proof.ts line 9
+EVIDENCE: process.exitCode is set to 1 only for grade, integrity, sourceSame, getOnly, external report, closures, coverage and reaping. strict_collections_equal, current_production_payload_equal, the model, and component and adapter equality are printed but never gate the exit. proof.py:34 sets pass from the exit code alone. In this run all of them were observed true.
+PROPOSAL: In the next packet's helper, make strict_collections_equal, payload equality, the expected model and the ac76 and ff38 commit equality fail the exit, so a non-identical tracker collection cannot pass silently.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: tests/vh-adlc/triage/copilot-trial.test.ts
+EVIDENCE: Every fixture uses the nonexistent root /input. existsSync is therefore false, and these branches have no regression:
+- the realpath escape branch at copilot-trial.ts:18
+- resolvedOutside and the glob lstat symlink exception at :28
+Also untested are canary values in returned.error (:20-21), incomplete-required-read (:48) and a relative view path resolved against the input CWD. Only the live private run exercised the denied probe outcomes.
+PROPOSAL: Add temp-directory fixtures with a real inside symlink to an outside canary for view, grep and glob success. Also add a canary in the error channel, a partial required read and a relative path, and keep the positive symlink-listing case.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: stackweaver tests/agent-triage/README.md lines 47-48 and 69
+EVIDENCE: "GUI trials remain required there" and "missing GUI proof remain visible blockers" do not name the owner-approved residual #33.
+PROPOSAL: At the next adapter revision, reference #33 so the handoff matches the recorded residual. Do not change the current reviewed pair for this alone.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: review procedure
+EVIDENCE: Procedural deviations:
+1. One grep on the spec with a broad pattern overflowed (181.6 KB). The tool saved the output to /tmp/copilot-tool-output-1793053044800-zjugla.txt, outside the packet. I never read that file and used a narrower pattern afterwards.
+2. proof.sh was invoked three times, each time with the same argument-free command.
+3. I read the conventions from the packet copy vhco-pro-docs, not the binary cache. I read feature-documents.md lines 78-200 only and did not read guides/humanize-prose.md.
+4. Some hash-listed inputs and review-prompt.txt were not read manually.
+I ran no other shell commands, made no edits, used no network, and did not use wc, list_bash or read_bash. Isolation was procedural.
+PROPOSAL: Record these deviations with this review.
 
 ## Sources
 
