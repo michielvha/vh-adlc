@@ -25,11 +25,17 @@ export function gradeCopilotRead(options:{raw:string;args:string[];input:string;
  const result=events.findLast(e=>e.type==='result');if(result?.exitCode!==0)failures.push('native-exit');
  return{pass:failures.length===0,failures:[...new Set(failures)],probes:probeResults,tool_calls:calls.length,successful_reads:successfulReads.map(e=>e.path),models:[...new Set(events.map(e=>e.data?.model).filter(Boolean))]};
 }
-export function parseCopilotResponse(text:string){
+export function parseCopilotResponse(text:string,expected?:{mode:string;source_commit:string;requested_ids:number[]}){
  if(typeof text!=="string")throw Error("missing native response");
  const blocks=[...text.matchAll(/```json\s*([\s\S]*?)\s*```/g)];
  if(blocks.length>1)throw Error("ambiguous native response");
- return JSON.parse(blocks.length===1?blocks[0][1]:text.trim());
+ const response=JSON.parse(blocks.length===1?blocks[0][1]:text.trim());
+ if(expected){
+  if(response?.mode!==expected.mode||response.source_commit!==expected.source_commit||!Array.isArray(response.observations))throw Error("response-scope");
+  const ids=response.observations.map((o:any)=>o?.number);
+  if(ids.length!==expected.requested_ids.length||new Set(ids).size!==ids.length||ids.some((id:unknown)=>typeof id!=="number"||!expected.requested_ids.includes(id)))throw Error("response-scope");
+ }
+ return response;
 }
 if(import.meta.main){
  const flag=(s:string)=>process.argv[process.argv.indexOf(s)+1],checkout=resolve(flag('--checkout')),plugin=resolve(flag('--plugin')),snapshot=resolve(flag('--snapshot')),output=resolve(flag('--output')),repo=resolve(flag('--repo')),input=join(output,'input');
@@ -43,6 +49,6 @@ if(import.meta.main){
  const args=copilotReadLaunch(input,join(input,'plugin'),join(output,'logs'),prompt);writeFileSync(join(output,'launch.json'),JSON.stringify({args,cwd:input,probes,required_reads:required,component_commit:component,plugin_hash:pluginPayloadHash(plugin)}));
  const cleanup=await runOwnedClient(args,{cwd:input,env:{...process.env},stdout:join(output,'native.jsonl'),stderr:join(output,'stderr.log')},{timeout_ms:900000,grace_ms:500,reap_ms:2000}),exit=cleanup.exit_code;
  const raw=readFileSync(join(output,'native.jsonl'),'utf8'),grade=gradeCopilotRead({raw,args,input,probes,requiredReads:required}),after=captureControllerCheckout(checkout);writeFileSync(join(output,'checkout-after.json'),JSON.stringify(after));const preserved=JSON.stringify(before)===JSON.stringify(after),verified=verifyInputs(input,{checkout,plugin}),events=parse(raw),final=events.filter(e=>e.type==='assistant.message'&&e.data.content).at(-1)?.data.content;let report:string|null=null,error:string|null=null;
- try{if(exit!==0||cleanup.timed_out||!cleanup.reaped||!grade.pass||!grade.successful_reads.includes(join(input,'manifest.json'))||!preserved||!verified.pass)throw Error('native-boundary-or-preservation');const response=parseCopilotResponse(final);if(response.mode!==inventory.mode||response.source_commit!==manifest.source_commit||!Array.isArray(response.observations)||response.observations.some((o:any)=>!inventory.requested_ids.includes(o.number)))throw Error('response-scope');writeFileSync(join(output,'observations.json'),JSON.stringify(response));const normalized=buildReport(config,inventory,response.observations,{fixedHead:manifest.source_commit});report=saveReport(config,normalized,{output:join(output,'triage-report.md')});writeFileSync(join(output,'normalized-report.json'),JSON.stringify(normalized));}catch(e){error=e instanceof Error?e.message:'native-trial-failed';}
+ try{if(exit!==0||cleanup.timed_out||!cleanup.reaped||!grade.pass||!grade.successful_reads.includes(join(input,'manifest.json'))||!preserved||!verified.pass)throw Error('native-boundary-or-preservation');const response=parseCopilotResponse(final,{mode:inventory.mode,source_commit:manifest.source_commit,requested_ids:inventory.requested_ids});if(response.mode!==inventory.mode||response.source_commit!==manifest.source_commit||!Array.isArray(response.observations)||response.observations.some((o:any)=>!inventory.requested_ids.includes(o.number)))throw Error('response-scope');writeFileSync(join(output,'observations.json'),JSON.stringify(response));const normalized=buildReport(config,inventory,response.observations,{fixedHead:manifest.source_commit});report=saveReport(config,normalized,{output:join(output,'triage-report.md')});writeFileSync(join(output,'normalized-report.json'),JSON.stringify(normalized));}catch(e){error=e instanceof Error?e.message:'native-trial-failed';}
  const result={schema_version:1,host:'copilot-cli',component_commit:component,source_commit:manifest.source_commit,plugin_hash:pluginPayloadHash(plugin),exit,process_cleanup:cleanup,grade,preserved,input_integrity:verified,report,error,limits:'Test-only native read-tools analysis. Copilot CLI enforces path permissions; no custom MCP server bypass, token transfer, shell or network tool. Canary route files are synthetic, never real credentials. Host control plane retains its existing provider login/network. Report-only observations confer no managed publication authority.'};writeFileSync(join(output,'result.json'),JSON.stringify(result,null,2));console.log(JSON.stringify({output,pass:!!report,error,grade:{pass:grade.pass,failures:grade.failures},preserved}));if(!report)process.exitCode=1;
 }

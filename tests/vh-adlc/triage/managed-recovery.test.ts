@@ -40,6 +40,10 @@ test("managed recovery reobserves the original batch and journal with one commen
    rmSync(original);await resume();writeFileSync(original,bytes);
    writeFileSync(original,bytes+" ");await resume();writeFileSync(original,bytes);
    await resume("b".repeat(64));
+   async function* intact(){yield JSON.stringify({id:"intact-resume",method:"resume",params:{batch,approval:{batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Resume the exact stored fixture batch"}}});}
+   await operatorController({config,inventory,report,output:analysis,verificationHash,input:intact(),adapter,write:line=>responses.push(JSON.parse(line))});
+   expect(responses.at(-1).error).toBeUndefined();expect(responses.at(-1).result.completed).toEqual(["explain"]);expect(responses.at(-1).result.failed).toEqual(["close"]);expect(adapterCalls).toBeGreaterThan(expectedCalls);expect(issue.comments.length).toBe(1);
+
 
   });
   expect(responses.find(response=>response.id===2).result.completed).toEqual(["explain"]);expect(issue.comments.length).toBe(1);

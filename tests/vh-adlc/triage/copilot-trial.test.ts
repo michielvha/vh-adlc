@@ -17,3 +17,9 @@ expect(grade([{type:'tool.execution_start',data:{toolCallId:'bad',toolName:'bash
 test('Copilot report parsing accepts one complete fenced result and rejects ambiguity',async()=>{
  const mod=await import(path),response={mode:'ids',source_commit:'synthetic',observations:[]};expect(mod.parseCopilotResponse('Observed read-only inputs.\n```json\n'+JSON.stringify(response)+'\n```')).toEqual(response);expect(()=>mod.parseCopilotResponse('```json\n{}\n```\n```json\n{}\n```')).toThrow();expect(()=>mod.parseCopilotResponse('not a result')).toThrow();
 });
+
+test('Copilot trial response must cover exactly its requested scope',async()=>{
+ const mod=await import(path),expected={mode:'ids',source_commit:'fixed',requested_ids:[1,2]},response={mode:'ids',source_commit:'fixed',observations:[{number:1},{number:2}]};expect(mod.parseCopilotResponse(JSON.stringify(response),expected)).toEqual(response);
+ for(const observations of[[],[{number:1}],[{number:1},{number:1}],[{number:1},{number:3}]])expect(()=>mod.parseCopilotResponse(JSON.stringify({...response,observations}),expected)).toThrow();
+ expect(()=>mod.parseCopilotResponse(JSON.stringify({...response,source_commit:'other'}),expected)).toThrow();
+});

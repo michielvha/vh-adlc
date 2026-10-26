@@ -14,9 +14,9 @@
     "50ffbbf"
   ],
   "latest_plugin_gate": {
-    "tests": 428,
+    "tests": 429,
     "failures": 0,
-    "assertions": 1782
+    "assertions": 1793
   },
   "gui_residual": "https://github.com/michielvha/vh-adlc/issues/33",
   "private_copilot_trial": "pending explicit private-payload confirmation required by automatic approval",
