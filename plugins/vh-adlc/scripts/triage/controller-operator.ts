@@ -10,15 +10,16 @@ import{inspectIssues,inspectRemoval,inspectSources}from"./verification";
 
 // Only the controller's parent input reaches this function. Analysis runs in a
 // different client with stdin ignored and a fixed read-only tool transport.
-export async function operatorController(options:{config:Settings;inventory:Inventory;report:Report;output:string;input:AsyncIterable<string>;adapter:Adapter;write:(line:string)=>void}){
+export async function operatorController(options:{config:Settings;inventory:Inventory;report:Report;output:string;verificationHash:string;input:AsyncIterable<string>;adapter:Adapter;write:(line:string)=>void}){
  if(!hasManagedControllerAuthority())throw Error("managed operator requires current confined-controller authority");
+ if(typeof options.verificationHash!=="string"||!/^[a-f0-9]{64}$/.test(options.verificationHash))throw Error("managed operator requires the fixed verification input");
  const{config,inventory,report}=options,batches=new Map<string,Batch>();
  for await(const line of options.input){
   if(!line.trim())continue;let id:unknown=null;
   try{
    const request=JSON.parse(line),args=request.params??{};id=request.id;let result:unknown;
    if(request.method==="batch"){
-    const batch=planBatch(config,inventory,report,args.actions);const path=join(options.output,`batch-${batch.hash}.json`),bytes=JSON.stringify(batch);
+    const batch=planBatch(config,inventory,report,args.actions,{verificationHash:options.verificationHash});const path=join(options.output,`batch-${batch.hash}.json`),bytes=JSON.stringify(batch);
     if(existsSync(path)){if(readFileSync(path,"utf8")!==bytes)throw Error("prior batch artifact differs");}else writeFileSync(path,bytes,{flag:"wx",mode:0o600});
     batches.set(batch.hash,batch);result=batch;
    }else if(request.method==="execute"||request.method==="resume"){

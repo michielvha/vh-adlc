@@ -34,7 +34,7 @@ export type Adapter = {
 };
 export type Batch = {
   schema_version: 1; hash: string; context_id:string;repository: string; hostname: string; settings_hash: string;
-  source_commit: string; source_hash: string; report: Report; issues: Issue[]; actions: Action[]; labels:Label[];actor:string|null;inventory:Inventory;
+  source_commit: string; source_hash: string; verification_hash:string|null;report: Report; issues: Issue[]; actions: Action[]; labels:Label[];actor:string|null;inventory:Inventory;
 };
 export type Approval = { batch_hash: string; action_ids: string[]; owner_statement: string };
 type Journal = {
@@ -227,16 +227,18 @@ function renderActions(config:Settings,inventory:Inventory,report:Report,request
   return actions;
 }
 
-export function planBatch(config: Settings, inventory: Inventory, report: Report, requested: Action[]): Batch {
+export function planBatch(config: Settings, inventory: Inventory, report: Report, requested: Action[],options:{verificationHash?:string}={}): Batch {
   if (report.repository !== config.repository || inventory.repository !== config.repository || report.hostname !== config.hostname ||
       report.source_commit !== inventory.source_commit || git(config.root, "rev-parse", "HEAD") !== report.source_commit || !Array.isArray(requested)) bad();
   if(!Array.isArray(report.observations)||!Array.isArray(report.index_requests))bad();
   const rebuilt=buildReport(config,inventory,report.observations,{runId:report.run_id,indexRequests:report.index_requests});
   if(hash(reportFacts(rebuilt))!==hash(reportFacts(report)))bad();
-  const contextId=hash({config,inventory,report:reportFacts(report)});
+  const verificationHash=options.verificationHash??null;
+  if(verificationHash!==null&&!/^[a-f0-9]{64}$/.test(verificationHash))bad();
+  const contextId=hash({config,inventory,report:reportFacts(report),verification_hash:verificationHash});
   const actions=renderActions(config,inventory,report,requested,contextId);
   const batch: Batch = { schema_version: 1, hash: "", context_id:contextId,repository: config.repository, hostname: config.hostname,
-    settings_hash: hash(config), source_commit: report.source_commit, source_hash: sourceHash(config, actions),
+    settings_hash: hash(config), source_commit: report.source_commit, source_hash: sourceHash(config, actions),verification_hash:verificationHash,
     report: structuredClone(report), issues: structuredClone([...inventory.issues, ...inventory.closed_issues]), labels:structuredClone(inventory.labels??[]),actor:inventory.actor??null,inventory:structuredClone(inventory), actions };
   batch.hash = batchHash(batch); return batch;
 }
@@ -252,7 +254,8 @@ export async function executeBatch(config: Settings, batch: Batch, approval: App
   if (batch.hash !== batchHash(batch) || approval.batch_hash !== batch.hash || hash(config) !== batch.settings_hash ||
       !nonempty(approval.owner_statement) || new Set(approval.action_ids).size !== approval.action_ids.length ||
       approval.action_ids.some((id) => !batch.actions.some((action) => action.id === id))) bad();
-  if(batch.context_id!==hash({config,inventory:batch.inventory,report:reportFacts(batch.report)}))bad();
+  if(batch.verification_hash!==null&&(typeof batch.verification_hash!=="string"||!/^[a-f0-9]{64}$/.test(batch.verification_hash)))bad();
+  if(batch.context_id!==hash({config,inventory:batch.inventory,report:reportFacts(batch.report),verification_hash:batch.verification_hash}))bad();
   if(batch.schema_version!==1||batch.repository!==config.repository||batch.hostname!==config.hostname||
     batch.source_commit!==batch.report.source_commit||batch.source_commit!==batch.inventory.source_commit||
     hash(batch.issues)!==hash([...batch.inventory.issues,...batch.inventory.closed_issues])||

@@ -111,6 +111,9 @@ files alone grant no execution authority. Prior artifacts are preserved. Complet
 and creations are never repeated within the unchanged original batch.
 
 The complete original check/removal selection is stored in the hash-bound verification input.
+Its hash is part of the exact approved batch and explanation context, including an empty selection.
+Recovery rejects a missing or replaced manifest hash before launching analysis or calling the tracker.
+An older batch without this binding requires a fresh run and approval; never reconstruct its input.
 Editable controller state must match it, including checks the report did not cite. Dropping a check
 or changing its arguments stops recovery before fresh native analysis or tracker effects.
 

@@ -13,14 +13,13 @@ function normalizedSelection(selection:VerificationSelection={}){
 }
 // Ordinary selection data, never proof authority. Resume compares the editable
 // state with the complete selection in the original hash-bound fixed input.
-export function originalVerificationSelection(input:string,state:VerificationSelection={}){
- const manifest=JSON.parse(readFileSync(join(input,"manifest.json"),"utf8"));let original=normalizedSelection();
- if(manifest.verification_hash!==undefined){
-  const bytes=readFileSync(join(input,"verification.json"));
-  if(!/^[a-f0-9]{64}$/.test(manifest.verification_hash)||createHash("sha256").update(bytes).digest("hex")!==manifest.verification_hash)throw Error("original verification input changed");
-  const prepared=JSON.parse(bytes.toString());if(prepared.schema_version!==1||!prepared.selection)throw Error("original operator verification selection unavailable");
-  original=normalizedSelection(prepared.selection);
- }
+export function originalVerificationSelection(input:string,state:VerificationSelection={},approvedHash?:string){
+ const manifest=JSON.parse(readFileSync(join(input,"manifest.json"),"utf8"));
+ if(typeof manifest.verification_hash!=="string"||!/^[a-f0-9]{64}$/.test(manifest.verification_hash))throw Error("original verification input unavailable");
+ const bytes=readFileSync(join(input,"verification.json"));
+ if(approvedHash!==undefined&&manifest.verification_hash!==approvedHash||createHash("sha256").update(bytes).digest("hex")!==manifest.verification_hash)throw Error("original verification input changed");
+ const prepared=JSON.parse(bytes.toString());if(prepared.schema_version!==1||!prepared.selection)throw Error("original operator verification selection unavailable");
+ const original=normalizedSelection(prepared.selection);
  if(JSON.stringify(original)!==JSON.stringify(normalizedSelection(state)))throw Error("original operator verification selection changed");
  return original;
 }

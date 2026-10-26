@@ -3,7 +3,7 @@ import{verifyInputs}from"./controller";
 import{existsSync,mkdirSync,readFileSync,readdirSync,realpathSync,writeFileSync}from"node:fs";
 import{dirname,isAbsolute,join,relative,resolve,sep}from"node:path";
 import{loadSettings}from"./settings";
-import{executeBatch,type Approval,type Batch}from"./execute";
+import{approveBatch,executeBatch,type Approval,type Batch}from"./execute";
 import{githubExecutor}from"./github";
 import{lifecycleGate}from"./lifecycle-gate";
 import{inspectIssues,inspectRemoval,inspectSources,inspectSearch,verifyCommand,verificationRecord,withVerificationBoundary,requiredVerificationFailed}from"./verification";
@@ -27,7 +27,9 @@ export async function resumeController(run:string,batchHash:string,output:string
  writeFileSync(join(attempt,"prior-run.json"),JSON.stringify({run:resolve(run),batch_hash:batchHash,journal},null,2));
  if(!existsSync(journal)||batch.hash!==batchHash||!verifyInputs(state.input,{checkout:state.checkout,plugin:state.plugin}).pass)throw Error("original journal or unchanged fixed input unavailable");
  if(JSON.stringify(batch.report.index_requests)!==JSON.stringify(state.indexRequests))throw Error("original operator selection changed");
- const selection=originalVerificationSelection(state.input,state.verification);
+ approveBatch(batch,approval.action_ids,approval.owner_statement);
+ if(typeof batch.verification_hash!=="string")throw Error("original verification input unavailable");
+ const selection=originalVerificationSelection(state.input,state.verification,batch.verification_hash);
  const receipts=new Set<string>();
  function collect(value:unknown){if(Array.isArray(value)){for(const entry of value)collect(entry);}else if(value&&typeof value==="object"){for(const[key,item]of Object.entries(value)){if(key==="receipt"&&typeof item==="string")receipts.add(item);else collect(item);}}}
  collect(batch.report.observations);

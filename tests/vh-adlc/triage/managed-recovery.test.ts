@@ -1,6 +1,6 @@
 import{test}from"./boundary-test";
 import{expect}from"bun:test";
-import{mkdirSync,mkdtempSync,rmSync,readFileSync,writeFileSync,chmodSync}from"node:fs";
+import{mkdirSync,mkdtempSync,rmSync,readFileSync,writeFileSync,chmodSync,existsSync}from"node:fs";
 import{tmpdir}from"node:os";
 import{join,resolve}from"node:path";
 import{fixture,git}from"./fixtures";
@@ -29,7 +29,7 @@ test("managed recovery reobserves the original batch and journal with one commen
    const report=buildReport(config,inventory,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")}]);
    const adapter:any={identity:async()=>"operator",labels:async()=>[],issue:async()=>structuredClone(issue),receipt:async()=>null,mutate:async(action:any)=>{if(action.kind==="close")throw new MutationFailure(false);issue.comments.push({id:1,author:"operator",body:action.body,created_at:now});return{issue:structuredClone(issue)};}};
    async function* requests(){yield JSON.stringify({id:1,method:"batch",params:{actions:[{id:"explain",kind:"comment",issue:1,body:"Observed the actual public export."},{id:"close",kind:"close",issue:1,reason:"completed",duplicate_of:null,comment:"explain"}]}});batch=responses.at(-1).result;yield JSON.stringify({id:2,method:"execute",params:{approval:{batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Approve this exact fixture batch"}}});}
-   await operatorController({config,inventory,report,output:analysis,input:requests(),adapter,write:line=>responses.push(JSON.parse(line))});
+   await operatorController({config,inventory,report,output:analysis,verificationHash:JSON.parse(readFileSync(join(input,"manifest.json"),"utf8")).verification_hash,input:requests(),adapter,write:line=>responses.push(JSON.parse(line))});
   });
   expect(responses.at(-1).result.completed).toEqual(["explain"]);expect(issue.comments.length).toBe(1);
   const controllerState={schema_version:1,checkout:f.root,plugin,input,verification:selection,indexRequests:[]};
@@ -54,10 +54,26 @@ else throw Error("Unapproved route");writeFileSync(path,JSON.stringify(data));co
   const denied=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"resume","--run-dir",analysis,"--batch-hash",batch.hash,"--output-dir",attempt],{env:{...process.env,PATH:tools+":"+process.env.PATH,TRIAGE_RECOVERY_API:database},stdin:Buffer.from(approval+"\n"),stdout:"pipe",stderr:"pipe",timeout:15_000});
   expect(denied.exitCode).toBe(1);expect(denied.stderr.toString()).toContain("configured confined native adapter");expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
   const priorPath=process.env.PATH,priorApi=process.env.TRIAGE_RECOVERY_API;process.env.PATH=tools+":"+priorPath;process.env.TRIAGE_RECOVERY_API=database;
+  const nativeProbe=join(control,"unexpected-native-launch");writeFileSync(join(tools,"codex"),`#!/usr/bin/env bun\nimport{writeFileSync}from"node:fs";writeFileSync(${JSON.stringify(nativeProbe)},"unexpected native launch");process.exit(69);\n`);chmodSync(join(tools,"codex"),0o700);
+  const cliDenied=(name:string,message:string)=>{
+   const output=join(control,name),child=Bun.spawnSync([process.execPath,join(plugin,"scripts/triage/controller.ts"),"resume","--run-dir",analysis,"--batch-hash",batch.hash,"--output-dir",output],{env:{...process.env},stdin:Buffer.from(approval+"\n"),stdout:"pipe",stderr:"pipe",timeout:15_000});
+   expect(child.exitCode).toBe(1);expect(child.stderr.toString()).toContain(message);expect(existsSync(nativeProbe)).toBe(false);expect(existsSync(output)).toBe(false);expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
+  };
   let result;try{
    writeFileSync(join(analysis,"controller-state.json"),JSON.stringify({...controllerState,verification:{}}));
    await expect(resumeController(analysis,batch.hash,join(control,"tampered-attempt"),JSON.parse(approval),plugin)).rejects.toThrow("original operator verification selection changed");
    expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
+   const manifestPath=join(input,"manifest.json"),manifestBytes=readFileSync(manifestPath,"utf8"),manifest=JSON.parse(manifestBytes);
+   delete manifest.verification_hash;writeFileSync(manifestPath,JSON.stringify(manifest));
+   writeFileSync(join(analysis,"controller-state.json"),JSON.stringify({...controllerState,host:"codex",verification:{}}));cliDenied("stripped-cli-attempt","original verification input unavailable");
+   await expect(resumeController(analysis,batch.hash,join(control,"stripped-hash-attempt"),JSON.parse(approval),plugin)).rejects.toThrow("original verification input unavailable");
+   expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
+   const verificationPath=join(input,"verification.json"),verificationBytes=readFileSync(verificationPath,"utf8"),replacement=JSON.parse(verificationBytes);replacement.selection={checks:{},removals:[]};replacement.operations=[];
+   const changed=JSON.stringify(replacement);writeFileSync(verificationPath,changed);manifest.verification_hash=Bun.CryptoHasher.hash("sha256",changed,"hex");writeFileSync(manifestPath,JSON.stringify(manifest));
+   cliDenied("replaced-cli-attempt","original verification input changed");
+   await expect(resumeController(analysis,batch.hash,join(control,"replaced-hash-attempt"),JSON.parse(approval),plugin)).rejects.toThrow("original verification input changed");
+   expect(JSON.parse(readFileSync(database,"utf8")).trace).toEqual([]);
+   writeFileSync(verificationPath,verificationBytes);writeFileSync(manifestPath,manifestBytes);
    writeFileSync(join(analysis,"controller-state.json"),JSON.stringify(controllerState));
    result=await resumeController(analysis,batch.hash,attempt,JSON.parse(approval),plugin);
   }finally{process.env.PATH=priorPath;if(priorApi===undefined)delete process.env.TRIAGE_RECOVERY_API;else process.env.TRIAGE_RECOVERY_API=priorApi;}
@@ -78,7 +94,7 @@ test("operator distinguishes failed required verification from an unrelated batc
    const proof=(pass:"primary"|"adversarial")=>{const receipt=inspectSources(config,["src/app.ts"],pass).receipt;return[{kind:"source",path:"src/app.ts",line:1,detail:"Actual public export",verified:true,receipt},{kind:"wiring",path:"src/app.ts",line:1,detail:"Export is the requested contract",verified:true,receipt}];};
    const report=buildReport(config,inventory,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")}]),responses:any[]=[];
    async function* request(){yield JSON.stringify({id:"batch",method:"batch",params:{actions:[{id:"explain",kind:"comment",issue:1,body:"Verified the public answer export."}]}});}
-   await operatorController({config,inventory,report,output,input:request(),adapter:{}as any,write:line=>responses.push(JSON.parse(line))});
+   await operatorController({config,inventory,report,output,verificationHash:JSON.parse(readFileSync(join(input,"manifest.json"),"utf8")).verification_hash,input:request(),adapter:{}as any,write:line=>responses.push(JSON.parse(line))});
    if(exit===0)expect(responses[0].result.hash).toMatch(/^[a-f0-9]{64}$/);else expect(responses[0].error_code).toBe("verification-required");
   });
  }finally{f.dispose();rmSync(control,{recursive:true,force:true});}
