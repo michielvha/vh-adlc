@@ -1,15 +1,35 @@
 # Shared triage evidence
 
-The JSON records summarize actual observations and retain source and payload hashes. The final clean-commit Claude/Codex runs share component `f1f1810fc24f2f6e586676a931cca30d7c78cddb` and the same canonical plugin hash; both passed native invocation, complete engineering-page reads, eight actual-session probes and external report rendering. No actions executed. The final disposable rollback/index rehearsal passed against adapter `4532b929286c1af9df5cfac3b37fddec6004a4a9`. Native runs used disposable client profiles and a synthetic repository. The trusted Stackweaver collector made GET requests only; its raw private inputs remain in local temporary artifacts. Collection is separate from agent analysis.
+The JSON records retain the actual observed source commits and payload hashes. They are
+historical evidence, not a claim that every later revision has had the same native run.
+The current results and review records live in [the feature document](../../../../docs/specs/shared-triage.md).
 
-The synthetic migration matrix in `tests/vh-adlc/triage/parity.test.ts` checks retained behavior and intentional differences across every mode. It does not establish a native run of the frozen legacy agent.
+Copilot Opus 5.5 R-27 independently regraded 28 actual CLI safety cases at `cb943a9`:
+original and uncertain recovery, exact-payload and required-check denials, forged/replayed
+proof, confinement failures, owned-process cleanup and cross-batch cases on Codex and
+Claude. Generic backlog discovery passed on both. The frozen legacy/shared/index
+comparison agreed on six ordinary classifications and actionable ready order, while
+retaining the legacy display's extra nonactionable rows. Disposable rollback/reapply
+passed at Stackweaver adapter `ff38a71f`.
 
-Outstanding acceptance proof:
+Subsequent malformed-event and stored-resume guards passed focused regressions and the
+full gate. The quiet assertion rubric now accepts only an attributable observed check;
+original failed records remain intact. These unit/integration results are separate from
+the older native component, and exact revisions are recorded in the feature document.
 
-- Private Stackweaver analysis through Claude is authorized for the fixed input set; its execution remains pending. No tracker effect is authorized.
-- The bounded Copilot paired implementation-review packet is authorized; its returned review remains pending.
-- Native legacy/shared parity and Claude compatibility-command invocation remain pending.
-- Codex desktop and VS Code Local have no observed native invocation here. They still block AC-01; no residual was approved.
-- The owner-authorized local history cleanup removed the private status-report blob from feature-reachable history while preserving the final tree, index and published main refs. `history-cleanup.json` records the mapping; no push occurred.
+The test-only Copilot runner uses native read tools, outside-canary and symlink denials,
+complete engineering-page reads and the canonical report renderer. It grants no managed
+publication capability. Its synthetic raw results include a default-model no-call refusal
+and an initial strict-grader failure; the retained Opus transcript passes the corrected
+regrade with all ten probes denied and all executable closures disabled. The full private
+Copilot trial remains pending explicit payload-transfer confirmation required by automatic
+approval. Private source, tracker snapshots, findings, reports and native logs stay local.
 
-Raw temporary client profiles contain existing-login access paths and must never be committed or copied into a review packet. Claude phone notifications and other deferred workflows were not changed.
+GUI triage discovery and invocation remain unverified and owner-deferred in
+[issue #33](https://github.com/michielvha/vh-adlc/issues/33). This is a compatibility follow-up;
+the runtime has no GUI dependency. Existing GUI history elsewhere is not new triage proof.
+
+The owner-authorized history cleanup is retained in `history-cleanup.json`. Raw client
+profiles contain existing-login access paths and must never be committed or copied into
+a review packet. Claude phone notifications and the deferred documentation, maintenance,
+audit and domain workflows were not changed. No feature source was pushed or released.

@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "CLI recovery and execution independently verified; current private Claude trial awaits spend availability, and GUI compatibility remains unverified."
+status_description: "Runtime review fixes pass 428 tests; the private Copilot trial awaits explicit payload-transfer confirmation, and GUI checks are deferred in #33."
 issue: null
 branch: feat/shared-triage
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
@@ -740,6 +740,8 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Owner instruction on 2026-10-26 authorizes the full required private migration input set to Copilot for the remaining read-only trial, keeps GUI checks deferred and requests the remaining review fixes. Copilot trial support is test-only and grants no managed publication capability. Existing Claude command/model metadata and original Stackweaver runtime remain unchanged. No source push, merge or release is authorized.
 
       Current owner-approved GUI deferral: https://github.com/michielvha/vh-adlc/issues/33 tracks both surfaces and the required evidence. The GitHub connector lacked issue-write permission; the existing authenticated repository CLI created the tracker as michielvha. This is a compatibility residual, not a runtime GUI dependency or a source-publication grant.
+
+      Private-run approval boundary: The prepared run at committed `50ffbbf` was rejected before starting because automatic approval recognized only the earlier bounded Copilot packet, not explicit transfer authority for the full private payload. A focused asynchronous request now names the entire fixed source tree, configured report history, collected issue/PR snapshot and Copilot Opus 5.5 destination, excluding credentials and host configuration. The private trial has not started; unrelated fixes and the bounded review continue. No prior failed trial is relabelled a pass.
 
 ## Open Questions
 
@@ -2158,3 +2160,8 @@ PROPOSAL: Record these deviations alongside this review.
 - [GitHub issue events API](https://docs.github.com/en/rest/issues/events#list-issue-events): issue-scoped event pagination used to reconcile uncertain closure and label writes.
 
 - [GitHub issue event types](https://docs.github.com/en/rest/using-the-rest-api/issue-event-types): event actor, timestamp, closure/reopening and label-change fields used for attribution.
+
+- https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference - native read-tool availability, session flags and MCP naming; installed CLI help and actual transcripts decide the observed host behavior.
+- https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/allowing-tools - distinguishes tool availability from permission; supports testing the actual restricted inventory and path denials.
+- https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/configure-copilot-cli - native path restrictions and the limits of shell/path heuristics; no shell tool is exposed in the migration runner.
+- https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers - session MCP configuration; the actual organization registry rejection remains authoritative and is not bypassed.

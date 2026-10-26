@@ -1,0 +1,29 @@
+{
+  "review": "R-27",
+  "observed_native_component": "cb943a937847ab6530d4ad370174d6144a2eeda6",
+  "adapter": "ff38a71fae332d44995c52f5a59e999c67898528",
+  "observed_native_safety_cases": 28,
+  "runtime_execution_criterion": "met",
+  "subsequent_guard_commits": [
+    "db3c84f",
+    "049855d"
+  ],
+  "quiet_assertion_commit": "7db6ac6",
+  "copilot_test_runner_commits": [
+    "c0ad9a6",
+    "50ffbbf"
+  ],
+  "latest_plugin_gate": {
+    "tests": 428,
+    "failures": 0,
+    "assertions": 1782
+  },
+  "gui_residual": "https://github.com/michielvha/vh-adlc/issues/33",
+  "private_copilot_trial": "pending explicit private-payload confirmation required by automatic approval",
+  "limitations": [
+    "Older native evidence is not relabelled as a new final-payload run.",
+    "Copilot support is a read-only migration-test runner, not a shipped managed execution adapter.",
+    "Private raw inputs, results and existing-login profiles are excluded.",
+    "Publication and actual Stackweaver main cutover remain separately authorized."
+  ]
+}
