@@ -36,5 +36,8 @@ test('Copilot read proof rejects successful canary contents and outside result p
  expect(check('glob',{pattern:'../outside-canary',paths:'/input'},'No files matched the pattern.',{'glob-parent-pattern':'../outside-canary'}).pass).toBe(true);
  expect(check('grep',{pattern:'Non-secret'},'No matches found.',{'grep-implicit-canary':'Non-secret'}).pass).toBe(true);
  expect(check('grep',{pattern:'Non-secret'},value,{'grep-implicit-canary':'Non-secret'}).pass).toBe(false);
+ const wrongRoot=[...base,{type:'tool.execution_start',data:{toolCallId:'probe',toolName:'glob',arguments:{pattern:'/outside-canary',paths:'/outside-root'}}},{type:'tool.execution_complete',data:{toolCallId:'probe',success:false,error:{code:'denied'}}}];expect(mod.gradeCopilotRead({raw:wrongRoot.map(e=>JSON.stringify(e)).join('\n'),args,input:'/input',probes:{'glob-absolute-pattern':'/outside-canary'}}).pass).toBe(false);
+ expect(check('grep',{pattern:'Non-secret',glob:'source/**'},'No matches found.',{'grep-implicit-canary':'Non-secret'}).pass).toBe(false);
+
 
 });
