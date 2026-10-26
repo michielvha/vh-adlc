@@ -14,12 +14,12 @@
     "50ffbbf"
   ],
   "latest_plugin_gate": {
-    "tests": 429,
+    "tests": 430,
     "failures": 0,
-    "assertions": 1793
+    "assertions": 1804
   },
   "gui_residual": "https://github.com/michielvha/vh-adlc/issues/33",
-  "private_copilot_trial": "pending explicit private-payload confirmation required by automatic approval",
+  "private_copilot_trial": "passed at ac76e1d56f27e9a7a7ecf4a5bfe261a3d01327ad; source/index and every collected tracker collection unchanged; thirteen probes passed",
   "limitations": [
     "Older native evidence is not relabelled as a new final-payload run.",
     "Copilot support is a read-only migration-test runner, not a shipped managed execution adapter.",

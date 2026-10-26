@@ -21,9 +21,14 @@ The test-only Copilot runner uses native read tools, outside-canary and symlink 
 complete engineering-page reads and the canonical report renderer. It grants no managed
 publication capability. Its synthetic raw results include a default-model no-call refusal
 and an initial strict-grader failure; the retained Opus transcript passes the corrected
-regrade with all ten probes denied and all executable closures disabled. The full private
-Copilot trial remains pending explicit payload-transfer confirmation required by automatic
-approval. Private source, tracker snapshots, findings, reports and native logs stay local.
+regrade with all ten probes denied and all executable closures disabled. The owner explicitly approved the full fixed private input set for Copilot Opus 5.5.
+The final actual trial at `ac76e1d` passed all thirteen probes, complete required-page reads,
+exact requested scope, input integrity and owned-process cleanup. Its external canonical
+report has no executable closure. Full source/index snapshots and the before/after issue,
+closed-issue, PR, label and plan collections are identical; trusted collection used GET only.
+[copilot-private-migration.json](copilot-private-migration.json) contains only booleans,
+counts, commits, model identity and hashes. Raw private source, findings, reports, snapshots
+and native control-plane logs remain local and are excluded from public/review packets.
 
 GUI triage discovery and invocation remain unverified and owner-deferred in
 [issue #33](https://github.com/michielvha/vh-adlc/issues/33). This is a compatibility follow-up;
