@@ -26,7 +26,11 @@ export async function operatorController(options:{config:Settings;inventory:Inve
     const approval=args.approval as Approval,batch=request.method==="resume"?args.batch as Batch:batches.get(approval?.batch_hash);
     if(!batch||!/^[a-f0-9]{64}$/.test(approval?.batch_hash??""))throw Error("unowned batch");
     const journal=join(options.output,`journal-${approval.batch_hash}.json`);
-    if(request.method==="resume"&&!existsSync(journal))throw Error("original journal required");
+    if(request.method==="resume"){
+     if(!existsSync(journal))throw Error("original journal required");
+     const stored=join(options.output,`batch-${approval.batch_hash}.json`);
+     if(batch.verification_hash!==options.verificationHash||!existsSync(stored)||readFileSync(stored,"utf8")!==JSON.stringify(batch))throw Error("original stored batch required");
+    }
     result=await executeBatch(config,batch,approval,options.adapter,{journal,gate:gate=>lifecycleGate(config,gate)});
    }else if(request.method==="inspect")result=inspectSources(config,args.paths,args.pass,args.range);
    else if(request.method==="inspect-issues")result=inspectIssues(config,inventory,args.numbers,args.pass);

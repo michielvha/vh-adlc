@@ -27,11 +27,22 @@ test("managed recovery reobserves the original batch and journal with one commen
    prepareVerification(config,input,selection);
    const proof=(pass:"primary"|"adversarial")=>{const receipt=inspectSources(config,["src/app.ts"],pass).receipt;return[{kind:"source",path:"src/app.ts",line:1,detail:"Actual export",verified:true,receipt},{kind:"wiring",path:"src/app.ts",line:1,detail:"Public module export",verified:true,receipt}];};
    const report=buildReport(config,inventory,[{number:1,state:"resolved",remaining:"",evidence:proof("primary"),adversarial:proof("adversarial")}]);
-   const adapter:any={identity:async()=>"operator",labels:async()=>[],issue:async()=>structuredClone(issue),receipt:async()=>null,mutate:async(action:any)=>{if(action.kind==="close")throw new MutationFailure(false);issue.comments.push({id:1,author:"operator",body:action.body,created_at:now});return{issue:structuredClone(issue)};}};
+   let adapterCalls=0;
+   const adapter:any={identity:async()=>{adapterCalls++;return"operator";},labels:async()=>{adapterCalls++;return[];},issue:async()=>{adapterCalls++;return structuredClone(issue);},receipt:async()=>{adapterCalls++;return null;},mutate:async(action:any)=>{adapterCalls++;if(action.kind==="close")throw new MutationFailure(false);issue.comments.push({id:1,author:"operator",body:action.body,created_at:now});return{issue:structuredClone(issue)};}};
    async function* requests(){yield JSON.stringify({id:1,method:"batch",params:{actions:[{id:"explain",kind:"comment",issue:1,body:"Observed the actual public export."},{id:"close",kind:"close",issue:1,reason:"completed",duplicate_of:null,comment:"explain"}]}});batch=responses.at(-1).result;yield JSON.stringify({id:2,method:"execute",params:{approval:{batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Approve this exact fixture batch"}}});}
    await operatorController({config,inventory,report,output:analysis,verificationHash:JSON.parse(readFileSync(join(input,"manifest.json"),"utf8")).verification_hash,input:requests(),adapter,write:line=>responses.push(JSON.parse(line))});
+   const original=join(analysis,`batch-${batch.hash}.json`),bytes=readFileSync(original,"utf8"),expectedCalls=adapterCalls,verificationHash=JSON.parse(readFileSync(join(input,"manifest.json"),"utf8")).verification_hash;
+   const resume=async(hash=verificationHash)=>{
+    async function* request(){yield JSON.stringify({id:"defensive-resume",method:"resume",params:{batch,approval:{batch_hash:batch.hash,action_ids:["explain","close"],owner_statement:"Resume this exact original fixture batch"}}});}
+    await operatorController({config,inventory,report,output:analysis,verificationHash:hash,input:request(),adapter,write:line=>responses.push(JSON.parse(line))});
+    expect(responses.at(-1).error).toBeDefined();expect(adapterCalls).toBe(expectedCalls);
+   };
+   rmSync(original);await resume();writeFileSync(original,bytes);
+   writeFileSync(original,bytes+" ");await resume();writeFileSync(original,bytes);
+   await resume("b".repeat(64));
+
   });
-  expect(responses.at(-1).result.completed).toEqual(["explain"]);expect(issue.comments.length).toBe(1);
+  expect(responses.find(response=>response.id===2).result.completed).toEqual(["explain"]);expect(issue.comments.length).toBe(1);
   const controllerState={schema_version:1,checkout:f.root,plugin,input,verification:selection,indexRequests:[]};
   writeFileSync(join(analysis,"controller-state.json"),JSON.stringify(controllerState));
   writeFileSync(database,JSON.stringify({issue,trace:[]}));
