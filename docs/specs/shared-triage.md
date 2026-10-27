@@ -31,6 +31,15 @@ there with bounded 60-second test allowances, and runs the existing portable tes
 triage inputs on macOS. This changes runner provisioning and coverage selection only; the reviewed
 runtime, test assertions and declared Linux controller requirement remain unchanged. The original
 failure is retained at https://github.com/michielvha/vh-adlc/actions/runs/40437519571.
+The next hosted run also exposes the Ubuntu AppArmor profile requirement, the Go workflow contract's
+exact checker-command requirement, and two macOS test fixtures using an aliased temporary root.
+The correction loads the packaged Bubblewrap profile in CI, retains `bun test tests/vh-adlc`, and
+canonicalizes only those test fixture roots. The actual namespace/network confinement and every
+positive/negative assertion remain intact. A Linux reproduction using an aliased temporary directory
+observes the old fixtures fail twice and the corrected fixtures pass all six tests (41 assertions).
+The test-only change requires a fresh implementation review; the shipped runtime and private-trial
+driver remain byte-identical. The second failed run is retained at
+https://github.com/michielvha/vh-adlc/actions/runs/40438096797.
 
 Current result: Copilot Opus 5.5 R-32 independently verifies eight criteria at shared component
 `d848160c76a6df0b8f9eaa3f95218015463de224`, paired with Stackweaver adapter
@@ -800,6 +809,9 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       Evidence: R-32 at `d848160c76a6df0b8f9eaa3f95218015463de224`: Both baseline diff files and every referenced input verify before/after. The independently started worker finishes all fifteen commands successfully. Final lint, fresh and review-check pass; `vh-adlc next` returns ship. The complete gate passes with no failing condition: `vh-adlc gate complete: pass (rules 1, docs e4d58d2)`. No source publication or main cutover follows from this local completion.
       The final author integrity-only preflight created an empty proof-state directory, without a started marker or worker. The reviewer subsequently launched its own worker; R-32's statement that the directory did not exist should be read with this directory-versus-worker distinction. All fifteen actual commands ran independently.
       R-31 stops before worker startup because the packet copied the baseline-diff manifest without its two referenced files. No runtime or private-trial command runs in that pass; every criterion remains not verified. The correction belongs to review packaging, with no plugin, driver, adapter or test change. Preserve its returned text and deviations verbatim.
+
+- [ ] T81 `.github/workflows/ci.yml`, `tests/vh-adlc/triage/copilot-trial.test.ts` and this document - provision the actual Ubuntu boundary, retain the Go workflow contract, correct only the two aliased temporary roots, and obtain hosted CI plus fresh independent Opus review before publication (AC-01 through AC-09).
+      Observed red: the original hosted jobs fail for the recorded platform setup and fixture reasons; aliased-temp reproduction fails exactly two of six focused tests. Green: canonical test roots pass all six tests and 41 assertions; the Go workflow contract and actionlint pass. Runtime, trial-driver and assertion bytes remain unchanged. Full hosted checks and the new committed review remain pending.
 
 ## Open Questions
 
@@ -2593,3 +2605,4 @@ PROPOSAL: Record these deviations with this review.
 - https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/allowing-tools - distinguishes tool availability from permission; supports testing the actual restricted inventory and path denials.
 - https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/configure-copilot-cli - native path restrictions and the limits of shell/path heuristics; no shell tool is exposed in the migration runner.
 - https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers - session MCP configuration; the actual organization registry rejection remains authoritative and is not bypassed.
+
