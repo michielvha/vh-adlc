@@ -2,6 +2,19 @@
   "name": "vhco-tools",
   "plugins": [
     {
+      "name": "codex-qr-pairing",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-qr-pairing"
+      },
+      "description": "Generate a fresh QR code for pairing with the current Codex host.",
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    },
+    {
       "name": "vh-adlc",
       "source": {
         "source": "local",

@@ -5,6 +5,11 @@
   },
   "plugins": [
     {
+      "name": "codex-qr-pairing",
+      "source": "./plugins/codex-qr-pairing",
+      "description": "Generate a fresh QR code for pairing with the current Codex host."
+    },
+    {
       "name": "github-app-registration",
       "source": "./plugins/github-app-registration",
       "description": "Register GitHub Apps through the manifest flow and keep their credentials out of chat and Git."

@@ -81,6 +81,7 @@ This repository hosts the **vhco-tools** marketplace. Each plugin installs separ
 | `vh-adlc` | Development workflows, feature gates, and independent reviews. |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes. |
 | `github-app-registration` | Register GitHub Apps and save their credentials locally. |
+| `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. |
 
 See the [marketplace guide](docs/reference/marketplace.md) for availability and installation.
 

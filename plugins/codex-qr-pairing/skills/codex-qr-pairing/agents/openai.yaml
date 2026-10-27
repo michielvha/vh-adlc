@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex QR pairing"
+  short_description: "Generate a fresh QR code to pair this Codex host"
+  default_prompt: "Use $codex-qr-pairing to generate a fresh QR code for pairing with this Codex host."
