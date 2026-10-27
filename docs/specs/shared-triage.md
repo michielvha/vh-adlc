@@ -811,7 +811,10 @@ Bun, the repository's existing scripting runtime; they are packaged with the can
       R-31 stops before worker startup because the packet copied the baseline-diff manifest without its two referenced files. No runtime or private-trial command runs in that pass; every criterion remains not verified. The correction belongs to review packaging, with no plugin, driver, adapter or test change. Preserve its returned text and deviations verbatim.
 
 - [ ] T81 `.github/workflows/ci.yml`, `tests/vh-adlc/triage/copilot-trial.test.ts` and this document - provision the actual Ubuntu boundary, retain the Go workflow contract, correct only the two aliased temporary roots, and obtain hosted CI plus fresh independent Opus review before publication (AC-01 through AC-09).
-      Observed red: the original hosted jobs fail for the recorded platform setup and fixture reasons; aliased-temp reproduction fails exactly two of six focused tests. Green: canonical test roots pass all six tests and 41 assertions; the Go workflow contract and actionlint pass. Runtime, trial-driver and assertion bytes remain unchanged. Full hosted checks and the new committed review remain pending.
+      Observed red: the original hosted jobs fail for the recorded platform setup and fixture reasons; aliased-temp reproduction fails exactly two of six focused tests. Green: canonical test roots pass all six tests and 41 assertions; the Go workflow contract and actionlint pass. Runtime, trial-driver and assertion bytes remain unchanged. Hosted run `40438748800` now passes Ubuntu full tests, macOS portable tests, Go verification and the version job. R-33 independently passes the runtime, private proof, Go contract and workflow lint; only its old blanket preservation helper fails. The owner-authorized publication paths are exactly `.github/workflows/ci.yml` and `docs/specs/shared-workflow-migration.md`. The corrected helper must bind those two files by hash while preserving every other existing workflow and D-01 through D-05 unchanged. This separates publication infrastructure from the maintenance/audit/docs/domain automation covered by AC-09, without changing accepted Scope, Test Plan or covers.
+
+- [ ] T82 frozen preservation helper and this document - bind only the two owner-authorized publication paths by name/hash, retain all unrelated workflow and register comparisons, run the corrected check before review, and obtain a clean independent pass before merge (R-33 F-01; AC-09).
+      The test-only Copilot migration driver currently requires an unaliased physical output root. R-33 F-02 is retained as that limitation; a future driver revision requires a new actual trial binding. The fixture correction does not claim that the driver itself now accepts aliased roots. No product runtime or publication authority is changed.
 
 ## Open Questions
 
@@ -861,6 +864,7 @@ R-22 reviewed the complete revised specification, and the owner accepted it on 2
 | 2026-10-26 | R-30 | implementation | `318b9fff6bf59a14bd1fbdfb73e690c846a76020` | claude-opus-5.5 | procedural | Eight criteria met and fourteen proof commands pass; completion blocked by a spec-baseline freshness mismatch. Runtime and private acceptance fixes pass. |
 | 2026-10-26 | R-31 | implementation | `1c04e06de858de43f215ad397e470ef84fd971d7` | claude-opus-5.5 | procedural | No criteria verified: two baseline-diff files missing from the bounded packet prevent its integrity precheck and worker startup. |
 | 2026-10-26 | R-32 | implementation | `d848160c76a6df0b8f9eaa3f95218015463de224` | claude-opus-5.5 | procedural | Eight criteria met; GUI compatibility remains under owner-approved #33. All fifteen independent commands pass; only evidence/count and procedural nits remain. |
+| 2026-10-27 | R-33 | implementation | `89fec1fd9ebfc518076bf945eb88080b635a4d41` | claude-opus-5.5 | procedural | Runtime, private proof, Go contract and workflow lint pass. The old blanket preservation helper rejects the newly authorized parent document and publication CI; AC-09 remains unverified until the exact-path check is corrected. |
 
 ### R-1
 
@@ -2541,6 +2545,88 @@ EVIDENCE: Procedural deviations:
 5. I did not read every hash-listed input or review-prompt.txt manually.
 I ran no other shell commands, made no edits, used no network, did not use wc, list_bash or read_bash, and never viewed private paths. Isolation was procedural.
 PROPOSAL: Record these deviations with this review.
+
+### R-33
+
+CRITERION: AC-01 The shared triage operation is discoverable and invokes the same canonical procedure through Codex CLI, Claude CLI, Codex desktop and VS Code Local without a Claude-only dependency; generic intake routes backlog triage to it, preserves existing intake/maintenance routes, and the README and linked workflow/compatibility/installation guides accurately state the expanded operation set and tested support; the shared triage SKILL.md, authority.md, lifecycle.md, triage-boundary.md and public guides consistently require the controller for executable closure and every write asserting verified state while preserving local report-only output.
+VERDICT: not verified
+EVIDENCE: I ran the argument-free proof.sh worker at 89fec1fd9ebfc518076bf945eb88080b635a4d41. plugin-suite exited 0 with 432 pass, 0 fail and 1825 expect() calls. lint exited 0. codex-lifecycle-recheck, codex-reserved-recheck, claude-lifecycle-recheck and migration-parity-false-prior all exited 0. gui-residual exited 0 and reported issue 33 open, owned by michielvha and tracking both GUI surfaces, with gui_execution_observed false. Limitations: no Codex desktop or VS Code Local execution was observed. The CLI subset passing does not upgrade this composite criterion, so it stays not verified under the owner-approved residual https://github.com/michielvha/vh-adlc/issues/33.
+
+CRITERION: AC-02 Generic and Stackweaver settings yield repository-correct scope, protected-work exclusions including new unlisted index issues, plan metadata, ranking and report placement without Stackweaver constants in shared behavior.
+VERDICT: met
+EVIDENCE: At 89fec1fd and ff38a71f, plugin-suite passed 432 tests with 0 failures and 1825 assertions. adapter-contract passed 4 tests with 24 assertions, including the test "local settings and handoff preserve protection, project priorities and deferred workflows". migration-parity-false-prior exited 0. It reports six dispositions that agree, legacy actionable order equal to shared ready order [63,68,71], and true results for exclusions and expected_reports. Limitations: these are synthetic and frozen fixtures, plus the archived cb native analyses, which were regraded rather than reinvoked.
+
+CRITERION: AC-03 Collection includes every requested page and reports incomplete or denied coverage explicitly; any incomplete required collection or verification input blocks every executable closure and write asserting verified state in that report, and partial data never establishes exhaustive triage.
+VERDICT: met
+EVIDENCE: plugin-suite passed (432 tests, 0 failures, 1825 assertions). private-proof-exit-regressions exited 0 with 43 actual CLI exit cases and 24 metadata cases. Those cases deny empty coverage, a missing or duplicate category, missing comments, incomplete entries, open-only issue scope, and non-GET or errored traces. private-copilot-readonly-proof exited 0 with collector_coverage_complete true and collector_get_only true, and its summary equals the committed sanitized evidence. Limitations: raw private snapshots were not viewed by me; the fixed helper graded them.
+
+CRITERION: AC-04 Completion states and cleared blockers use proof actually observed inside the current enforced verification boundary before affecting dependency readiness, executable closure or a write asserting verified state; closure proposals have adversarially verified evidence appropriate to their reason: reachable completed behavior, removed or superseded scope, or total overlap with an identified canonical issue; partial work, stale blockers and unverified claims retain their true remaining scope.
+VERDICT: met
+EVIDENCE: plugin-suite passed (432 tests, 0 failures). native-recheck exited 0 for all 20 regraded core cases, including the cached, forged, installed, probe, payload-denial and required-fail denials. migration-parity-false-prior exited 0: on both Codex and Claude the planted false prior completion produced actual_state partial and close_executable false. extended-native-recheck exited 0. Limitations: the native cases are archived trials at cb943a93, regraded under the current code. Only the two controller guards in native-runtime-delta.patch differ from cb, and the current suite exercises them.
+
+CRITERION: AC-05 Every mode reports its source commit, requested issue subset and collection completeness, preserves previous runs with measured counts and run-over-run differences, saves reports uncommitted unless a commit is requested, limits readiness ranking to sweep/next, where verified prerequisites precede dependents with reasons and blocked work is excluded from ready rankings, and leaves GitHub unchanged until exact actions are approved; local report saving or committing cannot authorize remote publication, which remains unavailable without current enforced proof and separate publication authority.
+VERDICT: met
+EVIDENCE: plugin-suite passed (432 tests, 0 failures, 1825 assertions). private-copilot-readonly-proof exited 0 with response_exact_scope true, external_report_saved true, all_executable_closures_disabled true and analysis_github_tool_calls 0. Every collection_equal entry was true: issues, closed_issues, pulls, labels and plans. migration-parity-false-prior reports policy differences that include report-commit-opt-in and all-writes-approved. Limitations: GitHub immutability was proven for the private read-only trial and the fake adapters only.
+
+CRITERION: AC-06 A confined managed controller separates analysis from operator approval, rejects unexpected tools and forged or replayed proof, and permits executable closure and writes asserting verified state only with fresh observed verification; execution applies only the approved targets and exact payloads after revalidation, preserves unrelated issue-body content and protected work except explicitly requested and approved umbrella checklist/closure actions, applies plan-status sync and issue-URL backfill only when specifically approved and applicable lifecycle gates pass, and resumes an unchanged batch after partial failure without duplicate completed actions or duplicate issue creation; a materially changed context stops the old batch and requires a new approved batch with a fresh explanation comment; local plan commits contain only the approved successful patches and shown commit metadata. The controller serializes effects per hostname/repository across batches and output paths, keeps uncertain outcomes blocked across resume and replacement batches, preserves prior artifacts, confines checks to the fixed-source filesystem/network boundary without owner files or credentials, and bounds cleanup of owned process groups with recorded exit and cleanup outcomes.
+VERDICT: met
+EVIDENCE: plugin-suite passed 432 tests with 0 failures and 1825 assertions on this Linux host, which includes the Linux controller and effect tests. native-recheck exited 0 with these outcomes:
+- recover and uncertain scenarios passed on both hosts;
+- extra-tool cases graded exclusive-read-only-tools;
+- installed cases graded installed-payload;
+- probe cases graded analysis-boundary-probes;
+- stubborn-descendant cleanup passed;
+- artifacts were preserved in every case.
+proof.py verify() confirmed before and after that the only production delta from cb is native-runtime-delta.patch: the stored-batch and verification-hash resume guard, and the rejection of malformed or nonobject native events. Limitations: the native trials are archived cb invocations, and there is no new model trial at this target.
+
+CRITERION: AC-07 The reviewed Stackweaver migration branch is ready to publish: its triage command and harness-neutral entry invoke the exact local shared revision with preserved settings, paired commits and parity proof, and both forward the controller requirement for executable closure and every write asserting verified state without a weaker plain-chat permission; the live read-only trial preserves the checkout and proves through its exclusively reachable read-only GitHub path that it makes no tracker write while saving its report externally, and actual main cutover remains the ordered follow-up.
+VERDICT: met
+EVIDENCE: The proof.py integrity check passed before and after the run. It confirmed:
+- HEADs were exactly 89fec1fd and ff38a71f, with both trees clean;
+- Stackweaver changes are limited to the allowed migration paths;
+- the plugins/vh-adlc and tests/vh-adlc/triage/copilot-trial.ts bytes have no diff between ac76e1d5 and the target.
+adapter-contract passed 4 tests. I inspected agents/issue-triage.md lines 14 to 22 and .claude/commands/triage.md: both forward the managed-controller requirement and offer no legacy fallback.
+
+private-copilot-readonly-proof exited 0. It showed:
+- component ac76, adapter ff38 and model ["claude-opus-5.5"];
+- native exit 0 and failures [];
+- all thirteen probes true;
+- required_page_reads_complete, source_and_index_preserved, input_integrity and only_native_read_tools all true;
+- collector_get_only true and all five collections equal;
+- external_report_saved true and owned_process_reaped true;
+- a summary exactly equal to tests/vh-adlc/evidence/triage/copilot-private-migration.json, including the five artifact hashes.
+private-proof-exit-regressions exited 0 with 43 actual CLI exit cases and 24 metadata cases.
+
+Limitations: the private inputs were graded by the fixed helper, not viewed by me. The environment, helper, keyring and socket probes use task-owned stand-ins. The pair remains unpublished, and the main cutover is still the ordered follow-up.
+
+CRITERION: AC-08 The documented Stackweaver rollback restores the prior triage entry points on a disposable checkout while preserving unrelated agents, plans, Git state and runtime resources.
+VERDICT: met
+EVIDENCE: rollback (`bun tests/agent-triage/rehearse.ts`) exited 0 at ff38a71fae332d44995c52f5a59e999c67898528. It observed rollback true, reapply true, index_preserved true and rollback_index_bytes_preserved true. Runtime paths were limited to AGENTS.md, agents/issue-triage.md, .claude/commands/triage.md and .vh-adlc/triage.json. Limitations: the raw private rehearsal output is excluded from the packet, so only the sanitized observed fields were seen.
+
+CRITERION: AC-09 Dependency maintenance, codebase audit, documentation and domain workflows remain unchanged, with the deferred work register preserved for later scope decisions.
+VERDICT: not verified
+EVIDENCE: workflow-preservation (`python3 external/check-workflow-preservation.py`) exited 1. Its log shows an AssertionError at line 5, the assertion that every path changed since baseline 6ea0ce5c falls within the triage covers list. The script aborted before its byte comparison of the baseline maintenance/review references and .github/workflows, and before its comparison of the D-01 to D-05 register against accepted c252339a. By inspection, the register rows D-01 to D-05 are present at docs/specs/shared-triage.md:154-158, and proof.py verify() shows plugins/vh-adlc unchanged from ac76 to the target. Limitations: the fixed check for this criterion did not pass in this pass, so preservation was not established by executed evidence.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Proof packet, workflow-preservation (AC-09)
+EVIDENCE: proof-state/finished.json records workflow-preservation with exit 1 and pass false, the only failure among the seventeen commands. proof-state/workflow-preservation.log shows an AssertionError at check-workflow-preservation.py line 5. That line requires every path in `git diff --name-only 6ea0ce5c` to sit under plugins/vh-adlc/, tests/vh-adlc/, README.md, the three guides or docs/specs/shared-triage.md. source-manifest.json lists the R-33 publication paths outside that set: .github/workflows/ci.yml, cmd/vh-adlc/workflow_test.go and docs/specs/shared-workflow-migration.md. Line 6 of the script also treats every baseline file under .github/workflows as preserved automation, and ci.yml changed in this follow-up. The author preflight (--verify-only) does not run this command, so the claim that all seventeen pass was never observed.
+PROPOSAL: Decide whether owner-authorized publication CI and parent-planning paths fall within the AC-09 automation scope. Then update the frozen check to allow exactly those paths by name and hash, keeping the maintenance/audit/docs/domain byte comparison and the register comparison intact, and confirm the change does not alter the accepted Test Plan or covers. Then run a new independent pass; this pass stays blocking.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/triage/copilot-trial.ts:15, :18, :28 and copilot-trial.test.ts:21, :35
+EVIDENCE: `inside()` compares paths with `relative(resolve(options.input), ...)` but never resolves options.input to its real path. The escape checks at :18 and :28 then compare `realpathSync(...)` results against that unresolved root. On an aliased root such as macOS /var to /private/var, every safe read is therefore classified as outside, and the run fails closed. The R-33 fix normalizes only the test fixture roots with realpathSync, so the macOS job now passes while a real macOS trial with an aliased output root would still reject itself. external/publish-temp-alias-green.log shows a run from tests/vh-adlc/triage with no visible aliased root, so the green run under an aliased root is not demonstrated by that log.
+PROPOSAL: In the next driver revision, which needs a fresh trial binding, apply realpath to options.input before comparison and add an aliased-root regression. Until then, record that this test-only driver requires an unaliased output root.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Review procedure disclosure
+EVIDENCE: Every read used view, grep or glob inside the packet. The only shell commands were the exact argument-free proof.sh, run four times: one launch and three progress checks. A glob confirmed proof-state was initially empty, with no started marker. Two accidental view calls named nonexistent placeholder paths inside the packet (proof-state/go-test-and-lint-placeholder and worker-log-not-needed). Both returned "does not exist" and read no data. One grep used count mode on proof-state. I did not use wc, list_bash or read_bash, and I made no writes. I read the conventions and humanize-prose.md completely from the packet copies, the spec only in ranges and anchors, and review-prompt.txt not at all. Isolation is procedural.
+PROPOSAL: Record this disclosure with the pass; no action is needed.
 
 ## Sources
 
