@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Locally complete and reviewed; GUI compatibility is deferred in #33. Shared publication and Stackweaver cutover remain."
+status_description: "Plugin 0.4.0 and signed runtime v0.6.0 are published; actual marketplace tests pass and Stackweaver triage is adopted. GUI discovery remains deferred in #33."
 issue: null
 branch: feat/shared-triage
 goal: "Deliver one shared evidence-based triage operation and a reviewed Stackweaver migration branch ready to publish, without duplicating project-independent instructions."
@@ -16,6 +16,19 @@ covers:
 # Plan: Shared triage and Stackweaver migration
 
 ## Context
+
+Publication and adoption completed on 2026-10-27. [vh-adlc #34](https://github.com/michielvha/vh-adlc/pull/34)
+merged at `80fd36d0f9a1bc8f3610ff77c1f4c3f038e4a8f8`; plugin 0.4.0 passed actual Codex and Claude
+marketplace upgrades with all nine skills and the exact reviewed payload. The configured automatic
+workflow published [signed runtime v0.6.0](https://github.com/michielvha/vh-adlc/releases/tag/v0.6.0),
+with signature, all four archive checksums and Linux execution verified. Installed-helper read-only
+reports preserved checkout/index state. [Stackweaver #976](https://github.com/michielvha/stackweaver/pull/976)
+merged at `5cb8917434ec322f257679302b174800031c9b1c`, with its exact tested tree, unchanged triage
+settings/command model, and rollback updated to current pre-cutover main `3d97c58d`. Four adapter
+contracts, installed-plugin rollback/reapplication and fourteen applicable consumer checks pass.
+The internal-tooling merge intentionally skips hosted product CI; it is not reported as a hosted pass.
+The parent roadmap records the delivered pair and future capability decisions. No GUI pass or new
+private model trial is inferred from adoption.
 
 Active cross-capability migration planning now lives in
 [shared-workflow-migration.md](shared-workflow-migration.md). It owns the maintenance, audit,
@@ -41,14 +54,14 @@ The test-only change requires a fresh implementation review; the shipped runtime
 driver remain byte-identical. The second failed run is retained at
 https://github.com/michielvha/vh-adlc/actions/runs/40438096797.
 
-Current result: Copilot Opus 5.5 R-34 independently verifies eight criteria at shared component
+Local acceptance baseline: Copilot Opus 5.5 R-34 independently verifies eight criteria at shared component
 `8f9b6f62925f49ff34558d727a18da20debce90d`, paired with Stackweaver adapter
 `ff38a71fae332d44995c52f5a59e999c67898528`. All seventeen proof commands pass, including
 432 tests with 1825 assertions; the author run separately recorded 1815 assertions.
 The private thirteen-probe trial retains its actual `ac76e1d` binding, unchanged runtime/driver
 bytes, external report and identical source/index and tracker snapshots. GUI compatibility
-remains unverified under owner-approved #33. Shared publication and the ordered Stackweaver
-main cutover remain separate; the original Stackweaver checkout and deferred workflows are untouched.
+remains unverified under owner-approved #33. The separately authorized publication and ordered Stackweaver
+cutover are recorded above; deferred workflow implementations remain untouched.
 
 The owner selected triage as the first extraction from Stackweaver on 2026-10-23. This is selective
 reuse: Stackweaver keeps its project rules and domain workflows. Maintenance and audit are later

@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Parent migration plan drafted. Triage is reviewed locally; publication, marketplace verification and Stackweaver adoption are authorized and underway. Other extractions remain unselected."
+status_description: "Triage is published and adopted after actual marketplace verification. Maintenance and audit remain candidates for separate child specs; other extractions are deferred."
 issue: null
 goal: "Selected reusable Stackweaver workflows are delivered through vh-adlc, with a separate accepted spec and verified migration for each capability."
 covers:
@@ -18,7 +18,7 @@ on 2026-10-27 so future maintenance, audit and documentation decisions do not ac
 completed triage feature.
 
 Triage is the first extraction. Its accepted behavior and local verification remain in
-[shared-triage.md](shared-triage.md), completed at `0e033f8` after Copilot Opus 5.5 R-32.
+[shared-triage.md](shared-triage.md), initially completed at `0e033f8` and refreshed by Copilot Opus 5.5 R-34 before publication.
 That document's original deferred register records its reviewed scope boundaries; the live roadmap
 is maintained here. Its completion does not mark the wider migration complete.
 
@@ -42,11 +42,30 @@ credentials, services and notification behavior remain outside this migration un
 
 ## Design
 
+### Delivered triage adoption
+
+The owner-authorized adoption completed on 2026-10-27, in dependency order:
+
+| Delivery | Observed result |
+| --- | --- |
+| Shared source | [vh-adlc PR #34](https://github.com/michielvha/vh-adlc/pull/34) merged at `80fd36d0f9a1bc8f3610ff77c1f4c3f038e4a8f8`. Final feature-head CI and main CI passed Ubuntu full-suite, macOS portable-suite, Go and version jobs. |
+| Shared runtime | [v0.6.0](https://github.com/michielvha/vh-adlc/releases/tag/v0.6.0) was created by the configured automatic version/release workflows. The signature verifies against primary fingerprint `9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`; all four platform archive checksums pass, and the Linux binary executes as `vh-adlc 0.6.0`. The plugin's binary lock remains intentionally at 0.1.0. |
+| Actual marketplace upgrade | Native Codex and Claude installers upgraded disposable profiles from 0.3.1/seven skills to 0.4.0/nine skills, including triage. Both fetched the exact reviewed payload `f5d395ed87fb3785837dacc00ed26c0a74d1d4ad58e2022e4b18b1faf4220a17`, including modes. Native local-profile installation also completed for use in future sessions. |
+| Installed operation | The installed binary bootstrap verified its locked download. The installed helpers completed a GET-only public collection and saved external reports through both payloads, leaving the checkout/index unchanged and every closure disabled. This is an installed-helper smoke test, not a GUI invocation or a new model trial. |
+| Consumer adoption | [Stackweaver PR #976](https://github.com/michielvha/stackweaver/pull/976) merged at `5cb8917434ec322f257679302b174800031c9b1c`. Its tree exactly matches verified adapter `712af76e8f7a76f38c2888264fe2e33f869d1416`. Settings and triage command/model/procedure match the original reviewed adapter. |
+| Rollback and preservation | The actual installed plugin passes rollback/reapplication against pre-cutover main `3d97c58d9984c5f74ab54bd76e6a333e10f6b095`, preserving index bytes and the newer public-docs route in AGENTS.md. Other agents and documentation workflow code stay unchanged. |
+| Consumer verification | Four adapter contracts and all fourteen applicable scoped checks pass with zero failures/skips, including frontend checks selected by the required internal changelog disposition. The public changelog remains byte-identical. Stackweaver's internal-tooling merge intentionally uses `[skip ci]`; no hosted run is represented as a pass. |
+
+The original private model trial retains its actual `ac76e1d`/`ff38a71f` binding. The later consumer
+integration does not relabel it as a new trial. Published shared runtime and driver bytes are unchanged;
+adoption rechecks cover the installed payload, forwarding/settings, current-main preservation and the
+updated rollback baseline. GUI discovery remains unverified under #33.
+
 ### Capability roadmap
 
 | ID | Capability and existing source | Disposition and next decision |
 | --- | --- | --- |
-| TRIAGE | Backlog triage, `agents/issue-triage.md` | [Child spec](shared-triage.md) locally complete. Publish vh-adlc, verify the published marketplace payload, then merge the reviewed Stackweaver adapter. GUI discovery remains under [#33](https://github.com/michielvha/vh-adlc/issues/33). |
+| TRIAGE | Backlog triage, `agents/issue-triage.md` | [Child spec](shared-triage.md) adopted through vh-adlc #34 and Stackweaver #976 after actual marketplace tests. The delivery evidence is above. GUI discovery remains under [#33](https://github.com/michielvha/vh-adlc/issues/33). |
 | D-01 | Dependency/security maintenance, `agents/maintenance.md` | Next extraction candidate after triage adoption. Draft a separate maintenance spec when selected. Compare dependency inventory, changelog/usage analysis and approved dispositions with existing vh-adlc bounded maintenance. Retain repository topology and release checks as settings; resolve the local protection-policy conflict before extraction. |
 | D-02 | Persistent codebase audit, `agents/codebase-audit.md` | Candidate for a separate audit spec. Preserve finding identities, adversarial re-verification and residuals, and connect remediation to the existing lifecycle. Decide write/merge authority before carrying over local automation. |
 | D-03 | Documentation impact, drift audit/resolution and truth checks | Deferred. Compare `agents/docs-impact.md`, `docs-drift-audit.md`, `docs-drift-resolver.md` and `docs-truth.md` with vh-adlc's existing documentation workflow first. Any selected extraction gets a separate spec. Existing scanners, ledgers, hooks and schedules stay unchanged. |
@@ -74,8 +93,9 @@ harness-neutral entry points. Keep repository settings in the consumer and rehea
 disposable checkout. Recheck evidence affected by changed commits rather than relabelling older runs.
 
 The triage adapter's durable publication and rollback procedure is
-`tests/agent-triage/README.md` in Stackweaver at `ff38a71f`. Its reviewed legacy entry remains on
-Stackweaver main until the published shared dependency has been verified. Every later child supplies
+`tests/agent-triage/README.md` in adopted Stackweaver adapter `712af76e`. Its original local
+acceptance used `ff38a71f`; the later adoption and current-main rollback baseline are recorded above.
+The published shared dependency was verified before the consumer merge. Every later child supplies
 its own equivalent handoff. A parent status never replaces a child's acceptance gate.
 
 ## Acceptance Criteria
@@ -97,7 +117,8 @@ its own equivalent handoff. A parent status never replaces a child's acceptance 
 ## Tasks
 
 - [x] T1 `docs/specs/shared-workflow-migration.md` - establish the parent roadmap and child-feature boundary without starting another extraction; lint the document (AC-01, AC-04).
-- [ ] T2 `docs/specs/shared-triage.md` and Stackweaver `tests/agent-triage/README.md` - record the authorized shared publication, actual marketplace installation and ordered consumer adoption with exact revisions (AC-02, AC-03).
+- [x] T2 `docs/specs/shared-triage.md` and Stackweaver `tests/agent-triage/README.md` - record the authorized shared publication, actual marketplace installation and ordered consumer adoption with exact revisions (AC-02, AC-03).
+      Evidence: Shared merge `80fd36d0`, signed runtime v0.6.0, two exact marketplace payload checks, installed-helper reports, installed-plugin rollback, fourteen consumer checks and Stackweaver merge `5cb89174` are observed and recorded above. No maintenance, audit, documentation or domain extraction started.
 - [ ] T3 `docs/specs/` - when the owner selects maintenance, draft and independently review its own child spec before implementation (AC-01, AC-04).
 - [ ] T4 `docs/specs/` - when the owner selects audit, draft and independently review its own child spec before implementation (AC-01, AC-04).
 - [ ] T5 `docs/specs/` and this document - revisit documentation overlap, domain extensions and broader onboarding only when selected; retain explicit dispositions meanwhile (AC-01, AC-04).
