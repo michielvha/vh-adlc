@@ -17,6 +17,13 @@ covers:
 
 ## Context
 
+Active cross-capability migration planning now lives in
+[shared-workflow-migration.md](shared-workflow-migration.md). It owns the maintenance, audit,
+documentation and domain-workflow roadmap, with separate child specs before each extraction.
+The deferred register below remains the historical scope boundary accepted for this completed
+triage feature; it does not authorize those other migrations. On 2026-10-27 the owner authorized
+vh-adlc publication, the actual marketplace installation test and the ordered Stackweaver triage merge.
+
 Current result: Copilot Opus 5.5 R-32 independently verifies eight criteria at shared component
 `d848160c76a6df0b8f9eaa3f95218015463de224`, paired with Stackweaver adapter
 `ff38a71fae332d44995c52f5a59e999c67898528`. All fifteen proof commands pass, including
