@@ -24,6 +24,14 @@ The deferred register below remains the historical scope boundary accepted for t
 triage feature; it does not authorize those other migrations. On 2026-10-27 the owner authorized
 vh-adlc publication, the actual marketplace installation test and the ordered Stackweaver triage merge.
 
+Publication validation: The first hosted run for PR #34 passed Go verification but failed the package
+checks because Ubuntu had no system Bubblewrap and macOS was running Linux-only managed-controller
+tests. The CI correction installs and probes Bubblewrap/util-linux on Ubuntu, runs the full suite
+there with bounded 60-second test allowances, and runs the existing portable tests plus portable
+triage inputs on macOS. This changes runner provisioning and coverage selection only; the reviewed
+runtime, test assertions and declared Linux controller requirement remain unchanged. The original
+failure is retained at https://github.com/michielvha/vh-adlc/actions/runs/40437519571.
+
 Current result: Copilot Opus 5.5 R-32 independently verifies eight criteria at shared component
 `d848160c76a6df0b8f9eaa3f95218015463de224`, paired with Stackweaver adapter
 `ff38a71fae332d44995c52f5a59e999c67898528`. All fifteen proof commands pass, including
