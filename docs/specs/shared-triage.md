@@ -2606,3 +2606,4 @@ PROPOSAL: Record these deviations with this review.
 - https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/configure-copilot-cli - native path restrictions and the limits of shell/path heuristics; no shell tool is exposed in the migration runner.
 - https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers - session MCP configuration; the actual organization registry rejection remains authoritative and is not bypassed.
 
+- [Official Ubuntu Bubblewrap setup](https://github.com/openai/codex-security/blob/main/github-action/README.md#ubuntu-sandbox-setup): load the packaged AppArmor profile before probing namespace/network isolation on the hosted Ubuntu runner. No host-wide AppArmor restriction is disabled.
