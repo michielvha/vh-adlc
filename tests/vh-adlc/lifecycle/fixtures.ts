@@ -252,6 +252,23 @@ function localFeatureRefs(before: string, after: string): boolean {
   return differences(a, b).every((name) => name === "refs/heads/feat/shout" && a[name] && b[name]);
 }
 
+const quietTagScript="#!/usr/bin/env bash\nset -euo pipefail\n[[ \"$(bash tag.sh)\" == 'v1.2.3' ]]\n";
+const quietShoutAppend="[[ \"$(bash greet.sh)\" == 'Hello, world.' ]]\n[[ \"$(bash greet.sh --shout)\" == 'HELLO, WORLD.' ]]\n";
+function quietTagObserved(f:Fixture,before:Snapshot,after:Snapshot,c:Command){
+  const marker=c.command.match(/(?:^|[;\n])\s*bash test\.sh\s*&&\s*echo\s+([A-Za-z0-9_-]+)(?:[;\n]|$)/)?.[1];
+  return c.exitCode===0&&!c.command.includes("||")&&!!marker&&c.output.split("\n").includes(marker)
+    &&before.files["test.sh"]?.hash===hash(quietTagScript)&&after.files["test.sh"]?.hash===hash(quietTagScript)
+    &&before.files["tag.sh"]?.hash===after.files["tag.sh"]?.hash
+    &&after.files["tag.sh"]?.hash===hash("#!/usr/bin/env bash\nprintf 'v1.2.3\\n'\n");
+}
+function quietShoutFailure(f:Fixture,before:Snapshot,after:Snapshot,c:Command){
+  const prefix=`cd ${f.project};`,command=c.command.startsWith(prefix)?c.command.slice(prefix.length).trim():c.command.trim();
+  return command===`cat >> test.sh <<'EOF'\n${quietShoutAppend}EOF\nbash test.sh; echo "exit=$?"`
+    &&c.output.trim()==="exit=1"&&before.files["test.sh"]?.hash===hash(quietTagScript)
+    &&before.files["greet.sh"]?.hash===hash("#!/usr/bin/env bash\nprintf 'Hello, world.\\n'\n")
+    &&after.files["test.sh"]?.hash===hash(quietTagScript+quietShoutAppend);
+}
+
 function testInvocation(c: Command): boolean { return /(?:\bbash\s+(?:-[A-Za-z]+\s+)*(?:['"])?(?:\.\/)?test\.sh|\.\/test\.sh)/.test(c.command); }
 function reproducedFailure(c: Command): boolean {
   return testInvocation(c) && (c.exitCode !== 0 && /FAIL|expected/i.test(c.output)
@@ -324,6 +341,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
     const readme = readFileSync(join(f.project, "README.md"), "utf8");
     checks.push({ name: "README actually corrected", pass: changed.includes("README.md") && readme.includes("v1.2.3") && !readme.includes("v2.0.0") });
     checks.push({ name: "README correction checked against actual tag output", pass: commands.some((c) => {
+      if (quietTagObserved(f,before,after,c)) return true;
       if (c.exitCode !== 0 || !/(?:\bbash\s+(?:-[A-Za-z]+\s+)*['"]?(?:\.\/)?tag\.sh|\.\/tag\.sh)/.test(c.command)) return false;
       if (/^v1\.2\.3$/m.test(c.output)) return true;
       const captured = c.command.match(/\b([A-Za-z_]\w*)=\$\(\s*(?:bash\s+|\.\/)(?:\.\/)?tag\.sh\s*\)/)?.[1];
@@ -338,7 +356,7 @@ export function grade(f: Fixture, before: Snapshot, after: Snapshot, response: s
   if (f.id === "L15") {
     const shout = Bun.spawnSync(["bash", "greet.sh", "--shout"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
     const normal = Bun.spawnSync(["bash", "greet.sh"], { cwd: f.project, stdout: "pipe", stderr: "pipe" });
-    const failedAt = commands.findIndex((c) => testInvocation(c) && c.exitCode !== 0 && /shout|HELLO, WORLD/i.test(c.output));
+    const failedAt = commands.findIndex((c) => testInvocation(c) && (c.exitCode !== 0 && /shout|HELLO, WORLD/i.test(c.output) || quietShoutFailure(f,before,after,c)));
     const passedAt = commands.findIndex((c, at) => at > failedAt && testInvocation(c) && c.exitCode === 0);
     checks.push(
       { name: "accepted feature implemented without changing the default", pass: shout.exitCode === 0 && shout.stdout.toString().trim() === "HELLO, WORLD." && normal.stdout.toString().trim() === "Hello, world." },

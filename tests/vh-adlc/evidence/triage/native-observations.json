@@ -1,0 +1,198 @@
+{
+  "scope": "Synthetic example/project fixture; these are observed client runs, not private live or GUI proof.",
+  "runs": [
+    {
+      "schema_version": 1,
+      "host": "claude",
+      "component_commit": "afb10652fc11d0141b49d10d1331051261ada44c",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "82251044acfa0d03b04740ccc063baf6ffbd0be9c9dd1a1ec6bee2a0cd01bc06",
+      "driver_hash": "fbe7358036a22653f8c290cf4813d79f3ac313f5c2a35abfa3df5498b2b66f70",
+      "kind": "live-read-only-boundary",
+      "duration_ms": 39131,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "history_cleanup_equivalent_commit": "a05b40c09b86e8528ada68363bfc7259cb4a3720"
+    },
+    {
+      "schema_version": 1,
+      "host": "codex",
+      "component_commit": "c3b664e37e83c41ef7c442bd7d6814c4239c85df",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "558cbed00f6c88b9e2ddfb2692fe1ebb3e89de395957e6666a4d80efb01d8c28",
+      "driver_hash": "5c805c1852a8226a184800dc4a7828335177fc30bb17a9f97bb7ea2e0367ab15",
+      "kind": "native-discovery",
+      "duration_ms": 109134,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "history_cleanup_equivalent_commit": "b17f311f81550c236cba475d9b2e8a3e45074581"
+    },
+    {
+      "schema_version": 1,
+      "host": "codex",
+      "component_commit": "15802ef302f2efd1da1d5f5b7e2bb7dee3d1a819",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "540480c8611e4314c4fabb35117082cffca9047c84d44e773acabb6d6f89bb37",
+      "driver_hash": "5c805c1852a8226a184800dc4a7828335177fc30bb17a9f97bb7ea2e0367ab15",
+      "kind": "native-discovery",
+      "duration_ms": 76630,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "history_cleanup_equivalent_commit": "108866649dea8d331815f88370e6849df446c286"
+    }
+  ],
+  "diagnostic_runs": [
+    {
+      "name": "claude-5",
+      "eligibility": "Not acceptance evidence: component had uncommitted input.",
+      "host": "claude",
+      "component_commit": "15802ef302f2efd1da1d5f5b7e2bb7dee3d1a819",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "7309011c2fc656b7412529775b230e9ec0186ccbde1d81f4fb3ca330498521a0",
+      "driver_hash": "5c805c1852a8226a184800dc4a7828335177fc30bb17a9f97bb7ea2e0367ab15",
+      "exit_code": 0,
+      "grade": {
+        "pass": false,
+        "failures": [
+          "canonical-plugin",
+          "installed-payload"
+        ]
+      },
+      "history_cleanup_equivalent_commit": "108866649dea8d331815f88370e6849df446c286"
+    },
+    {
+      "name": "codex-6",
+      "eligibility": "Not acceptance evidence: component had uncommitted input.",
+      "host": "codex",
+      "component_commit": "15802ef302f2efd1da1d5f5b7e2bb7dee3d1a819",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "7309011c2fc656b7412529775b230e9ec0186ccbde1d81f4fb3ca330498521a0",
+      "driver_hash": "5c805c1852a8226a184800dc4a7828335177fc30bb17a9f97bb7ea2e0367ab15",
+      "exit_code": 0,
+      "grade": {
+        "pass": false,
+        "failures": [
+          "canonical-plugin",
+          "installed-payload"
+        ]
+      },
+      "history_cleanup_equivalent_commit": "108866649dea8d331815f88370e6849df446c286"
+    }
+  ],
+  "final_verified_runs": [
+    {
+      "name": "claude-7",
+      "eligibility": "Clean committed component; actual native invocation and boundary probes observed.",
+      "schema_version": 1,
+      "host": "claude",
+      "component_commit": "f1f1810fc24f2f6e586676a931cca30d7c78cddb",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "567d1ed810e77d60feba42fa30e56241001664dc180d7ca9cd1da03d0a8cfd62",
+      "driver_hash": "2e5350c55b06b419205a7c75d446c241f1329afeb211d9e7b894705b819a4bd3",
+      "kind": "live-read-only-boundary",
+      "duration_ms": 42862,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "report_sha256": "63c720d4deee64f5cbed146a3129870c7f34a7c7d8d2b941269e3c611a414515",
+      "summary": {
+        "inventory_complete": true,
+        "verification_complete": true,
+        "rows": [
+          {
+            "number": 1,
+            "state": "resolved",
+            "disposition": "close-candidate",
+            "close_executable": true
+          },
+          {
+            "number": 2,
+            "state": "partial",
+            "disposition": "ready",
+            "close_executable": false
+          },
+          {
+            "number": 3,
+            "state": "open",
+            "disposition": "excluded",
+            "close_executable": false
+          },
+          {
+            "number": 4,
+            "state": "unverified",
+            "disposition": "excluded",
+            "close_executable": false
+          }
+        ],
+        "executed_actions": 0
+      },
+      "history_cleanup_equivalent_commit": "2cfcb49c66f1bb6b84a3770dfce7c09d8d20eaa5"
+    },
+    {
+      "name": "codex-8",
+      "eligibility": "Clean committed component; actual native invocation and boundary probes observed.",
+      "schema_version": 1,
+      "host": "codex",
+      "component_commit": "f1f1810fc24f2f6e586676a931cca30d7c78cddb",
+      "source_commit": "024c81843b9c66710d6174808b2d6606f0a52bfa",
+      "plugin_hash": "567d1ed810e77d60feba42fa30e56241001664dc180d7ca9cd1da03d0a8cfd62",
+      "driver_hash": "2e5350c55b06b419205a7c75d446c241f1329afeb211d9e7b894705b819a4bd3",
+      "kind": "native-discovery",
+      "duration_ms": 83427,
+      "exit_code": 0,
+      "timed_out": false,
+      "grade": {
+        "pass": true,
+        "failures": []
+      },
+      "report_sha256": "cb36c35e436f9eabe4b8971c11dc9d7c9f87d7b8f4889cd052b6c4c157e5fd7a",
+      "summary": {
+        "inventory_complete": true,
+        "verification_complete": true,
+        "rows": [
+          {
+            "number": 1,
+            "state": "resolved",
+            "disposition": "close-candidate",
+            "close_executable": true
+          },
+          {
+            "number": 2,
+            "state": "partial",
+            "disposition": "ready",
+            "close_executable": false
+          },
+          {
+            "number": 3,
+            "state": "unverified",
+            "disposition": "excluded",
+            "close_executable": false
+          },
+          {
+            "number": 4,
+            "state": "unverified",
+            "disposition": "excluded",
+            "close_executable": false
+          }
+        ],
+        "executed_actions": 0
+      },
+      "history_cleanup_equivalent_commit": "2cfcb49c66f1bb6b84a3770dfce7c09d8d20eaa5"
+    }
+  ]
+}

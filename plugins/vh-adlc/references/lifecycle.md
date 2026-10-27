@@ -39,6 +39,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Requested result | Procedure |
 | --- | --- |
 | Answer or advice | Inspect the relevant source and answer with its practical limits. No saved artifact unless requested. |
+| Backlog triage | Use `skills/vh-adlc-triage/SKILL.md` to verify scope, rank ready work and save a report; GitHub writes require exact triage approval; every published verdict and local assessment patch also needs current proof in the confined controller from [the boundary guide](triage-boundary.md). |
 | Diagnosis or findings | Use `skills/vh-adlc-investigate/SKILL.md` with the selected investigation intent. Reproduce the issue and respect report-only limits. |
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
 | Bounded maintenance | Follow the maintenance procedure below if the public contract is preserved and local instructions allow it. |
@@ -46,7 +47,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Bootstrap or onboarding | Read the applicable engineering guide; apply it within the selected task's authority. Creating application behavior still uses the feature procedure. |
 | Verification or review | Observe the requested checks. For feature review, dispatch the canonical independent feature reviewer at an exact commit. |
 | Resume | Reconstruct the artifact, Git history and owner handoff. Features use their existing resume operation; maintenance uses its record and review target; docs use the requested artifact and remaining authorized edit. |
-| Ship or a live operation | Require an explicit request and a supported procedure. Existing feature shipping uses its original preflight. Report unsupported non-feature publishing or live-operation gaps. |
+| Ship or a live operation | Require an explicit request and a supported procedure. Existing feature shipping uses its original preflight. Exact batch approval permits only the triage actions in `references/triage.md`, subject to its enforced proof requirement for every published verdict and local assessment patch; other non-feature publishing or live-operation gaps remain unsupported. |
 
 The paths in this table are relative to the plugin root. A generic request to
 diagnose and fix can finish diagnosis, then enter maintenance or feature work
@@ -74,7 +75,9 @@ shipping operation, whether intake selects it or the owner names the skill.
 Directly invoking a named operation retains the publication authority its
 existing contract grants. This distinction changes no acceptance, branch,
 review or completion gate, and grants no merge, release or live-operation
-permission.
+permission. The separately presented exact triage batch grants only its named tracker actions and
+local plan patches/commit under `references/triage.md`; it grants no feature publication,
+implementation, merge or release authority.
 
 ## Bounded maintenance
 

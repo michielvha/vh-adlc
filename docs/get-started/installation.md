@@ -78,7 +78,8 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains seven skills and a reviewer definition. Its first operation
+The package contains nine skills: the generic `vh-adlc` entry and eight named operations.
+It also includes a reviewer definition. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
 It verifies the archive and binary hashes before execution and writes downloads
@@ -88,6 +89,16 @@ The first operation may ask permission to read the installed plugin's references
 and its pinned public documentation cache. The plugin uses your repository's
 engineering conventions pin when present, otherwise its
 [own pin](../../plugins/vh-adlc/knowledge.md).
+
+Shared triage uses Bun for its packaged helpers, Git for source verification, and the GitHub CLI
+(`gh`) for its GitHub adapter. Authenticate that CLI for the intended repository using your normal
+account setup before running triage; the plugin does not provision credentials or switch accounts.
+Every published triage verdict and local assessment patch also needs the [managed verification controller](../../plugins/vh-adlc/references/triage-boundary.md),
+which currently requires Linux, Bubblewrap, `flock` from util-linux and an authenticated supported CLI.
+The shared procedure and stream protocol remain independent of the harness; other host integrations
+must enforce the same boundary and pass their own tests. Missing confinement leaves closure execution and all assessment writes
+unavailable; local reports remain available. Another read adapter must preserve the pagination and error contract. The other feature
+operations continue to use the verified binary without requiring Bun.
 
 The other marketplace plugins install separately. Bun is required for the
 GitHub App registration scripts; installing vh-adlc does not install those scripts

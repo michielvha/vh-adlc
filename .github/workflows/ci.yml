@@ -23,11 +23,19 @@ jobs:
 
   checker:
     runs-on: ubuntu-latest
+    env:
+      VH_ADLC_TRIAGE_TEST_TIMEOUT_MS: '60000'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Install and probe the Linux verification boundary
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap util-linux apparmor-profiles
+          sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          bwrap --unshare-all --ro-bind / / -- /usr/bin/true
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
@@ -44,8 +52,18 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
-      - name: Check the vh-adlc package
-        run: bun test tests/vh-adlc
+      # Managed verification and effect recovery require Linux/Bubblewrap/flock.
+      # Ubuntu runs every test; macOS checks the portable feature and report inputs.
+      - name: Check portable vh-adlc behavior
+        run: >-
+          bun test tests/vh-adlc/*.test.ts
+          tests/vh-adlc/triage/collection.test.ts
+          tests/vh-adlc/triage/copilot-trial.test.ts
+          tests/vh-adlc/triage/discovery.test.ts
+          tests/vh-adlc/triage/migration.test.ts
+          tests/vh-adlc/triage/owned-process.test.ts
+          tests/vh-adlc/triage/settings.test.ts
+          --timeout 60000
 
   # Tags main, and a branch whose open PR has the release:preview label at this
   # commit. Every other run only calculates the version.

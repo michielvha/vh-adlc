@@ -6,6 +6,26 @@ Check the plugin version as well as the host: a successful run on an older versi
 does not establish support for a newer workflow. Installation instructions are in
 [Install vh-adlc](../get-started/installation.md).
 
+## Shared triage
+
+Shared triage is an unpublished local candidate on plugin 0.4.0. Both Codex CLI and
+Claude Code CLI have observed read-only discovery and managed fake-tracker execution,
+including interruption recovery, uncertainty, concurrency and exact-payload denials.
+The [feature evidence](../specs/shared-triage.md) records the exact tested commits,
+subsequent defensive fixes and the limits of the private migration trial.
+
+Every published triage verdict and local assessment patch requires current proof in a
+[confined controller](../../plugins/vh-adlc/references/triage-boundary.md), plus exact approval.
+The shipped managed adapters require Linux, Bubblewrap, util-linux flock and an
+authenticated Codex or Claude CLI. Other harnesses can report; execution needs their own tested
+confinement adapter. A raw session or cache receipt grants no execution authority.
+
+Codex desktop and VS Code Local triage invocations remain unverified. The owner deferred
+those compatibility checks to [issue #33](https://github.com/michielvha/vh-adlc/issues/33).
+The runtime has no GUI dependency. Other GUI surfaces have no triage support claim.
+Copilot's migration runner is test-only and grants no managed execution support.
+The historical results below retain their original scope.
+
 ## Support matrix
 
 Supported means the scenario run in `tests/vh-adlc/evidence/` passed on that host. Everything else is
@@ -19,6 +39,7 @@ claiming that the whole scenario matrix passed.
 | Codex CLI 0.163.0, plugin 0.2.0 packaging | Historical native installation check in an isolated, credential-free profile; no 0.2.0 CLI agent-loop claim | [Codex GUI run](../../tests/vh-adlc/evidence/codex/gui-smoke.md) |
 | Lifecycle front door, plugin 0.3.0, Codex CLI 0.163.0 | 57 fresh native CLI trials pass on one compact package/docs pair, with required repetitions and linked independent review; prior publication failures are retained. This is a bounded scenario result | [Lifecycle evaluation](../../tests/vh-adlc/evidence/lifecycle/README.md) |
 | Lifecycle front door, plugin 0.3.0, desktop and other hosts | Unverified; Computer Use refused access to the local Codex app, so no new desktop result is claimed | [Lifecycle testing limits](../../tests/vh-adlc/evidence/lifecycle/README.md) |
+| Generic `vh-adlc` discovery entry, plugin 0.4.0 candidate | Native generic intake observed on Codex CLI and Claude CLI; GUI compatibility deferred in #33 | [Shared triage acceptance](../specs/shared-triage.md) |
 | Codex VS Code extension and Copilot's Codex harness | Not yet tested | Not inferred from the desktop app |
 | Claude Code desktop app 2.42304.2, macOS arm64 | Historical core GUI loop passed on plugin 0.1.2, through gated completion; the new inherited-default policy has not been rerun here | [Desktop GUI run](../../tests/vh-adlc/evidence/claude-desktop/gui-smoke.md) |
 | Claude Code VS Code extension 2.1.301, macOS arm64 | Partial GUI validation: seven operations, investigation, independent spec review and structured owner questions passed | [Native extension GUI run](../../tests/vh-adlc/evidence/claude-code-extension/gui-smoke.md) |

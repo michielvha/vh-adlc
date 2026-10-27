@@ -29,6 +29,7 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 - Check review freshness and completion with deterministic commands.
 - Get independent spec and implementation reviews before completing a feature.
 - Handle documentation and small maintenance tasks without creating a feature spec.
+- Triage backlog issues against source and observed checks. [Every published triage verdict requires the managed verification controller](plugins/vh-adlc/references/triage-boundary.md) and exact approval; local reports work across harnesses.
 
 ## Get started
 
@@ -51,7 +52,8 @@ claude plugin marketplace add michielvha/vh-adlc
 claude plugin install vh-adlc@vhco-tools
 ```
 
-Then start with `/vh-adlc:vh-adlc-spec` and describe a feature.
+Describe the work with `Use vh-adlc`, or choose an operation such as
+`/vh-adlc:vh-adlc-spec` to describe a feature.
 
 See [installation](docs/get-started/installation.md) for desktop and VS Code
 instructions, then follow [your first feature](docs/get-started/first-feature.md).
@@ -63,6 +65,7 @@ Host coverage varies by plugin version and operation; check
 | I want to… | Read |
 | --- | --- |
 | Build a feature from spec to PR | [Your first feature](docs/get-started/first-feature.md) |
+| Triage and prioritize a backlog | [Workflows](docs/user-guides/workflows.md) |
 | Choose an operation or resume work | [Workflows](docs/user-guides/workflows.md) |
 | Update or remove the plugin | [Managing plugins](docs/user-guides/managing-plugins.md) |
 | Check which hosts have been tested | [Compatibility](docs/reference/compatibility.md) |

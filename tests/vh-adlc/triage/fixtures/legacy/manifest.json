@@ -1,0 +1,26 @@
+{
+  "repository": "michielvha/stackweaver",
+  "baseline": "129581f6dbe4df71200af8f67d7bc017d35e89ad",
+  "files": {
+    "agents/issue-triage.md": "d03ec9fae185d40139c783c68b7d4fbbf1c70b1e1e5dcb1876b001e27249abba",
+    ".claude/commands/triage.md": "a0ecdbcb65d7bbbc827e1b50e8c9e56716f552d085f2f38697b39b38e6faab34"
+  },
+  "intentional_differences": [
+    "all-writes-approved",
+    "unbounded-pagination",
+    "incomplete-blocks-all-closures",
+    "current-index-request",
+    "all-modes-save-report",
+    "report-commit-opt-in",
+    "scope-safe-history",
+    "enforced-controller-execution"
+  ],
+  "history": {
+    "docs/internal/status/2026-09-26-issue-triage.md": {
+      "fixture": "status/2026-09-26-issue-triage.md",
+      "sha256": "cc6153ecc42c59e4184e97fd9d78ef3073a0b90f33b132f57e7dc1b4332be6f1",
+      "source_sha256": "c71d60d547a661a442242b8eb22bfafef893ff7ab3f4d5bc166ca645f0029b6c",
+      "synthetic": true
+    }
+  }
+}

@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vh-adlc",
-  "version": "0.3.1",
-  "description": "Explicit software lifecycle intake, bounded maintenance and the existing gated feature operations; framework procedure lives in this package and engineering conventions remain pinned external inputs.",
+  "version": "0.4.0",
+  "description": "Explicit lifecycle intake, evidence-based backlog triage, bounded maintenance and gated feature operations; shared framework procedures use pinned external engineering conventions.",
   "author": {
     "name": "Michiel VH"
   },
