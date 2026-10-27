@@ -17,6 +17,11 @@ feature document, implementation, tests and adoption evidence. The owner request
 on 2026-10-27 so future maintenance, audit and documentation decisions do not accumulate in the
 completed triage feature.
 
+The owner selected dependency/security maintenance next on 2026-10-27. Its draft child is
+[shared-maintenance.md](shared-maintenance.md); independent review and owner acceptance precede
+implementation. Stackweaver retains its specific operating procedures, including its existing
+approved satellite-merge helper. No audit, documentation or domain extraction has been selected.
+
 Triage is the first extraction. Its accepted behavior and local verification remain in
 [shared-triage.md](shared-triage.md), initially completed at `0e033f8` and refreshed by Copilot Opus 5.5 R-34 before publication.
 That document's original deferred register records its reviewed scope boundaries; the live roadmap
@@ -66,7 +71,7 @@ updated rollback baseline. GUI discovery remains unverified under #33.
 | ID | Capability and existing source | Disposition and next decision |
 | --- | --- | --- |
 | TRIAGE | Backlog triage, `agents/issue-triage.md` | [Child spec](shared-triage.md) adopted through vh-adlc #34 and Stackweaver #976 after actual marketplace tests. The delivery evidence is above. GUI discovery remains under [#33](https://github.com/michielvha/vh-adlc/issues/33). |
-| D-01 | Dependency/security maintenance, `agents/maintenance.md` | Next extraction candidate after triage adoption. Draft a separate maintenance spec when selected. Compare dependency inventory, changelog/usage analysis and approved dispositions with existing vh-adlc bounded maintenance. Retain repository topology and release checks as settings; resolve the local protection-policy conflict before extraction. |
+| D-01 | Dependency/security maintenance, `agents/maintenance.md` | Selected by the owner; [child spec](shared-maintenance.md) is being reviewed before acceptance. Reuse existing bounded maintenance. Retain topology, release checks and the approved satellite-helper exception locally; preserve the daily command and model. |
 | D-02 | Persistent codebase audit, `agents/codebase-audit.md` | Candidate for a separate audit spec. Preserve finding identities, adversarial re-verification and residuals, and connect remediation to the existing lifecycle. Decide write/merge authority before carrying over local automation. |
 | D-03 | Documentation impact, drift audit/resolution and truth checks | Deferred. Compare `agents/docs-impact.md`, `docs-drift-audit.md`, `docs-drift-resolver.md` and `docs-truth.md` with vh-adlc's existing documentation workflow first. Any selected extraction gets a separate spec. Existing scanners, ledgers, hooks and schedules stay unchanged. |
 | D-04 | TFE compatibility and provider-fork workflows | Keep `agents/tfe-compat.md` and `agents/provider-fork.md` as domain extensions in Stackweaver. Extract only a separately selected reusable part, preserving product contracts and licensing boundaries. |
@@ -120,6 +125,7 @@ its own equivalent handoff. A parent status never replaces a child's acceptance 
 - [x] T2 `docs/specs/shared-triage.md` and Stackweaver `tests/agent-triage/README.md` - record the authorized shared publication, actual marketplace installation and ordered consumer adoption with exact revisions (AC-02, AC-03).
       Evidence: Shared merge `80fd36d0`, signed runtime v0.6.0, two exact marketplace payload checks, installed-helper reports, installed-plugin rollback, fourteen consumer checks and Stackweaver merge `5cb89174` are observed and recorded above. No maintenance, audit, documentation or domain extraction started.
 - [ ] T3 `docs/specs/` - when the owner selects maintenance, draft and independently review its own child spec before implementation (AC-01, AC-04).
+      Progress: Selected on 2026-10-27; `shared-maintenance.md` drafted, independent review pending. No maintenance implementation has started.
 - [ ] T4 `docs/specs/` - when the owner selects audit, draft and independently review its own child spec before implementation (AC-01, AC-04).
 - [ ] T5 `docs/specs/` and this document - revisit documentation overlap, domain extensions and broader onboarding only when selected; retain explicit dispositions meanwhile (AC-01, AC-04).
 
