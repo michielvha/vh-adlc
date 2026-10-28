@@ -58,7 +58,7 @@ export function resolveInside(root: string, path: string): string {
   return completed;
 }
 
-function origin(root: string): { repository: string; hostname: string } {
+export function origin(root: string): { repository: string; hostname: string } {
   let remote = git(root, "remote", "get-url", "origin");
   const scp = remote.match(/^git@([A-Za-z0-9.-]+):([^?#]+)$/);
   if (scp) remote = `ssh://git@${scp[1]}/${scp[2]}`;
