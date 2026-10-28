@@ -4,9 +4,13 @@ import { join } from "node:path";
 
 const root = join(import.meta.dir, "../..");
 const baseline = "b313327b134bc5ecfa7167856d4b567f8701ba06";
-test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps the original operation body", (name) => {
+// The owner requested a conversational summary before accepting a completed spec.
+// Keep that intentional change as the spec baseline; other operation bodies retain theirs.
+const specSummaryBaseline = "116accd0a50e2c0da741a0ed6f762f177c61babd";
+test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resume"])("direct %s keeps its approved operation body", (name) => {
   const path = `plugins/vh-adlc/skills/vh-adlc-${name}/SKILL.md`;
-  const old = Bun.spawnSync(["git", "show", `${baseline}:${path}`], { cwd: root, stdout: "pipe", stderr: "pipe" });
+  const revision = name === "spec" ? specSummaryBaseline : baseline;
+  const old = Bun.spawnSync(["git", "show", `${revision}:${path}`], { cwd: root, stdout: "pipe", stderr: "pipe" });
   expect(old.exitCode).toBe(0);
   const body = (text: string) => text.slice(text.indexOf("The plugin directory is two levels"));
   let current = readFileSync(join(root, path), "utf8");
