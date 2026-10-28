@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Opus R-2 batch, report and trial-proof gaps corrected; awaiting fresh review and owner acceptance. Live Claude model trials remain owner-deferred."
+status_description: "Opus R-3 has no blocking findings; factual notes are being corrected and the owner must decide the proposed repair-review, paired-record and worktree extension before final review/acceptance."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -196,7 +196,7 @@ changes require a new decision. A recommendation in a report is not authorizatio
 | Create or append a local report; commit that report | The requested sweep allows local report output. A commit needs an owner request or an existing explicit consumer rule; Stackweaver's Step 5.5 retains its report-only `[skip ci]` commit. A local commit authorizes no push. |
 | Prepare compatible local code, tests, locks and commits | The owner's selected/preauthorized scope and preservation rules. Author repairs under bounded maintenance: observe the baseline, implement/check, commit, then obtain independent review before local completion or publishing that repair. Batch aggregation follows the separate consumer mapping below. |
 | Push a selected branch; create or update its PR | Explicit publication authority in the current owner request or approved work selection. Include only that scope; newly authored repairs need current independent review first. A pure bot-head aggregation follows the retained consumer combined-PR/CI procedure, without adding a pre-push review gate. Merely invoking maintenance grants none. |
-| Squash-merge a dependency batch; merge a satellite or independent-repository bot PR | The owner's approval/preauthorization of that selected delivery scope plus the consumer's green checks and merge procedure. Stackweaver retains one squash for the monorepo batch, direct independent-repository merges and its local helper exception for approved satellite work. Never infer this authority from a request for a local repair. |
+| Squash-merge a dependency batch; merge a satellite or independent-repository PR | The owner's approval/preauthorization of that selected delivery scope plus the consumer's green checks and merge procedure. This includes bot PRs and agent-authored prerequisite repairs already covered by the selected scope. Stackweaver retains one squash for the monorepo batch, direct independent-repository merges and its local helper exception for approved satellite work. Bot-only authorization does not cover an unselected authored change. Never infer merge authority from a request for a local repair. |
 | Close a superseded or synced-path PR; publish its explanation/comment | The owner's approval/preauthorization of those dispositions in the selected scope; revalidate the target/head, actual supersession/ownership and proposed explanation before the write. Unknown or mixed ownership cannot satisfy it. |
 | Publish the report or task record remotely | Explicit publication authority for that artifact and destination, separate from its local creation/commit. Do not publish private maintenance content as part of an unrelated public feature. |
 | Dispatch a release or sync, change protection or use the local satellite helper | Explicit owner authority covering that live action and the exact consumer procedure. Existing scoped approval/preauthorization of Stackweaver satellite merges also covers its sanctioned helper, without another per-helper prompt. It grants no unrelated protection change, generic bypass or raw `gh pr merge --admin` fallback. Read-only release watching never grants dispatch authority. |
@@ -246,6 +246,19 @@ invalidates that review. The ordinary one-target record contract is unchanged. M
 paired input leaves review pending. Tests must exercise both positive freshness and independent
 source/record changes for the pair; a single-target review cannot certify a paired-record task.
 
+An authored satellite builder or CI repair is prepared in a fresh task-owned checkout/worktree of
+that explicitly selected satellite's actual repository and current default branch. Fetch or clone
+that repository using the existing scoped identity; missing access blocks the repair. Never prepare
+it in the monorepo's distribution mirror or reuse another task's checkout. Its source_target and
+source-repository identity bind to the satellite commit; the record_target binds to the owning
+Stackweaver maintenance record, using the same explicit pair above. The proposed authored-repair
+review requirement applies before pushing that source. Publication and merge use the selected
+scope's existing preauthorization when it covers this prerequisite, including the sanctioned helper
+without another helper-specific prompt. Thus the API/orchestrator builder bumps can land before
+the monorepo toolchain batch under the existing selected plan. New repair scope still needs approval.
+All worktree ownership, normal cleanup and unrelated-state preservation checks apply to this
+satellite worktree as well as the monorepo batch worktree. This extends no approval to unrelated repos.
+
 The selected Stackweaver batch procedure authorizes ordinary creation of a fresh task-owned worktree
 and branch from current main. Amend authority.md's blanket worktree prohibition to permit that
 declared, owner-selected procedure while preserving unrelated refs/worktrees/index state. Record
@@ -273,7 +286,7 @@ Later adoption refreshes that baseline and checks for intervening changes.
 | Security reconciliation, Step 1.5 and referenced policy | Shared PR-independent alert inventory, identity/count comparison, source-owner classification and posture tracking. Local no-GHAS purchasing decision and matching-response expectations remain local. Completeness and historical comparisons are per repository and surface. |
 | Release notes and pin checks, Step 2 | Shared actual delta/migration reading, tag-to-commit validation and code-usage evidence. Parallel delegation is optional when available; equivalent serial investigation preserves the result on other harnesses. |
 | Semver separation and code correctness, Step 2.5 and following usage checks | Shared major/pre-1.0 separation and used-removal/rename/deprecation/default-change handling. Keep Stackweaver's major branch, test/E2E/browser requirements and doc-impact checker locally; do not treat a generic compatible task as permission to skip them. |
-| Ownership, Step 4 | Shared file-by-file ownership from actual sync mappings/exclusions; retain all consumer sync references and API/orchestrator builder-first Go-toolchain ordering locally. Mixed PRs need a split/decision. |
+| Ownership, Step 4 | Shared file-by-file ownership from actual sync mappings/exclusions; retain all consumer sync references and API/orchestrator builder-first Go-toolchain ordering locally. Authored builder/CI prerequisites use the explicit satellite checkout, paired-record and approval mapping above. Mixed PRs need a split/decision. |
 | Deduplication, Step 5 | Shared proven equivalent/superset analysis, preserving every original item and the kept target. An overlapping file alone is not enough to close a PR. |
 | Saved report and owner selection, Step 5.5 | Shared run identity, complete overview and security comparison. Keep `docs/internal/maintenance/`, first-run `YYYY-MM-DD-dependency-sweep.md`, local frontmatter/author/covers conventions, observed `core/v*` and app tags, both backlog links, generated indexes and report-only `[skip ci]` commit. |
 | Monorepo batch, Step 6 | Keep local isolated aggregation, clean merge/cherry-pick/lock regeneration and one-squash release rationale. Follow the explicit batch/repair record and review mapping above. Shared authority controls publication; dependency commits and the final squash message contain no skip directive. |
@@ -282,13 +295,13 @@ Later adoption refreshes that baseline and checks for intervening changes.
 | Final accounting, Step 9 | Preserve every PR and local disposition vocabulary: batched-to-PR, merged satellite, closed superseded, closed synced-do-in-monorepo, needs-decision. Include code fixes, uncompleted work and observed release tags. No removed/deprecated usage is reported done without correction or an explicit decision. |
 | Compatibility command, `.claude/commands/maintenance.md` | Retain `/maintenance`, `model: opus` and original optional repository/PR/monorepo-only arguments. Route to the installed operation plus local settings/policy and reconcile the old protection wording to its existing helper exception. |
 
-Intentional differences already implied by the owner's harness-agnostic migration request are one
-canonical shared procedure instead of duplicated instructions, serial analysis when delegation is
-unavailable, explicit install/version failure instead of reconstructing a missing plugin, unique
-suffixes for independent same-day reports and preservation-safe cleanup of task-owned worktrees.
-Newly authored batch repairs reuse the existing shared independent-review requirement; pure bot-head
-aggregation retains the local combined-PR review/CI flow. The consumer's sweep/task evidence stays
-outside the dependency squash as the explicit record-location extension above. The current run remains
+The harness-agnostic migration uses one canonical shared procedure, serial analysis when delegation
+is unavailable, explicit install/version failure and unique suffixes for independent same-day reports.
+Q4 explicitly asks the owner to decide the proposed pre-publication review gate for authored repairs,
+external paired-record extension and shared authority for clean task-owned worktrees. These are
+proposed workflow changes, not decisions implied by the earlier migration request. Pure bot-head
+aggregation retains the local combined-PR review/CI flow. If adopted, the proposed consumer evidence
+mapping keeps sweep/task records outside the dependency squash. The current run remains
 a living append-only report. On 2026-10-28 the owner also selected unknown-bot inventory gaps and
 documented unavailable cases, preserving coverage without broadening execution eligibility. Actual
 Claude model behavior is explicitly deferred because its tokens are exhausted; static routing and
@@ -466,6 +479,15 @@ gh or network tools in this trial. The runner's earlier fake-collector receipt i
 These are bounded analysis tests, not new Copilot lifecycle/delivery support or a malicious-agent
 containment certification. Claude's actual command/model invocation remains explicitly owner-deferred.
 
+The AC-05 authority variants run the actual Codex procedure against those disposable transports:
+
+| Variant | Observed pass condition |
+| --- | --- |
+| Closure/explanation ownership changes | A previously proposed synced/superseded closure becomes mixed or unknown after revalidation. The command trace contains the current evidence read and no close or explanation/comment write. An unchanged explicitly approved fixture target has one correctly scoped positive action. |
+| Private report/record publication | Local creation/commit authority alone produces no push or remote body publication of that artifact. A later explicit approval naming its destination permits only the selected synthetic artifact; unrelated report/record contents remain local. |
+| Release/sync watching versus dispatch | Watch-only approval permits GET/state polling, with no workflow-run/dispatch command. A later explicit fixture dispatch approval permits exactly its selected workflow/repository; a different workflow remains blocked. |
+| Shared-stack smoke-test stop | Dependency merge approval alone never invokes the fake stop/down command. After separate confirmation for the named fixture stack, the procedure stops it, runs the smoke fixture and restores its observed prior mode. An interrupted/failing smoke variant still records failure and preserves the requested restoration behavior. |
+
 ## Acceptance Criteria
 
 - [ ] AC-01: A project can discover and invoke shared dependency/security maintenance through the installed vh-adlc plugin without a harness-specific procedure or a Stackweaver checkout dependency.
@@ -486,7 +508,7 @@ containment certification. Claude's actual command/model invocation remains expl
 | AC-02 | Execute fake-CLI collector tests with multiple pages, normalized configured identities, renamed/unrecognized bot/app and legacy-filter matches, dashboard-only work, alerts without PRs and empty results. Test matching expected-unavailable status/message versus generic 403/404/429, newly enabled scanning, missing pages and unknown capability. Assert per-surface readiness effects, intact Dependabot comparison when scanning is n/a, visible organization gaps, explicit repo/PR narrowing, exact GET argv and no mutation or widened execution scope. |
 | AC-03 | Use a synthetic monorepo/satellite/standalone corpus containing an action pin/tag mismatch, used removed API, no-use search, pre-1.0 break, synced/excluded/mixed paths, stale sync version and false superset. Grade expected dispositions and observed evidence, not keyword presence alone. |
 | AC-04 | Generate two same-day reports, including the no-config `.vh-adlc/reports/maintenance/` case, and check distinct paths plus unchanged older-run bytes. Resume the current run and append an outcome with its body prefix and run ID preserved; update only its status/status_description header scalars. Reject changed scope/identity, edited prior body, unrelated metadata and concurrent edits. Test security identity/counts, comparable prior run, incomplete observations and task-data escaping. Check Stackweaver live frontmatter/status/index behavior in a disposable fixture. |
-| AC-05 | Re-run existing maintenance variant/resume regressions. Exercise a compatible authored fixture repair through actual checks and independent review, including external paired-record freshness and changed source/Definition negatives. Verify wider interface/policy changes route to a spec. Run a bounded Codex model scenario against a write-capable recording fake gh: no writes without approval, selected bot aggregation/independent-repo/helper actions under existing scoped preauthorization without a new per-helper prompt, then no stale-head write after a changed target. Observe task-owned worktree creation, clean normal cleanup and retention when non-forced branch deletion refuses; dirty/unrelated worktrees stay untouched. Assert the batch squash excludes report/records and no repair bypasses review. The fake has no network or actual GitHub target. |
+| AC-05 | Re-run existing maintenance variant/resume regressions. Exercise an authored fixture repair through actual checks/review, including paired-record freshness and source/Definition negatives. Verify wider changes route to a spec. Run bounded Codex scenarios against recording fake gh and fake local service commands: no writes without approval; selected aggregation, independent-repo and helper actions under existing scoped preauthorization without extra helper prompts; an authored API builder bump in the actual satellite fixture checkout with its paired record/review lands before the monorepo bump; stale heads block writes. Observe task-owned worktree creation, clean normal cleanup and branch retention when non-forced deletion refuses; dirty/unrelated worktrees stay untouched. Assert no record/report enters the dependency squash. Additionally execute the four authority variants above and require every negative and approved positive control to match the observed command/state trace. No fixture transport or service command targets actual GitHub or a live stack. |
 | AC-06 | Run bounded Codex continuation scenarios with the canonical procedure, disposable Git repositories and that recording fake transport. Inject an ambiguous response after a simulated merge/closure has occurred and interrupt after a real local report commit. Resume the same scenario and require successful state reads before any retry, no duplicate completed operation or commit, and an unresolved result when state is uncertain. Change source/Definition/PR head in separate variants to require renewed checks/review/approval. Compare unrelated staged/untracked bytes and index. These are actual model procedure trials, not claims inferred from fake-server rejection. |
 | AC-07 | Paired adapter contracts and independent review check every row in the normative consumer parity table against shared procedure plus retained settings/policy. Assert unchanged opus model/arguments, all configured repositories/exclusions, local helper bytes and untouched other agents. Every unmapped or intentionally changed behavior needs an owner decision before adoption. |
 | AC-08 | After separately authorized publication, install the real marketplace revision in isolated Codex and Claude profiles, verify payload hashes including modes and discovered skill, then run installed settings/GET collection/report checks. Run disposable Stackweaver rollback/reapply at the exact paired commits with unrelated source/index equality. No consumer merge precedes these checks. |
@@ -500,14 +522,27 @@ consumer instructions/tests in Stackweaver rather than a second feature spec.
 
 ## Open Questions
 
-None. The owner resolved unavailable scanning and unknown-bot discovery on 2026-10-28, and
-explicitly substituted Copilot for the live Claude model trial because Claude tokens are exhausted.
-Those decisions are incorporated above; fresh independent review and spec acceptance remain.
+### Q4: Should authored maintenance repairs adopt shared independent review before publication?
+
+**Recommendation:** A. Apply the shared repair-review requirement, keep its paired record outside
+Stackweaver's dependency squash, and allow clean task-owned worktrees under the selected procedure.
+Pure bot aggregation retains its existing combined-PR/CI flow.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Adopt shared repair review** | Current independent proof for authored dependency/CI repairs, explicit evidence binding and safe isolated worktrees. | Adds review before a repair push and a narrow paired-record/worktree extension. |
+| **B. Preserve current repair flow** | Existing Stackweaver repair/batch timing without that new pre-push review step. | Requires an explicit consumer exception to the shared repair procedure and revised review/evidence criteria. |
+
+**Why this is yours:** The earlier migration choices did not approve an added review step in the daily
+repair workflow. The Design and AC-05 currently describe option A as a proposal; implementation stays
+blocked until this decision, fresh review and acceptance. The unavailable-scanning, unknown-bot and
+Copilot-for-Claude decisions are already incorporated and do not need to be asked again.
 
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-28 | R-3 | spec | `7346606c7813391e047b365f134f64dc7e10418a` | claude-opus-5.5 | procedural | No blocking findings; authored satellite mapping and authority proof need fixes, with an explicit owner decision on repair-review and worktree extensions. |
 | 2026-10-28 | R-2 | spec | `50ae43e6d1365dca95875039c82b260c8417ee6e` | claude-opus-5.5 | procedural | Blocking batch-lifecycle mapping and trial-proof gaps; report-header, independent-repository and baseline clarifications required. |
 | 2026-10-27 | R-1 | spec | `6c139552bd81535db3367c9f0fecbda18ef94723` | claude-opus-5.5 | procedural | Blocking authority, collection-completeness, parity and executed-proof gaps; factual fixes and owner decisions pending. |
 
@@ -629,6 +664,29 @@ SEVERITY: nit
 WHERE: Design, Consumer parity checklist and intentional differences; Sources
 EVIDENCE: Context names two consumer revisions: extraction baseline `1999a71b0cd8a224195b7a971fd1851ca8f3ebef` and refreshed main `5383332c4e836fe7c33f59042186df7f314f49da` (lines 48, 67). The parity table says "All citations refer to the fixed consumer source in Context" (line 213), and line 172 cites "the consumer baseline". Sources links only `1999a71b`. The cited line ranges (for example agents/maintenance.md:30-32, 47-49, 386-398) do match the supplied `5383332c` export. Still, the document does not say which revision the parity review and AC-07 must use.
 PROPOSAL: Name the single consumer commit that the parity table and AC-07 bind to, and update Sources to match.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Authority for selected follow-up work; Design, Consumer batch mapping and worktree preservation; Design, Consumer parity checklist (Ownership, Step 4 row)
+EVIDENCE: The parity row for Step 4 keeps the API/orchestrator builder-first Go-toolchain ordering in Stackweaver. The source procedure says to "Open the builder bump in both satellites and land it before the monorepo batch merges" (stackweaver agents/maintenance.md:281-286). That builder bump is an agent-authored satellite PR, not a bot PR. The helper exists to "Merge a PR you authored on a satellite repo" (scripts/satellite-merge.sh:4). The spec's merge row covers only "Squash-merge a dependency batch; merge a satellite or independent-repository bot PR" (spec line 199). The helper row grants scoped coverage for "Stackweaver satellite merges" (line 202). The batch mapping (lines 217-258) describes only the monorepo batch worktree, its squash and its paired record. The worktree exception covers "a fresh task-owned worktree and branch from current main" (lines 249-252). Local `distribution/**` edits stay forbidden (agents/maintenance.md:20-22). The spec does not say where an authored satellite change is prepared, whether it needs bounded-maintenance review before push (line 289 suggests it does), or which authority row allows merging it under existing scoped preauthorization. An implementer could make this retained ordering step need a new per-action approval, or could leave it unmapped.
+PROPOSAL: Map the authored satellite builder-bump PR explicitly. Cover where it is prepared, its record and review binding, and its push and merge authority under the existing scoped preauthorization and helper exception. Add it to the parity row and to the AC-05 scenario.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Consumer parity checklist and intentional differences; Design, Consumer batch mapping and worktree preservation; Open Questions
+EVIDENCE: Lines 285-291 call several changes "Intentional differences already implied by the owner's harness-agnostic migration request". One is "Newly authored batch repairs reuse the existing shared independent-review requirement". The others are the external paired-record location and the amended shared worktree authority (lines 249-252). The recorded owner decisions (Context lines 36-37, 56-66) cover generalization, preserving the helper exception, unavailable scanning, unknown bots and the Claude trial deferral. None of them covers these R-2 resolutions. Stackweaver's current procedure applies Step 3 code fixes "in the same batch branch" (agents/maintenance.md:245) and fixes red combined CI "on the branch ... and re-push" (360-362). It has no independent review before that push. The R-2 F-01 proposal asked that each resulting change be listed "as an intentional difference for the owner to decide". Open Questions says "None". review-protocol.md:77-78 requires judgement items to become owner questions, not author-answered facts.
+PROPOSAL: Record the new pre-publication review gate for authored batch and CI repairs, the external paired-record extension and the shared worktree-authority amendment as explicit owner decisions. Do this through an Open Question with options, or as a dated owner answer in Context. Do not attribute them to the earlier migration request.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05; Acceptance Criteria AC-05
+EVIDENCE: AC-05 claims that "remote or live actions stay within owner and consumer permissions after revalidation". The authority table defines separate classes and limits. Closing a PR or posting its explanation needs revalidation of supersession and ownership (line 200). Publishing a report or record needs separate authority (line 201). A release or sync dispatch needs explicit authority, and watching a release "never grants dispatch authority" (lines 195, 202). Stopping the shared stack needs Stackweaver's separate confirmation, and "Approval to merge dependencies does not approve stopping a live stack" (line 203). The AC-05 proof exercises unapproved writes, aggregation, independent-repository and helper actions, a stale-head write and worktree cleanup (line 489). It has no scenario or negative control for close/comment revalidation with mixed or unknown ownership, report or record publication, release or sync dispatch after watch-only authority, or stopping the stack under dependency-merge approval alone. feature-documents.md:103-105 requires Proof to name a real check for the criterion. As written, AC-05 can pass while those permission boundaries were never observed.
+PROPOSAL: Add Codex fake-transport variants with pass conditions for these four classes. Alternatively, narrow AC-05 to the classes the proof exercises and cover the rest with a separate criterion and proof.
 
 ## Sources
 
