@@ -56,7 +56,8 @@ release checks and security/backlog documents are consumer facts, not shared def
 repository/PR scope. `AGENTS.md:10-23` currently routes maintenance locally and triage to vh-adlc.
 These claims were checked with `git show origin/main:<path>` after fetching both repositories.
 
-The command says never change protection while the playbook permits its sanctioned local helper.
+The command both says never change protection and tells the agent to hand off satellite-only PRs,
+while the playbook permits merging approved green PRs with its sanctioned local helper.
 The owner resolved the migration intent in this session: this is Stackweaver-specific and must
 remain usable as before. Preserve that helper exception and its existing approved-batch requirements
 in Stackweaver. Do not turn it into a shared protection-changing default. The script itself is not
@@ -196,7 +197,8 @@ release/sync verification and Compose smoke-test stop/restore requirements. No l
 and green-check preconditions live in the local procedure, not the script
 (`agents/maintenance.md:30-32,47-49,386-398` at parity baseline `5383332c`). Its exception remains
 specific to that procedure and approved satellite scope.
-Reconcile the command's contradictory wording to point to that retained local policy, preserving
+Reconcile both command passages, `.claude/commands/maintenance.md:28-29` (satellite handoff) and
+`:31-33` (protection), to point to that retained local policy, preserving
 the owner's answer rather than imposing a new shared policy.
 
 ### Authority for selected follow-up work
@@ -235,13 +237,18 @@ triage's exact-batch/controller contracts remain unchanged.
 ### Consumer batch mapping and worktree preservation
 
 An aggregation consists only of selected bot commits with unchanged intended patch content
-(cherry-pick commit IDs may differ) plus mechanical lock regeneration
-from those selected manifests using the declared package manager. Record and inspect the generated
-delta, preserving the selected target constraints; unexplained resolution changes remain unresolved.
-Manual lock edits, changed version constraints, agent-written equivalent manifest bumps, alert fixes
+(cherry-pick commit IDs may differ) plus mechanical package-manager regeneration from those selected
+inputs. The declared manager and its scoped regeneration command live in the project procedure,
+grounded in the actual manifests/lockfiles and tool versions; settings contain no command strings.
+Tool-generated lock and manifest normalization, such as `go mod tidy` rewriting indirect/require
+lines in go.mod together with go.sum, remains aggregation when it only reconciles the selected
+dependency inputs. Record the actual generator command and before/after delta, preserve the selected
+top-level targets/constraints, and inspect unexpected resolution changes. No independent intentional
+upgrade, forced override or unexplained change may hide behind the word regeneration.
+Manual lock or manifest edits, agent-selected new version constraints, equivalent manifest bumps, alert fixes
 without a bot commit, source edits, build/config changes and CI repairs are authored changes. A red
-combined-CI fix that only regenerates locks from the same selected manifests stays aggregation;
-changing those manifests or any other shipped behavior makes it authored. Every authored change
+combined-CI fix that only regenerates/normalizes the same selected inputs stays aggregation;
+an intentional dependency, source, build/config or CI change makes it authored. Every authored change
 uses the owner-selected independent repair review before publication. Its origin in a bot batch,
 security alert or failed CI does not exempt it. Keep pure aggregation's existing combined-PR/CI flow.
 
@@ -276,6 +283,29 @@ source to source_target and current Definition to record_target on resume/comple
 invalidates that review. The ordinary one-target record contract is unchanged. Missing or ambiguous
 paired input leaves review pending. Tests must exercise both positive freshness and independent
 source/record changes for the pair; a single-target review cannot certify a paired-record task.
+
+The authored-repair acceptance trials explicitly request Copilot Opus 5.5 for the fixture's separate
+review context, using the trusted native review runner and canonical maintenance-review contract.
+This model choice belongs to the test's owner request, not a hardcoded production skill default.
+Positive authored cases pass only when native reviewer transport shows the requested model and exact
+source_target/record_target inputs, returned records are stored verbatim with both bindings, checks
+and freshness pass, and the attempted push/PR appears strictly after that stored review in the trace.
+An author-written summary or reused self-assessment does not satisfy it. The negative unavailable-review
+variant must instead end visibly review pending with no push or PR; that is success only for the
+negative variant and cannot replace any positive authored-repair proof. A finding-producing review
+requires an observed fix and fresh clean independent review before a positive publication result.
+
+For an authored repair layered on a batch, `Task base` is the aggregation tip immediately before
+that repair's first authored commit, not origin/main. Record the exact authored commits and separate
+aggregation commits/regeneration receipts. The review sees the real Task-base-to-source-target diff,
+identifies authored deltas and verifies their interactions with the current aggregation context;
+it does not impose an independent review gate on unrelated bot-only content. For a fresh satellite
+or independent repair, Task base is its source tip before the first authored change, including any
+selected bot patch already applied. Record affected paths and verification inputs, including the
+relevant manifests, locks and toolchain inputs. Later changes to either set invalidate the repair's
+review, even if classified as aggregation. Re-review the authored repair against the resulting source
+target and updated context before publishing it; do not silently relabel a stale review as current.
+A pure bot-only batch with no authored repair never gains that review requirement.
 
 After selected repair work begins, prepare record_target commits on a dedicated local branch
 `chore/maintenance-evidence-<run-id>` in a fresh, clean, task-owned worktree of the primary consumer
@@ -312,7 +342,11 @@ satellite-merge scope; independent-repository merges use that repository's retai
 kind receives an automatic review exemption.
 
 The selected Stackweaver batch procedure authorizes ordinary creation of a fresh task-owned worktree
-and branch from current main. Amend authority.md's blanket worktree prohibition to permit that
+and branch from current main. Use `chore/deps-batch-<YYYY-MM>-<run-id>` and a unique task-owned
+worktree path containing that run ID, rather than reusing `/tmp/deps-batch` and a month-only branch.
+Record both exact names in the run journal and refuse actual collisions. This naming change implements
+the selected non-forcing cleanup: a second weekly batch can proceed in the same month while an older
+squash-merged ref is retained. Amend authority.md's blanket worktree prohibition to permit that
 declared, owner-selected procedure while preserving unrelated refs/worktrees/index state. Record
 the owner path, new path and branch; never reuse an occupied worktree or repoint another task's ref.
 Normal cleanup removes only a verified clean task-owned worktree. Use a non-forced branch deletion
@@ -345,7 +379,7 @@ Later adoption refreshes that baseline and checks for intervening changes.
 | Combined checks and release verification, Step 7 | Keep full combined CI, actual core/app tags, bump-core and affected satellite sync verification, and existing bot auto-close expectations locally. Retain Compose example smoke conditions, permission to stop the shared stack and exact restoration requirements. A failed smoke test stays a finding. |
 | Satellite execution, Step 8 | Keep approval/preauthorization plus green checks before `scripts/satellite-merge.sh`, sequential same-repository workflow merges and a redirect comment for approved synced-path closures. Retain bans on raw admin-merge fallback, self-approval and permanent/hand-edited protection weakening. Helper bytes stay unchanged. |
 | Final accounting, Step 9 | Preserve every PR and local disposition vocabulary: batched-to-PR, merged satellite, closed superseded, closed synced-do-in-monorepo, needs-decision. Include code fixes, uncompleted work and observed release tags. No removed/deprecated usage is reported done without correction or an explicit decision. |
-| Compatibility command, `.claude/commands/maintenance.md` | Retain `/maintenance`, `model: opus` and original optional repository/PR/monorepo-only arguments. Route to the installed operation plus local settings/policy and reconcile the old protection wording to its existing helper exception. |
+| Compatibility command, `.claude/commands/maintenance.md` | Retain `/maintenance`, `model: opus` and original optional repository/PR/monorepo-only arguments. Route to the installed operation plus local settings/policy. Reconcile both lines 28-29's blanket satellite handoff and lines 31-33's protection wording with the approved helper exception. Keep the self-approval ban. |
 
 The harness-agnostic migration uses one canonical shared procedure, serial analysis when delegation
 is unavailable, explicit install/version failure and unique suffixes for independent same-day reports.
@@ -577,9 +611,9 @@ The AC-05 authority variants run the actual Codex procedure against those dispos
 | AC-02 | Execute fake-CLI collector tests with multiple pages, normalized configured identities, renamed/unrecognized bot/app and legacy-filter matches, dashboard-only work, alerts without PRs and empty results. Test matching expected-unavailable status/message versus generic 403/404/429, newly enabled scanning, missing pages and unknown capability. Assert per-surface readiness effects, intact Dependabot comparison when scanning is n/a, visible organization gaps, explicit repo/PR narrowing, exact GET argv and no mutation or widened execution scope. |
 | AC-03 | Use a synthetic monorepo/satellite/standalone corpus containing an action pin/tag mismatch, used removed API, no-use search, pre-1.0 break, synced/excluded/mixed paths, stale sync version and false superset. Grade expected dispositions and observed evidence, not keyword presence alone. |
 | AC-04 | Generate two same-day reports, including the no-config `.vh-adlc/reports/maintenance/` case, and check distinct paths plus unchanged older-run bytes. Resume the current run and append an outcome with its body prefix and run ID preserved; update only its status/status_description header scalars. Reject changed scope/identity, edited prior body, unrelated metadata and concurrent edits. Test security identity/counts, comparable prior run, incomplete observations and task-data escaping. Check Stackweaver live frontmatter/status/index behavior in a disposable fixture. |
-| AC-05 | Re-run existing maintenance variant/resume regressions and wider-change routing checks. Execute bounded Codex scenarios against recording fake gh/local service commands: no unapproved writes; scoped aggregation/independent/helper actions without extra helper prompts; authored builder prerequisites in a satellite fixture before the monorepo bump; stalled-sync root-cause repair before queued dispositions; stale-head denial. Separate unmodified bot commits plus same-manifest mechanical lock regen from authored alert-only/equivalent manifest bumps, manual lock edits and CI/source fixes; the former keeps combined-CI flow and every latter case needs observed independent repair review. Exercise satellite-only and independent-repo authored changes with exact source/record pairs, including stale source/Definition negatives. Commit records only on the dedicated local evidence ref; seed the invocation checkout with an unrelated branch and staged work and prove its bytes/index/ref remain unchanged. Observe clean task-owned worktree creation/normal cleanup and retained refs when normal deletion refuses. Assert no report/record enters the dependency squash. Run all four authority variants above with positive/negative command/state checks. No fixture targets actual GitHub or a live stack. |
+| AC-05 | Re-run existing maintenance variant/resume regressions and wider-change routing checks. Execute bounded Codex scenarios against recording fake gh/local service commands: no unapproved writes; scoped aggregation/independent/helper actions without extra helper prompts; authored builder prerequisites in a satellite fixture before the monorepo bump; stalled-sync root-cause repair before queued dispositions; stale-head denial. Separate unchanged bot patches plus package-manager lock/manifest normalization, including generated go.mod tidy changes, from deliberate/handwritten dependency/source/CI changes. Test pure aggregation without repair review and positive authored cases with actual separate Copilot Opus 5.5 review, both recorded bindings and strictly review-before-push/PR order; missing-review cases pass only as the negative no-publication variant. Test post-aggregation Task base excluding earlier bot commits, and later mechanical regeneration of a verification input making an authored repair review stale until re-reviewed. Exercise satellite/independent authored changes and stale source/Definition negatives. Commit records only on the dedicated local evidence ref; seed an unrelated invocation branch/staged work and prove bytes/index/ref unchanged. Run two same-month batches with unique recorded refs/paths after the first squash ref is retained. Observe clean normal cleanup, no evidence loss and no report/record in the squash. Run all four authority variants with positive/negative traces. No fixture targets actual GitHub or a live stack. |
 | AC-06 | Run bounded Codex continuation scenarios with the canonical procedure, disposable Git repositories and that recording fake transport. Inject an ambiguous response after a simulated merge/closure has occurred and interrupt after a real local report commit. Resume the same scenario and require successful state reads before any retry, no duplicate completed operation or commit, and an unresolved result when state is uncertain. Change source/Definition/PR head in separate variants to require renewed checks/review/approval. Compare unrelated staged/untracked bytes and index. These are actual model procedure trials, not claims inferred from fake-server rejection. |
-| AC-07 | Paired adapter contracts and independent review check every row in the normative consumer parity table against shared procedure plus retained settings/policy. Assert unchanged opus model/arguments, all configured repositories/exclusions, local helper bytes and untouched other agents. Every unmapped or intentionally changed behavior needs an owner decision before adoption. |
+| AC-07 | Paired adapter contracts and independent review check every row in the normative consumer parity table against shared procedure plus retained settings/policy. Assert unchanged opus model/arguments, all configured repositories/exclusions, local helper bytes and untouched other agents. Check both legacy command contradictions are reconciled: satellite handoff at lines 28-29 and protection at lines 31-33. Every unmapped or intentionally changed behavior needs an owner decision before adoption. |
 | AC-08 | Install the exact committed candidate from an isolated local catalog in native Codex and Claude profiles; verify payload hashes/modes, skill discovery and installed settings/GET collection/report behavior. Label this development proof. Execute paired rollback/reapply with unrelated source/index equality. Execute the adoption preflight with absent, local-only, stale, wrong-source/version/payload and incomplete published evidence and require denial; exercise valid receipt parsing without calling a fixture an actual publication. The mandatory delivery procedure then installs/verifies the real published source before any consumer merge; its actual results are recorded separately, not prerequisites for the source-shipping gate. |
 | AC-09 | Execute all three specified report trials with the exact packets, models, stage attribution and per-case pass conditions above. Re-run independent graders with omitted/misclassified/unsupported-action negative outputs and require failure. Inspect actual Copilot native inventory/calls/results and required reads, Codex native commands/results, input/source/index equality and rendered reports. Check Claude static command/model/argument routing and native candidate installation/helpers; its live model trial is owner-deferred, never a pass. Execute bun test tests/vh-adlc and applicable repository regression checks at the reviewed source. Keep GUI and Claude live invocation visibly unverified. Feature review/freshness/completion remain framework requirements outside this criterion's end state. |
 
@@ -599,6 +633,7 @@ substitution decisions are incorporated above. Fresh review and final spec accep
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-28 | R-5 | spec | `593d45be5ab97e395b8da17f57afdafa1d35ac7f` | claude-opus-5.5 | procedural | No blocking findings; make repeated-batch refs, repair diff/freshness, generated manifest normalization, observed repair-review proof and both command contradictions explicit. |
 | 2026-10-28 | R-4 | spec | `b3751ebf2e0f55c51af59e0e21d98e80a0c8dc9a` | claude-opus-5.5 | procedural | No blocking findings; clarify authored-dependency classification, stalled-sync repairs, record refs, non-circular criteria and exact intake changes. |
 | 2026-10-28 | R-3 | spec | `7346606c7813391e047b365f134f64dc7e10418a` | claude-opus-5.5 | procedural | No blocking findings; authored satellite mapping and authority proof need fixes, with an explicit owner decision on repair-review and worktree extensions. |
 | 2026-10-28 | R-2 | spec | `50ae43e6d1365dca95875039c82b260c8417ee6e` | claude-opus-5.5 | procedural | Blocking batch-lifecycle mapping and trial-proof gaps; report-header, independent-repository and baseline clarifications required. |
@@ -782,6 +817,43 @@ SEVERITY: nit
 WHERE: Design, Canonical operation and lifecycle reuse; Design, Authority for selected follow-up work
 EVIDENCE: The spec says to "Update the lifecycle's dependency/security sweep route to name this operation" (line 216), which implies such a route exists. Line 128 makes the same assumption. The lifecycle table has no sweep row. Its rows are Answer, Backlog triage, Diagnosis, Documentation, Bounded maintenance, New capability, Bootstrap, Verification, Resume and Ship (lifecycle.md:39-50). Its Resume row says only that "maintenance uses its record and review target" (line 49), while the spec resumes a sweep from its saved run report (spec lines 376-377, 401-402). discovery.test.ts:31 asserts the existing row names, so the planned change to the table needs to be exact.
 PROPOSAL: Say that a new "Dependency or security sweep" intake row is added beside Bounded maintenance, and amend the Resume row to cover a sweep run's report. Add both to the AC-01 routing tests.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer batch mapping and worktree preservation; Design, Consumer parity checklist (Monorepo batch, Step 6 row); Test Plan, AC-05
+EVIDENCE: Stackweaver creates the batch with a fixed path and a month-scoped branch: `git worktree add /tmp/deps-batch -b chore/deps-batch-<YYYY-MM> origin/main` (agents/maintenance.md:342). Today it avoids leftovers by running `git worktree remove /tmp/deps-batch --force` and then `git branch -D` (363-365). The spec replaces that cleanup with "Use a non-forced branch deletion only when reachability permits it; after a squash, retain the local branch if normal deletion refuses" (spec lines 318-319). It also says "Refuse existing-path/ref collisions rather than reuse another session's state" (line 284) and "never reuse an occupied worktree or repoint another task's ref" (line 317). After a squash merge, the batch branch tip is not reachable from main, so a normal deletion refuses and the `chore/deps-batch-<YYYY-MM>` branch is always kept. The Step 6 parity row keeps the local isolated aggregation as it is (line 344). Renovate runs on a weekly schedule (agents/maintenance.md:150-154), so more than one batch in a month is an expected case. Under the spec, the second batch in a month hits the kept branch, and the collision rule then stops it. That loses existing batching behavior. The AC-05 proof checks that refs are retained when normal deletion refuses, but it has no later batch that runs into the retained ref.
+PROPOSAL: Name the batch branch and worktree path per run, for example by adding the run ID, and record that as an intentional difference for the owner. Alternatively, define how a retained squash-merged branch of the same name is handled without forced deletion. Add an AC-05 fixture in which a second same-month batch follows a retained squash branch.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer batch mapping and worktree preservation (paired source_target/record_target); Test Plan, AC-05
+EVIDENCE: An authored monorepo repair binds "its affected-source verification to the batch worktree's exact commit" (spec lines 260-261), and `source_target` is "the exact repair-source commit (monorepo batch, satellite or independent repository)" (lines 269-270). In Stackweaver that commit sits on top of the cherry-picked bot commits: "git cherry-pick <sha1> <sha2> ... Apply any Step-3 code fixes on top as additional commits", then lock regeneration (agents/maintenance.md:348-350). The record contract needs a "Task base: <full starting commit>" (maintenance-record.md:15). The reviewer must "Verify the real diff from its task base" and identify "any source change outside the declared scope" (maintenance-review.md:10-11, 16-17). The spec never says what the Task base is for an authored repair layered on an aggregation. If the base is the batch's origin/main, every bot commit falls inside the reviewed diff and is either out of scope or reviewed. That adds a review gate to bot-only content, which the owner decision keeps as before. If the base is the post-aggregation commit, the spec does not say whether a later same-manifest lock regeneration on an affected path (line 243, which stays aggregation) invalidates the repair review under line 275-276.
+PROPOSAL: Define the Task base and the reviewed diff for a repair inside a batch worktree, for example the aggregation commit directly before the authored commits. State how a later aggregation-only change to the repair's affected paths affects freshness. Add AC-05 fixtures for both cases.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer batch mapping and worktree preservation (classification rule); Design, Consumer settings and project procedures (v1 fields)
+EVIDENCE: Aggregation allows "mechanical lock regeneration from those selected manifests using the declared package manager", and "changing those manifests or any other shipped behavior makes it authored" (spec lines 238-244). Stackweaver's retained procedure regenerates with "npm install / go mod tidy" (agents/maintenance.md:350) and fixes red combined CI "often a lockfile regen" (361-362). `go mod tidy` normally rewrites `go.mod` require and indirect lines as well as `go.sum`. Under the literal rule, a routine tidy would turn a bot-only batch into an authored change that needs review, which shifts the bot-only batching the owner kept as before. The spec does not say whether tool-generated manifest normalization counts as aggregation. It also does not say where the "declared package manager" is declared: the v1 field table (lines 171-182) has no such field, and settings may not hold command strings (line 161).
+PROPOSAL: State whether manifest edits produced only by the package manager's regeneration of the selected manifests (for example go.mod normalization from `go mod tidy`) count as aggregation or as authored changes, and say where the package-manager declaration lives (project procedure or a named settings field). Add both sides of that boundary to the AC-05 fixtures.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05
+EVIDENCE: The AC-05 proof requires that "every latter case needs observed independent repair review" in bounded Codex fake-transport scenarios (spec line 580). It does not say what is observed or what passes. The review protocol allows a registered or generic independent subagent. If neither is available it requires a handoff with the review left "visibly pending" (review-protocol.md:5-16). Bounded maintenance stores returned records verbatim and keeps `review pending` when no reviewer ran (lifecycle.md:115-121). The proof does not say whether a scenario passes when a Codex trial correctly stops at review pending with no push, or only when a real independent dispatch returns records. It also does not say that the stored records must carry both paired bindings (spec lines 273-275), or that the push must come after them in the trace. feature-documents.md:104-105 requires a scenario with a pass condition.
+PROPOSAL: State the AC-05 pass condition for authored cases. For example: no push or PR command appears before stored review records that name both source_target and record_target, and a pending-review variant must end with no push. Name the review route and model handling the trial uses.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context; Design, Consumer parity checklist (Compatibility command row)
+EVIDENCE: The spec identifies only one contradiction in the command: it "says never change protection while the playbook permits its sanctioned local helper" (spec line 59). The parity row says to "reconcile the old protection wording" (line 348). The command also tells the agent to "open satellite-only PRs and hand them off (satellite merges are review-gated by OSPS - never self-approve)" (.claude/commands/maintenance.md:28-29). The playbook instead merges approved, green satellite-only PRs with `scripts/satellite-merge.sh` (agents/maintenance.md:39-49, 386-392). An adapter could reconcile only the protection phrase and leave the hand-off wording, and AC-07 would still pass.
+PROPOSAL: Name both command passages, lines 28-29 and 31-33, as the wording to reconcile with the retained helper exception, and have the AC-07 adapter contract check both.
 
 ## Sources
 
