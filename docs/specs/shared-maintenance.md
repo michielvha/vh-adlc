@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Opus R-17 has no blockers after the 0.4.1 summary correction; historical baseline note clarified; awaiting owner spec acceptance."
+status: planned
+status_description: "Owner accepted R-17; planned gate passed; preparing tracking, task decomposition and implementation claim."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -126,6 +126,12 @@ keeps its report candidate local, with publication pending and an explicit hando
 observe no branch switch and no direct push from the report-role worktree. This is a proof sample for
 the existing main-checkout-only route, not a new authority or publication behavior. The reviewed
 normative baseline remains `f0517c1e5fe3801d0312732c6d3e114dd7f04ce9` for owner acceptance.
+
+After the owner-facing summary and the presented acceptance/publication request, the owner asked to
+continue on 2026-10-28. That accepts the summarized design and authorizes publishing the summary-rule
+patch, maintenance documentation, tracking issue and implementation claim. Local implementation may
+start after the gate and claim. Feature-code shipment, consumer merges, releases and live dependency
+operations retain their separately scoped authority.
 
 ## Scope
 
@@ -1085,6 +1091,7 @@ None.
 | 2026-10-28 | R-15 | spec | `70b42a627aea300ca83d5a3ebe80d32d8f409044` | claude-opus-5.5 | procedural | No blockers; separate publication-case outcomes, align lifecycle authority and positive criteria, preserve unverified legacy visibility and isolate GET imports. |
 | 2026-10-28 | R-16 | spec | `f0517c1e5fe3801d0312732c6d3e114dd7f04ce9` | claude-opus-5.5 | procedural | No blocking findings; carry the missing-default-checkout fixture clarification into task planning under the existing main-checkout-only publication rule. |
 | 2026-10-28 | R-17 | spec | `ad48fedfb7931e5479c32f1b9029829b1fe16a4b` | claude-opus-5.5 | procedural | No blockers after covered summary/version drift; clarify historical 0.4.0 install evidence. Prior missing-default-checkout fixture remains tracked for task planning. |
+| 2026-10-28 | R-17 | spec | `ad48fedfb7931e5479c32f1b9029829b1fe16a4b` | n/a | n/a | accepted by owner |
 
 ### R-1
 
