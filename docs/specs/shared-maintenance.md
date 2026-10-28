@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Opus R-16 has no blockers; one missing-default-checkout fixture clarification is tracked for task planning; awaiting owner spec acceptance."
+status_description: "Opus R-17 has no blockers after the 0.4.1 summary correction; historical baseline note clarified; awaiting owner spec acceptance."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -108,8 +108,11 @@ source binding; consumer adoption still uses then-current main and rechecks pres
 Pre-implementation marketplace baselines were observed on 2026-10-28 in isolated Codex and Claude
 profiles: native installers fetched public vh-adlc 0.4.0, nine skills and no maintenance operation.
 All 47 installed payload files, including modes, match shared main `609ceeb` on both hosts. These
-installer-only checks invoked no models and copied no credentials; they establish an upgrade
-baseline, not acceptance of the unimplemented maintenance operation.
+installer-only checks invoked no models and copied no credentials. They predate the local 0.4.1
+spec-summary correction and describe historical public source `609ceeb`, not the current candidate.
+The pre-maintenance upgrade base is whatever plugin version is published when adoption runs; the
+existing adoption preflight observes that version and payload again. These observations are not
+acceptance of the unimplemented maintenance operation.
 
 R-14 notes two restrictions introduced by prior fixes, rather than requested by the owner. The
 Design removes the ban on index entries derived from already committed default-branch documents
@@ -1081,6 +1084,7 @@ None.
 | 2026-10-28 | R-14 | spec | `e70b2ea8d475834334b83b702de411fe74de403b` | claude-opus-5.5 | procedural | No blockers; align advancement proof, persist comparable history, cover reused types and preserve committed-index regeneration and scoped leak recovery. |
 | 2026-10-28 | R-15 | spec | `70b42a627aea300ca83d5a3ebe80d32d8f409044` | claude-opus-5.5 | procedural | No blockers; separate publication-case outcomes, align lifecycle authority and positive criteria, preserve unverified legacy visibility and isolate GET imports. |
 | 2026-10-28 | R-16 | spec | `f0517c1e5fe3801d0312732c6d3e114dd7f04ce9` | claude-opus-5.5 | procedural | No blocking findings; carry the missing-default-checkout fixture clarification into task planning under the existing main-checkout-only publication rule. |
+| 2026-10-28 | R-17 | spec | `ad48fedfb7931e5479c32f1b9029829b1fe16a4b` | claude-opus-5.5 | procedural | No blockers after covered summary/version drift; clarify historical 0.4.0 install evidence. Prior missing-default-checkout fixture remains tracked for task planning. |
 
 ### R-1
 
@@ -1620,6 +1624,15 @@ SEVERITY: nit
 WHERE: Design, Local report commits and declared publication; Design, Report-publication cases for AC-04/AC-05; Test Plan, AC-04
 EVIDENCE: Spec line 565-570 says the `default-branch-checkout-ff-only` route is chosen by either authority, including a generic consumer's explicit publication request, and pushes "from the owning main checkout". Line 578 says to "Locate that checkout through Git metadata, never switching another session's branch". The only text that might cover a repository with no such checkout is line 549-550: "The same isolation applies when main is missing, diverged, dirty on report/index paths". "Main is missing" can mean a missing local default branch or no worktree with the default branch checked out. A generic project whose only checkout is on a feature branch hits the second case, and the spec forbids switching that branch. The Report-publication cases table (lines 1004-1019) covers a "Generic explicit report publication" positive (line 1007) but has no row for a repository with no default-branch checkout. An implementation could stop with publication pending, or could push the candidate directly from the report-role worktree. Both readings match the current text, and only the second departs from the owner-settled R-12 rule that publication moves the change to the main checkout and pushes from there.
 PROPOSAL: State that when no worktree has the validated default branch checked out, the candidate stays on its isolated ref and publication remains pending with a handoff, and that no direct push from the report-role worktree happens. Add that row to the Report-publication cases table so the AC-04/AC-05 fixtures assert it.
+
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context (pre-implementation marketplace baseline paragraph)
+EVIDENCE: Spec lines 108-112 say that native installers "fetched public vh-adlc 0.4.0, nine skills and no maintenance operation. All 47 installed payload files, including modes, match shared main `609ceeb` on both hosts" and that these checks "establish an upgrade baseline". At the reviewed target ad48fed, both manifests are now 0.4.1 (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3). The spec operation body also changed: tests/vh-adlc/direct-operation-compatibility.test.ts:7-12 pins `vh-adlc-spec` to a new `specSummaryBaseline`, while the other operations keep their earlier baseline. So shared main no longer has the payload that the recorded 0.4.0 observation describes. The skill count is still nine (tests/vh-adlc/triage/discovery.test.ts:13), and no normative section or criterion depends on this baseline. AC-08 and the adoption preflight (spec lines 906-928) install whatever exact candidate and published version are current at that time. A reader of Context could still treat the 0.4.0 payload as the current pre-implementation upgrade base.
+PROPOSAL: Label the 2026-10-28 observation as predating the 0.4.1 spec-summary change. State that the pre-maintenance upgrade base is whatever version is published when adoption runs, observed again by the existing preflight. No normative change is needed.
 
 ## Sources
 
