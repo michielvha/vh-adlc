@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner decisions are incorporated; Opus R-4 factual classification, evidence-ref and lifecycle-proof corrections are being reviewed before spec acceptance."
+status_description: "Opus R-6 factual handoff/authority/normalization fixes recorded; awaiting the owner report-publication decision, re-review and spec acceptance."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -174,7 +174,7 @@ identities are scoped to the configured hostname. Collections default to empty u
 | `schema_version`, `repository`, `hostname` | Version 1; primary owner/repository and GitHub hostname, inferred from the checkout only when absent. A declared primary must match the checkout identity or stop with a mismatch. |
 | `repositories` | Related repository records with `repository`, `role` (`synced` or `independent`) and optional local `sync_workflow`. No duplicate primary or related identities. A synced entry requires its local mapping reference. |
 | `discovery_organizations`, `excluded_repositories` | Supplemental inventory scope and explicit no-action exclusions, with reasons recorded in the project procedure. An excluded repo may appear as a skipped inventory row, never an action target. |
-| `bot_authors` | Exact configured logins after normalization; default common dependency identities are Renovate and Dependabot. Other bot/app accounts and legacy-filter matches appear as inventory gaps, not newly eligible action targets. |
+| `bot_authors` | Exact configured logins after the normalization below; default strings are `renovate` and `dependabot`. Other bot/app accounts and legacy-filter matches appear as inventory gaps, not newly eligible action targets. |
 | `bot_inventory_terms` | Optional case-insensitive literal login substrings for additional inventory visibility; no regular expressions or action authority. Stackweaver retains its existing Renovate, Dependabot and release-bot discovery terms locally. |
 | `dashboards` | Repository plus exactly one issue number or exact title identifying its dependency dashboard; a missing or ambiguous configured dashboard is incomplete, not empty. |
 | `generated_mirrors`, `source_references`, `backlog_references` | Local relative paths to exclude from edits or inspect for ownership/backlog. Required references must exist. |
@@ -186,6 +186,14 @@ The local report's required metadata comes from that consumer procedure; arbitra
 or model names are not settings fields. Stackweaver retains its documented no-GHAS expectation as
 consumer data. Matching uses the exact status and a literal message substring, never an executable
 expression or a blanket rule for all 403/404 responses.
+
+For matching, lowercase both configured and observed login, strip one leading `app/`, then one
+trailing `[bot]`, and compare the resulting whole login for equality. Preserve raw login/type in
+the inventory and revalidation evidence. Thus `stackweaver-release-bot`,
+`app/stackweaver-release-bot` and `stackweaver-release-bot[bot]` match the same configured identity;
+`other-stackweaver-release-bot` does not. Default examples `renovate[bot]` and `APP/Dependabot` match,
+but `renovate-other[bot]` and `my-dependabot` do not. Substring visibility belongs only to
+`bot_inventory_terms`; it never changes exact configured eligibility or grants write authority.
 
 Stackweaver's retained `agents/maintenance.md` becomes a thin shared-operation entry and points to
 project policy in `agents/maintenance-project.md`. Its settings retain the
@@ -284,16 +292,32 @@ invalidates that review. The ordinary one-target record contract is unchanged. M
 paired input leaves review pending. Tests must exercise both positive freshness and independent
 source/record changes for the pair; a single-target review cannot certify a paired-record task.
 
-The authored-repair acceptance trials explicitly request Copilot Opus 5.5 for the fixture's separate
-review context, using the trusted native review runner and canonical maintenance-review contract.
-This model choice belongs to the test's owner request, not a hardcoded production skill default.
-Positive authored cases pass only when native reviewer transport shows the requested model and exact
-source_target/record_target inputs, returned records are stored verbatim with both bindings, checks
-and freshness pass, and the attempted push/PR appears strictly after that stored review in the trace.
-An author-written summary or reused self-assessment does not satisfy it. The negative unavailable-review
-variant must instead end visibly review pending with no push or PR; that is success only for the
-negative variant and cannot replace any positive authored-repair proof. A finding-producing review
-requires an observed fix and fresh clean independent review before a positive publication result.
+The authored-repair acceptance trials use an explicit cross-host handoff, matching the requested
+Copilot Opus 5.5 reviewer without pretending that Codex can dispatch that model as a native subagent.
+This is test-operator orchestration, not a new automatic reviewer fallback in the production protocol.
+
+1. A bounded Codex session performs the fixture repair under its selected synthetic-owner scope. Its
+   fixture request names Copilot Opus 5.5. When no matching native route exists, the correct first
+   result is review pending with the canonical self-contained handoff, exact source/record targets,
+   docs revision and checks. No push or PR is permitted in that phase. It does not launch another CLI.
+2. The trusted test runner, acting as the handoff operator outside the Codex session, independently
+   verifies both committed targets and executes a separate Copilot CLI context with the canonical
+   maintenance-review contract. Give it the exact source/record packet and a frozen argument-free
+   check launcher for the fixture's required checks. Record actual native tool/test results, model
+   identity and returned records. A missing runner or wrong model leaves the whole case pending.
+   The operator writes its actual returned artifact outside the source checkout, not invented records.
+3. Resume the same Codex thread with that operator-supplied artifact and the existing scoped owner
+   authorization. The session checks its identity/bindings and current source/Definition, stores the
+   returned records verbatim on the evidence ref, and only then continues the selected fake publication.
+
+Positive cases require observed phase ordering, matching actual Copilot transport and MODEL header,
+both exact bindings, executed checks, fresh source/Definition, byte-equal stored records and a push/PR
+strictly after storage. A self-assessment, narrative dispatch claim or direct cross-CLI launch from the
+Codex actor fails. The unavailable-review negative variant withholds the operator result; Codex must
+remain review pending and publish nothing. That is success only for that negative variant, not a
+replacement for the required completed positive handoff/resume cases. Findings require an observed
+fix and another real independent pass before publication. The shared protocol and host-specific
+support matrix are unchanged; the fixture's separate-host operator route is recorded explicitly.
 
 For an authored repair layered on a batch, `Task base` is the aggregation tip immediately before
 that repair's first authored commit, not origin/main. Record the exact authored commits and separate
@@ -355,6 +379,17 @@ Never infer approval for `git worktree remove --force`, `git branch -D`, dirty-w
 history rewriting. Report retained artifacts; destructive cleanup requires its existing separate
 authority. This applies existing preservation rules to local Step 7's force-cleanup example while
 preserving its dependency batching, squash and release behavior. No unrelated worktree is touched.
+
+The authority amendment must explicitly cover each permitted maintenance location, rather than
+only the monorepo batch: (1) batch source worktree/ref, (2) primary-consumer evidence worktree/ref,
+(3) selected satellite or independent source worktree/ref, and (4) a fresh clone of a selected source
+repository when no suitable task-owned checkout exists. Record their repository identity, base,
+owner path, new path and ref under the selected task scope. Allow ordinary creation and non-forced
+cleanup only for these owned locations; keep evidence refs reachable. Never reuse occupied locations,
+repoint another task's ref, force-delete changes or broaden repository scope. The blanket prohibition
+continues outside this declared maintenance exception. The AC-05 contract checks all four kinds and
+their limits, alongside the actual fixtures. Report-only publication uses only its separately
+authorized consumer policy; that publication decision is recorded in Open Questions until answered.
 
 ### Consumer parity checklist and intentional differences
 
@@ -608,10 +643,10 @@ The AC-05 authority variants run the actual Codex procedure against those dispos
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Add operation/discovery contracts and a no-config single-project fixture. Test the new Dependency or security sweep intake row beside unchanged Bounded maintenance, and Resume choosing a run report for a sweep versus a record/review target for a repair. Verify no canonical model or project identities. Candidate installation checks are also required by AC-08. |
-| AC-02 | Execute fake-CLI collector tests with multiple pages, normalized configured identities, renamed/unrecognized bot/app and legacy-filter matches, dashboard-only work, alerts without PRs and empty results. Test matching expected-unavailable status/message versus generic 403/404/429, newly enabled scanning, missing pages and unknown capability. Assert per-surface readiness effects, intact Dependabot comparison when scanning is n/a, visible organization gaps, explicit repo/PR narrowing, exact GET argv and no mutation or widened execution scope. |
+| AC-02 | Execute fake-CLI collector tests with multiple pages, exact normalized configured identities (leading app/, trailing [bot], case variations and non-matching longer logins), renamed/unrecognized bot/app and legacy-filter matches, dashboard-only work, alerts without PRs and empty results. Test matching expected-unavailable status/message versus generic 403/404/429, newly enabled scanning, missing pages and unknown capability. Assert per-surface readiness effects, intact Dependabot comparison when scanning is n/a, visible organization gaps, explicit repo/PR narrowing, exact GET argv and no mutation or widened execution scope. |
 | AC-03 | Use a synthetic monorepo/satellite/standalone corpus containing an action pin/tag mismatch, used removed API, no-use search, pre-1.0 break, synced/excluded/mixed paths, stale sync version and false superset. Grade expected dispositions and observed evidence, not keyword presence alone. |
 | AC-04 | Generate two same-day reports, including the no-config `.vh-adlc/reports/maintenance/` case, and check distinct paths plus unchanged older-run bytes. Resume the current run and append an outcome with its body prefix and run ID preserved; update only its status/status_description header scalars. Reject changed scope/identity, edited prior body, unrelated metadata and concurrent edits. Test security identity/counts, comparable prior run, incomplete observations and task-data escaping. Check Stackweaver live frontmatter/status/index behavior in a disposable fixture. |
-| AC-05 | Re-run existing maintenance variant/resume regressions and wider-change routing checks. Execute bounded Codex scenarios against recording fake gh/local service commands: no unapproved writes; scoped aggregation/independent/helper actions without extra helper prompts; authored builder prerequisites in a satellite fixture before the monorepo bump; stalled-sync root-cause repair before queued dispositions; stale-head denial. Separate unchanged bot patches plus package-manager lock/manifest normalization, including generated go.mod tidy changes, from deliberate/handwritten dependency/source/CI changes. Test pure aggregation without repair review and positive authored cases with actual separate Copilot Opus 5.5 review, both recorded bindings and strictly review-before-push/PR order; missing-review cases pass only as the negative no-publication variant. Test post-aggregation Task base excluding earlier bot commits, and later mechanical regeneration of a verification input making an authored repair review stale until re-reviewed. Exercise satellite/independent authored changes and stale source/Definition negatives. Commit records only on the dedicated local evidence ref; seed an unrelated invocation branch/staged work and prove bytes/index/ref unchanged. Run two same-month batches with unique recorded refs/paths after the first squash ref is retained. Observe clean normal cleanup, no evidence loss and no report/record in the squash. Run all four authority variants with positive/negative traces. No fixture targets actual GitHub or a live stack. |
+| AC-05 | Re-run existing maintenance variant/resume regressions and wider-change routing checks. Execute bounded Codex scenarios against recording fake gh/local service commands: no unapproved writes; scoped aggregation/independent/helper actions without extra helper prompts; authored builder prerequisites in a satellite fixture before the monorepo bump; stalled-sync root-cause repair before queued dispositions; stale-head denial. Separate unchanged bot patches plus package-manager lock/manifest normalization, including generated go.mod tidy changes, from deliberate/handwritten dependency/source/CI changes. Test pure aggregation without repair review and positive authored cases with the explicit Codex pending-handoff, test-operator Copilot Opus 5.5 review and same-thread resume sequence, both recorded bindings and strictly review-before-push/PR order; missing-review cases pass only as the negative no-publication variant. Test post-aggregation Task base excluding earlier bot commits, and later mechanical regeneration of a verification input making an authored repair review stale until re-reviewed. Exercise satellite/independent authored changes and stale source/Definition negatives. Commit records only on the dedicated local evidence ref; seed an unrelated invocation branch/staged work and prove bytes/index/ref unchanged. Run two same-month batches with unique recorded refs/paths after the first squash ref is retained. Observe clean normal cleanup, no evidence loss and no report/record in the squash. Assert authority text explicitly allows only the batch, evidence and selected related-source worktree/clone roles and their non-forced cleanup. Run all four authority variants with positive/negative traces. No fixture targets actual GitHub or a live stack. |
 | AC-06 | Run bounded Codex continuation scenarios with the canonical procedure, disposable Git repositories and that recording fake transport. Inject an ambiguous response after a simulated merge/closure has occurred and interrupt after a real local report commit. Resume the same scenario and require successful state reads before any retry, no duplicate completed operation or commit, and an unresolved result when state is uncertain. Change source/Definition/PR head in separate variants to require renewed checks/review/approval. Compare unrelated staged/untracked bytes and index. These are actual model procedure trials, not claims inferred from fake-server rejection. |
 | AC-07 | Paired adapter contracts and independent review check every row in the normative consumer parity table against shared procedure plus retained settings/policy. Assert unchanged opus model/arguments, all configured repositories/exclusions, local helper bytes and untouched other agents. Check both legacy command contradictions are reconciled: satellite handoff at lines 28-29 and protection at lines 31-33. Every unmapped or intentionally changed behavior needs an owner decision before adoption. |
 | AC-08 | Install the exact committed candidate from an isolated local catalog in native Codex and Claude profiles; verify payload hashes/modes, skill discovery and installed settings/GET collection/report behavior. Label this development proof. Execute paired rollback/reapply with unrelated source/index equality. Execute the adoption preflight with absent, local-only, stale, wrong-source/version/payload and incomplete published evidence and require denial; exercise valid receipt parsing without calling a fixture an actual publication. The mandatory delivery procedure then installs/verifies the real published source before any consumer merge; its actual results are recorded separately, not prerequisites for the source-shipping gate. |
@@ -625,14 +660,27 @@ consumer instructions/tests in Stackweaver rather than a second feature spec.
 
 ## Open Questions
 
-None. The owner resolved the authored-repair review, paired-record and worktree choice on
-2026-10-28. Bot-only batching stays as before. Earlier scanning, discovery and Claude-trial
-substitution decisions are incorporated above. Fresh review and final spec acceptance remain.
+### Q5: Does an authorized Stackweaver sweep publish its dated report commit to main?
+
+**Recommendation:** A. Keep the report as tracked remote history by committing and pushing its
+report-only `[skip ci]` change during the authorized Stackweaver sweep, before dependency selection.
+This is a local consumer permission, not a shared default.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Commit and push the report** | The dated history is available remotely after a sweep without a separate report-push prompt. | The invocation authorizes this narrowly scoped report publication before dependency work is selected. |
+| **B. Commit locally until requested** | Existing generic local-commit and separate-publication boundaries. | The report stays local until a request explicitly covers its push. |
+
+**Why this is yours:** The source explicitly requires the report commit but does not settle its push
+or the scope of preauthorization for that artifact. Prior choices keep authored repairs independently
+reviewed and bot-only batching unchanged; they do not answer this publication question. Implementation
+still waits for this answer, fresh review and final spec acceptance.
 
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-28 | R-6 | spec | `b425fbba9523bd8eaef2ed6285ddb72333d4c471` | claude-opus-5.5 | procedural | Define the cross-host fixture handoff/resume, exact worktree-authority amendment, report-publication policy and bot-login normalization. |
 | 2026-10-28 | R-5 | spec | `593d45be5ab97e395b8da17f57afdafa1d35ac7f` | claude-opus-5.5 | procedural | No blocking findings; make repeated-batch refs, repair diff/freshness, generated manifest normalization, observed repair-review proof and both command contradictions explicit. |
 | 2026-10-28 | R-4 | spec | `b3751ebf2e0f55c51af59e0e21d98e80a0c8dc9a` | claude-opus-5.5 | procedural | No blocking findings; clarify authored-dependency classification, stalled-sync repairs, record refs, non-circular criteria and exact intake changes. |
 | 2026-10-28 | R-3 | spec | `7346606c7813391e047b365f134f64dc7e10418a` | claude-opus-5.5 | procedural | No blocking findings; authored satellite mapping and authority proof need fixes, with an explicit owner decision on repair-review and worktree extensions. |
@@ -854,6 +902,36 @@ SEVERITY: nit
 WHERE: Context; Design, Consumer parity checklist (Compatibility command row)
 EVIDENCE: The spec identifies only one contradiction in the command: it "says never change protection while the playbook permits its sanctioned local helper" (spec line 59). The parity row says to "reconcile the old protection wording" (line 348). The command also tells the agent to "open satellite-only PRs and hand them off (satellite merges are review-gated by OSPS - never self-approve)" (.claude/commands/maintenance.md:28-29). The playbook instead merges approved, green satellite-only PRs with `scripts/satellite-merge.sh` (agents/maintenance.md:39-49, 386-392). An adapter could reconcile only the protection phrase and leave the hand-off wording, and AC-07 would still pass.
 PROPOSAL: Name both command passages, lines 28-29 and 31-33, as the wording to reconcile with the retained helper exception, and have the AC-07 adapter contract check both.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Consumer batch mapping and worktree preservation (authored-repair acceptance trials); Test Plan, AC-05
+EVIDENCE: The spec says the authored-repair trials "explicitly request Copilot Opus 5.5 for the fixture's separate review context, using the trusted native review runner" (spec lines 287-289). Positive cases pass only when "native reviewer transport shows the requested model" and the push appears after the stored review (lines 290-292). The AC-05 proof runs these as "bounded Codex scenarios" with "actual separate Copilot Opus 5.5 review" (line 614). The canonical protocol has only two independent routes: a registered agent or a generic subagent on the same host. Otherwise it writes "a self-contained handoff the owner runs elsewhere" and leaves the review pending (review-protocol.md:5-16). For a named model it says: "If the host cannot pass it, rejects it ... leave the review pending" (review-protocol.md:48-50). compatibility.md:52 says the same. A Codex session has no native route to a Copilot CLI `claude-opus-5.5` reviewer. Under the shared contract, the correct Codex procedure therefore ends at review pending, which the spec allows only for the negative variant. The positive variant can pass only through glue that the spec never defines: who carries the handoff to Copilot, whether the Codex session resumes, and which actor stores the returned records verbatim (lifecycle.md:119-121). The other option is a procedure that calls another CLI by shell, which the protocol does not allow. "Trusted native review runner" appears nowhere in the supplied sources. The existing lifecycle fixture only accepts a host "native reviewer receipt" (tests/vh-adlc/lifecycle/maintenance-fixture.ts:80). The owner's choice to continue this spec's review loop with Copilot Opus 5.5 does not, on its own, make Copilot a reviewer inside the Codex fixture.
+PROPOSAL: Define the positive authored-repair sequence so the canonical protocol can satisfy it. One option is a Codex handoff that leaves the review pending, then a trusted runner that executes the canonical maintenance reviewer in Copilot, then a resumed Codex session that stores the records and pushes, with a pass condition for each step. Another is to run the fixture reviewer as a native Codex subagent with no named model. Put the reviewer-model choice for this fixture to the owner as a decision, not an implied consequence of the spec-loop instruction.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer batch mapping and worktree preservation; covers (references/authority.md)
+EVIDENCE: The only authority.md change the spec states is: "Amend authority.md's blanket worktree prohibition to permit that declared, owner-selected procedure" (spec lines 349-350). It refers to the Stackweaver batch worktree introduced at line 344. The design also creates two other kinds of worktree. One is a "fresh, clean, task-owned worktree of the primary consumer repository" for the `chore/maintenance-evidence-<run-id>` ref (lines 310-313). The other is "a fresh task-owned checkout/worktree" of a satellite or independent repository, made by fetch or clone (lines 323-326). It also applies "normal cleanup" to the satellite worktree (lines 334-335). authority.md:66 still says "Never create, remove, prune, reset or force-move a worktree". As worded, the amendment does not cover the evidence or satellite worktrees or their cleanup. An implementer must either leave authority.md contradicting these steps or widen the exception on their own judgement. The AC-05 proof exercises the evidence ref and satellite fixtures but checks no matching authority text.
+PROPOSAL: State the exact authority.md amendment once, so it covers all three task-owned worktree kinds (batch, evidence and selected satellite or independent repository) and a fresh clone. Include their non-forced cleanup limits, and add an AC-01 or AC-05 contract assertion on that authority row.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Authority for selected follow-up work (report commit and publication rows); Design, Consumer parity checklist (Saved report and owner selection, Step 5.5 row)
+EVIDENCE: Stackweaver says to "Commit the dated report itself with `[skip ci]` (it's `docs/internal/**`)" (agents/maintenance.md:325) and calls the report "the tracked, append-only history" (300-308). `[skip ci]` matters only when a commit is pushed. CLAUDE.md:171 says to "Push skip-eligible work separately for free", and CLAUDE.md:159 sends small verified changes "straight to `main`". The spec keeps the "report-only `[skip ci]` commit" (spec lines 217, 377). It also says "A local commit authorizes no push" (line 217), and remote publication of a report needs "Explicit publication authority for that artifact and destination" (line 222). The parity row does not say whether the existing flow pushes the report commit to main, or whether a scoped "just do it" preauthorization covers that push. If Stackweaver pushed it before, this is an unlisted change to a consumer behavior that the owner asked to keep usable as before. The source does not settle it either way.
+PROPOSAL: Ask the owner whether the existing Stackweaver report commit is pushed to main under the current request or preauthorization. Record the answer as retained local policy or as an explicit intentional difference in the Step 5.5 parity row, and have the AC-04 or AC-07 fixture check it.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Consumer settings and project procedures (`bot_authors`); Design, Collection and completeness
+EVIDENCE: The settings table says `bot_authors` holds "Exact configured logins after normalization; default common dependency identities are Renovate and Dependabot" (spec line 177). Collection matches "normalized exact logins, including GitHub's `app/` and `[bot]` forms" (lines 404-405). The AC-02 proof tests "normalized configured identities" (line 611). The normalization rule and the default login strings are never stated. Stackweaver's sync author is `app/stackweaver-release-bot` (agents/maintenance.md:126). The supplied triage helpers have no existing `[bot]` or `app/` normalization to reuse (no match in plugins/vh-adlc/scripts/triage). Two implementations could disagree on whether a configured `stackweaver-release-bot` matches, which changes execution eligibility, not only inventory visibility.
+PROPOSAL: State the normalization, for example stripping a leading `app/` and a trailing `[bot]` and then comparing case-insensitively, and list the exact default logins. Add matching and non-matching cases to the AC-02 fixture.
 
 ## Sources
 
