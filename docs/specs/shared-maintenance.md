@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Opus R-11 has no blockers; restricted output, pending warnings, index preservation and bot eligibility fixes await fresh review and acceptance."
+status_description: "Opus R-12 has no blockers; isolated local report commits preserve eligibility without publishing; fresh review and spec acceptance next."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -167,7 +167,7 @@ checkout's GitHub origin; reject ambiguous/non-GitHub identities until supplied 
 Do not default to Stackweaver, its organization, its bot, or any personal path.
 The default report directory is `.vh-adlc/reports/maintenance/` inside that checkout. A generic sweep creates
 an uncommitted report there; this expected new file is declared in the handoff. Stackweaver uses its
-main-checkout report placement and standing-publication procedure below instead. A bounded read-only
+isolated report preparation and main-checkout standing-publication procedure below instead. A bounded read-only
 trial instead passes an explicit `--report-output` outside the checkout and leaves its entire tree
 and index unchanged. The command-line override changes only report placement, never scope or authority.
 
@@ -335,7 +335,7 @@ The shared authority contract recognizes this declaration for report artifacts o
 can establish equivalent standing instructions through their own explicit owner acceptance; the
 operation has no Stackweaver identity hardcoded. Every valid declaration explicitly selects the shared
 default-branch-checkout-ff-only route; a non-Stackweaver consumer receives that same opt-in route,
-not an inferred Stackweaver exception. Generic sweeps with no declaration remain uncommitted. It checks the declared repository, destination branch
+not an inferred Stackweaver exception. Generic sweeps with no declaration remain uncommitted unless a current request or explicit local consumer rule authorizes their local report commit; that case uses the isolated report-commit route below and grants no push. It checks the declared repository, destination branch
 and path scope against the actual checkout and current run, and records the instruction source and
 current request. Missing, ambiguous, unadopted or mismatched instructions leave publication pending.
 This is an instruction-level permission mechanism, consistent with the stated procedural boundary,
@@ -481,12 +481,14 @@ preserving its dependency batching, squash and release behavior. No unrelated wo
 
 The authority amendment must explicitly cover each permitted maintenance location, rather than
 only the monorepo batch: (1) batch source worktree/ref, (2) primary-consumer evidence worktree/ref,
-(3) selected satellite or independent source worktree/ref, and (4) a fresh clone of a selected source
-repository when no suitable task-owned checkout exists. Record their repository identity, base,
+(3) selected satellite or independent source worktree/ref, (4) a fresh clone of a selected source
+repository when no suitable task-owned checkout exists, and (5) a primary-repository report-only
+worktree/ref when a current request or explicit local rule authorizes committing the report. This
+fifth role is available before dependency selection; it grants no dependency task or publication. Record their repository identity, base,
 owner path, new path and ref under the selected task scope. Allow ordinary creation and non-forced
 cleanup only for these owned locations; keep evidence refs reachable. Never reuse occupied locations,
 repoint another task's ref, force-delete changes or broaden repository scope. The blanket prohibition
-continues outside this declared maintenance exception. The AC-05 contract checks all four kinds and
+continues outside this declared maintenance exception. The AC-05 contract checks all five kinds and
 their limits, alongside the actual fixtures.
 
 Generated report index paths are necessary but insufficient publication scope. A committed index
@@ -504,139 +506,118 @@ staged and unstaged edits in a declared index path and requires unchanged workin
 report mutation of that path and no committed/pushed version of those unrelated edits. The paired tests retain
 the actual generator contract locally in Stackweaver.
 
-### Declared default-branch report publication and continuation
+### Local report commits and declared publication
 
-Report placement is chosen before writing anything in a source checkout. A current `read-only`,
-`draft-only` or `no-commit` restriction produces no report/index edit or commit in the main or
-invocation checkout. A `no-push` restriction also keeps a newly generated report off shared main:
-this procedure chooses a private uncommitted draft, rather than putting a locally allowed commit
-where another session could push it. Use the explicitly supplied external `--report-output` if
-present; otherwise the runner supplies `<run>/drafts/report.md` under the Git-private journal
-location as its external output. This deterministic live-run fallback needs no user-supplied path.
-The journal records its draft-only state and authoritative draft path. Local analysis artifacts in
-Git-private state are permitted for a read-only source/GitHub sweep; an explicit prohibition on all
-filesystem writes instead produces chat-only findings and no persisted run. Never call such a run
-saved or publication-ready.
+An unrestricted generic sweep with no commit request or explicit local commit rule saves an
+uncommitted report at its configured checkout path. A current `read-only`, `draft-only` or `no-commit`
+restriction instead uses the explicit external `--report-output`, or the automatic
+`<run>/drafts/report.md` under Git-private journal state when no path was supplied. It leaves source
+checkout and index unchanged, with no report commit. These local analysis artifacts are permitted
+for a source/GitHub read-only sweep; a prohibition on all filesystem writes produces chat-only
+findings and no persisted run. Never label an unsaved finding saved or publication-ready.
 
-The same private draft path applies when main-checkout preconditions fail before a report commit:
-missing/occupied checkout, dirty report/index path, unrelated outgoing commit, divergence or known
-protection refusal. Do not create the dated tracked path or main commit merely to discover a known
-blocker. A new restricted draft can be discussed/selected, but it has not met the retained report
-commit prerequisite for merge/closure. Resume imports it only when the applicable restrictions and
-main-checkout blocker are resolved. The ordinary generic sweep without a declaration remains the
-previously declared uncommitted checkout report unless its current source-read-only restriction
-selects the same private draft fallback.
+When the owner requests a report commit, or the consumer explicitly requires one, prepare it in a
+fresh task-owned primary-repository worktree on
+`chore/maintenance-report-<run-id>-<step-id>`, from the recorded fetched default-branch commit. The
+helper allocates UUID run/step IDs and a unique recorded path outside every occupied checkout.
+This local report role is the fifth narrow worktree exception above; it does not depend on selecting
+dependency work or on a standing publication declaration. Refuse collisions and do not repoint a ref.
+Author only the report and its verified generated indexes, with applicable checks, normal hooks,
+explicit-path commits, `[skip ci]` where the consumer permits it, and run/step trailers. Inspect the
+full candidate diff/history and index. No task record, repair, dependency or unrelated source change
+belongs in this candidate. The journal binds repository, base, owned worktree/ref, report path/digests
+and commit. This candidate is the authoritative working report until publication; other copies are
+frozen receipts or explicitly marked drafts, never competing untracked files in the invocation tree.
 
-The shared procedure below runs only for an adopted declaration selecting
-`default-branch-checkout-ff-only`. Its branch is the validated declared primary default branch;
-Stackweaver instantiates it as `main`, preserving CLAUDE.md:138,159-166. References to the main
-checkout and remote main in this procedure mean that declared default branch for another consumer,
-including a differently named default branch. This is an explicitly selected route, not a universal
-publication default. Locate the owning main checkout from
-Git worktree metadata; never switch or repoint another session's checkout. Before creating the dated
-file, verify repository/account identity, branch `main`, the standing instruction and current request.
-Inspect staged/unstaged/untracked state. Fetch and merge remote main with `--ff-only` as the local
-rules require, preserving unrelated state; refuse overlapping report/index edits. Confirm local main
-has no outgoing commits unrelated to this run. A missing main checkout, non-main branch, divergence,
-concurrent conflicting work or protection refusal leaves publication pending, never changes another
-session's branch or authorizes a bypass. If safe main-checkout authoring is unavailable, render a
-clearly pending draft only at the explicit or Git-private fallback report-output path and record it; do not
-leave an untracked dated file in an invocation checkout that later needs to sync the published file.
+A no-push request that permits the otherwise required local commit leaves that report committed only
+on this local report ref, without advancing shared main. The same isolation applies when main is
+missing, diverged, dirty on report/index paths, has unrelated outgoing commits or is protected against
+the intended push. A generic consumer with no declaration but an explicit commit request uses this
+same route; no push is inferred. Return its actual local ref/commit/report location. If the request
+requires a different existing destination, apply its explicit ownership and preservation constraints;
+do not silently put the report on the invocation feature branch or an unrelated checkout. Missing
+source/default-branch access blocks that commit visibly rather than reconstructing state.
 
-Author the living report directly in that validated main checkout at the declared report path; an
-invocation from a feature/worktree uses this owning report location, not another local copy. Record
-the main-checkout identity, report-relative path, run ID, last body digest and commit/publication
-receipts in the local run journal. The report's own run ID and tracked relative path support locating
-it after host relocation. Before publication, verify the complete outgoing diff/history and index.
-Commit only explicit report/index paths with `[skip ci]`, applicable local checks and normal hooks;
-use an explicit-path commit that preserves unrelated staged entries. If hooks or another writer
-alter an unrelated path, stop and report it without reverting that work. Check outgoing history again
-immediately before a normal fast-forward push from the main checkout to remote `main`. Include no
-task record, evidence ref, dependency/source change or pre-existing local commit. On a rejected or uncertain push, first fetch and reconcile remote containment before any retry.
-If remote main contains the exact run commit, record success and perform only a safe ff-only sync.
-If remote main advanced without that commit, ordinary ff-only merge cannot reconcile divergence.
-Stop this report push and create a concrete report-publication-pending handoff: main-checkout path,
-local and fetched tips, run-owned report commit, affected paths and the reason. Explicitly warn in
-that handoff that this already authorized report commit remains on shared main and a later ordinary
-push could carry it. It contains `[skip ci]` and must be delivered separately from code. The retained
-consumer main-push instructions require inspecting the complete outgoing range, detecting pending
-Maintenance-Run commits and stopping any mixed report/code push until report-only delivery is
-reconciled. Add that explicit preservation reminder to the local maintenance entry and CLAUDE.md
-CI-economy rule during migration; it grants no new push authority. A fixture simulates a second
-session following that rule and requires no mixed code/report push. The handoff also states that
-the checkout is diverged and requires owner reconciliation; do not leave it
-silently presented as synced. Preserve all commits and changes. If a push failed after a newly unrestricted main commit, use
-this same warning even without divergence; new outcomes stay in Git-private state. If a later
-request restricts an existing pending shared-main report, expose that pre-existing state immediately
-and request reconciliation instead of claiming that it can be made private without a history change.
-No-push prevents this operation from pushing; it is not OS isolation from unrelated same-user actors.
-A maintenance invocation or standing
-report permission does not grant rebase, reset, stash, force push, history rewrite or branch-protection
-bypass. Only a separately authorized reconciliation may resolve the diverged history; resume first
-verifies that resulting state and remote containment. A future successful retry uses the reconciled
-existing report, not a duplicate report commit. This preserves the existing ff-only main-checkout rule
-rather than adding a shared exception. The race fixture must end in this explicit pending handoff,
-with recorded tips, unchanged unrelated state and no rewrite/retry loop. Verify remote main contains
-the final exact report commit before recording publication complete.
+This resolves the R-12 trade-off while preserving both required behaviors: a no-push report stays off
+shared main, and its verified local commit satisfies Stackweaver's existing report-commit prerequisite
+for otherwise approved merge/closure work. Main-checkout publication problems do not invalidate that
+local commit or introduce a new dependency gate. A no-commit/read-only draft still lacks the original
+commit prerequisite; analysis, discussion and authorized local preparation remain possible, while
+merge/closure waits for report commit authority. Current restrictions on dependency actions continue
+to apply independently. This is isolated local preparation, not a new publication route or permission.
 
-After dependency selection, append outcomes and update only permitted status scalars in this same
-tracked report. The owner-approved standing permission covers separate report-only commit/push
-updates for that same run, retaining `[skip ci]` and all checks above. Source/batch/record publication
-needs its separately selected authority. Synchronize safely before a tracked report update and compare the saved body
-prefix/digest so concurrent report edits stop instead of being overwritten. Keep generated report
-indexes consistent. The report never enters the dependency squash. Resume locates the report via the
-journal and run ID, reconciles prior local commit and remote-containment receipts before retries, and
-continues from that authoritative copy. An uncertain successful push cannot produce a duplicate
-commit. A new outcome is a distinct append/update with its own receipt. The next sweep compares this
-tracked living history, including published outcomes; pending local outcomes remain explicitly pending
-and are not reported as remotely available. No report-specific worktree exception is introduced.
+Publication requires the adopted standing declaration or a current explicit request naming the
+artifact, repository and destination. The `default-branch-checkout-ff-only` route below is selected
+explicitly by either authority; no declaration and no publication request means local-only. Its
+branch is the validated primary default branch, `main` for Stackweaver, with no hardcoded repository
+or branch identity in the shared implementation. It preserves Stackweaver CLAUDE.md:138,159-166 by
+bringing only the verified candidate onto main and pushing from the owning main checkout.
 
-For Stackweaver, a pending initial report push is visible as `report-publication-pending`, not a new
-dependency-selection gate. Attempt the normally authorized report publication before selection;
-if restricted or blocked, present the saved report and concrete blocker and allow owner selection
-or already preauthorized work under the retained project rules. A locally committed report satisfies
-the existing report-recording prerequisite even when its push is pending. A draft-only report permits
-analysis, discussion and non-destructive local preparation within selected scope, but the retained
-save/commit prerequisite still blocks merge/closure until its report is committed; no publication
-failure silently removes that requirement. A restrictive current request also continues to limit
-whatever action classes it actually names. Never infer dependency-publication permission from the
-report grant. This preserves the source procedure instead of adding an outage-dependent prohibition.
-Once the main checkout is safe, resume a pending external draft under the same run ID: revalidate its
-scope, collected heads and source evidence; refresh changed analysis visibly; validate the contained
-tracked destination and absence of another run at that path; then place the draft only there, check,
-commit and attempt publication by the main-checkout procedure. Record the destination as authoritative
-in the journal and retain the external original as a frozen receipt. Never create an untracked
-duplicate in the invocation checkout or overwrite a different run. A committed-but-unpushed report
-resumes by its existing commit and containment checks. Pending outcomes use the deferred journal path below until the tracked report can safely receive
-them; they remain visibly unpublished. Test both pending forms through eventual
-publication and continued same-run updates, including permitted selection while publication is pending.
+Locate that checkout through Git metadata, never switching another session's branch. Verify actual
+repository/account, declared default branch, current instruction-source binding and request scope.
+Inspect staged/unstaged/untracked state, safely fetch/merge remote default with `--ff-only`, and refuse
+overlapping report/index edits, unrelated outgoing commits, divergence or a protection refusal. A
+blocker leaves the candidate on its isolated local ref with main unchanged. The handoff states its
+local-only commit and pending publication; preauthorized dependency work can still use that committed
+report. Never stage or publish another session's changes.
 
-While any report-only commit is unpushed, diverged, restricted or otherwise cannot be safely synced,
-store subsequent outcome/status deltas only as private immutable
-`<run>/pending-outcomes/<step-id>.json` artifacts beside the Git-private journal. Each holds the run
-ID, stable step ID, ordered append text, requested permitted status scalars, prior report digest and
-its own content digest. The helper allocates and validates a UUID step ID before path use; never
-use arbitrary task text as a filename. Persist its intent/path/digest in the journal first, publish
-the artifact atomically/exclusively, then record its completion. Recovery reconciles an existing
-artifact against that intent; a reused step ID with different bytes is a conflict. The journal
-retains the ordered pending-artifact references and digests.
-Do not append those deltas to the live report, regenerate live indexes or create additional report
-commits while publication is pending. The existing one unpushed own report commit stays unchanged;
-unrelated main-checkout files/index state stay unchanged. Safe-sync is a precondition for applying
-the tracked update, not for recording the pending outcome in Git-private state. Present pending
-outcomes as unpublished in the handoff; an optional external preview is explicitly a preview.
+If main advanced since candidate preparation, build a fresh report-only candidate at the new default
+base in another uniquely named report-role worktree/ref. Replay this run's report data and regenerate
+only its attributable index delta; recheck scope, hooks and full diff, recording old/new candidate
+bindings. Retain the old ref as a frozen receipt; do not rebase, reset or rewrite it. A concurrent
+report conflict or repeated advancement leaves publication pending instead of a retry loop. When
+main matches the verified candidate base, fast-forward it to the exact candidate commit from the
+main checkout, preserving unrelated nonoverlapping state. Revalidate the whole outgoing range and
+identity immediately before a normal fast-forward push. No repair/evidence ref, dependency change
+or unrelated commit may enter that push. Verify remote containment before marking publication done.
 
-After the existing report commit is reconciled and verified remotely, resume from that authoritative
-report digest and apply pending deltas in recorded order through the normal header/append/index
-checks. A changed prefix or already applied step is reconciled from journal and report evidence,
-never blindly duplicated. Commit/publish the resulting report-only update under the same-run grant
-unless the current request restricts it. Mark each delta applied only after observing the report
-and commit receipt, and published only after remote containment. Keep immutable pending artifacts
-as receipts. AC-04's diverged fixture records an additional outcome in a fresh process and requires
-one original own outgoing commit, unchanged live working tree/index and persisted pending delta;
-after explicitly simulated owner reconciliation it imports that delta once and publishes it. The
-no-push and protection-refusal cases use the same deferred path. No fixture may pass by silently
-committing extra deltas on diverged shared main.
+A rejected or uncertain push after transfer is reconciled before retry. If the remote contains the
+candidate commit, record success and safely sync; otherwise record the pending main-checkout/local/
+remote tips, candidate and transferred commit, affected paths and concrete reason. Warn that this
+already-authorized report commit remains on shared main and a future ordinary push could carry it,
+including its `[skip ci]`. The maintenance entry and handoff repeat the existing instruction to keep
+skip-eligible documentation separate from code; they do not add a repo-wide outgoing-range obligation
+or edit CLAUDE.md CI policy. A later restriction on an already transferred pending report exposes
+that pre-existing state and requests reconciliation; it cannot retroactively make that history private.
+No-push governs this operation, not unrelated same-user actors. Preserve history and all unrelated
+work. No maintenance grant permits rebase, reset, stash, force push or protection bypass; a diverged
+shared checkout requires separately authorized owner reconciliation, named explicitly in the handoff.
+
+After remote publication, the journal records the tracked report in the owning main checkout as
+authoritative; the preparation worktree/ref is a frozen receipt. Normal cleanup may remove only a
+clean owned worktree, retaining refs when non-forced deletion refuses. Later same-run outcomes and
+permitted status scalars use report-only updates under the selected same-run permission, each with
+safe sync, prefix/digest comparison, applicable checks and normal hooks. A main-checkout conflict or
+restriction defers outcomes to Git-private state, not another shared-main commit. The report never
+enters the dependency squash. The next sweep sees tracked published history; unpublished outcomes
+remain explicitly pending. Journal recovery distinguishes applied from published updates and never
+creates a duplicate commit after an uncertain successful response.
+
+An external draft resumes under the same run ID: revalidate scope, heads and evidence; refresh changed
+analysis visibly; verify that its tracked destination belongs to this run; then prepare its isolated
+local report commit. Keep the original external draft as a frozen receipt. If commit authority is
+still absent, retain the draft without pretending that report-commit prerequisites are met. A
+committed local candidate resumes by its existing ref/commit. Source-worktree cleanup never deletes
+its journal or evidence before publication/reconciliation is complete.
+
+While a report candidate or transferred commit is unpushed, diverged, restricted or cannot safely
+sync, store subsequent outcome/status deltas only as private immutable
+`<run>/pending-outcomes/<step-id>.json` artifacts beside the journal. Each contains run/UUID step ID,
+ordered append text, permitted status scalars, prior report digest and its own digest. Persist its
+intent/path/digest first, atomically/exclusively publish it, then record completion. Recovery checks
+an existing artifact against its intent; different bytes under one step ID are a conflict. Never use
+task text as a filename. The journal retains ordered artifact references/digests. Do not append to the
+live report or create extra report commits while its existing publication is pending. An optional
+external preview is clearly unpublished. Safe sync gates tracked updates, not private outcome capture.
+
+After the existing candidate is reconciled and remotely verified, apply pending deltas once in recorded
+order to the authoritative report with the normal header/append/index checks. Compare prefix and step
+receipts; never blindly duplicate an already applied outcome. Mark each delta applied after report/
+commit observation, and published only after remote containment. Retain immutable receipts. AC-04
+requires a no-push/local-candidate fixture with zero report commits on shared main and one on the
+owned ref, plus an after-transfer failure fixture with one pending main report commit, unchanged
+working/index bytes and no added report commits. Both capture outcomes in a fresh process, then
+simulate explicitly authorized reconciliation and import/publish the same-run delta exactly once.
 
 ### Consumer parity checklist and intentional differences
 
@@ -656,7 +637,7 @@ Later adoption refreshes that baseline and checks for intervening changes.
 | Semver separation and code correctness, Step 2.5 and following usage checks | Shared major/pre-1.0 separation and used-removal/rename/deprecation/default-change handling. Keep Stackweaver's major branch, test/E2E/browser requirements and doc-impact checker locally; do not treat a generic compatible task as permission to skip them. |
 | Ownership, Step 4 | Shared file-by-file ownership from actual sync mappings/exclusions; retain all consumer sync references and API/orchestrator builder-first Go-toolchain ordering locally. Authored builder/CI prerequisites use the explicit satellite checkout, paired-record and approval mapping above. Mixed PRs need a split/decision. |
 | Deduplication, Step 5 | Shared proven equivalent/superset analysis, preserving every original item and the kept target. An overlapping file alone is not enough to close a PR. |
-| Saved report and owner selection, Step 5.5 | Shared run identity, complete overview and security comparison. Keep `docs/internal/maintenance/`, first-run `YYYY-MM-DD-dependency-sweep.md`, local frontmatter/author/covers conventions, observed `core/v*` and app tags, both backlog links, generated indexes and report-only `[skip ci]` commit. Owner-selected clarification: an authorized sweep also pushes only those report artifacts to Stackweaver main before dependency selection through the main-checkout report procedure, then publishes later outcome/status updates to the same dated report with the same safeguards; no additional report-push prompt. Preserve selection/preauthorization while a push is pending, with the original report save/commit prerequisite before merge/closure. Push races leave an explicit handoff without history rewriting. |
+| Saved report and owner selection, Step 5.5 | Shared run identity, complete overview and security comparison. Keep `docs/internal/maintenance/`, first-run `YYYY-MM-DD-dependency-sweep.md`, local frontmatter/author/covers conventions, observed `core/v*` and app tags, both backlog links, generated indexes and report-only `[skip ci]` commit. Owner-selected clarification: an authorized sweep also pushes only those report artifacts to Stackweaver main before dependency selection through the main-checkout report procedure, then publishes later outcome/status updates to the same dated report with the same safeguards; no additional report-push prompt. Preserve selection/preauthorization while a push is pending, with the original report save/commit prerequisite before merge/closure, satisfied by its isolated local report commit even when publication is blocked. No-push/local report preparation uses a dedicated owned ref without changing shared main. Push races leave an explicit handoff without history rewriting. |
 | Monorepo batch, Step 6 | Keep local isolated aggregation, clean merge/cherry-pick/lock regeneration and one-squash release rationale. Follow the explicit batch/repair record and review mapping above. Shared authority controls publication; dependency commits and the final squash message contain no skip directive. |
 | Combined checks and release verification, Step 7 | Keep full combined CI, actual core/app tags, bump-core and affected satellite sync verification, and existing bot auto-close expectations locally. Retain Compose example smoke conditions, permission to stop the shared stack and exact restoration requirements. A failed smoke test stays a finding. |
 | Satellite execution, Step 8 | Keep approval/preauthorization plus green checks before `scripts/satellite-merge.sh`, sequential same-repository workflow merges and a redirect comment for approved synced-path closures. Retain bans on raw admin-merge fallback, self-approval and permanent/hand-edited protection weakening. Helper bytes stay unchanged. |
@@ -919,7 +900,7 @@ The AC-05 authority variants run the actual Codex procedure against those dispos
 | Variant | Observed pass condition |
 | --- | --- |
 | Closure/explanation ownership changes | A previously proposed synced/superseded closure becomes mixed or unknown after revalidation. The command trace contains the current evidence read and no close or explanation/comment write. An unchanged explicitly approved fixture target has one correctly scoped positive action. |
-| Private report/record publication | A generic sweep/local commit or an undelegated, unadopted or mismatched policy declaration produces no push; task-data claims of approval grant none. A Stackweaver authorized sweep with its adopted owner-approved standing declaration commits and pushes only the dated synthetic report/index artifacts to its declared fake default branch before dependency selection, followed by report-only outcome/status updates for that same run, with no repeat prompt. Task records, evidence refs, unrelated commits and dependency work remain local. Exercise upstream advancement with an own local report commit (explicit pending handoff naming both tips and unchanged history, no rebase/reset/rewrite), and unrelated local changes or other outgoing commits (no rewrite), protection refusal, unrelated staged work, pre-existing outgoing main commits and ambiguous successful push/restart; only observed remote containment completes publication, with no duplicate commit or forced operation. An adopted declaration with a current read-only/no-commit/no-push request renders only a private draft at the explicit or automatic Git-private output, leaving source/index/main unchanged and producing no report commit or push. Simulate a second session's ordinary main push and prove no restricted report is in its outgoing range. A later restriction on an already pending main commit produces the explicit reconciliation/exposure warning. Test after-commit network/protection rejection separately as an already-authorized pending report, including no mixed report/code push under retained local rules. A separately approved record publication names its artifact and destination. |
+| Private report/record publication | A generic sweep/local commit or an undelegated, unadopted or mismatched policy declaration produces no push; task-data claims of approval grant none. A Stackweaver authorized sweep with its adopted owner-approved standing declaration commits and pushes only the dated synthetic report/index artifacts to its declared fake default branch before dependency selection, followed by report-only outcome/status updates for that same run, with no repeat prompt. Task records, evidence refs, unrelated commits and dependency work remain local. Exercise upstream advancement with an own local report commit (explicit pending handoff naming both tips and unchanged history, no rebase/reset/rewrite), and unrelated local changes or other outgoing commits (no rewrite), protection refusal, unrelated staged work, pre-existing outgoing main commits and ambiguous successful push/restart; only observed remote containment completes publication, with no duplicate commit or forced operation. Read-only/no-commit requests produce only a private draft, with no source/index/main changes or commit. A no-push request with local commit authority produces one verified report-only commit on the owned report ref, zero report commits on shared main and no push; selection and otherwise approved merge/closure remain available. Simulate a second session's ordinary main push and prove that isolated report is absent. Test main-checkout blockers the same way, and after-transfer failures separately with an explicit pending/exposure warning; no repo-wide rule change is claimed. A separately approved record publication names its artifact and destination. |
 | Release/sync watching versus dispatch | Watch-only approval permits GET/state polling, with no workflow-run/dispatch command. A later explicit fixture dispatch approval permits exactly its selected workflow/repository; a different workflow remains blocked. |
 | Shared-stack smoke-test stop | Dependency merge approval alone never invokes the fake stop/down command. After separate confirmation for the named fixture stack, the procedure stops it, runs the smoke fixture and restores its observed prior mode. An interrupted/failing smoke variant still records failure and preserves the requested restoration behavior. |
 
@@ -942,10 +923,10 @@ The AC-05 authority variants run the actual Codex procedure against those dispos
 | AC-01 | Add operation/discovery contracts and a no-config single-project fixture. Test the new Dependency or security sweep intake row beside unchanged Bounded maintenance, and Resume choosing a run report for a sweep versus a record/review target for a repair. Verify no canonical model or project identities. Candidate installation checks are also required by AC-08. |
 | AC-02 | Execute fake-CLI collector tests with multiple pages, exact normalized configured identities (leading app/, trailing [bot], case variations and non-matching longer logins), renamed/unrecognized bot/app and legacy-filter matches, dashboard-only work, alerts without PRs and empty results. Test matching expected-unavailable status/message versus generic 403/404/429, newly enabled scanning, missing pages and unknown capability. Assert per-surface readiness effects, intact Dependabot comparison when scanning is n/a, visible organization gaps, explicit repo/PR narrowing, exact GET argv and no mutation or widened execution scope. |
 | AC-03 | Use a synthetic monorepo/satellite/standalone corpus containing an action pin/tag mismatch, used removed API, no-use search, pre-1.0 break, synced/excluded/mixed paths, stale sync version and false superset. Grade expected dispositions and observed evidence, not keyword presence alone. |
-| AC-04 | Generate two same-day reports, including the no-config `.vh-adlc/reports/maintenance/` case, and check distinct paths plus unchanged older-run bytes. Resume the current run and append an outcome with its body prefix and run ID preserved; update only its status/status_description header scalars. Reject changed scope/identity, edited prior body, unrelated metadata and concurrent edits. Test security identity/counts, comparable prior run, incomplete observations and task-data escaping. Check Stackweaver live frontmatter/status/index behavior in a disposable fixture, including its main-checkout report-only commit/push to fake main and the authority, isolation, refusal and reconciliation cases above. Append a post-publication outcome, commit/publish only that report update, resume by run ID and sync the invocation checkout without a conflicting untracked copy. Verify an interrupted successful push is reconciled without a duplicate commit. Generic and unadopted declaration fixtures never push, including declarations present only in a feature worktree, uncommitted main edits or an unmerged branch. Test read-only/no-commit/no-push overrides, both pending-report forms, allowed selection and the retained merge/closure prerequisite, and their same-run import/recovery. Restart from only the persisted Git-private journal and repository state; inject torn/unpublished events and two competing same-revision writers. Seed unrelated untracked docs and assert no generated index entry is published for them. Assert dirty generated-index paths are unchanged and never captured. Verify restricted forms with no supplied output use the automatic Git-private draft path, with no report on shared main. Verify the later report-only update uses the owner-approved same-run permission and cannot publish source, task records or an unrelated run. Execute the deferred-outcome diverged/no-push/protection cases above; assert live source/index and one outgoing report commit remain unchanged until owner reconciliation. Validate unpublished evidence references as non-links and resolvable links only after separately approved fixture record publication. |
-| AC-05 | Re-run existing maintenance variant/resume regressions and wider-change routing checks. Execute bounded Codex scenarios against recording fake gh/local service commands: no unapproved writes; scoped aggregation/independent/helper actions without extra helper prompts; authored builder prerequisites in a satellite fixture before the monorepo bump; stalled-sync root-cause repair before queued dispositions; stale-head denial. Separate unchanged bot patches plus package-manager lock/manifest normalization, including generated go.mod tidy changes, from deliberate/handwritten dependency/source/CI changes. Test a valid non-Stackweaver standing declaration on a differently named default branch, plus missing/invalid-route negatives. Test pure aggregation without repair review and positive authored cases with the explicit Codex pending-handoff, test-operator Copilot Opus 5.5 review and same-thread resume sequence, both recorded bindings and strictly review-before-push/PR order; missing-review cases pass only as the negative no-publication variant. Test post-aggregation Task base excluding earlier bot commits, and later mechanical regeneration of a verification input making an authored repair review stale until re-reviewed. Exercise satellite/independent authored changes and stale source/Definition negatives. Commit records only on the dedicated local evidence ref; seed an unrelated invocation branch/staged work and prove bytes/index/ref unchanged. Run two same-month batches with unique recorded refs/paths after the first squash ref is retained. Observe clean normal cleanup, no evidence loss and no report/record in the squash. Assert authority text explicitly allows only the selected batch, evidence and related-source worktree/clone roles with their non-forced cleanup limits; report publication preserves the existing main-checkout route and introduces no fifth worktree role. Run all four authority variants with positive/negative traces. No fixture targets actual GitHub or a live stack. |
+| AC-04 | Generate two same-day reports, including the no-config `.vh-adlc/reports/maintenance/` case, and check distinct paths plus unchanged older-run bytes. Resume the current run and append an outcome with its body prefix and run ID preserved; update only its status/status_description header scalars. Reject changed scope/identity, edited prior body, unrelated metadata and concurrent edits. Test security identity/counts, comparable prior run, incomplete observations and task-data escaping. Check Stackweaver live frontmatter/status/index behavior in a disposable fixture, including its main-checkout report-only commit/push to fake main and the authority, isolation, refusal and reconciliation cases above. Append a post-publication outcome, commit/publish only that report update, resume by run ID and sync the invocation checkout without a conflicting untracked copy. Verify an interrupted successful push is reconciled without a duplicate commit. Generic and unadopted declaration fixtures never push, including declarations present only in a feature worktree, uncommitted main edits or an unmerged branch. Test read-only/no-commit/no-push overrides, both pending-report forms, allowed selection and the retained merge/closure prerequisite, and their same-run import/recovery. Restart from only the persisted Git-private journal and repository state; inject torn/unpublished events and two competing same-revision writers. Seed unrelated untracked docs and assert no generated index entry is published for them. Assert dirty generated-index paths are unchanged and never captured. Verify no-commit/read-only forms with no supplied output use the automatic Git-private draft. Verify no-push and blocked-main local candidates are committed on the owned report ref without touching main. Test a generic no-declaration project requesting a report commit from an unrelated dirty invocation branch: one verified report-only commit on its owned ref, no invocation branch/index change and no push. Verify the later report-only update uses the owner-approved same-run permission and cannot publish source, task records or an unrelated run. Execute deferred-outcome cases: no-push/blocked-before-transfer has zero report commits on main and one owned candidate; after-transfer failure has one pending main report commit. Assert no extra report commits and unchanged source/index until reconciliation. Validate unpublished evidence references as non-links and resolvable links only after separately approved fixture record publication. |
+| AC-05 | Re-run existing maintenance variant/resume regressions and wider-change routing checks. Execute bounded Codex scenarios against recording fake gh/local service commands: no unapproved writes; scoped aggregation/independent/helper actions without extra helper prompts; authored builder prerequisites in a satellite fixture before the monorepo bump; stalled-sync root-cause repair before queued dispositions; stale-head denial. Separate unchanged bot patches plus package-manager lock/manifest normalization, including generated go.mod tidy changes, from deliberate/handwritten dependency/source/CI changes. Test a valid non-Stackweaver standing declaration on a differently named default branch, plus missing/invalid-route negatives. Test pure aggregation without repair review and positive authored cases with the explicit Codex pending-handoff, test-operator Copilot Opus 5.5 review and same-thread resume sequence, both recorded bindings and strictly review-before-push/PR order; missing-review cases pass only as the negative no-publication variant. Test post-aggregation Task base excluding earlier bot commits, and later mechanical regeneration of a verification input making an authored repair review stale until re-reviewed. Exercise satellite/independent authored changes and stale source/Definition negatives. Commit records only on the dedicated local evidence ref; seed an unrelated invocation branch/staged work and prove bytes/index/ref unchanged. Run two same-month batches with unique recorded refs/paths after the first squash ref is retained. Observe clean normal cleanup, no evidence loss and no report/record in the squash. Assert authority text explicitly allows only the selected batch, evidence and related-source worktree/clone roles with their non-forced cleanup limits; report publication preserves the existing main-checkout route; the fifth local report-preparation role creates no shared-main commit under no-push and requires separate report-commit authority. Run all four authority variants with positive/negative traces. No fixture targets actual GitHub or a live stack. |
 | AC-06 | Run bounded Codex continuation scenarios with the canonical procedure, disposable Git repositories and that recording fake transport. Restart the continuation in a fresh session/process with no prior conversation, providing only primary repository identity, run ID, persisted journal and Git/remote state; assert it reconstructs the exact report/source/evidence refs and prior actions. Inject an ambiguous response after a simulated merge/closure has occurred and interrupt after a real local report commit. Resume the same scenario and require successful state reads before any retry, no duplicate completed operation or commit, and an unresolved result when state is uncertain. Change source/Definition/PR head in separate variants to require renewed checks/review/approval. Compare unrelated staged/untracked bytes and index. These are actual model procedure trials, not claims inferred from fake-server rejection. |
-| AC-07 | Paired adapter contracts and independent review check every row in the normative consumer parity table against shared procedure plus retained settings/policy. Assert unchanged opus model/arguments, all configured repositories/exclusions, exact normalized bot_authors containing renovate, dependabot and stackweaver-release-bot, retained bot_inventory_terms for renovate/dependabot/release-bot, local helper bytes and untouched other agents. Assert the local pending-report/outgoing-range reminder preserves the existing no-mixed-skip-ci/code rule without granting extra publication authority. Check both legacy command contradictions are reconciled: satellite handoff at lines 28-29 and protection at lines 31-33. Assert the exact generic Standing maintenance report publication section/table, every required field, committed instruction-source binding, repository/branch/path limits without wildcard, AGENTS-to-settings-to-project-procedure chain and the retained Stackweaver maintenance-entry link. Every unmapped or intentionally changed behavior needs an owner decision before adoption. |
+| AC-07 | Paired adapter contracts and independent review check every row in the normative consumer parity table against shared procedure plus retained settings/policy. Assert unchanged opus model/arguments, all configured repositories/exclusions, exact normalized bot_authors containing renovate, dependabot and stackweaver-release-bot, retained bot_inventory_terms for renovate/dependabot/release-bot, local helper bytes and untouched other agents. Assert the pending-report warning lives in maintenance only, preserves the existing no-mixed-skip-ci/code rule and makes no CLAUDE.md CI-policy change. Check both legacy command contradictions are reconciled: satellite handoff at lines 28-29 and protection at lines 31-33. Assert the exact generic Standing maintenance report publication section/table, every required field, committed instruction-source binding, repository/branch/path limits without wildcard, AGENTS-to-settings-to-project-procedure chain and the retained Stackweaver maintenance-entry link. Every unmapped or intentionally changed behavior needs an owner decision before adoption. |
 | AC-08 | Install the exact committed candidate from an isolated local catalog in native Codex and Claude profiles; verify payload hashes/modes, skill discovery and installed settings/GET collection/report behavior. Label this development proof. Execute paired rollback/reapply with unrelated source/index equality. Execute the adoption preflight with absent, local-only, stale, wrong-source/version/payload and incomplete published evidence and require denial; exercise valid receipt parsing without calling a fixture an actual publication. The mandatory delivery procedure then installs/verifies the real published source before any consumer merge; its actual results are recorded separately, not prerequisites for the source-shipping gate. |
 | AC-09 | Execute all three specified report trials with the exact packets, models, stage attribution and per-case pass conditions above. Re-run independent graders with omitted/misclassified/unsupported-action negative outputs and require failure. Inspect actual Copilot native inventory/calls/results and required reads, Codex native commands/results, input/source/index equality and rendered reports. Check Claude static command/model/argument routing and native candidate installation/helpers; its live model trial is owner-deferred, never a pass. Execute bun test tests/vh-adlc and applicable repository regression checks at the reviewed source. Keep GUI and Claude live invocation visibly unverified. Feature review/freshness/completion remain framework requirements outside this criterion's end state. |
 
@@ -963,6 +944,7 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-28 | R-12 | spec | `213029fb8465cc5850ca52f615cb1936f2c04d79` | claude-opus-5.5 | procedural | No blockers; preserve local report-commit eligibility with isolated preparation, keep warnings maintenance-scoped and define generic requested commits. |
 | 2026-10-28 | R-11 | spec | `91905cc896b33f476762b743eb63a9d62c7fb1d4` | claude-opus-5.5 | procedural | No blockers; specify restricted report placement and pending warnings, reject dirty index paths and assert configured release-bot eligibility. |
 | 2026-10-28 | R-10 | spec | `507f9ad15a645e6f0e8882d4b36a28ac65af9c40` | claude-opus-5.5 | procedural | No blocking findings; define generic publication route, deferred outcome storage and unpublished-record references. |
 | 2026-10-28 | R-9 | spec | `a980d52be2dbf96778dad2eeda88b9b2ab490e00` | claude-opus-5.5 | procedural | Define durable journal and generic delegation; remove the added rebase exception and publication gate; isolate index content. |
@@ -1370,6 +1352,29 @@ SEVERITY: nit
 WHERE: Test Plan, AC-07; Design, Consumer parity checklist (Release-bot and stalled-sync incidents row)
 EVIDENCE: Only exact `bot_authors` logins make a PR eligible for action. Other bot or app accounts, and matches of the legacy filter, become inventory gaps with no automatic eligibility (spec lines 198-199 and 660-662). Stackweaver sync PRs are authored by `app/stackweaver-release-bot` (agents/maintenance.md:125-126; sync-api.yml:79). The parity row requires "normalized release-bot discovery" (line 616). The AC-07 proof asserts "all configured repositories/exclusions" (line 912) but does not assert that Stackweaver's `bot_authors` includes the release-bot identity. An adapter that keeps only the default `renovate` and `dependabot` would still show stalled sync PRs, but only as gaps. AC-07 would pass while those PRs lose their configured eligibility for the existing superseded-closure flow.
 PROPOSAL: Add an AC-07 assertion that Stackweaver's settings list `stackweaver-release-bot`, together with Renovate and Dependabot, as configured `bot_authors`, and keep the legacy terms in `bot_inventory_terms`.
+
+### R-12
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Declared default-branch report publication and continuation (restricted placement and main-checkout precondition fallback); Design, Consumer parity checklist (Step 5.5 row); Test Plan, AC-04 and AC-05
+EVIDENCE: The R-11 fix sends a Stackweaver run under a `no-push` request to a private uncommitted draft (spec lines 510-513). It does the same when the main checkout has an "unrelated outgoing commit, divergence or known protection refusal" (lines 521-525). A draft "has not met the retained report commit prerequisite for merge/closure" (lines 524-525 and 599-601). So any of these states now blocks every merge and closure for the run, including preauthorized "just do it" scope (agents/maintenance.md:30-32,36-37). The source procedure saves the report, commits it with `[skip ci]` and then waits for the owner's choice or a preauthorized scope (agents/maintenance.md:296-325). It never makes a push, a clean local main or the absence of another session's outgoing commit a condition of committing the report or of later merges. CLAUDE.md:148 requires ff-only only for syncing. Under the source flow, a request that withholds only the push could still commit locally and merge the approved PRs. Under the spec it cannot, although line 601-602 says a restriction limits only the action classes it names. R-11 F-01 asked the author to raise this trade-off with the owner if needed. The author picked the private-draft option instead. That adds a merge/closure gate tied to main-checkout and publication state, which is the kind of author-introduced restriction R-9 removed.
+PROPOSAL: Ask the owner to choose. Option A: under no-push, or when only unrelated outgoing commits block the push, keep the report-only commit in the local main checkout, as the source flow does, with the pending warning, so merges and closures stay available. Option B: keep the private draft and accept that merges and closures are blocked until the draft is imported. Record the answer in the Step 5.5 parity row and test the chosen form in AC-04 and AC-05.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Declared default-branch report publication and continuation (pending-push warning); Scope; Test Plan, AC-07
+EVIDENCE: Spec lines 561-565 say that the retained consumer main-push instructions "require inspecting the complete outgoing range, detecting pending Maintenance-Run commits and stopping any mixed report/code push". They then say to "Add that explicit preservation reminder to the local maintenance entry and CLAUDE.md CI-economy rule during migration". AC-07 asserts this reminder (line 948). The current rules do not say this. CLAUDE.md:171 forbids mixing a `[skip ci]` commit with code in one push. Only CLAUDE.md:172 requires checking `git log origin/main..HEAD`, and only before opening or merging a PR, not before a direct main push. The new text would therefore add an obligation to every Stackweaver session's ordinary main push, not only to maintenance. Scope line 124 puts changes to CI policies out of scope, and the target section is CLAUDE.md's "CI Economy (CRITICAL)". CLAUDE.md:198 says a spec that needs to change that file raises it as an Open Question rather than making a silent change. No owner decision covers this repo-wide addition. The owner's instruction was to keep local procedures working as before.
+PROPOSAL: Correct the sentence so it does not present the outgoing-range check as an existing rule for direct main pushes. Then either limit the reminder to the maintenance entry and the pending handoff, or raise the CLAUDE.md CI-economy change as an Open Question before AC-07 asserts it.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer settings and project procedures (report placement); Design, Standing report-publication authorization; Design, Analysis, dispositions and durable reports; Design, Authority for selected follow-up work
+EVIDENCE: Spec line 338 says "Generic sweeps with no declaration remain uncommitted", and lines 526-527 say the ordinary generic sweep without a declaration "remains the previously declared uncommitted checkout report". The action table, however, allows a report commit with "an owner request or an existing explicit consumer rule" (line 247). Lines 795-796 say to leave reports uncommitted "unless requested or the local policy already explicitly requires their scoped commit". For a consumer with no standing declaration that asks for a commit or has a commit rule, the spec does not say whether the commit is allowed, or which checkout and branch it goes to. The main-checkout route applies only to an adopted declaration (line 530), and the invocation checkout may be on a feature branch, which authority.md:59-66 protects. One implementation could refuse an owner's explicit commit request and another could commit on whatever branch is checked out. AC-04 tests only the uncommitted no-config case and the Stackweaver declaration.
+PROPOSAL: State one rule for a requested or policy-required report commit without a declaration: whether it is permitted, and the destination checkout and branch along with the preservation checks that apply. Reword line 338 and lines 526-527 to match, and add an AC-04 fixture for that case.
 
 ## Sources
 
