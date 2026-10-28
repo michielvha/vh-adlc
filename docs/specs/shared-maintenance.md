@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Owner accepted R-17; issue #35 tracks the test-first implementation plan; preparing default-branch publication and claim."
+status: in-progress
+branch: feat/shared-maintenance
+status_description: "Implementation claimed on feat/shared-maintenance; starting strict settings and GET-only inventory tests; live Claude and GUI trials remain deferred."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
