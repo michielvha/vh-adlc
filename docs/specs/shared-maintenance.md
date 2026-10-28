@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Opus R-3 has no blocking findings; factual notes are being corrected and the owner must decide the proposed repair-review, paired-record and worktree extension before final review/acceptance."
+status_description: "The owner adopted shared review for authored repairs and unchanged bot-only batching on 2026-10-28; awaiting fresh Copilot Opus 5.5 review and spec acceptance."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -68,6 +68,17 @@ The refreshed consumer main is `5383332c4e836fe7c33f59042186df7f314f49da`.
 `git diff --stat 1999a71b origin/main --` the declared policy and workflow paths reported only two
 added lines in `.github/workflows/ci.yml`; maintenance policy, command, helper and sync mappings
 remain unchanged from the cited extraction baseline.
+
+The owner resolved Q4 on 2026-10-28: "adopt the shared review for authored repairs, keep bot-only
+batching as before and continue the loop with Copilot Opus 5.5". This selects the presented repair
+review path, with its record outside the dependency squash and clean task-owned worktree support.
+The intentional differences below are now explicit owner decisions. This decision does not replace
+the final independent spec review and acceptance step.
+
+Before the next review, consumer main was refreshed to `010bcddf7faa61aa8ef8a78b9c1fa3e0838881e6`.
+`git diff --stat 5383332c origin/main --` all declared maintenance policy, entry, helper, workflow
+and backlog paths produced no changes. The parity review therefore keeps its exact `5383332c`
+source binding; consumer adoption still uses then-current main and rechecks preservation.
 
 Pre-implementation marketplace baselines were observed on 2026-10-28 in isolated Codex and Claude
 profiles: native installers fetched public vh-adlc 0.4.0, nine skills and no maintenance operation.
@@ -251,7 +262,7 @@ that explicitly selected satellite's actual repository and current default branc
 that repository using the existing scoped identity; missing access blocks the repair. Never prepare
 it in the monorepo's distribution mirror or reuse another task's checkout. Its source_target and
 source-repository identity bind to the satellite commit; the record_target binds to the owning
-Stackweaver maintenance record, using the same explicit pair above. The proposed authored-repair
+Stackweaver maintenance record, using the same explicit pair above. The owner-selected authored-repair
 review requirement applies before pushing that source. Publication and merge use the selected
 scope's existing preauthorization when it covers this prerequisite, including the sanctioned helper
 without another helper-specific prompt. Thus the API/orchestrator builder bumps can land before
@@ -297,11 +308,10 @@ Later adoption refreshes that baseline and checks for intervening changes.
 
 The harness-agnostic migration uses one canonical shared procedure, serial analysis when delegation
 is unavailable, explicit install/version failure and unique suffixes for independent same-day reports.
-Q4 explicitly asks the owner to decide the proposed pre-publication review gate for authored repairs,
-external paired-record extension and shared authority for clean task-owned worktrees. These are
-proposed workflow changes, not decisions implied by the earlier migration request. Pure bot-head
-aggregation retains the local combined-PR review/CI flow. If adopted, the proposed consumer evidence
-mapping keeps sweep/task records outside the dependency squash. The current run remains
+On 2026-10-28 the owner explicitly adopted the pre-publication review requirement for authored repairs,
+the presented external paired-record extension and clean task-owned worktree support. Pure bot-head
+aggregation retains the local combined-PR review/CI flow. The selected consumer evidence mapping
+keeps sweep/task records outside the dependency squash. The current run remains
 a living append-only report. On 2026-10-28 the owner also selected unknown-bot inventory gaps and
 documented unavailable cases, preserving coverage without broadening execution eligibility. Actual
 Claude model behavior is explicitly deferred because its tokens are exhausted; static routing and
@@ -522,21 +532,9 @@ consumer instructions/tests in Stackweaver rather than a second feature spec.
 
 ## Open Questions
 
-### Q4: Should authored maintenance repairs adopt shared independent review before publication?
-
-**Recommendation:** A. Apply the shared repair-review requirement, keep its paired record outside
-Stackweaver's dependency squash, and allow clean task-owned worktrees under the selected procedure.
-Pure bot aggregation retains its existing combined-PR/CI flow.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Adopt shared repair review** | Current independent proof for authored dependency/CI repairs, explicit evidence binding and safe isolated worktrees. | Adds review before a repair push and a narrow paired-record/worktree extension. |
-| **B. Preserve current repair flow** | Existing Stackweaver repair/batch timing without that new pre-push review step. | Requires an explicit consumer exception to the shared repair procedure and revised review/evidence criteria. |
-
-**Why this is yours:** The earlier migration choices did not approve an added review step in the daily
-repair workflow. The Design and AC-05 currently describe option A as a proposal; implementation stays
-blocked until this decision, fresh review and acceptance. The unavailable-scanning, unknown-bot and
-Copilot-for-Claude decisions are already incorporated and do not need to be asked again.
+None. The owner resolved the authored-repair review, paired-record and worktree choice on
+2026-10-28. Bot-only batching stays as before. Earlier scanning, discovery and Claude-trial
+substitution decisions are incorporated above. Fresh review and final spec acceptance remain.
 
 ## Review Log
 
