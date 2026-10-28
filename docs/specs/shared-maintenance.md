@@ -1,7 +1,7 @@
 ---
 status: planned
-status_description: "Owner accepted R-17; planned gate passed; preparing tracking, task decomposition and implementation claim."
-issue: null
+status_description: "Owner accepted R-17; issue #35 tracks the test-first implementation plan; preparing default-branch publication and claim."
+issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-maintenance/
@@ -1062,9 +1062,25 @@ Report-publication cases for AC-04/AC-05:
 
 ## Tasks
 
-None yet; decompose the accepted scope into failing-test-first commits after spec review and owner
-acceptance. Keep the paired consumer checklist and adoption evidence in this child, with durable
-consumer instructions/tests in Stackweaver rather than a second feature spec.
+Each implementation task starts by writing and observing its behavioral regression fail, then making
+it pass before the task commit. Native acceptance tasks first exercise their negative controls and
+then observe the real client; no fabricated model or command receipt counts. Keep private consumer
+source and raw trial output outside this public repository; record exact paired commits and bounded
+results here. The R-16 no-default-checkout fixture is part of T5/T12.
+
+- [ ] T1 `tests/vh-adlc/maintenance/settings.test.ts`, `fixtures.ts`, `plugins/vh-adlc/scripts/maintenance/settings.ts` and `types.ts` - implement strict v1 settings, inferred identity, normalized bot matching and contained references after observing missing/invalid-input cases fail; `bun test tests/vh-adlc/maintenance/settings.test.ts` passes with default, scoped, malformed and symlink fixtures (AC-02).
+- [ ] T2 `tests/vh-adlc/maintenance/collection.test.ts`, `plugins/vh-adlc/scripts/github-read.ts`, `scripts/maintenance/collect.ts` and `scripts/triage/github.ts` - extract pure GET transport and collect every declared inventory surface without the triage controller graph; fake CLI pagination/error/identity/unknown-bot cases and existing triage collection regressions pass after observed failures (AC-01, AC-02).
+- [ ] T3 `tests/vh-adlc/maintenance/journal.test.ts` and `plugins/vh-adlc/scripts/maintenance/journal.ts` - persist private immutable run headers/events with atomic competing-writer rejection; fresh-process resume, interrupted intent/receipt, corrupt chain, symlink and cleanup-preservation cases pass after observed failures (AC-04, AC-06).
+- [ ] T4 `tests/vh-adlc/maintenance/report.test.ts`, `scripts/maintenance/report.ts` and `history.ts` - save/resume reports, reserve same-day names, recover late path collisions and compare portable per-surface observations including unverified legacy history; report/metadata/concurrency/escaping/history cases pass after observed failures (AC-04, AC-06).
+- [ ] T5 `tests/vh-adlc/maintenance/publication.test.ts`, `scripts/maintenance/authority.ts` and `report-candidate.ts` - resolve the adopted declaration from committed default-branch inputs and prepare isolated local report commits without a remote mutation helper; explicit/current restrictions, generic commit/promotion, dirty/nonoverlapping state, no default-branch checkout and candidate refresh cases pass after observed failures (AC-04, AC-05).
+- [ ] T6 `tests/vh-adlc/maintenance/analysis.test.ts`, `fixtures/`, `trial-proof.ts`, `scripts/maintenance/cli.ts` and `analysis-input.ts` - build the synthetic analysis corpus and helper-produced packets, expose settings/GET/report/journal CLI stages and grade exact item/evidence outcomes; omitted/misclassified/unsupported-action negative controls fail and complete synthetic examples pass (AC-02, AC-03, AC-09).
+- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md`, `references/maintenance.md`, `maintenance-settings.md`, `maintenance-record.md`, `maintenance-review.md`, `lifecycle.md`, `authority.md`, both plugin manifests, `tests/vh-adlc/check.test.ts`, `direct-operation-compatibility.test.ts`, `triage/discovery.test.ts` and `maintenance/discovery.test.ts` - register the model-neutral operation and canonical sweep/repair/publication/resume procedure after missing-operation checks fail; package/discovery and direct/intake authority fixtures pass, preserving existing operations and bumping the candidate plugin minor version (AC-01, AC-05, AC-07).
+- [ ] T8 `tests/vh-adlc/maintenance/migration.test.ts`, `migration.ts` and synthetic `fixtures/migration/` - implement exact-revision adoption preflight and disposable rollback/reapply proof; absent/local-only/stale/wrong-source/payload receipts fail and matching receipt/rollback fixtures pass with unrelated bytes preserved (AC-07, AC-08).
+- [ ] T9 Stackweaver `.vh-adlc/maintenance.json`, `agents/maintenance.md`, `maintenance-project.md`, `.claude/commands/maintenance.md`, `AGENTS.md` and `tests/agent-maintenance/`, with paired evidence in this document - prepare the consumer adapter on its isolated migration branch from refreshed main; observe its initial parity/preflight failures, preserve every normative parity row and helper bytes, commit its local source and record both exact commits; all consumer contracts pass while real-publication adoption remains denied (AC-07, AC-08).
+- [ ] T10 `tests/vh-adlc/maintenance/install.test.ts`, `install-trial.ts`, `docs/get-started/installation.md`, `docs/reference/marketplace.md`, `compatibility.md`, `docs/user-guides/workflows.md` and `README.md` - verify native isolated Codex/Claude candidate installation, payload modes/hashes and installed helper behavior; catalog/receipt negatives fail, actual candidate installs and rollback pass, and guidance reports observed support plus the required later real-marketplace cutover checks (AC-01, AC-02, AC-04, AC-08).
+- [ ] T11 `tests/vh-adlc/maintenance/report-trial.ts`, `trial-proof.test.ts` and evidence in this document - run actual Codex generic, Copilot Opus 5.5 generic and bounded Stackweaver-policy report trials on exact helper-produced synthetic packets; negative graders reject omitted evidence/items or unsupported actions and all real reports meet the normative case table with native model/tool and input-integrity receipts (AC-03, AC-09).
+- [ ] T12 `tests/vh-adlc/maintenance/lifecycle-trial.ts`, `publication-cases.ts`, `recovery-trial.ts`, their grader tests and evidence in this document - execute the bounded Codex authority/publication/recovery cases and positive authored-repair handoff through an actual independent Copilot review then Codex resume; negative/pending variants deny publication, fresh-session continuations reconcile completed effects and every specified final Git/transport state matches while preserving unrelated work (AC-04, AC-05, AC-06).
+- [ ] T13 `.github/workflows/ci.yml`, portable maintenance tests and evidence in this document - add portable cases to the existing macOS selection, run the full Linux plugin and applicable repository checks, preserve triggers/permissions/release rules, and record the final source/consumer targets and explicit live-Claude/GUI deferrals; all required executed regression checks pass before independent implementation review (AC-09).
 
 ## Open Questions
 
