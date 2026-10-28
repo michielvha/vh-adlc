@@ -100,3 +100,7 @@ Code, commands and file contents stay exact, in code spans.
 
 End every operation by reporting what changed, what was verified, every binary result acted on, and what
 is left.
+
+When reporting finished spec work to the owner or requesting spec acceptance, including through resume,
+present the owner-facing summary from `skills/vh-adlc-spec/SKILL.md` in the conversation before the
+acceptance question. Keep the full document and review status available as supporting detail.
