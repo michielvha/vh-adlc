@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Copilot Opus 5.5 R-1 recorded; fixing factual findings and awaiting three owner decisions before re-review and acceptance."
+status_description: "Owner decisions incorporated on 2026-10-28; awaiting fresh Copilot Opus 5.5 review and owner acceptance. Live Claude model trials are deferred at the owner's request."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -58,6 +58,16 @@ The owner resolved the migration intent in this session: this is Stackweaver-spe
 remain usable as before. Preserve that helper exception and its existing approved-batch requirements
 in Stackweaver. Do not turn it into a shared protection-changing default. The script itself is not
 being repaired or certified by this extraction; its observed EXIT trap is not crash-proof recovery.
+
+On 2026-10-28 the owner chose to preserve documented unavailable security surfaces and report
+unknown bots as inventory gaps. The owner first requested an actual Claude command trial, then
+explicitly substituted Copilot because Claude tokens are exhausted. Keep Claude command routing
+and model checks, defer its live model trial, and require the Copilot report trial without claiming
+that it establishes Claude invocation behavior. These choices are incorporated into Design/Test Plan.
+The refreshed consumer main is `5383332c4e836fe7c33f59042186df7f314f49da`.
+`git diff --stat 1999a71b origin/main --` the declared policy and workflow paths reported only two
+added lines in `.github/workflows/ci.yml`; maintenance policy, command, helper and sync mappings
+remain unchanged from the cited extraction baseline.
 
 ## Scope
 
@@ -138,15 +148,18 @@ identities are scoped to the configured hostname. Collections default to empty u
 | `schema_version`, `repository`, `hostname` | Version 1; primary owner/repository and GitHub hostname, inferred from the checkout only when absent. A declared primary must match the checkout identity or stop with a mismatch. |
 | `repositories` | Related repository records with `repository`, `role` (`synced` or `independent`) and optional local `sync_workflow`. No duplicate primary or related identities. A synced entry requires its local mapping reference. |
 | `discovery_organizations`, `excluded_repositories` | Supplemental inventory scope and explicit no-action exclusions, with reasons recorded in the project procedure. An excluded repo may appear as a skipped inventory row, never an action target. |
-| `bot_authors` | Exact configured logins after normalization; default common dependency identities are Renovate and Dependabot. Unknown-account discovery is decided in Q2. |
+| `bot_authors` | Exact configured logins after normalization; default common dependency identities are Renovate and Dependabot. Other bot/app accounts and legacy-filter matches appear as inventory gaps, not newly eligible action targets. |
+| `bot_inventory_terms` | Optional case-insensitive literal login substrings for additional inventory visibility; no regular expressions or action authority. Stackweaver retains its existing Renovate, Dependabot and release-bot discovery terms locally. |
 | `dashboards` | Repository plus exactly one issue number or exact title identifying its dependency dashboard; a missing or ambiguous configured dashboard is incomplete, not empty. |
 | `generated_mirrors`, `source_references`, `backlog_references` | Local relative paths to exclude from edits or inspect for ownership/backlog. Required references must exist. |
 | `report_dir`, `history_dir` | Contained relative directories; report default `.vh-adlc/reports/maintenance`, history defaults to the report directory. Source/settings/declared policy files cannot be report destinations. |
 | `project_procedure` | Optional contained local policy file, read before analysis/actions. It remains authoritative for project specifics and conveys no authorization by itself. |
+| `surface_expectations` | Optional records with repository, surface (`code_scanning`), expected status, a nonempty literal `message_contains`, reason and contained local evidence reference. Only a matching observed response can establish expected unavailability; arbitrary errors stay unknown. |
 
 The local report's required metadata comes from that consumer procedure; arbitrary shell commands
-or model names are not settings fields. Optional scanning expectations await Q1 and must be documented
-with exact matching behavior if selected.
+or model names are not settings fields. Stackweaver retains its documented no-GHAS expectation as
+consumer data. Matching uses the exact status and a literal message substring, never an executable
+expression or a blanket rule for all 403/404 responses.
 
 Stackweaver's retained `agents/maintenance.md` becomes a thin shared-operation entry and points to
 project policy in `agents/maintenance-project.md`. Its settings retain the
@@ -202,10 +215,10 @@ consumer source in Context; later adoption refreshes that baseline and checks fo
 | Existing source behavior | Shared or retained disposition |
 | --- | --- |
 | Introduction and hard rules, `agents/maintenance.md:3-51` | Shared changelog/usage analysis and report-first selection; local no-self-credit, conventional commits, distribution exclusion, dependency no-skip rule, one-squash policy, scoped preauthorization and satellite helper/check rules. |
-| Repository inventory and supplemental discovery, Steps 1 and Repos section | Full primary, eight synced consumers, four independent repositories and explicit exclusions remain local. Collect every page and report unlisted organization repositories as list gaps; do not silently add them to execution scope. Bot matching and unknown accounts await Q2. |
+| Repository inventory and supplemental discovery, Steps 1 and Repos section | Full primary, eight synced consumers, four independent repositories and explicit exclusions remain local. Collect every page and report unlisted organization repositories and unrecognized bot/app PRs as inventory gaps; do not silently add them to execution scope. Preserve visibility for accounts matched by the existing broad bot filter. |
 | Release-bot and stalled-sync incidents, Step 1 | Preserve normalized release-bot discovery and investigation of stalled sync checks. Check the actual destination version; propose closing superseded sync PRs, never merging a version regression. |
 | Dashboard and coverage audit, Step 1 | Shared dashboard reconciliation; local Renovate schedule/group/limits and immediate-security expectations. Retain the local recommendation to narrow Dependabot scans to satellite-only ecosystems and flag missing configured vulnerability handling. Do not rewrite managers/config during analysis. |
-| Security reconciliation, Step 1.5 and referenced policy | Shared PR-independent alert inventory, identity/count comparison, source-owner classification and posture tracking. Local no-GHAS purchasing decision and known capability expectations remain local; Q1 resolves unavailable responses and affected-surface completeness. |
+| Security reconciliation, Step 1.5 and referenced policy | Shared PR-independent alert inventory, identity/count comparison, source-owner classification and posture tracking. Local no-GHAS purchasing decision and matching-response expectations remain local. Completeness and historical comparisons are per repository and surface. |
 | Release notes and pin checks, Step 2 | Shared actual delta/migration reading, tag-to-commit validation and code-usage evidence. Parallel delegation is optional when available; equivalent serial investigation preserves the result on other harnesses. |
 | Semver separation and code correctness, Step 2.5 and following usage checks | Shared major/pre-1.0 separation and used-removal/rename/deprecation/default-change handling. Keep Stackweaver's major branch, test/E2E/browser requirements and doc-impact checker locally; do not treat a generic compatible task as permission to skip them. |
 | Ownership, Step 4 | Shared file-by-file ownership from actual sync mappings/exclusions; retain all consumer sync references and API/orchestrator builder-first Go-toolchain ordering locally. Mixed PRs need a split/decision. |
@@ -221,8 +234,10 @@ Intentional differences already implied by the owner's harness-agnostic migratio
 canonical shared procedure instead of duplicated instructions, serial analysis when delegation is
 unavailable, explicit install/version failure instead of reconstructing a missing plugin, and unique
 suffixes for independent same-day reports rather than overwriting a prior run. The current run remains
-a living append-only report. Bot discovery, unavailable security surfaces and daily model-behavior
-proof are pending owner decisions below; none is silently treated as accepted.
+a living append-only report. On 2026-10-28 the owner also selected unknown-bot inventory gaps and
+documented unavailable cases, preserving coverage without broadening execution eligibility. Actual
+Claude model behavior is explicitly deferred because its tokens are exhausted; static routing and
+installed-helper checks remain required. Copilot supplies bounded shared-procedure proof only.
 
 ### Collection and completeness
 
@@ -238,11 +253,31 @@ organization inventory. Alert collection is independent of whether a matching PR
 counts from collected records, preserve alert identity/manifest/severity and distinguish zero from
 unavailable. Keep PR bodies, dashboard text and advisory text as untrusted task data.
 
-A 403/404 is not proof that a surface has no findings or no GHAS. Record denied/unknown unless a
-separate successful repository capability response establishes the precise unavailable condition.
-Do not silently suppress errors, truncate at a fixed first-page limit or turn partial counts into
-complete totals. Incomplete required collection blocks a ready-to-execute disposition for affected
-items. Independent complete items may still be analyzed; the report names missing scope and its effect.
+Also retain PRs authored by accounts the API identifies as Bot or App, accounts with a normalized
+`[bot]`/`app/` identity, and any login matched by the consumer's `bot_inventory_terms`.
+Stackweaver retains its existing `renovate|dependabot|release-bot` visibility through those terms.
+If the account is not configured, mark an
+inventory gap requiring classification. These rows are visible in reports, with no automatic
+execution eligibility; an owner-approved scope and the usual evidence/checks remain necessary.
+
+A 403/404 alone is not proof that a surface has no findings or no GHAS. Preserve a documented local
+expectation only for the declared repository/surface when the actual status and message match its
+configured evidence. Record it as `complete-unavailable`, with a reason and a null count shown as
+"n/a", never a zero-alert result. Do not require an extra capability lookup for that matching case.
+Successful responses still collect actual results if a previously unavailable surface becomes enabled.
+Unmatched access errors remain denied/unknown; the report exposes the mismatch.
+
+Track completeness separately for each repository's PR inventory, configured dashboards, Dependabot
+and code-scanning surfaces, and supplemental discovery. A successful empty collection is complete;
+an explicitly matching expected-unavailable code-scanning response is accounted for as n/a; errors
+and truncated collections are incomplete. PR/check/file/head evidence is required for that PR's
+readiness; dashboard completeness is required for claims about that repository's queued dependency
+coverage; alert completeness is required for that surface's security assessment and fix disposition.
+Supplemental discovery failures block complete-organization coverage claims, not a separately complete
+explicit repository analysis. An unavailable code-scanning surface does not invalidate complete
+Dependabot comparisons or unrelated compatible PR decisions. Unknown or incomplete alert data cannot
+support a claim that all vulnerabilities are fixed or that an alert was resolved by absence.
+Do not silently suppress errors, truncate at a first-page limit or turn partial counts into totals.
 
 ### Analysis, dispositions and durable reports
 
@@ -269,8 +304,10 @@ updates append dated sections without changing its existing prefix or deleting h
 rescope starts a new linked run rather than rewriting the original scope. Record source revisions and scope, collection
 coverage/errors, each PR/version delta, release-note evidence, code impact, risk, ownership, proposed
 action, unmet checks and major/hygiene backlog. Include a Security alerts section with per-repository
-counts/breakdowns, dispositions and comparison with the previous complete comparable run. Partial or
-differently scoped runs cannot claim an alert was resolved by absence. Follow the consumer's metadata
+counts/breakdowns, dispositions and comparison with the previous complete comparable observation for
+each repository and surface. Compare resolved identities only when both observations are successful
+complete lists with the same scope. A missing, differently scoped, unknown or n/a observation never
+proves resolution; show availability changes separately. Follow the consumer's metadata
 and generated-index conventions; leave reports uncommitted unless requested or the local policy
 already explicitly requires their scoped commit. Stackweaver retains its report-commit policy.
 
@@ -306,7 +343,9 @@ tests actual model procedure use without a live dependency merge or full private
 Keep the private packet and output local, exclude credentials/host configuration/historical private
 reports, and compare source/index bytes before/after. Record model identities and exact revisions;
 missing access or a failed trial remains blocking. Claude CLI discovery/installed-helper behavior
-is required; a Claude model-behavior claim needs its own observed trial and is not implied by install.
+is required. The owner explicitly deferred an actual Claude model trial while tokens are exhausted;
+keep its command/model/argument routing contracts and declare live invocation unverified. Copilot
+report-stage evidence does not turn that deferral into a pass.
 GUI invocation checks remain deferred as in the owner's prior decision; add a maintenance-specific
 support note rather than treating the triage issue as maintenance execution evidence.
 
@@ -316,8 +355,8 @@ shared commit. Use only native view/grep/glob tools for that report trial, with 
 network and GitHub tools disabled. The trusted test runner saves the returned assessment externally.
 This measures bounded report-stage behavior; it does not claim Copilot lifecycle, delivery or managed
 execution support. The Codex write-capable fake-transport trials in AC-05/AC-06 separately test
-selected-action and continuation behavior. Q3 determines whether actual Claude command report behavior
-is also a required pre-adoption proof; installer success never substitutes for that result.
+selected-action and continuation behavior. The explicitly deferred Claude model trial is not a
+pre-adoption blocker; all required Codex/Copilot trials remain blocking until observed successful.
 Update fixed operation-count assertions, including `tests/vh-adlc/triage/discovery.test.ts`, without
 weakening their existing triage checks. Add the portable maintenance helper tests to the current
 macOS selection in `.github/workflows/ci.yml`; Linux continues running the complete plugin suite.
@@ -325,7 +364,7 @@ macOS selection in `.github/workflows/ci.yml`; Linux continues running the compl
 ## Acceptance Criteria
 
 - [ ] AC-01: A project can discover and invoke shared dependency/security maintenance through the installed vh-adlc plugin without a harness-specific procedure or a Stackweaver checkout dependency.
-- [ ] AC-02: A sweep respects explicit repository scope, includes all configured dependency/sync bot PRs, dashboard work and security alerts, and exposes incomplete collection without declaring affected work ready.
+- [ ] AC-02: A sweep respects explicit repository scope, includes configured dependency/sync bot PRs, unknown-bot inventory gaps, dashboard work and security alerts, and distinguishes documented unavailable surfaces from incomplete collection without declaring affected work ready.
 - [ ] AC-03: Maintenance decisions use actual version/changelog, code-usage and source-ownership evidence, keep major migrations separate and leave ambiguous or mixed changes unresolved.
 - [ ] AC-04: Each sweep preserves a durable, uniquely named report covering every discovered PR, security reconciliation and unresolved work without overwriting history or claiming completion from missing data.
 - [ ] AC-05: Selected compatible work reuses bounded-maintenance checks and independent review, wider changes use the feature loop, and remote or live actions stay within existing owner and consumer permissions after revalidation.
@@ -339,14 +378,14 @@ macOS selection in `.github/workflows/ci.yml`; Linux continues running the compl
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Add operation/discovery contracts, a no-config single-project fixture and generic-intake routing tests. Verify no canonical model or project identities. Native marketplace checks are also required by AC-08. |
-| AC-02 | Execute fake-CLI collector tests with multiple pages, all normalized bot identities, dashboard-only work, alerts without PRs, empty results, 403/404/429, missing pages, unknown capability, unknown organization repositories and explicit repo/PR narrowing. Assert exact GET argv and no mutation or widened execution scope. |
+| AC-02 | Execute fake-CLI collector tests with multiple pages, normalized configured identities, renamed/unrecognized bot/app and legacy-filter matches, dashboard-only work, alerts without PRs and empty results. Test matching expected-unavailable status/message versus generic 403/404/429, newly enabled scanning, missing pages and unknown capability. Assert per-surface readiness effects, intact Dependabot comparison when scanning is n/a, visible organization gaps, explicit repo/PR narrowing, exact GET argv and no mutation or widened execution scope. |
 | AC-03 | Use a synthetic monorepo/satellite/standalone corpus containing an action pin/tag mismatch, used removed API, no-use search, pre-1.0 break, synced/excluded/mixed paths, stale sync version and false superset. Grade expected dispositions and observed evidence, not keyword presence alone. |
 | AC-04 | Generate two same-day reports, including the no-config `.vh-adlc/reports/maintenance/` case, and check distinct paths plus unchanged older bytes. Resume the current run and observe an append-only outcome with its original prefix and run ID preserved. Test security identity/counts, comparable prior run, incomplete prior/current runs and task-data escaping. Check Stackweaver metadata/index behavior in a disposable fixture. |
 | AC-05 | Re-run existing maintenance variant/resume regressions. Exercise a compatible local fixture repair from baseline through real checks and independent review; verify interface/policy changes route to a spec. Run a bounded Codex model scenario following the installed maintenance procedure against a write-capable fake gh transport in a disposable repo. Give no publication authorization, then a scoped approval in the same scenario, then change an approved target head. Grade its recorded attempted argv: no writes before approval, only selected approved repo/PR/action afterward and no stale-head write. Check local review/Definition/source state independently. The fake records all attempted writes and has no network or actual GitHub target. |
 | AC-06 | Run bounded Codex continuation scenarios with the canonical procedure, disposable Git repositories and that recording fake transport. Inject an ambiguous response after a simulated merge/closure has occurred and interrupt after a real local report commit. Resume the same scenario and require successful state reads before any retry, no duplicate completed operation or commit, and an unresolved result when state is uncertain. Change source/Definition/PR head in separate variants to require renewed checks/review/approval. Compare unrelated staged/untracked bytes and index. These are actual model procedure trials, not claims inferred from fake-server rejection. |
 | AC-07 | Paired adapter contracts and independent review check every row in the normative consumer parity table against shared procedure plus retained settings/policy. Assert unchanged opus model/arguments, all configured repositories/exclusions, local helper bytes and untouched other agents. Every unmapped or intentionally changed behavior needs an owner decision before adoption. |
 | AC-08 | After separately authorized publication, install the real marketplace revision in isolated Codex and Claude profiles, verify payload hashes including modes and discovered skill, then run installed settings/GET collection/report checks. Run disposable Stackweaver rollback/reapply at the exact paired commits with unrelated source/index equality. No consumer merge precedes these checks. |
-| AC-09 | Run actual Codex and requested Copilot Opus 5.5 synthetic trials plus the bounded local private-policy trial; independently grade report contents, source/index preservation and zero remote writes from transport logs. Run bun test tests/vh-adlc, required repository checks for changed paths, feature lint/freshness/gates and Copilot Opus 5.5 implementation review at exact commits. Keep GUI and unexecuted Claude model behavior visibly unverified. |
+| AC-09 | Run actual Codex and requested Copilot Opus 5.5 synthetic report trials plus the bounded local private-policy trial from the exact shared payload; independently grade report contents, source/index preservation and zero remote writes from transport logs. Check the Claude command/model/argument contract and native installation/helpers; its live model trial is owner-deferred and cannot be claimed passed. Run bun test tests/vh-adlc, required repository checks for changed paths, feature lint/freshness/gates and Copilot Opus 5.5 implementation review at exact commits. Keep GUI and Claude live invocation visibly unverified. |
 
 ## Tasks
 
@@ -356,41 +395,9 @@ consumer instructions/tests in Stackweaver rather than a second feature spec.
 
 ## Open Questions
 
-### Q1: Should documented unavailable security surfaces remain normal for Stackweaver?
-
-**Recommendation:** A. Preserve a consumer-declared expected-unavailable case only when the observed
-status/body matches its documented evidence; track completeness and comparisons per surface.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Preserve documented cases** | Existing no-GHAS behavior without treating arbitrary access errors as empty results. | A local expectation and matching-response test. |
-| **B. Require a fresh capability lookup** | Independent capability confirmation on every run. | Existing unavailable surfaces can block analysis when the lookup is inaccessible. |
-
-**Why this is yours:** It sets the intentional difference, if any, from the daily Stackweaver workflow.
-
-### Q2: Should unrecognized bot and app PRs appear as inventory gaps?
-
-**Recommendation:** A. Report unknown bot/app PRs as inventory gaps while retaining configured
-execution scope, so renamed accounts cannot silently disappear from the sweep.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Report unknown bots** | Coverage at least as visible as the old broad bot filter. | Some extra rows need classification. |
-| **B. Only configured identities** | A smaller inventory. | New/renamed bot work can be missed until configured. |
-
-**Why this is yours:** It chooses discovery coverage versus noise; neither option permits extra writes.
-
-### Q3: Should the daily Claude command have an actual bounded model trial before adoption?
-
-**Recommendation:** A. Test the real Claude `/maintenance` report entry with synthetic tracker data
-alongside Codex/Copilot trials; no real dependency merges occur.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Test the command** | Observed routing and report behavior on the daily surface. | Requires authenticated Claude access and a successful bounded trial. |
-| **B. Static routing only** | Faster acceptance with an explicit model-behavior limitation. | No observed claim that the migrated daily command runs correctly. |
-
-**Why this is yours:** It determines the required adoption proof and whether a missing Claude trial blocks it.
+None. The owner resolved unavailable scanning and unknown-bot discovery on 2026-10-28, and
+explicitly substituted Copilot for the live Claude model trial because Claude tokens are exhausted.
+Those decisions are incorporated above; fresh independent review and spec acceptance remain.
 
 ## Review Log
 

@@ -125,7 +125,7 @@ its own equivalent handoff. A parent status never replaces a child's acceptance 
 - [x] T2 `docs/specs/shared-triage.md` and Stackweaver `tests/agent-triage/README.md` - record the authorized shared publication, actual marketplace installation and ordered consumer adoption with exact revisions (AC-02, AC-03).
       Evidence: Shared merge `80fd36d0`, signed runtime v0.6.0, two exact marketplace payload checks, installed-helper reports, installed-plugin rollback, fourteen consumer checks and Stackweaver merge `5cb89174` are observed and recorded above. No maintenance, audit, documentation or domain extraction started.
 - [ ] T3 `docs/specs/` - when the owner selects maintenance, draft and independently review its own child spec before implementation (AC-01, AC-04).
-      Progress: Selected on 2026-10-27; `shared-maintenance.md` drafted and independently reviewed by Copilot Opus 5.5 R-1. Factual corrections are recorded; three owner decisions, re-review and acceptance remain before implementation.
+      Progress: Selected on 2026-10-27; `shared-maintenance.md` drafted and independently reviewed by Copilot Opus 5.5 R-1. Factual corrections and the 2026-10-28 owner decisions are incorporated. Fresh review and acceptance remain before implementation; the live Claude model trial is explicitly deferred while tokens are exhausted.
 - [ ] T4 `docs/specs/` - when the owner selects audit, draft and independently review its own child spec before implementation (AC-01, AC-04).
 - [ ] T5 `docs/specs/` and this document - revisit documentation overlap, domain extensions and broader onboarding only when selected; retain explicit dispositions meanwhile (AC-01, AC-04).
 
