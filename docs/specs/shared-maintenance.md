@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Opus R-15 has no blockers; publication cases, lifecycle authority, positive criteria and isolated GET-helper fixes await fresh review and acceptance."
+status_description: "Opus R-16 has no blockers; one missing-default-checkout fixture clarification is tracked for task planning; awaiting owner spec acceptance."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -116,6 +116,13 @@ Design removes the ban on index entries derived from already committed default-b
 and explicitly maps the existing skip-leak recovery under an approved delivery scope. These retain
 the owner's instruction to keep Stackweaver procedures working as before; neither creates a generic
 release-dispatch grant or permission to index unpublished documents.
+
+R-16 returned one nonblocking test-precision nit. Task decomposition must include a generic project
+whose only checkout is on a feature branch: the already specified missing-main-checkout isolation
+keeps its report candidate local, with publication pending and an explicit handoff. The fixture must
+observe no branch switch and no direct push from the report-role worktree. This is a proof sample for
+the existing main-checkout-only route, not a new authority or publication behavior. The reviewed
+normative baseline remains `f0517c1e5fe3801d0312732c6d3e114dd7f04ce9` for owner acceptance.
 
 ## Scope
 
@@ -1058,6 +1065,7 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-28 | R-16 | spec | `f0517c1e5fe3801d0312732c6d3e114dd7f04ce9` | claude-opus-5.5 | procedural | No blocking findings; carry the missing-default-checkout fixture clarification into task planning under the existing main-checkout-only publication rule. |
 | 2026-10-28 | R-15 | spec | `70b42a627aea300ca83d5a3ebe80d32d8f409044` | claude-opus-5.5 | procedural | No blockers; separate publication-case outcomes, align lifecycle authority and positive criteria, preserve unverified legacy visibility and isolate GET imports. |
 | 2026-10-28 | R-14 | spec | `e70b2ea8d475834334b83b702de411fe74de403b` | claude-opus-5.5 | procedural | No blockers; align advancement proof, persist comparable history, cover reused types and preserve committed-index regeneration and scoped leak recovery. |
 | 2026-10-28 | R-13 | spec | `35e84a042b99b70612774fb38b1d7a0fe3a8da1e` | claude-opus-5.5 | procedural | No blockers; clarify update candidates, same-day reservations, generic draft promotion and explicit publication tests. |
@@ -1603,6 +1611,15 @@ SEVERITY: nit
 WHERE: Frontmatter covers; Design, Collection and completeness; Scope
 EVIDENCE: The Design reuses "existing contained-path, pagination and owned-client helpers" (lines 688-689), and covers lists `scripts/triage/github.ts`, `collect.ts`, `types.ts`, `settings.ts` and `owned-process.ts` (lines 15-19). However, github.ts:3 imports `MutationFailure` from `./execute`. execute.ts:1-9 in turn imports `controller-authority`, `execution-history`, `execution-lock` and `report`, and report.ts:7 imports `verification`. Reusing `parsePage` or `githubReader` from github.ts therefore loads triage's execution and controller-authority graph into the maintenance collector. None of those files is covered, so a change there could affect maintenance without making its reviews stale. Scope also excludes "importing triage's managed publication controller into maintenance" (lines 133-134).
 PROPOSAL: Move the reused read-only helpers into a module that does not import `./execute`, and cover that module. Alternatively, add the transitively imported triage files to covers and say that the import is not a controller dependency.
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Local report commits and declared publication; Design, Report-publication cases for AC-04/AC-05; Test Plan, AC-04
+EVIDENCE: Spec line 565-570 says the `default-branch-checkout-ff-only` route is chosen by either authority, including a generic consumer's explicit publication request, and pushes "from the owning main checkout". Line 578 says to "Locate that checkout through Git metadata, never switching another session's branch". The only text that might cover a repository with no such checkout is line 549-550: "The same isolation applies when main is missing, diverged, dirty on report/index paths". "Main is missing" can mean a missing local default branch or no worktree with the default branch checked out. A generic project whose only checkout is on a feature branch hits the second case, and the spec forbids switching that branch. The Report-publication cases table (lines 1004-1019) covers a "Generic explicit report publication" positive (line 1007) but has no row for a repository with no default-branch checkout. An implementation could stop with publication pending, or could push the candidate directly from the report-role worktree. Both readings match the current text, and only the second departs from the owner-settled R-12 rule that publication moves the change to the main checkout and pushes from there.
+PROPOSAL: State that when no worktree has the validated default branch checked out, the candidate stays on its isolated ref and publication remains pending with a handoff, and that no direct push from the report-role worktree happens. Add that row to the Report-publication cases table so the AC-04/AC-05 fixtures assert it.
 
 ## Sources
 
