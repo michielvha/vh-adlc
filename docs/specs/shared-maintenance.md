@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner adopted shared review for authored repairs and unchanged bot-only batching on 2026-10-28; awaiting fresh Copilot Opus 5.5 review and spec acceptance."
+status_description: "Owner decisions are incorporated; Opus R-4 factual classification, evidence-ref and lifecycle-proof corrections are being reviewed before spec acceptance."
 issue: null
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -12,6 +12,9 @@ covers:
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/scripts/maintenance/
+  - plugins/vh-adlc/scripts/triage/github.ts
+  - plugins/vh-adlc/scripts/triage/settings.ts
+  - plugins/vh-adlc/scripts/triage/owned-process.ts
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - tests/vh-adlc/maintenance/
@@ -132,6 +135,11 @@ document or proof that any proposed repair is implemented. Public contract, data
 delivery-policy changes use the existing spec/tasks/implement/review route. Major upgrades remain
 separate migration tasks under the consumer's policy, never hidden in the routine batch.
 
+Add a new `Dependency or security sweep` intake row beside `Bounded maintenance`; there is no
+existing sweep row to replace. Update Resume to distinguish a sweep resumed from its run report
+from an authored repair resumed from its record/review target. Preserve the existing row names,
+direct operations and their authority. AC-01 tests both the new intake row and this resume routing.
+
 ### Consumer settings and project procedures
 
 Read optional `.vh-adlc/maintenance.json`, schema version 1. Without it, use only the validated
@@ -213,7 +221,8 @@ changes require a new decision. A recommendation in a report is not authorizatio
 | Dispatch a release or sync, change protection or use the local satellite helper | Explicit owner authority covering that live action and the exact consumer procedure. Existing scoped approval/preauthorization of Stackweaver satellite merges also covers its sanctioned helper, without another per-helper prompt. It grants no unrelated protection change, generic bypass or raw `gh pr merge --admin` fallback. Read-only release watching never grants dispatch authority. |
 | Stop and restore a shared development stack for a release smoke test | Stackweaver's separate confirmation naming the shared stack; inspect its current mode, stop only after approval, and restore the same mode. Approval to merge dependencies does not approve stopping a live stack. |
 
-Update the lifecycle's dependency/security sweep route to name this operation. Amend its Ship/live
+Add the lifecycle's `Dependency or security sweep` row naming this operation and amend its Resume
+row as described above. Amend its Ship/live
 operation row's unsupported-gap sentence to permit only the selected maintenance delivery classes
 above when explicitly authorized. Keep the bounded-maintenance local-authority paragraph; append a
 cross-reference saying that delivery is a separate authorized phase. Add an authority-table row for
@@ -225,8 +234,18 @@ triage's exact-batch/controller contracts remain unchanged.
 
 ### Consumer batch mapping and worktree preservation
 
-Distinguish a bot-head aggregation from an authored repair. Stackweaver's existing Step 6 combines
-selected bot commits, regenerates compatible locks as required and opens one combined PR. Its
+An aggregation consists only of selected bot commits with unchanged intended patch content
+(cherry-pick commit IDs may differ) plus mechanical lock regeneration
+from those selected manifests using the declared package manager. Record and inspect the generated
+delta, preserving the selected target constraints; unexplained resolution changes remain unresolved.
+Manual lock edits, changed version constraints, agent-written equivalent manifest bumps, alert fixes
+without a bot commit, source edits, build/config changes and CI repairs are authored changes. A red
+combined-CI fix that only regenerates locks from the same selected manifests stays aggregation;
+changing those manifests or any other shipped behavior makes it authored. Every authored change
+uses the owner-selected independent repair review before publication. Its origin in a bot batch,
+security alert or failed CI does not exempt it. Keep pure aggregation's existing combined-PR/CI flow.
+
+Stackweaver's existing Step 6 combines selected bot commits and opens one combined PR. Its
 dated sweep report records selection, source PR heads, compatibility evidence, combined-CI results
 and release outcomes. Keep that existing report in the owning consumer checkout, with its existing
 report-only commit policy; do not insert another maintenance record or the report into the dependency
@@ -235,7 +254,7 @@ PR/check/merge requirements still apply, including actual changelog and usage an
 This is the explicitly authorized consumer delivery extension, not a claim that the generic
 bounded-maintenance completion procedure was executed for an aggregation task.
 
-If the agent authors a source or CI repair while preparing that batch, use the unchanged bounded
+If the agent authors a dependency, source, build/config or CI repair while preparing that batch, use the bounded
 maintenance path for that repair. Its Definition/evidence/review record lives under the owning
 consumer's maintenance directory, outside the dependency worktree's outgoing change set. Bind its
 affected-source verification to the batch worktree's exact commit and record any transplant. Before
@@ -247,7 +266,8 @@ The existing bounded-maintenance default still commits a task record with the re
 batch record-location rule applies. Document this narrow consumer record-location extension in
 lifecycle.md and maintenance-record.md; do not silently exempt authored repairs from review.
 
-For that external record only, use an explicit pair: `source_target` is the exact batch-source commit
+For that external record only, use an explicit pair: `source_target` is the exact repair-source commit
+(monorepo batch, satellite or independent repository)
 and `record_target` is the committed Definition/evidence artifact in the owning consumer's Git
 history. Both repository/worktree paths and both full commits are review inputs. Extend
 maintenance-review.md to read the Definition at record_target and the actual source diff/checks
@@ -257,8 +277,22 @@ invalidates that review. The ordinary one-target record contract is unchanged. M
 paired input leaves review pending. Tests must exercise both positive freshness and independent
 source/record changes for the pair; a single-target review cannot certify a paired-record task.
 
-An authored satellite builder or CI repair is prepared in a fresh task-owned checkout/worktree of
-that explicitly selected satellite's actual repository and current default branch. Fetch or clone
+After selected repair work begins, prepare record_target commits on a dedicated local branch
+`chore/maintenance-evidence-<run-id>` in a fresh, clean, task-owned worktree of the primary consumer
+repository, starting from the recorded current consumer-main base. Its path is recorded as
+`evidence_checkout`; it is separate from all source worktrees and the live/shared main checkout.
+Refuse existing-path/ref collisions rather than reuse another session's state. Commit only the
+explicit record paths after checking that worktree's index; never commit records on an unrelated
+feature branch or the main checkout's current branch. Store this ref and both review bindings in
+the owning run's journal. Retain the local evidence ref so record_target remains reachable through
+resume and review; a normal source-worktree cleanup cannot delete it. It stays local unless the
+owner separately authorizes publication to its named destination. A report's existing local commit
+rule does not authorize pushing that report or this ref. Pre-selection analysis does not create
+this repair-evidence branch: reports keep their existing placement and commit-eligibility checks.
+
+An authored dependency, builder, source or CI repair in a satellite or independent repository is
+prepared in a fresh task-owned checkout/worktree of that explicitly selected actual repository and
+its current default branch. Fetch or clone
 that repository using the existing scoped identity; missing access blocks the repair. Never prepare
 it in the monorepo's distribution mirror or reuse another task's checkout. Its source_target and
 source-repository identity bind to the satellite commit; the record_target binds to the owning
@@ -269,6 +303,13 @@ without another helper-specific prompt. Thus the API/orchestrator builder bumps 
 the monorepo toolchain batch under the existing selected plan. New repair scope still needs approval.
 All worktree ownership, normal cleanup and unrelated-state preservation checks apply to this
 satellite worktree as well as the monorepo batch worktree. This extends no approval to unrelated repos.
+
+Alert-only satellite fixes and independent-repository dependency work use this same source-repository
+and record-target mapping. An equivalent monorepo bump derived from a synced satellite PR, or a
+monorepo alert with no bot PR, is authored in the monorepo batch source worktree with its record on
+the separate evidence ref. Satellite prerequisites still use the sanctioned helper under the selected
+satellite-merge scope; independent-repository merges use that repository's retained policy. Neither
+kind receives an automatic review exemption.
 
 The selected Stackweaver batch procedure authorizes ordinary creation of a fresh task-owned worktree
 and branch from current main. Amend authority.md's blanket worktree prohibition to permit that
@@ -292,7 +333,7 @@ Later adoption refreshes that baseline and checks for intervening changes.
 | --- | --- |
 | Introduction and hard rules, `agents/maintenance.md:3-51` | Shared changelog/usage analysis and report-first selection; local no-self-credit, conventional commits, distribution exclusion, dependency no-skip rule, one-squash policy, scoped preauthorization and satellite helper/check rules. |
 | Repository inventory and supplemental discovery, Steps 1 and Repos section | Full primary, eight synced consumers, four independent repositories and explicit exclusions remain local. Collect every page and report unlisted organization repositories and unrecognized bot/app PRs as inventory gaps; do not silently add them to execution scope. Preserve visibility for accounts matched by the existing broad bot filter. |
-| Release-bot and stalled-sync incidents, Step 1 | Preserve normalized release-bot discovery and investigation of stalled sync checks. Check the actual destination version; propose closing superseded sync PRs, never merging a version regression. |
+| Release-bot and stalled-sync incidents, Step 1 | Preserve normalized release-bot discovery, inspect stalled sync checks and repair the satellite root cause through the authored-repair/evidence-ref/selected-scope path before deciding whether queued syncs are live or superseded. Then check the actual destination version; propose closing superseded sync PRs, never merging a version regression. |
 | Dashboard and coverage audit, Step 1 | Shared dashboard reconciliation; local Renovate schedule/group/limits and immediate-security expectations. Retain the local recommendation to narrow Dependabot scans to satellite-only ecosystems and flag missing configured vulnerability handling. Do not rewrite managers/config during analysis. |
 | Security reconciliation, Step 1.5 and referenced policy | Shared PR-independent alert inventory, identity/count comparison, source-owner classification and posture tracking. Local no-GHAS purchasing decision and matching-response expectations remain local. Completeness and historical comparisons are per repository and surface. |
 | Release notes and pin checks, Step 2 | Shared actual delta/migration reading, tag-to-commit validation and code-usage evidence. Parallel delegation is optional when available; equivalent serial investigation preserves the result on other harnesses. |
@@ -323,6 +364,8 @@ Provide helpers under `scripts/maintenance/` for settings resolution, collection
 They have no remote mutation command. Use the existing authenticated GitHub CLI through fixed argv
 and validated API endpoints with GET only. Use no shell interpolation of settings, PR text or paths.
 Capture the queried repository/head, pagination, timestamps, request errors and per-surface completeness.
+Reuse existing contained-path, pagination and owned-client helpers where their interfaces fit,
+preserving current triage callers and tests. Shared utility changes are scoped to that reuse.
 
 Collect all pages of open PRs and relevant changed-file/check/head data; include configured dependency
 and sync bots using normalized exact logins, including GitHub's `app/` and `[bot]` forms. Also inspect
@@ -419,6 +462,22 @@ development test only. Consumer rollback restores the pre-cutover tracked entry 
 reapplication restores the new route while preserving unrelated tracked, untracked and staged bytes.
 Refresh the rollback base if main advances before adoption; do not transplant stale AGENTS.md.
 
+Separate source completion from post-publication adoption so the feature cannot require its own
+release before passing the gate that permits shipping it. Before publication, native candidate
+installation/discovery and installed-helper checks use the exact committed local catalog, clearly
+identified as development proof. The paired adapter's adoption preflight must fail when actual
+published-marketplace evidence is missing, stale, from a different payload or only a local catalog.
+Test that denial and the verifier's valid/invalid receipt handling before source completion.
+The implementation review observes those executable checks; it does not need its own verdict or
+the completion gate to have passed in advance.
+
+After separately authorized shared publication, the real marketplace installs and installed-operation
+checks above remain mandatory before the Stackweaver merge. Record their exact source/version/payload
+and command results in the adoption handoff, re-run the preflight and stop adoption on any failure.
+Candidate-install proof is never relabelled published proof. Source `complete` does not mean migration
+is complete; keep the parent/adoption state pending until actual publication checks and consumer
+adoption finish. This is delivery sequencing, not a deferral or waiver of marketplace testing.
+
 Require bounded actual Codex CLI and Copilot Opus 5.5 read-only report trials on synthetic repositories,
 plus one fixed Stackweaver source/configuration read-only trial with synthetic tracker data. This
 tests actual model procedure use without a live dependency merge or full private-source transfer.
@@ -507,22 +566,22 @@ The AC-05 authority variants run the actual Codex procedure against those dispos
 - [ ] AC-05: Newly authored compatible repairs use bounded-maintenance checks and independent review, selected bot-batch delivery preserves the declared consumer procedure, wider changes use the feature loop, and remote or live actions stay within owner and consumer permissions after revalidation.
 - [ ] AC-06: Resuming a task preserves unrelated work and prior evidence, invalidates stale reviews/approvals and reconciles interrupted actions before retrying them.
 - [ ] AC-07: Stackweaver routes maintenance to the installed shared operation while retaining its command/model/arguments, repository facts, batching and release checks, and existing approved satellite-helper behavior locally.
-- [ ] AC-08: The published marketplace payload passes native Codex and Claude CLI installation/discovery and installed-helper checks before Stackweaver adoption, and the consumer can roll back and reapply without unrelated changes.
-- [ ] AC-09: Actual bounded Codex and Copilot report-stage trials follow the shared analysis procedure and retained consumer policy, and required tests and independent review pass without implying untested delivery or GUI support or changing deferred workflows.
+- [ ] AC-08: The exact committed candidate passes native Codex and Claude CLI installation/discovery and installed-helper checks, the consumer can roll back and reapply without unrelated changes, and its adoption preflight blocks cutover until matching real marketplace verification is available.
+- [ ] AC-09: Actual bounded Codex and Copilot report-stage trials follow the shared analysis procedure and retained consumer policy, and required regression and trial checks pass without implying untested delivery or GUI support or changing deferred workflows.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Add operation/discovery contracts, a no-config single-project fixture and generic-intake routing tests. Verify no canonical model or project identities. Native marketplace checks are also required by AC-08. |
+| AC-01 | Add operation/discovery contracts and a no-config single-project fixture. Test the new Dependency or security sweep intake row beside unchanged Bounded maintenance, and Resume choosing a run report for a sweep versus a record/review target for a repair. Verify no canonical model or project identities. Candidate installation checks are also required by AC-08. |
 | AC-02 | Execute fake-CLI collector tests with multiple pages, normalized configured identities, renamed/unrecognized bot/app and legacy-filter matches, dashboard-only work, alerts without PRs and empty results. Test matching expected-unavailable status/message versus generic 403/404/429, newly enabled scanning, missing pages and unknown capability. Assert per-surface readiness effects, intact Dependabot comparison when scanning is n/a, visible organization gaps, explicit repo/PR narrowing, exact GET argv and no mutation or widened execution scope. |
 | AC-03 | Use a synthetic monorepo/satellite/standalone corpus containing an action pin/tag mismatch, used removed API, no-use search, pre-1.0 break, synced/excluded/mixed paths, stale sync version and false superset. Grade expected dispositions and observed evidence, not keyword presence alone. |
 | AC-04 | Generate two same-day reports, including the no-config `.vh-adlc/reports/maintenance/` case, and check distinct paths plus unchanged older-run bytes. Resume the current run and append an outcome with its body prefix and run ID preserved; update only its status/status_description header scalars. Reject changed scope/identity, edited prior body, unrelated metadata and concurrent edits. Test security identity/counts, comparable prior run, incomplete observations and task-data escaping. Check Stackweaver live frontmatter/status/index behavior in a disposable fixture. |
-| AC-05 | Re-run existing maintenance variant/resume regressions. Exercise an authored fixture repair through actual checks/review, including paired-record freshness and source/Definition negatives. Verify wider changes route to a spec. Run bounded Codex scenarios against recording fake gh and fake local service commands: no writes without approval; selected aggregation, independent-repo and helper actions under existing scoped preauthorization without extra helper prompts; an authored API builder bump in the actual satellite fixture checkout with its paired record/review lands before the monorepo bump; stale heads block writes. Observe task-owned worktree creation, clean normal cleanup and branch retention when non-forced deletion refuses; dirty/unrelated worktrees stay untouched. Assert no record/report enters the dependency squash. Additionally execute the four authority variants above and require every negative and approved positive control to match the observed command/state trace. No fixture transport or service command targets actual GitHub or a live stack. |
+| AC-05 | Re-run existing maintenance variant/resume regressions and wider-change routing checks. Execute bounded Codex scenarios against recording fake gh/local service commands: no unapproved writes; scoped aggregation/independent/helper actions without extra helper prompts; authored builder prerequisites in a satellite fixture before the monorepo bump; stalled-sync root-cause repair before queued dispositions; stale-head denial. Separate unmodified bot commits plus same-manifest mechanical lock regen from authored alert-only/equivalent manifest bumps, manual lock edits and CI/source fixes; the former keeps combined-CI flow and every latter case needs observed independent repair review. Exercise satellite-only and independent-repo authored changes with exact source/record pairs, including stale source/Definition negatives. Commit records only on the dedicated local evidence ref; seed the invocation checkout with an unrelated branch and staged work and prove its bytes/index/ref remain unchanged. Observe clean task-owned worktree creation/normal cleanup and retained refs when normal deletion refuses. Assert no report/record enters the dependency squash. Run all four authority variants above with positive/negative command/state checks. No fixture targets actual GitHub or a live stack. |
 | AC-06 | Run bounded Codex continuation scenarios with the canonical procedure, disposable Git repositories and that recording fake transport. Inject an ambiguous response after a simulated merge/closure has occurred and interrupt after a real local report commit. Resume the same scenario and require successful state reads before any retry, no duplicate completed operation or commit, and an unresolved result when state is uncertain. Change source/Definition/PR head in separate variants to require renewed checks/review/approval. Compare unrelated staged/untracked bytes and index. These are actual model procedure trials, not claims inferred from fake-server rejection. |
 | AC-07 | Paired adapter contracts and independent review check every row in the normative consumer parity table against shared procedure plus retained settings/policy. Assert unchanged opus model/arguments, all configured repositories/exclusions, local helper bytes and untouched other agents. Every unmapped or intentionally changed behavior needs an owner decision before adoption. |
-| AC-08 | After separately authorized publication, install the real marketplace revision in isolated Codex and Claude profiles, verify payload hashes including modes and discovered skill, then run installed settings/GET collection/report checks. Run disposable Stackweaver rollback/reapply at the exact paired commits with unrelated source/index equality. No consumer merge precedes these checks. |
-| AC-09 | Execute all three specified report trials with the exact packets, models, stage attribution and per-case pass conditions above. Re-run the independent graders with omitted/misclassified/unsupported-action negative outputs to prove they fail. Inspect actual Copilot native inventory/calls/results and required reads, Codex native commands/results, input/source/index equality and rendered report contents. Check Claude static command/model/argument routing and native installation/helpers; its live model trial is owner-deferred, never a pass. Run bun test tests/vh-adlc, applicable repository checks, feature lint/freshness/gates and Copilot Opus 5.5 implementation review at exact commits. Keep GUI and Claude live invocation visibly unverified. |
+| AC-08 | Install the exact committed candidate from an isolated local catalog in native Codex and Claude profiles; verify payload hashes/modes, skill discovery and installed settings/GET collection/report behavior. Label this development proof. Execute paired rollback/reapply with unrelated source/index equality. Execute the adoption preflight with absent, local-only, stale, wrong-source/version/payload and incomplete published evidence and require denial; exercise valid receipt parsing without calling a fixture an actual publication. The mandatory delivery procedure then installs/verifies the real published source before any consumer merge; its actual results are recorded separately, not prerequisites for the source-shipping gate. |
+| AC-09 | Execute all three specified report trials with the exact packets, models, stage attribution and per-case pass conditions above. Re-run independent graders with omitted/misclassified/unsupported-action negative outputs and require failure. Inspect actual Copilot native inventory/calls/results and required reads, Codex native commands/results, input/source/index equality and rendered reports. Check Claude static command/model/argument routing and native candidate installation/helpers; its live model trial is owner-deferred, never a pass. Execute bun test tests/vh-adlc and applicable repository regression checks at the reviewed source. Keep GUI and Claude live invocation visibly unverified. Feature review/freshness/completion remain framework requirements outside this criterion's end state. |
 
 ## Tasks
 
@@ -540,6 +599,7 @@ substitution decisions are incorporated above. Fresh review and final spec accep
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-28 | R-4 | spec | `b3751ebf2e0f55c51af59e0e21d98e80a0c8dc9a` | claude-opus-5.5 | procedural | No blocking findings; clarify authored-dependency classification, stalled-sync repairs, record refs, non-circular criteria and exact intake changes. |
 | 2026-10-28 | R-3 | spec | `7346606c7813391e047b365f134f64dc7e10418a` | claude-opus-5.5 | procedural | No blocking findings; authored satellite mapping and authority proof need fixes, with an explicit owner decision on repair-review and worktree extensions. |
 | 2026-10-28 | R-2 | spec | `50ae43e6d1365dca95875039c82b260c8417ee6e` | claude-opus-5.5 | procedural | Blocking batch-lifecycle mapping and trial-proof gaps; report-header, independent-repository and baseline clarifications required. |
 | 2026-10-27 | R-1 | spec | `6c139552bd81535db3367c9f0fecbda18ef94723` | claude-opus-5.5 | procedural | Blocking authority, collection-completeness, parity and executed-proof gaps; factual fixes and owner decisions pending. |
@@ -685,6 +745,43 @@ SEVERITY: should-fix
 WHERE: Test Plan, AC-05; Acceptance Criteria AC-05
 EVIDENCE: AC-05 claims that "remote or live actions stay within owner and consumer permissions after revalidation". The authority table defines separate classes and limits. Closing a PR or posting its explanation needs revalidation of supersession and ownership (line 200). Publishing a report or record needs separate authority (line 201). A release or sync dispatch needs explicit authority, and watching a release "never grants dispatch authority" (lines 195, 202). Stopping the shared stack needs Stackweaver's separate confirmation, and "Approval to merge dependencies does not approve stopping a live stack" (line 203). The AC-05 proof exercises unapproved writes, aggregation, independent-repository and helper actions, a stale-head write and worktree cleanup (line 489). It has no scenario or negative control for close/comment revalidation with mixed or unknown ownership, report or record publication, release or sync dispatch after watch-only authority, or stopping the stack under dependency-merge approval alone. feature-documents.md:103-105 requires Proof to name a real check for the criterion. As written, AC-05 can pass while those permission boundaries were never observed.
 PROPOSAL: Add Codex fake-transport variants with pass conditions for these four classes. Alternatively, narrow AC-05 to the classes the proof exercises and cover the rest with a separate criterion and proof.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer batch mapping and worktree preservation; Design, Authority for selected follow-up work; Test Plan, AC-05
+EVIDENCE: The spec defines only two kinds of change. A bot-head aggregation "combines selected bot commits, regenerates compatible locks as required" (spec lines 228-229). An authored repair is introduced with "If the agent authors a source or CI repair" (line 238), and the satellite mapping covers only "An authored satellite builder or CI repair" (line 260). Several existing Stackweaver flows produce agent-authored dependency changes that fit neither definition. Step 1.5 folds an alert's "dependency bump into the same one-squash batch" when no fix PR exists, and fixes a satellite-only alert "in that satellite" (agents/maintenance.md:196-200). Step 4 folds "the equivalent bump into the monorepo batch" after a synced satellite PR is closed (265-269). Step 7 fixes red combined CI "on the branch (often a lockfile regen) and re-push" (360-362). Authored work can also land in the four independent repositories (66-83), and the spec gives that work no preparation location or record binding. The owner decision applies review to authored repairs and keeps bot-only batching. Without a classification rule, an implementer can review lock regenerations, which changes bot-only batching. An implementer can also skip review for agent-written manifest bumps, which exempts authored changes from the review the owner adopted. The AC-05 proof covers neither boundary.
+PROPOSAL: State the classification rule. For example, only unmodified cherry-picked bot commits plus mechanical lock regeneration for those manifests count as aggregation, and any agent-written manifest, source or CI change is authored. Map alert-driven, equivalent-bump, satellite-only and independent-repository authored changes to a preparation location and the paired-record path. Add fixture cases on both sides of the boundary to the AC-05 proof.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer parity checklist and intentional differences (Release-bot and stalled-sync incidents row)
+EVIDENCE: For a stalled sync PR, Stackweaver says: "check `gh pr checks`, fix the root cause on the satellite, and only then decide whether the queued PRs are still live or superseded" (agents/maintenance.md:132-138). Both recorded incidents were CodeQL failures after a monorepo Go bump (134-135). The parity row keeps only "investigation of stalled sync checks" and the superseded-closure rule (spec line 295). It does not map the root-cause repair, its ordering before the live-or-superseded decision, or its authority under the authored satellite repair path. AC-07 checks every row of this table, so this retained behavior can be lost while AC-07 still passes.
+PROPOSAL: Add the satellite root-cause repair, and its ordering before the disposition of queued sync PRs, to the parity row. Route it through the authored satellite repair, paired-record and selected-scope authority mapping, and include it in the Stackweaver policy report or AC-05 fixtures.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer batch mapping and worktree preservation; Design, Authority for selected follow-up work
+EVIDENCE: The external record "lives under the owning consumer's maintenance directory" (spec lines 239-240), and `record_target` is "the committed Definition/evidence artifact in the owning consumer's Git history" (lines 250-251). The spec does not say which checkout, worktree or branch receives that commit. The shared bounded procedure requires "a short-lived maintenance branch in the task's owning checkout; do not write into an unrelated feature" (lifecycle.md:97-98). Stackweaver treats its main working tree as "live and shared" and edits code in worktrees (CLAUDE.md:130), and it lets small verified changes go "straight to `main`" (CLAUDE.md:159). The authority table names commit rules only for the sweep report (spec line 207). It does not say whether the record commit may land on the main checkout's current branch, which can be another session's work with staged entries (authority.md:59-63), or whether that commit is ever pushed. Push and publication need separate authority (line 212). Reviewers and resume need `record_target` to stay reachable, but nothing defines where it lives.
+PROPOSAL: Specify the ref and checkout that receive `record_target` commits, for example the same location and branch as the consumer's report commit, with explicit-path commits and an unrelated-state check. State that the commit stays local unless publication is separately authorized. Add a fixture in which the owner checkout is on an unrelated branch with staged work.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-09; Test Plan AC-09
+EVIDENCE: AC-09 requires that "required tests and independent review pass" (spec line 511). Its proof includes "feature lint/freshness/gates and Copilot Opus 5.5 implementation review at exact commits" (line 525). Under feature-documents.md:183-185, an implementation review returns `met` only when "executed evidence observed in this review establishes the criterion". A reviewer cannot observe its own pass. The `complete` gate also requires `all_met` and `impl_review_clean` (feature-documents.md:248, 289-291), so AC-09 depends on the gate and review that evaluate it. The deciding review can never return `met` for AC-09, so the criterion is circular and can only end unmet or residualised.
+PROPOSAL: Remove the independent review and gate passes from AC-09's end state, since the completion gate already enforces them, and keep only the trial and test outcomes that a reviewer can observe.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Canonical operation and lifecycle reuse; Design, Authority for selected follow-up work
+EVIDENCE: The spec says to "Update the lifecycle's dependency/security sweep route to name this operation" (line 216), which implies such a route exists. Line 128 makes the same assumption. The lifecycle table has no sweep row. Its rows are Answer, Backlog triage, Diagnosis, Documentation, Bounded maintenance, New capability, Bootstrap, Verification, Resume and Ship (lifecycle.md:39-50). Its Resume row says only that "maintenance uses its record and review target" (line 49), while the spec resumes a sweep from its saved run report (spec lines 376-377, 401-402). discovery.test.ts:31 asserts the existing row names, so the planned change to the table needs to be exact.
+PROPOSAL: Say that a new "Dependency or security sweep" intake row is added beside Bounded maintenance, and amend the Resume row to cover a sweep run's report. Add both to the AC-01 routing tests.
 
 ## Sources
 
