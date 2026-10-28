@@ -25,8 +25,14 @@ document holds the requirements, acceptance criteria, test plan, and later tasks
 The agent asks you to resolve choices that affect the feature's scope.
 
 Run `vh-adlc-spec review <path>` for an independent spec review. Resolve the
-findings, then accept the reviewed scope when you are satisfied. The binary checks
-whether the document can move to `planned`.
+findings. Before asking you to accept, the agent summarizes the proposed behavior,
+scope, significant permissions and side effects, migration, and validation status
+in the conversation. It identifies deferred tests and explains what your acceptance
+authorizes, so you can decide without reading the full document. Revised specs get
+a fresh summary of what changed. The full document remains available for details.
+
+Accept the reviewed scope when you are satisfied. The binary checks whether the
+document can move to `planned`.
 
 ## 2. Plan the work
 

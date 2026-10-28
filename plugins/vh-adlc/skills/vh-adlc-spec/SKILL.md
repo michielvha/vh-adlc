@@ -60,9 +60,28 @@ without asking, and `references/review-protocol.md` for the review mode.
    before changing anything. Then run `vh-adlc review check` against the same text.
 4. Apply factual findings. Turn judgement findings into Open Questions for the owner. Commit. A blocking
    pass is cleared only by a new independent pass at the new commit.
-5. When a clean review at X exists and Open Questions is empty, ask the owner to accept. On acceptance in
-   session, append the acceptance row at X, run `vh-adlc gate planned`, and on a pass move the status and
-   commit with the gate's line.
+5. When a clean review at X exists and Open Questions is empty, present the owner-facing summary below,
+   then ask the owner to accept. On acceptance in session, append the acceptance row at X, run
+   `vh-adlc gate planned`, and on a pass move the status and commit with the gate's line.
+
+## Owner-facing summary
+
+Whenever you finish spec work, summarize the current spec in the conversation. Before each acceptance
+or renewed acceptance request, give the owner enough information to decide without reading the document
+end to end or reopening earlier progress updates. Scale the summary to the feature; use plain language
+and a few short paragraphs or bullets covering:
+
+- The problem, intended outcome and proposed user-visible behavior.
+- What is included, what stays unchanged or local, and what is excluded.
+- Significant defaults, side effects, permissions and trade-offs.
+- Migration, compatibility and rollback when relevant.
+- The validation plan, current review result, and remaining blockers, limitations or deferred tests.
+- Exactly what acceptance authorizes and which later actions still need separate approval.
+
+For a revised spec, explain what changed since the last accepted version. Distinguish planned checks
+from executed checks and spec review from implementation verification. Link the full document for
+details; a link, review verdict or list of criterion IDs does not replace the summary. The document
+remains the canonical scope and the existing acceptance and status gates still apply.
 
 ## Revising a planned or in-progress document
 
