@@ -75,14 +75,17 @@ export function canonicalJSON(value: unknown, ancestors = new Set<object>()): st
   } finally { ancestors.delete(value); }
 }
 
-function syncDirectory(path: string) {
+export function syncDirectory(path: string) {
   const fd = openSync(path, "r");
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
 
 /** Publish complete private bytes exactly once; the final filename is never replaced. */
 export function publishJSON(path: string, value: unknown): string {
-  const bytes = `${canonicalJSON(value)}\n`, temporary = join(dirname(path), `.tmp-${randomUUID()}`);
+  return publishBytes(path, `${canonicalJSON(value)}\n`);
+}
+export function publishBytes(path: string, bytes: string | Uint8Array): string {
+  const temporary = join(dirname(path), `.tmp-${randomUUID()}`);
   const fd = openSync(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
   try { writeFileSync(fd, bytes); fsyncSync(fd); }
   finally { closeSync(fd); }
@@ -99,7 +102,7 @@ export function publishJSON(path: string, value: unknown): string {
 function commonDir(config: Settings): string {
   return realpathSync(git(config.root, "rev-parse", "--path-format=absolute", "--git-common-dir"));
 }
-function privateDirectory(base: string, parts: string[], create: boolean): string {
+export function privateDirectory(base: string, parts: string[], create: boolean): string {
   let current = base;
   for (const part of parts) {
     current = join(current, part);
