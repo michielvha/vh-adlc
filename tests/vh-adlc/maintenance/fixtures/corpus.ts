@@ -4,12 +4,14 @@ import { dirname, join } from "node:path";
 import { fixture, git } from "../fixtures";
 import { loadSettings } from "../../../../plugins/vh-adlc/scripts/maintenance/settings";
 import { canonicalJSON, createRun, digest } from "../../../../plugins/vh-adlc/scripts/maintenance/journal";
+import { jsonEvidence } from "../json-evidence";
 import type { ExpectedCase } from "../trial-proof";
 
-export function syntheticCorpus() {
+export function syntheticCorpus(options: { operatorInputs?: (root: string) => Record<string, string> } = {}) {
   const project = fixture(), output = mkdtempSync(join(tmpdir(), "vh-maintenance-packet-")), dispose = project.dispose;
   project.dispose = () => { dispose(); rmSync(output, { recursive: true, force: true }); };
   const files: Record<string, string> = {
+    ...options.operatorInputs?.(project.root),
     "src/app.ts": "import { oldCall } from 'widget';\nexport const value = oldCall();\n",
     "src/security.ts": "import { vulnerable } from 'unsafe-lib';\nexport const entry = vulnerable();\n",
     "package.json": '{"dependencies":{"widget":"1.2.0","experimental":"0.4.0","unsafe-lib":"1.0.0"}}\n',
@@ -34,7 +36,7 @@ export function syntheticCorpus() {
   for (const path of ["plugin.json", ".claude-plugin/plugin.json"]) project.write(`${component}/${path}`, '{"name":"vh-adlc","version":"0.5.0"}\n');
   project.write(`${component}/skills/vh-adlc-maintenance/SKILL.md`, "# Synthetic maintenance component\n");
   project.write(`${component}/references/maintenance.md`, "Report stage uses supplied synthetic collection receipts; no live action.\n");
-  git(project.root, "add", "src", "package.json", "versions.json", ".github", ".vh-adlc", "security.md", "notes", component); git(project.root, "commit", "-qm", "test: synthetic maintenance corpus");
+  git(project.root, "add", "src", "package.json", "versions.json", ".github", ".vh-adlc", "security.md", "notes", component, ...(options.operatorInputs ? ["operator", "AGENTS.md"] : [])); git(project.root, "commit", "-qm", "test: synthetic maintenance corpus");
   const commit = git(project.root, "rev-parse", "HEAD"), config = loadSettings(project.root), run = createRun(config);
   const sha = "a".repeat(40), routes: Record<string, any> = {};
   const titles: Record<number, string> = { 11: "widget 1.2.0 to 1.2.1", 12: "widget 2 to 3 major", 13: "experimental 0.4 to 0.5", 14: "widget 1.8 removes oldCall", 15: "action v3 pin", 16: "mixed synced/excluded paths", 17: "sync version 1.9.0", 18: "rounding patch", 19: "distinct parser patch", 20: "renamed bot update", 21: "legacy release-bot visibility" };
@@ -84,13 +86,13 @@ writeSync(1,'HTTP/2.0 '+status+' Response\\r\\n'+(value.__headers??'')+'\\r\\n'+
   add(pr(16), "mixed-ownership", "split-or-owner-decision", [[".github/workflows/sync-demo.yml", 2], [".github/workflows/sync-demo.yml", 3]], { source_owner: "mixed" });
   add(pr(17), "superseded-sync", "propose-close-superseded", [["versions.json", 1]]);
   for (const n of [18, 19]) add(pr(n), "overlap-distinct", "keep-both", [["notes/overlap.md", 1]], { related_ids: [pr(n === 18 ? 19 : 18)] });
-  for (const n of [20, 21]) add(pr(n), "inventory-gap", "classify-before-selection", [["package.json", 1]], { source_owner: "unknown" });
-  add("alert:example/project:dependabot#77", "unresolved-remediation", "track-source-fix", [["notes/security.md", 1], ["src/security.ts", 2]]);
+  for (const n of [20, 21]) add(pr(n), "inventory-gap", "classify-before-selection", [["package.json", 1]]);
+  add("alert:example/project:dependabot#77", "unresolved-remediation", "track-source-fix", [["notes/security.md", 1], ["src/security.ts", 2]], { coverage: "complete", measured_count: 1 });
   add("coverage:example/project:code_scanning", "expected-unavailable", "retain-n-a", [["security.md", 1]], { coverage: "complete-unavailable" });
-  add("coverage:example/project:dependabot", "complete-comparable", "record-observation-diff", [["notes/security.md", 1]], { coverage: "complete", measured_count: 1, claimed_resolved: ["dependabot:76"] });
+  add("coverage:example/project:dependabot", "complete-comparable", "record-observation-diff", [], { coverage: "complete", measured_count: 1, claimed_resolved: ["dependabot:76"] });
   add("coverage:example/partial:dependabot", "incomplete-security", "retain-unknown", [["security.md", 1]], { source_owner: "independent", coverage: "incomplete" });
   add("history:example/no-history:dependabot", "history-unavailable", "establish-new-baseline", [["security.md", 1]], { source_owner: "independent", coverage: "complete", measured_count: 0 });
-  add("dashboard:example/project#99", "queued-work", "reconcile-coverage", [["package.json", 1]]);
+  add("dashboard:example/project#99", "queued-work", "reconcile-coverage", []);
   add("repository:example/new-repository", "inventory-gap", "classify-before-selection", [[".github/workflows/sync-demo.yml", 4]], { source_owner: "unknown" });
   const historical = { schema_version: 1, run_id: "00000000-0000-4000-8000-000000000001", created_at: "2026-10-01T00:00:00Z", observations: [{ hostname: "github.com", repository: "example/project", surface: "dependabot", scope: { state: "open", filters: [], exclusions: [] }, observed_at: "2026-10-01T00:00:00Z", source_reference: "synthetic-prior", status: "complete", reason: null, count: 2, alerts: [76, 77].map(number => ({ number, identity: `dependabot:${number}`, package: "unsafe-lib", manifest: "package.json", severity: "high" })) }] };
   const historyText = "## Security alerts\n\n```maintenance-observation-v1\n" + JSON.stringify(historical) + "\n```\n";
@@ -98,7 +100,7 @@ writeSync(1,'HTTP/2.0 '+status+' Response\\r\\n'+(value.__headers??'')+'\\r\\n'+
   const { root: _root, ...portableSettings } = config;
   evidence["settings.json"] = canonicalJSON({ ...portableSettings, root: "source" }) + "\n";
   const bindInventory = (inventory: unknown) => {
-    evidence["inventory.json"] = JSON.stringify(inventory, null, 2) + "\n";
+    const encoded = jsonEvidence(inventory); evidence["inventory.json"] = encoded.text;
     const lines = evidence["inventory.json"].split("\n");
     for (const row of cases) {
       const number = row.id.match(/^pr:example\/project#(\d+)$/)?.[1];
@@ -106,12 +108,20 @@ writeSync(1,'HTTP/2.0 '+status+' Response\\r\\n'+(value.__headers??'')+'\\r\\n'+
       const line = lines.findIndex(text => text.includes(query)) + 1;
       if (!line) throw Error("corpus evidence binding missing");
       if (row.classification === "inventory-gap" || row.classification === "incomplete-security" || row.classification === "history-unavailable") row.evidence = [];
-      row.evidence.push({ path: "inventory.json", line });
+      if (row.id === "coverage:example/project:dependabot" || row.id === "history:example/no-history:dependabot") {
+        const repository = row.id === "coverage:example/project:dependabot" ? "example/project" : "example/no-history";
+        const index = (inventory as any).repositories.findIndex((entry: any) => entry.repository === repository);
+        row.evidence.push({ path: "inventory.json", ...encoded.at("repositories", index, "dependabot", "coverage") });
+      } else if (row.id.startsWith("pr:")) {
+        const index = (inventory as any).repositories.findIndex((entry: any) => entry.repository === row.id.slice(3).split("#")[0]);
+        const pullIndex = (inventory as any).repositories[index].pulls.findIndex((entry: any) => entry.number === Number(row.id.split("#")[1]));
+        row.evidence.push({ path: "inventory.json", ...encoded.at("repositories", index, "pulls", pullIndex) });
+      } else row.evidence.push({ path: "inventory.json", line });
       if (row.claimed_resolved.length || row.classification === "history-unavailable") row.evidence.push({ path: "history/0000.md", line: 4 });
       if (row.id.startsWith("repository:")) row.evidence.push({ path: "settings.json", line: 1 });
     }
   };
   return { project, config, env, cases, evidence, bindInventory, requests: () => readFileSync(env.MAINTENANCE_FAKE_LOG, "utf8").trim().split("\n").map(line => JSON.parse(line)), requestsDigest: () => digest(readFileSync(env.MAINTENANCE_FAKE_LOG)),
-    packet: { run_id: run.header.run_id, synthetic_input: true, component: { root: join(project.root, component), commit }, source_paths: ["src", "package.json", "versions.json", ".github", "security.md"], release_paths: ["notes"],
+    packet: { run_id: run.header.run_id, synthetic_input: true, component: { root: join(project.root, component), commit }, source_paths: ["src", "package.json", "versions.json", ".github", "security.md", ...(options.operatorInputs ? ["operator", "AGENTS.md"] : [])], release_paths: ["notes"],
       history: [{ path: "synthetic-prior.md", provenance: "local" as const, digest: digest(historyText), text: historyText }], output: join(output, "packet") } };
 }

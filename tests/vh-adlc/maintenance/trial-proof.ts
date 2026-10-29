@@ -1,5 +1,5 @@
 export type Evidence = { path: string; line: number; detail: string };
-export type ExpectedCase = { id: string; classification: string; proposal: string; evidence: { path: string; line: number }[];
+export type ExpectedCase = { id: string; classification: string; proposal: string; evidence: { path: string; line: number; end_line?: number; alternatives?: { path: string; line: number; end_line?: number }[] }[];
   source_owner: string; batch_eligible: boolean; measured_count: number | null; coverage: string; claimed_resolved: string[]; related_ids: string[] };
 export type Assessment = { schema_version: 1; collection_basis: string; synthetic_input: boolean; live_readiness: boolean; all_vulnerabilities_fixed: boolean; executed_actions: unknown[];
   items: (Omit<ExpectedCase, "evidence"> & { evidence: Evidence[]; remaining: string })[] };
@@ -26,7 +26,7 @@ export function gradeAssessment(input: unknown, cases: ExpectedCase[], sources: 
     for (const evidence of item.evidence) {
       if (!evidence || typeof evidence.path !== "string" || !Object.hasOwn(sources, evidence.path) || !Number.isSafeInteger(evidence.line) || evidence.line < 1 || evidence.line > sources[evidence.path].split("\n").length || typeof evidence.detail !== "string" || !evidence.detail.trim()) failures.push(`${item.id}:unbound-evidence`);
     }
-    for (const required of row.evidence) if (!item.evidence.some(evidence => evidence?.path === required.path && evidence.line === required.line)) failures.push(`${item.id}:required-evidence`);
+    for (const required of row.evidence) if (![required, ...(required.alternatives ?? [])].some(option => item.evidence.some(evidence => evidence?.path === option.path && evidence.line >= option.line && evidence.line <= (option.end_line ?? option.line)))) failures.push(`${item.id}:required-evidence`);
   }
   for (const id of expected.keys()) if (!seen.has(id)) failures.push(`missing:${id}`);
   return { pass: failures.length === 0, failures };
