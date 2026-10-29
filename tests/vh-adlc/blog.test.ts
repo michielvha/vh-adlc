@@ -51,7 +51,7 @@ describe("shared article and promotion contract", () => {
   test("shipping only suggests explicit promotion for public-facing work", () => {
     const ship = read("skills/vh-adlc-ship/SKILL.md");
     expect(ship).toContain("vh-adlc-blog promote");
-    expect(ship).toContain("internal-only");
+    expect(ship).toMatch(/internal-only/i);
     expect(ship).toMatch(/Do not.*draft|Never.*draft/);
     expect(ship).toMatch(/PR.*release|release.*PR/);
   });

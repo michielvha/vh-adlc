@@ -61,5 +61,15 @@ Hosts may register the reviewer agent directly or dispatch a generic independent
 the same reviewer file. If neither capability is available, the review stays pending with a handoff.
 The primary session never substitutes self-review for independence.
 
+## Article operation
+
+The article and promotion procedure is packaged as `vh-adlc-blog`. Its source
+checks cover discovery, preservation and publication boundaries; native runtime
+checks are recorded separately under `tests/vh-adlc/evidence/blog/` when executed.
+No desktop, extension or connector support follows from those source checks.
+An unavailable write-like-me retrieval integration remains unverified even when
+drafting from supplied voice references works. The operation can use the pinned
+prose guide when the humanizer skill is unavailable.
+
 Continue with [your first feature](../get-started/first-feature.md) or
 [review requirements](../user-guides/workflows.md#reviews).
