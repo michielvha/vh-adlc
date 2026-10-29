@@ -1389,6 +1389,8 @@ results here. The R-16 no-default-checkout fixture is part of T5/T12.
 
 - [ ] T16 report-trial grader/replay driver and this document - address R-21: bind a new side-by-side replay to its actual committed grader bytes, reject positive production-compatibility claims despite unrelated qualifying words, and keep all raw review records under Review Log. Observe the new negative control fail before tightening the grader, preserve prior artifacts, run required checks and obtain a fresh actual Copilot Opus 5.5 review (AC-09).
 
+      T16 progress: the mixed positive-claim/qualifying-word control first failed, then seven focused tests/43 assertions passed after claim-level qualification binding. The full bare Linux suite passed 598 tests/2632 assertions (`r21-final-full-suite-20261029.log`), followed by all Go/module/lint, other-plugin and CI syntax checks. The replay driver supports a fresh side-by-side output and records actual implementation commit/file hash; its committed-source replay is the remaining T16 verification. Raw R-20/R-21 bytes now sit under Review Log, and both review-check commands pass.
+
 ## Open Questions
 
 None.

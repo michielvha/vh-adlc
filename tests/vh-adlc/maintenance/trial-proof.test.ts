@@ -89,7 +89,7 @@ test("a declared security expectation is valid evidence alongside its local proc
 });
 
 test("consumer builder ordering accepts the bound primary repository and rejects another or a prefix match", () => {
-  const plan = { builder_order: ["satellite API/orchestrator builder prerequisite", "primary michielvha/stackweaver synced backend/go.mod bump"], single_squash: true, skip_ci: false, distribution_edits: false, satellite_helper: "Only approved/preauthorized selected green checks", production_compatibility: "unverified synthetic samples", report_publication: "Only the authorized run report" };
+  const plan = { builder_order: ["satellite API/orchestrator builder prerequisite", "primary michielvha/stackweaver synced backend/go.mod bump"], single_squash: true, skip_ci: false, distribution_edits: false, satellite_helper: "Only approved/preauthorized selected green checks", production_compatibility: "Production compatibility is unverified; synthetic samples only.", report_publication: "Only the authorized run report" };
   expect(gradeConsumerPlan(plan, "michielvha/stackweaver").pass).toBe(true);
   expect(gradeConsumerPlan({ ...plan, builder_order: [plan.builder_order[0], "monorepo backend/go.mod bump"] }, "michielvha/stackweaver").pass).toBe(true);
   for (const destination of ["primary other/project backend/go.mod", "primary michielvha/stackweaver-extra backend/go.mod"]) expect(gradeConsumerPlan({ ...plan, builder_order: [plan.builder_order[0], destination] }, "michielvha/stackweaver").pass).toBe(false);
@@ -97,4 +97,6 @@ test("consumer builder ordering accepts the bound primary repository and rejects
   expect(gradeConsumerPlan({ ...plan, skip_ci: true }, "michielvha/stackweaver").pass).toBe(false);
   expect(gradeConsumerPlan({ ...plan, production_compatibility: "The synthetic caller samples support only bounded fixture routing. They establish no production call-site compatibility, check result or readiness." }, "michielvha/stackweaver").pass).toBe(true);
   expect(gradeConsumerPlan({ ...plan, production_compatibility: "The synthetic samples establish production call-site compatibility and readiness." }, "michielvha/stackweaver").pass).toBe(false);
+  for (const claim of ["Samples prove production compatibility; nothing cannot ship", "Production compatibility is unverified; samples prove production compatibility", "Production compatibility is not verified but production compatibility is confirmed", "Unverified production compatibility is proven"]) expect(gradeConsumerPlan({ ...plan, production_compatibility: claim }, "michielvha/stackweaver").pass).toBe(false);
+  expect(gradeConsumerPlan({ ...plan, production_compatibility: "None. They cannot establish compatibility with production source." }, "michielvha/stackweaver").pass).toBe(true);
 });

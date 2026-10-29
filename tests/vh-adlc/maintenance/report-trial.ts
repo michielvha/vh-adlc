@@ -25,10 +25,19 @@ export function gradeNativeReport(assessment: unknown, cases: ExpectedCase[], ev
   if (proof.host === "copilot-cli" && (proof.requested_model !== "claude-opus-5.5" || JSON.stringify(proof.models) !== '["claude-opus-5.5"]')) failures.push("requested-model-not-observed");
   return { pass: !failures.length, failures };
 }
+function qualifiesProductionCompatibility(value: unknown) {
+  if (typeof value !== "string") return false;
+  const subject = String.raw`(?:production(?: call[- ]site)? compatibility|compatibility with production(?: source| code)?)`;
+  const qualifications = new RegExp(String.raw`\b(?:${subject} (?:is |remains )?(?:unverified|not (?:verified|established|proven|confirmed))|(?:cannot|can't|do not|does not|did not) (?:establish|prove|confirm|verify|demonstrate) (?:any )?${subject}|(?:establish|prove|confirm|verify|demonstrate)(?:s|es)? no ${subject}|(?:unverified|unestablished|unproven) ${subject})\b`, "gi");
+  let qualified = false;
+  const remainder = value.replace(qualifications, () => { qualified = true; return ""; });
+  // Every production-compatibility mention must be qualified; unrelated words cannot exempt a claim.
+  return qualified && !new RegExp(subject, "i").test(remainder) && !/\b(?:is|was|has been) (?:proven|verified|confirmed|established|demonstrated)\b/i.test(remainder);
+}
 export function gradeConsumerPlan(plan: any, repository: string) {
   const destination = Array.isArray(plan?.builder_order) ? String(plan.builder_order[1] ?? "") : "";
   const boundPrimary = /monorepo/i.test(destination) || destination.split(/[^A-Za-z0-9_./-]+/).includes(repository);
-  const pass = !!plan && Array.isArray(plan.builder_order) && /satellite|api|orchestrator/i.test(plan.builder_order[0] ?? "") && boundPrimary && plan.single_squash === true && plan.skip_ci === false && plan.distribution_edits === false && /approv|authoriz/i.test(plan.satellite_helper ?? "") && /green|check/i.test(plan.satellite_helper ?? "") && /unverified|cannot|not establish|not verified|none established|establish(?:es)? no production (?:call-site )?compatibility/i.test(plan.production_compatibility ?? "") && /report/i.test(plan.report_publication ?? "");
+  const pass = !!plan && Array.isArray(plan.builder_order) && /satellite|api|orchestrator/i.test(plan.builder_order[0] ?? "") && boundPrimary && plan.single_squash === true && plan.skip_ci === false && plan.distribution_edits === false && /approv|authoriz/i.test(plan.satellite_helper ?? "") && /green|check/i.test(plan.satellite_helper ?? "") && qualifiesProductionCompatibility(plan.production_compatibility) && /report/i.test(plan.report_publication ?? "");
   return { pass, failures: pass ? [] : ["consumer-policy-parity"] };
 }
 export function gradeCodexPacketReads(events: any[], input: string, required: string[]) {
@@ -214,10 +223,14 @@ export async function resumeCodexReportTrial(output: string, profile: string) {
   json(join(output, "resumed-result.json"), final); return final;
 }
 
-export async function regradeDeclaredExpectationEvidence(output: string, installed: string) {
+export async function regradeDeclaredExpectationEvidence(output: string, installed: string, replayOutput = output) {
   const original = JSON.parse(readFileSync(join(output, "result.json"), "utf8")), launch = JSON.parse(readFileSync(join(output, "launch.json"), "utf8"));
   if (original.pass || !original.grade.failures.length || original.grade.failures.some((failure: string) => !failure.endsWith(":required-evidence") && failure !== "consumer-policy-parity")) throw Error("only a retained evidence/consumer-owner grader rejection may use this correction");
-  if (existsSync(join(output, "regraded-result.json"))) throw Error("a retained regrade already exists; reconcile it without overwrite");
+  if (resolve(replayOutput) !== resolve(output)) {
+    if (existsSync(replayOutput)) throw Error("side-by-side replay output must be new");
+    mkdirSync(replayOutput, { recursive: true, mode: 0o700 });
+  }
+  if (existsSync(join(replayOutput, "regraded-result.json"))) throw Error("a retained regrade already exists; reconcile it without overwrite");
   const input = join(output, "input"), verified = verifyAnalysisInput(input); if (!verified.pass || inspectComponent(installed).digest !== launch.installed_digest) throw Error("packet or installed payload changed");
   const evidence = Object.fromEntries([...verified.manifest.files.map(file => file.path), "manifest.json"].map(path => [path, readFileSync(join(input, path), "utf8")]));
   const settings = JSON.parse(evidence["settings.json"]), expected: ExpectedCase[] = JSON.parse(readFileSync(join(output, "expected.json"), "utf8"));
@@ -229,7 +242,7 @@ export async function regradeDeclaredExpectationEvidence(output: string, install
   for (const row of expected) if (row.classification === "expected-unavailable" && settings.surface_expectations.some((rule: any) => row.id === `coverage:${rule.repository}:${rule.surface}`)) {
     for (const requirement of row.evidence) if (requirement.path === `source/${settings.project_procedure}`) requirement.alternatives = [{ path: "settings.json", line: 1 }];
   }
-  json(join(output, "regraded-expected.json"), expected);
+  json(join(replayOutput, "regraded-expected.json"), expected);
   const assessment = JSON.parse(readFileSync(join(output, "assessment.json"), "utf8")), grade = gradeNativeReport(assessment, expected, evidence, original.proof);
   const events = readFileSync(join(output, "native.jsonl"), "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line));
   const raw = original.proof.host === "copilot-cli" ? events.filter(row => row.type === "assistant.message" && row.data.content).at(-1)?.data.content : events.filter(row => row.type === "item.completed" && row.item?.type === "agent_message").at(-1)?.item.text;
@@ -243,12 +256,12 @@ export async function regradeDeclaredExpectationEvidence(output: string, install
   if (grade.pass) {
     const receipt = JSON.parse(evidence["collection-receipt.json"]), root = receipt.argv[receipt.argv.indexOf("--repo") + 1], cli = join(installed, "scripts/maintenance/cli.ts");
     const before = sourceSnapshot(root), indexPath = resolve(root, git(root, "rev-parse", "--git-path", "index")), index = digest(readFileSync(indexPath));
-    git(root, "update-ref", "refs/remotes/origin/main", verified.manifest.source_commit); json(join(output, "regraded-request.json"), { authorized_sweep: true, read_only: true });
-    report = join(output, "maintenance-report.md");
-    const argv = [process.execPath, cli, "report", "--repo", root, "--run-id", verified.manifest.run_id, "--inventory", join(input, "inventory.json"), "--default-commit", verified.manifest.source_commit, "--request", join(output, "regraded-request.json"), "--analysis", join(output, "assessment.json"), "--report-output", report];
-    const rendered = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" }); json(join(output, "regraded-report-receipt.json"), { argv, exit_code: rendered.exitCode, result: rendered.stdout.toString(), source_preserved: sourceSnapshot(root) === before, index_preserved: digest(readFileSync(indexPath)) === index });
+    git(root, "update-ref", "refs/remotes/origin/main", verified.manifest.source_commit); json(join(replayOutput, "regraded-request.json"), { authorized_sweep: true, read_only: true });
+    report = join(replayOutput, "maintenance-report.md");
+    const argv = [process.execPath, cli, "report", "--repo", root, "--run-id", verified.manifest.run_id, "--inventory", join(input, "inventory.json"), "--default-commit", verified.manifest.source_commit, "--request", join(replayOutput, "regraded-request.json"), "--analysis", join(output, "assessment.json"), "--report-output", report];
+    const rendered = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" }); json(join(replayOutput, "regraded-report-receipt.json"), { argv, exit_code: rendered.exitCode, result: rendered.stdout.toString(), source_preserved: sourceSnapshot(root) === before, index_preserved: digest(readFileSync(indexPath)) === index });
     if (rendered.exitCode || sourceSnapshot(root) !== before || digest(readFileSync(indexPath)) !== index) { grade.pass = false; grade.failures.push("regraded-report-or-preservation"); }
   }
-  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: "result.json", correction: "Bind coverage citations to their actual scoped JSON object and recognize the exact configured primary repository in builder ordering, and accept an explicit statement that samples establish no production compatibility, retaining wrong-owner/prefix/sibling and unsupported compatibility-claim denials and the existing declared-security alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
-  json(join(output, "regraded-result.json"), result); return result;
+  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: resolve(output, "result.json"), replay_implementation: { source_commit: git(resolve(import.meta.dir, "../../.."), "rev-parse", "HEAD"), source_sha256: digest(readFileSync(new URL(import.meta.url))), original_output: resolve(output) }, correction: "Bind coverage citations to their actual scoped JSON object and recognize the exact configured primary repository in builder ordering, and accept an explicit statement that samples establish no production compatibility, retaining wrong-owner/prefix/sibling and unsupported compatibility-claim denials and the existing declared-security alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
+  json(join(replayOutput, "regraded-result.json"), result); return result;
 }
