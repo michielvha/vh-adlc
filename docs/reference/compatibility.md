@@ -36,7 +36,7 @@ source/index. Uninstall/reinstall results and exact source targets are recorded 
 the [maintenance feature evidence](../specs/shared-maintenance.md).
 
 After blog integration, final 0.6.0 local-catalog validation passed at committed source
-`3039766d5755be8cb88589c3f5c05e3f9ddaa946`: both native CLI hosts discovered all eleven
+`1d8bc8ae47dac829e6fe0612386c05ea54ab4936`: both native CLI hosts discovered all eleven
 skills, passed installed helpers with source/index preservation, and restored the same
 payload through uninstall/reinstall. The exact targets and digest are in the feature evidence.
 These are development checks. Consumer cutover still requires actual

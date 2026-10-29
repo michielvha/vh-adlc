@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-maintenance
-status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria; its minor notes and an observed trial-grader wording defect are fixed and tested. R-21 notes are fixed and verified, including a new committed-source replay. R-22 met all criteria with two minor notes; T17 resolves report receipt and canonical evidence-ref instructions. Live Claude/GUI are deferred; publication and cutover are pending."
+status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria; its minor notes and an observed trial-grader wording defect are fixed and tested. R-21 notes are fixed and verified, including a new committed-source replay. R-22 notes are fixed and verified. All implementation tasks are checked; final independent review remains before completion. Live Claude/GUI are deferred; publication and cutover are pending."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -408,6 +408,17 @@ wording-only grader correction with a production-claim negative. The latest shar
 plans are included in the next bounded review packet to remove R-20's evidence-inspection limitation.
 These changes alter no accepted normative section or production plugin payload. Final review and
 complete gate remain pending; published-marketplace proof must still precede consumer adoption.
+
+R-22 independently returned all nine criteria met, with two minor notes. T17 fixes both within
+accepted Design: evidence instructions use the per-run ref, while historical suffixed refs remain
+readable; replay records and verifies the helper's actual report path/digest and reuse flag. The
+new exact candidate at `1d8bc8a` passed both native CLI install/helper/reinstall checks at full
+payload `bed9339394aee9d4f45e54962751eb2e9ca1c06c5011ad8f4e3d2d6ceaba0ea9`. Older
+report/authored proofs keep their real 23fced/86ee21 and earlier bindings; the new production delta
+is a ref-name instruction, not a runtime or analysis change. The latest replay correctly resumes
+the already saved report rather than claiming a new file. Shared verification passed 599 tests/2640
+assertions and all repository checks. Consumer `9e1af57f` passed its normal checks; final paired
+review is next. No normative revision, publication, marketplace proof or consumer adoption occurred.
 
 ## Scope
 
@@ -1393,9 +1404,11 @@ results here. The R-16 no-default-checkout fixture is part of T5/T12.
 
       Final T16 evidence: the fresh side-by-side replay passed at committed code `2ed05edafb7c2fbc6ef2fedb23d17b49f3fcadfc`, actual grader SHA-256 `7eb986673d96e238823e57ab9315ab7eb00f31715b5bf087648cb432948760e9` (`post-r21-policy-replay/regraded-result.json`). Its actual installed report render passed. The original result, prior replay, assessment, consumer plan and native transcript hashes remained identical. The final independent review launcher now repeats this replay from its own exact source target into a separate new directory and checks code binding and preservation. Earlier artifacts are retained with their real provenance; no earlier replay is relabeled as a new model answer or this implementation.
 
-- [ ] T17 report replay receipt verification, maintenance evidence instructions, paired consumer policy and this document - resolve R-22 within accepted Design: record and validate the helper's actual existing-or-new report path/digest, and use the accepted per-run evidence-ref name. Preserve old artifacts and compatibility with historical refs. Observe missing-report/digest and canonical-ref controls fail, then pass checks and refresh exact native-install proof before final Copilot review (AC-05, AC-07, AC-08, AC-09).
+- [x] T17 report replay receipt verification, maintenance evidence instructions, paired consumer policy and this document - resolve R-22 within accepted Design: record and validate the helper's actual existing-or-new report path/digest, and use the accepted per-run evidence-ref name. Preserve old artifacts and compatibility with historical refs. Observe missing-report/digest and canonical-ref controls fail, then pass checks and refresh exact native-install proof before final Copilot review (AC-05, AC-07, AC-08, AC-09).
 
       T17 progress: missing report-receipt verifier and canonical-ref controls first failed, then twelve focused tests/138 assertions passed. The consumer passed eleven tests/129 assertions after its canonical-ref red. The full bare shared suite passed 599 tests/2640 assertions (`r22-final-full-suite-20261029.log`), followed by all Go/module/lint, other-plugin and CI syntax checks. The replay verifies the actual helper-returned path and digest, records reuse honestly and rejects absent, changed or unrelated reports. Shared/consumer instructions and the synthetic delivery fixture now use the already accepted per-run evidence ref; runtime compatibility with historical suffixed refs is unchanged. Final committed native installation and replay remain pending.
+
+      Final T17 evidence: source `1d8bc8ae47dac829e6fe0612386c05ea54ab4936` passed both native CLI installs, eleven-skill discovery, installed settings/GET/report helpers and uninstall/reinstall (`post-r22-native-install/result.json`), full payload `bed9339394aee9d4f45e54962751eb2e9ca1c06c5011ad8f4e3d2d6ceaba0ea9`. The only production delta from 23fced is the evidence-ref instruction matching accepted Design; historical native analysis/authored proofs keep their original payload/ref bindings. The replay at that exact committed code verified the helper-returned existing report path and digest `fd3b4a4468bd98967d9b37451f097316cebe411e562b9bd4c311465637eddaf2`, recorded report_reused true and preserved every original artifact (`post-r22-policy-replay/regraded-result.json`). Consumer `9e1af57f34b51b230eb2a4271416ca7bcc166ca3` committed the matching canonical instruction with all seventeen normal checks passing and no skips. The final independent launcher checks the new installed payload, executes the consumer suite through it, and separately replays the historical packet with its original matching renderer while verifying the actual report file. No new rendering or native model answer is inferred from an idempotent resumed report.
 
 ## Open Questions
 
