@@ -36,8 +36,8 @@ function qualifiesProductionCompatibility(value: unknown) {
   const qualifications = new RegExp(String.raw`\b(?:${subject} (?:is |remains )?(?:unverified|not (?:verified|established|proven|confirmed))|(?:cannot|can't|do not|does not|did not) (?:establish|prove|confirm|verify|demonstrate) (?:any )?${subject}|(?:establish|prove|confirm|verify|demonstrate)(?:s|es)? no ${subject}|(?:unverified|unestablished|unproven) ${subject})\b`, "gi");
   let qualified = false;
   const remainder = value.replace(qualifications, () => { qualified = true; return ""; });
-  // Every production-compatibility mention must be qualified; unrelated words cannot exempt a claim.
-  return qualified && !new RegExp(subject, "i").test(remainder) && !/\b(?:is|was|has been) (?:proven|verified|confirmed|established|demonstrated)\b/i.test(remainder);
+  // Every compatibility assertion in this field must be qualified; unrelated words cannot exempt a claim.
+  return qualified && !/\bcompatib(?:ility|le)\b/i.test(remainder) && !/\b(?:is|was|has been) (?:proven|verified|confirmed|established|demonstrated)\b/i.test(remainder);
 }
 export function gradeConsumerPlan(plan: any, repository: string) {
   const destination = Array.isArray(plan?.builder_order) ? String(plan.builder_order[1] ?? "") : "";
