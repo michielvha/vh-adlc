@@ -89,6 +89,8 @@ See the [marketplace guide](docs/reference/marketplace.md) for availability and 
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and local checks.
+To match CI's plugin-test budget, run `bun test tests/vh-adlc --timeout 60000`.
+These fixtures create Git repositories and invoke compilers.
 Report bugs and suggest improvements in [GitHub Issues](https://github.com/michielvha/vh-adlc/issues).
 
 Maintained by [VH & Co](https://vhco.pro).

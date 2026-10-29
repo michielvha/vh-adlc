@@ -15,4 +15,4 @@ test("action transport permits observable mistakes rather than making the native
     const trace = readFileSync(t.trace, "utf8").trim().split("\n").map(line => JSON.parse(line));
     expect(gradeActions([item], trace).failures).toContain("close-mixed:unapproved-remote-effect");
   } finally { rmSync(root, { recursive: true, force: true }); }
-});
+}, 30_000);

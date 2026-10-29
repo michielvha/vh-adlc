@@ -24,11 +24,20 @@ export function inspectComponent(root: string) {
   for (const path of ["skills/vh-adlc-maintenance/SKILL.md", "scripts/maintenance/cli.ts", "references/maintenance.md"]) if (!files.some(file => file.path === path)) throw Error("maintenance payload missing");
   return { version: manifests[0].version as string, digest: hash(JSON.stringify(files)), files };
 }
+export function discoveredClaudeOperations(transcript: string, expected: string[]): string[] {
+  const row = transcript.match(/^\s*Skills \((\d+)\)[ \t]+([^\r\n]+)/m), names = row?.[2].split(",").map(name => name.trim());
+  if (!row || !names || !expected.length || Number(row[1]) !== expected.length || names.length !== expected.length || new Set(names).size !== names.length || names.some(name => !expected.includes(name))) throw Error("native Claude component inventory missing or differs from installed skills");
+  return names;
+}
+function componentOperations(component: ReturnType<typeof inspectComponent>) {
+  return component.files.flatMap(row => row.path.match(/^skills\/([^/]+)\/SKILL\.md$/)?.[1] ?? []);
+}
 export function verifyCandidateInstall(source: ReturnType<typeof inspectComponent>, installed: ReturnType<typeof inspectComponent>, receipt: any) {
   const failures: string[] = [];
   if (receipt.kind !== "local-catalog") failures.push("candidate provenance differs");
   if (installed.version !== source.version || receipt.version !== source.version || installed.digest !== source.digest || receipt.payload_digest !== source.digest) failures.push("installed payload differs");
-  if (!receipt.discovery?.includes("vh-adlc-maintenance")) failures.push("native maintenance discovery missing");
+  const expected = componentOperations(source);
+  if (!Array.isArray(receipt.discovery) || receipt.discovery.length !== expected.length || expected.some(name => !receipt.discovery.includes(name))) failures.push("native component discovery missing or incomplete");
   if (!receipt.commands?.length || receipt.commands.some((row: any) => row.exit_code !== 0 || row.timed_out)) failures.push("native command failed");
   for (const stage of ["settings", "collection", "report"]) {
     const row = receipt.helpers?.find((row: any) => row.stage === stage);
@@ -148,7 +157,7 @@ export async function nativeInstallTrial(repo: string, commit: string, output: s
       const report = await helper("report", "report", ["--run-id", started.header.run_id, "--inventory", inv, "--default-commit", git(corpus.project.root, "rev-parse", "HEAD")]);
       if (!report.saved || !report.observations || !corpus.requests().every(row => row.argv.includes("GET"))) throw Error("installed report or GET collection missing");
       const receipt = { kind: "local-catalog", host, native_version: version, source_commit: commit, version: installed.version, payload_digest: installed.digest, installed_path: installedPath,
-        discovery: host === "codex-cli" ? discoveredCodexOperations(discovered, `vh-adlc@${catalogName}`) : /Skills \(10\).*\bvh-adlc-maintenance\b/.test(discovered) ? ["vh-adlc-maintenance"] : [], commands, helpers, authentication_copied: false, model_invocations: 0 };
+        discovery: host === "codex-cli" ? discoveredCodexOperations(discovered, `vh-adlc@${catalogName}`) : discoveredClaudeOperations(discovered, componentOperations(source)), commands, helpers, authentication_copied: false, model_invocations: 0 };
       // Some Codex plugin/list versions expose only the component. app-server skills/list provides operation discovery separately.
       await run([client, "plugin", host === "codex-cli" ? "remove" : "uninstall", `vh-adlc@${catalogName}`, "--json"]);
       const removed = JSON.parse(await run([client, "plugin", "list", "--json"]));

@@ -1,3 +1,4 @@
+import { coverageEvidence } from "./json-evidence";
 // Explicit native-model acceptance runner. Expected answers never enter the model packet.
 import { existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -211,9 +212,15 @@ export async function resumeCodexReportTrial(output: string, profile: string) {
 export async function regradeDeclaredExpectationEvidence(output: string, installed: string) {
   const original = JSON.parse(readFileSync(join(output, "result.json"), "utf8")), launch = JSON.parse(readFileSync(join(output, "launch.json"), "utf8"));
   if (original.pass || !original.grade.failures.length || original.grade.failures.some((failure: string) => !failure.endsWith(":required-evidence"))) throw Error("only an evidence-requirement-only rejection may use this correction");
+  if (existsSync(join(output, "regraded-result.json"))) throw Error("a retained regrade already exists; reconcile it without overwrite");
   const input = join(output, "input"), verified = verifyAnalysisInput(input); if (!verified.pass || inspectComponent(installed).digest !== launch.installed_digest) throw Error("packet or installed payload changed");
   const evidence = Object.fromEntries([...verified.manifest.files.map(file => file.path), "manifest.json"].map(path => [path, readFileSync(join(input, path), "utf8")]));
   const settings = JSON.parse(evidence["settings.json"]), expected: ExpectedCase[] = JSON.parse(readFileSync(join(output, "expected.json"), "utf8"));
+  const inventory = JSON.parse(evidence["inventory.json"]);
+  for (const row of expected) {
+    const coverage = coverageEvidence(inventory, row.id);
+    if (coverage) for (const requirement of row.evidence) if (requirement.path === "inventory.json") Object.assign(requirement, coverage);
+  }
   for (const row of expected) if (row.classification === "expected-unavailable" && settings.surface_expectations.some((rule: any) => row.id === `coverage:${rule.repository}:${rule.surface}`)) {
     for (const requirement of row.evidence) if (requirement.path === `source/${settings.project_procedure}`) requirement.alternatives = [{ path: "settings.json", line: 1 }];
   }
@@ -229,6 +236,6 @@ export async function regradeDeclaredExpectationEvidence(output: string, install
     const rendered = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" }); json(join(output, "regraded-report-receipt.json"), { argv, exit_code: rendered.exitCode, result: rendered.stdout.toString(), source_preserved: sourceSnapshot(root) === before, index_preserved: digest(readFileSync(indexPath)) === index });
     if (rendered.exitCode || sourceSnapshot(root) !== before || digest(readFileSync(indexPath)) !== index) { grade.pass = false; grade.failures.push("regraded-report-or-preservation"); }
   }
-  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: "result.json", correction: "Allow the actual declared security expectation in settings.json as an alternative to its local procedure explanation. No classification, ownership, count, action, model, tool or preservation requirement changed." };
+  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: "result.json", correction: "Bind all coverage citations to their actual scoped collected JSON object, preserving sibling-surface rejection; allow the exact declared security expectation as the existing procedure alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
   json(join(output, "regraded-result.json"), result); return result;
 }

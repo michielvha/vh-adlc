@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { discoveredCodexOperations, inspectComponent, verifyCandidateInstall } from "./install-trial";
+import { discoveredCodexOperations, discoveredClaudeOperations, inspectComponent, verifyCandidateInstall } from "./install-trial";
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 function component(version = "0.5.0") {
@@ -33,4 +33,12 @@ test("Codex operation discovery requires an enabled exact-plugin native response
   expect(discoveredCodexOperations(transcript([row]), row.pluginId)).toEqual(["vh-adlc-maintenance"]);
   expect(discoveredCodexOperations(transcript([{ ...row, enabled: false }, { ...row, pluginId: "wrong" }]), row.pluginId)).toEqual([]);
   expect(() => discoveredCodexOperations('{"id":2,"error":{"message":"vh-adlc-maintenance"}}', row.pluginId)).toThrow();
+});
+
+test("Claude discovery verifies the actual component inventory rather than a hardcoded skill count", () => {
+  const names = ["vh-adlc", "vh-adlc-blog", "vh-adlc-maintenance"], details = `Component inventory\n  Skills (3)  ${names.join(", ")}\n  Agents (1)  reviewer\n`;
+  expect(discoveredClaudeOperations(details, names)).toEqual(names);
+  expect(() => discoveredClaudeOperations(details.replace("(3)", "(10)"), names)).toThrow();
+  expect(() => discoveredClaudeOperations(details.replace("vh-adlc-maintenance", "unrelated"), names)).toThrow();
+  expect(() => discoveredClaudeOperations("Projected cost: vh-adlc-maintenance", names)).toThrow();
 });

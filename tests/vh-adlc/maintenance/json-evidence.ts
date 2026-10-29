@@ -16,3 +16,11 @@ export function jsonEvidence(value: unknown) {
   if (text !== JSON.stringify(value, null, 2) + "\n") throw Error("JSON evidence serialization differs");
   return { text, at: (...path: (string | number)[]) => { const range = ranges.get(JSON.stringify(path)); if (!range) throw Error("JSON evidence node missing"); return range; } };
 }
+
+export function coverageEvidence(inventory: any, id: string, encoded = jsonEvidence(inventory)) {
+  const match = id.match(/^(?:coverage|history):([^:]+):(dependabot|code_scanning)$/);
+  if (!match) return null;
+  const index = inventory.repositories.findIndex((row: any) => row.repository === match[1]);
+  if (index < 0) throw Error("scoped coverage repository missing");
+  return encoded.at("repositories", index, match[2], "coverage");
+}

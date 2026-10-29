@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 import { fixture, git } from "../fixtures";
 import { loadSettings } from "../../../../plugins/vh-adlc/scripts/maintenance/settings";
 import { canonicalJSON, createRun, digest } from "../../../../plugins/vh-adlc/scripts/maintenance/journal";
-import { jsonEvidence } from "../json-evidence";
+import { jsonEvidence, coverageEvidence } from "../json-evidence";
 import type { ExpectedCase } from "../trial-proof";
 
 export function syntheticCorpus(options: { operatorInputs?: (root: string) => Record<string, string> } = {}) {
@@ -108,10 +108,9 @@ writeSync(1,'HTTP/2.0 '+status+' Response\\r\\n'+(value.__headers??'')+'\\r\\n'+
       const line = lines.findIndex(text => text.includes(query)) + 1;
       if (!line) throw Error("corpus evidence binding missing");
       if (row.classification === "inventory-gap" || row.classification === "incomplete-security" || row.classification === "history-unavailable") row.evidence = [];
-      if (row.id === "coverage:example/project:dependabot" || row.id === "history:example/no-history:dependabot") {
-        const repository = row.id === "coverage:example/project:dependabot" ? "example/project" : "example/no-history";
-        const index = (inventory as any).repositories.findIndex((entry: any) => entry.repository === repository);
-        row.evidence.push({ path: "inventory.json", ...encoded.at("repositories", index, "dependabot", "coverage") });
+      const coverage = coverageEvidence(inventory, row.id, encoded);
+      if (coverage) {
+        row.evidence.push({ path: "inventory.json", ...coverage });
       } else if (row.id.startsWith("pr:")) {
         const index = (inventory as any).repositories.findIndex((entry: any) => entry.repository === row.id.slice(3).split("#")[0]);
         const pullIndex = (inventory as any).repositories[index].pulls.findIndex((entry: any) => entry.number === Number(row.id.split("#")[1]));

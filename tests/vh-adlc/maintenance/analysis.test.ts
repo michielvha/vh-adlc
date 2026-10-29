@@ -7,6 +7,7 @@ import { loadSettings } from "../../../plugins/vh-adlc/scripts/maintenance/setti
 import { appendRun, canonicalJSON, createRun, digest, readRun } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
 import { fixture, git } from "./fixtures";
 import { exportAnalysisInput, verifyAnalysisInput } from "../../../plugins/vh-adlc/scripts/maintenance/analysis-input";
+import { jsonEvidence } from "./json-evidence";
 import { syntheticCorpus } from "./fixtures/corpus";
 import { gradeAssessment, passingAssessment } from "./trial-proof";
 
@@ -153,4 +154,29 @@ test("packet export rejects omitted scoped repositories and contradictory alert 
     expect(() => exportAnalysisInput(corpus.config, { ...corpus.packet, inventory: value, collection_receipt: receipt })).toThrow();
     expect(existsSync(corpus.packet.output)).toBe(false);
   }
+});
+
+test("packet and installed-component digests use the same locale-independent file order", async () => {
+  const corpus = syntheticCorpus(); projects.push(corpus.project);
+  const collected = invoke(corpus.project.root, "collect", [], corpus.env); expect(collected.exit).toBe(0);
+  const component = corpus.packet.component.root;
+  corpus.project.write("test-component/scripts/maintenance/cli.ts", "// Synthetic installed helper\n");
+  corpus.project.write("test-component/Z-proof.txt", "uppercase proof\n");
+  corpus.project.write("test-component/a-proof.txt", "lowercase proof\n");
+  git(corpus.project.root, "add", "test-component"); git(corpus.project.root, "commit", "-qm", "test: mixed-case installed inputs");
+  const packet = exportAnalysisInput(corpus.config, { ...corpus.packet, component: { root: component, commit: git(corpus.project.root, "rev-parse", "HEAD") }, inventory: JSON.parse(collected.out), collection_receipt: { argv: [process.execPath, cli, "collect"], exit_code: 0, requests_digest: corpus.requestsDigest() } });
+  const { inspectComponent } = await import("./install-trial");
+  expect(packet.manifest.plugin_digest).toBe(inspectComponent(component).digest);
+});
+
+test("every coverage case binds its own collected JSON object and rejects a sibling surface", () => {
+  const corpus = syntheticCorpus(); projects.push(corpus.project);
+  const collected = invoke(corpus.project.root, "collect", [], corpus.env); expect(collected.exit).toBe(0);
+  const inventory = JSON.parse(collected.out); corpus.bindInventory(inventory);
+  const row = corpus.cases.find(row => row.id === "coverage:example/project:code_scanning")!;
+  const { text, at } = jsonEvidence(inventory), status = at("repositories", 0, "code_scanning", "coverage", "count"), sibling = at("repositories", 0, "dependabot", "coverage", "count");
+  const assessment = passingAssessment([row]); assessment.items[0].evidence = [{ path: "source/security.md", line: 1, detail: "The configured documented unavailable response." }, { path: "inventory.json", line: status.line, detail: "The scoped coverage object has a null count." }];
+  expect(gradeAssessment(assessment, [row], { ...corpus.evidence, "inventory.json": text }).pass).toBe(true);
+  assessment.items[0].evidence[1].line = sibling.line;
+  expect(gradeAssessment(assessment, [row], { ...corpus.evidence, "inventory.json": text }).pass).toBe(false);
 });

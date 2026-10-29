@@ -70,7 +70,7 @@ export function exportAnalysisInput(config: Settings, input: AnalysisInput) {
     const path = `history/${String(index).padStart(4, "0")}.md`; add(path, report.text);
     history.push({ path, provenance: report.provenance, digest: report.digest, ...(report.commit ? { commit: report.commit } : {}) });
   }
-  const files = [...content].map(([path, row]) => ({ path, sha256: digest(row.bytes), mode: row.mode })).sort((a, b) => a.path.localeCompare(b.path));
+  const files = [...content].map(([path, row]) => ({ path, sha256: digest(row.bytes), mode: row.mode })).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   const pluginFiles = files.filter(row => row.path.startsWith("plugin/")).map(row => ({ ...row, path: row.path.slice(7) }));
   const manifest: AnalysisManifest = { schema_version: 1, run_id: run.header.run_id, synthetic_input: input.synthetic_input, source_commit: inventory.source_commit,
     hostname: inventory.hostname, repository: inventory.repository, scope: inventory.scope, component_commit: componentCommit, plugin_version: pluginVersion,
