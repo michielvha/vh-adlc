@@ -88,7 +88,7 @@ for (const id of selected) {
     packageUnchanged: fingerprint(installed.installedPath) === installedHash,
   };
   const allowedPaths = new Set(id === "promotion" ? ["promotion.md", "site/article.md"] : ["new", "repair", "fallback"].includes(id) ? ["article.md"] : []);
-  const changedPaths = git(project, "status", "--porcelain", "--untracked-files=all").split("\n").filter(Boolean).map(line => line.slice(3));
+  const changedPaths = [git(project, "diff", "--name-only"), git(project, "ls-files", "--others", "--exclude-standard")].flatMap(value => value.split("\n")).filter(Boolean);
   checks.onlyAuthorizedPaths = changedPaths.every(path => allowedPaths.has(path));
   if (["keep", "denied-site", "editor", "ship-public", "ship-internal"].includes(id)) checks.allFilesUnchanged = fingerprint(project) === beforeFiles;
   if (["new", "fallback"].includes(id)) {
