@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-maintenance
-status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria; its minor notes and an observed trial-grader wording defect are fixed and tested. R-21 notes are fixed and verified, including a new committed-source replay. All implementation tasks are checked; fresh final review remains. Live Claude/GUI are deferred; publication and cutover are pending."
+status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria; its minor notes and an observed trial-grader wording defect are fixed and tested. R-21 notes are fixed and verified, including a new committed-source replay. R-22 met all criteria with two minor notes; T17 resolves report receipt and canonical evidence-ref instructions. Live Claude/GUI are deferred; publication and cutover are pending."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -1393,6 +1393,8 @@ results here. The R-16 no-default-checkout fixture is part of T5/T12.
 
       Final T16 evidence: the fresh side-by-side replay passed at committed code `2ed05edafb7c2fbc6ef2fedb23d17b49f3fcadfc`, actual grader SHA-256 `7eb986673d96e238823e57ab9315ab7eb00f31715b5bf087648cb432948760e9` (`post-r21-policy-replay/regraded-result.json`). Its actual installed report render passed. The original result, prior replay, assessment, consumer plan and native transcript hashes remained identical. The final independent review launcher now repeats this replay from its own exact source target into a separate new directory and checks code binding and preservation. Earlier artifacts are retained with their real provenance; no earlier replay is relabeled as a new model answer or this implementation.
 
+- [ ] T17 report replay receipt verification, maintenance evidence instructions, paired consumer policy and this document - resolve R-22 within accepted Design: record and validate the helper's actual existing-or-new report path/digest, and use the accepted per-run evidence-ref name. Preserve old artifacts and compatibility with historical refs. Observe missing-report/digest and canonical-ref controls fail, then pass checks and refresh exact native-install proof before final Copilot review (AC-05, AC-07, AC-08, AC-09).
+
 ## Open Questions
 
 None.
@@ -1423,6 +1425,7 @@ None.
 | 2026-10-29 | R-19 | implementation | `3216f0962d54afc8dc584394d13a74fe57e0759f` | claude-opus-5.5 | procedural | AC-01 through AC-06 met; AC-07/AC-08 not verified; AC-09 not met. The workflow guard fails, and the consumer policy location differs from accepted Design. Fixes and re-review required. |
 | 2026-10-29 | R-20 | implementation | `f6974f259de383bbbc803261a0fa33b3e949876d` | claude-opus-5.5 | procedural | All nine criteria met; three factual/test nits remain: final compatibility wording, consumer minimum version and a preflight false-positive branch. T15 resolves them before final review. |
 | 2026-10-29 | R-21 | implementation | `1a121564d92ac3da8bf7bef238432a527b3888f4` | claude-opus-5.5 | procedural | All nine criteria met; three minor notes require replay-code provenance, stronger compatibility-claim controls and correct Review Log placement. T16 addresses them before final review. |
+| 2026-10-29 | R-22 | implementation | `06b171348ece78c622b914838babfbe5cb442951` | claude-opus-5.5 | procedural | All nine criteria met. Two minor notes require recording the actual resumed report path/digest and aligning the evidence ref instruction with accepted Design. T17 applies those fixes. |
 
 
 ### R-1
@@ -2339,6 +2342,149 @@ SEVERITY: nit
 WHERE: docs/specs/shared-maintenance.md:2064-2082 (Review Log and Sources)
 EVIDENCE: "## Sources" starts at line 2064, after "### R-19", and "### R-20" follows at line 2082. The R-20 records therefore sit under Sources instead of under the Review Log, which the feature-document standard requires to hold each "### R-<n>" subsection.
 PROPOSAL: Move the "### R-20" subsection above "## Sources" so that every stored review record sits inside the Review Log section.
+
+### R-22
+
+CRITERION: AC-01 A project can discover and invoke shared dependency/security maintenance through the installed vh-adlc plugin without a harness-specific procedure or a Stackweaver checkout dependency.
+VERDICT: met
+EVIDENCE: I ran /home/m/code/.maintenance-review-archive/implementation-r22/input/check.sh once. It printed {"pass_": true, "commands": 12, "preserved": true}. execution/receipt.json shows all 12 commands exited 0. Source head was 06b171348ece78c622b914838babfbe5cb442951 and consumer head was 9111242da11be04157b7cccd994426069d31b9d5. Head, index, empty status and refs were identical before and after. The launcher also verified 446 source objects, 191 proofs and 32 required positive results. Command 00 printed {"version":"0.6.0","digest":"23fcedd9c556c64c71c9fc4afb9873f5408d7f493c80fef14441c9ca23a00652","files":66,"exact":true}. So committed plugins/vh-adlc at 06b17134 matches the Codex-installed post-R19 payload. Command 01 (bun test tests/vh-adlc) passed 598 tests and 2632 assertions with 0 failures. These included maintenance/discovery.test.ts ("maintenance is a discoverable model-neutral operation with one canonical procedure", "intake keeps existing routes and adds sweep/resume without granting publication"), settings.test.ts ("an unconfigured project has one repository and creates no settings or output"), collection.test.ts ("the collector's runtime import graph does not load triage execution or the controller") and the check.test.ts vh-adlc-maintenance skill checks (01.stderr:236-238, 527, 570, 657-658). Command 11 invoked the installed payload's scripts/maintenance/cli.ts report helper, which exited 0. I inspected proofs/post-r19-native-install-b/result.json: kind local-catalog, source_commit 3039766d (the candidate_commit in targets.json), Codex and Claude hosts, payload 23fced, model_invocations 0, reinstall restored 23fced, and pass true. Limitations: these are local-catalog development installs, not published-marketplace installs. I inspected the native install results; I did not rerun them.
+
+CRITERION: AC-02 A sweep respects explicit repository scope, includes configured dependency/sync bot PRs, unknown-bot inventory gaps, dashboard work and security alerts, and distinguishes documented unavailable surfaces from incomplete collection without declaring affected work ready.
+VERDICT: met
+EVIDENCE: In command 01 at 06b17134, every settings.test.ts and collection.test.ts case passed (01.stderr:526-579). They cover:
+- fixed GET argv
+- every page collected, with unknown bots kept as gaps
+- documented unavailable scanning reported as n/a while Dependabot stays complete
+- unmatched 403, 404 and 429 responses treated as incomplete
+- partial pages
+- configured dashboard-only work, with ambiguity left incomplete
+- organization gaps without widened explicit scope
+- normalized bot matching
+- newly enabled scanning
+- the 1000-suite cap
+- stale status
+
+analysis.test.ts "every coverage case binds its own collected JSON object and rejects a sibling surface" passed (01.stderr:654). The consumer settings (consumer/.vh-adlc/maintenance.json:21-22,30-37) declare the exact bot_authors and bot_inventory_terms and the 403 literal-message expectation. The fresh replay render receipt (execution/fresh-replay/regraded-report-receipt.json) shows monorepo code_scanning as complete-unavailable with a null count and the provider Dependabot surface as incomplete with a null count. Limitations: fake-CLI and synthetic inventories only; no live GitHub collection.
+
+CRITERION: AC-03 Maintenance decisions use actual version/changelog, code-usage and source-ownership evidence, keep major migrations separate and leave ambiguous or mixed changes unresolved.
+VERDICT: met
+EVIDENCE: Command 01 passed analysis.test.ts ("graders require every exact item/class and cited input, with no invented collection or live actions") and all seven trial-proof.test.ts cases (01.stderr:645, 678-685). I inspected the retained trials:
+- proofs/final-report-codex/result.json: pass true, model gpt-6.1-sol, component 5f52f789, plugin_digest 23fced.
+- proofs/final-report-copilot: result.json retains pass false with "coverage:example/project:code_scanning:required-evidence", beside regraded-result.json pass true on the same component and payload. The sibling-surface negative still passes as a rejection in this run.
+- proofs/final-report-stack-policy: inspected.
+- Command 11 re-executed the post-R20 policy replay from committed 06b17134 (described under AC-09). It passed with grade failures [] while the five retained artifacts stayed byte-identical.
+
+Limitations: synthetic corpus and source samples only. Production call-site compatibility remains unverified, and the consumer plan itself says so.
+
+CRITERION: AC-04 Each sweep permitted to write local artifacts preserves a durable, uniquely named report covering every discovered PR, security reconciliation and unresolved work without overwriting history or claiming completion from missing data; a sweep forbidden from all filesystem writes returns chat-only findings without claiming a saved report.
+VERDICT: met
+EVIDENCE: Command 01 passed (01.stderr:581-654):
+- journal.test.ts: 8 tests.
+- report.test.ts: 22 tests, covering same-day reservation, the two-process unsuffixed race, report-role refs forcing a suffix, cross-host relocation, published collision handoff, append-only resume, legacy unverified history and non-link unpublished evidence.
+- publication.test.ts: 23 tests, covering the committed default-branch grant only, feature-branch and uncommitted denials, isolated commits, promotion, protection refusal, interrupted-commit recovery and the exposed transferred pending commit.
+- analysis.test.ts: "no-filesystem mode creates no journal".
+
+Before running the commands, the launcher asserted pass true for publication-h, i, j, l, m and n, and for second-actor-no-push. In the fresh replay receipt, the read-only request yields kind external-draft with commit false and push false. Limitations: synthetic local-bare transports only; no real GitHub publication; the native runs were not rerun.
+
+CRITERION: AC-05 Newly authored compatible repairs use bounded-maintenance checks and independent review, selected bot-batch delivery preserves the declared consumer procedure, wider changes use the feature loop, and remote or live actions stay within owner and consumer permissions after revalidation.
+VERDICT: met
+EVIDENCE: Command 01 passed maintenance-variants, the lifecycle maintenance-branch publication denials, delivery-cases, paired-review-trial, action-cases, paired-check, bot-only-trial (real go mod tidy), related-cases, builder-order and stalled-sync-trial (01.stderr:131-136, 159-161, 698-724). I inspected the following:
+- proofs/authored-satellite-a-review-7/returned.txt is exactly "MODEL: claude-opus-5.5" followed by "NO FINDINGS".
+- proofs/authored-satellite-a/continuation-result.json has pass true and the same original and resumed thread (01a18631-9349-7be1-ac15-2777c076bdf0).
+- That result records successful_source_pushes 1 and PR headRefOid 3706784e, equal to source_target.
+- Stored review R-7 is verbatim, with R-1 through R-6 preserved. Report, evidence and primary batch are unpublished.
+
+The launcher asserted pass true for the authored-primary-b and authored-independent-a continuations, stalled-sync, bot-only-go-a (batch, second batch and cleanup), and actions-a and actions-b. Limitations: synthetic local transports only; no live dependency, merge, dispatch or helper action. The final satellite proof used frozen payload 86ee21d9, not 23fced. The unchanged Stackweaver helper's crash safety is not certified.
+
+CRITERION: AC-06 Resuming a task preserves unrelated work and prior evidence, invalidates stale reviews/approvals and reconciles interrupted actions before retrying them.
+VERDICT: met
+EVIDENCE: Command 01 passed (01.stderr:141-157, 582-613, 625-638, 711):
+- maintenance-resume.test.ts, including unavailable review staying pending.
+- native-review "a changed Definition invalidates review".
+- journal torn-event, two-real-process and linked-worktree cases.
+- report fresh-process append reconciliation and unfinished-intent blocking.
+- publication interrupted Git commit resume without a duplicate, and moved-ref conflict.
+- paired-check rejection of a changed verification-input export.
+
+The launcher asserted pass true for the actions-c and actions-d fresh recoveries, the publication-h interrupted commit, publication-i accepted-response-lost, and publication-n unobservable and fresh recovery. Limitations: procedural recovery against synthetic transports; no exactly-once remote guarantee.
+
+CRITERION: AC-07 Stackweaver routes maintenance to the installed shared operation while retaining its command/model/arguments, repository facts, batching and release checks, approved satellite-helper behavior and scoped skip-leak recovery locally; an authorized sweep publishes its initial and later same-run report artifacts through the retained main-checkout route, while other consumers publish reports only under an explicit request or adopted declaration.
+VERDICT: met
+EVIDENCE: Command 09 ran bun test tests/agent-maintenance in the consumer at 9111242d, with VH_ADLC_PLUGIN_DIR set by check.py to the installed 23fced payload. It passed 11 tests and 127 assertions with no skips (09.stderr). Command 10 (changelog check) passed.
+
+I inspected consumer/ against consumer-parity-baseline/ for every parity row (spec lines 960-977):
+- The command keeps model: opus and $ARGUMENTS and routes to vh-adlc-maintenance. Its lines 10-13 replace baseline lines 28-29 (satellite handoff) and 31-33 (protection) with the approved helper exception, and keep the self-approval ban.
+- maintenance.json keeps 8 synced and 4 independent repositories, 4 exclusions, bot_authors renovate/dependabot/stackweaver-release-bot, bot_inventory_terms renovate/dependabot/release-bot, the dashboard, the no-GHAS expectation and project_procedure agents/maintenance-project.md.
+- maintenance-project.md keeps the remaining rows:
+  - reusable-workflow tag and input-default checks
+  - provider direct merges
+  - the distribution ban
+  - Renovate limits and satellite-only ecosystems
+  - security mapping and no-GHAS
+  - legacy unverified history
+  - core/v* tags and both backlog links
+  - report-only [skip ci]
+  - one squash with no dependency skip
+  - the merge-tree exit code
+  - builder-first ordering and stalled-sync root cause
+  - majors, Playwright and check-doc-coverage
+  - GitVersion Tag, bump-core and sync checks
+  - skip-leak recovery (lines 160-163)
+  - Compose smoke stop/restore
+  - the helper, green-check and raw-admin bans
+  - non-forced cleanup
+  - the disposition vocabulary
+  - the exact Standing maintenance report publication table (lines 113-124)
+- AGENTS.md:15-17 links to agents/maintenance.md and to .vh-adlc/maintenance.json.
+
+contract.test.ts passed the helper, other agents and CLAUDE.md preservation checks. publication.test.ts proves that other consumers publish only under an explicit request or an adopted declaration. Limitations: the adapter is unmerged and unadopted, so the standing grant is not yet live. Main-checkout publication is proven only on synthetic transports. Live Claude /maintenance invocation is owner-deferred.
+
+CRITERION: AC-08 The exact committed candidate passes native Codex and Claude CLI installation/discovery and installed-helper checks, the consumer can roll back and reapply without unrelated changes, and its adoption preflight blocks cutover until matching real marketplace verification is available.
+VERDICT: met
+EVIDENCE: Installation: proofs/post-r19-native-install-b/result.json (pass true, local-catalog, source 3039766d, payload 23fced, Codex and Claude hosts, reinstall restored 23fced). Command 00 proved committed 06b17134 is identical to that installed payload. Command 09 passed:
+- rehearsal.test.ts: restores and reapplies only the runtime paths and preserves unrelated bytes.
+- installed.test.ts: rejects an empty payload, 0.4.1 and a maintenance-shaped 0.5.99, and accepts 0.6.0. installed.ts:10 rejects any 0.x minor below 6. checks/r20-version-gate-red shows 0.5.99 was accepted before the fix.
+- preflight.test.ts, two separate passing cases. The clean case asserts empty fixture status, then pass false with "expected published target absent or invalid". The dirty case adds an untracked file and rejects with "consumer migration scope is not a clean committed snapshot".
+
+Command 01 passed the shared migration.test.ts denials (absent and local-catalog proof, wrong or stale source, consumer, version, model or payload, missing hosts or helpers) and valid-receipt parsing without a publication claim. The consumer manifest records minimum_plugin_version 0.6.0 and adoption_state pending-published-marketplace-proof. Limitations: no real published-marketplace install exists. Under the accepted Design, that blocks cutover before consumer merge and is not a source-gate prerequisite. The clean consumer case is denied because the published target is absent, before the receipt branch; shared tests cover the receipt branch.
+
+CRITERION: AC-09 Actual bounded Codex and Copilot report-stage trials follow the shared analysis procedure and retained consumer policy, and required regression and trial checks pass without implying untested delivery or GUI support or changing deferred workflows.
+VERDICT: met
+EVIDENCE: All 12 launcher commands exited 0 at 06b17134 and 9111242d:
+- bun test tests/vh-adlc: 598 pass, 2632 assertions.
+- go test ./...: all ok, partly cached.
+- go vet, go mod tidy -diff, and golangci-lint config verify and run ("0 issues.").
+- github-app-registration: 34 pass.
+- actionlint.
+- consumer: 11 tests and the changelog check.
+
+Command 11 replayed the policy trial into the new execution/fresh-replay directory. replay_implementation.source_commit is 06b17134, and source_sha256 7eb98667 equals the launcher's hash of committed report-trial.ts. grade.failures is [], with input digest 5e9dcce5, plugin 23fced and consumer 9111242d. The five retained files (result.json, regraded-result.json, assessment.json, consumer-plan.json and native.jsonl) stayed byte-identical. regradeDeclaredExpectationEvidence (report-trial.ts:246-253) requires the retained assessment and plan to equal the native return, so this is a regrade of the unchanged answer, not a new model answer.
+
+I inspected the full proofs/post-r20-report-stack-policy/native.jsonl (2167 lines):
+- Bash, create, edit, web_fetch and task are disabled.
+- All 64 tool starts are view, grep or glob, and all stay under the input root. 59 starts have a path argument; the other 5 are grep and glob calls whose paths argument is also under the input root. There is no "..".
+- There are 64 completions, one with success false.
+- The result has exitCode 0 and no code changes.
+
+The final assistant message contains the consumer-plan.json text: satellite builder first, michielvha/stackweaver second, single_squash true, skip_ci false, distribution_edits false, and "They establish no production call-site compatibility, check result or readiness." result.json retains pass false with only consumer-policy-parity.
+
+Grader controls: checks/r20-compatibility-wording-red fails exactly that qualification, and r21-claim-boundary-red shows a mixed positive claim passing before the fix. Now trial-proof.test.ts:98-101 passes. It accepts the actual qualification and "cannot establish compatibility with production source". It rejects an unqualified claim and four claims that mix a positive claim with qualifying words, plus a wrong owner, a prefix, reversed order and skip_ci true.
+
+compatibility.md:42-48 keeps live Claude and GUI deferred and makes no Copilot lifecycle claim. Limitations: live Claude and GUI remain unverified. The fresh replay re-used the original run's saved report (see F-01).
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: tests/vh-adlc/maintenance/report-trial.ts:260-265; execution/fresh-replay/regraded-result.json:745; proofs/post-r21-policy-replay/regraded-report-receipt.json
+EVIDENCE: The fresh replay result claims "report": ".../execution/fresh-replay/maintenance-report.md", but that file does not exist. glob of execution/fresh-replay lists only the four regraded-* files. The receipt's argv passed that path as --report-output for run 09186268. The installed helper instead returned "path": ".../runtime-20261029/post-r20-report-stack-policy/maintenance-report.md" with digest fd3b4a44. That is the retained original report (manifest.json:699-701). The post-R21 replay receipt shows the same reuse. The code sets report = join(replayOutput, "maintenance-report.md") without checking the helper's returned path, and the launcher does not check the report. So the "installed report render" in a side-by-side replay resumes the original run's report rather than rendering a new one. Grades, the native answer and preservation are unaffected.
+PROPOSAL: Record the helper's returned path and digest in the replay result, and fail when the claimed report is absent. Alternatively, render into an isolated run so that a fresh report is actually produced.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: plugins/vh-adlc/references/maintenance-record.md:54; consumer agents/maintenance-project.md:142
+EVIDENCE: The accepted Design (spec lines 743-744) names the evidence branch `chore/maintenance-evidence-<run-id>`. The shared procedure and the consumer policy use `chore/maintenance-evidence-<run-id>-<task-id>`, and report.ts:204 accepts either form. The per-task form still keeps evidence refs unique and local, but it differs from the accepted ref name.
+PROPOSAL: Either record the per-task suffix as an accepted refinement through the normal revision route, or align the procedure with the Design name.
 ## Sources
 
 - [Pinned agent entry](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md): task routes and preservation of local instructions.
