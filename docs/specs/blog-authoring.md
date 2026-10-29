@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted for implementation and merge on 2026-10-29 after clean review at 320b728; task planning next."
+status: in-progress
+branch: feat/blog-authoring
+status_description: "Accepted article/promotion workflow claimed on feat/blog-authoring; implementing package and native verification."
 issue: null
 goal: "Prepare repository-owned articles and social drafts that link to them, using verified project facts and the requested writer's actual style before owner review."
 covers:
