@@ -58,6 +58,17 @@ choose an operation such as `/vh-adlc:vh-adlc-spec`.
 This is the native extension. Copilot Chat's **Claude** harness has its own
 compatibility entry.
 
+## Codex CLI
+
+```sh
+codex plugin marketplace add michielvha/vh-adlc
+codex plugin add vh-adlc@vhco-tools
+```
+
+Start a new session in your project and invoke `vh-adlc` or a named operation.
+The CLI keeps its own installation profile; installation in another client does
+not establish that this profile has the plugin.
+
 ## Claude Code CLI
 
 Run in a terminal:
@@ -78,7 +89,7 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains nine skills: the generic `vh-adlc` entry and eight named operations.
+The package contains ten skills: the generic `vh-adlc` entry and nine named operations.
 It also includes a reviewer definition. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
@@ -97,8 +108,14 @@ Every published triage verdict and local assessment patch also needs the [manage
 which currently requires Linux, Bubblewrap, `flock` from util-linux and an authenticated supported CLI.
 The shared procedure and stream protocol remain independent of the harness; other host integrations
 must enforce the same boundary and pass their own tests. Missing confinement leaves closure execution and all assessment writes
-unavailable; local reports remain available. Another read adapter must preserve the pagination and error contract. The other feature
-operations continue to use the verified binary without requiring Bun.
+unavailable; local reports remain available. Another read adapter must preserve the pagination and error contract. Shared dependency and security maintenance also requires Bun, Git and an authenticated `gh`.
+Its [settings](../../plugins/vh-adlc/references/maintenance-settings.md) are optional;
+project topology, verification commands and delivery policies stay in the consumer.
+Invoke `vh-adlc-maintenance` on plugin 0.5.0 or later. Missing that operation is an
+installation blocker; do not reconstruct it from a legacy local agent.
+Maintenance uses an agent procedure with observed evidence, rather than triage's
+managed publication controller. The other feature operations continue to use the
+verified binary without requiring Bun.
 
 The other marketplace plugins install separately. Bun is required for the
 GitHub App registration scripts; installing vh-adlc does not install those scripts

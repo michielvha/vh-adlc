@@ -12,8 +12,8 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has nine skills: this entry and
-eight named operations. Check
+repository and selects a procedure. The package has ten skills: this entry and
+nine named operations. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -38,6 +38,7 @@ see [installation](../get-started/installation.md).
 
 | Operation | Invocation name | Purpose |
 | --- | --- | --- |
+| Maintenance | `vh-adlc-maintenance` | Sweep dependency/security work, save a report and resume selected repairs under local project rules. |
 | Triage | `vh-adlc-triage` | Sweep a backlog, verify a shortlist, propose closures, or inspect stale/explicit issues; apply only approved exact actions. |
 | Investigate | `vh-adlc-investigate` | Measure an issue or failure and report; never fixes. |
 | Spec | `vh-adlc-spec` | Write or revise the feature document. Add `review <path>` for an independent spec review. |
@@ -56,6 +57,39 @@ and neutral vocabulary. Triage does not implement the selected issues.
 Repository settings are optional; see the [settings contract](../../plugins/vh-adlc/references/triage-settings.md).
 
 For a walkthrough, see [your first feature](../get-started/first-feature.md).
+
+## Dependency and security maintenance
+
+Ask `Use vh-adlc-maintenance to sweep dependency and security work; report first`.
+The operation inventories configured repositories, bot PRs, dashboards and security
+surfaces, then checks release notes, affected usage, ownership and available checks.
+It saves a dated report and presents proposed work for selection. A scoped request
+stays scoped; unavailable alerts and incomplete pages remain visible limitations.
+A green bot PR is not by itself compatibility evidence.
+
+Keep repository topology, bots, sync mappings, exclusions, verification commands
+and release/merge rules in the consumer's
+[maintenance settings and project procedure](../../plugins/vh-adlc/references/maintenance-settings.md).
+The shared operation does not create a generic protection-changing permission.
+Existing entries can forward to the installed operation while retaining their
+local model and scope arguments. Missing plugin/version support blocks that route.
+
+Report-only commits and pushes need explicit current permission or the documented
+committed consumer grant. That grant can cover the initial report and later updates
+for the same run. Current read-only/no-push restrictions still apply. Reports use
+an isolated candidate ref and the consumer's owning default-branch checkout for
+publication; unavailable or conflicting publication stays pending without rebasing
+or forcing. Resume by the saved run ID so completed effects are reconciled before
+any retry. Unpublished later outcomes stay in private run artifacts.
+
+Selected compatible authored repairs use bounded maintenance and an independent
+review of the exact source and Definition. A consumer may keep review evidence
+outside a dependency squash, with both commits explicitly bound. Existing authorized
+bot-only aggregation keeps its combined-PR/check flow. Major or public-contract
+changes use the feature loop. Dependency pushes, merges, releases and live smoke
+operations still require their own authority. See the
+[canonical procedure](../../plugins/vh-adlc/references/maintenance.md) and
+[tested compatibility](../reference/compatibility.md#dependency-and-security-maintenance).
 
 ## Reviews
 
@@ -80,6 +114,10 @@ Directly invoking `vh-adlc-spec` or `vh-adlc-tasks` retains their authority to
 commit and push feature documents to the default branch before the feature has
 an owning branch. A directly invoked implementation operation also has its
 documented claim-commit authority. Repository instructions still apply.
+
+A committed consumer maintenance grant can authorize its declared report-only
+publication, including when a sweep is selected through generic intake. It grants
+no dependency delivery permission.
 
 Merging, tagging, releasing, deploying, and destructive operations need separate
 approval. See the [authority reference](../../plugins/vh-adlc/references/authority.md)

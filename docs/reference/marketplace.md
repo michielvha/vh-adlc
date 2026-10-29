@@ -19,6 +19,21 @@ The [Codex catalog](../../.agents/plugins/marketplace.json) and
 [Claude catalog](../../.claude-plugin/marketplace.json) define package sources.
 Both pin auth-refresh to the same component commit.
 
+## Shared maintenance
+
+The `vh-adlc-maintenance` operation is included in vh-adlc from plugin 0.5.0;
+it is not a separate marketplace plugin. Update the client installation and
+verify its version and operation discovery before replacing a local entry.
+Project-specific maintenance policy and scope remain in the consuming repository.
+See [maintenance workflow](../user-guides/workflows.md#dependency-and-security-maintenance).
+
+For a migration, validate an exact candidate in isolated profiles first, then
+repeat installation and installed-helper checks against the published marketplace.
+A local catalog or copied skill is insufficient for consumer cutover. The packaged
+adoption preflight checks the exact shared/consumer targets, version, payload,
+native-host receipts and paired review. It treats receipts as operator attestations;
+it neither publishes the feature nor authorizes a consumer merge.
+
 ## codex-qr-pairing
 
 After adding this marketplace, install **codex-qr-pairing** from **vhco-tools**.
