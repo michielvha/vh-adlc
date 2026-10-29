@@ -30,6 +30,7 @@ const host = run(["codex", "--version"]).trim();
 run(["codex", "plugin", "marketplace", "add", market, "--json"]);
 const installed = JSON.parse(run(["codex", "plugin", "add", "vh-adlc@blog-trials", "--json"]));
 const installedHash = fingerprint(installed.installedPath);
+const component = git(repo, "rev-parse", "HEAD");
 const pin = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
 const original = "---\nstatus: draft\nauthor: Fixture writer\n---\n\n# Cedar reference\n\nI prefer the management cluster for shared controllers.\nThe workload cluster runs the application.\n\n```sh\ncedar docs --format html\n```\n";
 const protectedCopy = "i use Cedar with customers and it is the only tool that can document this stuff…";
@@ -86,6 +87,9 @@ for (const id of selected) {
     sentinelUnchanged: content("sentinel.txt") === "UNRELATED CONTENT MUST REMAIN IDENTICAL\n",
     packageUnchanged: fingerprint(installed.installedPath) === installedHash,
   };
+  const allowedPaths = new Set(id === "promotion" ? ["promotion.md", "site/article.md"] : ["new", "repair", "fallback"].includes(id) ? ["article.md"] : []);
+  const changedPaths = git(project, "status", "--porcelain", "--untracked-files=all").split("\n").filter(Boolean).map(line => line.slice(3));
+  checks.onlyAuthorizedPaths = changedPaths.every(path => allowedPaths.has(path));
   if (["keep", "denied-site", "editor", "ship-public", "ship-internal"].includes(id)) checks.allFilesUnchanged = fingerprint(project) === beforeFiles;
   if (["new", "fallback"].includes(id)) {
     const article = content("article.md");
@@ -113,7 +117,7 @@ for (const id of selected) {
   if (id === "ship-public") checks.explicitSuggestion = response.includes("vh-adlc-blog promote") && /unreleased|no.*release|not.*released|not.*published/i.test(response);
   if (id === "ship-internal") checks.noSuggestion = !response.includes("vh-adlc-blog promote");
   writeFileSync(join(out, `${id}.response.txt`), response);
-  const result = { id, host, component: git(repo, "rev-parse", "HEAD"), installedHash, driverHash, durationMs: Date.now() - started, thread: parsed.threadId, exitCode, timedOut, status: Object.values(checks).every(Boolean) ? "pass" : "fail", checks, rawEventsHash: createHash("sha256").update(readFileSync(raw)).digest("hex") };
+  const result = { id, host, component, installedHash, driverHash, durationMs: Date.now() - started, thread: parsed.threadId, exitCode, timedOut, status: Object.values(checks).every(Boolean) ? "pass" : "fail", checks, rawEventsHash: createHash("sha256").update(readFileSync(raw)).digest("hex") };
   results.push(result); writeFileSync(join(out, "results.json"), JSON.stringify(results, null, 2));
   console.log(JSON.stringify(result));
   if (exitCode !== 0 || timedOut) break;
