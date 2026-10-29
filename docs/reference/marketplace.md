@@ -21,7 +21,7 @@ Both pin auth-refresh to the same component commit.
 
 ## Shared maintenance
 
-The `vh-adlc-maintenance` operation is included in vh-adlc from plugin 0.5.0;
+The `vh-adlc-maintenance` operation is included in vh-adlc from plugin 0.6.0;
 it is not a separate marketplace plugin. Update the client installation and
 verify its version and operation discovery before replacing a local entry.
 Project-specific maintenance policy and scope remain in the consuming repository.

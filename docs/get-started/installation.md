@@ -89,8 +89,9 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains ten skills: the generic `vh-adlc` entry and nine named operations.
-It also includes a reviewer definition. Its first operation
+The package contains eleven skills: the generic `vh-adlc` entry, nine engineering
+operations and `vh-adlc-blog` for article and promotion drafts. It includes
+separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
 It verifies the archive and binary hashes before execution and writes downloads
@@ -111,7 +112,7 @@ must enforce the same boundary and pass their own tests. Missing confinement lea
 unavailable; local reports remain available. Another read adapter must preserve the pagination and error contract. Shared dependency and security maintenance also requires Bun, Git and an authenticated `gh`.
 Its [settings](../../plugins/vh-adlc/references/maintenance-settings.md) are optional;
 project topology, verification commands and delivery policies stay in the consumer.
-Invoke `vh-adlc-maintenance` on plugin 0.5.0 or later. Missing that operation is an
+Invoke `vh-adlc-maintenance` on plugin 0.6.0 or later. Missing that operation is an
 installation blocker; do not reconstruct it from a legacy local agent.
 Maintenance uses an agent procedure with observed evidence, rather than triage's
 managed publication controller. The other feature operations continue to use the

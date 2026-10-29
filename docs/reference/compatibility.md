@@ -28,14 +28,15 @@ The historical results below retain their original scope.
 
 ## Dependency and security maintenance
 
-Maintenance requires plugin 0.5.0 or later. Isolated native installs of the exact
-local candidate passed on Codex CLI 0.163.0 and Claude Code CLI 2.1.309 on Linux:
+Maintenance requires plugin 0.6.0 or later. Isolated native installs of the exact
+earlier 0.5.0 development candidate passed on Codex CLI 0.163.0 and Claude Code CLI 2.1.309 on Linux:
 both discovered the operation and ran installed settings, fake-GET collection
 and private-report helpers with matching payload bytes/modes and preserved fixture
 source/index. Uninstall/reinstall results and exact source targets are recorded in
 the [maintenance feature evidence](../specs/shared-maintenance.md).
 
-These are development local-catalog checks. Consumer cutover also requires actual
+Final 0.6.0 candidate validation is pending after integration with the published blog
+workflow. The earlier results are development local-catalog checks. Consumer cutover also requires actual
 published-marketplace installs, installed-helper tests and a fresh paired review.
 The adoption preflight rejects local-catalog receipts as publication proof.
 Native model report/delivery trials are tracked separately in that feature;
@@ -77,6 +78,16 @@ that identity was not attested. Asking for a specific model still requires a mat
 Hosts may register the reviewer agent directly or dispatch a generic independent subagent that reads
 the same reviewer file. If neither capability is available, the review stays pending with a handoff.
 The primary session never substitutes self-review for independence.
+
+## Article operation
+
+The article and promotion procedure is packaged as `vh-adlc-blog`. Its source
+checks cover discovery, preservation and publication boundaries; native runtime
+checks are recorded separately under `tests/vh-adlc/evidence/blog/` when executed.
+No desktop, extension or connector support follows from those source checks.
+An unavailable write-like-me retrieval integration remains unverified even when
+drafting from supplied voice references works. The operation can use the pinned
+prose guide when the humanizer skill is unavailable.
 
 Continue with [your first feature](../get-started/first-feature.md) or
 [review requirements](../user-guides/workflows.md#reviews).

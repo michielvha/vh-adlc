@@ -17,7 +17,7 @@
     {
       "name": "vh-adlc",
       "source": "./plugins/vh-adlc",
-      "description": "Explicit software lifecycle intake and bounded maintenance, with deterministic gates for the feature loop."
+      "description": "Shared engineering lifecycle and article/promotion drafting with adopter-owned voice rules."
     },
     {
       "name": "auth-refresh",

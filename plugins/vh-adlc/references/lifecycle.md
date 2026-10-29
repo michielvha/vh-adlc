@@ -41,6 +41,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Answer or advice | Inspect the relevant source and answer with its practical limits. No saved artifact unless requested. |
 | Backlog triage | Use `skills/vh-adlc-triage/SKILL.md` to verify scope, rank ready work and save a report; GitHub writes require exact triage approval; every published verdict and local assessment patch also needs current proof in the confined controller from [the boundary guide](triage-boundary.md). |
 | Diagnosis or findings | Use `skills/vh-adlc-investigate/SKILL.md` with the selected investigation intent. Reproduce the issue and respect report-only limits. |
+| Article authoring, revision or promotion drafts | Use `skills/vh-adlc-blog/SKILL.md`; promotion mode prepares article-linked social copy only on request. Writing an article needs no software feature document. A request for implementing a blog or changing application behavior stays in the feature procedure. |
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
 | Dependency or security sweep | Use `skills/vh-adlc-maintenance/SKILL.md` for inventory, evidence, durable reporting and selected follow-up; publish reports only through its exact current/adopted authority. |
 | Bounded maintenance | Follow the maintenance procedure below if the public contract is preserved and local instructions allow it. |

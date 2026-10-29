@@ -9,7 +9,7 @@ test("maintenance is a discoverable model-neutral operation with one canonical p
   expect(header.name).toBe("vh-adlc-maintenance"); expect(header).not.toHaveProperty("model"); expect(header).not.toHaveProperty("allowed-tools");
   expect(skill.length).toBeLessThan(5000);
   for (const path of ["references/maintenance.md", "references/maintenance-settings.md", "references/authority.md", "references/loop.md"]) { expect(skill).toContain(path); expect(read(path).length).toBeGreaterThan(0); }
-  expect(readdirSync(join(plugin, "skills"))).toHaveLength(10);
+  expect(readdirSync(join(plugin, "skills"))).toHaveLength(11);
   expect(read("references/maintenance.md")).not.toMatch(/\b(?:AskUserQuestion|TodoWrite|mcp__|model:)\b/);
 });
 

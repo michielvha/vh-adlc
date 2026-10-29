@@ -12,8 +12,8 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has ten skills: this entry and
-nine named operations. Check
+repository and selects a procedure. The package has eleven skills: this entry,
+nine engineering operations and one article-writing operation. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -25,6 +25,7 @@ on your host.
 | Backlog triage | Verify issues against source and observed checks, rank ready work, and save a report. Approve an exact batch before any tracker change. |
 | Diagnosis | Investigate and report. A report-only request does not authorize a fix. |
 | Documentation | Edit the requested document and check it. A prose edit does not need a feature spec. |
+| Article or social draft | Read the project's evidence and the site's voice rules, draft or revise the requested prose, and obtain a source-comparing editorial pass. Publication is separate. |
 | Small maintenance | Preserve the public contract, keep a short task record, run appropriate checks, and obtain an independent review. |
 | A new feature or a wider change | Use a feature document with acceptance, tests, reviews, and binary status gates. |
 
@@ -47,6 +48,7 @@ see [installation](../get-started/installation.md).
 | Review | `vh-adlc-review` | Dispatch an independent implementation review of an exact commit. |
 | Ship | `vh-adlc-ship` | On an explicit request, push the branch, open or update the PR, and update the issue. Never merges. |
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
+| Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
 
 Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
 labels, waits for the report and approval of the exact batch. Local plan patches and their commit
@@ -90,6 +92,38 @@ changes use the feature loop. Dependency pushes, merges, releases and live smoke
 operations still require their own authority. See the
 [canonical procedure](../../plugins/vh-adlc/references/maintenance.md) and
 [tested compatibility](../reference/compatibility.md#dependency-and-security-maintenance).
+
+## Articles and promotion
+
+Invoke `vh-adlc-blog <brief or article>` for a new draft, revision or editorial
+review. Use `vh-adlc-blog promote <project or article>` for an article and social
+drafts. Shipping public-facing work may suggest that command; it never runs the
+writer automatically. Article authoring does not create a software feature plan.
+
+The shared writer reads the adopter's agent entry point, voice guide and article
+schema. Keep personal samples and framework-specific frontmatter in the site
+repository. An existing local writer/editor can be replaced with pointers to
+this shared operation while retaining its site-specific rules. Each authorized
+destination is checked separately when project and website are different repos.
+
+The writer and independent editor preserve supported facts and the author's
+positions. Exact-wording requests protect the supplied copy; a factual error is
+reported outside it. New material can develop rough notes into prose, while
+revisions retain sound existing passages. The handoff groups substantive
+exceptions instead of asking the owner to approve every copy repair.
+
+Promotion copy points to the verified canonical article URL. Unpublished or
+older article content keeps the bundle pending. Release-day launch copy may be
+prepared in advance when requested, with the release dependency recorded outside
+the public text. A private preview remains an owner-review link.
+
+Tool availability is reported honestly. The writer uses the host's write-like-me
+and humanizer skills where available, otherwise supplied references and the
+pinned prose guide. A self-edit is identified when independent dispatch is
+unavailable. Prompt checks and package installation do not establish a native
+connector run; consult the [compatibility record](../reference/compatibility.md).
+
+The complete procedure is in the [article reference](../../plugins/vh-adlc/references/blog.md).
 
 ## Reviews
 

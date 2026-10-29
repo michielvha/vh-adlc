@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "vh-adlc",
-  "version": "0.5.0",
-  "description": "Explicit lifecycle intake, evidence-based backlog triage, dependency/security sweeps, bounded repairs and gated feature operations; shared framework procedures use pinned external engineering conventions.",
+  "version": "0.6.0",
+  "description": "Shared lifecycle, dependency/security maintenance and article/promotion drafting, with project-specific rules and independent review.",
   "author": {
     "name": "Michiel VH"
   },

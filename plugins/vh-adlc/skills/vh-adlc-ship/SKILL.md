@@ -65,6 +65,15 @@ the completion update, and say in the PR what remains.
 
 Never merge, and never bypass branch protection or rewrite a pushed commit.
 
+## Article and promotion handoff
+
+For public-facing work that would benefit from an article, suggest
+`vh-adlc-blog promote <project or article>` in the owner handoff. Internal-only
+changes receive no promotion suggestion. Do not invoke the writer or draft files
+as part of shipping, and do not make promotion a feature gate. A merged or shipped
+PR does not establish that its release is available. Any later promotion run
+checks release state and prepares drafts under its own requested scope.
+
 ## After an authorized merge
 
 Use trunk-based development. A separate owner-authorized merge ends the remote

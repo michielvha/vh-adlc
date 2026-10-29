@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-maintenance
-status_description: "T1-T11 complete: 570 plugin tests and all three actual report trials passed, including bounded Stackweaver policy. Publication/action/recovery trials and independent implementation review remain; live Claude and GUI tests are deferred."
+status_description: "T1-T11 complete. T12 is exercising native publication/recovery; isolation and initial publication cases pass, a repeated-publication scope defect is fixed, and fresh-context interruption/action/review trials remain. Live Claude and GUI tests stay deferred."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -133,6 +133,43 @@ continue on 2026-10-28. That accepts the summarized design and authorizes publis
 patch, maintenance documentation, tracking issue and implementation claim. Local implementation may
 start after the gate and claim. Feature-code shipment, consumer merges, releases and live dependency
 operations retain their separately scoped authority.
+
+T12 progress on 2026-10-29: observed red/green regressions now expose a previously transferred
+pending report commit under current restrictions, including a later descendant on main and concurrent
+remote advancement, while preserving unrelated state. Complete evidence-target hashes are checked.
+Native Codex publication batch A passed standing publication plus a fresh-candidate outcome,
+nonoverlapping staged/working preservation and no-push isolation; its retained initial false grade
+was caused by the grader's nonmatching Git ref prefix, fixed with an actual committed-ref regression
+and replayed as `/tmp/maintenance-publication-native-20261029-a/regraded-result.json`.
+Batch C passed all six isolation/refusal cases at
+`/tmp/maintenance-publication-native-20261029-c/result.json`. Batch B exposed an actual extra
+same-run publication after an initial-only explicit request; its failed result remains retained.
+The canonical procedure now clarifies that a completed initial-only request grants no second
+outcome/publication, and the focused retest passed at
+`/tmp/maintenance-publication-native-20261029-e/result.json`. Deliberate post-commit/post-push
+interruption and fresh-context recovery, wider authority variants and paired authored-repair review
+are still in progress; none of these partial results completes T12 or migration acceptance.
+The intermediate full suite encountered the host's per-user `/tmp` quota, not a passing result.
+Only completed isolated profiles' reproducible remote-catalog caches were moved to the private local
+archive with byte/mode inventories and original-path symlinks; raw proof and installed candidates
+remain intact. New test temporary roots use owned home storage. The feature remains in progress.
+
+On 2026-10-29, freshly fetched main advanced from the claim to
+`b25807d307069a9ea9c7df8378df45c20b9e317c`, merging the blog workflow at plugin 0.5.0.
+The binary returned `next: spec review`, rule 4, because R-17's covered default-branch files drifted.
+Local integration preserves both operations, both reviewer definitions and existing blog evidence;
+the maintenance release candidate now targets 0.6.0, with eleven skills (nine engineering operations,
+one article operation and the generic entry). The earlier 0.5.0 maintenance candidate observations
+remain historical development evidence, not proof of published 0.5.0 maintenance availability.
+Scope, Design, Acceptance Criteria, Test Plan and covers remain byte-identical to the accepted R-17
+normative baseline. This refresh requests a new independent spec review of upstream compatibility;
+it does not claim implementation completion or publication authority. T12 working changes are not
+part of that committed spec-review target. The exact quiet required suite passed 577 tests/2462
+assertions before this upstream integration (`t12-quiet-default-suite-20261029.log` in the local
+review archive). Quota-affected earlier interruption jobs did not reach their intended action and
+are not recovery passes. Home-backed reruns have now observed actual owned host-namespace SIGKILL
+after a committed report and after a server-accepted local push; fresh-context recovery verification
+is still running and remains required.
 
 ## Scope
 
