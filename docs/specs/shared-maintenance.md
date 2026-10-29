@@ -1157,6 +1157,7 @@ None.
 | 2026-10-28 | R-16 | spec | `f0517c1e5fe3801d0312732c6d3e114dd7f04ce9` | claude-opus-5.5 | procedural | No blocking findings; carry the missing-default-checkout fixture clarification into task planning under the existing main-checkout-only publication rule. |
 | 2026-10-28 | R-17 | spec | `ad48fedfb7931e5479c32f1b9029829b1fe16a4b` | claude-opus-5.5 | procedural | No blockers after covered summary/version drift; clarify historical 0.4.0 install evidence. Prior missing-default-checkout fixture remains tracked for task planning. |
 | 2026-10-28 | R-17 | spec | `ad48fedfb7931e5479c32f1b9029829b1fe16a4b` | n/a | n/a | accepted by owner |
+| 2026-10-29 | R-18 | spec | `6a28de399189560f49e0f8957d9226d1d2f2c047` | claude-opus-5.5 | procedural | No blocking findings after blog integration; one factual marketplace-description nit. |
 
 ### R-1
 
@@ -1705,6 +1706,17 @@ SEVERITY: nit
 WHERE: Context (pre-implementation marketplace baseline paragraph)
 EVIDENCE: Spec lines 108-112 say that native installers "fetched public vh-adlc 0.4.0, nine skills and no maintenance operation. All 47 installed payload files, including modes, match shared main `609ceeb` on both hosts" and that these checks "establish an upgrade baseline". At the reviewed target ad48fed, both manifests are now 0.4.1 (plugins/vh-adlc/plugin.json:4, plugins/vh-adlc/.claude-plugin/plugin.json:3). The spec operation body also changed: tests/vh-adlc/direct-operation-compatibility.test.ts:7-12 pins `vh-adlc-spec` to a new `specSummaryBaseline`, while the other operations keep their earlier baseline. So shared main no longer has the payload that the recorded 0.4.0 observation describes. The skill count is still nine (tests/vh-adlc/triage/discovery.test.ts:13), and no normative section or criterion depends on this baseline. AC-08 and the adoption preflight (spec lines 906-928) install whatever exact candidate and published version are current at that time. A reader of Context could still treat the 0.4.0 payload as the current pre-implementation upgrade base.
 PROPOSAL: Label the 2026-10-28 observation as predating the 0.4.1 spec-summary change. State that the pre-maintenance upgrade base is whatever version is published when adoption runs, observed again by the existing preflight. No normative change is needed.
+
+### R-18
+
+```text
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Context, upstream integration paragraph (lines 157-163); covered `docs/reference/marketplace.md`
+EVIDENCE: Context line 160 says local integration preserves both operations. Lines 161-162 say the 0.6.0 candidate has eleven skills, including one article operation. Both manifests at 6a28de3 describe the package as "Shared lifecycle, dependency/security maintenance and article/promotion drafting" (`plugins/vh-adlc/plugin.json:5`, `plugins/vh-adlc/.claude-plugin/plugin.json:4`). `docs/user-guides/workflows.md:15-16,51` and `docs/get-started/installation.md:92-93` list `vh-adlc-blog`, and the lifecycle intake routes article work to it (`references/lifecycle.md:44`). The covered marketplace guide's plugin table gives the vh-adlc purpose only as "Lifecycle intake, maintenance, and a spec-driven feature loop." (`docs/reference/marketplace.md:13`), with no article operation. The integrated catalog guide therefore gives a narrower package description than the committed manifests and the other guides. No normative section or criterion depends on this row.
+PROPOSAL: Make the `docs/reference/marketplace.md:13` purpose match the manifest description by adding article and promotion drafting. No change to Scope, Design, Acceptance Criteria, Test Plan or covers is needed.
+```
 
 ## Sources
 
