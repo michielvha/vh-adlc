@@ -29,6 +29,14 @@ export function fixture() {
   return {
     root, write,
     settings: (data: unknown) => write(".vh-adlc/maintenance.json", JSON.stringify(data)),
-    dispose: () => rmSync(root, { recursive: true, force: true }),
+    dispose: () => {
+      // These checkouts belong to this disposable fixture, including deliberate dirty negatives.
+      const registered = git(root, "worktree", "list", "--porcelain", "-z").split("\0");
+      for (const item of registered) if (item.startsWith("worktree ")) {
+        const path = item.slice(9);
+        if (path !== root && path.startsWith(join(tmpdir(), `.vh-adlc-maintenance-${root.split("/").at(-1)}-`))) rmSync(path, { recursive: true, force: true });
+      }
+      rmSync(root, { recursive: true, force: true });
+    },
   };
 }
