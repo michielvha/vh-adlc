@@ -7,6 +7,7 @@ import { appendReport, renderReport, reserveReport, saveReport } from "./report"
 import { compareHistory, parseObservation, readHistory } from "./history";
 import { parseReportRequest, reportPermission, resolveStanding } from "./authority";
 import { capturePendingOutcome, pendingOutcomes, storeCollection } from "./artifacts";
+import { adoptionPreflight } from "./migration";
 import { beginCandidate, candidateSnapshot, commitCandidate, promoteOriginal, publicationReadiness, type Candidate } from "./report-candidate";
 
 const commands: Record<string, string[]> = {
@@ -19,6 +20,7 @@ const commands: Record<string, string[]> = {
   "candidate-snapshot": ["--run-id", "--step-id"], "commit-candidate": ["--run-id", "--step-id", "--permission", "--checks", "--generated-indexes", "--skip-ci"],
   "promote-report": ["--run-id", "--step-id", "--permission"], "publication-readiness": ["--run-id", "--step-id", "--permission", "--known-blocker"],
   "analysis-input": ["--input"],
+  "adoption-preflight": ["--input"],
   "pending-outcome": ["--run-id", "--update", "--request"], "pending-outcomes": ["--run-id"],
   "store-collection": ["--run-id", "--inventory", "--step-id", "--request"],
 };
@@ -43,6 +45,9 @@ function flag(value: string | undefined) { if (value !== undefined && !["true", 
 export async function main(argv = process.argv.slice(2)) {
   const { operation, args } = argumentsFor(argv), config = loadSettings(args["--repo"] ?? process.cwd(), args["--settings"] ? { settingsPath: args["--settings"] } : {});
   if (operation === "settings") return config;
+  if (operation === "adoption-preflight") {
+    const result = adoptionPreflight(input(required(args, "--input"))); if (!result.pass) process.exitCode = 1; return result;
+  }
   const selected = args["--repository"], pull = args["--pull"] === undefined ? undefined : number(args["--pull"]);
   if (pull === 0) throw Error("maintenance pull must be positive");
   if (operation === "collect") return collect(config, { scope: { repository: selected, pull } });

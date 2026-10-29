@@ -107,6 +107,7 @@ JSON inputs are explicit files; never interpolate PR text, settings or payloads 
 | `pending-outcome` | `--run-id --update`, optional `--request`; immutable private outcome, without editing an unpushed report. |
 | `pending-outcomes` | `--run-id`; intent-ordered outcome artifacts, including recoverable incomplete capture intents. |
 | `analysis-input` | `--input`; trusted-operator export of a fixed packet to a fresh external directory. |
+| `adoption-preflight` | `--input`; compare expected reviewed/published/consumer targets with complete marketplace and paired-review receipts/artifacts. Failure prevents cutover; a pass grants no merge permission. |
 
 A request JSON has `authorized_sweep` and optional boolean `read_only`, `draft_only`, `no_commit`,
 `no_push`, `no_filesystem`, `commit_report`, plus an optional exact `publication` object. Convert the
