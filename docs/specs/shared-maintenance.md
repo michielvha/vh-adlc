@@ -1709,14 +1709,12 @@ PROPOSAL: Label the 2026-10-28 observation as predating the 0.4.1 spec-summary c
 
 ### R-18
 
-```text
 FINDING: F-01
 KIND: factual
 SEVERITY: nit
 WHERE: Context, upstream integration paragraph (lines 157-163); covered `docs/reference/marketplace.md`
 EVIDENCE: Context line 160 says local integration preserves both operations. Lines 161-162 say the 0.6.0 candidate has eleven skills, including one article operation. Both manifests at 6a28de3 describe the package as "Shared lifecycle, dependency/security maintenance and article/promotion drafting" (`plugins/vh-adlc/plugin.json:5`, `plugins/vh-adlc/.claude-plugin/plugin.json:4`). `docs/user-guides/workflows.md:15-16,51` and `docs/get-started/installation.md:92-93` list `vh-adlc-blog`, and the lifecycle intake routes article work to it (`references/lifecycle.md:44`). The covered marketplace guide's plugin table gives the vh-adlc purpose only as "Lifecycle intake, maintenance, and a spec-driven feature loop." (`docs/reference/marketplace.md:13`), with no article operation. The integrated catalog guide therefore gives a narrower package description than the committed manifests and the other guides. No normative section or criterion depends on this row.
 PROPOSAL: Make the `docs/reference/marketplace.md:13` purpose match the manifest description by adding article and promotion drafting. No change to Scope, Design, Acceptance Criteria, Test Plan or covers is needed.
-```
 
 ## Sources
 
