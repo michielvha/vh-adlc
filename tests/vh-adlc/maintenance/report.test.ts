@@ -246,3 +246,12 @@ test("a configured repository-root report directory keeps canonical paths and av
   expect(history.filter(report => report.path.endsWith(path))).toHaveLength(1);
   expect(history[0].provenance).toBe("published");
 });
+
+test("unpublished evidence accepts only complete SHA-1 or SHA-256 targets", () => {
+  const value = { run_id: randomUUID(), ref: "chore/maintenance-evidence-test", path: "reports/task.md", record_target: "a".repeat(40) };
+  expect(evidenceReference({ ...value, record_target: "b".repeat(64) })).toContain("unpublished");
+  for (const length of [39, 41, 48, 63, 65]) {
+    expect(() => evidenceReference({ ...value, record_target: "b".repeat(length) })).toThrow();
+    expect(() => evidenceReference({ ...value, source_target: "c".repeat(length) })).toThrow();
+  }
+});

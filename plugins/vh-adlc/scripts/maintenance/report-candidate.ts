@@ -227,20 +227,29 @@ export function promoteOriginal(config: Settings, id: string, step: string) {
 }
 export function publicationReadiness(config: Settings, id: string, step: string, authority: ReportPermission, options: { known_blocker?: string } = {}) {
   const run = readRun(config, id), value = candidate(run, step);
-  const pending = (reason: string, details: Record<string, unknown> = {}) => ({ ready: false, reason, candidate: value, ...details });
+  let observed: Record<string, unknown> = {};
+  const pending = (reason: string, details: Record<string, unknown> = {}) => ({ ready: false, reason, candidate: value, ...observed, ...details });
   permission(config, authority, run);
-  if (!authority.push) return pending("report publication not authorized by current request");
-  if (!value.commit || !value.tree || value.state !== "committed") return pending("verified candidate commit required");
-  if (value.permission_binding !== authority.binding) return pending("candidate authority changed; reconcile");
+  if (!value.commit || !value.tree || value.state !== "committed") return pending(authority.push ? "verified candidate commit required" : "report publication not authorized by current request");
   identity(config, run, value); validateCommit(config, run, value, value.commit, value.tree);
   const checkouts = worktrees(config.root).filter(row => row.branch === `refs/heads/${authority.branch}`);
-  if (checkouts.length !== 1) return pending("owning default-branch checkout unavailable; local candidate retained");
-  const main = checkouts[0].path, head = command(main, "rev-parse", "HEAD"), remote = command(main, "rev-parse", `refs/remotes/origin/${authority.branch}`);
-  if (options.known_blocker) return pending(`known publication refusal: ${options.known_blocker}`, { main, head, remote });
-  if (command(main, "status", "--porcelain=v1", "--untracked-files=all", "--", ...value.allowed_paths)) return pending("overlapping report/index working or staged changes", { main, head, remote });
-  if (success(main, "merge-base", "--is-ancestor", value.commit, remote)) return pending("candidate already contained remotely; reconcile publication receipt without another push", { main, head, remote, remote_contains: true });
-  if (remote !== value.base) return pending("default branch advanced; prepare one fresh candidate without rewriting the old ref", { main, head, remote });
-  if (head !== value.base && head !== value.commit) return pending("default checkout has unrelated outgoing history, divergence or needs ff-only synchronization", { main, head, remote });
+  const main = checkouts.length === 1 ? checkouts[0].path : null;
+  let head = "", remote = "";
+  if (main) {
+    head = command(main, "rev-parse", "HEAD"); remote = command(main, "rev-parse", `refs/remotes/origin/${authority.branch}`);
+    const transferred = success(main, "merge-base", "--is-ancestor", value.commit, head), remoteContains = success(main, "merge-base", "--is-ancestor", value.commit, remote);
+    observed = { main, head, remote, transferred, remote_contains: remoteContains,
+      ...(transferred && !remoteContains ? { pending_commit: value.commit, exposure_warning: "The already authorized report commit remains on the shared default branch. A future ordinary push can carry it, including any [skip ci] marker; reconcile this existing history before further publication." } : {}) };
+  }
+  // Restrictions govern the next effect; they cannot hide a commit already transferred to shared main.
+  if (!authority.push) return pending("report publication not authorized by current request; reconcile any existing transferred state");
+  if (value.permission_binding !== authority.binding) return pending("candidate authority changed; reconcile");
+  if (!main) return pending("owning default-branch checkout unavailable; local candidate retained");
+  if (options.known_blocker) return pending(`known publication refusal: ${options.known_blocker}`);
+  if (command(main, "status", "--porcelain=v1", "--untracked-files=all", "--", ...value.allowed_paths)) return pending("overlapping report/index working or staged changes");
+  if (observed.remote_contains) return pending("candidate already contained remotely; reconcile publication receipt without another push");
+  if (remote !== value.base) return pending("default branch advanced; prepare one fresh candidate without rewriting the old ref");
+  if (head !== value.base && head !== value.commit) return pending("default checkout has unrelated outgoing history, divergence or needs ff-only synchronization");
   return { ready: true, reason: head === value.commit ? "already transferred; reconcile before retrying push" : "candidate may fast-forward only from the owning default-branch checkout",
-    candidate: value, main, head, remote, transferred: head === value.commit, remote_contains: false };
+    candidate: value, ...observed };
 }

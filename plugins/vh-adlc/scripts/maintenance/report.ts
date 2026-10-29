@@ -200,7 +200,7 @@ export function appendReport(config: Settings, id: string, update: Update): Save
 
 export function evidenceReference(input: { run_id: string; ref: string; path: string; record_target: string; source_target?: string }): string {
   runID(input.run_id);
-  if (!/^[a-f0-9]{40,64}$/.test(input.record_target) || input.source_target !== undefined && !/^[a-f0-9]{40,64}$/.test(input.source_target) ||
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(input.record_target) || input.source_target !== undefined && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(input.source_target) ||
       !/^chore\/maintenance-evidence-[a-z0-9-]+$/.test(input.ref) || isAbsolute(input.path) || input.path.split(/[\\/]/).some(part => ["..", ".", ""].includes(part)) || /[\x00-\x1f\x7f]/.test(input.path)) fail("invalid unpublished evidence reference");
   return `unpublished: run ${escapeCell(input.run_id)}, ref ${escapeCell(input.ref)}, record ${escapeCell(input.path)} at ${input.record_target}${input.source_target ? `, source ${input.source_target}` : ""}`;
 }

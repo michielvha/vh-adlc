@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-maintenance
-status_description: "T1-T11 complete. T12 is exercising native publication/recovery; isolation and initial publication cases pass, a repeated-publication scope defect is fixed, and fresh-context interruption/action/review trials remain. Live Claude and GUI tests stay deferred."
+status_description: "T1-T12 complete with native scoped-delivery and crash-recovery proof. T13 refreshes final candidate install/report checks and portable CI before independent implementation review. Live Claude and GUI remain deferred; marketplace cutover is pending."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -170,6 +170,157 @@ review archive). Quota-affected earlier interruption jobs did not reach their in
 are not recovery passes. Home-backed reruns have now observed actual owned host-namespace SIGKILL
 after a committed report and after a server-accepted local push; fresh-context recovery verification
 is still running and remains required.
+
+
+R-18 returned no blocking findings at `6a28de399189560f49e0f8957d9226d1d2f2c047`;
+its factual marketplace-description nit is fixed. The in-progress gate passed and `next` returned
+implementation under the existing accepted normative baseline. No renewed owner acceptance was
+manufactured. Fresh recovery has now passed for both deliberately interrupted cases:
+`publication-h/fresh-recovery-interrupted-commit-result.json` and
+`publication-i/fresh-recovery-accepted-response-lost-result.json`, under the private local
+`.maintenance-review-archive/runtime-20261029` directory. Each used a new actual Codex thread and
+only persisted journal/Git state; recovery reconciled the prior commit or accepted push without
+duplicating it and recorded the authoritative published report. These are local-bare synthetic
+transport results, not live GitHub delivery. The first authored-repair preparation preserved its
+source/evidence separation and stopped review pending, but its check recorder was bypassed by
+login-shell PATH ordering. That preparation remains incomplete; a fresh trial pins the actual owned
+check executable. The independent paired review must still execute its own real checks before
+same-thread continuation can publish a fixture repair. Explicit-authorization batch J passed all five mismatched/missing-payload negatives. Saved-report
+batch L passed unchanged external/checkout promotion and edited/staged preservation denials.
+Initial-only concurrent-main batch M passed fresh-candidate rebuilding and cross-host report-path
+collision preservation; batch K retains its earlier extra-update failures and its passing repeated-
+advance, post-transfer divergence and pre-transfer divergence observations. An ordinary second
+writer's actual main push did not include batch A's isolated no-push report. The first restricted
+fresh continuation passed with no extra effect and a private pending outcome; an additional case
+with an actually pending main commit remains running. Actual Opus paired reviews exposed missing
+launcher permission, exact-executable and Git blob/mode correspondence requirements, then a trimmed
+Definition export; those failed receipts remain retained. The author fixed normalization in the
+same original thread, preserving its earlier records. The fixed independent runner now verifies
+all exported/working verification inputs and the committed Definition before executing the required
+check executable. Its regression rejects a changed unused input and even a stripped final newline.
+Native action batch A passed all thirteen closure/explanation, workflow and stack-scope variants.
+Batch B repeated scoped skip-leak recovery and wrong-version/no-dispatch negatives against actual
+seeded Git subject/version evidence and passed all three. Fresh contexts reconciled an interrupted
+completed closure without another close/comment and restored the journaled prior mode after an
+interrupted fake-stack smoke without repeating it (`actions-c` and `actions-d` fresh-recovery results).
+The unobservable-remote case stayed pending with no retry or invented receipt; after observation was
+restored, another fresh context reconciled the accepted push without another commit/push (`publication-n`).
+The original failed-push case with a pending shared-main commit also passed the current no-push
+override. Once its fixture refusal was removed and publication explicitly reauthorized, a fresh
+context published the existing commit, imported the saved private deltas in order through one fresh
+candidate and preserved their immutable artifacts. Another fresh context observed those published
+steps without reappending, committing or pushing. These results are retained under the original
+`/tmp/maintenance-publication-native-20261029-d/outcome-*-result.json` paths.
+The actual native repair review's substantive object/contract/check results pass, but later protocol
+notes and inconsistent historical handoff/tool instructions remained unresolved in those passes.
+Their original failed records are retained; none is relabelled clean. A task-local proof-tool
+experiment was blocked by the host's MCP registry policy and removed without changing that policy.
+The current native route retains the fixed executed checks and read-only scope, permits only inert
+shell diagnostics, and uses view/grep/glob for file inspection. The worker also independently verifies
+the Definition section's exact hash and identity with the previous committed record. Its actual
+source/record checks, historical receipt limitations and procedural isolation remain explicit.
+The actual native paired repair review now returned `NO FINDINGS` with model claude-opus-5.5
+(`authored-primary-b-review-10/result.json`). The original Codex author resumed the same thread,
+verified the actual artifact/current input bindings, stored returned records before the only source
+push and fake combined PR, and preserved main, unrelated staged/working/index bytes and unpublished
+report/evidence refs (`authored-primary-b/continuation-result.json`, passed). Earlier failed reviews
+remain preserved. The real-Go bot-only trial passed actual `go mod tidy`, source tests, one source
+push and one fake combined PR without adding an authored-review gate (`bot-only-go-a/result.json`).
+A second distinct run in that same repository/month prepared fresh local-only batch/report refs
+and preserved every occupied first-run ref and unrelated checkout/index, with no additional push/PR
+(`bot-only-go-a/second-batch-result.json`). Actual same-author continuations rejected the old real review after source, mechanically regenerated
+verification-input and Definition-only changes, with no further source/PR effect. The Definition-only
+case restored every reviewed source-input blob first, so a changed source head alone was not its
+reason. The second bot run's real synthetic squash preserved the exact source tree while leaving its
+source commit non-ancestral; native cleanup removed only its clean source worktree and retained the
+unchanged branch after one ordinary `-d` refusal, without force or another worktree/ref mutation.
+The full checkpoint plugin suite passed 589 tests/2563 assertions across 62 files
+(`t12-checkpoint-full-suite-20261029.log`); later added related-source fixtures still need the final
+suite. A real independent-source trial has prepared its repair through a fresh owned clone, kept its
+Definition/journal in primary and preserved the canonical source checkout. Its first actual Copilot
+Opus 5.5 paired review returned `NO FINDINGS`; same-thread selected delivery passed with only the
+independent source branch/PR published and the canonical checkout and primary indexes preserved
+(`authored-independent-a/continuation-result.json`). The report-only phase kept local evidence as a
+plain unpublished reference. After separate exact evidence-ref authorization and observed remote
+record reachability, the next report update added its immutable repository/blob link; stale source
+proof remained pending and no other ref changed (`authored-primary-b/evidence-*-result.json`). The
+satellite preparation also passed: a fresh builder clone's committed repair produced the actual
+source-bound artifact before the exact unchanged primary pointer bot commit was applied on its own
+local batch. Its source and record remain paired for actual independent review; primary main,
+unrelated invocation and canonical builder checkout stayed unchanged. The satellite review/delivery
+and final regression/review still remain required. T12 and migration acceptance remain open.
+
+The next full Linux plugin checkpoint passed 594 tests/2602 assertions across 65 files
+(`t12-final-full-suite-20261029.log` in the private local review archive). Go tests, vet,
+module tidiness, golangci-lint configuration/run and the other plugin's 34 tests also passed.
+The approved native sanctioned-helper case passed after the watch-only, red-CI and stale-head
+negatives: one selected invocation, actual fresh head/check reads, simulated admin restoration,
+no raw merge fallback and no report/evidence push. The real Stackweaver helper remains unchanged
+and its crash safety remains unclaimed. The satellite's same author clarified original task
+selection, verification-executable bindings and historical-hook limitations without changing source,
+Definition or the local primary pointer batch. Copilot R-3 then exposed a self-comparison in the
+operator's prior-Definition binding and a missing independent primary-batch test. Those findings
+remain retained; the runner now binds the original prior record and executes that actual batch's
+checks. A fresh paired review is pending. Explicit stalled-sync queue proof is being added before
+T12 completion. Subsequent actual satellite reviews verified the repaired bindings/checks and
+required preserving every prior review plus qualifying historical normalizer/hook claims.
+The same author has retained all five returned reviews, marked unsupported historical execution
+as author observation and kept the actual independently executed checks distinct. Source and
+Definition remain unchanged; the next fresh paired review remains required. No criterion, marketplace cutover or production action is claimed from these
+intermediate results. Refreshed shared main remains `b25807d`; R-18's normative spec review is
+current and lint passes.
+
+The committed-consumer rerun exposed an unconditional empty snapshot commit in its rehearsal
+test. The red result is retained in `consumer-maintenance-rehearsal-red-20261029.log`; after the
+fixture commits only a real staged difference, all nine adapter tests passed with no skips
+(`consumer-maintenance-rehearsal-green-20261029.log`). Normal commit hooks then caught the
+original routing migration's missing internal changelog disposition. Consumer
+`d94e2fe4c4d21646480e1cf9adf3ed713878de78` includes the test fix and the exact internal-only
+ledger entry for `717cfa55`; all seventeen hook suites passed, including frontend lint,
+type checking, tests/build, changelog, capability and leak checks. The consumer is clean and
+its helper, other agents, product source, generated changelog and coverage index remain unchanged.
+No hooks were bypassed, history rewritten or changes pushed. The earlier `717cfa55` report
+packet remains historical evidence of identical runtime adapter files; final paired verification
+will use the refreshed consumer commit.
+
+Further satellite review nits required qualifying every historical executable attribution and
+including actual prior review artifacts in the packet. Those original rows and all six raw returned
+bodies remain preserved. The original author added the global qualification; the independent worker
+now compares each copied prior artifact and its stored raw body with the actual original native
+return. The new fixture-recorder regression first failed for its missing executable binding
+(`t12-command-recorder-red-20261029.log`), then passed with real wrapper/runtime path/hash/mode
+bindings and an actual normalization receipt (`t12-command-recorder-green-20261029.log`, five
+tests/49 assertions). Existing frozen native wrappers and raw history were not changed or upgraded
+retroactively. The worker unit has a 30-second limit because it runs real Git/tests and repeatedly
+hashes the actual runtime binary; required source checks retain their own normal limits.
+At committed consumer `d94e2fe4`, `FAST=0 make verify SUITES=frontend` independently repeated all
+seventeen affected checks without failures or skips; retained output is
+`consumer-maintenance-committed-checks-20261029.log`. Integration/E2E/security services outside
+this migration remain unclaimed. The final satellite paired pass, selected source delivery and
+stalled-sync classification are still pending.
+
+The actual satellite paired review returned `NO FINDINGS` with claude-opus-5.5
+(`authored-satellite-a-review-7/result.json`); its fixed worker also verified the copied prior
+native artifacts and every verbatim stored body. The original Codex author then passed selected
+delivery in the SAME thread (`authored-satellite-a/continuation-result.json`): review storage
+preceded exactly one source push/PR, the primary pointer batch remained unchanged and unpublished,
+and canonical/main/invocation raw indexes and work were preserved. The final T12 plugin suite
+passed 594 tests/2609 assertions across 65 files (`t12-complete-full-suite-20261029.log`).
+A subsequent focused stalled-sync grader control exposed that a correct-looking destination value
+alone was insufficient. It now requires an observed successful read of the actual committed main
+pointer, in addition to root diagnosis/check-before-queue ordering and no remote effects; the
+negative control failed first and then the focused test passed eight assertions. The actual final
+stalled-sync run is pending. All of these remain synthetic local transport results, with no real
+source PR, deployment or production readiness claim.
+
+The final actual same-author stalled-sync trial passed (`authored-satellite-a/stalled-sync-result.json`).
+The failed run and real repaired-source check preceded queue inspection. A recorded Git read proved
+committed main remained at 1.0.0, distinct from the unpublished 1.1.0 primary batch. The actor
+proposed closure only for the generated 0.9.0 regression, left the live 1.1.0 sync pending source
+delivery and kept mixed handwritten work unresolved. No comments, closures, merges, dispatches,
+Git ref/index changes or publication occurred. T12 is complete. T13's unchecked tail now explicitly
+includes refreshing the final native proofs and their digest/discovery preconditions after blog
+integration; this changes task decomposition only, not the accepted normative baseline.
 
 ## Scope
 
@@ -1128,8 +1279,9 @@ results here. The R-16 no-default-checkout fixture is part of T5/T12.
       Evidence: On 2026-10-29, install tests first failed for missing install-trial.ts (`/tmp/shared-maintenance-t10-red.log`). Three focused tests/14 assertions now pass, including wrong payload/version/discovery, failed command, absent helper and changed source denials. The exact frozen candidate at `0230a6cdf9a770c0a1c70c7e1eb83024761584ed` installed through native local catalogs on Codex CLI 0.163.0 and Claude Code CLI 2.1.309 in empty isolated profiles. Codex skills/list and Claude plugin details discovered maintenance; both installed settings, fake-GET collection and private report helpers passed with source bytes/modes and raw Git index preserved. Native uninstall/reinstall restored the same full component digest `7a40b340645d06c89e3f42f68949283d28a54303572e116d98b251d196cfd107`. Actual receipts and grades are `/tmp/maintenance-native-candidate-20261029-d/result.json`; no models ran and no authentication was copied. Development local-catalog proof does not satisfy published-marketplace adoption. The existing committed consumer rollback proof remains T9. The final full host plugin suite passed 564 tests/2390 assertions (`/tmp/shared-maintenance-t10-final-suite.log`).
 - [x] T11 `tests/vh-adlc/maintenance/report-trial.ts`, `trial-proof.test.ts` and evidence in this document - run actual Codex generic, Copilot Opus 5.5 generic and bounded Stackweaver-policy report trials on exact helper-produced synthetic packets; negative graders reject omitted evidence/items or unsupported actions and all real reports meet the normative case table with native model/tool and input-integrity receipts (AC-03, AC-09).
       Evidence: On 2026-10-29, native-proof tests first failed for missing report-trial.ts (`/tmp/shared-maintenance-t11-red.log`). Six focused proof tests/30 assertions and the final full host suite of 570 tests/2420 assertions passed (`/tmp/shared-maintenance-t11-final-suite.log`). Actual native Copilot Opus 5.5 passed all 18 generic cases at `/tmp/maintenance-report-copilot-20261029-e/result.json`; actual Codex with inherited `gpt-6.1-sol` passed all 18 at `/tmp/maintenance-report-codex-20261029-d/resumed-result.json`. Its original provider-capacity failure remains recorded; the successful continuation uses the same native thread, and that thread's actual turn-context records attest the same model across both turns. Copilot Opus 5.5 passed the 20-case bounded Stackweaver policy trial at `/tmp/maintenance-report-policy-copilot-20261029-c/regraded-result.json`, including frontend/API ownership, builder order, squash/no-skip, helper scope, distribution exclusion and unverified production compatibility. That replay corrects only a demonstrated citation-requirement bug: the model cited the actual declared security expectation rather than its equivalent local procedure explanation. The original failed grade, unchanged returned assessment and corrected expected-evidence artifact remain local; an observed red/green negative-control test rejects unrelated alternatives. Earlier failures also exposed a contradictory shell-read prompt, undeclared valid packet evidence, ambiguous response fields and overly narrow citation lines; the corrected protocol preserves exact item/class/count/ownership/action assertions and binds citations to the correct collected object or actual source lines. All three trials use the exact installed component from `b763e850fb94f9e01c5e023b47349ab42171520c` with full payload digest `7a40b340645d06c89e3f42f68949283d28a54303572e116d98b251d196cfd107`; native tool traces, required complete reads, frozen input hashes, source/index preservation and actual external report rendering passed. Only configured maintenance policy/entries/settings/sync inputs from consumer `717cfa55f1f13250abe54ea88a2a5343e7194bc3` entered the private policy packet; full production source, tracker/report history, host configuration and credentials were excluded. The real consumer remains clean at that commit. These are bounded report-stage results; delivery/recovery remains T12 and Claude/GUI deferrals are unchanged.
-- [ ] T12 `tests/vh-adlc/maintenance/lifecycle-trial.ts`, `publication-cases.ts`, `recovery-trial.ts`, their grader tests and evidence in this document - execute the bounded Codex authority/publication/recovery cases and positive authored-repair handoff through an actual independent Copilot review then Codex resume; negative/pending variants deny publication, fresh-session continuations reconcile completed effects and every specified final Git/transport state matches while preserving unrelated work (AC-04, AC-05, AC-06).
-- [ ] T13 `.github/workflows/ci.yml`, portable maintenance tests and evidence in this document - add portable cases to the existing macOS selection, run the full Linux plugin and applicable repository checks, preserve triggers/permissions/release rules, and record the final source/consumer targets and explicit live-Claude/GUI deferrals; all required executed regression checks pass before independent implementation review (AC-09).
+- [x] T12 `tests/vh-adlc/maintenance/lifecycle-trial.ts`, `publication-cases.ts`, `recovery-trial.ts`, their grader tests and evidence in this document - execute the bounded Codex authority/publication/recovery cases and positive authored-repair handoff through an actual independent Copilot review then Codex resume; negative/pending variants deny publication, fresh-session continuations reconcile completed effects and every specified final Git/transport state matches while preserving unrelated work (AC-04, AC-05, AC-06).
+      Evidence: On 2026-10-29, observed red controls exposed missing transferred-main warnings, an overbroad repeated publication, incomplete commit hashes, missing owned-process startup cleanup and gaps in test execution/provenance; their focused regressions passed after fixes. The full plugin suite passed 594 tests/2609 assertions (`t12-complete-full-suite-20261029.log`), with the later observed-main-pointer grader control passing eight assertions after its red. Actual native cases passed report authority/isolation/concurrency/promotion and pending-delta reconciliation; deliberately interrupted commit/push/closure/smoke and unobservable-remote recovery; three stale-review inputs; two real-Go bot batches and non-forced cleanup; primary, independent and satellite authored repairs with actual clean Copilot claude-opus-5.5 paired reviews followed by SAME-thread selected delivery; exact helper authorization negatives/positive; separate evidence publication; and stalled-sync root checks before queued dispositions. Final satellite results are `authored-satellite-a-review-7/result.json`, `authored-satellite-a/continuation-result.json` and `stalled-sync-result.json`, all passed. The current plugin matches the frozen native payload exactly: `86ee21d98bae21bbde2fff06e79981204b108ae73a4dbc34364db0c7033f364a`, candidate 0.6.0. Raw failed reviews remain retained. Go tests/vet/module/lint and the other plugin's 34 tests passed. Consumer `d94e2fe4c4d21646480e1cf9adf3ed713878de78` is clean after its observed red/green rehearsal fix; nine adapter tests and all seventeen affected normal checks passed without skips or hook bypass. These are synthetic local transport results, not live dependency operations or marketplace/adoption proof.
+- [ ] T13 `.github/workflows/ci.yml`, portable maintenance tests, native install/report trial helpers and evidence in this document - add portable cases and explicit compiler setup to the existing CI jobs, correct any observed final-payload digest/discovery regressions, refresh exact committed 0.6.0 native install/report proofs after upstream integration, run the full Linux plugin and applicable repository checks, preserve triggers/permissions/release rules, and record final paired targets plus explicit live-Claude/GUI deferrals; all required executed checks pass before independent implementation review (AC-08, AC-09).
 
 ## Open Questions
 

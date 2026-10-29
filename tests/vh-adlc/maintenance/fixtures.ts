@@ -4,15 +4,15 @@ import { tmpdir } from "node:os";
 
 export function git(root: string, ...args: string[]): string {
   const result = Bun.spawnSync(["git", "-C", root, ...args], {
-    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" },
+    env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_OPTIONAL_LOCKS: "0" },
     stdout: "pipe", stderr: "pipe",
   });
   if (result.exitCode !== 0) throw Error(`fixture git ${args[0]} failed: ${result.stderr}`);
   return result.stdout.toString().trim();
 }
 
-export function fixture() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-maintenance-")));
+export function fixture(parent = tmpdir()) {
+  const root = realpathSync(mkdtempSync(join(parent, "vh-maintenance-")));
   const write = (path: string, content: string) => {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
@@ -34,7 +34,7 @@ export function fixture() {
       const registered = git(root, "worktree", "list", "--porcelain", "-z").split("\0");
       for (const item of registered) if (item.startsWith("worktree ")) {
         const path = item.slice(9);
-        if (path !== root && path.startsWith(join(realpathSync(tmpdir()), `.vh-adlc-maintenance-${root.split("/").at(-1)}-`))) rmSync(path, { recursive: true, force: true });
+        if (path !== root && path.startsWith(join(dirname(root), `.vh-adlc-maintenance-${root.split("/").at(-1)}-`))) rmSync(path, { recursive: true, force: true });
       }
       rmSync(root, { recursive: true, force: true });
     },

@@ -283,3 +283,25 @@ test("a mismatched explicit current publication request never falls back to stan
   const publication = { repository: "other/project", hostname: config.hostname, branch: "main", publication_route: "default-branch-checkout-ff-only", report_path: path, index_paths: [] };
   expect(permission(config, standing, run.header.run_id, { publication }).push).toBe(false);
 });
+
+test("a current restriction still exposes the existing transferred pending report commit", () => {
+  const f = project(), { config, standing, commit } = adopted(f), { run } = saved(f, config), authority = permission(config, standing, run.header.run_id);
+  const candidate = beginCandidate(config, run.header.run_id, authority, { default_commit: commit });
+  const committed = commitCandidate(config, run.header.run_id, candidate.step_id, { checks: [{ argv: ["fixture-check"], exit_code: 0, input_digest: candidateSnapshot(candidate) }], skip_ci: true });
+  promoteOriginal(config, run.header.run_id, candidate.step_id); git(f.root, "merge", "--ff-only", committed.commit!);
+  const head = git(f.root, "rev-parse", "HEAD"), index = readFileSync(join(f.root, ".git/index"));
+  for (const restriction of ["no_push", "read_only", "no_commit", "no_filesystem"]) {
+    const current = permission(config, standing, run.header.run_id, { [restriction]: true });
+    const result = publicationReadiness(config, run.header.run_id, candidate.step_id, current);
+    expect(result).toMatchObject({ ready: false, main: f.root, head, remote: commit, transferred: true, pending_commit: head, remote_contains: false });
+    expect(result.exposure_warning).toContain("ordinary push");
+  }
+  expect(git(f.root, "rev-parse", "HEAD")).toBe(head); expect(readFileSync(join(f.root, ".git/index"))).toEqual(index);
+  f.write("unrelated-later.txt", "keep later main work\n"); git(f.root, "add", "unrelated-later.txt"); git(f.root, "commit", "-qm", "test: later unrelated main work");
+  const laterHead = git(f.root, "rev-parse", "HEAD"), laterIndex = readFileSync(join(f.root, ".git/index"));
+  const otherRemote = git(f.root, "commit-tree", `${commit}^{tree}`, "-p", commit, "-m", "test: concurrent remote advancement"); git(f.root, "update-ref", "refs/remotes/origin/main", otherRemote);
+  const currentStanding = resolveStanding(config, { default_branch: "main", default_commit: otherRemote });
+  const restricted = permission(config, currentStanding, run.header.run_id, { no_push: true });
+  expect(publicationReadiness(config, run.header.run_id, candidate.step_id, restricted)).toMatchObject({ ready: false, head: laterHead, remote: otherRemote, transferred: true, pending_commit: head, remote_contains: false });
+  expect(readFileSync(join(f.root, ".git/index"))).toEqual(laterIndex); expect(readFileSync(join(f.root, "unrelated-later.txt"), "utf8")).toBe("keep later main work\n");
+});

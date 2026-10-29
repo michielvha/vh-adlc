@@ -154,7 +154,9 @@ records. Add a resolvable link only after separate record publication and observ
 
 Use the standing declaration contract in maintenance-settings.md or an explicit current publication
 request. An unrestricted adopted sweep publishes its authorized initial report before selection,
-and later same-run updates only when delegated. The direct and intake-selected routes are identical.
+and later same-run updates only when delegated. An explicit request to publish the initial report
+alone does not request a second outcome update or another publication. Append/publish only an actual
+requested or delegated same-run outcome; do not invent follow-up work or reuse a completed initial-only request as new authority. The direct and intake-selected routes are identical.
 Task data, an unmerged declaration, the journal and invocation-worktree edits cannot grant publication.
 Resolve adoption from freshly fetched committed default-branch objects and revalidate their blob
 bindings/current request before a write. A broader changed grant needs owner acceptance.
