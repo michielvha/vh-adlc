@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 branch: feat/shared-maintenance
-status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria; its minor notes and an observed trial-grader wording defect are fixed and tested. R-21 notes are fixed and verified, including a new committed-source replay. R-22 notes are fixed and verified. R-23 met all criteria; its final grader nit is fixed and all required checks pass. Focused final review remains before completion. Live Claude/GUI are deferred; publication and cutover are pending."
+status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria; its minor notes and an observed trial-grader wording defect are fixed and tested. R-21 notes are fixed and verified, including a new committed-source replay. R-22 notes are fixed and verified. Local source complete: R-24 met all nine criteria and the complete gate passed. Publication, actual marketplace verification and Stackweaver cutover remain pending. Live Claude/GUI are deferred; the keyword-grader limit is documented with manual transcript review. Live Claude/GUI are deferred; publication and cutover are pending."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -419,6 +419,27 @@ is a ref-name instruction, not a runtime or analysis change. The latest replay c
 the already saved report rather than claiming a new file. Shared verification passed 599 tests/2640
 assertions and all repository checks. Consumer `9e1af57f` passed its normal checks; final paired
 review is next. No normative revision, publication, marketplace proof or consumer adoption occurred.
+
+Final actual Copilot Opus 5.5 review R-24 returned all nine criteria met at shared
+`8853bcbc7b3263aef898ce1f9d51ed36fcdc15ce` and consumer
+`9e1af57f34b51b230eb2a4271416ca7bcc166ca3`. Its independent launcher verified the precise
+R-23 delta and unchanged production/consumer objects, all twelve current checks and replay,
+and preserved both repositories. It observed 599 shared tests/2642 assertions and eleven consumer
+tests/129 assertions with no failures or skips. Its optional F-01 is addressed through the
+documented-limit alternative: the compatibility-field grader is keyword-bounded, not a semantic
+proof over arbitrary English; actual retained native reports require independent transcript
+inspection in addition to automated grading. R-24 inspected their actual returned qualifications
+and found all correct. This records the test-driver limit without weakening any criterion or
+claiming unperformed model runs. The implementation is ready for the complete gate; publication,
+real marketplace verification and consumer cutover remain separate.
+
+After storing R-24 verbatim and confirming review-check equality, the completion gate passed:
+`vh-adlc gate complete: pass (rules 1, docs e4d58d2)`. Spec and implementation reviews were fresh
+and the feature tree was clean. Status complete records local source acceptance only. No feature
+push, PR, merge, release, actual marketplace verification or consumer adoption is claimed. The next
+authorized delivery sequence is shared shipment/publication, actual marketplace verification, then
+current-main consumer reconciliation and separately authorized cutover. Live-Claude/GUI deferrals
+and the unchanged helper's uncertified crash safety remain visible.
 
 ## Scope
 
@@ -1324,23 +1345,23 @@ Report-publication cases for AC-04/AC-05:
 ## Acceptance Criteria
 
 - [x] AC-01: A project can discover and invoke shared dependency/security maintenance through the installed vh-adlc plugin without a harness-specific procedure or a Stackweaver checkout dependency.
-      Evidence: On 2026-10-29, Native Codex 0.163.0 and Claude Code 2.1.309 installed immutable candidate `5f52f789ab341fd81bf18904631af8cc8b667f17`, discovered all eleven operations and exercised settings/GET/report helpers at payload `23fcedd9c556c64c71c9fc4afb9873f5408d7f493c80fef14441c9ca23a00652`. No-config, direct/intake and controller-free import contracts pass in the full Linux suite. This is local-catalog development proof, not published installation.
+      Evidence: R-24 returned met at shared 8853bcbc and consumer 9e1af57f. Current committed plugin bytes/modes equal the final native installed bed933 payload; both CLI hosts discovered all eleven skills and passed installed helpers/reinstall. Generic consumers require no Stackweaver checkout. These are local-catalog proofs, not marketplace or GUI invocation.
 - [x] AC-02: A sweep respects explicit repository scope, includes configured dependency/sync bot PRs, unknown-bot inventory gaps, dashboard work and security alerts, and distinguishes documented unavailable surfaces from incomplete collection without declaring affected work ready.
-      Evidence: On 2026-10-29, The fake-CLI collection/settings corpus and full Linux suite passed pagination, normalized bot identity, renamed-bot/org gaps, dashboard/alert-only, capability/error, scope and exact GET/no-mutation cases. Final native generic reports preserved unavailable/null and incomplete observations. The declared unavailable rule matches its actual status/message; no claim of zero findings is inferred.
+      Evidence: R-24 returned met. Its current 599-test shared run passed fixed-GET scope/pagination, configured and unknown-bot inventory, dashboards, partial-data and independently comparable security surfaces. Native synthetic reports distinguish documented unavailable from incomplete data. No live collection or complete-vulnerability claim is inferred.
 - [x] AC-03: Maintenance decisions use actual version/changelog, code-usage and source-ownership evidence, keep major migrations separate and leave ambiguous or mixed changes unresolved.
-      Evidence: On 2026-10-29, Actual final Codex and Copilot reports classified the synthetic version/API/usage/pin/ownership/overlap/security cases against frozen source/notes and collection data. The bounded Stackweaver-policy trial additionally checked actual sync ownership/exclusions and retained batching. All three assessments and real installed-helper renders passed; samples do not establish production compatibility.
+      Evidence: R-24 returned met after inspecting the actual bounded Codex and Copilot reports against frozen source, notes, ownership and collection inputs. Historical trials retain their original component/consumer bindings; the final production delta is canonical evidence-ref wording. Actual native compatibility qualifications were inspected manually; production call-site compatibility remains unverified.
 - [x] AC-04: Each sweep permitted to write local artifacts preserves a durable, uniquely named report covering every discovered PR, security reconciliation and unresolved work without overwriting history or claiming completion from missing data; a sweep forbidden from all filesystem writes returns chat-only findings without claiming a saved report.
-      Evidence: On 2026-10-29, T4/T5 report, history and publication regressions plus T12 native authority/concurrency/promotion cases passed. Fresh-context reconciliation retained unique reports and immutable pending outcomes without duplicate commits/pushes. The actual second-writer push excluded the isolated no-push candidate. Main-transfer failures expose the existing pending commit; current restrictions win. No-filesystem requests produce chat only. Full Linux verification passed with the CI test budget.
+      Evidence: R-24 returned met. Current report/journal/publication regressions and retained native race/concurrency/recovery trials passed. Its fresh committed-code replay verified the actual existing report path/digest and report_reused true, without duplicate report creation or artifact mutation. Synthetic publication proofs are not real GitHub writes.
 - [x] AC-05: Newly authored compatible repairs use bounded-maintenance checks and independent review, selected bot-batch delivery preserves the declared consumer procedure, wider changes use the feature loop, and remote or live actions stay within owner and consumer permissions after revalidation.
-      Evidence: On 2026-10-29, T12 actual primary/independent/satellite authored repairs received clean native Copilot claude-opus-5.5 paired reviews before SAME-thread source push/one-PR delivery. Real-Go bot-only normalization/two batches, authored stale-input denials, builder-before-pointer, stalled-sync dispositions, scope/helper/dispatch/stack checks and non-forced cleanup passed. These are synthetic local transports; no live dependency action was performed or certified.
+      Evidence: R-24 returned met. It verified the unchanged production/consumer objects against actual R-23 review evidence and rechecked the canonical per-run instruction alignment. Historical primary/independent/satellite authored repairs retain actual clean paired Copilot reviews and same-thread source delivery; bot-only and builder ordering proofs retain real bindings. No live dependency/helper/merge action is certified.
 - [x] AC-06: Resuming a task preserves unrelated work and prior evidence, invalidates stale reviews/approvals and reconciles interrupted actions before retrying them.
-      Evidence: On 2026-10-29, Actual new-context commit, accepted-push, closure and smoke interruption recoveries passed; the unobservable remote remained pending and later reconciled without another effect. Journal torn-state/CAS regressions, source/Definition/generated-input review invalidation and staged/index preservation passed. Prior failed attempts and raw reviews remain retained; no history rewrite or evidence cleanup hid them.
+      Evidence: R-24 returned met. Current journal, stale-proof and fresh-process reconciliation controls passed, alongside retained deliberately interrupted native commit/push/closure/smoke cases. Unobservable effects remain pending until observed. Both real worktrees and original native artifacts were preserved; no exactly-once remote guarantee is claimed.
 - [x] AC-07: Stackweaver routes maintenance to the installed shared operation while retaining its command/model/arguments, repository facts, batching and release checks, approved satellite-helper behavior and scoped skip-leak recovery locally; an authorized sweep publishes its initial and later same-run report artifacts through the retained main-checkout route, while other consumers publish reports only under an explicit request or adopted declaration.
-      Evidence: R-20 returned met at `f6974f259de383bbbc803261a0fa33b3e949876d` with consumer `2095f06e4ccfe74740ceb9cfc806bcb7c7667b3a`. Its independent fixed launcher passed all eleven checks, including 598 plugin tests/2625 assertions, all Go/module/lint/CI checks and nine consumer tests/123 assertions; both repositories were preserved. Final native local-catalog payload equality and retained report/recovery trials were inspected with their recorded limitations. Three minor notes are tracked in T15; fresh review remains required after those changes. Real marketplace cutover, live-Claude invocation and GUI checks remain unclaimed.
+      Evidence: R-24 returned met at consumer 9e1af57f. Its eleven adapter tests/129 assertions and changelog check passed against final installed bed933. Command model/arguments, helper hash, other agents/docs workflows, local policy and authorized report route are preserved. All seventeen normal commit checks passed earlier without skips. The adapter is still unadopted; live Claude invocation remains deferred.
 - [x] AC-08: The exact committed candidate passes native Codex and Claude CLI installation/discovery and installed-helper checks, the consumer can roll back and reapply without unrelated changes, and its adoption preflight blocks cutover until matching real marketplace verification is available.
-      Evidence: R-20 returned met at `f6974f259de383bbbc803261a0fa33b3e949876d` with consumer `2095f06e4ccfe74740ceb9cfc806bcb7c7667b3a`. Its independent fixed launcher passed all eleven checks, including 598 plugin tests/2625 assertions, all Go/module/lint/CI checks and nine consumer tests/123 assertions; both repositories were preserved. Final native local-catalog payload equality and retained report/recovery trials were inspected with their recorded limitations. Three minor notes are tracked in T15; fresh review remains required after those changes. Real marketplace cutover, live-Claude invocation and GUI checks remain unclaimed.
+      Evidence: R-24 returned met. Final native source 1d8bc8a installed payload bed933 on both CLI hosts with eleven-skill discovery, helpers, source/index preservation and uninstall/reinstall; exact current production equality was measured. Current consumer rollback/reapply and distinct clean/dirty preflight cases passed. Missing real published-marketplace proof still blocks cutover before consumer merge.
 - [x] AC-09: Actual bounded Codex and Copilot report-stage trials follow the shared analysis procedure and retained consumer policy, and required regression and trial checks pass without implying untested delivery or GUI support or changing deferred workflows.
-      Evidence: R-20 returned met at `f6974f259de383bbbc803261a0fa33b3e949876d` with consumer `2095f06e4ccfe74740ceb9cfc806bcb7c7667b3a`. Its independent fixed launcher passed all eleven checks, including 598 plugin tests/2625 assertions, all Go/module/lint/CI checks and nine consumer tests/123 assertions; both repositories were preserved. Final native local-catalog payload equality and retained report/recovery trials were inspected with their recorded limitations. Three minor notes are tracked in T15; fresh review remains required after those changes. Real marketplace cutover, live-Claude invocation and GUI checks remain unclaimed.
+      Evidence: R-24 returned met. All twelve current commands passed: 599 shared tests/2642 assertions, Go tests/vet/tidy/lint, 34 other-plugin tests, actionlint, eleven consumer tests and changelog check, plus committed-source replay and actual report-file verification. The reviewer inspected native model/tool traces and correct compatibility denials. Automated compatibility grading is keyword-bounded and is backed by that manual inspection. GUI/live-Claude and production dependency compatibility remain unverified.
 
 ## Test Plan
 
@@ -1446,6 +1467,7 @@ None.
 | 2026-10-29 | R-21 | implementation | `1a121564d92ac3da8bf7bef238432a527b3888f4` | claude-opus-5.5 | procedural | All nine criteria met; three minor notes require replay-code provenance, stronger compatibility-claim controls and correct Review Log placement. T16 addresses them before final review. |
 | 2026-10-29 | R-22 | implementation | `06b171348ece78c622b914838babfbe5cb442951` | claude-opus-5.5 | procedural | All nine criteria met. Two minor notes require recording the actual resumed report path/digest and aligning the evidence ref instruction with accepted Design. T17 applies those fixes. |
 | 2026-10-29 | R-23 | implementation | `2a9aa910e1757a27bc736047439a1a848cd5623e` | claude-opus-5.5 | procedural | All nine criteria met; one test-grader nit remains for positive compatibility claims without the word production. T18 adds those controls before a focused final review. |
+| 2026-10-29 | R-24 | implementation | `8853bcbc7b3263aef898ce1f9d51ed36fcdc15ce` | claude-opus-5.5 | procedural | All nine criteria met; all twelve current checks passed. Optional keyword-grader limitation recorded with actual independent native-transcript inspection; no blocking findings. |
 
 
 ### R-1
@@ -2698,6 +2720,99 @@ SEVERITY: nit
 WHERE: tests/vh-adlc/maintenance/report-trial.ts:33-41 (qualifiesProductionCompatibility); tests/vh-adlc/maintenance/trial-proof.test.ts:117-120
 EVIDENCE: The subject pattern only recognizes "production(?: call[- ]site)? compatibility" or "compatibility with production ...". After one qualified phrase is removed, the remainder is checked only for that subject and for "is|was|has been proven/verified/...". A plan such as "Production compatibility is unverified. The samples prove call-site compatibility." or "Production compatibility is unverified, but the bump is compatible with all call sites." therefore passes, although it asserts compatibility over call sites from samples. The negative controls cover only claims that repeat the word "production". The actual retained answers (post-R19 and post-R20) are correct denials, so no verdict changes.
 PROPOSAL: Add negative controls for positive call-site or compatible-with claims that omit the word "production". Also extend the remainder check to reject any positive compatibility assertion, not only the "production" subject forms.
+
+### R-24
+
+CRITERION: AC-01 A project can discover and invoke shared dependency/security maintenance through the installed vh-adlc plugin without a harness-specific procedure or a Stackweaver checkout dependency.
+VERDICT: met
+EVIDENCE: I ran /home/m/code/.maintenance-review-archive/implementation-r24/input/check.sh once. It printed {"pass_": true, "commands": 12, "preserved": true}. execution/receipt.json shows all 12 commands exited 0 at source 8853bcbc7b3263aef898ce1f9d51ed36fcdc15ce and consumer 9e1af57f34b51b230eb2a4271416ca7bcc166ca3. Head, index, empty status and refs were identical before and after. The receipt reports 446 source objects, 209 proofs and 34 required positive results verified. Its incremental_verified block names baseline 2a9aa910 and allows only docs/specs/shared-maintenance.md, tests/vh-adlc/maintenance/report-trial.ts and tests/vh-adlc/maintenance/trial-proof.test.ts (delta 76d5287e). Command 00 printed {"version":"0.6.0","digest":"bed9339394aee9d4f45e54962751eb2e9ca1c06c5011ad8f4e3d2d6ceaba0ea9","files":66,"exact":true}. The committed plugin therefore still equals the post-R22 installed payload from candidate 1d8bc8ae. Command 01 (bun test tests/vh-adlc) passed 599 tests with 2642 assertions and 0 failures, including the discovery, no-config settings and controller-free collector import tests. The production bytes are unchanged, so I reused R-23's verified inspection of proofs/post-r22-native-install, which covered eleven-skill discovery on Codex CLI 0.163.0 and Claude Code 2.1.309, helpers and reinstall. Limitations: these are local-catalog development installs, not published-marketplace installs, and they were not rerun.
+
+CRITERION: AC-02 A sweep respects explicit repository scope, includes configured dependency/sync bot PRs, unknown-bot inventory gaps, dashboard work and security alerts, and distinguishes documented unavailable surfaces from incomplete collection without declaring affected work ready.
+VERDICT: met
+EVIDENCE: Command 01 at 8853bcbc passed every settings, collection and analysis test, including the sibling-surface coverage negative. This run's execution/fresh-replay/regraded-report-receipt.json shows:
+- monorepo code_scanning as complete-unavailable, with a null count and the documented no-GHAS reason
+- the provider Dependabot surface as incomplete, with a null count and "Fixture interrupted second page"
+- every other surface as complete
+
+The consumer settings are unchanged at 9e1af57f, and R-23 verified their bot_authors, inventory terms and 403 expectation. Limitations: fake-CLI and synthetic inventories only; no live GitHub collection.
+
+CRITERION: AC-03 Maintenance decisions use actual version/changelog, code-usage and source-ownership evidence, keep major migrations separate and leave ambiguous or mixed changes unresolved.
+VERDICT: met
+EVIDENCE: Command 01 passed analysis.test.ts and all eight trial-proof.test.ts cases. That includes the new compatibility controls (01.stderr:686). Command 11 re-graded the retained post-R20 policy assessment with the committed 8853bcbc grader: pass true, failures []. All three retained consumer plans still qualify under the new remainder rule:
+- post-R20: "They establish no production call-site compatibility" is matched by the "establish no <subject>" qualification. The remainder contains no compatib word.
+- post-R19: "production call-site compatibility is unverified" is matched.
+- final: "cannot establish compatibility with production source" is matched.
+
+The Codex generic trial passed, and the Copilot generic trial retains its initial required-evidence failure beside its regrade (R-23 evidence; unchanged bytes). Limitations: synthetic corpus and source samples only. Production call-site compatibility remains unverified.
+
+CRITERION: AC-04 Each sweep permitted to write local artifacts preserves a durable, uniquely named report covering every discovered PR, security reconciliation and unresolved work without overwriting history or claiming completion from missing data; a sweep forbidden from all filesystem writes returns chat-only findings without claiming a saved report.
+VERDICT: met
+EVIDENCE: Command 01 passed the journal, report, publication and no-filesystem tests at 8853bcbc. Production code and the retained publication proofs are unchanged; the launcher verified the proof hashes and required positive results, so R-23's inspection is reused.
+
+In the fresh replay, the read_only request produced kind external-draft with commit false and push false. The helper returned the existing same-run path runtime-20261029/post-r20-report-stack-policy/maintenance-report.md (digest fd3b4a44), not the requested execution/fresh-replay/maintenance-report.md. regraded-result.json:745-747 records that actual path and digest with report_reused true. The launcher checked the file SHA against report_digest. Limitations: synthetic local-bare transports only; no real GitHub publication.
+
+CRITERION: AC-05 Newly authored compatible repairs use bounded-maintenance checks and independent review, selected bot-batch delivery preserves the declared consumer procedure, wider changes use the feature loop, and remote or live actions stay within owner and consumer permissions after revalidation.
+VERDICT: met
+EVIDENCE: Command 01 passed the maintenance variants, delivery, paired-review, action, paired-check, bot-only (real go mod tidy), related, builder-order and stalled-sync suites. The authored-repair proofs are unchanged and hash-verified, so R-23's inspection is reused: clean paired claude-opus-5.5 reviews before same-thread push, with the satellite proof bound to frozen payload 86ee21d9 rather than bed93393. The canonical ref matches the accepted Design. Spec:755, plugins/vh-adlc/references/maintenance-record.md:54 and consumer agents/maintenance-project.md:142 all name `chore/maintenance-evidence-<run-id>`. Limitations: synthetic local transports only; no live dependency, merge or dispatch action. The Stackweaver helper's crash safety is not certified.
+
+CRITERION: AC-06 Resuming a task preserves unrelated work and prior evidence, invalidates stale reviews/approvals and reconciles interrupted actions before retrying them.
+VERDICT: met
+EVIDENCE: Command 01 passed the maintenance-resume, journal torn-state/CAS, report fresh-process reconciliation, publication interrupted-commit and paired-check stale-input tests at 8853bcbc. The launcher asserted the retained actions-c/d, publication-h/i/n and authored-primary-b stale-input proofs; their bytes are unchanged, so R-23's inspection is reused. Earlier failed attempts and reviews remain retained. Limitations: procedural recovery against synthetic transports only; no exactly-once remote guarantee.
+
+CRITERION: AC-07 Stackweaver routes maintenance to the installed shared operation while retaining its command/model/arguments, repository facts, batching and release checks, approved satellite-helper behavior and scoped skip-leak recovery locally; an authorized sweep publishes its initial and later same-run report artifacts through the retained main-checkout route, while other consumers publish reports only under an explicit request or adopted declaration.
+VERDICT: met
+EVIDENCE: The consumer head is 9e1af57f, the same commit R-23 reviewed, and the incremental delta contains no consumer path. I reused R-23's full row-by-row parity record against consumer-parity-baseline/. Command 09 passed bun test tests/agent-maintenance against installed payload bed93393: 11 pass, 0 fail, 129 assertions, no skips. That covers model/arguments routing, settings, every parity category plus the report grant, and the helper/other agents/constitution being unchanged. Command 10 (changelog check) passed. publication.test.ts in command 01 covers explicit-request and adopted-declaration-only publication for generic consumers. Limitations: the adapter is unmerged, so the standing grant is not yet live. Main-checkout publication is proven only on synthetic transports. Live Claude /maintenance is owner-deferred.
+
+CRITERION: AC-08 The exact committed candidate passes native Codex and Claude CLI installation/discovery and installed-helper checks, the consumer can roll back and reapply without unrelated changes, and its adoption preflight blocks cutover until matching real marketplace verification is available.
+VERDICT: met
+EVIDENCE: Command 00 proved the committed plugin equals the installed bed93393 payload from candidate 1d8bc8ae (native install inspected in R-23; unchanged).
+
+Command 09 passed:
+- the rehearsal restore/reapply test
+- "a maintenance-shaped 0.5.x payload is refused and the documented 0.6.0 minimum is accepted". installed.ts:10 rejects 0.x minors below 6, and installed.test.ts:24 rejects 0.5.99.
+- two distinct preflight cases (preflight.test.ts). The clean case asserts empty status and then the "expected published target absent or invalid" denial. The dirty case adds an untracked file and rejects with "consumer migration scope is not a clean committed snapshot".
+
+The manifest minimum is 0.6.0, and agents/maintenance.md:10 requires 0.6.0. Command 01 passed the shared migration denials and valid-receipt parsing. Limitations: no real published-marketplace install exists. Per the accepted Design (spec:1210-1224), that blocks cutover before consumer merge and is not a source-gate prerequisite.
+
+CRITERION: AC-09 Actual bounded Codex and Copilot report-stage trials follow the shared analysis procedure and retained consumer policy, and required regression and trial checks pass without implying untested delivery or GUI support or changing deferred workflows.
+VERDICT: met
+EVIDENCE: All 12 launcher commands exited 0:
+- bun test tests/vh-adlc: 599 pass, 2642 assertions
+- go test (all ok), go vet, go mod tidy -diff
+- golangci-lint config verify and run ("0 issues.")
+- github-app-registration: 34 pass
+- actionlint
+- consumer: 11 tests and the changelog check
+
+Command 11 replayed into execution/fresh-replay with the original 23fced payload. replay_implementation.source_commit is 8853bcbc and source_sha256 dd0d5619 matched the committed report-trial.ts. The result was pass true, failures [], with input 5e9dcce5 and consumer 9111242d. The five retained files stayed byte-identical. regradeDeclaredExpectationEvidence (report-trial.ts:255-257) requires the retained assessment and plan to equal the native return, so this replay re-grades an unchanged answer and is not a new model answer.
+
+New grader (report-trial.ts:33-41): every compatibility/compatible word left in the remainder now fails. Red log r23-compatibility-noun-red shows the new "compatible with the new API" control passing before the fix (8 tests: 7 pass, 1 fail). The green log shows 8 pass with 51 assertions. trial-proof.test.ts:117-120 accepts the actual qualification and "cannot establish compatibility with production source". It rejects an unqualified positive claim and six mixed claims, including "actual call-site compatibility is confirmed" and "the application is compatible with the new API". It also rejects a wrong owner, the stackweaver-extra prefix, reversed order and skip_ci true.
+
+I inspected proofs/post-r20-report-stack-policy/native.jsonl:
+- 64 starts and 64 completions; every start is view, grep or glob, with paths under the packet input and none containing "..".
+- Only line 32 failed, a grep regex error.
+- All 93 model fields are claude-opus-5.5.
+- Line 2167 shows exitCode 0 and no code changes.
+
+The consumer-plan text appears verbatim in the native return. result.json retains its initial rejection with only consumer-policy-parity.
+
+Earlier findings, rechecked:
+- R-20 F-01: fixed (compatibility.md:38-48).
+- R-20 F-02: fixed (0.6.0 gate and its version regression).
+- R-20 F-03: fixed (separate clean and dirty preflight tests).
+- R-21 F-01: fixed (committed-source fresh replay).
+- R-21 F-02: fixed (claim-level qualification with negatives).
+- R-21 F-03: fixed (Sources now follows R-23).
+- R-22: the report path/digest and canonical ref findings are addressed (see AC-04 and AC-05).
+
+compatibility.md keeps marketplace cutover pending and live Claude and GUI deferred, and makes no Copilot lifecycle claim. Limitations: live Claude and GUI remain unverified. The policy trial binds consumer 9111242d; the later 9e1af57f change is evidence-ref wording only and has no new model run.
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: tests/vh-adlc/maintenance/report-trial.ts:40 (qualifiesProductionCompatibility remainder check)
+EVIDENCE: The remainder test `\bcompatib(?:ility|le)\b` misses the plural "compatibilities" and the adverb "compatibly". It also misses positive assertions phrased without a compatib word or "is/was/has been <verified>". For example, "Production compatibility is unverified; samples prove the bump works with every production caller" would pass. All three actual retained answers (post-R19, post-R20 and final) are correct denials, and the bounded keyword grader is backed by transcript inspection, so no verdict changes.
+PROPOSAL: Optionally widen the remainder pattern to `\bcompatib\w*` and add one paraphrased positive-claim negative control. Alternatively, record that this field's grader is keyword-bounded and that the native transcripts are inspected manually.
 ## Sources
 
 - [Pinned agent entry](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md): task routes and preservation of local instructions.
