@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-maintenance
-status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria with three minor notes; T15 resolves them before final review. Live Claude/GUI are deferred; publication and cutover are pending."
+status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria; its minor notes and an observed trial-grader wording defect are fixed and tested. Fresh final implementation review remains. Live Claude/GUI are deferred; publication and cutover are pending."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -397,6 +397,17 @@ uninstall/reinstall at the unchanged full payload digest `23fcedd9c556c64c71c9fc
 (`post-r19-native-install-b/result.json`). An earlier invocation used a mistyped hash and failed
 before extraction; it remains retained and is not an installation pass. T13 final verification is
 complete; a fresh independent review of the committed source and consumer targets remains required.
+
+R-20 independently returned all nine criteria met at shared `f6974f2` and consumer `2095f06e`,
+with three minor notes. T15 corrects final compatibility wording, aligns the consumer minimum to
+0.6.0 and separates clean/dirty preflight controls. The parent roadmap now reflects accepted local
+implementation. Consumer `9111242d` passed eleven adapter tests and all seventeen normal commit
+checks; its refreshed actual Copilot policy answer and retained replay passed, after an observed
+wording-only grader correction with a production-claim negative. The latest shared suite passed
+598 tests/2627 assertions, followed by all repository checks. Full native transcripts and consumer
+plans are included in the next bounded review packet to remove R-20's evidence-inspection limitation.
+These changes alter no accepted normative section or production plugin payload. Final review and
+complete gate remain pending; published-marketplace proof must still precede consumer adoption.
 
 ## Scope
 
@@ -1373,7 +1384,8 @@ results here. The R-16 no-default-checkout fixture is part of T5/T12.
 
       Renewed final verification after R-19: the original bare Linux command passed 598 tests/2625 assertions, followed by all Go/module/lint, other-plugin and CI syntax checks. Both native CLI installations at exact source `3039766d5755be8cb88589c3f5c05e3f9ddaa946` passed all eleven skills, installed helpers and uninstall/reinstall (`post-r19-native-install-b/result.json`); its payload remains `23fcedd9c556c64c71c9fc4afb9873f5408d7f493c80fef14441c9ca23a00652`. Consumer `2095f06e4ccfe74740ceb9cfc806bcb7c7667b3a` passed nine tests/123 assertions and its normal commit checks at the accepted policy path. Its refreshed actual Copilot policy trial and unchanged-answer replay passed. Earlier R-19 verdicts and failures are retained; AC-07/08/09 stay unchecked until the fresh independent review returns their verdicts. No marketplace, adoption, live-Claude or GUI claim is made.
 
-- [ ] T15 `docs/reference/compatibility.md`, paired consumer installation/preflight tests and this document - resolve R-20 notes: record final local-catalog validation accurately, enforce the shared 0.6.0 minimum and require distinct clean-snapshot publication-denial and dirty-snapshot refusal controls. Observe the version regression fail before its fix, run required shared/consumer checks, and obtain a fresh actual Copilot Opus 5.5 review (AC-07, AC-08, AC-09).
+- [x] T15 `docs/reference/compatibility.md`, parent-roadmap status, report-trial grader, paired consumer installation/preflight tests and this document - resolve R-20 notes: record final local-catalog validation accurately, enforce the shared 0.6.0 minimum and require distinct clean-snapshot publication-denial and dirty-snapshot refusal controls. Correct the observed compatibility-qualification wording rejection without allowing a production-compatibility claim. Observe the version and wording regressions fail before their fixes, run required shared/consumer checks, then submit exact committed targets to a fresh actual Copilot Opus 5.5 review (AC-07, AC-08, AC-09).
+      Evidence: On 2026-10-29, a maintenance-shaped 0.5.99 payload incorrectly passed the new version control, then was rejected after the 0.6.0 gate fix; 0.6.0 passes. Consumer `9111242da11be04157b7cccd994426069d31b9d5` passed eleven tests/127 assertions, including separate clean-snapshot missing-publication-evidence and dirty-snapshot refusal cases; all seventeen normal commit checks passed without skips (including 1093 frontend tests). The refreshed actual Copilot Opus 5.5 trial binds that exact consumer and unchanged plugin payload 23fced. Its initial wording-only rejection is retained: the answer explicitly says the samples establish no production call-site compatibility. The observed red/green grader control accepts that qualification and rejects a production-readiness claim; seven focused tests/38 assertions pass. Its unchanged native assessment/plan replay passed all twenty cases, installed rendering and preservation checks (`post-r20-report-stack-policy/regraded-result.json`). The final bare shared suite passed 598 tests/2627 assertions (`r20-final-full-suite-20261029.log`), then all Go/module/lint, other-plugin and CI syntax checks passed. Production plugin bytes remain unchanged. A fresh exact-target independent implementation review is still required.
 
 ## Open Questions
 

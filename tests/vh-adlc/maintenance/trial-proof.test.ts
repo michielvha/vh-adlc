@@ -95,4 +95,6 @@ test("consumer builder ordering accepts the bound primary repository and rejects
   for (const destination of ["primary other/project backend/go.mod", "primary michielvha/stackweaver-extra backend/go.mod"]) expect(gradeConsumerPlan({ ...plan, builder_order: [plan.builder_order[0], destination] }, "michielvha/stackweaver").pass).toBe(false);
   expect(gradeConsumerPlan({ ...plan, builder_order: [...plan.builder_order].reverse() }, "michielvha/stackweaver").pass).toBe(false);
   expect(gradeConsumerPlan({ ...plan, skip_ci: true }, "michielvha/stackweaver").pass).toBe(false);
+  expect(gradeConsumerPlan({ ...plan, production_compatibility: "The synthetic caller samples support only bounded fixture routing. They establish no production call-site compatibility, check result or readiness." }, "michielvha/stackweaver").pass).toBe(true);
+  expect(gradeConsumerPlan({ ...plan, production_compatibility: "The synthetic samples establish production call-site compatibility and readiness." }, "michielvha/stackweaver").pass).toBe(false);
 });

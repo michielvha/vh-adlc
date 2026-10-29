@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Triage is published and adopted after actual marketplace verification. Maintenance and audit remain candidates for separate child specs; other extractions are deferred."
+status_description: "Triage is published and adopted. Maintenance has an accepted child spec and local implementation; final review, publication and marketplace-verified adoption remain separate. Audit and other extractions remain deferred."
 issue: null
 goal: "Selected reusable Stackweaver workflows are delivered through vh-adlc, with a separate accepted spec and verified migration for each capability."
 covers:
@@ -17,9 +17,9 @@ feature document, implementation, tests and adoption evidence. The owner request
 on 2026-10-27 so future maintenance, audit and documentation decisions do not accumulate in the
 completed triage feature.
 
-The owner selected dependency/security maintenance next on 2026-10-27. Its draft child is
-[shared-maintenance.md](shared-maintenance.md); independent review and owner acceptance precede
-implementation. Stackweaver retains its specific operating procedures, including its existing
+The owner selected dependency/security maintenance next on 2026-10-27. Its accepted child is
+[shared-maintenance.md](shared-maintenance.md); local implementation and candidate testing are recorded
+there, with final review and publication tracked separately from consumer adoption. Stackweaver retains its specific operating procedures, including its existing
 approved satellite-merge helper. No audit, documentation or domain extraction has been selected.
 
 Triage is the first extraction. Its accepted behavior and local verification remain in
@@ -71,7 +71,7 @@ updated rollback baseline. GUI discovery remains unverified under #33.
 | ID | Capability and existing source | Disposition and next decision |
 | --- | --- | --- |
 | TRIAGE | Backlog triage, `agents/issue-triage.md` | [Child spec](shared-triage.md) adopted through vh-adlc #34 and Stackweaver #976 after actual marketplace tests. The delivery evidence is above. GUI discovery remains under [#33](https://github.com/michielvha/vh-adlc/issues/33). |
-| D-01 | Dependency/security maintenance, `agents/maintenance.md` | Selected by the owner; [child spec](shared-maintenance.md) is being reviewed before acceptance. Reuse existing bounded maintenance. Retain topology, release checks and the approved satellite-helper exception locally; preserve the daily command and model. |
+| D-01 | Dependency/security maintenance, `agents/maintenance.md` | Accepted and implemented locally under its [child spec](shared-maintenance.md). Final review and delivery remain tracked there; publish and verify the shared component before consumer adoption. Reuse existing bounded maintenance. Retain topology, release checks and the approved satellite-helper exception locally; preserve the daily command and model. |
 | D-02 | Persistent codebase audit, `agents/codebase-audit.md` | Candidate for a separate audit spec. Preserve finding identities, adversarial re-verification and residuals, and connect remediation to the existing lifecycle. Decide write/merge authority before carrying over local automation. |
 | D-03 | Documentation impact, drift audit/resolution and truth checks | Deferred. Compare `agents/docs-impact.md`, `docs-drift-audit.md`, `docs-drift-resolver.md` and `docs-truth.md` with vh-adlc's existing documentation workflow first. Any selected extraction gets a separate spec. Existing scanners, ledgers, hooks and schedules stay unchanged. |
 | D-04 | TFE compatibility and provider-fork workflows | Keep `agents/tfe-compat.md` and `agents/provider-fork.md` as domain extensions in Stackweaver. Extract only a separately selected reusable part, preserving product contracts and licensing boundaries. |

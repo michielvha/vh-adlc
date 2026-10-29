@@ -28,7 +28,7 @@ export function gradeNativeReport(assessment: unknown, cases: ExpectedCase[], ev
 export function gradeConsumerPlan(plan: any, repository: string) {
   const destination = Array.isArray(plan?.builder_order) ? String(plan.builder_order[1] ?? "") : "";
   const boundPrimary = /monorepo/i.test(destination) || destination.split(/[^A-Za-z0-9_./-]+/).includes(repository);
-  const pass = !!plan && Array.isArray(plan.builder_order) && /satellite|api|orchestrator/i.test(plan.builder_order[0] ?? "") && boundPrimary && plan.single_squash === true && plan.skip_ci === false && plan.distribution_edits === false && /approv|authoriz/i.test(plan.satellite_helper ?? "") && /green|check/i.test(plan.satellite_helper ?? "") && /unverified|cannot|not establish|not verified|none established/i.test(plan.production_compatibility ?? "") && /report/i.test(plan.report_publication ?? "");
+  const pass = !!plan && Array.isArray(plan.builder_order) && /satellite|api|orchestrator/i.test(plan.builder_order[0] ?? "") && boundPrimary && plan.single_squash === true && plan.skip_ci === false && plan.distribution_edits === false && /approv|authoriz/i.test(plan.satellite_helper ?? "") && /green|check/i.test(plan.satellite_helper ?? "") && /unverified|cannot|not establish|not verified|none established|establish(?:es)? no production (?:call-site )?compatibility/i.test(plan.production_compatibility ?? "") && /report/i.test(plan.report_publication ?? "");
   return { pass, failures: pass ? [] : ["consumer-policy-parity"] };
 }
 export function gradeCodexPacketReads(events: any[], input: string, required: string[]) {
@@ -249,6 +249,6 @@ export async function regradeDeclaredExpectationEvidence(output: string, install
     const rendered = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" }); json(join(output, "regraded-report-receipt.json"), { argv, exit_code: rendered.exitCode, result: rendered.stdout.toString(), source_preserved: sourceSnapshot(root) === before, index_preserved: digest(readFileSync(indexPath)) === index });
     if (rendered.exitCode || sourceSnapshot(root) !== before || digest(readFileSync(indexPath)) !== index) { grade.pass = false; grade.failures.push("regraded-report-or-preservation"); }
   }
-  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: "result.json", correction: "Bind coverage citations to their actual scoped JSON object and recognize the exact configured primary repository in builder ordering, retaining wrong-owner/prefix/sibling denials and the existing declared-security alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
+  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: "result.json", correction: "Bind coverage citations to their actual scoped JSON object and recognize the exact configured primary repository in builder ordering, and accept an explicit statement that samples establish no production compatibility, retaining wrong-owner/prefix/sibling and unsupported compatibility-claim denials and the existing declared-security alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
   json(join(output, "regraded-result.json"), result); return result;
 }

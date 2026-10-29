@@ -35,8 +35,11 @@ and private-report helpers with matching payload bytes/modes and preserved fixtu
 source/index. Uninstall/reinstall results and exact source targets are recorded in
 the [maintenance feature evidence](../specs/shared-maintenance.md).
 
-Final 0.6.0 candidate validation is pending after integration with the published blog
-workflow. The earlier results are development local-catalog checks. Consumer cutover also requires actual
+After blog integration, final 0.6.0 local-catalog validation passed at committed source
+`3039766d5755be8cb88589c3f5c05e3f9ddaa946`: both native CLI hosts discovered all eleven
+skills, passed installed helpers with source/index preservation, and restored the same
+payload through uninstall/reinstall. The exact targets and digest are in the feature evidence.
+These are development checks. Consumer cutover still requires actual
 published-marketplace installs, installed-helper tests and a fresh paired review.
 The adoption preflight rejects local-catalog receipts as publication proof.
 Native model report/delivery trials are tracked separately in that feature;
