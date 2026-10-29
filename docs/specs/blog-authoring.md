@@ -168,8 +168,8 @@ None. The owner chose explicit invocation, suggested after shipping, over automa
 | 2026-10-29 | R-4 | spec | `94bc595082a658bde7114a999da1db1162c4d3d2` | unknown | procedural | No findings; explicit promotion mode and post-ship suggestion reviewed; model identity not attested. |
 | 2026-10-29 | R-5 | spec | `320b72856e5d2b7bb809e700a0c985ca03d5cea8` | unknown | procedural | No findings on refreshed current-main checkout; model identity not attested. |
 | 2026-10-29 | R-5 | spec | `320b72856e5d2b7bb809e700a0c985ca03d5cea8` | n/a | n/a | accepted by owner |
-
 | 2026-10-29 | R-6 | implementation | `31bc6cc304bb770fa1d37dcc04d36ec20327ac14` | unknown | procedural | Eleven criteria met; live retrieval/humanizer integration AC-03 not verified; model identity not attested. |
+
 
 ### R-1
 
