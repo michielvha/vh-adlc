@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 const root = resolve(import.meta.dir, "../..");
 const pkg = join(root, "plugins/vh-adlc");
-const read = (path: string) => readFileSync(join(pkg, path), "utf8");
+const read = (path: string) => readFileSync(join(pkg, path), "utf8").replace(/\s+/g, " ");
 
 describe("shared article and promotion contract", () => {
   test("packages one content operation and its independent editor", () => {
