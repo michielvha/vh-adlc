@@ -9,7 +9,7 @@ import { git } from "./fixtures";
 import { inspectComponent, sourceSnapshot } from "./install-trial";
 import { gradeAssessment, type ExpectedCase } from "./trial-proof";
 import { exportAnalysisInput, verifyAnalysisInput } from "../../../plugins/vh-adlc/scripts/maintenance/analysis-input";
-import { digest } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
+import { canonicalJSON, digest } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
 import { runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
 import { copilotReadLaunch, gradeCopilotRead, parseCopilotResponse } from "../triage/copilot-trial";
 const PIN = "e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a";
@@ -24,6 +24,12 @@ export function gradeNativeReport(assessment: unknown, cases: ExpectedCase[], ev
   if (!Array.isArray(proof.successful_reads) || proof.required_reads.some((path: string) => !proof.successful_reads.includes(path))) failures.push("required-input-not-read");
   if (proof.host === "copilot-cli" && (proof.requested_model !== "claude-opus-5.5" || JSON.stringify(proof.models) !== '["claude-opus-5.5"]')) failures.push("requested-model-not-observed");
   return { pass: !failures.length, failures };
+}
+export function gradeConsumerPlan(plan: any, repository: string) {
+  const destination = Array.isArray(plan?.builder_order) ? String(plan.builder_order[1] ?? "") : "";
+  const boundPrimary = /monorepo/i.test(destination) || destination.split(/[^A-Za-z0-9_./-]+/).includes(repository);
+  const pass = !!plan && Array.isArray(plan.builder_order) && /satellite|api|orchestrator/i.test(plan.builder_order[0] ?? "") && boundPrimary && plan.single_squash === true && plan.skip_ci === false && plan.distribution_edits === false && /approv|authoriz/i.test(plan.satellite_helper ?? "") && /green|check/i.test(plan.satellite_helper ?? "") && /unverified|cannot|not establish|not verified|none established/i.test(plan.production_compatibility ?? "") && /report/i.test(plan.report_publication ?? "");
+  return { pass, failures: pass ? [] : ["consumer-policy-parity"] };
 }
 export function gradeCodexPacketReads(events: any[], input: string, required: string[]) {
   const commands = events.filter(event => event.type === "item.completed" && event.item?.type === "command_execution").map(event => event.item);
@@ -90,7 +96,7 @@ export async function runReportTrial(host: "copilot-cli" | "codex-cli", repo: st
   const prepared = prepareReportTrial(repo, commit, installed, output, docs, consumer), { corpus, packet, required } = prepared;
   const sourceBefore = sourceSnapshot(corpus.project.root), indexBefore = digest(readFileSync(join(corpus.project.root, ".git/index")));
   const consumerInstructions = consumer ? `\nThis bounded Stackweaver-policy packet includes actual committed settings, entry, project procedure, CLAUDE rules, configured policy references and sync workflows. Tracker data, release notes, caller samples and history remain synthetic. Read those configured policy sources and the frontend/API sync mappings in full. Two synthetic satellite PRs test actual frontend sync ownership and API Dockerfile exclusion. Return an envelope {assessment:<the normal complete assessment>,consumer_plan:{builder_order:["first owner/location","next owner/location"], single_squash:boolean, skip_ci:boolean, distribution_edits:boolean, satellite_helper:"scope/requirements", production_compatibility:"what these samples can establish", report_publication:"scope of retained standing permission"}}. Infer these policy fields from the actual supplied files. Preserve every generic fixture item too. Do not claim production compatibility from a caller sample or publish any report remotely.` : "";
-  if (consumer) prepared.required.push("source/AGENTS.md", "source/CLAUDE.md", "source/maintenance-project.md", "source/.vh-adlc/maintenance.json", "source/agents/maintenance.md", "source/.claude/commands/maintenance.md", "source/.github/workflows/sync-frontend.yml", "source/.github/workflows/sync-api.yml");
+  if (consumer) prepared.required.push("source/AGENTS.md", "source/CLAUDE.md", `source/${corpus.config.project_procedure}`, "source/.vh-adlc/maintenance.json", "source/agents/maintenance.md", "source/.claude/commands/maintenance.md", "source/.github/workflows/sync-frontend.yml", "source/.github/workflows/sync-api.yml");
   const prompt = promptFor(prepared) + consumerInstructions, logs = join(output, "logs"); mkdirSync(logs);
   let args: string[], env = { ...process.env } as Record<string, string>;
   if (host === "copilot-cli") args = ["copilot", "--model", "claude-opus-5.5", ...copilotReadLaunch(packet.path, join(packet.path, "plugin"), logs, prompt).slice(1)];
@@ -134,8 +140,7 @@ export async function runReportTrial(host: "copilot-cli" | "codex-cli", repo: st
     required_reads: required, successful_reads: native.successful_reads.map((path: string) => path.slice(packet.path.length + 1)) };
   const grade = gradeNativeReport(assessment, corpus.cases, corpus.evidence, proof);
   if (consumer) {
-    const plan = consumerPlan;
-    if (!plan || !Array.isArray(plan.builder_order) || !/satellite|api|orchestrator/i.test(plan.builder_order[0] ?? "") || !/monorepo/i.test(plan.builder_order[1] ?? "") || plan.single_squash !== true || plan.skip_ci !== false || plan.distribution_edits !== false || !/approv|authoriz/i.test(plan.satellite_helper ?? "") || !/green|check/i.test(plan.satellite_helper ?? "") || !/unverified|cannot|not establish|not verified|none established/i.test(plan.production_compatibility ?? "") || !/report/i.test(plan.report_publication ?? "")) grade.failures.push("consumer-policy-parity");
+    grade.failures.push(...gradeConsumerPlan(consumerPlan, corpus.config.repository).failures);
     json(join(output, "consumer-plan.json"), consumerPlan ?? null);
   }
   if (error) grade.failures.push(error); grade.pass = !grade.failures.length;
@@ -211,7 +216,7 @@ export async function resumeCodexReportTrial(output: string, profile: string) {
 
 export async function regradeDeclaredExpectationEvidence(output: string, installed: string) {
   const original = JSON.parse(readFileSync(join(output, "result.json"), "utf8")), launch = JSON.parse(readFileSync(join(output, "launch.json"), "utf8"));
-  if (original.pass || !original.grade.failures.length || original.grade.failures.some((failure: string) => !failure.endsWith(":required-evidence"))) throw Error("only an evidence-requirement-only rejection may use this correction");
+  if (original.pass || !original.grade.failures.length || original.grade.failures.some((failure: string) => !failure.endsWith(":required-evidence") && failure !== "consumer-policy-parity")) throw Error("only a retained evidence/consumer-owner grader rejection may use this correction");
   if (existsSync(join(output, "regraded-result.json"))) throw Error("a retained regrade already exists; reconcile it without overwrite");
   const input = join(output, "input"), verified = verifyAnalysisInput(input); if (!verified.pass || inspectComponent(installed).digest !== launch.installed_digest) throw Error("packet or installed payload changed");
   const evidence = Object.fromEntries([...verified.manifest.files.map(file => file.path), "manifest.json"].map(path => [path, readFileSync(join(input, path), "utf8")]));
@@ -226,6 +231,14 @@ export async function regradeDeclaredExpectationEvidence(output: string, install
   }
   json(join(output, "regraded-expected.json"), expected);
   const assessment = JSON.parse(readFileSync(join(output, "assessment.json"), "utf8")), grade = gradeNativeReport(assessment, expected, evidence, original.proof);
+  const events = readFileSync(join(output, "native.jsonl"), "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line));
+  const raw = original.proof.host === "copilot-cli" ? events.filter(row => row.type === "assistant.message" && row.data.content).at(-1)?.data.content : events.filter(row => row.type === "item.completed" && row.item?.type === "agent_message").at(-1)?.item.text;
+  const actual = parseCopilotResponse(raw);
+  if (canonicalJSON(original.consumer_target ? actual.assessment : actual) !== canonicalJSON(assessment)) throw Error("retained assessment differs from actual native return");
+  if (original.consumer_target) {
+    if (canonicalJSON(JSON.parse(readFileSync(join(output, "consumer-plan.json"), "utf8"))) !== canonicalJSON(actual.consumer_plan)) throw Error("retained consumer plan differs from actual native return");
+    grade.failures.push(...gradeConsumerPlan(actual.consumer_plan, settings.repository).failures); grade.pass = !grade.failures.length;
+  }
   let report: string | null = null;
   if (grade.pass) {
     const receipt = JSON.parse(evidence["collection-receipt.json"]), root = receipt.argv[receipt.argv.indexOf("--repo") + 1], cli = join(installed, "scripts/maintenance/cli.ts");
@@ -236,6 +249,6 @@ export async function regradeDeclaredExpectationEvidence(output: string, install
     const rendered = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" }); json(join(output, "regraded-report-receipt.json"), { argv, exit_code: rendered.exitCode, result: rendered.stdout.toString(), source_preserved: sourceSnapshot(root) === before, index_preserved: digest(readFileSync(indexPath)) === index });
     if (rendered.exitCode || sourceSnapshot(root) !== before || digest(readFileSync(indexPath)) !== index) { grade.pass = false; grade.failures.push("regraded-report-or-preservation"); }
   }
-  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: "result.json", correction: "Bind all coverage citations to their actual scoped collected JSON object, preserving sibling-surface rejection; allow the exact declared security expectation as the existing procedure alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
+  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: "result.json", correction: "Bind coverage citations to their actual scoped JSON object and recognize the exact configured primary repository in builder ordering, retaining wrong-owner/prefix/sibling denials and the existing declared-security alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
   json(join(output, "regraded-result.json"), result); return result;
 }

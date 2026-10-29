@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { gradeNativeReport } from "./report-trial";
+import { gradeNativeReport, gradeConsumerPlan } from "./report-trial";
 import { passingAssessment } from "./trial-proof";
 const row = { id: "pr:example/project#1", classification: "routine-batch-candidate", proposal: "propose-batch", evidence: [{ path: "source/app.ts", line: 1 }], source_owner: "primary", batch_eligible: true, measured_count: null, coverage: "not-applicable", claimed_resolved: [], related_ids: [] };
 const assessment = passingAssessment([row]);
@@ -86,4 +86,13 @@ test("a declared security expectation is valid evidence alongside its local proc
   const sources = { "source/policy.md": "policy\nexpected unavailable\n", "settings.json": "actual declared expectation\n", "unrelated.json": "not policy\n" };
   expect(gradeNativeReport(assessment, [bound], sources, proof).pass).toBe(true);
   assessment.items[0].evidence[0].path = "unrelated.json"; expect(gradeNativeReport(assessment, [bound], sources, proof).pass).toBe(false);
+});
+
+test("consumer builder ordering accepts the bound primary repository and rejects another or a prefix match", () => {
+  const plan = { builder_order: ["satellite API/orchestrator builder prerequisite", "primary michielvha/stackweaver synced backend/go.mod bump"], single_squash: true, skip_ci: false, distribution_edits: false, satellite_helper: "Only approved/preauthorized selected green checks", production_compatibility: "unverified synthetic samples", report_publication: "Only the authorized run report" };
+  expect(gradeConsumerPlan(plan, "michielvha/stackweaver").pass).toBe(true);
+  expect(gradeConsumerPlan({ ...plan, builder_order: [plan.builder_order[0], "monorepo backend/go.mod bump"] }, "michielvha/stackweaver").pass).toBe(true);
+  for (const destination of ["primary other/project backend/go.mod", "primary michielvha/stackweaver-extra backend/go.mod"]) expect(gradeConsumerPlan({ ...plan, builder_order: [plan.builder_order[0], destination] }, "michielvha/stackweaver").pass).toBe(false);
+  expect(gradeConsumerPlan({ ...plan, builder_order: [...plan.builder_order].reverse() }, "michielvha/stackweaver").pass).toBe(false);
+  expect(gradeConsumerPlan({ ...plan, skip_ci: true }, "michielvha/stackweaver").pass).toBe(false);
 });

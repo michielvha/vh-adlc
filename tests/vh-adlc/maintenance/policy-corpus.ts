@@ -1,5 +1,5 @@
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
-import { jsonEvidence } from "./json-evidence";
+import { jsonEvidence, coverageEvidence } from "./json-evidence";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { syntheticCorpus } from "./fixtures/corpus";
@@ -59,11 +59,11 @@ export function stackweaverPolicyCorpus(consumer: { root: string; commit: string
   const line = (path: string, term: string) => { const number = corpus.evidence[`source/${path}`].split("\n").findIndex(value => value.includes(term)) + 1; if (!number) throw Error("actual workflow routing evidence absent"); return number; };
   for (const [id, classification, proposal, owner, path, term] of [["pr:vhco-pro/stackweaver-frontend#22", "sync-owned", "route-to-monorepo", "primary", ".github/workflows/sync-frontend.yml", "monorepo/frontend/ satellite/"], ["pr:vhco-pro/stackweaver-api#23", "satellite-owned", "retain-satellite", "satellite", ".github/workflows/sync-api.yml", "rsync -av --mkpath"]]) corpus.cases.push({ id, classification, proposal, source_owner: owner, batch_eligible: false, measured_count: null, coverage: "not-applicable", claimed_resolved: [], related_ids: [], evidence: [{ path: `source/${path}`, line: line(path, term), ...(id.endsWith("#23") ? { end_line: line(path, term) + 6 } : {}) }, { path: "source/notes/consumer-routing.md", line: 1 }] });
   const mixed = corpus.cases.find(row => row.id === `pr:${primary}#16`)!;
-  mixed.evidence = [{ path: "source/.github/workflows/sync-frontend.yml", line: line(".github/workflows/sync-frontend.yml", "monorepo/frontend/ satellite/") }, { path: "source/maintenance-project.md", line: line("maintenance-project.md", "Mixed ownership") }];
+  mixed.evidence = [{ path: "source/.github/workflows/sync-frontend.yml", line: line(".github/workflows/sync-frontend.yml", "monorepo/frontend/ satellite/") }, { path: `source/${settings.project_procedure}`, line: line(settings.project_procedure, "Mixed ownership") }];
   const scanning = corpus.cases.find(row => row.id === `coverage:${primary}:code_scanning`)!;
-  scanning.evidence = [{ path: "source/maintenance-project.md", line: line("maintenance-project.md", "declared 403"), alternatives: [{ path: "settings.json", line: 1 }] }];
+  scanning.evidence = [{ path: `source/${settings.project_procedure}`, line: line(settings.project_procedure, "declared 403"), alternatives: [{ path: "settings.json", line: 1 }] }];
   const api = corpus.cases.find(row => row.id === "pr:vhco-pro/stackweaver-api#23")!;
-  api.evidence = [{ path: "source/.github/workflows/sync-api.yml", line: line(".github/workflows/sync-api.yml", "Clean slate"), end_line: line(".github/workflows/sync-api.yml", "rsync -av --mkpath") + 6 }, { path: "source/maintenance-project.md", line: line("maintenance-project.md", "own their builder Dockerfile") }];
+  api.evidence = [{ path: "source/.github/workflows/sync-api.yml", line: line(".github/workflows/sync-api.yml", "Clean slate"), end_line: line(".github/workflows/sync-api.yml", "rsync -av --mkpath") + 6 }, { path: `source/${settings.project_procedure}`, line: line(settings.project_procedure, "own their builder Dockerfile") }];
   corpus.bindInventory = inventory => bindPolicyInventory(corpus.cases, corpus.evidence, inventory, corpus.config);
   return corpus;
 }
@@ -77,9 +77,9 @@ function bindPolicyInventory(cases: ExpectedCase[], evidence: Record<string, str
     const line = lines.findIndex(text => text.includes(query)) + 1; if (!line) throw Error(`policy corpus item absent from actual collector output: ${row.id}`);
     row.evidence = row.evidence.filter(item => item.path !== "inventory.json" && item.path !== "settings.json");
     if (["inventory-gap", "incomplete-security", "history-unavailable"].includes(row.classification)) row.evidence = [];
-    if (row.id.startsWith("coverage:") && row.classification === "complete-comparable" || row.classification === "history-unavailable") {
-      const repository = row.id.split(":")[1], index = inventory.repositories.findIndex((entry: any) => entry.repository === repository);
-      row.evidence.push({ path: "inventory.json", ...encoded.at("repositories", index, "dependabot", "coverage") });
+    const coverage = coverageEvidence(inventory, row.id, encoded);
+    if (coverage) {
+      row.evidence.push({ path: "inventory.json", ...coverage });
     } else if (row.id.startsWith("pr:")) {
       const index = inventory.repositories.findIndex((entry: any) => entry.repository === row.id.slice(3).split("#")[0]);
       const pullIndex = inventory.repositories[index].pulls.findIndex((entry: any) => entry.number === Number(row.id.split("#")[1]));

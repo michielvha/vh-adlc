@@ -44,7 +44,7 @@ jobs:
         with:
           bun-version: 1.4.4
       - name: Check the vh-adlc package
-        run: bun test tests/vh-adlc --timeout 60000
+        run: bun test tests/vh-adlc
 
   checker-macos:
     runs-on: macos-latest

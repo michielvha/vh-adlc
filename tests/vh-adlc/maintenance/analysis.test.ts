@@ -26,7 +26,7 @@ test("portable CLI rejects mutators, unknown/duplicate flags and invalid scope b
   expect(invoke(f.root, "start", ["--pull", "-2"]).exit).toBe(1);
   expect(existsSync(join(f.root, ".git/vh-adlc"))).toBe(false);
   expect(git(f.root, "rev-parse", "HEAD")).toBe(head);
-});
+}, 30_000);
 
 test("CLI start/resume persists one narrowed run and no-filesystem mode creates no journal", () => {
   const f = fixture(); projects.push(f); f.write("request.json", JSON.stringify({ authorized_sweep: true, no_filesystem: true }));
@@ -35,7 +35,7 @@ test("CLI start/resume persists one narrowed run and no-filesystem mode creates 
   const start = invoke(f.root, "start", ["--repository", "example/project", "--pull", "7"]); expect(start.exit).toBe(0);
   const run = JSON.parse(start.out); expect(run.header.scope).toEqual({ repositories: ["example/project"], pull: 7 });
   const resume = invoke(f.root, "resume", ["--run-id", run.header.run_id]); expect(resume.exit).toBe(0); expect(JSON.parse(resume.out).digest).toBe(run.digest);
-});
+}, 30_000);
 
 test("the synthetic packet uses actual CLI GET collection and preserves source/index while exporting frozen inputs", () => {
   const corpus = syntheticCorpus(); projects.push(corpus.project);
@@ -49,7 +49,7 @@ test("the synthetic packet uses actual CLI GET collection and preserves source/i
   expect(existsSync(join(packet.path, ".tools"))).toBe(false);
   expect(inventory.repositories[0].code_scanning.coverage.status).toBe("complete-unavailable");
   expect(inventory.repositories.find((row: any) => row.repository === "example/partial").dependabot.coverage.status).toBe("incomplete");
-});
+}, 30_000);
 
 test("packet integrity rejects changed, missing, extra and symbolic-link inputs", () => {
   const corpus = syntheticCorpus(); projects.push(corpus.project);
@@ -60,7 +60,7 @@ test("packet integrity rejects changed, missing, extra and symbolic-link inputs"
   writeFileSync(first, original); unlinkSync(first); expect(verifyAnalysisInput(packet.path).pass).toBe(false);
   writeFileSync(first, original, { mode: manifest.files[0].mode }); writeFileSync(join(packet.path, "extra.txt"), "not declared"); expect(verifyAnalysisInput(packet.path).pass).toBe(false);
   unlinkSync(join(packet.path, "extra.txt")); unlinkSync(first); symlinkSync(join(corpus.project.root, "src/app.ts"), first); expect(verifyAnalysisInput(packet.path).pass).toBe(false);
-});
+}, 30_000);
 
 test("graders require every exact item/class and cited input, with no invented collection or live actions", () => {
   const corpus = syntheticCorpus(); projects.push(corpus.project); const collected = invoke(corpus.project.root, "collect", [], corpus.env); expect(collected.exit).toBe(0); corpus.bindInventory(JSON.parse(collected.out)); const good = passingAssessment(corpus.cases);
@@ -76,7 +76,7 @@ test("graders require every exact item/class and cited input, with no invented c
   const unavailable = good.items.findIndex(row => row.id === "coverage:example/project:code_scanning");
   const contradiction = structuredClone(good); contradiction.items[unavailable].measured_count = 0;
   expect(gradeAssessment(contradiction, corpus.cases, corpus.evidence).pass).toBe(false);
-});
+}, 30_000);
 
 test("pending outcomes persist ordered immutable private artifacts without touching an unpushed report", () => {
   const f = fixture(); projects.push(f); const c = loadSettings(f.root), run = createRun(c), reportPath = join(f.root, "report.md");
@@ -90,7 +90,7 @@ test("pending outcomes persist ordered immutable private artifacts without touch
   expect(readFileSync(reportPath, "utf8")).toBe("unpublished report\n");
   const child = invoke(f.root, "pending-outcomes", ["--run-id", run.header.run_id]); expect(child.exit).toBe(0);
   expect(JSON.parse(child.out).length).toBe(2); expect(git(f.root, "log", "--format=%s")).toBe("test: seed project");
-});
+}, 30_000);
 
 test("CLI private reports retain collection and request bindings for fresh-process continuation", () => {
   const corpus = syntheticCorpus(); projects.push(corpus.project); const f = corpus.project;
@@ -105,7 +105,7 @@ test("CLI private reports retain collection and request bindings for fresh-proce
   const current = JSON.parse(resumed.out); expect(current.state.request.read_only).toBe(true);
   expect(JSON.parse(readFileSync(current.state.collection.path, "utf8")).inventory).toEqual(inventory);
   expect(git(f.root, "status", "--porcelain")).toBe(status); expect(readFileSync(join(f.root, ".git/index"))).toEqual(index);
-});
+}, 30_000);
 
 test("invalid request booleans and null publication cannot create a new run", () => {
   const f = fixture(); projects.push(f);
@@ -113,7 +113,7 @@ test("invalid request booleans and null publication cannot create a new run", ()
     f.write("request.json", JSON.stringify(request)); expect(invoke(f.root, "start", ["--request", join(f.root, "request.json")]).exit).toBe(1);
     expect(existsSync(join(f.root, ".git/vh-adlc"))).toBe(false);
   }
-});
+}, 30_000);
 
 test("a pending-outcome intent retains its exact data before artifact publication", () => {
   const f = fixture(); projects.push(f); const c = loadSettings(f.root), run = createRun(c), step = randomUUID();
@@ -125,7 +125,7 @@ test("a pending-outcome intent retains its exact data before artifact publicatio
   const pending = pendingOutcomes(c, run.header.run_id); expect(pending).toHaveLength(1); expect(pending[0].outcome.ordered_append_text).toBe(outcome.append);
   const result = capturePendingOutcome(c, run.header.run_id, outcome); expect(result.prior_report_digest).toBe("a".repeat(64));
   expect(readFileSync(path, "utf8")).toBe(canonicalJSON(value) + "\n"); expect(pendingOutcomes(c, run.header.run_id)).toHaveLength(1);
-});
+}, 30_000);
 
 test("interrupted outcome capture keeps intent order even when a later outcome finishes first", () => {
   const f = fixture(); projects.push(f); const c = loadSettings(f.root), run = createRun(c), step = randomUUID();
@@ -136,13 +136,13 @@ test("interrupted outcome capture keeps intent order even when a later outcome f
   expect(pendingOutcomes(c, run.header.run_id).map(row => row.outcome.ordered_append_text)).toEqual(["Earlier intent", "Later outcome"]);
   capturePendingOutcome(c, run.header.run_id, { step_id: step, at: payload.at, append: payload.ordered_append_text });
   expect(pendingOutcomes(c, run.header.run_id).map(row => row.outcome.ordered_append_text)).toEqual(["Earlier intent", "Later outcome"]);
-});
+}, 30_000);
 
 test("malformed assessment evidence produces a failing grade instead of crashing the runner", () => {
   const corpus = syntheticCorpus(); projects.push(corpus.project); const good = passingAssessment(corpus.cases);
   const malformed = structuredClone(good); malformed.items[0].evidence = [null as never];
   expect(gradeAssessment(malformed, corpus.cases, corpus.evidence).pass).toBe(false);
-});
+}, 30_000);
 
 test("packet export rejects omitted scoped repositories and contradictory alert coverage before writing", () => {
   const corpus = syntheticCorpus(); projects.push(corpus.project); const collected = invoke(corpus.project.root, "collect", [], corpus.env); expect(collected.exit).toBe(0);
@@ -154,7 +154,7 @@ test("packet export rejects omitted scoped repositories and contradictory alert 
     expect(() => exportAnalysisInput(corpus.config, { ...corpus.packet, inventory: value, collection_receipt: receipt })).toThrow();
     expect(existsSync(corpus.packet.output)).toBe(false);
   }
-});
+}, 30_000);
 
 test("packet and installed-component digests use the same locale-independent file order", async () => {
   const corpus = syntheticCorpus(); projects.push(corpus.project);
@@ -167,7 +167,7 @@ test("packet and installed-component digests use the same locale-independent fil
   const packet = exportAnalysisInput(corpus.config, { ...corpus.packet, component: { root: component, commit: git(corpus.project.root, "rev-parse", "HEAD") }, inventory: JSON.parse(collected.out), collection_receipt: { argv: [process.execPath, cli, "collect"], exit_code: 0, requests_digest: corpus.requestsDigest() } });
   const { inspectComponent } = await import("./install-trial");
   expect(packet.manifest.plugin_digest).toBe(inspectComponent(component).digest);
-});
+}, 30_000);
 
 test("every coverage case binds its own collected JSON object and rejects a sibling surface", () => {
   const corpus = syntheticCorpus(); projects.push(corpus.project);
@@ -179,4 +179,4 @@ test("every coverage case binds its own collected JSON object and rejects a sibl
   expect(gradeAssessment(assessment, [row], { ...corpus.evidence, "inventory.json": text }).pass).toBe(true);
   assessment.items[0].evidence[1].line = sibling.line;
   expect(gradeAssessment(assessment, [row], { ...corpus.evidence, "inventory.json": text }).pass).toBe(false);
-});
+}, 30_000);
