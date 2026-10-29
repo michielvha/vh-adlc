@@ -84,8 +84,10 @@ export function reserveReport(config: Settings, id: string, defaultCommit: strin
   return path;
 }
 
-export function renderReport(config: Settings, run: Run, inventory: Inventory, options: { metadata?: Record<string, string | string[]>; analysis?: string } = {}): string {
+export function portableObservations(run: Run, inventory: Inventory): ObservationDocument {
   if (inventory.repository !== run.header.repository || inventory.hostname !== run.header.hostname || canonicalJSON(inventory.scope) !== canonicalJSON(run.header.scope)) fail("collection scope differs from run");
+  if (!Array.isArray(inventory.repositories) || canonicalJSON(inventory.repositories.map(row => row.repository).sort()) !== canonicalJSON([...inventory.scope.repositories].sort())) fail("missing or duplicate scoped repository inventory");
+  if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(inventory.source_commit)) fail("invalid collection source commit");
   const observations: ObservationDocument = validateObservation({ schema_version: 1, run_id: run.header.run_id, created_at: run.header.created_at,
     observations: inventory.repositories.flatMap(repo => (["dependabot", "code_scanning"] as const).map(surface => {
       const input = repo[surface];
@@ -93,6 +95,11 @@ export function renderReport(config: Settings, run: Run, inventory: Inventory, o
         source_reference: `commit:${inventory.source_commit}`, status: input.coverage.status, reason: input.coverage.reason ?? (input.coverage.status === "incomplete" ? "Incomplete collection" : null),
         count: input.coverage.count, alerts: input.alerts?.map(alert => ({ number: alert.number, identity: `${surface}:${alert.number}`, package: alert.package, manifest: alert.manifest, severity: alert.severity })) ?? null };
     })) });
+  return observations;
+}
+
+export function renderReport(config: Settings, run: Run, inventory: Inventory, options: { metadata?: Record<string, string | string[]>; analysis?: string } = {}): string {
+  const observations = portableObservations(run, inventory);
   const metadata: Record<string, unknown> = { status: "in-progress", status_description: "Analysis saved; selection and outcomes pending.", run_id: run.header.run_id,
     repository: config.repository, hostname: config.hostname, scope: run.header.scope, source_commit: inventory.source_commit, created_at: run.header.created_at };
   for (const [key, value] of Object.entries(options.metadata ?? {})) {

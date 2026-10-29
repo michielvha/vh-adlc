@@ -110,11 +110,16 @@ export function resolveStanding(config: Settings, observed: { default_branch: st
   } catch { return { ...result, status: "invalid", reason: "invalid or ambiguous committed publication declaration", grant: null }; }
 }
 
-export function reportPermission(config: Settings, standing: Standing, rawRequest: ReportRequest | Record<string, unknown>, scope: { run_id: string; report_path: string; later_update?: boolean }): ReportPermission {
-  runID(scope.run_id); repositoryPath(scope.report_path);
+export function parseReportRequest(rawRequest: unknown): ReportRequest {
   const request = object(JSON.parse(canonicalJSON(rawRequest))) as unknown as ReportRequest;
   if (Object.keys(request).some(key => !["authorized_sweep", "read_only", "draft_only", "no_commit", "no_push", "no_filesystem", "commit_report", "publication"].includes(key)) || typeof request.authorized_sweep !== "boolean") fail("invalid current request");
   for (const [key, value] of Object.entries(request)) if (key !== "publication" && typeof value !== "boolean") fail("request flags must be boolean");
+  if (Object.hasOwn(request, "publication")) object(request.publication);
+  return request;
+}
+export function reportPermission(config: Settings, standing: Standing, rawRequest: ReportRequest | Record<string, unknown>, scope: { run_id: string; report_path: string; later_update?: boolean }): ReportPermission {
+  runID(scope.run_id); repositoryPath(scope.report_path);
+  const request = parseReportRequest(rawRequest);
   const filename = posix.basename(scope.report_path), directory = posix.dirname(scope.report_path);
   if (directory !== config.report_dir || !new RegExp(`^\\d{4}-\\d{2}-\\d{2}-dependency-sweep(?:-${scope.run_id})?\\.md$`).test(filename)) fail("artifact outside run report scope");
   let adopted = request.authorized_sweep && standing.status === "adopted" && !!standing.grant && (!scope.later_update || standing.grant.same_run_updates === "commit-and-push");

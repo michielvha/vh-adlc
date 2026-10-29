@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -12,7 +12,7 @@ export function git(root: string, ...args: string[]): string {
 }
 
 export function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "vh-maintenance-"));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-maintenance-")));
   const write = (path: string, content: string) => {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), content);
@@ -34,7 +34,7 @@ export function fixture() {
       const registered = git(root, "worktree", "list", "--porcelain", "-z").split("\0");
       for (const item of registered) if (item.startsWith("worktree ")) {
         const path = item.slice(9);
-        if (path !== root && path.startsWith(join(tmpdir(), `.vh-adlc-maintenance-${root.split("/").at(-1)}-`))) rmSync(path, { recursive: true, force: true });
+        if (path !== root && path.startsWith(join(realpathSync(tmpdir()), `.vh-adlc-maintenance-${root.split("/").at(-1)}-`))) rmSync(path, { recursive: true, force: true });
       }
       rmSync(root, { recursive: true, force: true });
     },
