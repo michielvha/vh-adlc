@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Article and promotion-draft workflow reviewed independently with no findings at 94bc595; owner acceptance pending."
+status: planned
+status_description: "Accepted for implementation and merge on 2026-10-29 after clean review at 320b728; task planning next."
 issue: null
 goal: "Prepare repository-owned articles and social drafts that link to them, using verified project facts and the requested writer's actual style before owner review."
 covers:
@@ -131,7 +131,11 @@ No article run changes vh-adlc feature statuses, creates an issue, updates a mil
 
 ## Tasks
 
-None yet; written after independent spec review and owner acceptance.
+- [ ] T1 `tests/vh-adlc/blog.test.ts` - package and authority checks fail because the shared blog operation, editor and promotion route are absent (AC-01, AC-02, AC-04, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12)
+- [ ] T2 `plugins/vh-adlc/skills/vh-adlc-blog/SKILL.md`, `plugins/vh-adlc/references/blog.md`, `plugins/vh-adlc/agents/vh-adlc-blog-editor.agent.md`, both package manifests and `tests/vh-adlc/check.test.ts` - shared authoring/editor contracts and discovery checks pass without weakening existing operation gates (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11)
+- [ ] T3 `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md`, `docs/user-guides/workflows.md` and `docs/reference/compatibility.md` - explicit promotion routing and suggestion checks pass and usage describes actual host limits (AC-07, AC-10, AC-12)
+- [ ] T4 `tests/vh-adlc/blog/` and `tests/vh-adlc/evidence/blog/` - execute isolated native drafting, preservation, comparison, editor, cross-repository promotion and authority scenarios; retain honest outcomes and connector limitations, with package/ref hashes unchanged (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-08, AC-09, AC-10, AC-11, AC-12)
+- [ ] T5 `docs/specs/blog-authoring.md` - current independent implementation review records every criterion and completion gate passes only with observed proof or an owner-approved tracked residual (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-11, AC-12)
 
 ## Open Questions
 
@@ -145,6 +149,8 @@ None. The owner chose explicit invocation, suggested after shipping, over automa
 | 2026-10-27 | R-2 | spec | `556d39a1b493dee6045c3f4baf998567c68f3175` | unknown | procedural | No findings; model identity not attested. |
 | 2026-10-27 | R-3 | spec | `394f5ff3122ac778d69f335a95de71725168c31a` | unknown | procedural | No findings; greenfield and existing-article modes verified; model identity not attested. |
 | 2026-10-29 | R-4 | spec | `94bc595082a658bde7114a999da1db1162c4d3d2` | unknown | procedural | No findings; explicit promotion mode and post-ship suggestion reviewed; model identity not attested. |
+| 2026-10-29 | R-5 | spec | `320b72856e5d2b7bb809e700a0c985ca03d5cea8` | unknown | procedural | No findings on refreshed current-main checkout; model identity not attested. |
+| 2026-10-29 | R-5 | spec | `320b72856e5d2b7bb809e700a0c985ca03d5cea8` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -164,6 +170,10 @@ NO FINDINGS
 NO FINDINGS
 
 ### R-4
+
+NO FINDINGS
+
+### R-5
 
 NO FINDINGS
 
