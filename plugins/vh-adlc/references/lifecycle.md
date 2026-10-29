@@ -42,12 +42,13 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Backlog triage | Use `skills/vh-adlc-triage/SKILL.md` to verify scope, rank ready work and save a report; GitHub writes require exact triage approval; every published verdict and local assessment patch also needs current proof in the confined controller from [the boundary guide](triage-boundary.md). |
 | Diagnosis or findings | Use `skills/vh-adlc-investigate/SKILL.md` with the selected investigation intent. Reproduce the issue and respect report-only limits. |
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
+| Dependency or security sweep | Use `skills/vh-adlc-maintenance/SKILL.md` for inventory, evidence, durable reporting and selected follow-up; publish reports only through its exact current/adopted authority. |
 | Bounded maintenance | Follow the maintenance procedure below if the public contract is preserved and local instructions allow it. |
 | New capability or wider behavior change | Locate any existing feature and use the existing spec/tasks/implement/review procedures and binary gates. No unaccepted implementation. |
 | Bootstrap or onboarding | Read the applicable engineering guide; apply it within the selected task's authority. Creating application behavior still uses the feature procedure. |
 | Verification or review | Observe the requested checks. For feature review, dispatch the canonical independent feature reviewer at an exact commit. |
-| Resume | Reconstruct the artifact, Git history and owner handoff. Features use their existing resume operation; maintenance uses its record and review target; docs use the requested artifact and remaining authorized edit. |
-| Ship or a live operation | Require an explicit request and a supported procedure. Existing feature shipping uses its original preflight. Exact batch approval permits only the triage actions in `references/triage.md`, subject to its enforced proof requirement for every published verdict and local assessment patch; other non-feature publishing or live-operation gaps remain unsupported. |
+| Resume | Reconstruct the artifact, Git history and owner handoff. Features use their existing resume operation; maintenance resumes a sweep from its run report/journal or an authored repair from its record and single/paired review target; docs use the requested artifact and remaining authorized edit. |
+| Ship or a live operation | Require an explicit request and a supported procedure. Existing feature shipping uses its original preflight. Exact batch approval permits only the triage actions in `references/triage.md`, subject to its enforced proof requirement for every published verdict and local assessment patch; the maintenance operation supports only its scoped report-publication and explicitly selected consumer-delivery procedure; other non-feature publishing or live-operation gaps remain unsupported. |
 
 The paths in this table are relative to the plugin root. A generic request to
 diagnose and fix can finish diagnosis, then enter maintenance or feature work
@@ -132,3 +133,20 @@ changed definition and re-review stale work; do not repeat a completed repair
 or publish it merely because the owner said continue. Preserve earlier reviews
 as history. Maintenance completion is a framework check, not a feature-gate
 status, and must never be reported as `vh-adlc gate complete`.
+
+
+## Consumer dependency batches
+
+The shared maintenance operation keeps pure selected bot aggregation on the consumer's existing
+combined-PR/check/approval/release flow. Authored dependency, source, build/config and CI repairs use
+the bounded-maintenance checks and independent review above before publication. Mechanical manager
+normalization for unchanged selected bot inputs remains aggregation; intentional new constraints,
+manual edits and unexplained changes do not.
+
+A selected consumer procedure can keep an authored task's Definition/evidence outside the dependency
+squash on a dedicated local primary evidence ref. Use maintenance-record.md and maintenance-review.md
+with both source_target and record_target. The post-aggregation task base, relevant verification inputs,
+exact source/Definition comparison and renewed review after changes still apply. Record placement
+never grants publication or removes review. Ordinary repairs keep their existing one-target contract.
+The authority guide's five declared maintenance location roles permit only scoped ordinary creation
+and non-forced cleanup; unrelated worktrees and evidence remain preserved.

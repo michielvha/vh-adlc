@@ -1,7 +1,7 @@
 {
   "name": "vh-adlc",
   "version": "0.5.0",
-  "description": "Explicit lifecycle intake, evidence-based backlog triage, bounded maintenance and gated feature operations; shared framework procedures use pinned external engineering conventions.",
+  "description": "Explicit lifecycle intake, evidence-based backlog triage, dependency/security sweeps, bounded repairs and gated feature operations; shared framework procedures use pinned external engineering conventions.",
   "author": {
     "name": "Michiel VH"
   },

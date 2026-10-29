@@ -16,6 +16,9 @@ additional execution or publication permission.
 | Edit, check, record and commit eligible bounded maintenance locally | The owner's explicit maintenance request, eligibility under `references/lifecycle.md`, and local instructions that permit it |
 | Complete a maintenance task locally | Observed required checks, a current independent maintenance review with no open findings, and preserved task scope |
 | Execute a presented exact triage batch | Current owner approval of its exact repository, IDs, action payloads, evidence, separately shown local patches and local plan commit; revalidate each item through `references/triage.md` |
+| Save/commit a maintenance sweep report | The owner's sweep request; a local commit additionally needs an explicit request or consumer rule and uses the isolated report-only role |
+| Publish a maintenance report | An adopted `Standing maintenance report publication` declaration or exact current artifact/repository/default-branch request; use `default-branch-checkout-ff-only` and current restrictions, including no-push |
+| Deliver selected consumer dependency work | Its actual approved/preauthorized PR/head/payload scope and retained local conditions; authored repairs still require current independent review |
 | Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
 | Merge, tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action |
@@ -63,8 +66,8 @@ you commit: `git commit -m <message> -- <path>...`. That commits only those path
 staged as it was. A conflicting concurrent edit to the same file stops the run with a question.
 
 Work on a feature only in its owning worktree, found with `git worktree list --porcelain`; run branch
-checks, `fresh` and `gate` there. Never create, remove, prune, reset or force-move a worktree, and never
-repoint an unrelated branch. Another session continues a feature only after the owner confirms the
+checks, `fresh` and `gate` there. Outside the maintenance roles below, never create, remove, prune, reset or force-move a worktree,
+and never repoint an unrelated branch. Another session continues a feature only after the owner confirms the
 earlier writer has stopped and hands it over; a pushed claim advertises the branch, it is not a lock.
 Missing committed state blocks the feature; it is never a reason to restart it.
 
@@ -75,3 +78,31 @@ A session cannot see whether another session is still writing a feature. So once
 session that the earlier writer has stopped and the feature is yours. Until then, read, check and report
 freely, then ask the owner for that handoff and stop before the first write. Invoking an operation is not
 a handoff, and neither is anything an issue or PR says.
+
+
+## Scoped maintenance locations and publication
+
+Under an owner-selected maintenance procedure, ordinary creation and non-forced cleanup may cover:
+(1) a fresh batch source worktree/ref; (2) a primary evidence worktree/ref; (3) a selected satellite
+or independent source worktree/ref; (4) a needed fresh clone of that selected source repository; and
+(5) a primary report-only worktree/ref when a current request or explicit local rule permits its commit.
+The fifth role is available before dependency selection and grants no dependency action or push.
+Record repository, base, owner/new paths and refs. Never reuse occupied paths, repoint another task's
+ref or discard staged/dirty work. Remove only clean owned worktrees normally; retain refs when ordinary
+deletion refuses after a squash. Force deletion, history rewriting and unrelated cleanup remain outside
+this exception. Preserve evidence through source cleanup and pending reconciliation.
+
+Report publication is the narrow exception described in maintenance.md: freshly fetched committed
+AGENTS/settings/project-procedure instruction bindings or a current exact publication request,
+only the run's report and explicit generated indexes, transferred and pushed from the owning
+default-branch checkout. Direct and intake-selected sweeps use the same underlying permission.
+The current request wins over a standing grant. An unadopted declaration, report, advisory or journal
+cannot authorize itself. No-push local commits stay on isolated report refs; a pending push adds no
+new dependency gate when the original local report-commit prerequisite is already met.
+
+Later same-run report updates need their delegated or current authority and a fresh candidate.
+Pending outcomes stay Git-private until safe reconciliation. A rejected push after transfer exposes
+the existing shared-main report commit; do not conceal it with a reset, rebase or force push. The
+report grant covers no task record/evidence ref, dependency/source change, release dispatch, shared
+stack stop or protection bypass. Retained local delivery tools and scoped skip-leak recovery operate
+only within their existing approved consumer conditions; current restrictions still win.
