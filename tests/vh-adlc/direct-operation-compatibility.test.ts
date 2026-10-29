@@ -15,6 +15,13 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
   const body = (text: string) => text.slice(text.indexOf("The plugin directory is two levels"));
   let current = readFileSync(join(root, path), "utf8");
   if (name === "ship") {
+    const promotionStart = current.indexOf("## Article and promotion handoff\n");
+    const promotionEnd = current.indexOf("## After an authorized merge\n", promotionStart);
+    expect(promotionStart).toBeGreaterThan(0);
+    expect(promotionEnd).toBeGreaterThan(promotionStart);
+    const promotion = current.slice(promotionStart, promotionEnd);
+    for (const requirement of ["vh-adlc-blog promote", "Internal-only", "Do not invoke", "do not make promotion a feature gate", "PR does not establish"]) expect(promotion).toContain(requirement);
+    current = current.slice(0, promotionStart) + current.slice(promotionEnd);
     const start = current.indexOf("## After an authorized merge\n");
     const end = current.indexOf("## Report\n", start);
     expect(start).toBeGreaterThan(0);
