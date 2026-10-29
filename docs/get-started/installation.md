@@ -78,8 +78,9 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains nine skills: the generic `vh-adlc` entry and eight named operations.
-It also includes a reviewer definition. Its first operation
+The package contains ten skills: the generic `vh-adlc` entry, eight engineering
+operations and `vh-adlc-blog` for article and promotion drafts. It includes
+separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
 It verifies the archive and binary hashes before execution and writes downloads
