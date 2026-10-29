@@ -1395,6 +1395,8 @@ results here. The R-16 no-default-checkout fixture is part of T5/T12.
 
 - [ ] T17 report replay receipt verification, maintenance evidence instructions, paired consumer policy and this document - resolve R-22 within accepted Design: record and validate the helper's actual existing-or-new report path/digest, and use the accepted per-run evidence-ref name. Preserve old artifacts and compatibility with historical refs. Observe missing-report/digest and canonical-ref controls fail, then pass checks and refresh exact native-install proof before final Copilot review (AC-05, AC-07, AC-08, AC-09).
 
+      T17 progress: missing report-receipt verifier and canonical-ref controls first failed, then twelve focused tests/138 assertions passed. The consumer passed eleven tests/129 assertions after its canonical-ref red. The full bare shared suite passed 599 tests/2640 assertions (`r22-final-full-suite-20261029.log`), followed by all Go/module/lint, other-plugin and CI syntax checks. The replay verifies the actual helper-returned path and digest, records reuse honestly and rejects absent, changed or unrelated reports. Shared/consumer instructions and the synthetic delivery fixture now use the already accepted per-run evidence ref; runtime compatibility with historical suffixed refs is unchanged. Final committed native installation and replay remain pending.
+
 ## Open Questions
 
 None.

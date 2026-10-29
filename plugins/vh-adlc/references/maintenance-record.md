@@ -51,7 +51,7 @@ changes. This extension uses a paired binding, not a missing-record exemption. R
 - primary record repository/worktree/ref/path and `record_target`, the full committed Definition;
 - selected task/PR/head scope, actual checks against source_target, and any transplant comparison.
 
-Use a fresh `chore/maintenance-evidence-<run-id>-<task-id>` ref/worktree, separate from the batch source.
+Use a fresh `chore/maintenance-evidence-<run-id>` ref/worktree, separate from the batch source.
 The Task base is the post-aggregation point immediately before authored changes, so review does not
 attribute earlier selected bot patches to the repair. Verification inputs must include related
 manifests, locks and configuration affecting those checks. Later related regeneration can stale the

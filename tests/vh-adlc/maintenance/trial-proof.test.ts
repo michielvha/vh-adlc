@@ -1,8 +1,27 @@
 import { expect, test } from "bun:test";
-import { gradeNativeReport, gradeConsumerPlan } from "./report-trial";
+import { gradeNativeReport, gradeConsumerPlan, verifyRenderedReport } from "./report-trial";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { passingAssessment } from "./trial-proof";
 const row = { id: "pr:example/project#1", classification: "routine-batch-candidate", proposal: "propose-batch", evidence: [{ path: "source/app.ts", line: 1 }], source_owner: "primary", batch_eligible: true, measured_count: null, coverage: "not-applicable", claimed_resolved: [], related_ids: [] };
 const assessment = passingAssessment([row]);
+test("replay records the helper's actual saved report and rejects absent, unrelated or changed reports", () => {
+  const root = mkdtempSync(join(tmpdir(), "maintenance-render-receipt-")), previous = join(root, "previous.md"), requested = join(root, "new.md");
+  const text = "# Saved maintenance report\n", hash = createHash("sha256").update(text).digest("hex");
+  try {
+    writeFileSync(previous, text);
+    const returned = (path = previous, digest = hash) => JSON.stringify({ saved: true, path, digest });
+    expect(verifyRenderedReport(returned(), requested, previous)).toEqual({ path: previous, digest: hash, reused: true });
+    expect(() => verifyRenderedReport(returned(requested), requested, previous)).toThrow();
+    expect(() => verifyRenderedReport(returned(previous, "0".repeat(64)), requested, previous)).toThrow();
+    expect(() => verifyRenderedReport(returned(join(root, "other.md")), requested, previous)).toThrow();
+    writeFileSync(requested, text);
+    expect(verifyRenderedReport(returned(requested), requested, previous)).toEqual({ path: requested, digest: hash, reused: false });
+    writeFileSync(previous, text + "changed"); expect(() => verifyRenderedReport(returned(), requested, previous)).toThrow();
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 const evidence = { "source/app.ts": "affected caller\n" };
 test("native report proof rejects wrong models, missing reads, failed calls and altered inputs", () => {
   const proof = { host: "copilot-cli", requested_model: "claude-opus-5.5", models: ["claude-opus-5.5"], exit_code: 0, timed_out: false, reaped: true, input_preserved: true, source_preserved: true, native_tools_pass: true, required_reads: ["manifest.json"], successful_reads: ["manifest.json"] };

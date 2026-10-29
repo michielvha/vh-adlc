@@ -37,5 +37,7 @@ test("authored repair review binds both source and Definition while bot-only bat
   for (const term of ["Task base", "post-aggregation", "Verification inputs", "source_target", "record_target"]) expect(record).toContain(term);
   for (const term of ["single-target", "Definition", "verification inputs", "MODEL:", "NO FINDINGS", "handoff"]) expect(review).toContain(term);
   expect(review).toMatch(/paired/i);
+  expect(record).toContain("`chore/maintenance-evidence-<run-id>`");
+  expect(record).not.toContain("maintenance-evidence-<run-id>-<task-id>");
   expect(read("references/maintenance.md")).toContain("Pure bot aggregation");
 });

@@ -1,6 +1,6 @@
 import { coverageEvidence } from "./json-evidence";
 // Explicit native-model acceptance runner. Expected answers never enter the model packet.
-import { existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { stackweaverPolicyCorpus } from "./policy-corpus";
@@ -24,6 +24,11 @@ export function gradeNativeReport(assessment: unknown, cases: ExpectedCase[], ev
   if (!Array.isArray(proof.successful_reads) || proof.required_reads.some((path: string) => !proof.successful_reads.includes(path))) failures.push("required-input-not-read");
   if (proof.host === "copilot-cli" && (proof.requested_model !== "claude-opus-5.5" || JSON.stringify(proof.models) !== '["claude-opus-5.5"]')) failures.push("requested-model-not-observed");
   return { pass: !failures.length, failures };
+}
+export function verifyRenderedReport(stdout: string, requested: string, previous: string) {
+  const saved = JSON.parse(stdout);
+  if (saved?.saved !== true || typeof saved.path !== "string" || ![resolve(requested), resolve(previous)].includes(saved.path) || typeof saved.digest !== "string" || !/^[a-f0-9]{64}$/.test(saved.digest) || !lstatSync(saved.path).isFile() || digest(readFileSync(saved.path)) !== saved.digest) throw Error("saved report path/digest is absent or differs");
+  return { path: saved.path as string, digest: saved.digest as string, reused: saved.path !== resolve(requested) };
 }
 function qualifiesProductionCompatibility(value: unknown) {
   if (typeof value !== "string") return false;
@@ -252,16 +257,20 @@ export async function regradeDeclaredExpectationEvidence(output: string, install
     if (canonicalJSON(JSON.parse(readFileSync(join(output, "consumer-plan.json"), "utf8"))) !== canonicalJSON(actual.consumer_plan)) throw Error("retained consumer plan differs from actual native return");
     grade.failures.push(...gradeConsumerPlan(actual.consumer_plan, settings.repository).failures); grade.pass = !grade.failures.length;
   }
-  let report: string | null = null;
+  let report: string | null = null, reportDigest: string | null = null, reportReused: boolean | null = null;
   if (grade.pass) {
     const receipt = JSON.parse(evidence["collection-receipt.json"]), root = receipt.argv[receipt.argv.indexOf("--repo") + 1], cli = join(installed, "scripts/maintenance/cli.ts");
     const before = sourceSnapshot(root), indexPath = resolve(root, git(root, "rev-parse", "--git-path", "index")), index = digest(readFileSync(indexPath));
     git(root, "update-ref", "refs/remotes/origin/main", verified.manifest.source_commit); json(join(replayOutput, "regraded-request.json"), { authorized_sweep: true, read_only: true });
     report = join(replayOutput, "maintenance-report.md");
     const argv = [process.execPath, cli, "report", "--repo", root, "--run-id", verified.manifest.run_id, "--inventory", join(input, "inventory.json"), "--default-commit", verified.manifest.source_commit, "--request", join(replayOutput, "regraded-request.json"), "--analysis", join(output, "assessment.json"), "--report-output", report];
-    const rendered = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" }); json(join(replayOutput, "regraded-report-receipt.json"), { argv, exit_code: rendered.exitCode, result: rendered.stdout.toString(), source_preserved: sourceSnapshot(root) === before, index_preserved: digest(readFileSync(indexPath)) === index });
-    if (rendered.exitCode || sourceSnapshot(root) !== before || digest(readFileSync(indexPath)) !== index) { grade.pass = false; grade.failures.push("regraded-report-or-preservation"); }
+    const rendered = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" });
+    let verifiedReport: ReturnType<typeof verifyRenderedReport> | null = null;
+    try { if (rendered.exitCode) throw Error("report helper failed"); verifiedReport = verifyRenderedReport(rendered.stdout.toString(), report, join(output, "maintenance-report.md")); } catch { grade.pass = false; grade.failures.push("regraded-report-path-or-digest"); }
+    report = verifiedReport?.path ?? null; reportDigest = verifiedReport?.digest ?? null; reportReused = verifiedReport?.reused ?? null;
+    json(join(replayOutput, "regraded-report-receipt.json"), { argv, exit_code: rendered.exitCode, result: rendered.stdout.toString(), verified_report: verifiedReport, source_preserved: sourceSnapshot(root) === before, index_preserved: digest(readFileSync(indexPath)) === index });
+    if (sourceSnapshot(root) !== before || digest(readFileSync(indexPath)) !== index) { grade.pass = false; grade.failures.push("regraded-report-or-preservation"); }
   }
-  const result = { ...original, pass: grade.pass, grade, report, original_grade_retained: resolve(output, "result.json"), replay_implementation: { source_commit: git(resolve(import.meta.dir, "../../.."), "rev-parse", "HEAD"), source_sha256: digest(readFileSync(new URL(import.meta.url))), original_output: resolve(output) }, correction: "Bind coverage citations to their actual scoped JSON object and recognize the exact configured primary repository in builder ordering, and accept an explicit statement that samples establish no production compatibility, retaining wrong-owner/prefix/sibling and unsupported compatibility-claim denials and the existing declared-security alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
+  const result = { ...original, pass: grade.pass, grade, report, report_digest: reportDigest, report_reused: reportReused, original_grade_retained: resolve(output, "result.json"), replay_implementation: { source_commit: git(resolve(import.meta.dir, "../../.."), "rev-parse", "HEAD"), source_sha256: digest(readFileSync(new URL(import.meta.url))), original_output: resolve(output) }, correction: "Bind coverage citations to their actual scoped JSON object and recognize the exact configured primary repository in builder ordering, and accept an explicit statement that samples establish no production compatibility, retaining wrong-owner/prefix/sibling and unsupported compatibility-claim denials and the existing declared-security alternative. No classification, ownership, count, action, model, tool, input or preservation requirement changed." };
   json(join(replayOutput, "regraded-result.json"), result); return result;
 }
