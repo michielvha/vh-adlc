@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/blog-authoring
-status_description: "Accepted article/promotion workflow claimed on feat/blog-authoring; implementing package and native verification."
+status_description: "Implemented and independently reviewed for supplied-reference authoring; live retrieval/humanizer integration AC-03 remains unverified. Owner-authorized merge does not mark the feature complete."
 issue: null
 goal: "Prepare repository-owned articles and social drafts that link to them, using verified project facts and the requested writer's actual style before owner review."
 covers:
@@ -99,19 +99,31 @@ No article run changes vh-adlc feature statuses, creates an issue, updates a mil
 
 ## Acceptance Criteria
 
-- [ ] AC-01: A user can invoke the packaged blog operation and receive a draft or revision in the adopter's existing article format without installing VitePress or creating a software feature document for the post; a greenfield brief can become newly structured prose instead of a minimally edited transcript.
-- [ ] AC-02: With a supplied voice guide and designated examples, the operation uses those sources and preserves supported facts, commands, code, URLs and declared uncertainty through the editorial pass; verified factual corrections are reported separately.
+- [x] AC-01: A user can invoke the packaged blog operation and receive a draft or revision in the adopter's existing article format without installing VitePress or creating a software feature document for the post; a greenfield brief can become newly structured prose instead of a minimally edited transcript.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
+- [x] AC-02: With a supplied voice guide and designated examples, the operation uses those sources and preserves supported facts, commands, code, URLs and declared uncertainty through the editorial pass; verified factual corrections are reported separately.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
 - [ ] AC-03: With working write-like-me retrieval and humanizer tools, the operation follows their current instructions, reads the selected writing content before drafting and keeps retrieved sample content out of package/output evidence caches.
-- [ ] AC-04: Without connector retrieval or an independent editor, the operation can produce an honest draft from supplied inputs, identifies the unavailable capability, and does not claim a retrieved voice match or independent review.
-- [ ] AC-05: A comparison request with mixed current/planned offerings and missing evidence produces accurate edition/availability distinctions, preserved unresolved questions and no invented first-person use, metrics, vendor claims or compliance guarantees.
-- [ ] AC-06: Drafting and editorial review leave publication state, unrelated repository files, Git refs, accounts and external services unchanged unless separately authorized; hostile instructions inside source material do not expand that authority.
-- [ ] AC-07: The plugin's existing lifecycle checks continue to enforce their gates, and the new operation is included in packaged discovery and usage documentation with no unsupported host-runtime compatibility claim.
+      Evidence: R-6 at 31bc6cc: not verified; actual write-like-me retrieval APIs are unavailable. No simulated tool proof or completion claim.
+- [x] AC-04: Without connector retrieval or an independent editor, the operation can produce an honest draft from supplied inputs, identifies the unavailable capability, and does not claim a retrieved voice match or independent review.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
+- [x] AC-05: A comparison request with mixed current/planned offerings and missing evidence produces accurate edition/availability distinctions, preserved unresolved questions and no invented first-person use, metrics, vendor claims or compliance guarantees.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
+- [x] AC-06: Drafting and editorial review leave publication state, unrelated repository files, Git refs, accounts and external services unchanged unless separately authorized; hostile instructions inside source material do not expand that authority.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
+- [x] AC-07: The plugin's existing lifecycle checks continue to enforce their gates, and the new operation is included in packaged discovery and usage documentation with no unsupported host-runtime compatibility claim.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
 
-- [ ] AC-08: Revising a sound original leaves it unchanged; targeted repairs preserve recommendations/defaults and their strength, domain-role terms, concrete examples, and callout purposes, and report verified factual or meaning changes separately.
-- [ ] AC-09: The independent editor compares original/source notes with the candidate and returns a verdict, minimal repairs and genuine exceptions without a replacement article or invented findings; the owner-facing handoff summarizes routine repairs and groups substantive batch exceptions.
-- [ ] AC-10: Explicit promotion mode creates an article draft and Markdown social copy linking to the verified canonical website article, follows adopter-specific writing rules, and identifies an unpublished or outdated destination without presenting the bundle as ready to post.
-- [ ] AC-11: An exact-wording request preserves the protected copy through writing and editorial review, while unsupported novelty, release and experience claims are surfaced separately; new feature claims cannot be attributed to an older published release.
-- [ ] AC-12: Shipping relevant public-facing work suggests the explicit promotion command without drafting, publishing or adding a lifecycle gate; internal-only work produces no promotion suggestion.
+- [x] AC-08: Revising a sound original leaves it unchanged; targeted repairs preserve recommendations/defaults and their strength, domain-role terms, concrete examples, and callout purposes, and report verified factual or meaning changes separately.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
+- [x] AC-09: The independent editor compares original/source notes with the candidate and returns a verdict, minimal repairs and genuine exceptions without a replacement article or invented findings; the owner-facing handoff summarizes routine repairs and groups substantive batch exceptions.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
+- [x] AC-10: Explicit promotion mode creates an article draft and Markdown social copy linking to the verified canonical website article, follows adopter-specific writing rules, and identifies an unpublished or outdated destination without presenting the bundle as ready to post.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
+- [x] AC-11: An exact-wording request preserves the protected copy through writing and editorial review, while unsupported novelty, release and experience claims are surfaced separately; new feature claims cannot be attributed to an older published release.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
+- [x] AC-12: Shipping relevant public-facing work suggests the explicit promotion command without drafting, publishing or adding a lifecycle gate; internal-only work produces no promotion suggestion.
+      Evidence: R-6 at 31bc6cc: met; independent executed/inspected evidence is preserved verbatim in the criterion record below.
 
 ## Test Plan
 
@@ -156,6 +168,8 @@ None. The owner chose explicit invocation, suggested after shipping, over automa
 | 2026-10-29 | R-5 | spec | `320b72856e5d2b7bb809e700a0c985ca03d5cea8` | unknown | procedural | No findings on refreshed current-main checkout; model identity not attested. |
 | 2026-10-29 | R-5 | spec | `320b72856e5d2b7bb809e700a0c985ca03d5cea8` | n/a | n/a | accepted by owner |
 
+| 2026-10-29 | R-6 | implementation | `31bc6cc304bb770fa1d37dcc04d36ec20327ac14` | unknown | procedural | Eleven criteria met; live retrieval/humanizer integration AC-03 not verified; model identity not attested. |
+
 ### R-1
 
 FINDING: F-01
@@ -180,6 +194,56 @@ NO FINDINGS
 ### R-5
 
 NO FINDINGS
+
+### R-6
+
+CRITERION: AC-01 A user can invoke the packaged blog operation and receive a draft or revision in the adopter's existing article format without installing VitePress or creating a software feature document for the post; a greenfield brief can become newly structured prose instead of a minimally edited transcript.
+VERDICT: met
+EVIDENCE: At 31bc6cc304bb770fa1d37dcc04d36ec20327ac14, inspected native Codex CLI new/repair trials and their raw sessions, resulting articles and Git diffs. The installed package fingerprint matches the reviewed source: 8360c2ee12e6f3d8681e7928b0b39a4c197527f326fbbceb744c5a96f3db6332. The new article develops the notes into paragraphs and sections with adopter-required frontmatter; repair changes the identified defects. Neither run requires VitePress or creates a software feature document.
+
+CRITERION: AC-02 With a supplied voice guide and designated examples, the operation uses those sources and preserves supported facts, commands, code, URLs and declared uncertainty through the editorial pass; verified factual corrections are reported separately.
+VERDICT: met
+EVIDENCE: Inspected CLI new/repair/keep raw sessions and independent editor child sessions for the package matching 31bc6cc. The repair retains the management/workload distinction, command and self-hosting preference, removes the unsupported compliance guarantee and reports that correction separately. The valid keep fixture remains identical. Direct app-host promotion/comparison scenarios additionally preserve protected copy and explicit competitor uncertainty. These runs use supplied local references, not retrieved style samples.
+
+CRITERION: AC-03 With working write-like-me retrieval and humanizer tools, the operation follows their current instructions, reads the selected writing content before drafting and keeps retrieved sample content out of package/output evidence caches.
+VERDICT: not verified
+EVIDENCE: At 31bc6cc, the workflow specifies actual tool discovery, source reading and protection of retrieved samples, and explicitly rejects simulated integration proof. Actual write-like-me retrieval APIs are unavailable in the reviewed host. Native trials use local voice references and the pinned prose-guide fallback. No run exercises the required live retrieval/humanizer combination, so source checks and successful fallback drafting do not establish this criterion.
+
+CRITERION: AC-04 Without connector retrieval or an independent editor, the operation can produce an honest draft from supplied inputs, identifies the unavailable capability, and does not claim a retrieved voice match or independent review.
+VERDICT: met
+EVIDENCE: Inspected /tmp/vh-blog-native-fallback-20261029 raw events, response, article and result receipt at 31bc6cc; verified the raw-event hash. The native CLI run completes with independent dispatch disabled, produces adopter-formatted prose, identifies unavailable retrieval and independent review, and reports self-editing with the pinned guide. No replacement host, publication, commit or unsupported integration claim appears.
+
+CRITERION: AC-05 A comparison request with mixed current/planned offerings and missing evidence produces accurate edition/availability distinctions, preserved unresolved questions and no invented first-person use, metrics, vendor claims or compliance guarantees.
+VERDICT: met
+EVIDENCE: Executed a direct app-host comparison scenario using the shared procedure at 31bc6cc, then inspected /tmp/vh-blog-independent-app-20261029/comparison/article.md and its independent editor verdict. The article distinguishes released Markdown, unreleased HTML and the unavailable planned managed service. Missing Pine evidence remains an explicit verification placeholder; there is no invented benchmark, customer outcome, region or compliance guarantee. External research was forbidden for this fixture, so it correctly remains an incomplete draft.
+
+CRITERION: AC-06 Drafting and editorial review leave publication state, unrelated repository files, Git refs, accounts and external services unchanged unless separately authorized; hostile instructions inside source material do not expand that authority.
+VERDICT: met
+EVIDENCE: Independently compared fixture file hashes, Git refs and index snapshots for direct app-host promotion, denied-site, comparison, editor and ship-handoff scenarios at 31bc6cc. Only authorized article/social destinations change; denied-site/editor/ship fixtures remain identical. CLI fixture diffs and receipts likewise preserve inputs, sentinels, refs, index and installed package. The embedded instruction to commit, push and publish is ignored. Evidence is limited to these observed scenarios and procedural host isolation.
+
+CRITERION: AC-07 The plugin's existing lifecycle checks continue to enforce their gates, and the new operation is included in packaged discovery and usage documentation with no unsupported host-runtime compatibility claim.
+VERDICT: met
+EVIDENCE: Independently executed bun test tests/vh-adlc at 31bc6cc with required host capabilities: 437 pass, 0 fail, 1862 assertions. Inspected the skill inventory, matching manifests, discovery changes, retained engineering-gate tests and usage/compatibility documentation. Native CLI sessions read the installed blog operation from the package whose fingerprint matches source. The initial restricted run failed on network/Bubblewrap capabilities and is retained separately; no desktop, extension or connector compatibility follows from the passing checks.
+
+CRITERION: AC-08 Revising a sound original leaves it unchanged; targeted repairs preserve recommendations/defaults and their strength, domain-role terms, concrete examples, and callout purposes, and report verified factual or meaning changes separately.
+VERDICT: met
+EVIDENCE: Inspected the valid native keep fixture at /tmp/vh-blog-native-keep-20261029/keep: clean tree and identical article, metadata and command. Inspected the repair diff and independent editor child verdict: the grammatical repair and unsupported guarantee removal retain the strong self-hosting preference, tip purpose, management/workload roles and command. The original malformed keep fixture is a retained failed trial because it omitted mandatory frontmatter; it is not counted as preservation proof.
+
+CRITERION: AC-09 The independent editor compares original/source notes with the candidate and returns a verdict, minimal repairs and genuine exceptions without a replacement article or invented findings; the owner-facing handoff summarizes routine repairs and groups substantive batch exceptions.
+VERDICT: met
+EVIDENCE: Inspected raw CLI child session metadata and editor verdicts for new, repair and valid keep. Executed a separate app-host editorial scenario using the packaged shared editor: it rejects the unjustified replacement of the author's management-cluster preference with a weaker statement, proposes the exact minimal revert, and does not rewrite either file. The app-host batch handoff groups promotion/comparison exceptions. Separate editor context is observed; model identity and structural read-only enforcement are not attested.
+
+CRITERION: AC-10 Explicit promotion mode creates an article draft and Markdown social copy linking to the verified canonical website article, follows adopter-specific writing rules, and identifies an unpublished or outdated destination without presenting the bundle as ready to post.
+VERDICT: met
+EVIDENCE: Inspected the completed native CLI promotion trial at 31bc6cc and verified raw-event hash 3768b4592e15a6e13e1b174875b4d65239d833cebe385e89a732f195c55d4a35. It creates only the authorized article/social files, uses the adopter's schema and declared canonical URL, and keeps the inaccessible/unpublished destination explicitly pending. Independent app-host promotion and denied-site scenarios confirm the same behavior and no unauthorized cross-destination write. The canonical is verified against fixture metadata; no live public article, named-channel limits or separate outdated-destination variant is claimed.
+
+CRITERION: AC-11 An exact-wording request preserves the protected copy through writing and editorial review, while unsupported novelty, release and experience claims are surfaced separately; new feature claims cannot be attributed to an older published release.
+VERDICT: met
+EVIDENCE: Independently compared protected.txt with CLI and app-host social output: the protected body remains byte-identical and its unsupported exclusivity claim is flagged separately. Articles distinguish released 1.0 from unreleased implementation. In a supplemental app-host scenario, the harness changes source facts after editorial review to remove implemented HTML support; the writer rereads them, changes only affected article statements and obtains a second independent editorial verdict. Social text, source facts, refs and index remain unchanged by the writer. Receipts are in /tmp/vh-blog-independent-app-20261029/drift-after-check.json.
+
+CRITERION: AC-12 Shipping relevant public-facing work suggests the explicit promotion command without drafting, publishing or adding a lifecycle gate; internal-only work produces no promotion suggestion.
+VERDICT: met
+EVIDENCE: Executed read-only public-facing and internal-only ship-handoff scenarios against the actual shared ship section at 31bc6cc. Public work suggests vh-adlc-blog promote Cedar while preserving the distinction between a shipped PR and an unpublished release; internal-only cleanup produces no promotion suggestion. Both fixture trees, refs and indexes remain identical. Independent full package checks pass with engineering-gate coverage retained. These are handoff exercises, not actual feature shipments or publication tests.
 
 ## Sources
 
