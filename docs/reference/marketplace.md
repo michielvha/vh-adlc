@@ -10,7 +10,7 @@ want separately.
 
 | Plugin | Purpose | Availability |
 | --- | --- | --- |
-| `vh-adlc` | Lifecycle intake, maintenance, and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
+| `vh-adlc` | Lifecycle intake, dependency/security maintenance, article/promotion drafts and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes, with Claude Remote Control phone notifications. | Codex and Claude catalogs; source lives in [auth-refresh](https://github.com/michielvha/auth-refresh). |
 | `github-app-registration` | Register a GitHub App through its manifest flow, save credentials locally with mode 0600, and export them to project files. | Claude catalog. The scripts require [Bun](https://bun.sh). |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. | Codex and Claude catalogs. Requires a signed-in Codex host with Remote Control running and `qrencode`. |
