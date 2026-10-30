@@ -39,9 +39,15 @@ After blog integration, final 0.6.0 local-catalog validation passed at committed
 `1d8bc8ae47dac829e6fe0612386c05ea54ab4936`: both native CLI hosts discovered all eleven
 skills, passed installed helpers with source/index preservation, and restored the same
 payload through uninstall/reinstall. The exact targets and digest are in the feature evidence.
-These are development checks. Consumer cutover still requires actual
-published-marketplace installs, installed-helper tests and a fresh paired review.
-The adoption preflight rejects local-catalog receipts as publication proof.
+Those earlier runs are development checks. On 2026-10-30, fresh installs and upgrades
+from the actual GitHub marketplace passed on both CLI hosts at published source
+`b5b94495f5bf3dd1d0678c8fabaf102506cfe3d1`, plugin 0.6.0/eleven skills, with exact
+payload bytes and modes. Native discovery, installed settings, GET-only collection,
+private reports and uninstall/reinstall passed with source/index preservation.
+A fresh paired Copilot Opus 5.5 review returned no findings, and the artifact-bound
+adoption preflight passed before Stackweaver PR #997 merged. Exact revisions, rollback
+and receipt limitations are in the feature evidence. The preflight continues to reject
+local-catalog receipts as publication proof.
 Native model report/delivery trials are tracked separately in that feature;
 an installer result does not establish agent behavior. The live Claude command
 trial and GUI maintenance checks remain deferred. Copilot report/reviewer tests

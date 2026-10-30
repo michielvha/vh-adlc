@@ -1,7 +1,7 @@
 ---
 status: complete
 branch: feat/shared-maintenance
-status_description: "Source complete after R-25: all nine criteria met, no findings. PR #37 awaits green Linux/macOS CI before merge, release verification, actual marketplace checks and consumer cutover. Live Claude/GUI remain deferred."
+status_description: "Published and adopted: shared PR #37, signed runtime v0.8.0, real marketplace plugin 0.6.0 and Stackweaver PR #997 verified. Final paired Opus review and adoption preflight pass. Live Claude, GUI and production dependency checks remain deferred."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -484,6 +484,56 @@ full preservation of unrelated current-main content. All twelve commands passed,
 599-test suite/2642 assertions, eleven consumer tests/129 assertions and committed-code replay.
 The local host budget/scratch limits remain documented; actual hosted Linux/macOS CI must pass
 on the updated PR head before merge. No failed hosted run is relabeled or bypassed.
+
+
+### Published maintenance and consumer adoption, 2026-10-30
+
+[Shared PR #37](https://github.com/michielvha/vh-adlc/pull/37) merged at
+`b5b94495f5bf3dd1d0678c8fabaf102506cfe3d1`; its full tree equals reviewed feature head
+`2c9fb6e4111d9571c22211286e360b3043d04064`. Updated-head CI 40990673798 and main CI
+40991144050 passed Linux, portable macOS, Go and version checks. Release run 40991504509
+published [runtime v0.8.0](https://github.com/michielvha/vh-adlc/releases/tag/v0.8.0).
+Its signature verifies against pinned VHCO Pro primary fingerprint
+`9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6`. All four platform archive checksums pass;
+the Linux amd64 binary executes as 0.8.0. Darwin archives were verified, not executed here.
+The plugin's separate locked bootstrap remains intentionally at 0.1.0.
+
+Fresh installs and upgrades through the actual GitHub marketplace passed on native Codex and
+Claude CLIs in isolated profiles. Upgrade profiles started at published plugin 0.5.0/ten skills.
+All four final profiles fetched shared source `b5b94495`, plugin 0.6.0/eleven skills, and exact
+byte/mode digest `bed9339394aee9d4f45e54962751eb2e9ca1c06c5011ad8f4e3d2d6ceaba0ea9`.
+Native discovery, installed settings, GET-only collection, private report generation, locked
+bootstrap and uninstall/reinstall passed with source/index preservation. These acceptance runs
+copied no credentials and invoked no models. The host's default Codex plugin also updated to 0.6.0;
+new sessions can discover the maintenance skill. Existing Claude configuration was untouched.
+
+The final published paired review used actual Copilot `claude-opus-5.5`, procedural isolation,
+shared `b5b94495` and consumer `d7c622bf0fdb7607742d25a2e68dc30bc7a9ea87`. It returned
+NO FINDINGS. Its fixed launcher independently verified the native artifacts, release signature,
+all archive hashes, installed bytes, source preservation and eleven consumer tests/129 assertions.
+The final adoption preflight passed against those actual review and marketplace artifacts before
+consumer merge. Codex discovery uses the separately executed zero-exit RPC probe; successful RPC
+completion is not represented as a natural exit of the long-running app-server.
+These artifact-backed receipts are operator attestations, not an enforced proof boundary.
+
+[Stackweaver PR #997](https://github.com/michielvha/stackweaver/pull/997) merged at
+`e87e0399d872d0dd71ca3f89f7866a2dab53f561`. Its tree exactly equals reviewed consumer
+`d7c622bf`; rollback baseline is `dbbe28556650a53a2c0b85cacb8398f0dbd21458`.
+The adapter retains local operating policy, the unchanged sanctioned helper, command/model/arguments
+and unrelated workflows. Normal commit verification and the focused consumer suite passed.
+Hosted Stackweaver CI was intentionally skipped for this internal tooling migration and is not
+claimed as a pass. No real dependency batch or service operation ran.
+
+The remote migration is complete. This host's main Stackweaver checkout cannot fast-forward:
+it holds two unrelated local planning commits plus uncommitted documents. That checkout was preserved;
+its local routes will update when its owner reconciles those commits with remote main. The isolated
+migration checkout and remote main already contain the adopted routes. Live Claude invocation, GUI
+checks, production dependency compatibility and the unchanged helper's crash safety retain their
+previous deferrals. None is established by native installation alone.
+
+Detailed local proofs remain under `.maintenance-review-archive/` outside the public tree:
+`marketplace-acceptance-20261030/`, `published-adoption-review-20261030/`,
+`published-adoption-20261030/` and `release-v0.8.0-20261030/`.
 
 ## Scope
 
