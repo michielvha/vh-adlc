@@ -1,7 +1,7 @@
 ---
 status: complete
 branch: feat/shared-maintenance
-status_description: "Source completed at R-24. PR #37 passed Linux/Go CI; shipment waits for the macOS test-path correction, renewed paired review and green CI before marketplace-verified adoption."
+status_description: "Source complete after R-25: all nine criteria met, no findings. PR #37 awaits green Linux/macOS CI before merge, release verification, actual marketplace checks and consumer cutover. Live Claude/GUI remain deferred."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -475,6 +475,15 @@ implementation review and gate re-check after this covered test correction. This
 procedure's verification-fix route, not a normative revision. Consumer reconciliation committed
 at `f9f907ed`, refreshing the rollback baseline with normal hooks. Fresh paired review will bind
 that current consumer commit before marketplace-gated cutover. The real macOS failure is retained.
+
+R-25 returned all nine criteria met with no findings at source
+`9d6719320c47dd2900538bc514f5bfd1f468eafd` and reconciled consumer
+`f9f907edca9abf5bb791df5813ecc89294d53879`. Its independent fixed launcher verified the
+canonical alias regression, unchanged runtime payload, consumer rollback-only selected delta and
+full preservation of unrelated current-main content. All twelve commands passed, including the
+599-test suite/2642 assertions, eleven consumer tests/129 assertions and committed-code replay.
+The local host budget/scratch limits remain documented; actual hosted Linux/macOS CI must pass
+on the updated PR head before merge. No failed hosted run is relabeled or bypassed.
 
 ## Scope
 
@@ -1507,6 +1516,7 @@ None.
 | 2026-10-29 | R-22 | implementation | `06b171348ece78c622b914838babfbe5cb442951` | claude-opus-5.5 | procedural | All nine criteria met. Two minor notes require recording the actual resumed report path/digest and aligning the evidence ref instruction with accepted Design. T17 applies those fixes. |
 | 2026-10-29 | R-23 | implementation | `2a9aa910e1757a27bc736047439a1a848cd5623e` | claude-opus-5.5 | procedural | All nine criteria met; one test-grader nit remains for positive compatibility claims without the word production. T18 adds those controls before a focused final review. |
 | 2026-10-29 | R-24 | implementation | `8853bcbc7b3263aef898ce1f9d51ed36fcdc15ce` | claude-opus-5.5 | procedural | All nine criteria met; all twelve current checks passed. Optional keyword-grader limitation recorded with actual independent native-transcript inspection; no blocking findings. |
+| 2026-10-30 | R-25 | implementation | `9d6719320c47dd2900538bc514f5bfd1f468eafd` | claude-opus-5.5 | procedural | All nine criteria met, no findings. Twelve checks passed; canonical alias identity and current-main consumer rollback were independently verified. Hosted CI still gates merge. |
 
 
 ### R-1
@@ -2852,6 +2862,86 @@ SEVERITY: nit
 WHERE: tests/vh-adlc/maintenance/report-trial.ts:40 (qualifiesProductionCompatibility remainder check)
 EVIDENCE: The remainder test `\bcompatib(?:ility|le)\b` misses the plural "compatibilities" and the adverb "compatibly". It also misses positive assertions phrased without a compatib word or "is/was/has been <verified>". For example, "Production compatibility is unverified; samples prove the bump works with every production caller" would pass. All three actual retained answers (post-R19, post-R20 and final) are correct denials, and the bounded keyword grader is backed by transcript inspection, so no verdict changes.
 PROPOSAL: Optionally widen the remainder pattern to `\bcompatib\w*` and add one paraphrased positive-claim negative control. Alternatively, record that this field's grader is keyword-bounded and that the native transcripts are inspected manually.
+
+### R-25
+
+CRITERION: AC-01 A project can discover and invoke shared dependency/security maintenance through the installed vh-adlc plugin without a harness-specific procedure or a Stackweaver checkout dependency.
+VERDICT: met
+EVIDENCE: I ran /home/m/code/.maintenance-review-archive/implementation-r25/input/check.sh once. It printed {"pass_": true, "commands": 12, "preserved": true}. execution/receipt.json shows all 12 commands exited 0 at source 9d6719320c47dd2900538bc514f5bfd1f468eafd and consumer f9f907edca9abf5bb791df5813ecc89294d53879. Head, index, empty status and refs were identical before and after. The receipt reports 446 source objects, 215 proofs and 34 required positive results verified. check.py asserts that the baseline and target trees for plugins/vh-adlc are the same object, and that baseline 8853bcbc to target changes only docs/specs/shared-maintenance.md and tests/vh-adlc/maintenance/delivery-cases.test.ts. The test delta hash f4c8e9c7 equals incremental.patch. Command 00 printed {"version":"0.6.0","digest":"bed9339394aee9d4f45e54962751eb2e9ca1c06c5011ad8f4e3d2d6ceaba0ea9","files":66,"exact":true}, so the committed plugin still equals the final native installed payload from candidate 1d8bc8ae. Command 01 passed 599 tests with 2642 assertions and 0 failures, including the discovery, no-config and controller-free import contracts. The production objects are unchanged, so I reused R-24's actual inspection of the post-r22 native install (Codex CLI and Claude Code CLI, eleven skills, helpers, reinstall). I confirmed that R-24 is bound to 8853bcbc and 9e1af57f through proofs/prior-r24/provenance.json and its receipt. Limitations: these are local-catalog development installs, not published-marketplace or GUI invocation. The installs were not rerun in this review.
+
+CRITERION: AC-02 A sweep respects explicit repository scope, includes configured dependency/sync bot PRs, unknown-bot inventory gaps, dashboard work and security alerts, and distinguishes documented unavailable surfaces from incomplete collection without declaring affected work ready.
+VERDICT: met
+EVIDENCE: Command 01 at 9d671932 passed all maintenance settings, collection and analysis tests (599/2642, 0 fail). The production plugin tree is unchanged from R-24, which verified the same surface distinctions. Command 11's fresh replay into execution/fresh-replay passed with failures []. The consumer settings path .vh-adlc/maintenance.json is not in the consumer's prior-to-target delta: check.py asserts that only tests/agent-maintenance/manifest.json changed among the private paths. Consumer command 09 passed the settings contract that retains the primary repository, sync roles, exclusions and bot visibility. Limitations: fake CLI and synthetic inventories only. No live GitHub collection and no claim that vulnerability data is complete.
+
+CRITERION: AC-03 Maintenance decisions use actual version/changelog, code-usage and source-ownership evidence, keep major migrations separate and leave ambiguous or mixed changes unresolved.
+VERDICT: met
+EVIDENCE: Command 01 passed analysis.test.ts and trial-proof.test.ts. trial-proof.test.ts:117 accepts the actual "They establish no production call-site compatibility" qualification. Line 119 rejects six positive or mixed claims, including "actual call-site compatibility is confirmed" and "compatible with the new API". I inspected proofs/post-r20-report-stack-policy:
+- consumer-plan.json: production_compatibility says the synthetic samples "establish no production call-site compatibility, check result or readiness".
+- result.json: the original grade is retained as pass false, with failures ["consumer-policy-parity"].
+- native.jsonl: 64 tool starts and 64 completions. Every start path is under the packet input and none contains "..". There are no bash, edit or create tools. Exactly one result has success false. Every model field is claude-opus-5.5. The plan text appears verbatim. Line 2167 shows exitCode 0 and no code changes.
+
+Command 11 regraded that unchanged answer with the committed grader (source_commit 9d671932, sha dd0d5619) and got pass true. This is a replay of the retained answer, not a new model answer. Limitations: synthetic corpus and samples only. Production call-site compatibility remains unverified. The compatibility grader is keyword-bounded (documented) and is backed by this manual transcript inspection.
+
+CRITERION: AC-04 Each sweep permitted to write local artifacts preserves a durable, uniquely named report covering every discovered PR, security reconciliation and unresolved work without overwriting history or claiming completion from missing data; a sweep forbidden from all filesystem writes returns chat-only findings without claiming a saved report.
+VERDICT: met
+EVIDENCE: Command 01 passed the journal, report, publication and no-filesystem-write tests. The production code and retained publication proofs are unchanged and hash-verified by the launcher, so R-24's inspection is reused. I rechecked R-22 in execution/fresh-replay/regraded-result.json:745-747. The report path is the actual existing same-run file runtime-20261029/post-r20-report-stack-policy/maintenance-report.md, not the requested fresh-replay output. Its digest is fd3b4a44 and report_reused is true. The launcher asserted sha(report) == report_digest and that the five retained artifacts were byte-identical before and after the replay. Limitations: synthetic local-bare transports only. No real GitHub publication.
+
+CRITERION: AC-05 Newly authored compatible repairs use bounded-maintenance checks and independent review, selected bot-batch delivery preserves the declared consumer procedure, wider changes use the feature loop, and remote or live actions stay within owner and consumer permissions after revalidation.
+VERDICT: met
+EVIDENCE: Command 01 passed the maintenance variants, delivery, paired-review, paired-check, bot-only, builder-order and stalled-sync suites.
+
+The only code delta is in delivery-cases.test.ts. It creates a deliberately symlinked root (temporary/alias pointing to temporary/actual) and compares the recorded executable path and normalizer full_argv against realpathSync(transport.bin/bun) instead of the alias spelling. The recorder (delivery-cases.ts:44) records import.meta.path plus the sha256 of the executable and runtime. The assertion is still exact equality on one canonical file, with head, exit code and sha checks unchanged, so provenance is not relaxed.
+
+I inspected the retained logs:
+- The real PR #37 macOS CI failure expected /var/folders/... and received /private/var/... (shared-pr37-ci-failure:437-438; 442 pass, 1 fail).
+- The local red (macos-alias-red) reproduced the same mismatch, expected .../alias/bin/bun and received .../actual/bin/bun (3 pass, 1 fail).
+- The green log shows 4 pass with 33 assertions.
+- This run's 01.stderr:702 shows that test passing.
+
+The canonical per-run evidence ref `chore/maintenance-evidence-<run-id>` matches spec:811, maintenance-record.md:54 and consumer maintenance-project.md:142. Authored-repair proofs are reused from R-24 with their original payload bindings (satellite 86ee21). Limitations: synthetic transports only. No live dependency, merge or helper action. The helper's crash safety is not certified. macOS CI at the new head was not observed in this review.
+
+CRITERION: AC-06 Resuming a task preserves unrelated work and prior evidence, invalidates stale reviews/approvals and reconciles interrupted actions before retrying them.
+VERDICT: met
+EVIDENCE: Command 01 passed the maintenance-resume, journal, report reconciliation, publication interrupted-commit and stale-input tests. The relevant production code and retained interrupted-action proofs are unchanged and hash-verified, so R-24's inspection is reused. The launcher showed both real worktrees preserved: head, index, status and refs were identical before and after. Limitations: procedural recovery against synthetic transports only. No exactly-once remote guarantee.
+
+CRITERION: AC-07 Stackweaver routes maintenance to the installed shared operation while retaining its command/model/arguments, repository facts, batching and release checks, approved satellite-helper behavior and scoped skip-leak recovery locally; an authorized sweep publishes its initial and later same-run report artifacts through the retained main-checkout route, while other consumers publish reports only under an explicit request or adopted declaration.
+VERDICT: met
+EVIDENCE: check.py verified the following for the consumer:
+- Among the 29 private paths, only tests/agent-maintenance/manifest.json changed from 9e1af57f to f9f907ed. The delta hash equals consumer-incremental.patch, which changes only rollback_base (72186d3c to dbbe2855) and reflows runtime_paths without changing their content.
+- origin/main is dbbe2855 and is an ancestor of f9f907ed.
+- The net diff from main is exactly the seventeen maintenance migration paths.
+
+consumer-main-reconciliation-20261030.json records unrelated_main_policy_changes []. The adapter runtime files are unchanged from R-24, so R-24's actual row-by-row parity record is reused. Command 09 ran against installed bed933 and passed 11 tests with 129 assertions and no failures. These cover model/arguments routing, settings, every parity category plus the report grant, and an unchanged helper, other agents and constitution. Command 10 (changelog check) passed. Generic explicit-request and declaration-only publication pass in command 01. Limitations: the adapter is unadopted, and main-checkout publication is proven only on synthetic transports. Live Claude /maintenance remains owner-deferred.
+
+CRITERION: AC-08 The exact committed candidate passes native Codex and Claude CLI installation/discovery and installed-helper checks, the consumer can roll back and reapply without unrelated changes, and its adoption preflight blocks cutover until matching real marketplace verification is available.
+VERDICT: met
+EVIDENCE: Command 00 proved that the committed plugin equals the installed bed933 payload from 1d8bc8ae. The native install and discovery evidence is reused from R-24 because the plugin objects are unchanged. Command 09 at f9f907ed passed:
+- the rehearsal that restores and reapplies only the runtime paths to the new rollback_base dbbe2855 while preserving unrelated bytes
+- the 0.6.0 minimum with its 0.5.99 regression (installed.ts:10, installed.test.ts:24)
+- two distinct preflight cases: the clean snapshot is denied with "expected published target absent or invalid", and the dirty snapshot is refused with "consumer migration scope is not a clean committed snapshot"
+
+Command 01 passed the shared preflight denials and rollback tests. Limitations: no real published-marketplace install exists yet. Under accepted Design, this blocks consumer cutover and is not a source-gate prerequisite.
+
+CRITERION: AC-09 Actual bounded Codex and Copilot report-stage trials follow the shared analysis procedure and retained consumer policy, and required regression and trial checks pass without implying untested delivery or GUI support or changing deferred workflows.
+VERDICT: met
+EVIDENCE: All 12 launcher commands exited 0:
+- bun test tests/vh-adlc --timeout 60000: 599 pass, 2642 assertions
+- go test (all ok), go vet, go mod tidy -diff
+- golangci-lint config verify and run ("0 issues.")
+- the other plugin: 34 pass
+- actionlint
+- consumer: 11 tests and the changelog check
+- the committed-source replay
+
+The fresh replay used the original 23fced install. It recorded replay_implementation source_commit 9d671932 and source_sha256 dd0d5619, and preserved the original artifacts. Consumer binding 9111242d and report_reused true are recorded honestly, with no new model answer claimed.
+
+I rechecked the earlier findings:
+- R-20: compatibility.md:38-48 is corrected and keeps marketplace cutover pending and live-Claude/GUI deferred. The 0.6.0 gate and its 0.5.99 regression are present. The clean and dirty preflight cases are separate.
+- R-21: the committed-code replay provenance, claim-level negatives and Review Log placement hold.
+- R-22: the path/digest and canonical ref are fixed.
+- R-24 F-01: the keyword-grader limit is documented in the spec at lines 429-432.
+
+CI files are not in the delta. Limitations: live Claude and GUI remain unverified. The local suite used the macOS sixty-second budget and routed scratch rather than Linux CI's bare command. Hosted macOS and Linux CI at 9d671932 were not observed here and still gate merge.
 ## Sources
 
 - [Pinned agent entry](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md): task routes and preservation of local instructions.
