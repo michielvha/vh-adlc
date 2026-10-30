@@ -10,7 +10,7 @@ want separately.
 
 | Plugin | Purpose | Availability |
 | --- | --- | --- |
-| `vh-adlc` | Lifecycle intake, maintenance, and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
+| `vh-adlc` | Lifecycle intake, dependency/security maintenance, article/promotion drafts and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes, with Claude Remote Control phone notifications. | Codex and Claude catalogs; source lives in [auth-refresh](https://github.com/michielvha/auth-refresh). |
 | `github-app-registration` | Register a GitHub App through its manifest flow, save credentials locally with mode 0600, and export them to project files. | Claude catalog. The scripts require [Bun](https://bun.sh). |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. | Codex and Claude catalogs. Requires a signed-in Codex host with Remote Control running and `qrencode`. |
@@ -18,6 +18,21 @@ want separately.
 The [Codex catalog](../../.agents/plugins/marketplace.json) and
 [Claude catalog](../../.claude-plugin/marketplace.json) define package sources.
 Both pin auth-refresh to the same component commit.
+
+## Shared maintenance
+
+The `vh-adlc-maintenance` operation is included in vh-adlc from plugin 0.6.0;
+it is not a separate marketplace plugin. Update the client installation and
+verify its version and operation discovery before replacing a local entry.
+Project-specific maintenance policy and scope remain in the consuming repository.
+See [maintenance workflow](../user-guides/workflows.md#dependency-and-security-maintenance).
+
+For a migration, validate an exact candidate in isolated profiles first, then
+repeat installation and installed-helper checks against the published marketplace.
+A local catalog or copied skill is insufficient for consumer cutover. The packaged
+adoption preflight checks the exact shared/consumer targets, version, payload,
+native-host receipts and paired review. It treats receipts as operator attestations;
+it neither publishes the feature nor authorizes a consumer merge.
 
 ## codex-qr-pairing
 

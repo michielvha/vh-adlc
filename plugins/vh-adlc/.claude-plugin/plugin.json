@@ -1,7 +1,7 @@
 {
   "name": "vh-adlc",
-  "version": "0.5.0",
-  "description": "Shared lifecycle and article/promotion drafting, with verified project facts, adopter-owned voice rules and independent review.",
+  "version": "0.6.0",
+  "description": "Shared lifecycle, dependency/security maintenance and article/promotion drafting, with project-specific rules and independent review.",
   "author": {
     "name": "Michiel VH"
   },

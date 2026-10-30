@@ -17,7 +17,7 @@ const SCHEDULE: Record<number, string[]> = {
   4: ["investigate", "spec", "resume"],
   5: ["tasks", "implement"],
   6: ["review"],
-  7: ["ship", "triage"],
+  7: ["ship", "triage", "maintenance"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
 const CONTENT_OPERATIONS = ["blog"];
@@ -223,6 +223,7 @@ describe("manifest and marketplace", () => {
 
 describe("skills", () => {
   test("every skill is the entry, a gated operation or a declared content operation", () => {
+
     const dirs = existsSync(join(PKG, "skills")) ? readdirSync(join(PKG, "skills")).sort() : [];
     expect(dirs).toContain("vh-adlc");
     for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);

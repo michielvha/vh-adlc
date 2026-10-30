@@ -29,6 +29,7 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 - Check review freshness and completion with deterministic commands.
 - Get independent spec and implementation reviews before completing a feature.
 - Handle documentation and small maintenance tasks without creating a feature spec.
+- Sweep dependency and security work through [shared maintenance](docs/user-guides/workflows.md#dependency-and-security-maintenance), keeping project rules local and selecting work from an evidence-based report.
 - Triage backlog issues against source and observed checks. [Every published triage verdict requires the managed verification controller](plugins/vh-adlc/references/triage-boundary.md) and exact approval; local reports work across harnesses.
 
 ## Get started
@@ -88,6 +89,8 @@ See the [marketplace guide](docs/reference/marketplace.md) for availability and 
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout and local checks.
+Run `bun test tests/vh-adlc` for the full plugin suite. Tests that create Git
+repositories or invoke compilers use bounded setup timeouts.
 Report bugs and suggest improvements in [GitHub Issues](https://github.com/michielvha/vh-adlc/issues).
 
 Maintained by [VH & Co](https://vhco.pro).

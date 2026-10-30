@@ -8,7 +8,7 @@ does not establish support for a newer workflow. Installation instructions are i
 
 ## Shared triage
 
-Shared triage is an unpublished local candidate on plugin 0.4.0. Both Codex CLI and
+Shared triage is available from plugin 0.4.0. Both Codex CLI and
 Claude Code CLI have observed read-only discovery and managed fake-tracker execution,
 including interruption recovery, uncertainty, concurrency and exact-payload denials.
 The [feature evidence](../specs/shared-triage.md) records the exact tested commits,
@@ -25,6 +25,27 @@ those compatibility checks to [issue #33](https://github.com/michielvha/vh-adlc/
 The runtime has no GUI dependency. Other GUI surfaces have no triage support claim.
 Copilot's migration runner is test-only and grants no managed execution support.
 The historical results below retain their original scope.
+
+## Dependency and security maintenance
+
+Maintenance requires plugin 0.6.0 or later. Isolated native installs of the exact
+earlier 0.5.0 development candidate passed on Codex CLI 0.163.0 and Claude Code CLI 2.1.309 on Linux:
+both discovered the operation and ran installed settings, fake-GET collection
+and private-report helpers with matching payload bytes/modes and preserved fixture
+source/index. Uninstall/reinstall results and exact source targets are recorded in
+the [maintenance feature evidence](../specs/shared-maintenance.md).
+
+After blog integration, final 0.6.0 local-catalog validation passed at committed source
+`1d8bc8ae47dac829e6fe0612386c05ea54ab4936`: both native CLI hosts discovered all eleven
+skills, passed installed helpers with source/index preservation, and restored the same
+payload through uninstall/reinstall. The exact targets and digest are in the feature evidence.
+These are development checks. Consumer cutover still requires actual
+published-marketplace installs, installed-helper tests and a fresh paired review.
+The adoption preflight rejects local-catalog receipts as publication proof.
+Native model report/delivery trials are tracked separately in that feature;
+an installer result does not establish agent behavior. The live Claude command
+trial and GUI maintenance checks remain deferred. Copilot report/reviewer tests
+do not establish general Copilot lifecycle or delivery support.
 
 ## Support matrix
 
