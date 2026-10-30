@@ -1,7 +1,7 @@
 ---
 status: complete
 branch: feat/shared-maintenance
-status_description: "R-19 fixes and final committed native installs passed. R-20 met all criteria; its minor notes and an observed trial-grader wording defect are fixed and tested. R-21 notes are fixed and verified, including a new committed-source replay. R-22 notes are fixed and verified. Local source complete: R-24 met all nine criteria and the complete gate passed. Publication, actual marketplace verification and Stackweaver cutover remain pending. Live Claude/GUI are deferred; the keyword-grader limit is documented with manual transcript review. Live Claude/GUI are deferred; publication and cutover are pending."
+status_description: "Local source complete after R-24 and the complete gate. Publication and marketplace-verified Stackweaver adoption are authorized and in progress; live Claude/GUI remain deferred."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -440,6 +440,30 @@ push, PR, merge, release, actual marketplace verification or consumer adoption i
 authorized delivery sequence is shared shipment/publication, actual marketplace verification, then
 current-main consumer reconciliation and separately authorized cutover. Live-Claude/GUI deferrals
 and the unchanged helper's uncertified crash safety remain visible.
+
+### Publication verification, 2026-10-30
+
+The owner continued the presented merge/release, actual marketplace verification and consumer
+adoption sequence. Both repositories were clean at entry. Shared main remains `b25807d3`, with
+R-18 and R-24 fresh; the approved production payload remains bed933. The actual public marketplace
+baseline was installed into fresh isolated native Codex and Claude profiles: both fetched `b25807d3`,
+plugin 0.5.0 and ten skills without maintenance. No credentials were copied or models invoked.
+
+Shipping checks observed host I/O pressure and scratch limits. Initial failures are retained:
+the first fresh scratch directory was missing; disk-backed runs exceeded fixture deadlines; one
+RAM-backed Go build hit the per-user scratch quota. Routing Go build scratch into the workspace made
+that fixture pass. The final unchanged 599-test suite passed all 2642 assertions with explicit exit 0
+(`shipping-host-budget-suite-20261030.json`), using the existing macOS CI sixty-second default budget
+locally, RAM-backed fixture scratch and workspace-backed Go build scratch. Functional assertions and
+operation-specific deadlines were unchanged. Separate Go tests/vet/tidy/lint, the other plugin's
+34 tests, actionlint and whitespace checks passed. Linux CI retains its exact original command and
+must pass on the published head before merge; failed local runs are not relabeled as passes.
+
+Consumer main `dbbe2855` integrates cleanly into the isolated adapter branch. Its relevant agent,
+command, settings, helper and hook policies have no drift from the prior rollback base. The new
+rollback base is `dbbe2855`; only the seventeen maintenance migration paths differ from current
+main. This local preparation grants no cutover until real marketplace receipts and the refreshed
+paired review pass. Issue #35 stays open through adoption.
 
 ## Scope
 
