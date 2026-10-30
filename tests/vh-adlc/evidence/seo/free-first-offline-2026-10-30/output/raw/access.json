@@ -1,0 +1,20 @@
+{
+  "google_search_console": "supplied CSV sample only, not a full property export",
+  "bing": "not connected",
+  "ahrefs": "free verified-site account unavailable in this environment",
+  "screaming_frog": "not installed",
+  "lighthouse": "not run",
+  "semrush": "expired, see saved response",
+  "country_priorities": [
+    "BE",
+    "DE",
+    "NL"
+  ],
+  "language": "English",
+  "allowed_hosts": [
+    "automation.example",
+    "preview.automation.example"
+  ],
+  "canonical": "https://automation.example",
+  "evidence_kind": "synthetic forward-test fixtures, not observed website state"
+}

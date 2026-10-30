@@ -12,8 +12,8 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has eleven skills: this entry,
-nine engineering operations and one article-writing operation. Check
+repository and selects a procedure. The package has twelve skills: this entry,
+nine engineering operations, article writing and website SEO assessment. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -124,6 +124,25 @@ unavailable. Prompt checks and package installation do not establish a native
 connector run; consult the [compatibility record](../reference/compatibility.md).
 
 The complete procedure is in the [article reference](../../plugins/vh-adlc/references/blog.md).
+
+## Website SEO assessment
+
+Use `vh-adlc-seo <website or brief>` to assess technical search readiness,
+measured visibility and content opportunities. It uses accessible free sources
+and saved evidence; Semrush can supplement them while authorized access works.
+Its absence or expiry does not block the assessment. Missing measurements are
+reported as unknown, with their source coverage, rather than invented zeros.
+
+Keep domains, countries, audience and evidence locations in the adopter's SEO
+adapter. The shared procedure reads that adapter and keeps account access,
+publication, DNS and indexing changes outside the assessment. It saves permitted
+exports and hash manifests so results remain usable after temporary API access
+ends. A free plan may still require ownership verification, and free does not
+necessarily include a vendor's API or export feature.
+
+See the [SEO procedure](../../plugins/vh-adlc/references/seo.md). Its instruction
+and scenario checks do not certify authenticated Google, Bing or Ahrefs access
+on every host; report the integrations actually exercised.
 
 ## Reviews
 

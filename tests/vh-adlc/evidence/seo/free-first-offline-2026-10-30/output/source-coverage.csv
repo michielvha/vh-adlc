@@ -1,0 +1,9 @@
+source,status,target,country,period,retrieved_at,coverage
+Public HTTP,partial,automation.example and preview.automation.example,all requested markets; no geo test,,2026-10-29T10:00:00Z,"4 supplied response records, including one HTML document; synthetic capture; no network requests"
+Google Search Console,partial,property not supplied; URLs on automation.example,BE;DE rows; NL missing,2026-10-01/2026-10-28,,"3-row synthetic CSV sample; completeness, search type, filters and verification unavailable"
+Semrush saved domain_ranks,historical_no_data,automation.example,,,2026-10-29T10:05:00Z,exact saved request returns no_data; database/date/row limit not supplied; does not establish zero traffic
+Semrush access,expired,automation.example,,,,supplied current_access says expired; credential not accessed or tested; no calls made
+Bing Webmaster Tools,unavailable,not connected,BE;DE;NL,,,no Bing observations
+Ahrefs Free,unavailable,verified-site account unavailable,BE;DE;NL,,,"no backlink, audit or keyword estimates"
+Screaming Frog,unavailable,not installed,,,,no crawler run; supplied capture parsed locally
+Lighthouse / PageSpeed / CrUX,unavailable,not run,,,,no lab/mobile/desktop scores or field Core Web Vitals; missing metrics are null

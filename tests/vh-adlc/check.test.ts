@@ -20,7 +20,7 @@ const SCHEDULE: Record<number, string[]> = {
   7: ["ship", "triage", "maintenance"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
-const CONTENT_OPERATIONS = ["blog"];
+const CONTENT_OPERATIONS = ["blog", "seo"];
 
 function selectedPhase(): number {
   const raw = process.env.VH_ADLC_PHASE;

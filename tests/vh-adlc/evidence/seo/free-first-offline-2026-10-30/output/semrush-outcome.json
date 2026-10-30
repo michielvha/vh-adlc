@@ -1,0 +1,18 @@
+{
+  "saved_request": {
+    "report": "domain_ranks",
+    "target": "automation.example"
+  },
+  "retrieved_at": "2026-10-29T10:05:00Z",
+  "outcome": "no_data_for_exact_saved_request",
+  "current_access": "expired_as_supplied_not_live_tested",
+  "country_database": null,
+  "requested_date": null,
+  "row_limit": null,
+  "reported_unit_usage": null,
+  "observed_account_debit": null,
+  "assessment_api_calls": 0,
+  "assessment_units_spent": 0,
+  "repeat_request_performed": false,
+  "interpretation": "Does not prove zero traffic, no indexing, or no data in other reports/country databases. Historical fixture only."
+}
