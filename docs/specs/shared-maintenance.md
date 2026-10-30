@@ -1,7 +1,7 @@
 ---
 status: complete
 branch: feat/shared-maintenance
-status_description: "Local source complete after R-24 and the complete gate. Publication and marketplace-verified Stackweaver adoption are authorized and in progress; live Claude/GUI remain deferred."
+status_description: "Source completed at R-24. PR #37 passed Linux/Go CI; shipment waits for the macOS test-path correction, renewed paired review and green CI before marketplace-verified adoption."
 issue: https://github.com/michielvha/vh-adlc/issues/35
 goal: "Run dependency and security maintenance through one harness-agnostic vh-adlc operation while consumers retain their topology, release rules and existing approved operating procedures."
 covers:
@@ -464,6 +464,17 @@ command, settings, helper and hook policies have no drift from the prior rollbac
 rollback base is `dbbe2855`; only the seventeen maintenance migration paths differ from current
 main. This local preparation grants no cutover until real marketplace receipts and the refreshed
 paired review pass. Issue #35 stays open through adoption.
+
+PR #37 published `8014d07b22580e3c5cb0360e7bfc8d48120914f3`. Actual CI run 40988787916
+passed the original Linux checker and Go verification; macOS passed 442 cases and failed the
+recorder-path assertion against a `/var/...` alias of `/private/var/...`. The new owned alias
+regression reproduced that exact mismatch locally. T19 corrects canonical identity expectations;
+no runtime plugin byte changes. The feature remains source-complete at its recorded R-24 gate: the
+state machine rejects complete-to-in-progress, and shipment instead requires a fresh all-met
+implementation review and gate re-check after this covered test correction. This is the ship
+procedure's verification-fix route, not a normative revision. Consumer reconciliation committed
+at `f9f907ed`, refreshing the rollback baseline with normal hooks. Fresh paired review will bind
+that current consumer commit before marketplace-gated cutover. The real macOS failure is retained.
 
 ## Scope
 
@@ -1458,6 +1469,8 @@ results here. The R-16 no-default-checkout fixture is part of T5/T12.
 - [x] T18 report-trial compatibility grader, negative controls and this document - address the final R-23 nit by rejecting remaining positive compatibility assertions even when they omit production. Observe the new controls fail, then pass all required checks and submit the committed delta to a focused actual Copilot Opus 5.5 review bound to the unchanged R-23 production/consumer objects and current grader (AC-09).
 
       T18 evidence: the new call-site/compatible-with controls first failed because an unqualified positive claim passed. After requiring every remaining compatibility noun/adjective in the field to be qualified, eight focused tests/51 assertions passed. The complete bare suite passed 599 tests/2642 assertions (`r23-final-full-suite-20261029.log`), followed by all Go/module/lint, other-plugin and CI syntax checks. The only changed implementation files since R-23 are the grader and its negative controls; production payload bed933 and consumer `9e1af57f34b51b230eb2a4271416ca7bcc166ca3` are unchanged. The focused reviewer receives the actual R-23 native return/provenance/execution receipt, an exact Git-object delta and current required checks/replay, and must return all nine criterion records at the new commit. No existing proof is relabeled.
+
+- [ ] T19 `tests/vh-adlc/maintenance/delivery-cases.test.ts` and this document - correct the observed macOS canonical-path assertion without changing runtime behavior: reproduce it with an owned directory alias, bind recorded executable/argv paths to the canonical file, retain the actual CI failure and pass local checks plus fresh paired Copilot Opus 5.5 review before updating PR #37 (AC-08, AC-09).
 
 ## Open Questions
 
