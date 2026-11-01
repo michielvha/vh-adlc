@@ -674,6 +674,7 @@ Publication still waits for reviewed-spec acceptance. Any new judgment finding r
 | 2026-11-02 | R-8 | spec | `ac789a95aa362337face903e8e9fa41b41b622e9` | claude-opus-5.5 | procedural | Define non-self-referential verification target and stale selected-finding outcomes; raw footer retained. |
 | 2026-11-02 | R-9 | spec | `be05ddd32aa077c4de5278a4dabda1d9fa8c1e68` | claude-opus-5.5 | procedural | Require actual consumer policy validation before and after cutover. |
 | 2026-11-02 | R-10 | spec | `56ae457872568ae37ee6841aa93bd940cf09bc58` | claude-opus-5.5 | procedural | Define audit intake priority, bound parity-map artifact/completeness and owned cleanup. |
+| 2026-11-02 | R-11 | spec | `7eda0b6b00931ac1114861619e87bc73dc528f8c` | claude-opus-5.5 | procedural | Track temporary live-test resources across interruption and resume cleanup. |
 
 ### R-1
 
@@ -849,6 +850,15 @@ SEVERITY: nit
 WHERE: Design, Entry points and modes (owned ledger worktree)
 EVIDENCE: Lines 150-152 say the audit extension "permits ordinary creation of this owned ledger role and the selected repair worktree; it grants no cleanup of unrelated refs/worktrees or force deletion". authority.md:69 says that outside the maintenance roles, the procedure must "never create, remove, prune, reset or force-move a worktree". The maintenance roles at authority.md:85-93 explicitly allow "ordinary creation and non-forced cleanup" of clean owned worktrees. Lines 134-136 create a new `chore/audit-ledger-<run-id>` worktree for every permitted reverify or full application. Stackweaver's adopted rule allows this on each run. The spec never says whether the procedure may remove its own clean owned audit worktrees after the ledger commit is published, carried into a repair or superseded. Implementations would either leave them to accumulate or make up a cleanup rule.
 PROPOSAL: Give the audit ledger and repair roles the same non-forced cleanup the maintenance roles have: clean owned worktrees only, refs kept when ordinary deletion refuses, and pending or private ledger commits preserved. Alternatively, state that cleanup is left to the owner.
+
+### R-11
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Evidence, updates and recovery; Design, Remediation and delivery authority (retained live gate); Test Plan AC-04
+EVIDENCE: shared-audit.md:349-358 has an adopted `live-verify` effect run "scoped temporary test-key creation/use/revocation where necessary, owned test-data operations and row-scoped cleanup" under the local verification_policy. check.sh reported scoped_token (`CreateAPIKey`) and row_cleanup as present in Stackweaver's procedure. The recovery rule at shared-audit.md:263-266 only preserves "the snapshot, assessment, report/candidate and completed local Git work". On resume it inspects only "real Git/source/artifact state" and avoids duplicating "dated notes, findings, commits, issues or PRs". AC-04 (line 635) requires recovery from interruption "without silently replaying stale or duplicating completed effects". The AC-04 proof (line 647) interrupts only "after saved report, local commit and accepted fake remote effect with lost response". It observes temporary key and test-row cleanup only on the success path. Nothing requires the procedure to record a minted temporary key or the created test rows before they exist, and nothing checks for them on resume. An interruption between creation and revocation can leave a live credential and test data behind. A resumed run that starts the live gate again can then create a second key. AC-04 could still be ticked.
+PROPOSAL: Require each live-verify action to record its pending temporary key identifier and test-row scope in the batch record or private journal before it runs. On resume, run the consumer's revocation and row-scoped cleanup for any pending entries, or hand them off, before starting the gate again. Add an AC-04 synthetic case that interrupts after key creation and before revocation, and require exactly one cleanup and no orphaned key.
 
 ## Sources
 
