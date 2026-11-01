@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner decisions and R-1 through R-11 fixes are incorporated, including interrupted live-test key/data cleanup ownership. Fresh Opus review and owner acceptance remain pending; implementation has not started."
+status_description: "Copilot Opus 5.5 R-12 has no blocking findings, with one post-merge outcome placement/recovery recommendation tracked for implementation. Owner spec acceptance is pending; implementation and publication have not started."
 issue: null
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -73,6 +73,27 @@ Stackweaver's adopted local automation, allow contract-restoring bounded audit r
 record/final-head review per compatible selected batch. The owner separately required documentation
 publication to wait until spec acceptance. These decisions are folded into Design/Test Plan below;
 they are not acceptance of the not-yet-refreshed reviewed spec.
+
+
+### Latest spec review and implementation obligation
+
+Actual Copilot `claude-opus-5.5` R-12 reviewed `67a91a17944bb219ce956364963531532577c396`
+with no blocking findings and one should-fix recommendation about the post-merge outcome artifact.
+That recommendation is not claimed fixed or tested. Carry it into the AC-04 implementation tasks:
+use the existing private run journal/external run directory for the durable observed merge outcome,
+with optional deduplicated workstream-issue updates only under the existing `issue-write` scope.
+Do not invent an additional default-branch commit/push, which the existing grant does not authorize.
+The implementation must demonstrate lost squash-merge acknowledgement followed by a fresh-context
+reconciliation that discovers the actual merge, records the outcome once and makes no ungranted write.
+If a later status session lacks the local artifact, it must consult available recorded PR/issue
+observations or report unknown, not repeat a merge from the absence of a receipt. The exact artifact
+path and schema are implementation details under the existing private record/recovery behavior;
+required recovery evidence must be observed before AC-04 or the feature can be marked complete.
+
+The owner-facing purpose is software bug/security/reliability auditing with persistent finding
+history, re-verification and selected repairs. This extraction moves the reusable procedure and
+retains Stackweaver's ledger and product-specific rules; it performs no real product audit or fix.
+The draft remains local until the owner accepts the reviewed specification, as requested.
 
 ## Scope
 
@@ -701,6 +722,7 @@ Publication still waits for reviewed-spec acceptance. Any new judgment finding r
 | 2026-11-02 | R-9 | spec | `be05ddd32aa077c4de5278a4dabda1d9fa8c1e68` | claude-opus-5.5 | procedural | Require actual consumer policy validation before and after cutover. |
 | 2026-11-02 | R-10 | spec | `56ae457872568ae37ee6841aa93bd940cf09bc58` | claude-opus-5.5 | procedural | Define audit intake priority, bound parity-map artifact/completeness and owned cleanup. |
 | 2026-11-02 | R-11 | spec | `7eda0b6b00931ac1114861619e87bc73dc528f8c` | claude-opus-5.5 | procedural | Track temporary live-test resources across interruption and resume cleanup. |
+| 2026-11-02 | R-12 | spec | `67a91a17944bb219ce956364963531532577c396` | claude-opus-5.5 | procedural | No blocking findings; post-merge outcome placement/recovery remains an implementation proof obligation. |
 
 ### R-1
 
@@ -885,6 +907,14 @@ SEVERITY: should-fix
 WHERE: Design, Evidence, updates and recovery; Design, Remediation and delivery authority (retained live gate); Test Plan AC-04
 EVIDENCE: shared-audit.md:349-358 has an adopted `live-verify` effect run "scoped temporary test-key creation/use/revocation where necessary, owned test-data operations and row-scoped cleanup" under the local verification_policy. check.sh reported scoped_token (`CreateAPIKey`) and row_cleanup as present in Stackweaver's procedure. The recovery rule at shared-audit.md:263-266 only preserves "the snapshot, assessment, report/candidate and completed local Git work". On resume it inspects only "real Git/source/artifact state" and avoids duplicating "dated notes, findings, commits, issues or PRs". AC-04 (line 635) requires recovery from interruption "without silently replaying stale or duplicating completed effects". The AC-04 proof (line 647) interrupts only "after saved report, local commit and accepted fake remote effect with lost response". It observes temporary key and test-row cleanup only on the success path. Nothing requires the procedure to record a minted temporary key or the created test rows before they exist, and nothing checks for them on resume. An interruption between creation and revocation can leave a live credential and test data behind. A resumed run that starts the live gate again can then create a second key. AC-04 could still be ticked.
 PROPOSAL: Require each live-verify action to record its pending temporary key identifier and test-row scope in the batch record or private journal before it runs. On resume, run the consumer's revocation and row-scoped cleanup for any pending entries, or hand them off, before starting the gate again. Add an AC-04 synthetic case that interrupts after key creation and before revocation, and require exactly one cleanup and no orphaned key.
+
+### R-12
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Remediation and delivery authority (squash merge outcome); Test Plan AC-04
+EVIDENCE: shared-audit.md:524-527 says "A conditional squash merge carries the record and ledger to main" and requires the procedure to "Retain the actual merge outcome in the batch's durable outcome record after observing it". This is the only mention of a "durable outcome record" in the spec. The batch record (lines 405-407, 440-448) lives on the selected source branch. It reaches main only inside the squash commit, and that branch is then deleted. The spec never names the artifact that receives the post-merge outcome. It could be the in-tree record on main, the tracking issue, the private run journal or the external report directory. The spec also never names the authority for that write. The fix_effects vocabulary at line 326 covers `branch-push`, `pr-write`, `issue-write` and `conditional-merge`, but it has no effect for a later commit or push to the default branch. Line 52 of lifecycle.md says other non-feature publishing gaps "remain unsupported". In AC-04 (line 673), the squash case only checks a later reverify against the Scope baseline. Nothing checks where the merge outcome is recorded, or that recording it needs no unauthorized default-branch write. One implementation could push an outcome commit straight to main without any grant. Another could keep the outcome only in a local file, which a fresh-context resume or a later status run would not see. The interruption rule at lines 263-268 then cannot tell whether a merge whose response was lost was already recorded.
+PROPOSAL: Name the post-merge outcome location and the authority that covers it. For example, use the private run journal plus the existing `issue-write` on the workstream's tracking issue, and state that no default-branch commit follows the merge. Alternatively, define a new declared effect for that write. Add an AC-04 case where a merge acknowledgement is lost after a squash merge, and check that resume records the outcome once and makes no write outside the grant.
 
 ## Sources
 
