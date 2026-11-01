@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner decisions and R-1 through R-4 fixes are incorporated, including retained live-test authority, isolated ledger commits and effect precedence. Fresh Copilot Opus 5.5 review and owner acceptance remain pending; implementation has not started."
+status_description: "Owner decisions and R-1 through R-5 fixes are incorporated. Both ledger application and commit bind to the isolated assessed source; complete standalone examples are covered. Fresh Opus review and owner acceptance remain pending; implementation has not started."
 issue: null
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -12,6 +12,7 @@ covers:
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/scripts/audit/
+  - plugins/vh-adlc/examples/audit/
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - tests/vh-adlc/audit/
@@ -129,11 +130,22 @@ classified repair/feature route; remote actions additionally require the adopted
 Invalid modes/targets grant none of these writes. Each parity test checks the working tree, index,
 refs and fake remote effects, not just the final text.
 
-Place a permitted reverify/full local commit in a new owned ledger-only worktree/branch
-`chore/audit-ledger-<run-id>`, based on freshly fetched committed default-branch source. It contains
-only the validated ledger update and any explicitly required generated index, never changes from
-whichever checkout happened to invoke the operation. Record the new branch/worktree/base, source and
-ledger digests and commit. Never switch or commit into an unrelated feature or shared dirty main.
+Place every permitted reverify/full ledger application, including an uncommitted `ledger-update`
+without `ledger-commit`, in a new owned ledger-only worktree/branch
+`chore/audit-ledger-<run-id>`, based on freshly fetched committed default-branch source. Assess that
+same clean committed source before applying any candidate: assessed source commit must equal the
+owned ledger worktree's recorded default-branch base, and its ledger/settings/procedure bindings
+must match. A report assessed on an unrelated feature or dirty source remains a target-labelled
+private report; its verdicts cannot be applied or committed to the canonical default-branch ledger.
+Re-assess the proper clean base before any tracked update, even with explicit ledger-write permission.
+
+The ledger worktree contains only the validated ledger update and any explicitly required generated
+index, never changes from whichever checkout happened to invoke the operation. Record the new
+branch/worktree/base, source and ledger digests, actual candidate bytes and any commit. Before an
+optional commit, source/settings/procedure must still match that assessed base and the only owned
+working delta must be the exact validated ledger/index candidate; candidate bytes are not mistaken
+for unrelated dirty source. No commit permission leaves that candidate uncommitted only in its owned
+worktree. Never write into, switch or commit into an unrelated feature or shared dirty main.
 A conflict/occupied path leaves the private proposal and handoff. The audit authority/lifecycle
 extension permits ordinary creation of this owned ledger role and the selected repair worktree;
 it grants no cleanup of unrelated refs/worktrees or force deletion.
@@ -162,7 +174,11 @@ hostname), with repository-relative ledger and project-procedure paths, ID prefi
 profile options. Reject unknown fields, mismatched origin, traversal, symlink escape and unsupported
 profiles. Missing required configuration is an onboarding handoff, not permission to invent a ledger.
 Standalone adopters receive a complete synthetic example that explains how to create their own
-ledger/settings; it references no personal host paths or private configuration.
+ledger/settings; it references no personal host paths or private configuration. Store complete
+copyable files under `plugins/vh-adlc/examples/audit/basic/`: `.vh-adlc/audit.json`, `docs/audit.md`
+and `audit-project.md`, linked from the settings guide. A test copies the entire example into a
+fresh synthetic Git repository with its declared origin and exercises the actual settings and
+inventory helpers, rather than validating an abbreviated configuration fragment.
 
 The first implementation supports a documented Markdown profile with a designated severity-index
 section, ID in the first table cell and primary ID immediately after a finding heading marker.
@@ -477,9 +493,9 @@ live operations remain separate owner-selected tasks.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Extend the package/discovery/intake contracts and native CLI skills enumeration. Run default, status, full, explicit IDs, workstream and next scenarios; verify external proposal versus permitted ledger application/local commit by mode and consumer, its isolated branch/base/path scope even when invoked from an unrelated feature or dirty main, and no remote action from reverify/full. Invalid mode/ID/workstream fixtures must leave source/index/refs/ledger unchanged. |
-| AC-02 | Unit fixtures for AUD and a second prefix, incidental IDs in headings/prose, reference-only high IDs, duplicate index/entries, index-only/entry-only findings, missing config, identity mismatch, traversal, symlink escape and unknown profiles. Compare local real-ledger structure read-only and retain its hash; no private contents leave the host. |
-| AC-03 | Snapshot/report/update-validation tests and actual Copilot trials for valid/false FIXED, genuine MOOT vs renamed code, missing required checks/independent challenge, sibling-surface residual, incomplete coverage, source/settings/ledger drift, duplicate/renumber/delete attempts and concurrent new-ID conflict. A fixture terminal proposal passes only with all required evidence; every negative must be rejected. Inspect actual returned transcripts and saved report bytes. |
+| AC-01 | Extend the package/discovery/intake contracts and native CLI skills enumeration. Run default, status, full, explicit IDs, workstream and next scenarios; verify external proposal versus permitted ledger application/local commit by mode and consumer, including ledger-update without ledger-commit and its isolated assessed-source/branch/base/path scope when invoked from an unrelated feature or dirty main, and no remote action from reverify/full. Invalid mode/ID/workstream fixtures must leave source/index/refs/ledger unchanged. |
+| AC-02 | Unit fixtures for AUD and a second prefix, incidental IDs in headings/prose, reference-only high IDs, duplicate index/entries, index-only/entry-only findings, missing config, identity mismatch, traversal, symlink escape and unknown profiles. Copy and exercise the complete standalone example through actual settings/inventory helpers. Compare local real-ledger structure read-only and retain its hash; no private contents leave the host. |
+| AC-03 | Snapshot/report/update-validation tests and actual Copilot trials for valid/false FIXED, genuine MOOT vs renamed code, missing required checks/independent challenge, sibling-surface residual, incomplete coverage, source/settings/ledger drift, a reverify/full verdict assessed on non-default or dirty source being refused for tracked ledger application/commit, duplicate/renumber/delete attempts and concurrent new-ID conflict. A fixture terminal proposal passes only with all required evidence; every negative must be rejected. Inspect actual returned transcripts and saved report bytes. |
 | AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, a missing per-member challenge, and a batch where only the second member has a passing final-head check; a valid two-member batch including proposed ledger updates must pass. Provisional candidate FIXED/MOOT cannot be published before that pass. A ledger status/index edit after review must stale it, while a true append-only record review/state update may preserve freshness. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Exercise the deterministic declaration helper with every missing/duplicate/mismatched/unknown field, duplicated heading/table, valid/coherent restricted effect subsets and cross-mode effect, generic eligible local fix without a declaration, `fix_effects: none`, incoherent remote-only subset and actual local prohibition; reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Synthetic live-gate cases must distinguish adopted/requested permission, permission denial blocking merge, and a genuinely unreachable path with only its permitted residual; temporary key/test-row cleanup and no unrelated restart are observed. Carry a known unpublished ledger-only commit into the selected repair base; new default source or conflicting ledger must stop/reconcile. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
 | AC-05 | Row-by-row consumer contracts and bounded Copilot policy trials cover the parity map; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
 | AC-06 | Full `bun test tests/vh-adlc`, Go tests/vet/tidy/lint and other-plugin tests, actionlint/whitespace, portable macOS CI, plus isolated native install/discovery/helpers/reinstall. Store actual Copilot model identity/commit/payload, positive and negative grades, manual transcript checks and all failures; independent review verifies the exact committed code and evidence. No live-Claude/GUI inference. |
