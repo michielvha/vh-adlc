@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner accepted the three R-1 policy recommendations on 2026-11-01. Authority, mode writes, repair eligibility and batch review are specified; refreshed Copilot Opus 5.5 review and spec acceptance pending. Implementation has not started."
+status_description: "Owner policy decisions are incorporated. R-2 requested explicit batch record/reviewer inputs and per-member negative tests; these are specified. Fresh Copilot Opus 5.5 review and owner spec acceptance remain pending; implementation has not started."
 issue: null
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -8,6 +8,7 @@ covers:
   - plugins/vh-adlc/references/audit.md
   - plugins/vh-adlc/references/audit-settings.md
   - plugins/vh-adlc/references/audit-record.md
+  - plugins/vh-adlc/references/audit-review.md
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/scripts/audit/
@@ -97,7 +98,7 @@ checks, not an OS-enforced proof boundary or an arbitrary-code correctness oracl
 ### Entry points and modes
 
 Add `skills/vh-adlc-audit/SKILL.md`, `references/audit.md`, `audit-settings.md`, `audit-record.md`
-and focused modules under `scripts/audit/`. Native invocation is `vh-adlc-audit`; ordinary-language
+plus `audit-review.md` and focused modules under `scripts/audit/`. Native invocation is `vh-adlc-audit`; ordinary-language
 requests enter through the existing lifecycle intake without consuming unrelated investigation or
 triage requests. The shared skill has no model pin or harness-specific tool dependency.
 
@@ -250,6 +251,36 @@ record rule. Final verification must establish every member at the final batch t
 member cannot inherit a later member's pass. Mixed incompatible work uses the feature/owner path.
 Neither record nor review grants remote authority or weakens consumer checks.
 
+`references/audit-record.md` is the explicit audit batch template, retaining the common maintenance
+Definition/Evidence/Reviews/State sections and their freshness semantics. Its Definition records:
+repository and task base, selected workstream/run ID and exact finding IDs/coupled bundles, requested
+outcome, cited pre-existing contract for each member, per-member repair eligibility and owner-decision
+boundaries, preserved contract, affected source/test/config paths, verification inputs, proposed
+repair and each member's required checks/pass conditions. Record the ledger/settings/procedure
+bindings and the current selected-delivery permission separately from technical repair eligibility.
+The record remains on the selected source branch for this ordinary audit route; no external evidence
+ref/paired-record variant is introduced by this extraction.
+
+Its Evidence has one row/section per member: finding/scenario and current source symbols, pre-fix
+commit and observed failing regression, repair commit, green/current required check commands and
+results against the final batch target, live-gate or explicitly permitted unreachable-path residual,
+verification-input bindings, and unresolved siblings or other residuals. Red evidence retains its
+real pre-fix target; it is never relabeled as a failure on the fixed head. Every member's final
+required checks must actually establish that member at the final head. Record the batch's exact
+review target and preserve older checks/reviews rather than rebinding them to a newer commit.
+
+Dispatch the independent batch review with `references/audit-review.md`, the batch repository,
+exact final source commit, committed record path/Definition, selected scope, docs revision and shared
+review protocol. The audit-specific reviewer checks the accepted restoration classification against
+the cited existing contract, complete Definition membership/couplings, actual diff from task base,
+per-member red/green and final-target checks, live-gate/residual conditions, stale bindings and
+unrelated-state preservation. It may reuse operation-neutral review protocol/model/isolation rules,
+not dispatch an unchanged ordinary maintenance reviewer as if it covered these extra obligations.
+Missing cited contract or any member's required final-head evidence is a finding and prevents a
+clean batch review. Return the shared `MODEL:` header and complete findings or `NO FINDINGS`, store
+them verbatim with exact target/model/isolation, and apply the common review freshness rules.
+The existing maintenance record and reviewer stay unchanged; audit-specific files carry this extension.
+
 Stackweaver keeps its existing one-branch/one-PR-per-workstream batching, one finding or coupled bundle
 per commit, local full verification before one batch push, one tracking issue per workstream and
 conditional squash merge after live gates plus green CI. Its detailed step-7 merge rule explicitly
@@ -334,7 +365,7 @@ live operations remain separate owner-selected tasks.
 | AC-01 | Extend the package/discovery/intake contracts and native CLI skills enumeration. Run default, status, full, explicit IDs, workstream and next scenarios; verify external proposal versus permitted ledger application/local commit by mode and consumer, and no remote action from reverify/full. Invalid mode/ID/workstream fixtures must leave source/index/refs/ledger unchanged. |
 | AC-02 | Unit fixtures for AUD and a second prefix, incidental IDs in headings/prose, reference-only high IDs, duplicate index/entries, index-only/entry-only findings, missing config, identity mismatch, traversal, symlink escape and unknown profiles. Compare local real-ledger structure read-only and retain its hash; no private contents leave the host. |
 | AC-03 | Snapshot/report/update-validation tests and actual Copilot trials for valid/false FIXED, genuine MOOT vs renamed code, missing required checks/independent challenge, sibling-surface residual, incomplete coverage, source/settings/ledger drift, duplicate/renumber/delete attempts and concurrent new-ID conflict. A fixture terminal proposal passes only with all required evidence; every negative must be rejected. Inspect actual returned transcripts and saved report bytes. |
-| AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
+| AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, and a batch where only the second member has a passing final-head check; a valid two-member batch must pass. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
 | AC-05 | Row-by-row consumer contracts and bounded Copilot policy trials cover the parity map; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
 | AC-06 | Full `bun test tests/vh-adlc`, Go tests/vet/tidy/lint and other-plugin tests, actionlint/whitespace, portable macOS CI, plus isolated native install/discovery/helpers/reinstall. Store actual Copilot model identity/commit/payload, positive and negative grades, manual transcript checks and all failures; independent review verifies the exact committed code and evidence. No live-Claude/GUI inference. |
 | AC-07 | Unit preflight denials for maintenance/wrong operation, local-catalog, missing/wrong artifact/model/version/commit/digest and valid unchanged artifacts. Source completion checks the gate and installation candidates; delivery then requires actual published fresh install/upgrade, signed release verification where produced, a fresh paired review and passing actual preflight before consumer merge. This ordered publication obligation is not fabricated as a pre-publication source-test result. |
