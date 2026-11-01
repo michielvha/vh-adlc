@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner decisions and R-1 through R-9 fixes are incorporated. Actual consumer policy validation is required before and after adoption. Fresh Opus review and owner acceptance remain pending; implementation has not started."
+status_description: "Owner decisions and R-1 through R-10 fixes are incorporated, including intake priority, bound parity-map review and non-forced owned cleanup. Fresh Opus review and owner acceptance remain pending; implementation has not started."
 issue: null
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -103,6 +103,24 @@ plus `audit-review.md` and focused modules under `scripts/audit/`. Native invoca
 requests enter through the existing lifecycle intake without consuming unrelated investigation or
 triage requests. The shared skill has no model pin or harness-specific tool dependency.
 
+The audit intake predicate is explicit persistent source-audit intent: a named `/audit` or
+`vh-adlc-audit` mode, a request to maintain/reverify the audit findings ledger, a full source audit
+with persistent findings, or a selected audit-finding repair. A configured ledger is not permission
+to take over every security request, and configuration is not a precondition for routing an explicit
+audit request. Explicit audit intent without required configuration gets the documented onboarding
+handoff; it does not invent settings, silently create a ledger or fall through to another operation.
+
+Dependency/bot/advisory/alert security sweeps keep the maintenance route; a concrete observed failure
+or one-off source investigation without persistent-audit intent keeps investigation; issue/backlog
+prioritization keeps triage. These rules apply even when audit settings exist. For ambiguous wording
+such as "check our vulnerabilities" or "audit security", ask one focused scope question distinguishing
+persistent source/ledger audit, dependency/advisory sweep and diagnosis; inspect independent context
+read-only while waiting. A request like "audit the code for security issues" is not silently promoted
+to the expensive full-audit mode: clarify persistent/full scope unless the request already gives it.
+Route tests cover positive explicit audit requests with/without config, ordinary ledger requests,
+maintenance security sweeps, diagnosis, triage and ambiguous wording; configuration alone must never
+change those negative routes. Shared intake creates no additional mode or effect permission.
+
 - No arguments or `reverify`: read the configured ledger and source, re-locate cited symbols, scope
   changes since each recorded baseline, reassess all selected findings, scan relevant changed areas
   for related instances, prepare a dated ledger update, then present the result and ask which fixes
@@ -150,6 +168,11 @@ worktree. Never write into, switch or commit into an unrelated feature or shared
 A conflict/occupied path leaves the private proposal and handoff. The audit authority/lifecycle
 extension permits ordinary creation of this owned ledger role and the selected repair worktree;
 it grants no cleanup of unrelated refs/worktrees or force deletion.
+For these two audit roles, ordinary non-forced cleanup may remove only a clean owned worktree
+whose artifact/evidence/ledger outcome has been retained, published or explicitly superseded safely.
+Keep pending or private ledger commits and required evidence refs. Keep a ref when ordinary branch
+deletion refuses after squash; no force deletion, pruning, reset or unrelated worktree cleanup is
+inferred. Record retained paths/refs and the owner handoff instead of silently discarding them.
 
 That ledger commit stays local: reverify/full has no standing push permission. A current explicit
 request can separately publish it through the consumer's normal delivery route, otherwise it is not
@@ -508,13 +531,41 @@ procedure with a thin `agents/codebase-audit.md` forwarder and retain Stackweave
 No rewrite of the real ledger is part of migration. Existing triage, maintenance, SEO, docs, other
 agents, hooks and product paths remain unchanged relative the reconciled current-main baseline.
 
-Before implementation record a row-by-row parity map covering every existing mode, stable-ID/format
-rule, per-mode working-ledger/commit/publication permissions and ledger-branch/base handoff, live
-verification authority/denial/residual mapping, repair classification, batch record/review mapping, re-location, verification/challenge rule, delta scan, deduplication, coverage gap, ordering,
-coupling, regression ladder, live-runtime requirement/residual, token/data cleanup restriction,
-reference implementation, documentation check, batching, tracking, conditional merge, operational
-secret handoff and workstream boundary. Each row identifies its shared procedure or retained local
-home and an executable contract/scenario. Source-specific examples stay local.
+The first accepted implementation task, before shared helper/procedure or consumer forwarding
+changes, creates and commits `tests/agent-audit/parity.json` on the isolated consumer branch. The
+populated map lives in Stackweaver rather than being appended to this Design after acceptance.
+Its format is `schema_version: 1`, a `legacy` object binding repository, full baseline commit and
+source paths with Git blob IDs and SHA-256 bytes, plus a `rows` array. Each row has a stable unique
+`id`, `legacy_sources` (path, section/symbol, baseline line range and excerpt digest), required
+`behavior`, `home` entries (shared/local path and section), `contracts` (test path and case name),
+and `expected_effects` when that row describes per-mode authority. Effects use the declaration's
+mode/effect vocabulary; unrelated rows carry no grant. No report or parity-map row authorizes effects.
+
+Bind the initial legacy procedure to `0ae15a9dafc58ff6457cf90f2c91630015833539`, Git blob
+`4e67b95f30296a9de3d3ab728625b460dd42e3fe` at `agents/codebase-audit.md`, SHA-256
+`e6efd34845b16d902ea5c3bf2f89571d2e7b65520e9742fdbe45001ccc11b5cb`. Include the command
+and applicable constitution/shipping references in the same binding. Before migration, reconcile
+current default policy drift explicitly; changed legacy objects require an updated map and review,
+not silent reuse of old coverage. Source-specific examples and raw legacy text stay local unless
+separately authorized for the bounded reviewer packet.
+
+Rows cover every existing mode, stable-ID/format rule, per-mode working-ledger/commit/publication
+permissions and ledger-branch/base handoff, live verification authority/denial/residual mapping,
+repair classification, batch record/review mapping, re-location, verification/challenge, delta scan,
+deduplication, coverage gaps, ordering, coupling, regression ladder, live-runtime requirements and
+residuals, token/data cleanup, reference implementations, documentation checks, batching, tracking,
+conditional merge, operational-secret handoff and workstream boundary. Every row names its shared or
+retained local home and an executable contract/scenario; parser checks reject duplicates, stale
+source bindings, missing required dimensions and unresolved homes/contracts at completion.
+
+A paired independent migration review must compare the complete bound legacy procedure/command and
+applicable local rules against the populated map and adapter, not trust the author's map as proof of
+its own completeness. It must identify omitted legacy behavior even when remaining tests pass.
+Actual authority comparisons read `expected_effects` only after this map/binding has been validated;
+that mechanical match cannot replace semantic coverage review. Synthetic controls omit a legacy
+permission/verification rule and corrupt a legacy blob or effect row; they must prevent a clean parity
+result. Missing required reviewer access leaves AC-05 unverified, with transfer approval requested if
+private workflow files are needed; it never becomes a passing bounded predicate check by itself.
 
 Consumer fixtures under `tests/agent-audit/` use synthetic ledger/source data, including another
 ID prefix and generic consumer with no Stackweaver policy. Record the exact shared/consumer commits,
@@ -590,11 +641,11 @@ live operations remain separate owner-selected tasks.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Extend the package/discovery/intake contracts and native CLI skills enumeration. Run default, status, full, explicit IDs, workstream and next scenarios; verify external proposal versus permitted ledger application/local commit by mode and consumer, including ledger-update without ledger-commit and its isolated assessed-source/branch/base/path scope when invoked from an unrelated feature or dirty main, and no remote action from reverify/full. Invalid mode/ID/workstream fixtures must leave source/index/refs/ledger unchanged. |
+| AC-01 | Extend the package/discovery/intake contracts and native CLI skills enumeration. Run default, status, full, explicit IDs, workstream and next scenarios; verify external proposal versus permitted ledger application/local commit by mode and consumer, including ledger-update without ledger-commit and its isolated assessed-source/branch/base/path scope when invoked from an unrelated feature or dirty main, and no remote action from reverify/full. Add intake negatives where configured audit settings do not intercept maintenance security sweeps, diagnosis or backlog triage; ambiguous security wording must get the focused scope question and explicit audit without config gets onboarding. Invalid mode/ID/workstream fixtures must leave source/index/refs/ledger unchanged. |
 | AC-02 | Unit fixtures for AUD and a second prefix, incidental IDs in headings/prose, reference-only high IDs, duplicate index/entries, index-only/entry-only findings, missing config, identity mismatch, traversal, symlink escape and unknown profiles. Copy and exercise the complete standalone example through actual settings/inventory helpers. Compare local real-ledger structure read-only and retain its hash; no private contents leave the host. |
 | AC-03 | Snapshot/report/update-validation tests and actual Copilot trials for valid/false FIXED, genuine MOOT vs renamed code, missing required checks/independent challenge, sibling-surface residual, incomplete coverage, source/settings/ledger drift, a reverify/full verdict assessed on non-default or dirty source being refused for tracked ledger application/commit, resolvable ancestor versus missing/shallow/non-ancestor legacy baseline with honest unscoped reassessment, duplicate/renumber/delete attempts and concurrent new-ID conflict. A fixture terminal proposal passes only with all required evidence; every negative must be rejected. Inspect actual returned transcripts and saved report bytes. |
-| AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. Test a mixed selection where one member is already fixed/moot, one residual reproduces and one cannot be reproduced: no fabricated red evidence, no silent removal/replacement and unresolved required work blocks whole-batch completion; an all-assessment selection creates no empty repair PR. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, a missing per-member challenge, and a batch where only the second member has a passing final-head check; a valid two-member batch including proposed ledger updates must pass. Provisional candidate FIXED/MOOT cannot be published before that pass. Verify the frozen source_target to ledger/record-final-head Git-object equivalence; source changes after Verified source, a pre-fix SHA, missing SHA and placeholder replacement must fail or stale review. A ledger status/index edit after review must stale it, while a true append-only record review/state update may preserve freshness. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Exercise the deterministic declaration helper with every missing/duplicate/mismatched/unknown field, duplicated heading/table, valid/coherent restricted effect subsets and cross-mode effect, generic eligible local fix without a declaration, `fix_effects: none`, incoherent remote-only subset and actual local prohibition; reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Synthetic live-gate cases must distinguish adopted/requested permission, permission denial blocking merge, and a genuinely unreachable path with only its permitted residual; temporary key/test-row cleanup and no unrelated restart are observed. Carry an explicitly included known unpublished ledger-only commit into the selected repair base while retaining its default ancestor as Scope baseline; the actual batch reviewer must inspect that full publication diff, and missing carried-report approval, omitted carried ID/evidence or reviewing only Task-base-to-head must prevent push/merge. A fix selection without included report scope keeps that report private; new default source or conflicting ledger must stop/reconcile. Squash a synthetic reviewed batch, delete its branch and reverify using the recorded Scope baseline; legacy pre-squash or missing baselines must become unscoped and trigger direct reassessment without implying an empty delta or invoking full audit. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
-| AC-05 | Row-by-row consumer contracts and bounded Copilot policy trials cover the parity map. Run the real authority helper against the exact committed Stackweaver candidate settings/procedure, validating origin, fields, coherence, unique fragments and parity effects with no action grant; a malformed or mismatched real candidate must block cutover; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
+| AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. Test a mixed selection where one member is already fixed/moot, one residual reproduces and one cannot be reproduced: no fabricated red evidence, no silent removal/replacement and unresolved required work blocks whole-batch completion; an all-assessment selection creates no empty repair PR. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, a missing per-member challenge, and a batch where only the second member has a passing final-head check; a valid two-member batch including proposed ledger updates must pass. Provisional candidate FIXED/MOOT cannot be published before that pass. Verify the frozen source_target to ledger/record-final-head Git-object equivalence; source changes after Verified source, a pre-fix SHA, missing SHA and placeholder replacement must fail or stale review. A ledger status/index edit after review must stale it, while a true append-only record review/state update may preserve freshness. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Exercise the deterministic declaration helper with every missing/duplicate/mismatched/unknown field, duplicated heading/table, valid/coherent restricted effect subsets and cross-mode effect, generic eligible local fix without a declaration, `fix_effects: none`, incoherent remote-only subset and actual local prohibition; reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Synthetic live-gate cases must distinguish adopted/requested permission, permission denial blocking merge, and a genuinely unreachable path with only its permitted residual; temporary key/test-row cleanup and no unrelated restart are observed. Carry an explicitly included known unpublished ledger-only commit into the selected repair base while retaining its default ancestor as Scope baseline; the actual batch reviewer must inspect that full publication diff, and missing carried-report approval, omitted carried ID/evidence or reviewing only Task-base-to-head must prevent push/merge. A fix selection without included report scope keeps that report private; new default source or conflicting ledger must stop/reconcile. Squash a synthetic reviewed batch, delete its branch and reverify using the recorded Scope baseline; legacy pre-squash or missing baselines must become unscoped and trigger direct reassessment without implying an empty delta or invoking full audit. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. Exercise ordinary clean owned-worktree cleanup, refusal after squash and retention of private/pending ledger commits; no force cleanup or unrelated worktree change. No real remote or live stack action. |
+| AC-05 | Validate the committed `tests/agent-audit/parity.json` schema/baseline/row/home/contract bindings, then require independent full legacy-to-map/adapter coverage review and bounded Copilot policy trials; omission of a legacy rule must fail even with otherwise passing mapped tests. Run the real authority helper against the exact committed Stackweaver candidate settings/procedure, validating origin, fields, coherence, unique fragments and parity effects with no action grant; a malformed or mismatched real candidate must block cutover; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
 | AC-06 | Full `bun test tests/vh-adlc`, Go tests/vet/tidy/lint and other-plugin tests, actionlint/whitespace, portable macOS CI, plus isolated native install/discovery/helpers/reinstall. Store actual Copilot model identity/commit/payload, positive and negative grades, manual transcript checks and all failures; independent review verifies the exact committed code and evidence. No live-Claude/GUI inference. |
 | AC-07 | Unit preflight denials for maintenance/wrong operation, local-catalog, missing/wrong artifact/model/version/commit/digest and valid unchanged artifacts. Source completion checks the gate and installation candidates; delivery then requires actual published fresh install/upgrade, signed release verification where produced, a fresh paired review and passing actual preflight including the non-granting actual candidate-policy receipt before consumer merge. After merge require the read-only actual installed-helper check of freshly fetched adopted policy/effects and its parity match before declaring adoption complete; an induced synthetic mismatch must exercise the scoped rollback/repair handoff. This ordered publication obligation is not fabricated as a pre-publication source-test result. |
 
