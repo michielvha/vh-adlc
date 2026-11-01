@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Audit extraction specified from current shared code and Stackweaver policy; independent Copilot Opus 5.5 review and owner acceptance pending."
+status_description: "Draft reviewed by Copilot Opus 5.5 R-1; authority, repair classification, batch review and ledger-write choices await the owner. Audit-specific preflight clarified; implementation has not started."
 issue: null
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -246,8 +246,10 @@ verify its normal CI and signed runtime release when produced, then test fresh i
 the real marketplace and compare exact payload bytes/modes and native helper behavior. Obtain a fresh
 paired migration review at the actual published shared and current consumer commits, and require an
 artifact-bound adoption preflight pass before consumer merge. Native receipts are operator attestations;
-no shell-resistant boundary is claimed. Existing preflight primitives may be reused without changing
-maintenance/triage policy. Review provenance, transcripts, command exits and actual saved files must
+no shell-resistant boundary is claimed. The audit receipt/verifier lives under `scripts/audit/`, binds
+`operation: vh-adlc-audit`, and checks the actual audit skill and installed payload. Maintenance
+receipts cannot satisfy audit adoption. Its existing maintenance-specific verifier remains unchanged;
+reuse only operation-neutral filesystem/hash inspection utilities whose existing contracts fit. Review provenance, transcripts, command exits and actual saved files must
 remain inspectable; never replace missing native evidence with a constructed receipt.
 
 Update this child and the parent roadmap with source/release/marketplace/consumer delivery evidence,
@@ -275,7 +277,7 @@ live operations remain separate owner-selected tasks.
 | AC-04 | A bounded synthetic selected repair must show regression red/green, actual independent review, consumer-required verification and separate permissions; generic consumer cannot acquire Stackweaver publication/merge rights. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
 | AC-05 | Row-by-row consumer contracts and bounded Copilot policy trials cover the parity map; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
 | AC-06 | Full `bun test tests/vh-adlc`, Go tests/vet/tidy/lint and other-plugin tests, actionlint/whitespace, portable macOS CI, plus isolated native install/discovery/helpers/reinstall. Store actual Copilot model identity/commit/payload, positive and negative grades, manual transcript checks and all failures; independent review verifies the exact committed code and evidence. No live-Claude/GUI inference. |
-| AC-07 | Unit preflight denials for local-catalog, missing/wrong artifact/model/version/commit/digest and valid unchanged artifacts. Source completion checks the gate and installation candidates; delivery then requires actual published fresh install/upgrade, signed release verification where produced, a fresh paired review and passing actual preflight before consumer merge. This ordered publication obligation is not fabricated as a pre-publication source-test result. |
+| AC-07 | Unit preflight denials for maintenance/wrong operation, local-catalog, missing/wrong artifact/model/version/commit/digest and valid unchanged artifacts. Source completion checks the gate and installation candidates; delivery then requires actual published fresh install/upgrade, signed release verification where produced, a fresh paired review and passing actual preflight before consumer merge. This ordered publication obligation is not fabricated as a pre-publication source-test result. |
 
 ## Tasks
 
@@ -283,9 +285,45 @@ None yet; decompose into one-commit tasks after clean spec review and owner acce
 
 ## Open Questions
 
-None currently. Existing Stackweaver merge behavior is explicitly resolved by its detailed step-7
-rule, which replaces the older introductory stop; this extraction preserves it locally. Any judgment
-finding from independent review returns here for the owner before acceptance.
+### Q1: Should committed consumer policy preserve Stackweaver's ledger and conditional-delivery permissions?
+
+**Recommendation:** A. Preserve daily behavior through freshly fetched default-branch policy, with
+explicit operation/mode and selection bounds; a generic consumer receives no standing permission.
+This addresses R-1 F-01 and F-04.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Retain local authority** | Stackweaver's bare reverify/full may update and commit its ledger; selected fix scope may create its workstream issue, push/open its PR and conditionally merge after retained gates. Shared authority/lifecycle explicitly recognize this adopted-policy route. | Validate current committed origin/AGENTS/settings/project policy and mode/action scope; reject uncommitted, unmerged, forged-report and generic grants. Current request restrictions win. |
+| **B. Report-only defaults everywhere** | Reports stay external; each ledger edit/commit, issue, PR and merge receives a separate request. | Changes Stackweaver's daily flow and adds owner steps. |
+
+**Why this is yours:** It controls tracked and remote side effects and the compatibility of the existing command.
+
+### Q2: May a bounded audit repair restore an already documented security or data-handling behavior?
+
+**Recommendation:** A. Permit a scoped regression repair when it restores an established contract and
+adds no boundary, format or migration; otherwise retain the feature route and owner decision. This
+addresses R-1 F-02 and requires an explicit audit-specific classification rule, not a silent change
+to all maintenance eligibility.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Restore documented behavior** | A selected existing defect can use reviewed bounded audit repair, including a security regression. New/changed boundaries, stored formats, migrations and intentional user-visible changes still need the feature/owner path. | Record the existing contract and eligibility before repair; independent review must verify that classification. |
+| **B. Feature route for every boundary touch** | Preserve the current broad feature classification literally for security/data work. | A repair restoring the existing contract may need a separate accepted feature spec. |
+
+**Why this is yours:** It determines how much planning and approval an existing audit fix needs.
+
+### Q3: Should one compatible selected workstream batch be one repair record with final-head review?
+
+**Recommendation:** A. Enumerate every selected finding and coupled bundle in one bounded Definition;
+keep per-finding commits on one branch and require current independent review of the complete batch
+at its final head before publication. This addresses R-1 F-03.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. One record per compatible batch** | Preserve Stackweaver's workstream branch/PR shape and review all current member findings together. | The record and per-finding evidence must be complete; adding or changing any member invalidates the batch review. Mixed incompatible work enters the feature/owner path. |
+| **B. One repair record per finding** | Each finding has separate Definition/evidence/review accounting on the shared workstream branch. | Need explicit aggregation and final freshness checks for every record before the batch push. |
+
+**Why this is yours:** It sets the review and recovery unit for the existing workstream batching flow.
 
 ## Review Log
 
