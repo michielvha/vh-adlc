@@ -387,6 +387,7 @@ Publication still waits for reviewed-spec acceptance. Any new judgment finding r
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-01 | R-1 | spec | `5bddd847fc28744bb1ebe0a7d626f5b502f5645e` | claude-opus-5.5 | procedural | Blocking authority gap; repair/batch/ledger policy decisions and preflight clarification required. |
 | 2026-11-02 | R-2 | spec | `773c703b5a3f2b6f4773afe45b9f8e7e158ad0f8` | claude-opus-5.5 | procedural | Batch record/review dispatch needs explicit per-member fields and negative checks. |
+| 2026-11-02 | R-3 | spec | `cd10c08964a0b759f10b38b5f90fa9808db20241` | claude-opus-5.5 | procedural | Specify the authorization declaration and ledger/review ordering. |
 
 ### R-1
 
@@ -433,6 +434,22 @@ SEVERITY: should-fix
 WHERE: Design, Remediation and delivery authority; covers
 EVIDENCE: shared-audit.md:239-251 says a selected workstream batch gets "one record" whose "Definition enumerates the fixed selected IDs/coupled bundles, existing contract, repair eligibility, affected paths and each finding's required checks". It also says the final independent review checks "all Definition members, including their current verification evidence" and that "an earlier member cannot inherit a later member's pass". shared-audit.md:174-175 and 231-232 rely on "current independent bounded-maintenance or feature review" and say "the independent review checks" restoration eligibility. The existing template, maintenance-record.md:13-19, has only Outcome, Preserved contract, Task base, Affected paths, Verification inputs, Proposed change and Required checks. It has no selected-ID, bundle, eligibility or per-member evidence fields. maintenance-review.md:15-18 tells the reviewer to "Confirm that the task is eligible bounded maintenance", and lifecycle.md:91-93 sends "permission/trust boundaries" to the feature route. Neither reference is in covers. The spec never says what the new covered `references/audit-record.md` contains or which review instructions a batch dispatch passes. An implementation could therefore reuse the unchanged maintenance reviewer. That reviewer does not verify each member at the final head or the cited pre-existing contract, and it could reject a restoration that the audit rule permits. The AC-04 trial covers only review staleness and route classification. It does not check whether the reviewer enforces these batch obligations.
 PROPOSAL: State whether `audit-record.md` is the batch record template, list its Definition and per-member evidence fields, and say which review instructions the batch dispatch uses. If those are maintenance-review.md or maintenance-record.md, add the extension to covers. Otherwise add an audit-specific review reference. Extend the AC-04 trial so that the review finds a missing per-member final-head check and a missing cited contract.
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Remediation and delivery authority; Test Plan AC-04
+EVIDENCE: shared-audit.md:210-216 defines the local grant only as "a clearly named `Standing audit workflow authorization` declaration in the project procedure", which is checked against "repository/mode/selected-workstream scope" and "its restrictions". shared-audit.md:219-227 says this one declaration covers ledger update and local commit for reverify/full, plus issue tracking, one batch push/PR and conditional merge for `fix`. The spec gives no heading, fields, allowed values or uniqueness rule for this declaration. It also does not say whether audit-settings.md or a scripts/audit/ helper parses it. The existing standing grant is exact by comparison: maintenance-settings.md:53-77 requires "exactly one heading/table with every field below" (repository, hostname, branch, route, paths, update policy), and a missing or mismatched field grants nothing (maintenance-settings.md:81). The AC-04 proof requires rejecting "wrong-mode/selection" grants. The implementation has to make up the declaration's shape before that test can be written or graded.
+PROPOSAL: Specify the declaration's exact structure in audit-settings.md: repository, hostname, default branch, permitted modes, permitted effects for each mode, and a pointer to the retained merge conditions. Say that a missing, duplicate or mismatched field grants no effect. State whether a deterministic scripts/audit/ helper checks this and add that helper to the AC-04 unit denials.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Evidence, updates and recovery; Remediation and delivery authority
+EVIDENCE: shared-audit.md:174-176 says a new FIXED verdict for an authored fix needs "a separate adversarial challenge" and also "current independent bounded-maintenance or feature review". shared-audit.md:246-250 says the final batch review targets "the complete batch's exact committed head" and "a later source commit invalidates that review", and only "Append-only evidence/review bookkeeping may preserve freshness under the existing record rule". The audit-record.md Definition fields at shared-audit.md:255-260 list "affected source/test/config paths" and do not mention the ledger. The spec never says when a fix batch writes the ledger status/index change to FIXED: before the final review, so the review checks it, or after it. If the edit comes after the review, the spec does not say whether that ledger commit makes the review stale. It also does not say whether the final batch review counts as the separate adversarial challenge. One implementation could mark FIXED with no reviewed ledger diff. Another could loop, because each ledger commit that cites the review makes that review stale.
+PROPOSAL: State that the ledger status/index edit for each fix member is part of the batch Definition's affected paths and is committed before the final-head review, or define it as allowed post-review bookkeeping with explicit limits. Also say whether that review satisfies the FIXED adversarial challenge. Add an AC-04 case for a ledger change after the review.
 
 ## Sources
 
