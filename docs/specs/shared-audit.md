@@ -562,6 +562,7 @@ Publication still waits for reviewed-spec acceptance. Any new judgment finding r
 | 2026-11-02 | R-5 | spec | `0bd3d6f0375ed09590529166f4e95c307b3cc69b` | claude-opus-5.5 | procedural | Bind uncommitted ledger application to its isolated assessed source. |
 | 2026-11-02 | R-6 | spec | `ba3eef8de01afc773e70b4c3a5c43dca0934c97a` | claude-opus-5.5 | procedural | Preserve delta-scoping baselines across squash merge and missing history. |
 | 2026-11-02 | R-7 | spec | `b73cc50de4e94dfded9dbee2e06b7394eecc0ae8` | claude-opus-5.5 | procedural | Review carried ledger updates in the full publication range; name the audit-specific review. |
+| 2026-11-02 | R-8 | spec | `ac789a95aa362337face903e8e9fa41b41b622e9` | claude-opus-5.5 | procedural | Define non-self-referential verification target and stale selected-finding outcomes; raw footer retained. |
 
 ### R-1
 
@@ -681,6 +682,31 @@ SEVERITY: nit
 WHERE: Design, Evidence, updates and recovery
 EVIDENCE: Line 213 says an authored fix's FIXED verdict requires a "current independent bounded-maintenance or feature review". Lines 381-391 say a fix batch must use the audit-specific `references/audit-review.md` reviewer and must not "dispatch an unchanged ordinary maintenance reviewer as if it covered these extra obligations". They also say "The existing maintenance record and reviewer stay unchanged". Read on its own, line 213 could be satisfied by `maintenance-review.md`.
 PROPOSAL: Change line 213 to require the current independent audit batch review (`references/audit-review.md`) or a feature review, so it matches the later dispatch rule.
+
+### R-8
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Remediation and delivery authority (fix batch ledger ordering and Scope baseline); Test Plan AC-04
+EVIDENCE: shared-audit.md:406-408 says to "Prepare and commit those proposed updates on the selected unpublished source branch before the final-head review". Lines 428-430 say "Every new dated ledger update records a `Scope baseline` ... plus its batch/run reference and the real `Verified source` commit". Lines 383-384 say "Every member's final required checks must actually establish that member at the final head". Lines 422-425 say "Every actual ledger status/index/content change after that review is a material change and stales it". A ledger commit cannot name its own SHA or a later final head, so the `Verified source` that a fix batch writes into the ledger must be an earlier commit than the reviewed final target. The spec does not say which commit that is. It also does not require that the diff from that commit to the final target touches only the ledger, index and record paths, and it does not ask the batch reviewer to check this. An implementation could leave a placeholder and fill it in after the review, which stales the review under lines 422-425 and creates the loop that line 426 says this ordering avoids. Or it could name a pre-fix or intermediate source commit that the final checks did not establish. The AC-04 row (line 538) covers ledger edits after review and squash or baseline handling, but it has no case for the fix-batch `Verified source` value.
+PROPOSAL: Define the fix-batch ledger `Verified source` as the last source commit before the ledger-only commit. Require the diff from that commit to the final review target to contain only the ledger, index and record paths, and have the audit batch reviewer check this. Add an AC-04 negative case where a source change after the named `Verified source`, or a placeholder filled in after the review, prevents a clean or fresh review.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Entry points and modes (`fix`); Remediation and delivery authority (batch Definition and Evidence); Test Plan AC-04
+EVIDENCE: shared-audit.md:116-118 says `fix` will "Re-ground every selected finding ... write and observe a failing regression first". Lines 379-380 require each member's Evidence to include "pre-fix commit and observed failing regression, repair commit". Line 398 says "Every selected repair member still requires its own red/green and final-target evidence". Line 362 says "A newly added member, changed Definition ... invalidates that review". Line 119 says "A scope change or next workstream needs the consumer's existing selection boundary". The spec does not say what happens when re-grounding shows that a selected member is already FIXED, MOOT, PARTIAL or not reproducible at the Scope baseline. In that case no honest failing regression exists, and lines 113 and 383 forbid inventing one. Several readings are possible. The batch could block. The member could be removed from the Definition, which may count as a selection change that needs the owner. Or a reverify-style verdict could be recorded in the batch ledger update, which would then need the separate adversarial challenge from line 216 rather than red/green. The AC-04 trial uses two findings that both reproduce and has no stale-selection case. This is the persistent-ledger situation that reverify drift is meant to expose.
+PROPOSAL: State the outcome for a selected member that re-grounding finds already fixed, moot, partial or not reproducible. For example: stop and present it, record any terminal verdict as a non-authored reverify observation with its own adversarial challenge and no red/green claim, and remove it from the repair Definition only through the consumer's selection boundary before the record is fixed. Add an AC-04 synthetic case where one selected member no longer reproduces.
+
+<br>
+
+Two should-fix judgement findings, no blockers. The launcher passed:
+- **Files:** All 72 committed blobs matched.
+- **Lint:** Both specs passed `vh-adlc lint`.
+- **Worktrees:** Both repositories' worktrees, indexes and refs were left unchanged.
+- **Stackweaver policy:** All 20 bounded checks on Stackweaver's audit policy were present.
+- **Context figures:** The spec's figures matched: 991 lines, 67 ID headings, 7 headings citing other findings, highest ID AUD-159, eleven skills, plugin 0.6.0.
 
 ## Sources
 
