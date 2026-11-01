@@ -548,6 +548,7 @@ Publication still waits for reviewed-spec acceptance. Any new judgment finding r
 | 2026-11-02 | R-4 | spec | `c68255a2114b4d298948af9913468eeec4424528` | claude-opus-5.5 | procedural | Map retained live verification, ledger-only commit placement and request-versus-standing effects. |
 | 2026-11-02 | R-5 | spec | `0bd3d6f0375ed09590529166f4e95c307b3cc69b` | claude-opus-5.5 | procedural | Bind uncommitted ledger application to its isolated assessed source. |
 | 2026-11-02 | R-6 | spec | `ba3eef8de01afc773e70b4c3a5c43dca0934c97a` | claude-opus-5.5 | procedural | Preserve delta-scoping baselines across squash merge and missing history. |
+| 2026-11-02 | R-7 | spec | `b73cc50de4e94dfded9dbee2e06b7394eecc0ae8` | claude-opus-5.5 | procedural | Review carried ledger updates in the full publication range; name the audit-specific review. |
 
 ### R-1
 
@@ -651,6 +652,22 @@ SEVERITY: should-fix
 WHERE: Design, Entry points and modes; Remediation and delivery authority; Test Plan AC-03, AC-04
 EVIDENCE: shared-audit.md:106-107 says default reverify will "scope changes since each recorded baseline". Under shared-audit.md:393-396, a fix batch prepares and commits its ledger status, index and evidence updates on "the selected unpublished source branch before the final-head review". shared-audit.md:373-379 records each member's "pre-fix commit", "repair commit" and "exact review target" on that branch. shared-audit.md:415-417 keeps Stackweaver's "conditional squash merge", and authority.md:26 and authority.md:92 already plan for merged-branch deletion and refs that survive "after a squash". After a squash merge, the branch commits that the pre-merge ledger update can cite are not reachable from the default branch. That update cannot name the later squash commit either. The spec does not say which baseline a fix batch writes into the ledger. It also does not say what a later reverify does when a recorded baseline is unresolvable or not an ancestor of the assessed default source. No Test Plan row covers a reverify after a squash-merged fix batch. An implementation could fail the delta scan, silently skip scoping, or pick its own fallback. This affects the stable re-verification behavior that AC-03 and AC-05 must preserve.
 PROPOSAL: Define the baseline that a fix-batch ledger update records so that it stays resolvable after a squash merge, for example the reachable task base plus the batch reference. Also define how reverify handles a recorded baseline that is missing or not an ancestor: treat it as unscoped and reassess fully, and never treat it as unchanged. Add an AC-03/AC-04 synthetic case in which a squash-merged batch with its branch deleted is followed by reverify.
+
+### R-7
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Entry points and modes; Remediation and delivery authority; Test Plan AC-04
+EVIDENCE: Lines 156-160 let a fix repair worktree "start at the recorded ledger commit" from a reverify/full run, "Record that ledger commit as Task base before authored repairs", and say "its known report update is part of the selected batch's later reviewed publication scope". The audit batch reviewer, however, checks the "actual diff from task base" (line 384). The record's Definition and affected paths are also measured from that Task base (lines 365-366 and 393-395). So the reviewer never sees the reverify/full ledger commit, including any FIXED/MOOT verdicts it holds. Even so, the batch push and Stackweaver's conditional squash merge (lines 309-311 and 441-443) would publish it. That conflicts with "Reverify/full never inherit fix's remote permission" (line 314) and with the claim that the commit falls within reviewed publication scope. The AC-04 row only checks that this commit can become the repair base while the default ancestor stays the Scope baseline. It does not check that the review covers the commit or that publication handles it.
+PROPOSAL: Say whether the batch review diff starts at the Scope baseline (the default ancestor) so the carried ledger-only commit is reviewed, or whether that commit must be published separately under its own authority before it can serve as a fix Task base. Add an AC-04 negative case in which an unreviewed carried reverify verdict cannot be pushed or conditionally merged with the batch.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Evidence, updates and recovery
+EVIDENCE: Line 213 says an authored fix's FIXED verdict requires a "current independent bounded-maintenance or feature review". Lines 381-391 say a fix batch must use the audit-specific `references/audit-review.md` reviewer and must not "dispatch an unchanged ordinary maintenance reviewer as if it covered these extra obligations". They also say "The existing maintenance record and reviewer stay unchanged". Read on its own, line 213 could be satisfied by `maintenance-review.md`.
+PROPOSAL: Change line 213 to require the current independent audit batch review (`references/audit-review.md`) or a feature review, so it matches the later dispatch rule.
 
 ## Sources
 
