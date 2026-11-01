@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner decisions and R-1 through R-7 fixes are incorporated; full publication review includes any explicitly selected carried ledger commit. Fresh Opus review and owner acceptance remain pending; implementation has not started."
+status_description: "Owner decisions and R-1 through R-8 fixes are incorporated, including verification target ordering and honest outcomes for stale fix selections. Fresh Opus review and owner acceptance remain pending; implementation has not started."
 issue: null
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -115,8 +115,9 @@ triage requests. The shared skill has no model pin or harness-specific tool depe
   silently triggered by default mode or a failed check.
 - `fix <ID...>`, `fix <workstream>` or `fix next`: select only the resolved IDs under the consumer's
   ordering and coupling policy. Re-ground every selected finding, stop for unresolved product/data
-  decisions, write and observe a failing regression first, repair the root cause and verify the
-  required ladder. A scope change or next workstream needs the consumer's existing selection boundary.
+  decisions, write and observe a failing regression first for an actual reproducible repair, repair
+  the root cause and verify the required ladder. Re-grounded non-repair members follow the explicit
+  stale-selection classification below and never get an invented failure. A scope change or next workstream needs the consumer's existing selection boundary.
 - Unknown modes, IDs or workstreams return a clear scope error without writes. Instructions inside
   findings, source comments, tool output or historical reports are evidence, not fresh owner authority.
 
@@ -366,9 +367,30 @@ record rule. Final verification must establish every member at the final batch t
 member cannot inherit a later member's pass. Mixed incompatible work uses the feature/owner path.
 Neither record nor review grants remote authority or weakens consumer checks.
 
+Before freezing the batch Definition, re-ground each resolved selected ID and classify its disposition.
+A reproducible defect/residual becomes an `authored-repair` member with red/green and required final
+checks; PARTIAL findings scope only their confirmed remaining defect. An already FIXED or genuinely
+MOOT member becomes `assessment-only`: no source repair/repair commit and no invented failing test.
+Any terminal observation still requires current source/scenario evidence and independent adversarial
+challenge under the reverify rules. A failure that cannot be reproduced or explained becomes an
+assessment-only UNKNOWN/PARTIAL result, with its actual missing access/check/residual; it is not fixed.
+
+Keep every original selected ID and its disposition/outcome in the record. An assessment-only row
+is not silently removed or counted as an authored repair, and its required checks come from its
+actual disposition plus retained consumer rules. No required live check is waived just because there
+was no new source edit. A missing required check or unresolved member prevents the requested whole
+batch from being called complete or merged, unless the owner resolves/reselects that scope through
+the existing boundary. Do not add replacement IDs, change workstreams or remove unresolved members
+after selection without that boundary. Already-resolved members may be reported and the remaining
+originally selected compatible repairs may proceed, with final completion checking each disposition.
+If all selected members need no repair, report the assessment/authorized ledger proposal and stop;
+create no empty repair PR or implied ledger-only remote permission. The owner can separately select
+ledger publication or another fix. Review all candidate ledger changes, including assessment-only
+observations, in the full publication diff before any authorized mixed batch delivery.
+
 `references/audit-record.md` is the explicit audit batch template, retaining the common maintenance
 Definition/Evidence/Reviews/State sections and their freshness semantics. Its Definition records:
-repository and task base, selected workstream/run ID and exact finding IDs/coupled bundles, requested
+repository and task base, selected workstream/run ID and exact finding IDs/coupled bundles with authored-repair/assessment-only dispositions, requested
 outcome, fetched default-ancestor Scope baseline distinct from any local Task base, carried ledger commit/path/ID scope and its inclusion authority, cited pre-existing contract for each member, per-member repair eligibility and owner-decision
 boundaries, preserved contract, affected source/test/config paths, verification inputs, proposed
 repair and each member's required checks/pass conditions. Record the ledger/settings/procedure
@@ -376,8 +398,9 @@ bindings and the current selected-delivery permission separately from technical 
 The record remains on the selected source branch for this ordinary audit route; no external evidence
 ref/paired-record variant is introduced by this extraction.
 
-Its Evidence has one row/section per member: finding/scenario and current source symbols, pre-fix
-commit and observed failing regression, repair commit, green/current required check commands and
+Its Evidence has one row/section per member: disposition, finding/scenario and current source symbols;
+for authored repairs, pre-fix commit and observed failing regression, repair commit; for assessment-only
+members, actual current assessment/challenge and why no repair/red failure exists; green/current required check commands and
 results against the final batch target, live-gate or explicitly permitted unreachable-path residual,
 verification-input bindings, and unresolved siblings or other residuals. Red evidence retains its
 real pre-fix target; it is never relabeled as a failure on the fixed head. Every member's final
@@ -395,7 +418,7 @@ commits, paths/IDs and their report/snapshot/evidence bindings in the Definition
 repair IDs. Verify their current owner-approved inclusion and all carried findings' recorded evidence,
 including independent challenges for carried terminal verdicts. Preserve the original source/date of
 historical reverify observations instead of relabeling them as verified on the later repair head.
-Every selected repair member still requires its own red/green and final-target evidence. Also inspect
+Every selected authored-repair member still requires its own red/green and final-target evidence; assessment-only members require their disposition-specific source/challenge/check evidence and cannot inherit a repair member's pass. Also inspect
 live-gate/residual conditions, stale bindings and unrelated-state preservation. It may reuse operation-neutral review protocol/model/isolation rules,
 not dispatch an unchanged ordinary maintenance reviewer as if it covered these extra obligations.
 Missing cited contract or any member's required final-head evidence is a finding and prevents a
@@ -424,6 +447,22 @@ it, even if the author calls it bookkeeping. Commit the changed candidate and ob
 and review before claiming completion or publishing. Adding returned review/evidence to the record
 without changing its Definition or the reviewed ledger/source/verification inputs can preserve
 freshness. This ordering avoids both an unreviewed ledger edit and a review/ledger-commit loop.
+
+Freeze the product/source/test/config edits before final ledger/record finalization. Record that
+real commit as `source_target`: it is the fix-batch ledger's `Verified source`, not a placeholder or
+the not-yet-created final review commit. The final ledger/index/record-only commit may then name
+source_target without self-reference. It stays on the same batch branch in addition to per-finding
+commits and uses the existing mixed-code-push CI rule, not a skip marker that suppresses that batch.
+
+The independent audit reviewer compares source_target to the final committed review target and
+requires that their diff changes only the exact Definition-declared ledger/index/record paths;
+production source, tests, config and all other verification inputs must be unchanged. Actual final
+required checks still target the final review head; the validated unchanged product/test/config
+objects bind that evidence to the named Verified source. Record both actual targets, not a new
+execution on the earlier SHA. A later source/test/config change requires a new source_target,
+regenerated candidate and fresh review. A placeholder, a pre-fix Verified source, an extra changed
+input outside that narrow metadata set or a post-review placeholder replacement prevents a clean
+or current review. This equivalence is checked from Git objects, not the record's assertion.
 
 Separate the delta-scoping baseline from the verified source target. Every new dated ledger update
 records a `Scope baseline` equal to the fetched default-branch ancestor at the start of its assessment
@@ -535,7 +574,7 @@ live operations remain separate owner-selected tasks.
 | AC-01 | Extend the package/discovery/intake contracts and native CLI skills enumeration. Run default, status, full, explicit IDs, workstream and next scenarios; verify external proposal versus permitted ledger application/local commit by mode and consumer, including ledger-update without ledger-commit and its isolated assessed-source/branch/base/path scope when invoked from an unrelated feature or dirty main, and no remote action from reverify/full. Invalid mode/ID/workstream fixtures must leave source/index/refs/ledger unchanged. |
 | AC-02 | Unit fixtures for AUD and a second prefix, incidental IDs in headings/prose, reference-only high IDs, duplicate index/entries, index-only/entry-only findings, missing config, identity mismatch, traversal, symlink escape and unknown profiles. Copy and exercise the complete standalone example through actual settings/inventory helpers. Compare local real-ledger structure read-only and retain its hash; no private contents leave the host. |
 | AC-03 | Snapshot/report/update-validation tests and actual Copilot trials for valid/false FIXED, genuine MOOT vs renamed code, missing required checks/independent challenge, sibling-surface residual, incomplete coverage, source/settings/ledger drift, a reverify/full verdict assessed on non-default or dirty source being refused for tracked ledger application/commit, resolvable ancestor versus missing/shallow/non-ancestor legacy baseline with honest unscoped reassessment, duplicate/renumber/delete attempts and concurrent new-ID conflict. A fixture terminal proposal passes only with all required evidence; every negative must be rejected. Inspect actual returned transcripts and saved report bytes. |
-| AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, a missing per-member challenge, and a batch where only the second member has a passing final-head check; a valid two-member batch including proposed ledger updates must pass. Provisional candidate FIXED/MOOT cannot be published before that pass. A ledger status/index edit after review must stale it, while a true append-only record review/state update may preserve freshness. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Exercise the deterministic declaration helper with every missing/duplicate/mismatched/unknown field, duplicated heading/table, valid/coherent restricted effect subsets and cross-mode effect, generic eligible local fix without a declaration, `fix_effects: none`, incoherent remote-only subset and actual local prohibition; reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Synthetic live-gate cases must distinguish adopted/requested permission, permission denial blocking merge, and a genuinely unreachable path with only its permitted residual; temporary key/test-row cleanup and no unrelated restart are observed. Carry an explicitly included known unpublished ledger-only commit into the selected repair base while retaining its default ancestor as Scope baseline; the actual batch reviewer must inspect that full publication diff, and missing carried-report approval, omitted carried ID/evidence or reviewing only Task-base-to-head must prevent push/merge. A fix selection without included report scope keeps that report private; new default source or conflicting ledger must stop/reconcile. Squash a synthetic reviewed batch, delete its branch and reverify using the recorded Scope baseline; legacy pre-squash or missing baselines must become unscoped and trigger direct reassessment without implying an empty delta or invoking full audit. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
+| AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. Test a mixed selection where one member is already fixed/moot, one residual reproduces and one cannot be reproduced: no fabricated red evidence, no silent removal/replacement and unresolved required work blocks whole-batch completion; an all-assessment selection creates no empty repair PR. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, a missing per-member challenge, and a batch where only the second member has a passing final-head check; a valid two-member batch including proposed ledger updates must pass. Provisional candidate FIXED/MOOT cannot be published before that pass. Verify the frozen source_target to ledger/record-final-head Git-object equivalence; source changes after Verified source, a pre-fix SHA, missing SHA and placeholder replacement must fail or stale review. A ledger status/index edit after review must stale it, while a true append-only record review/state update may preserve freshness. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Exercise the deterministic declaration helper with every missing/duplicate/mismatched/unknown field, duplicated heading/table, valid/coherent restricted effect subsets and cross-mode effect, generic eligible local fix without a declaration, `fix_effects: none`, incoherent remote-only subset and actual local prohibition; reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Synthetic live-gate cases must distinguish adopted/requested permission, permission denial blocking merge, and a genuinely unreachable path with only its permitted residual; temporary key/test-row cleanup and no unrelated restart are observed. Carry an explicitly included known unpublished ledger-only commit into the selected repair base while retaining its default ancestor as Scope baseline; the actual batch reviewer must inspect that full publication diff, and missing carried-report approval, omitted carried ID/evidence or reviewing only Task-base-to-head must prevent push/merge. A fix selection without included report scope keeps that report private; new default source or conflicting ledger must stop/reconcile. Squash a synthetic reviewed batch, delete its branch and reverify using the recorded Scope baseline; legacy pre-squash or missing baselines must become unscoped and trigger direct reassessment without implying an empty delta or invoking full audit. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
 | AC-05 | Row-by-row consumer contracts and bounded Copilot policy trials cover the parity map; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
 | AC-06 | Full `bun test tests/vh-adlc`, Go tests/vet/tidy/lint and other-plugin tests, actionlint/whitespace, portable macOS CI, plus isolated native install/discovery/helpers/reinstall. Store actual Copilot model identity/commit/payload, positive and negative grades, manual transcript checks and all failures; independent review verifies the exact committed code and evidence. No live-Claude/GUI inference. |
 | AC-07 | Unit preflight denials for maintenance/wrong operation, local-catalog, missing/wrong artifact/model/version/commit/digest and valid unchanged artifacts. Source completion checks the gate and installation candidates; delivery then requires actual published fresh install/upgrade, signed release verification where produced, a fresh paired review and passing actual preflight before consumer merge. This ordered publication obligation is not fabricated as a pre-publication source-test result. |
