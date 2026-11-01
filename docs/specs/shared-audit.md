@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Copilot Opus 5.5 R-12 has no blocking findings, with one post-merge outcome placement/recovery recommendation tracked for implementation. Owner spec acceptance is pending; implementation and publication have not started."
+status: planned
+status_description: "Accepted by the owner after Copilot Opus 5.5 R-12. Documentation, tracking issue and implementation claim are authorized; R-12 recovery proof remains mandatory implementation work."
 issue: null
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -93,7 +93,9 @@ required recovery evidence must be observed before AC-04 or the feature can be m
 The owner-facing purpose is software bug/security/reliability auditing with persistent finding
 history, re-verification and selected repairs. This extraction moves the reusable procedure and
 retains Stackweaver's ledger and product-specific rules; it performs no real product audit or fix.
-The draft remains local until the owner accepts the reviewed specification, as requested.
+The owner accepted the summarized reviewed spec on 2026-11-02 and explicitly authorized publication
+of its documentation, tracking issue and implementation claim, followed by implementation. The R-12
+recovery obligation remains required; no implementation or runtime verification is claimed by acceptance.
 
 ## Scope
 
@@ -705,7 +707,7 @@ None yet; decompose into one-commit tasks after clean spec review and owner acce
 None. On 2026-11-01 the owner accepted the three recommendations summarized in the conversation:
 retain adopted local authority and per-mode ledger writes; allow bounded repairs restoring documented
 behavior; use one repair record with final-head review per compatible selected workstream batch.
-Publication still waits for reviewed-spec acceptance. Any new judgment finding returns to the owner.
+The reviewed spec was accepted on 2026-11-02. Any new policy judgment returns to the owner.
 
 ## Review Log
 
@@ -723,6 +725,7 @@ Publication still waits for reviewed-spec acceptance. Any new judgment finding r
 | 2026-11-02 | R-10 | spec | `56ae457872568ae37ee6841aa93bd940cf09bc58` | claude-opus-5.5 | procedural | Define audit intake priority, bound parity-map artifact/completeness and owned cleanup. |
 | 2026-11-02 | R-11 | spec | `7eda0b6b00931ac1114861619e87bc73dc528f8c` | claude-opus-5.5 | procedural | Track temporary live-test resources across interruption and resume cleanup. |
 | 2026-11-02 | R-12 | spec | `67a91a17944bb219ce956364963531532577c396` | claude-opus-5.5 | procedural | No blocking findings; post-merge outcome placement/recovery remains an implementation proof obligation. |
+| 2026-11-02 | R-12 | spec | `67a91a17944bb219ce956364963531532577c396` | n/a | n/a | accepted by owner |
 
 ### R-1
 
