@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner decisions and R-1 through R-6 fixes are incorporated, including squash-safe scoping baselines and missing-history fallback. Fresh Opus review and owner acceptance remain pending; implementation has not started."
+status_description: "Owner decisions and R-1 through R-7 fixes are incorporated; full publication review includes any explicitly selected carried ledger commit. Fresh Opus review and owner acceptance remain pending; implementation has not started."
 issue: null
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -156,8 +156,13 @@ advertised as remote history. If the owner then selects fixes from that same rep
 worktree may start at the recorded ledger commit only when its parent is the still-current fetched
 default base and its delta contains exactly the owned permitted ledger/index paths. Record that
 ledger commit as Task base before authored repairs; its known report update is part of the selected
-batch's later reviewed publication scope. If default source, ledger or policy advanced, reconcile
-and re-assess against the new base first; never carry stale verdicts onto the new branch. A generic
+batch's later reviewed publication scope only when the current owner selection explicitly includes
+that known report/ledger commit and its full ID scope as presented in the selection summary. Selecting
+a fix without that shown inclusion grants no publication of the separate reverify/full report.
+Absent inclusion, retain the ledger ref privately and start the repair from fetched default source
+with only the selected finding updates, or get the missing scope approval; do not silently carry it.
+If default source, ledger or policy advanced, reconcile and re-assess against the new base first;
+never carry stale verdicts onto the new branch. A generic
 consumer missing ledger-commit permission keeps its report external. Tests inspect the true commit
 branch/base/path set and cover an unrelated feature checkout, dirty main, unpublished local ledger
 commit followed by selected fixes, newer default source and conflicting ledger bytes.
@@ -210,7 +215,8 @@ preserved in historical text. Missing required checks or access becomes UNKNOWN/
 
 Every new FIXED/MOOT re-verification verdict needs source inspection addressing the original failure
 scenario and a separate adversarial challenge. An authored fix additionally requires its regression
-red/green, consumer-mandated checks and current independent bounded-maintenance or feature review.
+red/green, consumer-mandated checks and current independent audit batch review under
+`references/audit-review.md`, or the applicable feature implementation review.
 MOOT needs the actual removed applicability, not an absent old line. Residuals are carried explicitly;
 partial findings remain partial. Group-level test success does not establish an untested member.
 
@@ -363,7 +369,7 @@ Neither record nor review grants remote authority or weakens consumer checks.
 `references/audit-record.md` is the explicit audit batch template, retaining the common maintenance
 Definition/Evidence/Reviews/State sections and their freshness semantics. Its Definition records:
 repository and task base, selected workstream/run ID and exact finding IDs/coupled bundles, requested
-outcome, fetched default-ancestor Scope baseline distinct from any local Task base, cited pre-existing contract for each member, per-member repair eligibility and owner-decision
+outcome, fetched default-ancestor Scope baseline distinct from any local Task base, carried ledger commit/path/ID scope and its inclusion authority, cited pre-existing contract for each member, per-member repair eligibility and owner-decision
 boundaries, preserved contract, affected source/test/config paths, verification inputs, proposed
 repair and each member's required checks/pass conditions. Record the ledger/settings/procedure
 bindings and the current selected-delivery permission separately from technical repair eligibility.
@@ -381,9 +387,16 @@ review target and preserve older checks/reviews rather than rebinding them to a 
 Dispatch the independent batch review with `references/audit-review.md`, the batch repository,
 exact final source commit, committed record path/Definition, selected scope, docs revision and shared
 review protocol. The audit-specific reviewer checks the accepted restoration classification against
-the cited existing contract, complete Definition membership/couplings, actual diff from task base,
-per-member red/green and final-target checks, live-gate/residual conditions, stale bindings and
-unrelated-state preservation. It may reuse operation-neutral review protocol/model/isolation rules,
+the cited existing contract, complete Definition membership/couplings, and the entire proposed
+publication diff from the fetched default-ancestor Scope baseline to the final review target. That
+range includes any carried ledger-only commit; Task base marks the post-ledger point for attributing
+authored repair/red evidence and must not hide earlier changes from review. Enumerate carried ledger
+commits, paths/IDs and their report/snapshot/evidence bindings in the Definition alongside selected
+repair IDs. Verify their current owner-approved inclusion and all carried findings' recorded evidence,
+including independent challenges for carried terminal verdicts. Preserve the original source/date of
+historical reverify observations instead of relabeling them as verified on the later repair head.
+Every selected repair member still requires its own red/green and final-target evidence. Also inspect
+live-gate/residual conditions, stale bindings and unrelated-state preservation. It may reuse operation-neutral review protocol/model/isolation rules,
 not dispatch an unchanged ordinary maintenance reviewer as if it covered these extra obligations.
 Missing cited contract or any member's required final-head evidence is a finding and prevents a
 clean batch review. Return the shared `MODEL:` header and complete findings or `NO FINDINGS`, store
@@ -522,7 +535,7 @@ live operations remain separate owner-selected tasks.
 | AC-01 | Extend the package/discovery/intake contracts and native CLI skills enumeration. Run default, status, full, explicit IDs, workstream and next scenarios; verify external proposal versus permitted ledger application/local commit by mode and consumer, including ledger-update without ledger-commit and its isolated assessed-source/branch/base/path scope when invoked from an unrelated feature or dirty main, and no remote action from reverify/full. Invalid mode/ID/workstream fixtures must leave source/index/refs/ledger unchanged. |
 | AC-02 | Unit fixtures for AUD and a second prefix, incidental IDs in headings/prose, reference-only high IDs, duplicate index/entries, index-only/entry-only findings, missing config, identity mismatch, traversal, symlink escape and unknown profiles. Copy and exercise the complete standalone example through actual settings/inventory helpers. Compare local real-ledger structure read-only and retain its hash; no private contents leave the host. |
 | AC-03 | Snapshot/report/update-validation tests and actual Copilot trials for valid/false FIXED, genuine MOOT vs renamed code, missing required checks/independent challenge, sibling-surface residual, incomplete coverage, source/settings/ledger drift, a reverify/full verdict assessed on non-default or dirty source being refused for tracked ledger application/commit, resolvable ancestor versus missing/shallow/non-ancestor legacy baseline with honest unscoped reassessment, duplicate/renumber/delete attempts and concurrent new-ID conflict. A fixture terminal proposal passes only with all required evidence; every negative must be rejected. Inspect actual returned transcripts and saved report bytes. |
-| AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, a missing per-member challenge, and a batch where only the second member has a passing final-head check; a valid two-member batch including proposed ledger updates must pass. Provisional candidate FIXED/MOOT cannot be published before that pass. A ledger status/index edit after review must stale it, while a true append-only record review/state update may preserve freshness. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Exercise the deterministic declaration helper with every missing/duplicate/mismatched/unknown field, duplicated heading/table, valid/coherent restricted effect subsets and cross-mode effect, generic eligible local fix without a declaration, `fix_effects: none`, incoherent remote-only subset and actual local prohibition; reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Synthetic live-gate cases must distinguish adopted/requested permission, permission denial blocking merge, and a genuinely unreachable path with only its permitted residual; temporary key/test-row cleanup and no unrelated restart are observed. Carry a known unpublished ledger-only commit into the selected repair base while retaining its default ancestor as Scope baseline; new default source or conflicting ledger must stop/reconcile. Squash a synthetic reviewed batch, delete its branch and reverify using the recorded Scope baseline; legacy pre-squash or missing baselines must become unscoped and trigger direct reassessment without implying an empty delta or invoking full audit. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
+| AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, a missing per-member challenge, and a batch where only the second member has a passing final-head check; a valid two-member batch including proposed ledger updates must pass. Provisional candidate FIXED/MOOT cannot be published before that pass. A ledger status/index edit after review must stale it, while a true append-only record review/state update may preserve freshness. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Exercise the deterministic declaration helper with every missing/duplicate/mismatched/unknown field, duplicated heading/table, valid/coherent restricted effect subsets and cross-mode effect, generic eligible local fix without a declaration, `fix_effects: none`, incoherent remote-only subset and actual local prohibition; reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Synthetic live-gate cases must distinguish adopted/requested permission, permission denial blocking merge, and a genuinely unreachable path with only its permitted residual; temporary key/test-row cleanup and no unrelated restart are observed. Carry an explicitly included known unpublished ledger-only commit into the selected repair base while retaining its default ancestor as Scope baseline; the actual batch reviewer must inspect that full publication diff, and missing carried-report approval, omitted carried ID/evidence or reviewing only Task-base-to-head must prevent push/merge. A fix selection without included report scope keeps that report private; new default source or conflicting ledger must stop/reconcile. Squash a synthetic reviewed batch, delete its branch and reverify using the recorded Scope baseline; legacy pre-squash or missing baselines must become unscoped and trigger direct reassessment without implying an empty delta or invoking full audit. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. No real remote or live stack action. |
 | AC-05 | Row-by-row consumer contracts and bounded Copilot policy trials cover the parity map; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
 | AC-06 | Full `bun test tests/vh-adlc`, Go tests/vet/tidy/lint and other-plugin tests, actionlint/whitespace, portable macOS CI, plus isolated native install/discovery/helpers/reinstall. Store actual Copilot model identity/commit/payload, positive and negative grades, manual transcript checks and all failures; independent review verifies the exact committed code and evidence. No live-Claude/GUI inference. |
 | AC-07 | Unit preflight denials for maintenance/wrong operation, local-catalog, missing/wrong artifact/model/version/commit/digest and valid unchanged artifacts. Source completion checks the gate and installation candidates; delivery then requires actual published fresh install/upgrade, signed release verification where produced, a fresh paired review and passing actual preflight before consumer merge. This ordered publication obligation is not fabricated as a pre-publication source-test result. |
