@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Triage and maintenance are published and adopted through separately reviewed child specs and real marketplace tests. Audit, documentation and other extractions remain deferred."
+status_description: "Triage and maintenance are published and adopted through separately reviewed child specs and real marketplace tests. Audit is selected for its own spec; documentation and other extractions remain deferred."
 issue: null
 goal: "Selected reusable Stackweaver workflows are delivered through vh-adlc, with a separate accepted spec and verified migration for each capability."
 covers:
@@ -20,7 +20,7 @@ completed triage feature.
 The owner selected dependency/security maintenance next on 2026-10-27. Its accepted child is
 [shared-maintenance.md](shared-maintenance.md). Its published delivery and marketplace-verified
 Stackweaver adoption completed on 2026-10-30; exact revisions and remaining test limits are recorded there. Stackweaver retains its specific operating procedures, including its existing
-approved satellite-merge helper. No audit, documentation or domain extraction has been selected.
+approved satellite-merge helper. Audit was selected on 2026-11-01; its [child spec](shared-audit.md) is being reviewed before implementation. Documentation and domain extraction remain unselected.
 
 Triage is the first extraction. Its accepted behavior and local verification remain in
 [shared-triage.md](shared-triage.md), initially completed at `0e033f8` and refreshed by Copilot Opus 5.5 R-34 before publication.
@@ -72,7 +72,7 @@ updated rollback baseline. GUI discovery remains unverified under #33.
 | --- | --- | --- |
 | TRIAGE | Backlog triage, `agents/issue-triage.md` | [Child spec](shared-triage.md) adopted through vh-adlc #34 and Stackweaver #976 after actual marketplace tests. The delivery evidence is above. GUI discovery remains under [#33](https://github.com/michielvha/vh-adlc/issues/33). |
 | D-01 | Dependency/security maintenance, `agents/maintenance.md` | Published in [vh-adlc #37](https://github.com/michielvha/vh-adlc/pull/37) and adopted in [Stackweaver #997](https://github.com/michielvha/stackweaver/pull/997), after real Codex/Claude marketplace fresh installs/upgrades, final paired review and adoption preflight. The [child spec](shared-maintenance.md#published-maintenance-and-consumer-adoption-2026-10-30) records exact revisions, retained local policy and deferred live-Claude/GUI/production tests. The host main checkout still needs reconciliation of unrelated local planning work. |
-| D-02 | Persistent codebase audit, `agents/codebase-audit.md` | Candidate for a separate audit spec. Preserve finding identities, adversarial re-verification and residuals, and connect remediation to the existing lifecycle. Decide write/merge authority before carrying over local automation. |
+| D-02 | Persistent codebase audit, `agents/codebase-audit.md` | Selected on 2026-11-01; [shared-audit.md](shared-audit.md) specifies the extraction and Stackweaver migration. Independent review and owner acceptance precede implementation. Preserve finding identities, adversarial re-verification, residuals and local delivery policy. |
 | D-03 | Documentation impact, drift audit/resolution and truth checks | Deferred. Compare `agents/docs-impact.md`, `docs-drift-audit.md`, `docs-drift-resolver.md` and `docs-truth.md` with vh-adlc's existing documentation workflow first. Any selected extraction gets a separate spec. Existing scanners, ledgers, hooks and schedules stay unchanged. |
 | D-04 | TFE compatibility and provider-fork workflows | Keep `agents/tfe-compat.md` and `agents/provider-fork.md` as domain extensions in Stackweaver. Extract only a separately selected reusable part, preserving product contracts and licensing boundaries. |
 | D-05 | Broader Stackweaver development-loop onboarding | Separate future scope. Keep plan formats, slot isolation, integration/browser requirements and shipping rules local until their compatibility and migration are specified. No wholesale conversion follows from triage adoption. |

@@ -47,7 +47,7 @@ Stackweaver remote main is `0ae15a9dafc58ff6457cf90f2c91630015833539`. Its audit
 working tree and fetched remote main. Lines 3-44 define the ledger, stable IDs, verification and
 mode selection; lines 48-111 cover re-verification and full audit; lines 114-265 cover fixes,
 regression tests, live verification, batching, conditional merge and special cases.
-`.claude/commands/audit.md:1-49` preserves `/audit`, `model: opus`, optional arguments and
+`.claude/commands/audit.md:1-43` preserves `/audit`, `model: opus`, optional arguments and
 Stackweaver's existing conditional delivery behavior.
 
 The local ledger has historical summaries, a severity-index table and finding sections. A local
