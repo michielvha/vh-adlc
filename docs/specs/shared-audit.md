@@ -504,6 +504,7 @@ Publication still waits for reviewed-spec acceptance. Any new judgment finding r
 | 2026-11-02 | R-2 | spec | `773c703b5a3f2b6f4773afe45b9f8e7e158ad0f8` | claude-opus-5.5 | procedural | Batch record/review dispatch needs explicit per-member fields and negative checks. |
 | 2026-11-02 | R-3 | spec | `cd10c08964a0b759f10b38b5f90fa9808db20241` | claude-opus-5.5 | procedural | Specify the authorization declaration and ledger/review ordering. |
 | 2026-11-02 | R-4 | spec | `c68255a2114b4d298948af9913468eeec4424528` | claude-opus-5.5 | procedural | Map retained live verification, ledger-only commit placement and request-versus-standing effects. |
+| 2026-11-02 | R-5 | spec | `0bd3d6f0375ed09590529166f4e95c307b3cc69b` | claude-opus-5.5 | procedural | Bind uncommitted ledger application to its isolated assessed source. |
 
 ### R-1
 
@@ -589,6 +590,15 @@ SEVERITY: should-fix
 WHERE: Design, Entry points and modes; Remediation and delivery authority
 EVIDENCE: shared-audit.md:127-128 says "`fix` authorizes only selected source/ledger/record edits and local commits within the classified repair/feature route; remote actions additionally require the adopted delivery grant". This makes the fix request itself the source of local authority. Yet fix_effects lists `source-edit,ledger-update,local-commit` as declaration effects (shared-audit.md:233). shared-audit.md:240-241 says "A valid subset grants only its named effects; a local commit additionally needs the corresponding mode's ledger/source edit authority". authority.md:16 additionally requires "local instructions that permit it" for bounded maintenance edits. The spec does not settle three cases. First, whether a generic adopter with no declaration may make fix source, ledger and local-commit edits. Second, whether `fix_effects: none` or a subset that omits `source-edit` restricts a requested fix. Third, whether a remote-only subset such as `branch-push,pr-write` without `local-commit` is valid. The AC-04 proof requires grading "valid restricted effect subsets", so the implementation would have to invent these semantics.
 PROPOSAL: State whether fix local effects come from the current request plus lifecycle eligibility, from the declaration, or from both. Say whether omitting a fix_effects value restricts or only withholds a grant, and reject incoherent subsets, for example push or PR without local commit. Add AC-04 helper cases for each of these.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Entry points and modes; Evidence, updates and recovery
+EVIDENCE: shared-audit.md:122-125 says reverify/full "require a current explicit ledger-update request or adopted local rule before applying them to the tracked working-tree ledger", and a separate permission is needed for a commit. reverify_effects allows `ledger-update` alone as a valid subset (shared-audit.md:252), and a generic adopter can send an explicit ledger-update request with no commit. Isolation is only defined for the commit: shared-audit.md:132-136 places it in a new `chore/audit-ledger-<run-id>` worktree "based on freshly fetched committed default-branch source" and says "Never switch or commit into an unrelated feature or shared dirty main". The spec never says which working tree an uncommitted `ledger-update` writes to. As written, it could be whatever checkout invoked the operation, including an unrelated feature branch or dirty main with its own ledger edits. That conflicts with lifecycle.md:99-100 ("do not write into an unrelated feature") and authority.md:68. The spec also never requires the assessed source to be that default-branch commit. The snapshot records "source commit, source cleanliness/diff digest" (shared-audit.md:188), and the pre-apply check only stops when "material inputs changed" (shared-audit.md:212-213). So FIXED/MOOT verdicts made against a feature branch or uncommitted source could be applied or committed to the default-branch ledger, which is the false-fixed outcome AC-03 is meant to prevent. AC-01's isolation scenario (shared-audit.md:480) covers only the commit's branch/base/path scope.
+PROPOSAL: State where an applied but uncommitted reverify/full update lands. For example, use the same owned ledger worktree, or the invoking checkout only when it is a clean default-branch checkout of the assessed commit, and otherwise keep a private proposal and a handoff. Require the assessed source to be clean committed source at the ledger base before any ledger application or commit. Add AC-01/AC-03 cases for `ledger-update` without `ledger-commit` from an unrelated feature checkout or dirty main, and for verdicts assessed on non-default or dirty source.
 
 ## Sources
 
