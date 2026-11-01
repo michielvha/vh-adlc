@@ -602,6 +602,7 @@ Publication still waits for reviewed-spec acceptance. Any new judgment finding r
 | 2026-11-02 | R-6 | spec | `ba3eef8de01afc773e70b4c3a5c43dca0934c97a` | claude-opus-5.5 | procedural | Preserve delta-scoping baselines across squash merge and missing history. |
 | 2026-11-02 | R-7 | spec | `b73cc50de4e94dfded9dbee2e06b7394eecc0ae8` | claude-opus-5.5 | procedural | Review carried ledger updates in the full publication range; name the audit-specific review. |
 | 2026-11-02 | R-8 | spec | `ac789a95aa362337face903e8e9fa41b41b622e9` | claude-opus-5.5 | procedural | Define non-self-referential verification target and stale selected-finding outcomes; raw footer retained. |
+| 2026-11-02 | R-9 | spec | `be05ddd32aa077c4de5278a4dabda1d9fa8c1e68` | claude-opus-5.5 | procedural | Require actual consumer policy validation before and after cutover. |
 
 ### R-1
 
@@ -746,6 +747,14 @@ Two should-fix judgement findings, no blockers. The launcher passed:
 - **Worktrees:** Both repositories' worktrees, indexes and refs were left unchanged.
 - **Stackweaver policy:** All 20 bounded checks on Stackweaver's audit policy were present.
 - **Context figures:** The spec's figures matched: 991 lines, 67 ID headings, 7 headings citing other findings, highest ID AUD-159, eleven skills, plugin 0.6.0.
+
+### R-9
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Remediation and delivery authority; Stackweaver adapter, parity and rollback; Test Plan AC-05, AC-07
+EVIDENCE: shared-audit.md:254-260 says the standing grant comes only from a `Standing audit workflow authorization` declaration "reached through freshly fetched, committed default-branch AGENTS and audit settings", and that "Uncommitted or unmerged declarations, alternate origins, fixture-only adapters, copied settings ... confer no authority". Lines 282-284 say any missing, duplicate or unknown row, wrong identity, branch or path, or unresolved fragment means the declaration "grants no effect". Lines 316-319 depend on Stackweaver's own declaration for the ledger update/commit, issue, push/PR and conditional merge it keeps today, and lines 326-327 depend on it for the live gate. Lines 504-507 put that declaration in the new `agents/audit-project.md` and `.vh-adlc/audit.json` on the migration branch. The AC-04 helper trials (line 577) run only on synthetic declarations. The AC-05 proof (line 578) lists consumer contracts, Copilot policy trials, hashes, command metadata and rollback/reapply. The AC-07 preflight (lines 547-553, 580) binds the installed audit skill and payload. No criterion or proof runs the shared `scripts/audit/authority.ts` over Stackweaver's actual committed declaration, its fragment pointers into the real project procedure and its real origin/default branch. That check is not required before the consumer merge as a validation that grants nothing, and it is not required as a read-only check from the fetched default branch after the merge. Because an invalid declaration fails closed, one typo or a fragment that does not resolve would silently remove Stackweaver's adopted ledger-commit, live-verify and conditional-merge permissions. The synthetic AC-04/AC-05 evidence and the AC-07 preflight would still pass, so AC-05 could be ticked even though the retained authority behavior is gone.
+PROPOSAL: Add an AC-05 consumer contract that runs the actual shared authority helper over the migration branch's committed declaration and settings. It should check shape, coherence, field values and fragment resolution, and it must be explicitly non-granting before the merge. Also require a read-only post-merge check from the freshly fetched default branch that records the resolved effects per mode, so the cutover evidence shows the adopted grants match the parity map. Any mismatch blocks or rolls back the cutover.
 
 ## Sources
 
