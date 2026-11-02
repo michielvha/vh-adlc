@@ -1,7 +1,7 @@
 ---
 status: planned
 status_description: "Accepted by the owner after Copilot Opus 5.5 R-12. Documentation, tracking issue and implementation claim are authorized; R-12 recovery proof remains mandatory implementation work."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-audit/
@@ -700,7 +700,31 @@ live operations remain separate owner-selected tasks.
 
 ## Tasks
 
-None yet; decompose into one-commit tasks after clean spec review and owner acceptance.
+- [ ] T1 `Stackweaver:tests/agent-audit/parity.json` - commit the complete legacy-bound behavior/effect map before helper/forwarding edits; JSON structure, Git blob/excerpt hashes and all required dimensions resolve (AC-05).
+- [ ] T2 `tests/vh-adlc/audit/settings.test.ts` and `fixtures.ts` - write meaningful origin/config/profile/path and complete-example checks first; observe failure because the audit settings operation is absent (AC-02).
+- [ ] T3 `plugins/vh-adlc/scripts/audit/settings.ts`, `types.ts` and `examples/audit/basic/` - implement strict origin-bound settings and complete standalone files; T2 passes without host/private configuration (AC-02).
+- [ ] T4 `tests/vh-adlc/audit/inventory.test.ts` - write legacy-index/heading/reference/high-water/ambiguity tests first; observe the missing inventory behavior fail (AC-02).
+- [ ] T5 `plugins/vh-adlc/scripts/audit/inventory.ts` - implement supported Markdown inventory and conservative ID allocation; T4 passes including alternate prefix and incomplete inventories (AC-02).
+- [ ] T6 `tests/vh-adlc/audit/assessment.test.ts` and `snapshot.test.ts` - write target-binding, false-fixed, challenge, stale-source/history and candidate-integrity checks first; observe missing behavior fail (AC-03).
+- [ ] T7 `plugins/vh-adlc/scripts/audit/snapshot.ts`, `assessment.ts` and `report.ts` - implement private bound snapshots, evidence/proposal validation and exclusive reports; T6 passes with no ungranted checkout/index/ref writes (AC-03).
+- [ ] T8 `tests/vh-adlc/audit/authority.test.ts` - write declaration, provenance, current-request/effect precedence, coherent-subset and candidate/adopted dry-run denials first; observe failure before the authority helper exists (AC-04, AC-05).
+- [ ] T9 `plugins/vh-adlc/scripts/audit/authority.ts` - implement deterministic committed-policy validation and bounded effective-permission inspection; T8 passes and candidate inspection never grants an action (AC-04, AC-05).
+- [ ] T10 `tests/vh-adlc/audit/recovery.test.ts` and `live-recovery.test.ts` - write actual fake-transport interruption, private-journal ownership, key/row cleanup and lost squash-merge acknowledgement checks first; observe absent recovery behavior fail (AC-04).
+- [ ] T11 `plugins/vh-adlc/scripts/audit/journal.ts` and `recovery.ts` - implement owned private intent/outcome records and safe reconciliation without default-branch writes; T10 passes, including R-12's once-only observed merge outcome and denied-cleanup handoff (AC-04).
+- [ ] T12 `tests/vh-adlc/audit/ledger.test.ts` and `batch.test.ts` - write owned ledger application/base, provisional/final evidence, stale selection, source freeze, carried-scope and squash-baseline tests first; observe missing behavior fail (AC-03, AC-04).
+- [ ] T13 `plugins/vh-adlc/scripts/audit/ledger.ts`, `batch.ts` and `cli.ts` - implement checked local candidate/record interfaces and helper CLI; T12 passes with real fixture Git histories, preserved unrelated state and no invented red/green (AC-03, AC-04).
+- [ ] T14 `tests/vh-adlc/audit/discovery.test.ts`, `intake.test.ts` and relevant package contracts - write audit discovery/modes and maintenance/investigation/triage priority negatives first; observe the absent skill/route fail (AC-01).
+- [ ] T15 `plugins/vh-adlc/skills/vh-adlc-audit/SKILL.md` and `references/audit*.md`, `lifecycle.md`, `authority.md` - package the accepted procedure, exact settings/record/reviewer and authority contracts; T14 passes and no harness/model pin is added (AC-01, AC-03, AC-04).
+- [ ] T16 `Stackweaver:tests/agent-audit/` - write command/model/arguments, row-by-row parity, real candidate-policy and preserved-ledger/other-route contracts first; observe the local legacy-only route fail the shared-operation expectations (AC-05).
+- [ ] T17 `Stackweaver:AGENTS.md`, `agents/codebase-audit.md`, `agents/audit-project.md`, `.claude/commands/audit.md` and `.vh-adlc/audit.json` - implement the thin adapter and retained local policy; T16 passes using the actual shared helper in non-granting candidate mode (AC-05).
+- [ ] T18 `tests/vh-adlc/audit/adoption.test.ts` and `Stackweaver:tests/agent-audit/preflight.test.ts`, `rehearsal.test.ts` - write wrong-operation/artifact/target/model/version and unadopted-policy cutover denials plus rollback/reapply first; observe the absent audit verifier fail (AC-05, AC-07).
+- [ ] T19 `plugins/vh-adlc/scripts/audit/adoption.ts` and `Stackweaver:tests/agent-audit/preflight.ts`, `rehearse.ts`, `manifest.json`, `README.md` - implement audit-specific artifact-bound preflight and actual scoped rollback rehearsal; T18 passes and real publication remains required before cutover (AC-05, AC-07).
+- [ ] T20 `plugins/vh-adlc/plugin.json`, `.claude-plugin/plugin.json`, `README.md`, user/install/compatibility guides and `.github/workflows/ci.yml` - publish coherent candidate packaging/docs and add audit to the portable test selection; package contracts and actionlint pass without trigger/permission changes or untested compatibility claims (AC-01, AC-06).
+- [ ] T21 `tests/vh-adlc/audit/trial-proof.test.ts` - write positive/negative semantic-evidence and transcript/provenance controls for actual model trials; observe the missing grader/runner contract fail (AC-03, AC-04, AC-06).
+- [ ] T22 `tests/vh-adlc/audit/trial-proof.ts` and bounded synthetic trial runners - execute actual Copilot Opus 5.5 audit/repair/recovery trials at a committed payload, including independent repair review and adverse controls; raw transcripts, native exits and manual inspections establish the declared scenarios (AC-01, AC-03, AC-04, AC-06).
+- [ ] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
+- [ ] T24 `Stackweaver:tests/agent-audit/parity.json`, migration fixtures and paired review artifacts - independently verify full legacy-to-map/adapter coverage and bounded consumer policy behavior at exact commits, correcting omissions and rerunning affected checks; no private packet is transferred without applicable approval (AC-05, AC-06).
+- [ ] T25 `docs/specs/shared-audit.md` and exact committed feature/consumer snapshots - run the complete required local gates and independent implementation review, resolve all criterion gaps and preserve R-12 recovery evidence; source completion requires every current criterion met/residualised by the approved process, while actual marketplace/post-merge checks remain the ordered delivery obligations (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
 
 ## Open Questions
 
