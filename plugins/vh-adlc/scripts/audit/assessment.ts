@@ -1,7 +1,7 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { resolveInside } from "../triage/settings";
-import { checkSnapshot, git, hash, privateDirectory, type Snapshot } from "./snapshot";
+import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
 
 type Artifact = { path: string; sha256: string };
@@ -23,13 +23,31 @@ export function validArtifact(root: string, value: Artifact): boolean {
   } catch { return false; }
 }
 export function evaluateAssessments(config: Settings, snap: Snapshot, document: unknown) {
+  return evaluate(config, snap, document, false, false);
+}
+/** Used only with a separately checked full publication diff and append-only record freshness. */
+export function evaluateCommittedAssessments(config: Settings, snap: Snapshot, document: unknown) {
+  return evaluate(config, snap, document, true, false);
+}
+export function evaluateCandidateAssessments(config: Settings, snap: Snapshot, document: unknown) {
+  const checked = evaluate(config, snap, document, false, true);
+  return { ...checked, coverage: "provisional", eligible_ids: [], limit: checked.limit + " A provisional candidate supplies no completion/publication eligibility." };
+}
+function evaluate(config: Settings, snap: Snapshot, document: unknown, committed: boolean, provisional: boolean) {
   const errors: string[] = [], eligible: string[] = [];
   const limit = "Evidence records are operator attestations; structural checks do not establish semantic truth or shell-resistant proof.";
   const result = () => ({ pass: !errors.length, coverage: errors.length || eligible.length !== snap.selected_ids.length ? "incomplete" : "complete",
     eligible_ids: errors.length ? [] : eligible, errors, limit });
   try {
     privateDirectory(snap.artifact_root, config.root);
-    if (!checkSnapshot(config, snap).current || !snap.source.clean) errors.push("Source and audit bindings must be current and clean.");
+    if (committed) {
+      const { digest: claimed, ...body } = snap;
+      if (digest(body) !== claimed) errors.push("Snapshot identity changed.");
+      for (const [name, path] of [["settings", config.settings_path], ["ledger", config.ledger_path], ["procedure", config.project_procedure]] as const) {
+        if (hash(gitBytes(config.root, "show", `${snap.source.commit}:${path}`)) !== snap.bindings[name]) errors.push("Committed audit bindings differ.");
+      }
+    } else if (!checkSnapshot(config, snap).current) errors.push("Source and audit bindings must be current.");
+    if (!snap.source.clean) errors.push("Assessed source must be clean.");
     const doc = document as { schema_version: number; snapshot_digest: string; assessments: Assessment[] };
     if (doc?.schema_version !== 1 || doc.snapshot_digest !== snap.digest || !Array.isArray(doc.assessments)) throw Error("Assessment document does not match its snapshot.");
     if (doc.assessments.length !== snap.selected_ids.length || new Set(doc.assessments.map(row => row.id)).size !== doc.assessments.length ||
@@ -46,7 +64,9 @@ export function evaluateAssessments(config: Settings, snap: Snapshot, document: 
       if (!Array.isArray(row.evidence) || !row.evidence.length || row.evidence.some(e => {
         try {
           const path = resolveInside(config.root, e.path);
-          return !e.symbol?.trim() || !e.scenario?.trim() || e.commit !== snap.source.commit || !lstatSync(path).isFile() || hash(readFileSync(path)) !== e.sha256;
+          const bytes = committed ? gitBytes(config.root, "show", `${snap.source.commit}:${e.path}`) : readFileSync(path);
+          return !e.symbol?.trim() || !e.scenario?.trim() || e.commit !== snap.source.commit ||
+            (committed ? !/^100(?:644|755) blob /.test(git(config.root, "ls-tree", snap.source.commit, "--", e.path)) : !lstatSync(path).isFile()) || hash(bytes) !== e.sha256;
         } catch { return true; }
       })) errors.push("Original scenario needs current source evidence: " + row.id);
       const required = snap.required_checks[row.id] ?? [];
@@ -54,8 +74,8 @@ export function evaluateAssessments(config: Settings, snap: Snapshot, document: 
           required.some(name => !row.checks.some(c => c.name === name)) || row.checks.some(c => c.commit !== snap.source.commit || c.exit_code !== 0 ||
             !Array.isArray(c.argv) || !c.argv.length || c.argv.some(a => typeof a !== "string" || !a) || !validArtifact(snap.artifact_root, c.artifact))) errors.push("Required checks are missing, failed or stale: " + row.id);
       const challenge = row.challenge;
-      if (!challenge || !challenge.producer?.trim() || !challenge.reviewer?.trim() || challenge.producer === challenge.reviewer || challenge.id !== row.id ||
-          challenge.source_commit !== snap.source.commit || challenge.result !== "supports-verdict" || !validArtifact(snap.artifact_root, challenge.artifact)) errors.push("Independent member challenge is missing or stale: " + row.id);
+      if ((!provisional || challenge) && (!challenge || !challenge.producer?.trim() || !challenge.reviewer?.trim() || challenge.producer === challenge.reviewer || challenge.id !== row.id ||
+          challenge.source_commit !== snap.source.commit || challenge.result !== "supports-verdict" || !validArtifact(snap.artifact_root, challenge.artifact))) errors.push("Independent member challenge is missing or stale: " + row.id);
       if (row.disposition === "authored-repair") {
         const review = row.batch_review, red = row.red;
         let ancestor = false;
@@ -64,8 +84,8 @@ export function evaluateAssessments(config: Settings, snap: Snapshot, document: 
         }
         if (!red || red.exit_code === 0 || !Number.isInteger(red.exit_code) || red.commit === snap.source.commit || !red.argv?.length || !validArtifact(snap.artifact_root, red.artifact) ||
             !ancestor ||
-            !review || review.result !== "NO FINDINGS" || review.source_commit !== snap.source.commit || !review.producer || !review.reviewer || review.producer === review.reviewer ||
-            !validArtifact(snap.artifact_root, review.artifact)) errors.push("Authored repair needs actual red and current independent batch review: " + row.id);
+            (!provisional && (!review || review.result !== "NO FINDINGS" || review.source_commit !== snap.source.commit || !review.producer || !review.reviewer || review.producer === review.reviewer ||
+            !validArtifact(snap.artifact_root, review.artifact)))) errors.push("Authored repair needs actual red and current independent batch review: " + row.id);
       }
       if (errors.length === before) eligible.push(row.id);
     }

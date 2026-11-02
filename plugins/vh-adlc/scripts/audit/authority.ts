@@ -3,13 +3,13 @@ import { join } from "node:path";
 import { origin } from "../triage/settings";
 import { inventory, tableCells } from "./inventory";
 import { loadSettings } from "./settings";
-import { digest, git, hash } from "./snapshot";
+import { digest, git, gitBytes, hash } from "./snapshot";
 import type { AuditMode, Settings } from "./types";
 
 export type Effect = "source-edit" | "ledger-update" | "ledger-commit" | "local-commit" | "live-verify" | "issue-write" | "branch-push" | "pr-write" | "conditional-merge";
 type Observed = { default_branch: string; default_commit: string };
 type Request = { authorized: boolean; mode: AuditMode; ids: string[]; workstream?: string; eligible_repair?: boolean; effects?: Effect[] };
-type Options = { mode: AuditMode; ids: string[]; workstream?: string; effect: Effect; request: Request; no_fetch?: boolean;
+export type AuthorityOptions = { mode: AuditMode; ids: string[]; workstream?: string; effect: Effect; request: Request; no_fetch?: boolean;
   restrictions?: string[]; prohibited_effects?: Effect[]; refresh?: () => Observed };
 const local = ["source-edit", "ledger-update", "local-commit"] as const;
 const remote = ["live-verify", "issue-write", "branch-push", "pr-write", "conditional-merge"] as const;
@@ -67,7 +67,7 @@ export function inspectCandidatePolicy(config: Settings, options: { default_bran
     return { valid: parsed !== null, allowed: false as const, reason: "Candidate inspection confers no adopted effect.", declaration: parsed };
   } catch { return { valid: false, allowed: false as const, reason: "Invalid candidate declaration.", declaration: null }; }
 }
-function refreshDefault(config: Settings): Observed {
+export function refreshDefault(config: Settings): Observed {
   const head = git(config.root, "ls-remote", "--symref", "origin", "HEAD");
   const match = head.match(/^ref: refs\/heads\/([^\s]+)\s+HEAD$/m);
   if (!match) throw Error("remote default branch is unavailable");
@@ -83,9 +83,9 @@ function committedFile(config: Settings, commit: string, path: string): string {
     const entry = git(config.root, "ls-tree", commit, "--", parts.slice(0, i + 1).join("/"));
     if (!(i === parts.length - 1 ? /^100(?:644|755) blob / : /^040000 tree /).test(entry)) fail();
   }
-  return git(config.root, "show", `${commit}:${path}`);
+  return gitBytes(config.root, "show", `${commit}:${path}`).toString();
 }
-export function inspectAuthority(config: Settings, options: Options) {
+export function inspectAuthority(config: Settings, options: AuthorityOptions) {
   const sources: { path: string; digest: string }[] = [];
   let default_commit: string | null = null, default_branch: string | null = null;
   const response = (allowed: boolean, basis: "adopted" | "current-request" | "none", reason: string) => ({

@@ -6,28 +6,49 @@ import { captureSnapshot } from "../../../plugins/vh-adlc/scripts/audit/snapshot
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git } from "./fixtures";
 import { terminal } from "./evidence";
+import { createLedgerCandidate } from "../../../plugins/vh-adlc/scripts/audit/ledger";
 const projects: ReturnType<typeof fixture>[] = [];
-function context() {
+function context(carry = false) {
   const f = fixture(); projects.push(f); const config = loadSettings(f.root), base = git(f.root, "rev-parse", "HEAD");
   git(f.root, "update-ref", "refs/remotes/origin/main", base); git(f.root, "switch", "-qc", "fix/audit-batch");
+  let taskBase = base, carried: Definition["carried"] = null;
+  if (carry) {
+    const snapshot = captureSnapshot(config, { mode: "reverify", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts,
+      required_checks: { "AUD-001": ["unit"], "AUD-002": ["unit"] } });
+    const document = { schema_version: 1, snapshot_digest: snapshot.digest, assessments: snapshot.selected_ids.map(id => terminal(f, snapshot, id)) };
+    const candidate = createLedgerCandidate(config, snapshot, { document, at: "2026-11-02", run_id: "carried-ledger" });
+    f.write(config.ledger_path, candidate.bytes); taskBase = f.commit("test: private ledger report");
+    carried = { commit: taskBase, ids: snapshot.selected_ids, paths: [config.ledger_path], report_snapshot_digest: snapshot.digest,
+      evidence_artifact: f.artifact("carried-report.json", JSON.stringify({ snapshot, document, candidate })) };
+  }
   // Actual disposable regression execution is retained separately by the model trial; these unit records are structural attestations.
   f.write("src/app.ts", "export const answer = 43;\n"); const repaired = f.commit("test: authored fixture repair");
   const path = "docs/internal/maintenance/audit-A-test.md";
-  const definition: Definition = { schema_version: 1, repository: config.repository, hostname: config.hostname, run_id: "batch-test", workstream: "A",
-    scope_baseline: base, task_base: base, source_target: repaired, ledger_path: config.ledger_path, record_path: path,
+  const definition: Definition = { schema_version: 1, repository: config.repository, hostname: config.hostname, default_branch: "main", run_id: "batch-test", workstream: "A",
+    scope_baseline: base, task_base: taskBase, source_target: repaired, ledger_path: config.ledger_path, record_path: path,
     affected_paths: ["src/app.ts", config.ledger_path, path], verification_inputs: ["src/app.ts"],
-    members: ["AUD-001", "AUD-002"].map((id, i) => ({ id, disposition: i === 0 ? "authored-repair" : "assessment-only", contract: "Existing documented return-value contract.", eligibility: "restoration", required_checks: ["unit"], ...(i === 0 ? { pre_fix: base, repair_commit: repaired } : {}) })),
-    carried: null };
+    members: ["AUD-001", "AUD-002"].map((id, i) => ({ id, disposition: i === 0 ? "authored-repair" : "assessment-only", contract: "Existing documented return-value contract.", eligibility: "restoration", required_checks: ["unit"], ...(i === 0 ? { pre_fix: taskBase, repair_commit: repaired } : {}) })),
+    carried };
   f.write(path, renderRecord(definition)); f.write("docs/audit.md", readFileSync(join(f.root, "docs/audit.md"), "utf8") + "\nVerified source: " + repaired + "\n");
   const target = f.commit("test: finalize fixture ledger and record");
   const snapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": ["unit"], "AUD-002": ["unit"] } });
   const rows = snapshot.selected_ids.map(id => terminal(f, snapshot, id)); rows[0].disposition = "authored-repair";
-  rows[0].red = { ...rows[0].checks[0], commit: base, exit_code: 1, artifact: f.artifact("red.txt") };
+  rows[0].red = { ...rows[0].checks[0], commit: taskBase, exit_code: 1, artifact: f.artifact("red.txt") };
   rows[0].batch_review = { producer: "author", reviewer: "independent", result: "NO FINDINGS", source_commit: target, artifact: f.artifact("review.txt", "MODEL: claude-opus-5.5\nNO FINDINGS\n") };
   const input = { record_path: path, review_target: target, snapshot, document: { schema_version: 1, snapshot_digest: snapshot.digest, assessments: rows },
-    selection: { ids: ["AUD-001", "AUD-002"], workstream: "A", carried: null },
+    selection: { ids: ["AUD-001", "AUD-002"], workstream: "A", carried },
     review: { target, producer: "author", reviewer: "independent", artifact: rows[0].batch_review.artifact, model: "claude-opus-5.5" } };
   return { f, config, definition, input, base, target, path };
+}
+function retarget(c: ReturnType<typeof context>) {
+  const target = git(c.f.root, "rev-parse", "HEAD"), previous = c.input.document.assessments;
+  const snapshot = captureSnapshot(c.config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: c.base, artifact_root: c.f.artifacts, required_checks: { "AUD-001": ["unit"], "AUD-002": ["unit"] } });
+  const rows = snapshot.selected_ids.map(id => terminal(c.f, snapshot, id));
+  rows.forEach((row, i) => { row.disposition = previous[i].disposition; if (row.disposition === "authored-repair") {
+    row.red = previous[i].red; row.batch_review = { ...previous[i].batch_review!, source_commit: target };
+  } });
+  c.input.review_target = target; c.input.review.target = target; c.input.snapshot = snapshot;
+  c.input.document = { schema_version: 1, snapshot_digest: snapshot.digest, assessments: rows };
 }
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
 test("a fully covered mixed batch checks the full scope and frozen source without SHA self-reference", () => {
@@ -65,4 +86,38 @@ test("scope baseline survives a squash while the discarded pre-squash source tar
   const snap = captureSnapshot(loadSettings(c.f.root), { mode: "reverify", artifact_root: c.f.artifacts, baseline: c.base });
   expect(snap.history.status).toBe("scoped"); expect(snap.source.commit).toBe(squash);
   expect(captureSnapshot(loadSettings(c.f.root), { mode: "reverify", artifact_root: c.f.artifacts, baseline: c.target }).history.status).toBe("unscoped");
+});
+
+test("a caller cannot use another remote branch as default scope, or hide deleted finding content in metadata", () => {
+  const c = context();
+  git(c.f.root, "update-ref", "refs/remotes/origin/main", c.target);
+  git(c.f.root, "update-ref", "refs/remotes/origin/old-feature", c.base);
+  expect(checkBatch(c.config, c.input).pass).toBe(false);
+});
+test("re-reviewed ledger metadata still cannot delete pre-existing finding prose or IDs", () => {
+  const c = context(), text = readFileSync(join(c.f.root, "docs/audit.md"), "utf8");
+  c.f.write("docs/audit.md", text.replace("The return value needs a current check.\n", "")); c.f.commit(); retarget(c);
+  expect(checkBatch(c.config, c.input).pass).toBe(false);
+});
+test("all-assessment work produces no empty repair publication", () => {
+  const c = context(); c.definition.members.forEach(m => { m.disposition = "assessment-only"; delete m.pre_fix; delete m.repair_commit; });
+  c.f.write("src/app.ts", "export const answer = 42;\n"); c.definition.source_target = c.f.commit("test: restore original source");
+  c.f.write(c.path, renderRecord(c.definition)); c.f.commit();
+  c.input.document.assessments.forEach(row => { row.disposition = "assessment-only"; delete row.red; delete row.batch_review; }); retarget(c);
+  const result = checkBatch(c.config, c.input); expect(result.pass).toBe(true); expect(result.publish_repair).toBe(false);
+});
+
+test("a carried report is reviewed from its default ancestor and requires exact owner inclusion and all original evidence", () => {
+  const c = context(true); expect(checkBatch(c.config, c.input).pass).toBe(true);
+  c.input.selection.carried = null; expect(checkBatch(c.config, c.input).pass).toBe(false);
+});
+test("an omitted carried ID or missing member challenge cannot hide behind a structurally valid artifact digest", () => {
+  for (const kind of ["id", "challenge"]) {
+    const c = context(true), carried = c.definition.carried!;
+    const proof = JSON.parse(readFileSync(join(c.f.artifacts, carried.evidence_artifact.path), "utf8"));
+    if (kind === "id") proof.document.assessments.pop(); else proof.document.assessments[0].challenge = null;
+    carried.evidence_artifact = c.f.artifact("carried-bad.json", JSON.stringify(proof));
+    c.input.selection.carried = structuredClone(carried); c.f.write(c.path, renderRecord(c.definition)); c.f.commit(); retarget(c);
+    expect(checkBatch(c.config, c.input).pass).toBe(false);
+  }
 });

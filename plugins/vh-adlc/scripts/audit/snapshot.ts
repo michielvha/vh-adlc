@@ -13,12 +13,15 @@ export function digest(value: unknown): string {
     item && typeof item === "object" ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, stable(v)])) : item;
   return hash(JSON.stringify(stable(value)));
 }
-export function git(root: string, ...args: string[]): string {
+export function gitBytes(root: string, ...args: string[]): Buffer {
   const child = Bun.spawnSync(["git", "-C", root, ...args], {
     env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, stdout: "pipe", stderr: "pipe",
   });
   if (child.exitCode !== 0) throw Error("audit cannot read Git " + args[0]);
-  return child.stdout.toString().trimEnd();
+  return Buffer.from(child.stdout);
+}
+export function git(root: string, ...args: string[]): string {
+  return gitBytes(root, ...args).toString().trimEnd();
 }
 export function privateDirectory(path: string, checkout: string): string {
   const stat = lstatSync(path), canonical = realpathSync(path), root = realpathSync(checkout);

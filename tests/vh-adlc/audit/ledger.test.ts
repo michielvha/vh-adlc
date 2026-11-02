@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createLedgerCandidate, validateLedgerCandidate, applyLedgerCandidate, cleanupOwnedLedger } from "../../../plugins/vh-adlc/scripts/audit/ledger";
+import { createLedgerCandidate, validateLedgerCandidate, applyLedgerCandidate, cleanupOwnedLedger, appendFindings } from "../../../plugins/vh-adlc/scripts/audit/ledger";
 import { captureSnapshot } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git, ledger } from "./fixtures";
@@ -55,6 +55,12 @@ test("ledger-update without ledger-commit leaves only the owned candidate uncomm
   expect(applied.commit).toBe(null); expect(git(applied.path, "status", "--porcelain")).toContain("docs/audit.md");
   expect(git(c.f.root, "status", "--porcelain")).toBe("");
 });
+test("ordinary cleanup removes a clean owned worktree only after its commit and evidence are retained in default history", () => {
+  const c = context(), applied = applyLedgerCandidate(c.config, c.snap, c.candidate(), c.document, c.options);
+  git(c.f.root, "merge", "--ff-only", applied.commit!); git(c.f.root, "update-ref", "refs/remotes/origin/main", applied.commit!);
+  expect(cleanupOwnedLedger(c.config, applied, { retained: true }).removed).toBe(true);
+  expect(git(c.f.root, "worktree", "list", "--porcelain")).not.toContain(applied.path);
+});
 test.each(["feature", "dirty", "advanced", "no-permission", "no-commit"])("%s cannot bypass the assessed default source or permission boundary", kind => {
   const c = context();
   if (kind === "feature") { git(c.f.root, "switch", "-qc", "feat/unrelated"); c.snap.source.branch = "feat/unrelated"; }
@@ -65,4 +71,32 @@ test.each(["feature", "dirty", "advanced", "no-permission", "no-commit"])("%s ca
   if (kind === "no-commit") options.request = { ...options.request, effects: ["ledger-update"] };
   expect(() => applyLedgerCandidate(c.config, c.snap, c.candidate(), c.document, options)).toThrow();
   expect(git(c.f.root, "status", "--porcelain")).toBe(before);
+});
+
+test("explicit full mode allocates after all reserved references and preserves the original ledger", () => {
+  const c = context("full"); c.f.write("docs/audit.md", ledger + "\nHistorical reference AUD-019.\n"); c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "full", artifact_root: c.f.artifacts });
+  const result = appendFindings(c.config, snap, [{ id: "AUD-020", severity: "High", title: "New root cause", body: "Observed original scenario and source evidence." }]);
+  expect(result.bytes).toContain("### AUD-020 - New root cause"); expect(result.bytes).toContain("Historical reference AUD-019.");
+  expect(() => appendFindings(c.config, snap, [{ id: "AUD-019", severity: "High", title: "Reused", body: "No." }])).toThrow();
+  const reverify = captureSnapshot(c.config, { mode: "reverify", artifact_root: c.f.artifacts });
+  expect(() => appendFindings(c.config, reverify, [{ id: "AUD-020", severity: "High", title: "Unexpected full", body: "No." }])).toThrow();
+});
+
+test("an honest UNKNOWN assessment can propose a partial update without inventing terminal evidence", () => {
+  const c = context(); c.document.assessments[0].verdict = "UNKNOWN"; c.document.assessments[0].challenge = null;
+  c.document.assessments[0].checks = []; c.document.assessments[0].residuals = ["Required live access unavailable."];
+  expect(c.candidate().bytes).toContain("| AUD-001 | High | Incorrect result | UNKNOWN |");
+});
+
+test("a fix candidate can be explicitly provisional while missing independent final review, and cannot use the reverify application route", () => {
+  const c = context(); git(c.f.root, "switch", "-qc", "fix/selected");
+  c.f.write("src/app.ts", "export const answer = 43;\n"); c.f.commit("test: selected repair");
+  const snap = captureSnapshot(c.config, { mode: "fix", ids: ["AUD-001"], baseline: c.base, artifact_root: c.f.artifacts, required_checks: { "AUD-001": ["unit"] } });
+  const row = terminal(c.f, snap); row.disposition = "authored-repair"; row.challenge = null;
+  row.red = { ...row.checks[0], commit: c.base, exit_code: 1, artifact: c.f.artifact("selected-red.txt") };
+  const document = { schema_version: 1, snapshot_digest: snap.digest, assessments: [row] };
+  const candidate = createLedgerCandidate(c.config, snap, { document, at: "2026-11-02", run_id: "selected-fix", provisional: true });
+  expect(candidate.verdict_eligibility).toBe("provisional"); expect(candidate.bytes).toContain("Verified source: " + snap.source.commit);
+  expect(() => applyLedgerCandidate(c.config, snap, candidate, document, c.options)).toThrow();
 });
