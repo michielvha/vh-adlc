@@ -103,6 +103,10 @@ An incomplete aggregate/index-only identity can receive a dated UNKNOWN/PARTIAL 
 its actual gap, preserving the original ambiguous/range index. It cannot acquire an individual
 terminal verdict or an invented finding section. Supported title annotations and inline
 `**Re-verify (date):**` markers preserve the original heading text/anchors and earlier history.
+An existing `How this audit was performed` layout also retains its dated banner and categorized
+`Re-verification summary (date)` tables. Changed statuses get a dated marker immediately below the
+unchanged finding heading, preserving its anchor. Older banners, summaries and finding prose remain;
+unselected history is never described as freshly verified. Minimal ledgers keep their inline-note layout.
 
 An explicitly included local report may become a selected fix's Task base only if its parent is
 the still-current fetched default and its delta is exactly the known ledger/index. Present its

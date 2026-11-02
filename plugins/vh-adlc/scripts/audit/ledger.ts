@@ -42,6 +42,7 @@ export function createLedgerCandidate(config: Settings, snap: Snapshot, options:
 function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOptions, original: string): Candidate {
   if (!snap.scope_baseline) fail("a reachable next scope baseline is required for this update");
   const lines = original.split("\n");
+  const datedLayout = visibleLines(original).some(line => /^ {0,3}#{1,6}[ \t]+How this audit was performed(?:[ \t]+#+)?[ \t]*$/i.test(line));
   for (const row of options.document.assessments) {
     const finding = snap.inventory.findings.find(f => f.id === row.id);
     if (!finding) fail("finding identity is unknown");
@@ -85,6 +86,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
       "Scenario: " + safe(row.reason), "Evidence: " + row.evidence.map(e => safe(e.path + "#" + e.symbol)).join(", "),
       "Checks: " + row.checks.map(c => safe(c.name + " exit " + c.exit_code)).join(", "),
       "Residuals: " + (row.residuals.map(safe).join("; ") || "none recorded"), "");
+    if (datedLayout && finding.recorded_status !== row.verdict) lines.splice(finding.entry_lines[0], 0, "", `${stateMarker} **${row.verdict} (${options.at})** <!-- audit-status:${options.run_id}:${row.id} -->`, "");
   }
   const gaps = options.document.assessments.filter(row => !snap.inventory.findings.find(f => f.id === row.id)?.identity_valid);
   if (gaps.length) {
@@ -92,6 +94,21 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
       "Incomplete identities below were not converted into individual terminal verdicts; original index/history remains unchanged.");
     for (const row of gaps) lines.push(`- ${row.id}: ${row.verdict}. ${row.reason.replace(/[\r\n]/g, " ")} Gap: ${row.residuals.join("; ").replace(/[\r\n]/g, " ")}`);
     lines.push("");
+  }
+  if (datedLayout) {
+    const heading = visibleLines(lines.join("\n")).findIndex(line => /^ {0,3}#{1,6}[ \t]+How this audit was performed(?:[ \t]+#+)?[ \t]*$/i.test(line));
+    if (heading < 0) fail("dated layout heading changed");
+    lines.splice(heading + 1, 0, "", `> Audit pass (${options.at}): ${snap.selected_ids.length} selected assessments; run ${options.run_id}. Scope baseline: ${snap.scope_baseline}; Verified source: ${snap.source.commit}. Comparison: ${snap.history.status}. Prior passes remain historical.`, "");
+    lines.push("", `## Re-verification summary (${options.at})`, "", `Run: ${options.run_id}; selected scope only. ${options.provisional ? "Provisional verdicts require the final independent batch review before completion or publication." : "Checked proposals still require current ledger/delivery authority."}`);
+    const cell = (text: string) => text.replace(/[\r\n]/g, " ").replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("<", "&lt;");
+    for (const [title, verdict] of [["Fully fixed", "FIXED"], ["Partially fixed", "PARTIAL"], ["Regressed", "REGRESSED"], ["Moot", "MOOT"], ["Unknown", "UNKNOWN"]]) {
+      const rows = options.document.assessments.filter(row => row.verdict === verdict);
+      lines.push("", "### " + title, "", "| ID | Previously recorded | Current observation |", "| --- | --- | --- |");
+      for (const row of rows) lines.push(`| ${row.id} | ${snap.inventory.findings.find(f => f.id === row.id)?.recorded_status ?? "UNKNOWN"} | ${cell(row.reason)} |`);
+      if (!rows.length) lines.push("", "No selected findings in this category.");
+    }
+    const present = options.document.assessments.filter(row => row.verdict === "STILL_PRESENT").map(row => row.id);
+    lines.push("", "Assessed still present: " + (present.join(", ") || "none in the selected scope") + ".", "Unselected findings retain their recorded history; this pass does not freshly verify them.", "");
   }
   const body = { schema_version: 1 as const, run_id: options.run_id, at: options.at, snapshot_digest: snap.digest,
     assessments_digest: digest(options.document), source_target: snap.source.commit, scope_baseline: snap.scope_baseline,

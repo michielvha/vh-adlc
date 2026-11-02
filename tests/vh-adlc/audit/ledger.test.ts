@@ -185,3 +185,17 @@ test.each(["detached", "owned-branch"])("a clean %s assessment of exact default 
   expect(result.base).toBe(c.base); expect(git(c.f.root, "rev-parse", "main")).toBe(c.base);
   expect(git(c.f.root, "status", "--porcelain")).toBe(before); expect(hash(readFileSync(join(c.f.root, ".git/index")))).toBe(index);
 });
+
+test("an established dated-ledger layout keeps banners, summary tables, visible status markers and unchanged heading anchors", () => {
+  const c = context(), original = ledger.replace("## Severity index", "## How this audit was performed\n\n> Historical pass (2026-10-01): prior evidence only.\n\n## Severity index") + "\n## Re-verification summary (2026-10-01)\nOlder summary stays intact.\n";
+  c.f.write(c.config.ledger_path, original); const base = c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "reverify", ids: ["AUD-001"], baseline: base, artifact_root: c.f.artifacts });
+  const candidate = createLedgerCandidate(c.config, snap, { document: { schema_version: 1, snapshot_digest: snap.digest, assessments: [terminal(c.f, snap)] }, at: "2026-11-02", run_id: "dated-layout" });
+  expect(candidate.bytes).toContain("> Audit pass (2026-11-02)");
+  expect(candidate.bytes.indexOf("> Audit pass (2026-11-02)")).toBeLessThan(candidate.bytes.indexOf("> Historical pass"));
+  expect(candidate.bytes).toContain("## Re-verification summary (2026-11-02)");
+  for (const category of ["Fully fixed", "Partially fixed", "Regressed", "Moot", "Unknown"]) expect(candidate.bytes).toContain("### " + category);
+  expect(candidate.bytes).toContain("### AUD-001 - Incorrect result\n\n✅ **FIXED (2026-11-02)**");
+  expect(candidate.bytes).toContain("Older summary stays intact."); expect(candidate.bytes).toContain("Historical pass (2026-10-01): prior evidence only.");
+  expect(candidate.bytes).toContain("Unselected findings retain their recorded history");
+});
