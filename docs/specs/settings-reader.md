@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Split from yaml-settings.md on 2026-11-02 so each piece is one PR; waits for a spec review."
+status_description: "R-1 findings applied on 2026-11-02; it had no blockers, and its changes wait for a new independent review."
 issue: null
 goal: "`vh-adlc settings read` turns a YAML settings file into a checked value, or refuses it, for the TypeScript operations."
 covers:
@@ -9,6 +9,8 @@ covers:
   - internal/report/
   - schema/vh-adlc.schema.json
   - docs/reference/cli.md
+  - go.mod
+  - go.sum
 ---
 
 # Plan: Settings reader
@@ -18,12 +20,12 @@ the next piece and depends on this release.
 
 ## Context
 
-The owner chose a strict Go reader on 2026-11-02. `Bun.YAML.parse` took the last value of a duplicate key
-and expanded aliases on Bun 1.4.3 (`bun -e`). A lock can name only a stable release, which comes from
-`main` (`docs/internal/releasing.md`), so this has to merge and publish before the plugin can use it.
-Decoding `yaml.v3` to a node does not refuse a duplicate key, while decoding to a map does (a probe on
-`go.yaml.in/yaml/v3` v3.0.5). Its syntax errors carry no column, often no line, and can echo file text
-(R-2 F-06).
+The owner chose a strict Go reader on 2026-11-02, as Q3 of `yaml-settings.md` at `a842b58`. `Bun.YAML.parse` took
+the last value of a duplicate key and expanded aliases on Bun 1.4.3 (`bun -e`). A lock can name only a
+stable version (`plugins/vh-adlc/scripts/ensure-vh-adlc.sh:43`), so this has to merge and publish before the
+plugin can use it. `yaml.Unmarshal` of `a: 1\na: 2` into a `yaml.Node` returned no error, while into a map
+it did. Library syntax errors carry no column, often no line, and can echo file text (`yaml-settings.md`
+R-2 F-06).
 
 ## Scope
 
@@ -32,30 +34,44 @@ validation, and any change to the plugin or its lock.
 
 ## Design
 
-`vh-adlc settings read --stdin` takes one file's bytes and returns the value in `data.value` of the usual
-JSON report. It needs no conventions, so `dispatch` exempts it from `--plugin-pin`, and
-`docs/reference/cli.md` says so.
+`vh-adlc settings read --stdin` takes one file's bytes and reports result `answered` with the value in
+`data.value`, and `knowledge: null`. It needs no conventions, so `dispatch` exempts it from `--plugin-pin`,
+and `docs/reference/cli.md` says so. Without `--stdin` it reports `usage`, and a failed read reports
+`error`. The change lands with a `feat` commit, so `main` tags a stable minor release;
+`yaml-settings.md` AC-09 proves publication.
 
-It walks `yaml.v3` nodes and accepts one document with a mapping at the top, string keys, and values that
-are strings, `true`, `false`, `null`, decimal integers in JavaScript's safe range, sequences or mappings.
-An unquoted date comes back as the text written. Anything else is refused: empty input, duplicate keys,
-aliases, anchors, merge keys, tags, floats and other number or boolean spellings. Mapping keys come back
-sorted.
+It decodes until end of input and walks the `yaml.v3` nodes. It accepts one document with a mapping at the
+top, string keys, and these values:
 
-A refusal reports result `malformed` with the code `settings-invalid` and a fixed reason. It gives a line
-number when the walk knows one, and never includes text from the file or from the library's error.
+- strings, including `yes` and `no`, which YAML 1.2 reads as strings;
+- `true` and `false`;
+- `null` or an empty value;
+- integers matching `^-?(0|[1-9][0-9]*)$` in JavaScript's safe range;
+- a timestamp, which comes back as the text written;
+- sequences and mappings, including empty ones, with keys sorted.
+
+Anything else is refused: empty input, a second document including a trailing `---`, a top level that is not a
+mapping, a key that is not a string, duplicate keys, aliases, anchors, merge keys, explicit tags, floats, and
+other number, boolean or null spellings. Refusal covers what the node tree shows, so a bare `!`, a `%YAML`
+directive and a byte order mark are accepted.
+
+A refusal reports result `malformed`, `data: null` and one finding with the code `settings-invalid` and a
+fixed reason. Its line is the node's line, or the number from a library `line N` error, otherwise 0. No
+part of the report holds text from the file or from the library's error.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: `vh-adlc settings read --stdin` returns the parsed value of valid YAML with no conventions pin.
-- [ ] AC-02: Each refused form reports `malformed` and `settings-invalid`, and no message holds text from the file.
+- [ ] AC-01: For input in the accepted forms, with no `--plugin-pin`, `vh-adlc settings read --stdin` reports
+      `answered`, and `data.value` equals the expected value, with keys sorted and timestamps as written.
+- [ ] AC-02: Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from
+      the file.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | `internal/settings` table tests and a `cmd/vh-adlc` golden report validated against the schema. |
-| AC-02 | Table tests for each refused form, with a canary value, including an unknown anchor. |
+| AC-01 | `internal/settings` table tests naming each accepted form, including an empty sequence and mapping, both safe-range limits, `a:` and an unquoted date. A `cmd/vh-adlc` golden report validated against the schema, after the golden harness gains stdin. |
+| AC-02 | Table tests for each refused form, including a second document, a trailing `---`, a timestamp key, an out-of-range integer and an unknown anchor. A golden refusal report with a canary value. |
 
 ## Tasks
 
