@@ -29,6 +29,9 @@ export function evaluateAssessments(config: Settings, snap: Snapshot, document: 
 export function evaluateCommittedAssessments(config: Settings, snap: Snapshot, document: unknown) {
   return evaluate(config, snap, document, true, false);
 }
+export function evaluateFrozenCandidateAssessments(config: Settings, snap: Snapshot, document: unknown) {
+  return evaluate(config, snap, document, true, true);
+}
 export function evaluateCandidateAssessments(config: Settings, snap: Snapshot, document: unknown) {
   const checked = evaluate(config, snap, document, false, true);
   return { ...checked, coverage: "provisional", eligible_ids: [], limit: checked.limit + " A provisional candidate supplies no completion/publication eligibility." };

@@ -84,3 +84,13 @@ test/config, selection or Definition change stales review and requires renewed c
 Completion does not itself grant publication. Keep merge outcome in the external private journal,
 with optional deduplicated tracking-issue update only under existing issue-write authority; never
 push a new default-branch commit just to record the squash SHA.
+
+## Checked provisional bundle
+
+`batch-check` requires `provisional: {snapshot, document, candidate}` in addition to the final-head
+snapshot/assessments and actual independent review. Retain the exact snapshot and assessment used
+at frozen `source_target` to create `candidate --provisional true`; never reconstruct a proof from
+a later ledger. The frozen ledger must still equal the selected Task-base ledger, including only
+an explicitly included checked carried report. The final committed ledger must equal that candidate's
+bytes. Final verdicts, dispositions, reasons, residuals and scenario/source evidence must match;
+final checks and independent challenge/review artifacts bind the later actual review target.

@@ -2,7 +2,7 @@ import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
 import { inspectAuthority, refreshDefault, type AuthorityOptions } from "./authority";
-import { evaluateAssessments, evaluateCandidateAssessments, evaluateCommittedAssessments, type Assessment } from "./assessment";
+import { evaluateAssessments, evaluateCandidateAssessments, evaluateCommittedAssessments, evaluateFrozenCandidateAssessments, type Assessment } from "./assessment";
 import { tableCells } from "./inventory";
 import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
@@ -11,7 +11,7 @@ import { repositoryPath } from "../maintenance/authority";
 
 type Document = { schema_version: number; snapshot_digest: string; assessments: Assessment[] };
 type NewFinding = { id: string; severity: string; title: string; body: string; delta_paths?: string[] };
-type Candidate = { schema_version: 1; run_id: string; at: string; snapshot_digest: string; assessments_digest: string;
+export type Candidate = { schema_version: 1; run_id: string; at: string; snapshot_digest: string; assessments_digest: string;
   source_target: string; scope_baseline: string; ids: string[]; new_findings: NewFinding[]; verdict_eligibility: "provisional" | "checked-proposal"; bytes: string; digest: string };
 type OwnedLedger = { path: string; branch: string; base: string; commit: string | null; candidate_digest: string; owner_file: string };
 function fail(message: string): never { throw Error("audit ledger: " + message); }
@@ -107,6 +107,17 @@ export function validateHistoricalCandidate(config: Settings, snap: Snapshot, ca
     const expected = renderCandidate(config, snap, { document, at: candidate.at, run_id: candidate.run_id, new_findings: candidate.new_findings },
       gitBytes(config.root, "show", `${snap.source.commit}:${config.ledger_path}`).toString());
     return canonicalJSON(candidate) === canonicalJSON(expected);
+  } catch { return false; }
+}
+/** Reconstruct a provisional fix proposal from immutable frozen-source Git objects. */
+export function validateFrozenFixCandidate(config: Settings, snap: Snapshot, candidate: Candidate, document: Document) {
+  try {
+    if (snap.mode !== "fix" || !snap.source.clean || candidate.verdict_eligibility !== "provisional" ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(candidate.at) || !/^[a-z0-9][a-z0-9_-]{0,79}$/.test(candidate.run_id) ||
+        !evaluateFrozenCandidateAssessments(config, snap, document).pass) return false;
+    const expected = renderCandidate(config, snap, { document, at: candidate.at, run_id: candidate.run_id, new_findings: candidate.new_findings, provisional: true },
+      gitBytes(config.root, "show", `${snap.source.commit}:${config.ledger_path}`).toString());
+    return canonicalJSON(expected) === canonicalJSON(candidate);
   } catch { return false; }
 }
 function appendBytes(config: Settings, snap: Snapshot, original: string, findings: NewFinding[]) {

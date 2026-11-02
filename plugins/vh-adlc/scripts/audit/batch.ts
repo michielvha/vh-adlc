@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { canonicalJSON } from "../maintenance/journal";
 import { repositoryPath } from "../maintenance/authority";
 import { tableCells } from "./inventory";
-import { validateHistoricalCandidate } from "./ledger";
+import { validateHistoricalCandidate, validateFrozenFixCandidate, type Candidate } from "./ledger";
 import { evaluateCommittedAssessments, validArtifact } from "./assessment";
 import { digest, git, gitBytes, hash, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
@@ -60,6 +60,7 @@ function preservedLedger(before: string, after: string, selected: string[]) {
 }
 export function checkBatch(config: Settings, input: {
   record_path: string; review_target: string; snapshot: Snapshot; document: unknown;
+  provisional: { snapshot: Snapshot; document: { schema_version: number; snapshot_digest: string; assessments: any[] }; candidate: Candidate };
   selection: { ids: string[]; workstream: string; carried: Definition["carried"] };
   review: { target: string; producer: string; reviewer: string; artifact: { path: string; sha256: string }; model: string };
 }) {
@@ -97,6 +98,17 @@ export function checkBatch(config: Settings, input: {
           !validateHistoricalCandidate(config, carried.snapshot, carried.candidate, carried.document) ||
           gitBytes(config.root, "show", `${def.carried.commit}:${config.ledger_path}`).toString() !== carried.candidate.bytes) errors.push("Every carried finding needs its original checked report/source/challenge evidence.");
     } else if (input.selection.carried !== null || def.task_base !== def.scope_baseline) errors.push("Unapproved pre-repair publication changes are not hidden behind Task base.");
+    if (gitBytes(config.root, "show", `${def.source_target}:${config.ledger_path}`).toString() !== gitBytes(config.root, "show", `${def.task_base}:${config.ledger_path}`).toString()) errors.push("Frozen source must retain the selected Task-base ledger before provisional updates.");
+    const provisional = input.provisional;
+    if (!provisional || provisional.snapshot.source.commit !== def.source_target || provisional.candidate.source_target !== def.source_target ||
+        provisional.candidate.scope_baseline !== def.scope_baseline || provisional.candidate.run_id !== def.run_id ||
+        digest(provisional.candidate.ids.slice().sort()) !== digest(input.selection.ids.slice().sort()) ||
+        digest(provisional.snapshot.required_checks) !== digest(input.snapshot.required_checks) ||
+        !validateFrozenFixCandidate(config, provisional.snapshot, provisional.candidate, provisional.document) ||
+        gitBytes(config.root, "show", `${target}:${config.ledger_path}`).toString() !== provisional.candidate.bytes) errors.push("Committed ledger must equal the frozen-source checked provisional candidate.");
+    const semantics = (document: any) => document.assessments.map((row: any) => ({ id: row.id, disposition: row.disposition, verdict: row.verdict, reason: row.reason, residuals: row.residuals,
+      evidence: row.evidence.map(({ commit, ...evidence }: any) => evidence) })).sort((a: any, b: any) => a.id.localeCompare(b.id));
+    if (!provisional || digest(semantics(provisional.document)) !== digest(semantics(input.document))) errors.push("Final member verdicts/scenarios must match the provisional ledger assessments.");
     const rows = (input.document as { assessments: { id: string; disposition: string; red?: { commit: string } }[] })?.assessments;
     for (const member of def.members) {
       const row = rows?.find(row => row.id === member.id);
