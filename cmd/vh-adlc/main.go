@@ -20,6 +20,7 @@ import (
 	"github.com/michielvha/vh-adlc/internal/next"
 	"github.com/michielvha/vh-adlc/internal/report"
 	"github.com/michielvha/vh-adlc/internal/review"
+	"github.com/michielvha/vh-adlc/internal/settings"
 )
 
 // version is set at build time with -X main.version.
@@ -44,6 +45,7 @@ type options struct {
 	slug     string
 	review   string
 	returned string
+	stdin    bool
 }
 
 type stringList []string
@@ -60,10 +62,12 @@ func (o *options) knowledge() knowledge.Options {
 }
 
 // command describes one subcommand: its name, the positional arguments it
-// takes and the function that answers it.
+// takes and the function that answers it. A command that reads no conventions
+// sets noPin, and any --plugin-pin it is given goes unchecked.
 type command struct {
 	name        string
 	positionals []string
+	noPin       bool
 	flags       func(fs *flag.FlagSet, o *options)
 	run         func(ctx context.Context, o *options, args []string) *report.Report
 }
@@ -101,6 +105,14 @@ func commands() []command {
 		}, run: func(ctx context.Context, o *options, args []string) *report.Report {
 			return review.Command(ctx, o.knowledge(), args[0], o.review, o.returned)
 		}},
+		{name: "settings read", noPin: true, flags: func(fs *flag.FlagSet, o *options) {
+			fs.BoolVar(&o.stdin, "stdin", false, "read the settings file's bytes from stdin")
+		}, run: func(_ context.Context, o *options, _ []string) *report.Report {
+			if !o.stdin {
+				return usage("settings read", "settings read needs --stdin")
+			}
+			return settings.Command(os.Stdin)
+		}},
 	}
 }
 
@@ -125,7 +137,7 @@ func usage(name, format string, a ...any) *report.Report {
 
 func dispatch(ctx context.Context, args []string) *report.Report {
 	if len(args) == 0 {
-		return usage("", "a command is required: knowledge, find, lint, gate, fresh, next or review check")
+		return usage("", "a command is required: knowledge, find, lint, gate, fresh, next, review check or settings read")
 	}
 	name, rest := args[0], args[1:]
 	if name == "review" {
@@ -133,6 +145,12 @@ func dispatch(ctx context.Context, args []string) *report.Report {
 			return usage("review", "the only review subcommand is check")
 		}
 		name, rest = "review check", rest[1:]
+	}
+	if name == "settings" {
+		if len(rest) == 0 || rest[0] != "read" {
+			return usage("settings", "the only settings subcommand is read")
+		}
+		name, rest = "settings read", rest[1:]
 	}
 	for _, c := range commands() {
 		if c.name != name {
@@ -155,7 +173,7 @@ func dispatch(ctx context.Context, args []string) *report.Report {
 		if len(positionals) != len(c.positionals) {
 			return usage(c.name, "%s takes %d positional argument(s): %s", c.name, len(c.positionals), strings.Join(c.positionals, " "))
 		}
-		if !fullSHA.MatchString(o.pluginPin) {
+		if !c.noPin && !fullSHA.MatchString(o.pluginPin) {
 			return usage(c.name, "--plugin-pin must be a full 40-character lowercase SHA")
 		}
 		return c.run(ctx, o, positionals)

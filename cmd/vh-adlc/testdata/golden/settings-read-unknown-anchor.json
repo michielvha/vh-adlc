@@ -1,0 +1,1 @@
+{"schema_version":1,"command":"settings read","result":"malformed","knowledge":null,"data":null,"findings":[{"code":"settings-invalid","message":"invalid YAML syntax","path":"","line":0}]}

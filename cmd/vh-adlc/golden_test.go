@@ -213,6 +213,94 @@ func TestGolden(t *testing.T) {
 	}
 }
 
+func TestGoldenSettingsRead(t *testing.T) {
+	const canary = "SECRETCANARY"
+	tests := []struct {
+		name  string
+		stdin string
+	}{
+		{"settings-read", "# limits\nz: yes\nlimit: -0\nlabels: []\nmap: {}\nowner:\nsince: 2026-11-02\nnested:\n  b: true\n  a: [1, two]\n"},
+		{"settings-read-refused", "a: 1\n" + canary + ": 1\n" + canary + ": 2\n"},
+		{"settings-read-unknown-anchor", "a: *" + canary + "\n"},
+	}
+	home := t.TempDir()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := goldenCase{tt.name, []string{"settings", "read", "--stdin"}}
+			checkGolden(t, home, tt.stdin, c)
+			if out := runBinaryStdin(t, home, strings.NewReader(tt.stdin), c.args...); bytes.Contains(out.stdout, []byte(canary)) {
+				t.Fatalf("the report holds text from the file: %s", out.stdout)
+			}
+		})
+	}
+}
+
+// settingsReport is the part of a settings read report the tests below check.
+// Data and Knowledge stay raw so a test can tell null from a missing key.
+type settingsReport struct {
+	Result    report.Result    `json:"result"`
+	Knowledge json.RawMessage  `json:"knowledge"`
+	Data      json.RawMessage  `json:"data"`
+	Findings  []report.Finding `json:"findings"`
+}
+
+func readSettings(t *testing.T, stdin io.Reader, args ...string) (settingsReport, int) {
+	t.Helper()
+	out := runBinaryStdin(t, t.TempDir(), stdin, append([]string{"settings", "read", "--stdin"}, args...)...)
+	var rep settingsReport
+	if err := json.Unmarshal(out.stdout, &rep); err != nil {
+		t.Fatalf("output is not one JSON object: %v: %s", err, out.stdout)
+	}
+	if string(rep.Knowledge) != "null" {
+		t.Fatalf("knowledge = %s, want null", rep.Knowledge)
+	}
+	for _, f := range rep.Findings {
+		if f.Path != "" {
+			t.Fatalf("finding path = %q, want it empty", f.Path)
+		}
+	}
+	return rep, out.exit
+}
+
+func TestSettingsReadRefusal(t *testing.T) {
+	rep, exit := readSettings(t, strings.NewReader("a: 1\nb: 2\na: 3\n"))
+	if exit != 3 || rep.Result != report.Malformed {
+		t.Fatalf("exit %d, result %q, want 3 and malformed", exit, rep.Result)
+	}
+	if string(rep.Data) != "null" {
+		t.Fatalf("data = %s, want null", rep.Data)
+	}
+	if len(rep.Findings) != 1 || rep.Findings[0].Code != report.CodeSettingsInvalid || rep.Findings[0].Line != 3 {
+		t.Fatalf("findings = %+v, want one settings-invalid on line 3", rep.Findings)
+	}
+}
+
+func TestSettingsReadFailedRead(t *testing.T) {
+	dir, err := os.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dir.Close() })
+	rep, exit := readSettings(t, dir)
+	if exit != 4 || rep.Result != report.Error {
+		t.Fatalf("exit %d, result %q, want 4 and error", exit, rep.Result)
+	}
+	if string(rep.Data) != "null" || len(rep.Findings) != 1 || rep.Findings[0].Code != report.CodeError {
+		t.Fatalf("data = %s, findings = %+v, want null and one error finding", rep.Data, rep.Findings)
+	}
+}
+
+// TestSettingsReadIgnoresPin holds the exemption: the command needs no
+// conventions, so a pin, valid or not, changes nothing.
+func TestSettingsReadIgnoresPin(t *testing.T) {
+	for _, args := range [][]string{nil, {"--plugin-pin", "not-a-sha"}, {"--plugin-pin", strings.Repeat("0", 40)}} {
+		rep, exit := readSettings(t, strings.NewReader("a: 1\n"), args...)
+		if exit != 0 || rep.Result != report.Answered || string(rep.Data) != `{"value":{"a":1}}` {
+			t.Fatalf("%v: exit %d, result %q, data %s", args, exit, rep.Result, rep.Data)
+		}
+	}
+}
+
 // snapshot hashes every file below dir, including .git.
 func snapshot(t *testing.T, dir string) map[string]string {
 	t.Helper()
