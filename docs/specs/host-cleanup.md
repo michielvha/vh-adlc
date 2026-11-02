@@ -1,12 +1,13 @@
 ---
 status: draft
-status_description: "The owner answered all eight questions on 2026-11-02 and they are folded in; waits for an independent spec review."
+status_description: "The owner answered all eight questions and confirmed the trusted remotes on 2026-11-02; waits for an independent spec review."
 issue: null
 goal: "Any agent session on a shared workstation can remove what a project's killed runs left behind, through one reviewed vh-adlc command that touches only what that project's default branch declares it owns and has abandoned."
 covers:
   - cmd/vh-adlc/
   - internal/clean/
   - internal/knowledge/
+  - internal/settings/
   - internal/report/
   - schema/vh-adlc.schema.json
   - plugins/vh-adlc/skills/vh-adlc-clean/
@@ -173,8 +174,8 @@ Out of scope:
 
 - Moving the existing triage, maintenance and audit settings to YAML, and the conventions rule against
   choosing JSON over YAML. That is a separate outcome with its own consumers and release order, so it
-  has its own document, [yaml-settings.md](yaml-settings.md). This feature needs nothing from it,
-  because `go.yaml.in/yaml/v3` is already a dependency.
+  has its own document, [yaml-settings.md](yaml-settings.md). This feature shares only its strict
+  Go parser, `internal/settings`, and whichever feature lands first adds that package.
 - Running the binary as root or through `sudo`, and any other user's files. The firewall container is
   the one privileged step; it runs on the engine and only with `--firewall`.
 - Signalling host processes, as a broad `pkill` would. Only engine containers that a rule calls abandoned are stopped.
@@ -203,7 +204,7 @@ The owner answered every question on 2026-11-02. This design folds in those answ
 | Manifest | `.vh-adlc/cleanup.yaml`. YAML is the standard for settings; the wider migration is [yaml-settings.md](yaml-settings.md). |
 | Temp root | A per-host setting, defaulting to `/tmp/vh-adlc-<uid>/<project>`. |
 | Schedule | On demand only in v1. |
-| Trust | No registration. Rules come from the repository's default branch, so a branch or uncommitted edit only gets a dry run. |
+| Trust | No registration. Rules come from the repository's default branch, so a branch or uncommitted edit only gets a dry run. `trusted_remotes` is confirmed, with `github.com/michielvha/` and `github.com/vhco-pro/` on this host. |
 | Harnesses | Claude Code and Codex, both in v1. |
 | Commands | None in the manifest. |
 | Firewall | A firewall rule behind `--firewall`, through a digest-pinned image. |
@@ -261,8 +262,9 @@ today. New finding codes, added in the same minor release: `manifest-invalid`, `
 Two per-user files hold host state. Neither lives in a repository, and neither holds cleanup rules.
 
 `<user config dir>/vh-adlc/host.yaml` is the owner's optional setting, `schema_version: 1`. It has
-`temp_base`, the base of every temp root, and `trusted_remotes`, a list of normalized prefixes such as
-`github.com/michielvha/` and `github.com/vhco-pro/`.
+`temp_base`, the base of every temp root, and `trusted_remotes`, a list of normalized prefixes. This
+host's list is `github.com/michielvha/` and `github.com/vhco-pro/`. With no list, applied runs remove
+nothing.
 
 `<user cache dir>/vh-adlc/projects.yaml` is the host list. `vh-adlc knowledge`, `env` and `clean` add the
 repository's canonical path on first use, from `git rev-parse --git-common-dir`, so every worktree
@@ -328,8 +330,9 @@ and the reference says so.
 
 ### Ownership manifest
 
-`.vh-adlc/cleanup.yaml` is data with `schema_version: 1`, parsed with `yaml.v3`. It holds one document,
-unknown keys and duplicate keys fail, and aliases are refused. No field holds a command. The fields are:
+`.vh-adlc/cleanup.yaml` is data with `schema_version: 1`, parsed by the strict `internal/settings` package
+that [yaml-settings.md](yaml-settings.md) defines, which uses `yaml.v3`. It holds one document, unknown
+keys and duplicate keys fail, and aliases are refused. No field holds a command. The fields are:
 
 | Field | Meaning |
 | --- | --- |
@@ -468,7 +471,8 @@ The classifier keeps refusing raw sweeps such as `rm -rf /tmp/*` and `docker vol
 Stackweaver adopts first, in its own repository: it merges `.vh-adlc/cleanup.yaml` to its default branch
 and takes its test and build environment from `vh-adlc env --sh`. vh-adlc merges its own manifest for
 `vh-triage-locks-*`, `vh-triage-verification-*`, `vh-adlc-ensure.*` and the `vh-*` test fixtures, which
-also exercises the overlap check with two projects. The owner sets `trusted_remotes` once per host.
+also exercises the overlap check with two projects. The owner sets `trusted_remotes` once per host, to
+the list above on this host.
 
 The table is the acceptance fixture: the classes of leftover this host held on 2026-11-02 and the
 outcome the design requires. The reboot cleared the `/tmp` rows and the firewall chains, and Stackweaver's
