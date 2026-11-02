@@ -110,4 +110,5 @@ test("a generic selected eligible repair gets local authority and no live or rem
     expect(inspectAuthority(config, { mode: "fix", ids: ["AUD-001"], effect, request, no_fetch: true }).allowed).toBe(["source-edit", "ledger-update", "local-commit"].includes(effect));
   }
   expect(inspectAuthority(config, { mode: "status", ids: ["AUD-001"], effect: "ledger-update", request: { ...request, mode: "status", effects: ["ledger-update"] }, no_fetch: true }).allowed).toBe(false);
+  expect(inspectAuthority(config, { mode: "fix", ids: ["AUD-999"], effect: "source-edit", request: { ...request, ids: ["AUD-999"] }, no_fetch: true }).allowed).toBe(false);
 });

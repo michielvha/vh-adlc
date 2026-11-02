@@ -17,7 +17,7 @@ export function git(root: string, ...args: string[]): string {
   const child = Bun.spawnSync(["git", "-C", root, ...args], {
     env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" }, stdout: "pipe", stderr: "pipe",
   });
-  if (child.exitCode) throw Error("audit cannot read Git " + args[0]);
+  if (child.exitCode !== 0) throw Error("audit cannot read Git " + args[0]);
   return child.stdout.toString().trimEnd();
 }
 export function privateDirectory(path: string, checkout: string): string {

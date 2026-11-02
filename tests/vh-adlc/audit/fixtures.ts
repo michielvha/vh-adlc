@@ -8,7 +8,7 @@ export function git(root: string, ...args: string[]): string {
     env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_OPTIONAL_LOCKS: "0" },
     stdout: "pipe", stderr: "pipe",
   });
-  if (child.exitCode) throw Error("fixture git " + args[0] + " failed: " + child.stderr.toString());
+  if (child.exitCode !== 0) throw Error("fixture git " + args[0] + " failed: " + child.stderr.toString());
   return child.stdout.toString().trim();
 }
 
