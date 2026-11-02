@@ -82,6 +82,12 @@ version bump. A shell sequence did not stop after a failed metadata assertion. T
 no feature code was pushed. T26 moves the already-required coherent version bump forward, keeps the
 failed checker log, and requires the passing package/settings rerun before T3 completion.
 
+T5 measured the actual legacy table shape: recorded status markers are appended in its Title
+column, and four first-column ID ranges compress historical findings. Synthetic public controls
+cover those shapes. Inventory expands the reserved range IDs only as aggregate/incomplete entries;
+it does not invent per-member evidence or rewrite the private ledger. The read-only observed hash
+remains the original `c0eb6250` value, and ordinary ID allocation advances to AUD-160.
+
 ### Latest spec review and implementation obligation
 
 Actual Copilot `claude-opus-5.5` R-12 reviewed `67a91a17944bb219ce956364963531532577c396`
@@ -717,7 +723,8 @@ live operations remain separate owner-selected tasks.
       Evidence: Settings red became 22 passing tests/38 assertions in `T3-settings-green.log`. Code commit `90b2416` plus the prerequisite version task T26 now passes the 75-test combined settings/package check. The complete example loads in a fresh fixture and no input credential values are echoed. Inventory/AC-02 completion still requires T5.
 - [x] T4 `tests/vh-adlc/audit/inventory.test.ts` - write legacy-index/heading/reference/high-water/ambiguity tests first; observe the missing inventory behavior fail (AC-02).
       Evidence: `bun test tests/vh-adlc/audit/inventory.test.ts` exits 1 because the inventory module is absent; `T4-inventory-red.log` retains the observed red. Cases distinguish primary identities/references, historical status, incomplete/duplicate indices, alternate prefix and safe ID allocation.
-- [ ] T5 `plugins/vh-adlc/scripts/audit/inventory.ts` - implement supported Markdown inventory and conservative ID allocation; T4 passes including alternate prefix and incomplete inventories (AC-02).
+- [x] T5 `plugins/vh-adlc/scripts/audit/inventory.ts` - implement supported Markdown inventory and conservative ID allocation; T4 passes including alternate prefix and incomplete inventories (AC-02).
+      Evidence: Missing-module red and four additional observed parser/control failures became 87 passing combined settings/inventory/package tests with 267 assertions in `T5-legacy-format-green.log`. Actual private-ledger read-only inventory preserves SHA-256 `c0eb6250334fbb592ed955c595b24aea2d796f5c1c7b5279672e26065807d769`, exposes 122 indexed/entry IDs including four compressed ranges, derives AUD-160, and reports incomplete historical/group evidence rather than current verification. No private finding titles/bodies were copied to shared fixtures.
 - [ ] T6 `tests/vh-adlc/audit/assessment.test.ts` and `snapshot.test.ts` - write target-binding, false-fixed, challenge, stale-source/history and candidate-integrity checks first; observe missing behavior fail (AC-03).
 - [ ] T7 `plugins/vh-adlc/scripts/audit/snapshot.ts`, `assessment.ts` and `report.ts` - implement private bound snapshots, evidence/proposal validation and exclusive reports; T6 passes with no ungranted checkout/index/ref writes (AC-03).
 - [ ] T8 `tests/vh-adlc/audit/authority.test.ts` - write declaration, provenance, current-request/effect precedence, coherent-subset and candidate/adopted dry-run denials first; observe failure before the authority helper exists (AC-04, AC-05).

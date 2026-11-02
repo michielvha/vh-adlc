@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { cpSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { inventory } from "../../../plugins/vh-adlc/scripts/audit/inventory";
+import { inventory, tableCells } from "../../../plugins/vh-adlc/scripts/audit/inventory";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { baseSettings, fixture, git, ledger } from "./fixtures";
 
@@ -91,4 +91,38 @@ test("ambiguous status, unsafe numeric IDs and equivalent numeric identities nev
   expect(result.findings.find(row => row.id === "AUD-001")?.identity_valid).toBe(false);
   expect(result.next_id).toBeNull();
   expect(result.complete).toBe(false);
+});
+
+test("an escaped final pipe stays inside the final cell when the closing delimiter is omitted", () => {
+  expect(tableCells("| AUD-001 | High | Finding | OPEN\\|")).toEqual(["AUD-001", "High", "Finding", "OPEN|"]);
+});
+
+test("an overlong numeric finding spelling is not a valid identity even when its numeric value is small", () => {
+  const id = "AUD-00000000000000001";
+  const result = inventory(loadSettings(project(ledger.replaceAll("AUD-001", id)).root));
+  expect(result.findings.find(row => row.id === id)?.identity_valid).toBe(false);
+  expect(result.next_id).toBeNull();
+});
+
+test("legacy title-column annotations preserve historical status without matching ordinary title words", () => {
+  const text = ledger.replace("| ID | Sev | Finding | Status |", "| ID | Sev | Area | Title |")
+    .replace("| AUD-001 | High | Incorrect result | OPEN |", "| AUD-001 | High | Example | A result is not fixed-width - ✅ **FIXED (old)** - ⚠️ **PARTIAL (new)** |")
+    .replace("| AUD-002 | Low | Historical observation | FIXED |", "| AUD-002 | Low | Example | A fixed-width issue awaits assessment |");
+  const result = inventory(loadSettings(project(text).root));
+  expect(result.findings[0].recorded_status).toBe("PARTIAL");
+  expect(result.findings[0].recorded_status_text).not.toContain("fixed-width");
+  expect(result.findings[1].recorded_status).toBe("OPEN");
+  expect(result.complete).toBe(true);
+});
+
+test("compressed ranges expose every reserved ID without inventing per-member verification", () => {
+  const text = ledger.replace("| AUD-002 |", "| AUD-003..AUD-005 | Low | Historical group | FIXED |\n| AUD-002 |");
+  const result = inventory(loadSettings(project(text).root));
+  for (const id of ["AUD-003", "AUD-004", "AUD-005"]) {
+    expect(result.findings.find(row => row.id === id)?.aggregate).toBe(true);
+    expect(result.findings.find(row => row.id === id)?.identity_valid).toBe(false);
+  }
+  expect(result.next_id).toBe("AUD-006");
+  expect(result.complete).toBe(false);
+  expect(result.range_summaries).toHaveLength(1);
 });
