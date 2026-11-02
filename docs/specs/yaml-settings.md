@@ -1,8 +1,8 @@
 ---
 status: draft
-status_description: "R-3 findings applied on 2026-11-02, and every question is decided. Its blocker still needs a new independent review."
+status_description: "R-4 findings applied on 2026-11-02, and every question is decided. Waits for a new independent review."
 issue: null
-goal: "Every vh-adlc setting a person edits is YAML, Stackweaver's move is reviewed and ready to merge, and the pinned conventions forbid choosing JSON over YAML."
+goal: "Triage and maintenance settings are YAML, Stackweaver's move is reviewed, and the pinned conventions forbid choosing JSON over YAML. Audit is a known exception until its revision lands."
 covers:
   - plugins/vh-adlc/scripts/settings-file.ts
   - plugins/vh-adlc/scripts/ensure-vh-adlc.sh
@@ -44,17 +44,18 @@ generated JSON stay as they are.
 - `.vh-adlc/audit.json` is built but unmerged, on `feat/shared-audit` at
   `7e161c58ac2377e86503384744d3f03dc71f557a` in the clone `/home/m/code/vh-adlc-triage-spec`, and on
   Stackweaver's `feat/shared-audit-migration`.
-- The lock names 0.1.0 and needs a published stable release (`docs/internal/releasing.md`).
+- The lock names 0.1.0 and takes only a stable version (`plugins/vh-adlc/scripts/ensure-vh-adlc.sh:43`).
 
 ## Scope
 
 In scope: the shared loader, the lock bump, YAML for triage and maintenance, Stackweaver's reviewed branch,
-the conventions rule and pin bump. Shared audit's own revision is a dependency it records itself; this
-document only states the exact change.
+the conventions rule and pin bump. Audit is a known exception until its revision lands; this document
+states the exact change but does not make it.
 
 Out of scope: the reader itself, which is [settings-reader.md](settings-reader.md); reading both formats;
 a migration helper; any change to a setting's fields; enforcing a minimum plugin version beyond the
-adapter stating it.
+adapter stating it. The maintenance declaration's `index_paths` stays a JSON array in a Markdown table, a
+deliberate exception to the rule below.
 
 ## Design
 
@@ -97,17 +98,21 @@ files and machine-to-machine output may be JSON.
    Stackweaver commits (`tests/vh-adlc/triage/fixtures/migration/`, the corpus in
    `tests/vh-adlc/maintenance/policy-corpus.ts`): those stay as recorded data, and test setup writes their
    values as YAML into the fixture checkout. Stackweaver's branch is reviewed against this candidate plugin
-   before the PR merges: it converts both files by hand, updates its references, and states the plugin version
-   it needs in its adapter. An older plugin on that checkout is accepted.
-4. After this PR merges and the plugin publishes, Stackweaver finishes open triage batches and maintenance
-   runs and merges that branch. The result is recorded in this document, as earlier adoptions were.
-5. Shared audit's revision, below, which its own document tracks.
+   before the PR merges: it converts both files by hand, updates its references, re-baselines
+   `tests/agent-maintenance/contract.test.ts` with the reason recorded, and states the plugin version it needs
+   in `minimum_plugin_version` in `tests/agent-maintenance/manifest.json`. An older plugin on that checkout
+   is accepted.
+4. After this PR merges and the plugin publishes, Stackweaver's branch records the published commit and
+   payload digest and reruns the AC-06 comparison against the published plugin, and that update is reviewed.
+   Then finish open triage batches and maintenance runs on the old plugin, upgrade each host, and merge. The
+   result is recorded in this document, as earlier adoptions were.
+5. Shared audit's revision, below.
 
 ### Shared audit
 
 The revision belongs to the session on `feat/shared-audit`, and neither this feature nor its branch
-changes it. There, after `git fetch origin main`: run `vh-adlc gate draft docs/specs/shared-audit.md`, edit
-`status` only on a pass, and commit that alone with the gate's `data.line`. Then, at `7e161c5` line numbers:
+changes it. There, after `git fetch origin main`: run
+`vh-adlc gate draft docs/specs/shared-audit.md --repo . --plugin-pin <pin>`, edit `status` only on a pass, and commit that alone with the gate's `data.line`. Then, at `7e161c5` line numbers:
 
 - `shared-audit.md:262,268,616`: `.vh-adlc/audit.json` becomes `.vh-adlc/audit.yaml`, read through the
   shared loader. `covers` gains `plugins/vh-adlc/scripts/settings-file.ts`. Clear any criterion ticks, keep
@@ -139,10 +144,10 @@ changes it. There, after `git fetch origin main`: run `vh-adlc gate draft docs/s
 | --- | --- |
 | AC-01, AC-02 | `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/maintenance/settings.test.ts` on YAML, with a loader table for each refused file. |
 | AC-05 | `tests/vh-adlc/maintenance/publication.test.ts` with a YAML adoption chain. |
-| AC-06 | Stackweaver's `tests/agent-triage` and `tests/agent-maintenance` tests on its branch with the candidate plugin installed. The `settings` operation output at its last JSON commit and at the YAML commit must match apart from `settings_path`, for both operations. |
+| AC-06 | Stackweaver's `tests/agent-triage` and `tests/agent-maintenance` tests on its branch, with `VH_ADLC_PLUGIN_DIR` pointing at the candidate plugin, and a contract assertion on `minimum_plugin_version`. For both operations, the `settings` output at its last JSON commit, on the plugin before this feature, and at the YAML commit, on the candidate, run from the same checkout path, must be deeply equal, ignoring mapping key order and `settings_path`. |
 | AC-07 | Read the rule through `vh-adlc knowledge --page conventions/coding.md`. |
 | AC-09 | `tests/vh-adlc/ensure.test.ts` and `bun test tests/vh-adlc` against the bumped lock, plus a loader test with the installer failing. |
-| AC-10 | A test in `tests/vh-adlc/triage/` runs `exportInputs` on a YAML checkout, compares the export, and starts the real `boundaryCommand`, which verifies its hash. |
+| AC-10 | A test in `tests/vh-adlc/triage/` runs `exportInputs` on a YAML checkout, compares the export, calls `verifyInputs`, starts the real `boundaryCommand`, and reads `settings.json` through the session's `read` tool. |
 | AC-13 | A package test that greps both references and parses their YAML examples through the loader. |
 
 ## Tasks

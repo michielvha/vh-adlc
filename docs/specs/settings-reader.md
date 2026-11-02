@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-1 findings applied on 2026-11-02; it had no blockers, and its changes wait for a new independent review."
+status_description: "R-2 findings applied on 2026-11-02; it had no blockers, and its changes wait for a new independent review."
 issue: null
 goal: "`vh-adlc settings read` turns a YAML settings file into a checked value, or refuses it, for the TypeScript operations."
 covers:
@@ -48,12 +48,15 @@ top, string keys, and these values:
 - `null` or an empty value;
 - integers matching `^-?(0|[1-9][0-9]*)$` in JavaScript's safe range;
 - a timestamp, which comes back as the text written;
-- sequences and mappings, including empty ones, with keys sorted.
+- sequences and mappings, including empty ones, with keys sorted, so a comparison of values must ignore
+  mapping order.
+
+`-0` comes back as 0.
 
 Anything else is refused: empty input, a second document including a trailing `---`, a top level that is not a
-mapping, a key that is not a string, duplicate keys, aliases, anchors, merge keys, explicit tags, floats, and
-other number, boolean or null spellings. Refusal covers what the node tree shows, so a bare `!`, a `%YAML`
-directive and a byte order mark are accepted.
+mapping, a key that is not a string, duplicate keys, aliases, anchors, merge keys, a `<<` value, explicit tags,
+floats, and other number, boolean or null spellings. Refusal covers what the node tree shows, so a bare `!`,
+a `%YAML` directive of a version the library accepts and a byte order mark are accepted.
 
 A refusal reports result `malformed`, `data: null` and one finding with the code `settings-invalid` and a
 fixed reason. Its line is the node's line, or the number from a library `line N` error, otherwise 0. No
@@ -65,13 +68,18 @@ part of the report holds text from the file or from the library's error.
       `answered`, and `data.value` equals the expected value, with keys sorted and timestamps as written.
 - [ ] AC-02: Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from
       the file.
+- [ ] AC-03: Without `--stdin` the command reports `usage`, a failed read reports `error`, and a refusal has `data: null`,
+      one finding and the stated line.
+- [ ] AC-04: `docs/reference/cli.md` names the command and its pin exemption.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | `internal/settings` table tests naming each accepted form, including an empty sequence and mapping, both safe-range limits, `a:` and an unquoted date. A `cmd/vh-adlc` golden report validated against the schema, after the golden harness gains stdin. |
-| AC-02 | Table tests for each refused form, including a second document, a trailing `---`, a timestamp key, an out-of-range integer and an unknown anchor. A golden refusal report with a canary value. |
+| AC-01 | `internal/settings` table tests naming each accepted form, including an empty sequence and mapping, both safe-range limits, `a:`, `-0` and an unquoted date. A `cmd/vh-adlc` golden report validated against the schema, after the golden harness gains stdin. |
+| AC-02 | Table tests for each refused form, including a second document, a trailing `---`, a timestamp key, an out-of-range integer, `a: <<` and an unknown anchor. Every row carries a canary and asserts the code, the fixed reason and the canary's absence. One golden report for a walk refusal and one for the unknown anchor. |
+| AC-03 | `TestUsage` for a missing `--stdin`, and the stdin harness for a failed read and a refusal's `data`, finding count and line. |
+| AC-04 | A read of the page against the command. |
 
 ## Tasks
 
