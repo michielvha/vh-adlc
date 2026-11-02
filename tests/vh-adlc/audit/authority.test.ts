@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { inspectAuthority, inspectCandidatePolicy } from "../../../plugins/vh-adlc/scripts/audit/authority";
+import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "../../../plugins/vh-adlc/scripts/audit/authority";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git } from "./fixtures";
 
@@ -111,4 +111,20 @@ test("a generic selected eligible repair gets local authority and no live or rem
   }
   expect(inspectAuthority(config, { mode: "status", ids: ["AUD-001"], effect: "ledger-update", request: { ...request, mode: "status", effects: ["ledger-update"] }, no_fetch: true }).allowed).toBe(false);
   expect(inspectAuthority(config, { mode: "fix", ids: ["AUD-999"], effect: "source-edit", request: { ...request, ids: ["AUD-999"] }, no_fetch: true }).allowed).toBe(false);
+});
+
+
+test("adopted-policy inspection resolves fresh mode effects without inventing a selected fix request or granting execution", () => {
+  const c = adopted(), result = inspectAdoptedPolicy(c.config, { refresh: c.refresh });
+  expect(result.valid).toBe(true); expect(result.allowed).toBe(false); expect(result.adopted).toBe(true);
+  expect(result.declaration?.effects.fix).toContain("conditional-merge");
+  expect(result.default_commit).toBe(git(c.f.root, "rev-parse", "HEAD")); expect(c.fetches()).toBe(1);
+});
+test.each(["unmerged", "agents", "origin", "fetch"])("read-only adopted-policy inspection rejects %s", kind => {
+  const c = adopted();
+  if (kind === "unmerged") { c.f.write("audit-project.md", policy().replace("# Project audit", "# Unmerged audit")); c.f.commit(); }
+  if (kind === "agents") { c.f.write("AGENTS.md", "# No audit route\n"); git(c.f.root, "update-ref", "refs/remotes/origin/main", c.f.commit()); }
+  if (kind === "origin") git(c.f.root, "remote", "set-url", "origin", "https://github.com/other/project");
+  const result = inspectAdoptedPolicy(c.config, { refresh: kind === "fetch" ? () => { throw Error("offline"); } : c.refresh });
+  expect(result.valid).toBe(false); expect(result.allowed).toBe(false); expect(result.adopted).toBe(false);
 });

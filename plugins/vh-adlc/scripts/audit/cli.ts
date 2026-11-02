@@ -7,7 +7,7 @@ import { inventory } from "./inventory";
 import { captureSnapshot, privateDirectory, type Snapshot } from "./snapshot";
 import { evaluateAssessments } from "./assessment";
 import { saveReport } from "./report";
-import { inspectAuthority, inspectCandidatePolicy } from "./authority";
+import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "./authority";
 import { createLedgerCandidate, applyLedgerCandidate, appendFindings } from "./ledger";
 import { checkBatch } from "./batch";
 import { createRun, intent, noteResource, readRun } from "./journal";
@@ -17,7 +17,7 @@ const argumentsByOperation: Record<string, string[]> = {
   settings: [], status: [], inventory: [], snapshot: ["mode", "ids", "artifact-root", "baseline", "requirements", "name"],
   check: ["snapshot", "input"], report: ["snapshot", "input", "name"], candidate: ["snapshot", "input", "run-id", "date", "name", "new-findings", "provisional"],
   "new-findings": ["snapshot", "input", "name"], apply: ["snapshot", "input", "candidate", "request", "path", "commit"],
-  "policy-candidate": ["default-branch"], authority: ["input"], "batch-check": ["input"],
+  "policy-candidate": ["default-branch"], "policy-adopted": [], authority: ["input"], "batch-check": ["input"],
   "journal-new": ["artifact-root", "run-id", "batch-digest"], "journal-read": ["directory", "batch-digest"],
   "journal-intent": ["directory", "batch-digest", "input"], "journal-resource": ["directory", "batch-digest", "action-id", "resource-id"],
 };
@@ -64,6 +64,7 @@ export function runCLI(argv: string[]) {
     });
   }
   if (operation === "policy-candidate") return inspectCandidatePolicy(config, { default_branch: requireOption("default-branch") });
+  if (operation === "policy-adopted") return inspectAdoptedPolicy(config);
   if (operation === "authority") return inspectAuthority(config, json(requireOption("input")));
   if (operation === "batch-check") return checkBatch(config, json(requireOption("input")));
   if (operation === "journal-new") { const run = createRun(config, { artifact_root: requireOption("artifact-root"), run_id: requireOption("run-id"), batch_digest: requireOption("batch-digest") }); return { directory: run.directory, revision: run.revision }; }

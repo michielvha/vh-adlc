@@ -101,3 +101,13 @@ Inspect a migration candidate with `policy-candidate --default-branch <actual-de
 valid result has `allowed: false`. After migration, inspect the actual installed helper's freshly
 fetched adopted chain/effects read-only before claiming adoption. The authority helper checks
 identity, provenance, mode, IDs and effect; the operator must still observe every semantic gate.
+
+## Inspecting candidate and adopted policy
+
+`bun <plugin>/scripts/audit/cli.ts policy-candidate --repo <checkout> --default-branch main`
+checks the proposed declaration and fragment pointers. It grants no effect.
+After an authorized migration merge, run `policy-adopted --repo <checkout>` from the same helper.
+It refreshes the actual remote default, follows committed AGENTS/settings/procedure, and reports all
+resolved mode effects. Compare them with the consumer parity map; a mismatch blocks adoption.
+This read-only inspection does not invent a selected fix request and never authorizes execution.
+Current selection, restrictions and semantic gates still apply to each later action.

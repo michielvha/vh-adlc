@@ -84,6 +84,32 @@ function committedFile(config: Settings, commit: string, path: string): string {
   }
   return gitBytes(config.root, "show", `${commit}:${path}`).toString();
 }
+/** Read-only policy discovery, not an execution authorization or synthetic fix request. */
+export function inspectAdoptedPolicy(config: Settings, options: { refresh?: () => Observed } = {}) {
+  const sources: { path: string; digest: string }[] = [];
+  let observed: Observed | null = null;
+  try {
+    if (digest(loadSettings(config.root, { settingsPath: config.settings_path })) !== digest(config)) fail();
+    const identity = auditOrigin(config.root);
+    if (identity.repository.toLowerCase() !== config.repository || identity.hostname !== config.hostname) fail();
+    observed = (options.refresh ?? (() => refreshDefault(config)))();
+    git(config.root, "check-ref-format", "refs/heads/" + observed.default_branch);
+    if (!/^[a-f0-9]{40,64}$/.test(observed.default_commit) || git(config.root, "rev-parse", "refs/remotes/origin/" + observed.default_branch) !== observed.default_commit) fail();
+    const read = (path: string) => { const text = committedFile(config, observed!.default_commit, path); sources.push({ path, digest: hash(text) }); return text; };
+    const links = [...visible(read("AGENTS.md")).matchAll(/\[[^\]\n]+\]\(([^\s)]+)\)/g)].map(m => m[1].replace(/^\.\//, ""));
+    if (!links.includes(config.settings_path)) fail();
+    const settings = read(config.settings_path);
+    if (settings.trimEnd() !== readFileSync(join(config.root, config.settings_path), "utf8").trimEnd() || JSON.parse(settings).project_procedure !== config.project_procedure) fail();
+    const procedure = read(config.project_procedure);
+    if (procedure.trimEnd() !== readFileSync(join(config.root, config.project_procedure), "utf8").trimEnd()) fail();
+    const declaration = parseDeclaration(procedure, config, observed.default_branch); if (!declaration) fail();
+    return { valid: true, allowed: false as const, adopted: true, ...observed, sources, declaration,
+      limit: "Read-only adopted policy inspection; current selection, restrictions and semantic gates must still authorize each effect." };
+  } catch {
+    return { valid: false, allowed: false as const, adopted: false, default_branch: observed?.default_branch ?? null, default_commit: observed?.default_commit ?? null,
+      sources, declaration: null, limit: "Fresh adopted policy unavailable; this inspection grants no effect." };
+  }
+}
 export function inspectAuthority(config: Settings, options: AuthorityOptions) {
   const sources: { path: string; digest: string }[] = [];
   let default_commit: string | null = null, default_branch: string | null = null;
@@ -110,21 +136,10 @@ export function inspectAuthority(config: Settings, options: AuthorityOptions) {
     const explicit = request.effects?.includes(effect) || options.mode === "fix" && request.eligible_repair && local.includes(effect as typeof local[number]);
     if (explicit) return response(true, "current-request", "Current selected request grants this scoped effect; retained gates still apply.");
     if (options.no_fetch) return response(false, "none", "Fresh default policy unavailable under no-fetch request.");
-    const observed = (options.refresh ?? (() => refreshDefault(config)))();
-    git(config.root, "check-ref-format", "refs/heads/" + observed.default_branch);
-    if (!/^[a-f0-9]{40,64}$/.test(observed.default_commit) || git(config.root, "rev-parse", "refs/remotes/origin/" + observed.default_branch) !== observed.default_commit) fail();
-    default_commit = observed.default_commit; default_branch = observed.default_branch;
-    const read = (path: string) => { const text = committedFile(config, observed.default_commit, path); sources.push({ path, digest: hash(text) }); return text; };
-    const agents = visible(read("AGENTS.md"));
-    const links = [...agents.matchAll(/\[[^\]\n]+\]\(([^\s)]+)\)/g)].map(m => m[1].replace(/^\.\//, ""));
-    if (!links.includes(config.settings_path)) return response(false, "none", "Default AGENTS has no audit settings link.");
-    const settings = read(config.settings_path), currentSettings = readFileSync(join(config.root, config.settings_path), "utf8");
-    if (settings.trimEnd() !== currentSettings.trimEnd()) return response(false, "none", "Candidate settings are not adopted default settings.");
-    const parsed = JSON.parse(settings);
-    if (parsed.project_procedure !== config.project_procedure) fail();
-    const procedure = read(config.project_procedure);
-    if (procedure.trimEnd() !== readFileSync(join(config.root, config.project_procedure), "utf8").trimEnd()) return response(false, "none", "Candidate procedure is not adopted default policy.");
-    const grant = parseDeclaration(procedure, config, observed.default_branch);
-    return grant?.effects[options.mode].includes(effect) ? response(true, "adopted", "Fresh committed scoped grant; semantic gates remain pending.") : response(false, "none", "No adopted grant for this effect.");
+    const policy = inspectAdoptedPolicy(config, { refresh: options.refresh });
+    sources.push(...policy.sources); default_commit = policy.default_commit; default_branch = policy.default_branch;
+    return policy.valid && policy.declaration?.effects[options.mode].includes(effect)
+      ? response(true, "adopted", "Fresh committed scoped grant; semantic gates remain pending.")
+      : response(false, "none", "No fresh adopted grant for this effect.");
   } catch { return response(false, "none", "Fresh adopted policy could not be established."); }
 }
