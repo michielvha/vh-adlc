@@ -34,7 +34,7 @@ export function tableCells(line: string): string[] {
   return cells;
 }
 
-function visibleLines(text: string): string[] {
+export function visibleLines(text: string): string[] {
   let fence: { char: string; size: number } | undefined, comment = false;
   return text.split(/\r?\n/).map(raw => {
     const marker = raw.match(/^ {0,3}([~\x60])\1{2,}/);

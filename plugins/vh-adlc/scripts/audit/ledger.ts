@@ -3,7 +3,7 @@ import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
 import { inspectAuthority, refreshDefault, type AuthorityOptions } from "./authority";
 import { evaluateAssessments, evaluateCandidateAssessments, evaluateCommittedAssessments, evaluateFrozenCandidateAssessments, type Assessment } from "./assessment";
-import { tableCells } from "./inventory";
+import { tableCells, visibleLines } from "./inventory";
 import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
 import { loadSettings } from "./settings";
@@ -16,7 +16,7 @@ export type Candidate = { schema_version: 1; run_id: string; at: string; snapsho
 type OwnedLedger = { path: string; branch: string; base: string; commit: string | null; candidate_digest: string; owner_file: string };
 function fail(message: string): never { throw Error("audit ledger: " + message); }
 function marker(verdict: string) { return verdict === "FIXED" ? "✅" : verdict === "MOOT" ? "🗑️" : "⚠️"; }
-function replaceCell(line: string, index: number, value: string) {
+function replaceCell(line: string, index: number, value: string | ((raw: string) => string)) {
   const delimiters: number[] = []; let escaped = false;
   for (let i = 0; i < line.length; i++) {
     if (escaped) escaped = false;
@@ -27,7 +27,8 @@ function replaceCell(line: string, index: number, value: string) {
   const start = index === 0 && !leading ? 0 : (delimiters[index - (leading ? 0 : 1)] ?? fail("status cell missing")) + 1;
   const end = delimiters[index + (leading ? 1 : 0)] ?? line.length;
   const old = line.slice(start, end), spaces = old.match(/^(\s*)[\s\S]*?(\s*)$/)!;
-  return line.slice(0, start) + spaces[1] + value + spaces[2] + line.slice(end);
+  const rendered = typeof value === "function" ? value(old.slice(spaces[1].length, old.length - spaces[2].length)) : value;
+  return line.slice(0, start) + spaces[1] + rendered + spaces[2] + line.slice(end);
 }
 type CandidateOptions = { document: Document; at: string; run_id: string; new_findings?: NewFinding[]; provisional?: boolean };
 export function createLedgerCandidate(config: Settings, snap: Snapshot, options: CandidateOptions): Candidate {
@@ -61,8 +62,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     const title = column < 0;
     if (title) column = header.findIndex(c => /^(title|finding|description)$/i.test(c));
     if (column < 0) fail("supported status/title column is missing");
-    const existing = tableCells(lines[index])[column];
-    lines[index] = replaceCell(lines[index], column, title ? existing.replaceAll("|", "\\|") + ` - ${marker(row.verdict)} **${row.verdict} (${options.at})**` : row.verdict);
+    lines[index] = replaceCell(lines[index], column, title ? raw => raw + ` - ${marker(row.verdict)} **${row.verdict} (${options.at})**` : row.verdict);
   }
   // Append dated notes inside each finding section, without rewriting prior content or anchors.
   const rows = [...options.document.assessments].filter(row => snap.inventory.findings.find(f => f.id === row.id)?.identity_valid).sort((a, b) =>
@@ -70,7 +70,12 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
   for (const row of rows) {
     const finding = snap.inventory.findings.find(f => f.id === row.id)!;
     let end = finding.entry_lines[0];
-    while (end < lines.length && !new RegExp("^#{1," + config.profile.finding_level + "} ").test(lines[end])) end++;
+    const visible = visibleLines(lines.join("\n"));
+    while (end < lines.length) {
+      const heading = visible[end]?.match(/^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/);
+      if (heading && heading[1].length <= config.profile.finding_level) break;
+      end++;
+    }
     const marker = `<!-- audit-run:${options.run_id}:${row.id} -->`;
     if (lines.includes(marker)) fail("run note already exists; reconcile the actual ledger");
     const safe = (value: string) => value.replace(/[\r\n]/g, " ").replaceAll("<!--", "&lt;!--");

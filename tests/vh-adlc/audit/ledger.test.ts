@@ -152,3 +152,23 @@ test("fresh finding allocation preserves the widest observed ID spelling", () =>
   const snap = captureSnapshot(c.config, { mode: "full", artifact_root: c.f.artifacts }); expect(snap.inventory.next_id).toBe("AUD-0160");
   expect(appendFindings(c.config, snap, [{ id: "AUD-0160", severity: "High", title: "Distinct cause", body: "Observed fixture scenario." }]).bytes).toContain("### AUD-0160");
 });
+
+test("dated notes stay outside fenced/commented headings and before an indented next finding", () => {
+  const c = context(), sample = "```sh\n# reproduce as attacker\n## output\nprintf 'example'\n```\n<!--\n## Hidden example\n-->\nOriginal scenario detail.\n";
+  c.f.write(c.config.ledger_path, ledger.replace("The return value needs a current check.\n", sample).replace("### AUD-002", "  ### AUD-002")); const base = c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "reverify", ids: ["AUD-001"], baseline: base, artifact_root: c.f.artifacts });
+  const candidate = createLedgerCandidate(c.config, snap, { document: { schema_version: 1, snapshot_digest: snap.digest, assessments: [terminal(c.f, snap)] }, at: "2026-11-02", run_id: "body-boundaries" });
+  expect(candidate.bytes).toContain(sample);
+  const note = candidate.bytes.indexOf("<!-- audit-run:body-boundaries:AUD-001 -->");
+  expect(note).toBeGreaterThan(candidate.bytes.indexOf("Original scenario detail.")); expect(note).toBeLessThan(candidate.bytes.indexOf("  ### AUD-002"));
+});
+test("title status annotations preserve non-pipe Markdown escapes byte for byte", () => {
+  const c = context(), title = String.raw`Escaped \*literal\* \_name\_ \<tag\> and \\slash`;
+  const original = ledger.replace("| ID | Sev | Finding | Status |", "| ID | Sev | Area | Title |")
+    .replace("| AUD-001 | High | Incorrect result | OPEN |", `| AUD-001 | High | Example | ${title} |`)
+    .replace("| AUD-002 | Low | Historical observation | FIXED |", "| AUD-002 | Low | Example | Historical observation |" );
+  c.f.write(c.config.ledger_path, original); const base = c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "reverify", ids: ["AUD-001"], baseline: base, artifact_root: c.f.artifacts });
+  const candidate = createLedgerCandidate(c.config, snap, { document: { schema_version: 1, snapshot_digest: snap.digest, assessments: [terminal(c.f, snap)] }, at: "2026-11-02", run_id: "raw-title" });
+  expect(candidate.bytes).toContain(title + " - ✅ **FIXED");
+});
