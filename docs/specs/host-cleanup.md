@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-6 F-01, F-03, F-04, F-06 and F-10 applied on 2026-11-02. F-02, F-05, F-08 and F-09 carry into tasks, and F-07 waits on the owner's decision to push. The owner accepts this document if the next independent review has no blocking finding."
+status: planned
+status_description: "Accepted by the owner on 2026-11-02 at R-7. The non-blocking findings of R-6 and R-7 carry into tasks, and any of them needing a baseline change goes through the normal revision path at implementation."
 issue: null
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
 covers:
@@ -331,6 +331,7 @@ None.
 | 2026-11-02 | R-5 | spec | `d875e20f90e14d3d059de04fc3bf71203f45b386` | claude-opus-5-5 | procedural | 14 findings, 1 blocking |
 | 2026-11-02 | R-6 | spec | `104d96968de60313f1c940edc464180edf015fbb` | claude-opus-5-5 | procedural | 10 findings, 1 blocking |
 | 2026-11-02 | R-7 | spec | `ffe9dd6e7f388e7cfd20918e7f85ddf67b9c54ec` | claude-opus-5-5 | procedural | 9 findings, 0 blocking |
+| 2026-11-02 | R-7 | spec | `ffe9dd6e7f388e7cfd20918e7f85ddf67b9c54ec` | n/a | n/a | accepted by owner |
 
 ### R-1
 
