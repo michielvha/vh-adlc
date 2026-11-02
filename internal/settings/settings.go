@@ -11,9 +11,8 @@ import (
 	"regexp"
 	"strconv"
 
-	"go.yaml.in/yaml/v3"
-
 	"github.com/michielvha/vh-adlc/internal/report"
+	"go.yaml.in/yaml/v3"
 )
 
 const commandName = "settings read"
@@ -40,8 +39,13 @@ const (
 // decimal is the one integer spelling the reader accepts.
 var decimal = regexp.MustCompile(`^-?(0|[1-9][0-9]*)$`)
 
+// A library error names its line only as `yaml: line N: ...`.
+var libraryLine = regexp.MustCompile(`^yaml: line ([0-9]+):`)
+
+// refusal is why a file was refused. Line is 0 when no line is known.
 type refusal struct {
 	reason string
+	line   int
 }
 
 // answer is the report's data on success.
@@ -57,7 +61,7 @@ func Command(r io.Reader) *report.Report {
 	}
 	v, ref := parse(input)
 	if ref != nil {
-		return report.New(commandName, report.Malformed, report.Finding{Code: report.CodeSettingsInvalid, Message: ref.reason})
+		return report.New(commandName, report.Malformed, report.Finding{Code: report.CodeSettingsInvalid, Message: ref.reason, Line: ref.line})
 	}
 	rep := report.New(commandName, report.Answered)
 	rep.Data = answer{Value: v}
@@ -73,20 +77,31 @@ func parse(input []byte) (any, *refusal) {
 	case errors.Is(err, io.EOF):
 		return nil, &refusal{reason: reasonEmpty}
 	case err != nil:
-		return nil, &refusal{reason: reasonSyntax}
+		return nil, syntax(err)
 	}
 	var extra yaml.Node
 	switch err := dec.Decode(&extra); {
 	case err == nil:
-		return nil, &refusal{reason: reasonDocuments}
+		return nil, &refusal{reasonDocuments, extra.Line}
 	case !errors.Is(err, io.EOF):
-		return nil, &refusal{reason: reasonSyntax}
+		return nil, syntax(err)
 	}
 	top := doc.Content[0]
 	if top.Kind != yaml.MappingNode {
-		return nil, &refusal{reason: reasonTop}
+		return nil, &refusal{reasonTop, doc.Line}
 	}
 	return value(top)
+}
+
+// syntax keeps only the digits of a library error: the rest can echo the file.
+func syntax(err error) *refusal {
+	ref := &refusal{reason: reasonSyntax}
+	if m := libraryLine.FindStringSubmatch(err.Error()); m != nil {
+		if line, err := strconv.Atoi(m[1]); err == nil {
+			ref.line = line
+		}
+	}
+	return ref
 }
 
 // value converts a node to its JSON value. Collections are never nil, so an
@@ -119,9 +134,9 @@ func value(n *yaml.Node) (any, *refusal) {
 func marked(n *yaml.Node) *refusal {
 	switch {
 	case n.Anchor != "" || n.Kind == yaml.AliasNode:
-		return &refusal{reason: reasonAnchor}
+		return &refusal{reasonAnchor, n.Line}
 	case n.Style&yaml.TaggedStyle != 0:
-		return &refusal{reason: reasonTag}
+		return &refusal{reasonTag, n.Line}
 	}
 	return nil
 }
@@ -134,7 +149,7 @@ func mapping(n *yaml.Node) (any, *refusal) {
 			return nil, ref
 		}
 		if _, ok := out[k.Value]; ok {
-			return nil, &refusal{reason: reasonDuplicate}
+			return nil, &refusal{reasonDuplicate, k.Line}
 		}
 		v, ref := value(n.Content[i+1])
 		if ref != nil {
@@ -151,9 +166,9 @@ func key(n *yaml.Node) *refusal {
 	}
 	switch {
 	case n.Tag == "!!merge":
-		return &refusal{reason: reasonMerge}
+		return &refusal{reasonMerge, n.Line}
 	case n.Kind != yaml.ScalarNode || n.Tag != "!!str":
-		return &refusal{reason: reasonKey}
+		return &refusal{reasonKey, n.Line}
 	}
 	return nil
 }
@@ -166,20 +181,20 @@ func scalar(n *yaml.Node) (any, *refusal) {
 		if n.Value == "true" || n.Value == "false" {
 			return n.Value == "true", nil
 		}
-		return nil, &refusal{reason: reasonSpelling}
+		return nil, &refusal{reasonSpelling, n.Line}
 	case "!!null":
 		if n.Value == "" || n.Value == "null" {
 			return nil, nil
 		}
-		return nil, &refusal{reason: reasonSpelling}
+		return nil, &refusal{reasonSpelling, n.Line}
 	case "!!int":
 		if v, err := strconv.ParseInt(n.Value, 10, 64); err == nil && decimal.MatchString(n.Value) && -maxSafeInteger <= v && v <= maxSafeInteger {
 			return v, nil
 		}
-		return nil, &refusal{reason: reasonNumber}
+		return nil, &refusal{reasonNumber, n.Line}
 	case "!!merge":
-		return nil, &refusal{reason: reasonMerge}
+		return nil, &refusal{reasonMerge, n.Line}
 	default: // !!float, the only tag left for an untagged scalar
-		return nil, &refusal{reason: reasonNumber}
+		return nil, &refusal{reasonNumber, n.Line}
 	}
 }

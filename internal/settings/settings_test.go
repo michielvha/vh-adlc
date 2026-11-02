@@ -231,3 +231,43 @@ func TestRefused(t *testing.T) {
 		})
 	}
 }
+
+func TestRefusalLine(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		line  int
+	}{
+		// The node's line.
+		{"second occurrence of a duplicate key", "a: 1\nb: 2\na: 3\n", 3},
+		{"offending key", "a: 1\n2: b\n", 2},
+		{"offending value", "a: 1\nb: 1.5\n", 2},
+		{"offending sequence item", "a:\n  - 1\n  - 1.5\n", 3},
+		{"tag on a key", "a: 1\n!!str b: 2\n", 2},
+		{"anchor on a nested collection", "a: 1\nb: &x\n  c: 1\n", 2},
+		{"root mapping with a tag", "# comment\n!!map {a: 1}\n", 2},
+		{"merge value", "a: 1\nb: <<\n", 2},
+		{"alias refused at its anchor", "a: &x 1\nb: *x\n", 1},
+		// The document node, for a refusal of a whole document.
+		{"trailing document marker", "a: 1\n---\n", 2},
+		{"second document", "a: 1\n---\nb: 2\n", 2},
+		{"null document", "---\n", 1},
+		{"sequence at the top", "\n- a\n", 2},
+		// The number in a library `line N` error, as the library counts it.
+		{"library line", "x: 1\nb: *.md\n", 2},
+		{"library line for a tab", "a:\n\t- b\n", 2},
+		{"library line in a second document", "a: 1\n---\nb: [\nc\n", 2},
+		// Otherwise 0.
+		{"unknown anchor", "a: *x\n", 0},
+		{"unsupported directive", "%YAML 1.2\n---\na: 1\n", 0},
+		{"empty input", "", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rep := Command(strings.NewReader(tt.input))
+			if len(rep.Findings) != 1 || rep.Findings[0].Line != tt.line {
+				t.Fatalf("findings = %+v, want one on line %d", rep.Findings, tt.line)
+			}
+		})
+	}
+}
