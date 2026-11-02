@@ -325,6 +325,7 @@ None.
 | 2026-11-02 | R-3 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 15 findings, 1 blocking |
 | 2026-11-02 | R-4 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 13 findings, 0 blocking |
 | 2026-11-02 | R-5 | spec | `d875e20f90e14d3d059de04fc3bf71203f45b386` | claude-opus-5-5 | procedural | 14 findings, 1 blocking |
+| 2026-11-02 | R-6 | spec | `104d96968de60313f1c940edc464180edf015fbb` | claude-opus-5-5 | procedural | 10 findings, 1 blocking |
 
 ### R-1
 
@@ -916,6 +917,78 @@ SEVERITY: nit
 WHERE: Acceptance Criteria, AC-12; Design, Adoption table
 EVIDENCE: AC-12 says run 1 "reports every row without `--kind` as required". The rows at lines 232-233 require "Untouched" for objects no rule matches, and line 175 and AC-02 report only declared resources, so run 1 says nothing about them. A review must read absence as a report. AC-06 covers only what Design lists, and lines 139-141 name unknown values in `kinds` but not in `liveness.kind`.
 PROPOSAL: Say that an untouched row passes by appearing in no removal or stop in the report, and add an unknown `liveness.kind` to the refusals.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Manifest; AC-08; Test Plan
+EVIDENCE: Line 135 says Compose liveness is "decided per project from its containers'" `working_dir`, and line 134 says an object is abandoned "when that path is gone". Neither says what happens when a project's containers disagree, and they can. Stackweaver's `scripts/compose-slot.sh` at `cc2cbbed` documents the flow: "`up` from checkout A, create work, then from checkout B `up N --upgrade`: same project, same volumes", and `--checkout DIR` is for "a worktree of an older release". Its last step is `dc up -d --build --remove-orphans`, with no `--force-recreate`. I ran a two-service project on this host's `docker compose` with `--project-directory A`, then again with `--project-directory B`. The service with a relative bind mount was recreated with label B. The service with no mount stayed `Up` with label A: `hcrev-t-1 .../B`, `hcrev-s-1 .../A`. `swc-7-redis` and `swc-7-frontend` have no mounts here. So after an upgrade, once the old worktree A is removed, a live slot holds one label whose path is gone and others whose path exists. A binary that reads any container, or the first one, calls that slot abandoned. It then stops the slot and removes `swc-N_postgres_data` and its other named volumes. "A failed check counts as live" does not apply, because the check succeeds. AC-08's "one with its working directory present stays" does not decide a mixed project, and the fake-engine row has no such case, so every box can tick with this defect in place. The scratch project was removed afterwards.
+PROPOSAL: State that a Compose project is abandoned only when the `working_dir` path of every one of its containers is gone. Say so in AC-08 and add a mixed-label project to the fake-engine row.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-07 and AC-18; frontmatter covers
+EVIDENCE: Both rows require a `cmd/vh-adlc` test that runs under Bubblewrap. `go test ./...` runs only in the `verify` job, through `michielvha/go-ci-action` (`action.yml:53`), and a search of that action finds no `bwrap`, `bubblewrap` or `apparmor`. Bubblewrap is installed and its AppArmor profile loaded only in the `checker` job (`.github/workflows/ci.yml:36-38`), which runs `bun test tests/vh-adlc`. No Go test uses `bwrap` today (`grep -rn bwrap cmd internal` is empty). So these two tests either fail in `verify`, which gates the release, or skip there, and a skip shows green. R-5 F-08 cited the `checker` lines as if they covered this test. The document does not say which outcome applies, and `.github/workflows/ci.yml` is not in `covers`.
+PROPOSAL: Name the CI job that runs these two tests and state that a missing `bwrap` fails that job and does not skip. Move them under `tests/vh-adlc`, or add a Go step to `checker`, and add `ci.yml` to `covers` if it changes.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Commands and Adoption; AC-02; AC-12
+EVIDENCE: AC-02 says `vh-adlc clean --dry-run` "reports every declared, abandoned resource". Compose and kind rules are declared, and line 82 puts them "behind `--compose` and `--kind`". Adoption run 1 is a flagless dry run that reports only "every row that needs no flag". The document does not say whether a flagless dry run lists abandoned projects and clusters. If it omits them, AC-02 is false as written. Line 192 also has the operation add the flags only when the user asks, so the user never learns there is anything to ask for. If it lists them, nothing says how they are marked. An implementation review cannot decide AC-02 for this case.
+PROPOSAL: State that a dry run without the flags also lists abandoned Compose projects and clusters, marked as needing their flag, with no change to the removal rules. Otherwise narrow AC-02 to the flags given and say what the operation reports instead.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, kind and Adoption; AC-08; AC-23
+EVIDENCE: Line 216 creates marks only in `e2e/k8s/run.sh`. At `cc2cbbed`, `e2e/k8s/driver-conformance.sh` defaults to the same cluster (`:27`, `sw-e2e`), requires that it already exists (`:40`) and runs a `go test -timeout 30m` against it, with no mark. Take a killed `run.sh`, which leaves the cluster with one ended mark. A later `driver-conformance.sh` on that cluster is a live run the mark set cannot see. Line 185's rule, "only when it has marks and all have ended", then lets `clean --kind` stop the nodes during that test. AC-08 protects only "any live mark", and AC-23 names this script only for its temp files.
+PROPOSAL: Have `driver-conformance.sh` create and remove a mark the way `run.sh` does, including the removal of ended marks at start. Add that to Adoption and AC-23, or state the gap as a limit.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-23
+EVIDENCE: The row says "each named entry point with the candidate binary, without it, and with a refused base so `env` fails". The mark half has a stated observation. The temp-file half has none, and the standard asks for "a scenario with a pass condition". AC-23 says five entry points "keep their temp files under its temp root". A before-and-after comparison of `/tmp` on this host cannot show that, because other sessions write there at the same time (R-1 F-23 measured the drift). A review therefore cannot return `met` from running the targets. The AC-01 fixture proves only one `go test` in a `cmd/vh-adlc` test.
+PROPOSAL: State the observation for each entry point, such as a probe test or script that records `TMPDIR`, `GOTMPDIR` and `t.TempDir` as seen inside the run, or a private `/tmp` for the run. Give the pass condition.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Order
+EVIDENCE: Lines 246 and 251 say the release, lock bump, install and first real run are "recorded here afterwards". Order is inside Design, a normative section (`normative_sections` in the pinned rules block), and "A change to any of them is a revision". These steps happen after `complete`, because the `complete` gate runs on the feature branch before the merge. The transitions allow `complete` to move only to `archived` or `superseded`, so the document cannot return to `draft`. Following the sentence therefore either breaks the standard or leaves `vh-adlc fresh` reporting a changed baseline on a closed document.
+PROPOSAL: Record these outcomes outside the normative baseline, for example in Context or `status_description`, and change the sentence to say where.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Review Log; frontmatter status_description
+EVIDENCE: This repeats R-3 F-11, R-4 F-09 and R-5 F-09. `status_description` says "R-5 findings applied", but R-5 F-09 is not. `git ls-remote origin main spec/host-cleanup` returns only `refs/heads/main` at `c8343c5`, `git branch -a --contains HEAD` lists only local `spec/host-cleanup`, and `git log origin/main..HEAD` has 17 commits. The document has no `branch`, and the pinned `conventions/delivery.md` says such a document is "committed and pushed to the default branch". `git merge-base --is-ancestor origin/main HEAD` succeeds, so a fast-forward works today. Local `main` at `930541c` is still not an ancestor of HEAD, and a rebase would make every reviewed commit in this log unreachable.
+PROPOSAL: Fast-forward `origin/main` to the commit the acceptance will name, without rebasing, or correct the status line and state why it waits.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Commands
+EVIDENCE: Line 100 says "A dry run reports `answered`", and lines 101-102 say `temp-base-refused` and `host-settings-invalid` "also report `fail`, and stop the run". Line 101's list is scoped to "An applied run", and the "also" sentence does not say whether it carries that scope. A `clean --dry-run` with an invalid `host.yaml` could therefore report either result. The same is open for `engine-unreachable` and `manifest-invalid` on a dry run. The operation acts on that result before it applies.
+PROPOSAL: State the result of a dry run for each of these four codes.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Commands and Manifest; AC-24
+EVIDENCE: Line 98 says `--older-than` "applies to `tmp` and `temp_root` ages". The built-in `go-build*` and `gopls-tempmod*` globs have a fixed 24 hours and are in neither manifest section. Line 146 says they clear "under the same limits", which does not say whether the flag raises their age. AC-24 speaks of "a rule's age".
+PROPOSAL: State whether `--older-than` also raises the built-in age.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, opening paragraph; Temp root
+EVIDENCE: Line 81 says "a run nobody asked for may remove `/tmp` files only", and `references/authority.md` gains that row. Line 110 lets `temp_base` move every temp root out of `/tmp`, and line 161 removes entries inside the root wherever it is. With a moved base, an unrequested run removes files outside `/tmp`, which the sentence says it may not.
+PROPOSAL: Word the rule and the authority row as "`/tmp` entries and the project's temp root".
 
 ## Sources
 
