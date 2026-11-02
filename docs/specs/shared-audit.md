@@ -701,7 +701,8 @@ live operations remain separate owner-selected tasks.
 
 ## Tasks
 
-- [ ] T1 `Stackweaver:tests/agent-audit/parity.json` - commit the complete legacy-bound behavior/effect map before helper/forwarding edits; JSON structure, Git blob/excerpt hashes and all required dimensions resolve (AC-05).
+- [x] T1 `Stackweaver:tests/agent-audit/parity.json` - commit the complete legacy-bound behavior/effect map before helper/forwarding edits; JSON structure, Git blob/excerpt hashes and all required dimensions resolve (AC-05).
+      Evidence: Consumer commit `04696fb7e50168fd9e742a9f1d57a457e6dde388` records 39 rows and five bound legacy files at `0ae15a9d`; all excerpt hashes/required dimensions validated. Normal host commit hooks passed four checks with no skips after a retained sandbox Git-spawn EPERM. Future homes/contracts and independent semantic completeness remain for T24; AC-05 is not ticked.
 - [ ] T2 `tests/vh-adlc/audit/settings.test.ts` and `fixtures.ts` - write meaningful origin/config/profile/path and complete-example checks first; observe failure because the audit settings operation is absent (AC-02).
 - [ ] T3 `plugins/vh-adlc/scripts/audit/settings.ts`, `types.ts` and `examples/audit/basic/` - implement strict origin-bound settings and complete standalone files; T2 passes without host/private configuration (AC-02).
 - [ ] T4 `tests/vh-adlc/audit/inventory.test.ts` - write legacy-index/heading/reference/high-water/ambiguity tests first; observe the missing inventory behavior fail (AC-02).
