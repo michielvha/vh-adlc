@@ -170,7 +170,7 @@ export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate
   if (!validateLedgerCandidate(config, snap, candidate, document).valid) fail("invalid or stale candidate");
   const observed = (options.refresh ?? (() => refreshDefault(config)))();
   if (observed.default_commit !== snap.source.commit || observed.default_commit !== snap.scope_baseline ||
-      snap.source.branch !== observed.default_branch || !snap.source.clean ||
+      !snap.source.clean ||
       git(config.root, "rev-parse", "refs/remotes/origin/" + observed.default_branch) !== observed.default_commit) fail("assessment must use the same clean fetched default source");
   for (const effect of ["ledger-update", ...(options.commit ? ["ledger-commit"] : [])] as const) {
     if (!inspectAuthority(config, { mode: snap.mode, ids: snap.selected_ids, effect: effect as "ledger-update" | "ledger-commit", request: options.request,

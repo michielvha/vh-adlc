@@ -87,8 +87,12 @@ Generic reverify/full stays private. Tracked application requires current explic
 permission or an adopted rule; a local commit additionally needs ledger-commit. Neither grants push.
 Every permitted application, even without a commit, goes in a new owned
 `chore/audit-ledger-<run-id>` worktree at the freshly fetched clean committed default source that
-was assessed. A dirty or unrelated-feature assessment stays private; re-assess the correct base
-before canonical application. Never switch or write into shared dirty main or unrelated work.
+was assessed. A dirty or diverged-feature assessment stays private; re-assess the correct base
+before canonical application. When shared main is dirty, the owned audit-ledger role may record a
+separate clean detached assessment worktree at the freshly fetched default commit. Keep its owner,
+path and base in private run evidence. Its output stays private; apply into the separately owned ledger
+branch only after the normal checks. Commit identity and cleanliness establish the assessed default
+base, not a local branch name. Never switch or write into shared dirty main or unrelated work.
 
 `apply` consumes snapshot/candidate/assessment/current-request files and a separate new canonical
 worktree path, with `--commit true|false`. It verifies the same fetched default base and exact current

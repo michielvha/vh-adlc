@@ -135,3 +135,8 @@ safely superseded. Keep refs when ordinary deletion refuses after squash; no for
 unrelated index/worktree cleanup follows. Development key/row verification must journal exact owned
 scope before creation and reconcile cleanup before retry/completion; journal strings execute nothing.
 These audit rules do not import maintenance report-push permission or triage's confined proof boundary.
+
+A permitted audit-ledger update may use a separately recorded clean detached assessment worktree
+at the freshly fetched default commit when shared main is dirty. This is part of the owned audit-ledger
+role: record owner/path/base, keep assessment output private, and apply only in the separate owned
+ledger branch after all audit gates. It grants no mutation or cleanup of unrelated worktrees.

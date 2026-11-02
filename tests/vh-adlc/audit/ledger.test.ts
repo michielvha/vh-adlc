@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createLedgerCandidate, validateLedgerCandidate, applyLedgerCandidate, cleanupOwnedLedger, appendFindings } from "../../../plugins/vh-adlc/scripts/audit/ledger";
-import { captureSnapshot } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
+import { captureSnapshot, hash } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git, ledger } from "./fixtures";
 import { terminal } from "./evidence";
@@ -171,4 +171,17 @@ test("title status annotations preserve non-pipe Markdown escapes byte for byte"
   const snap = captureSnapshot(c.config, { mode: "reverify", ids: ["AUD-001"], baseline: base, artifact_root: c.f.artifacts });
   const candidate = createLedgerCandidate(c.config, snap, { document: { schema_version: 1, snapshot_digest: snap.digest, assessments: [terminal(c.f, snap)] }, at: "2026-11-02", run_id: "raw-title" });
   expect(candidate.bytes).toContain(title + " - ✅ **FIXED");
+});
+
+test.each(["detached", "owned-branch"])("a clean %s assessment of exact default can apply while shared main stays dirty and staged", mode => {
+  const c = context(), assessment = join(c.f.outer, "assessment");
+  c.f.write("OWNER-STAGED.txt", "Preserve staged owner bytes.\n"); git(c.f.root, "add", "OWNER-STAGED.txt"); c.f.write("OWNER-UNTRACKED.txt", "Preserve working owner bytes.\n");
+  const before = git(c.f.root, "status", "--porcelain"), index = hash(readFileSync(join(c.f.root, ".git/index")));
+  if (mode === "detached") git(c.f.root, "worktree", "add", "--detach", assessment, c.base);
+  else git(c.f.root, "worktree", "add", "-b", "chore/audit-ledger-assessment", assessment, c.base);
+  const config = loadSettings(assessment), snap = captureSnapshot(config, { mode: "reverify", ids: ["AUD-001"], artifact_root: c.f.artifacts, baseline: c.base, required_checks: { "AUD-001": ["unit"] } });
+  const document = { schema_version: 1, snapshot_digest: snap.digest, assessments: [terminal(c.f, snap)] }, candidate = createLedgerCandidate(config, snap, { document, at: "2026-11-02", run_id: "isolated-default" });
+  const result = applyLedgerCandidate(config, snap, candidate, document, { ...c.options, path: join(c.f.outer, "applied-default") });
+  expect(result.base).toBe(c.base); expect(git(c.f.root, "rev-parse", "main")).toBe(c.base);
+  expect(git(c.f.root, "status", "--porcelain")).toBe(before); expect(hash(readFileSync(join(c.f.root, ".git/index")))).toBe(index);
 });
