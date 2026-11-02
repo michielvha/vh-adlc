@@ -68,3 +68,7 @@ test("effect comparison treats declaration order as irrelevant, without dropping
   expect(effectsDigest({ ...effects, reverify: effects.reverify.slice().reverse() })).toBe(effectsDigest(effects));
   expect(effectsDigest({ ...effects, reverify: [] })).not.toBe(effectsDigest(effects));
 });
+
+test.each(["CRITERION: AC-01\nVERDICT: not met\nNO FINDINGS\n", "NO FINDINGS\nExtra footer\n"])("mixed paired review content is never a clean result: %s", body => {
+  const c = context(); c.receipt.paired_review.artifact = c.artifact("MODEL: claude-opus-5.5\n" + body); expect(c.check().pass).toBe(false);
+});

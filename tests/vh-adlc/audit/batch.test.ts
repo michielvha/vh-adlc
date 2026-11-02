@@ -141,3 +141,9 @@ test.each(["pre-fix-ledger-source", "missing-ledger-source", "placeholder-ledger
 test("an unchecked ledger edit hidden before frozen source cannot become a checked candidate baseline", () => {
   const c = context(false, false, true); expect(checkBatch(c.config, c.input).pass).toBe(false);
 });
+
+test("a verbatim clean review may separate its model header and records with a blank line, without admitting other content", () => {
+  const c = context(); c.input.review.artifact = c.f.artifact("blank-separated-review.txt", "MODEL: claude-opus-5.5\n\nNO FINDINGS\n");
+  expect(checkBatch(c.config, c.input).pass).toBe(true);
+  c.input.review.artifact = c.f.artifact("review-footer.txt", "MODEL: claude-opus-5.5\nNO FINDINGS\nAn extra claim.\n"); expect(checkBatch(c.config, c.input).pass).toBe(false);
+});

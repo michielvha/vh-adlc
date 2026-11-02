@@ -142,3 +142,13 @@ test.each(["missing", "older"])("a %s comparison remains honest while the next s
   const result = applyLedgerCandidate(c.config, snap, candidate, document, { ...c.options, path: join(c.f.outer, "comparison-worktree") });
   expect(result.base).toBe(head); expect(readFileSync(join(result.path, "docs/audit.md"), "utf8")).toBe(candidate.bytes);
 });
+
+test.each([false, true])("CI suppression is only included with the explicit current request flag %s", skip_ci => {
+  const c = context(), applied = applyLedgerCandidate(c.config, c.snap, c.candidate(), c.document, { ...c.options, request: { ...c.options.request, skip_ci } });
+  expect(git(applied.path, "log", "-1", "--format=%s").includes("[skip ci]")).toBe(skip_ci);
+});
+test("fresh finding allocation preserves the widest observed ID spelling", () => {
+  const c = context("full"); c.f.write(c.config.ledger_path, ledger.replaceAll("AUD-001", "AUD-0001").replaceAll("AUD-002", "AUD-0002") + "\nReference-only AUD-0159.\n"); c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "full", artifact_root: c.f.artifacts }); expect(snap.inventory.next_id).toBe("AUD-0160");
+  expect(appendFindings(c.config, snap, [{ id: "AUD-0160", severity: "High", title: "Distinct cause", body: "Observed fixture scenario." }]).bytes).toContain("### AUD-0160");
+});

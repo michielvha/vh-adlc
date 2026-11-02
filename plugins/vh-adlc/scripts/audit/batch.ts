@@ -125,9 +125,13 @@ export function checkBatch(config: Settings, input: {
     const evidence = evaluateCommittedAssessments(config, input.snapshot, input.document);
     if (!evidence.pass || evidence.coverage !== "complete" || evidence.eligible_ids.length !== def.members.length) errors.push(...evidence.errors, "Every requested member needs its final disposition-specific terminal evidence.");
     const review = input.review;
+    let cleanReview = false;
+    if (validArtifact(input.snapshot.artifact_root, review.artifact)) {
+      const text = readFileSync(join(input.snapshot.artifact_root, review.artifact.path), "utf8");
+      cleanReview = text.split(/\r?\n/)[0] === `MODEL: ${review.model}` && text.slice(text.indexOf("\n") + 1).trim() === "NO FINDINGS";
+    }
     if (review.target !== target || !review.producer?.trim() || !review.reviewer?.trim() || review.producer === review.reviewer ||
-        !review.model?.trim() || !validArtifact(input.snapshot.artifact_root, review.artifact) ||
-        !new RegExp("^MODEL: " + review.model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\r?\\nNO FINDINGS\\s*$").test(readFileSync(join(input.snapshot.artifact_root, review.artifact.path), "utf8"))) errors.push("Current independent audit review is missing or has findings.");
+        !review.model?.trim() || !cleanReview) errors.push("Current independent audit review is missing or has findings.");
     const head = git(config.root, "rev-parse", "HEAD");
     if (git(config.root, "status", "--porcelain") || !ancestor(config, target, head) || changed(config, target, head).some(path => path !== recordPath)) errors.push("Current source/ledger changed since review.");
     if (head !== target && !appendOnlyRecord(record, gitBytes(config.root, "show", `${head}:${recordPath}`).toString())) errors.push("Only append-only record bookkeeping can retain review freshness.");

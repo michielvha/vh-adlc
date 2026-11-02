@@ -41,7 +41,7 @@ export function adoptionPreflight(input: { expected: AdoptionExpected; receipt?:
     };
     const review = receipt.paired_review;
     if (!review || review.shared_commit !== expected.reviewed_shared_commit || review.consumer_commit !== expected.consumer_commit || review.model !== expected.review_model || review.result !== "NO FINDINGS") fail("paired-review-target-model-or-result");
-    else { const text = artifact(review.artifact, "paired-review"); if (!text || !text.startsWith(`MODEL: ${expected.review_model}\n`) || !/^NO FINDINGS\s*$/m.test(text) || /^FINDING:/m.test(text)) fail("paired-review-bytes"); }
+    else { const text = artifact(review.artifact, "paired-review"); if (!text || text.split(/\r?\n/)[0] !== `MODEL: ${expected.review_model}` || text.slice(text.indexOf("\n") + 1).trim() !== "NO FINDINGS") fail("paired-review-bytes"); }
     const policy = receipt.candidate_policy;
     if (!policy || policy.kind !== "installed-candidate-policy" || policy.shared_commit !== expected.published_source_commit || policy.consumer_commit !== expected.consumer_commit || policy.payload_digest !== expected.payload_digest || digest(policy.bindings) !== digest(expected.policy) || policy.valid !== true || policy.allowed !== false || policy.adopted !== false) fail("installed-candidate-policy");
     else {

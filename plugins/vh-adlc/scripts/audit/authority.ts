@@ -7,7 +7,7 @@ import type { AuditMode, Settings } from "./types";
 
 export type Effect = "source-edit" | "ledger-update" | "ledger-commit" | "local-commit" | "live-verify" | "issue-write" | "branch-push" | "pr-write" | "conditional-merge";
 type Observed = { default_branch: string; default_commit: string };
-type Request = { authorized: boolean; mode: AuditMode; ids: string[]; workstream?: string; eligible_repair?: boolean; effects?: Effect[] };
+type Request = { authorized: boolean; mode: AuditMode; ids: string[]; workstream?: string; eligible_repair?: boolean; skip_ci?: boolean; effects?: Effect[] };
 export type AuthorityOptions = { mode: AuditMode; ids: string[]; workstream?: string; effect: Effect; request: Request; no_fetch?: boolean;
   restrictions?: string[]; prohibited_effects?: Effect[]; refresh?: () => Observed };
 const local = ["source-edit", "ledger-update", "local-commit"] as const;

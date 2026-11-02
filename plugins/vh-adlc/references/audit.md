@@ -93,7 +93,7 @@ before canonical application. Never switch or write into shared dirty main or un
 `apply` consumes snapshot/candidate/assessment/current-request files and a separate new canonical
 worktree path, with `--commit true|false`. It verifies the same fetched default base and exact current
 permission, isolates the candidate, and reconciles an already observed exact local commit. It
-performs no remote push. Keep ownership/base/ref and the actual local commit in the private record.
+performs no remote push. Ledger commits do not add a CI-skip marker by default. Only an explicitly authorized current request with `skip_ci: true`, grounded in the consumer policy, can add it; that choice is bound to the owned-worktree intent. Keep ownership/base/ref and the actual local commit in the private record.
 A conflict leaves the proposal and handoff; no reset/stash/force operation repairs it.
 An incomplete aggregate/index-only identity can receive a dated UNKNOWN/PARTIAL coverage note with
 its actual gap, preserving the original ambiguous/range index. It cannot acquire an individual

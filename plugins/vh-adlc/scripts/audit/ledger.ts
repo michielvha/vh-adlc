@@ -127,7 +127,7 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
   let next = snap.inventory.highest_id + 1;
   for (const finding of findings) {
     if (!Number.isSafeInteger(next) || !finding || Object.keys(finding).some(key => !["id", "severity", "title", "body", "delta_paths"].includes(key))) fail("unsafe new-finding fields or ID allocation");
-    const expected = config.id_prefix + "-" + String(next++).padStart(3, "0");
+    const expected = config.id_prefix + "-" + String(next++).padStart(snap.inventory.next_id!.slice(config.id_prefix.length + 1).length, "0");
     if (finding.id !== expected || !finding.severity?.trim() || !finding.title?.trim() || !finding.body?.trim() ||
         /[\x00-\x1f\x7f|]/.test(finding.title + finding.severity) || finding.body.includes("\0") || new RegExp("^#{1,6}\\s+" + config.id_prefix + "-", "m").test(finding.body)) fail("new IDs must follow the reserved high-water mark with a single supported finding identity");
     if (snap.mode === "reverify" && (!delta || !Array.isArray(finding.delta_paths) || !finding.delta_paths.length ||
@@ -177,7 +177,7 @@ export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate
       !relative(config.root, options.path).startsWith(".." + sep)) fail("owned worktree requires a separate canonical sibling path");
   const directory = privateDirectory(snap.artifact_root, config.root), owner_file = join(directory, "ledger-" + candidate.run_id + ".json");
   const ownership = { path: options.path, branch, base: observed.default_commit, candidate_digest: candidate.digest,
-    default_branch: observed.default_branch, common_dir: realpathSync(git(config.root, "rev-parse", "--path-format=absolute", "--git-common-dir")), commit_requested: options.commit };
+    default_branch: observed.default_branch, common_dir: realpathSync(git(config.root, "rev-parse", "--path-format=absolute", "--git-common-dir")), commit_requested: options.commit, skip_ci: options.request.skip_ci === true };
   if (existsSync(owner_file)) {
     const info = lstatSync(owner_file);
     if (!info.isFile() || info.isSymbolicLink() || info.mode & 0o077 || process.getuid && info.uid !== process.getuid() || readFileSync(owner_file, "utf8") !== canonicalJSON(ownership) + "\n") fail("owned worktree intent conflicts");
@@ -200,7 +200,7 @@ export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate
   let commit: string | null = null;
   if (options.commit) {
     git(options.path, "add", "--", config.ledger_path);
-    git(options.path, "commit", "-m", `docs: audit verification ${candidate.at} [skip ci]`);
+    git(options.path, "commit", "-m", `docs(audit): re-verify findings at ${snap.source.commit.slice(0, 12)}${options.request.skip_ci === true ? " [skip ci]" : ""}`);
     commit = git(options.path, "rev-parse", "HEAD");
   }
   return { ...ownership, commit, owner_file };
