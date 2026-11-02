@@ -17,7 +17,7 @@ const argumentsByOperation: Record<string, string[]> = {
   settings: [], status: [], inventory: [], snapshot: ["mode", "ids", "artifact-root", "baseline", "scope-baseline", "requirements", "name"],
   check: ["snapshot", "input"], report: ["snapshot", "input", "name"], candidate: ["snapshot", "input", "run-id", "date", "name", "new-findings", "provisional"],
   "new-findings": ["snapshot", "input", "name"], apply: ["snapshot", "input", "candidate", "request", "path", "commit"],
-  "policy-candidate": ["default-branch"], "policy-adopted": [], authority: ["input"], "batch-check": ["input"],
+  "policy-candidate": ["default-branch", "commit", "parity"], "policy-adopted": [], authority: ["input"], "batch-check": ["input"],
   "journal-new": ["artifact-root", "run-id", "batch-digest"], "journal-read": ["directory", "batch-digest"],
   "journal-intent": ["directory", "batch-digest", "input"], "journal-resource": ["directory", "batch-digest", "action-id", "resource-id"],
 };
@@ -63,7 +63,7 @@ export function runCLI(argv: string[]) {
       path: requireOption("path"), commit: options.commit === "true", request: json(requireOption("request")),
     });
   }
-  if (operation === "policy-candidate") return inspectCandidatePolicy(config, { default_branch: requireOption("default-branch") });
+  if (operation === "policy-candidate") return inspectCandidatePolicy(config, { default_branch: requireOption("default-branch"), commit: requireOption("commit"), parity_path: options.parity });
   if (operation === "policy-adopted") return inspectAdoptedPolicy(config);
   if (operation === "authority") return inspectAuthority(config, json(requireOption("input")));
   if (operation === "batch-check") return checkBatch(config, json(requireOption("input")));

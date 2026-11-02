@@ -60,11 +60,38 @@ export function parseDeclaration(markdown: string, config: Settings, default_bra
   }
   return { declaration, effects };
 }
-export function inspectCandidatePolicy(config: Settings, options: { default_branch: string }) {
+export function inspectCandidatePolicy(config: Settings, options: { default_branch: string; commit: string; parity_path?: string; observe?: () => Observed }) {
   try {
-    const parsed = parseDeclaration(readFileSync(join(config.root, config.project_procedure), "utf8"), config, options.default_branch);
-    return { valid: parsed !== null, allowed: false as const, reason: "Candidate inspection confers no adopted effect.", declaration: parsed };
-  } catch { return { valid: false, allowed: false as const, reason: "Invalid candidate declaration.", declaration: null }; }
+    const commit = options.commit;
+    if (!/^[a-f0-9]{40,64}$/.test(commit) || git(config.root, "rev-parse", commit + "^{commit}") !== commit) fail();
+    const identity = auditOrigin(config.root);
+    if (identity.repository.toLowerCase() !== config.repository || identity.hostname !== config.hostname) fail();
+    const observed = (options.observe ?? (() => observeDefault(config)))();
+    if (observed.default_branch !== options.default_branch || !/^[a-f0-9]{40,64}$/.test(observed.default_commit)) fail();
+    git(config.root, "merge-base", "--is-ancestor", observed.default_commit, commit);
+    const read = (path: string) => {
+      const text = committedFile(config, commit, path);
+      if (text !== readFileSync(join(config.root, path), "utf8")) fail();
+      return text;
+    };
+    const links = [...visible(read("AGENTS.md")).matchAll(/\[[^\]\n]+\]\(([^\s)]+)\)/g)].map(m => m[1].replace(/^\.\//, ""));
+    if (!links.includes(config.settings_path)) fail();
+    if (JSON.parse(read(config.settings_path)).project_procedure !== config.project_procedure) fail();
+    const parsed = parseDeclaration(read(config.project_procedure), config, observed.default_branch); if (!parsed) fail();
+    const blob = (path: string) => git(config.root, "rev-parse", `${commit}:${path}`);
+    if (options.parity_path) read(options.parity_path);
+    const bindings = { agents_blob: blob("AGENTS.md"), settings_blob: blob(config.settings_path), procedure_blob: blob(config.project_procedure),
+      ...(options.parity_path ? { parity_blob: blob(options.parity_path) } : {}),
+      effects_digest: digest(Object.fromEntries(Object.entries(parsed.effects).map(([mode, effects]) => [mode, [...effects].sort()]))) };
+    return { valid: true, allowed: false as const, adopted: false as const, consumer_commit: commit, default_branch: observed.default_branch, default_commit: observed.default_commit,
+      reason: "Exact committed candidate inspection confers no adopted effect.", declaration: parsed, bindings };
+  } catch { return { valid: false, allowed: false as const, adopted: false as const, consumer_commit: null, reason: "Invalid or uncommitted candidate declaration/default identity.", declaration: null, bindings: null }; }
+}
+function observeDefault(config: Settings): Observed {
+  const head = git(config.root, "ls-remote", "--symref", "origin", "HEAD"), branch = [...head.matchAll(/^ref: refs\/heads\/([^\s]+)\s+HEAD$/gm)], commit = [...head.matchAll(/^([a-f0-9]{40,64})\s+HEAD$/gm)];
+  if (branch.length !== 1 || commit.length !== 1) fail();
+  git(config.root, "check-ref-format", "refs/heads/" + branch[0][1]);
+  return { default_branch: branch[0][1], default_commit: commit[0][1] };
 }
 export function refreshDefault(config: Settings): Observed {
   const head = git(config.root, "ls-remote", "--symref", "origin", "HEAD");
@@ -116,6 +143,7 @@ export function inspectAuthority(config: Settings, options: AuthorityOptions) {
   const response = (allowed: boolean, basis: "adopted" | "current-request" | "none", reason: string) => ({
     allowed, basis, reason, sources, default_commit, default_branch,
     scope: { mode: options.mode, ids: options.ids, workstream: options.workstream ?? null, effect: options.effect },
+    restrictions: [...new Set(options.restrictions ?? [])], prohibited_effects: [...new Set(options.prohibited_effects ?? [])],
     pending_conditions: allowed && remote.includes(options.effect as typeof remote[number]),
     limit: "Operator policy inspection; no OS capability or proof that semantic delivery gates passed.",
   });
@@ -124,6 +152,10 @@ export function inspectAuthority(config: Settings, options: AuthorityOptions) {
     if (digest(loadSettings(config.root, { settingsPath: config.settings_path })) !== digest(config)) return response(false, "none", "Settings changed.");
     const identity = auditOrigin(config.root);
     if (identity.repository.toLowerCase() !== config.repository || identity.hostname !== config.hostname) return response(false, "none", "Origin changed.");
+    if ((options.restrictions ?? []).some(value => !["read-only", "no-write", "no-commit", "no-push", "no-merge", "no-live"].includes(value)) ||
+        options.prohibited_effects?.some(value => !Object.values(modes).some(effects => effects.includes(value))) ||
+        request?.effects !== undefined && (!Array.isArray(request.effects) || request.effects.some(value => !Object.values(modes).some(effects => effects.includes(value))))) return response(false, "none", "Unknown restriction or effect fails closed.");
+    if (options.mode === "fix" && request?.eligible_repair !== true) return response(false, "none", "Ineligible fix needs the feature/owner route before any fix effect.");
     const known = new Set(inventory(config).findings.map(f => f.id));
     if (options.ids.some(id => !known.has(id)) || options.mode === "fix" && !options.ids.length) return response(false, "none", "Unknown or empty selected finding scope.");
     if (!modes[options.mode]?.includes(effect) || !request?.authorized || request.mode !== options.mode ||

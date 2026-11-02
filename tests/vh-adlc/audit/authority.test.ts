@@ -65,13 +65,13 @@ test("duplicate declarations, policy anchors or tables are invalid rather than a
   for (const suffix of ["\n## Standing audit workflow authorization\n" + policy(), "\n## Merge\nAmbiguous.\n", "\n| Field | Value |\n| --- | --- |\n| repository | example/project |\n"]) {
     const c = adopted(); c.f.write("audit-project.md", policy() + suffix); const commit = c.f.commit();
     git(c.f.root, "update-ref", "refs/remotes/origin/main", commit);
-    expect(inspectCandidatePolicy(loadSettings(c.f.root), { default_branch: "main" }).valid).toBe(false);
+    expect(inspectCandidatePolicy(loadSettings(c.f.root), { default_branch: "main", commit: git(c.f.root, "rev-parse", "HEAD"), observe: c.refresh }).valid).toBe(false);
   }
 });
 
 test("candidate policy validates shape without acquiring an adopted permission", () => {
-  const c = adopted(), result = inspectCandidatePolicy(c.config, { default_branch: "main" });
-  expect(result.valid).toBe(true); expect(result.allowed).toBe(false); expect(c.fetches()).toBe(0);
+  const c = adopted(), result = inspectCandidatePolicy(c.config, { default_branch: "main", commit: git(c.f.root, "rev-parse", "HEAD"), observe: c.refresh });
+  expect(result.valid).toBe(true); expect(result.allowed).toBe(false); expect(c.fetches()).toBe(1);
 });
 
 test.each(["unmerged", "dirty", "agents", "origin", "fetch", "no-fetch", "selection", "mode", "read-only", "no-push"])(
@@ -127,4 +127,28 @@ test.each(["unmerged", "agents", "origin", "fetch"])("read-only adopted-policy i
   if (kind === "origin") git(c.f.root, "remote", "set-url", "origin", "https://github.com/other/project");
   const result = inspectAdoptedPolicy(c.config, { refresh: kind === "fetch" ? () => { throw Error("offline"); } : c.refresh });
   expect(result.valid).toBe(false); expect(result.allowed).toBe(false); expect(result.adopted).toBe(false);
+});
+
+test.each(["adopted", "explicit"])("%s grants cannot bypass an ineligible fix or unknown restriction", basis => {
+  const c = adopted(), options = { mode: "fix" as const, ids: ["AUD-001"], workstream: "A", effect: "branch-push" as const,
+    request: { ...c.request, eligible_repair: false, ...(basis === "explicit" ? { effects: ["branch-push" as const] } : {}) }, refresh: c.refresh };
+  expect(inspectAuthority(c.config, options).allowed).toBe(false);
+  expect(inspectAuthority(c.config, { ...options, request: { ...options.request, eligible_repair: true }, restrictions: ["no-puhs"] }).allowed).toBe(false);
+});
+test("authority observations retain all current restrictions and prohibited effects", () => {
+  const c = adopted(), restrictions = ["no-live"], prohibited_effects = ["issue-write" as const];
+  const result = inspectAuthority(c.config, { mode: "fix", ids: ["AUD-001"], workstream: "A", effect: "branch-push", request: c.request, refresh: c.refresh, restrictions, prohibited_effects });
+  expect(result.restrictions).toEqual(restrictions); expect(result.prohibited_effects).toEqual(prohibited_effects);
+});
+test("candidate policy binds exact committed objects, actual default identity and parity bytes without granting effects", () => {
+  const c = adopted(); c.f.write("parity.json", "{}\n"); const commit = c.f.commit();
+  const observe = () => ({ default_branch: "main", default_commit: git(c.f.root, "rev-parse", "refs/remotes/origin/main") });
+  const options = { commit, default_branch: "main", parity_path: "parity.json", observe };
+  const result = inspectCandidatePolicy(c.config, options);
+  expect(result.valid).toBe(true); expect(result.allowed).toBe(false); expect(result.adopted).toBe(false); expect(result.consumer_commit).toBe(commit);
+  expect(result.bindings?.agents_blob).toBe(git(c.f.root, "rev-parse", commit + ":AGENTS.md"));
+  expect(result.bindings?.parity_blob).toBe(git(c.f.root, "rev-parse", commit + ":parity.json"));
+  expect(inspectCandidatePolicy(c.config, { ...options, default_branch: "invented" }).valid).toBe(false);
+  c.f.write("audit-project.md", policy().replace("# Project audit", "# Dirty candidate"));
+  expect(inspectCandidatePolicy(c.config, options).valid).toBe(false);
 });

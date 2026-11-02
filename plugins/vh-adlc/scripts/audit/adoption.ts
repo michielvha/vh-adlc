@@ -46,8 +46,8 @@ export function adoptionPreflight(input: { expected: AdoptionExpected; receipt?:
     if (!policy || policy.kind !== "installed-candidate-policy" || policy.shared_commit !== expected.published_source_commit || policy.consumer_commit !== expected.consumer_commit || policy.payload_digest !== expected.payload_digest || digest(policy.bindings) !== digest(expected.policy) || policy.valid !== true || policy.allowed !== false || policy.adopted !== false) fail("installed-candidate-policy");
     else {
       const text = command(policy.command, "candidate-policy");
-      if (!policy.command?.argv?.some((arg: string) => /(?:^|\/)scripts\/audit\/cli\.ts$/.test(arg)) || !policy.command.argv.includes("policy-candidate")) fail("candidate-policy-command");
-      try { const parsed = JSON.parse(text ?? "null"); if (parsed?.valid !== true || parsed?.allowed !== false || effectsDigest(parsed.declaration.effects) !== expected.policy.effects_digest) fail("candidate-policy-effects"); } catch { fail("candidate-policy-effects"); }
+      if (!policy.command?.argv?.some((arg: string) => /(?:^|\/)scripts\/audit\/cli\.ts$/.test(arg)) || !policy.command.argv.includes("policy-candidate") || policy.command.argv[policy.command.argv.indexOf("--commit") + 1] !== expected.consumer_commit) fail("candidate-policy-command");
+      try { const parsed = JSON.parse(text ?? "null"); if (parsed?.valid !== true || parsed?.allowed !== false || parsed?.adopted !== false || parsed?.consumer_commit !== expected.consumer_commit || digest(parsed?.bindings) !== digest(expected.policy) || effectsDigest(parsed.declaration.effects) !== expected.policy.effects_digest) fail("candidate-policy-effects"); } catch { fail("candidate-policy-effects"); }
     }
     if (!Array.isArray(receipt.hosts) || receipt.hosts.length !== 2 || new Set(receipt.hosts.map((host: any) => host.host)).size !== 2) throw Error("both distinct native hosts required");
     for (const name of ["codex-cli", "claude-cli"]) {

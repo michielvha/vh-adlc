@@ -17,7 +17,7 @@ function context() {
       artifact: artifact("MODEL: claude-opus-5.5\nNO FINDINGS\n") },
     candidate_policy: { kind: "installed-candidate-policy", shared_commit: expected.published_source_commit, consumer_commit: expected.consumer_commit, payload_digest: expected.payload_digest,
       bindings: expected.policy, valid: true, allowed: false, adopted: false,
-      command: command(["bun", "/isolated/plugins/cache/vh-adlc/scripts/audit/cli.ts", "policy-candidate", "--default-branch", "main"], JSON.stringify({ valid: true, allowed: false, declaration: { effects } })) },
+      command: command(["bun", "/isolated/plugins/cache/vh-adlc/scripts/audit/cli.ts", "policy-candidate", "--default-branch", "main", "--commit", expected.consumer_commit], JSON.stringify({ valid: true, allowed: false, adopted: false, consumer_commit: expected.consumer_commit, bindings: expected.policy, declaration: { effects } })) },
     hosts: ["codex-cli", "claude-cli"].map(host => ({ host, source: "published-marketplace", catalog_repository: expected.shared_repository,
       published_source_commit: expected.published_source_commit, version: expected.version, payload_digest: expected.payload_digest, isolated_profile: true, authentication_copied: false,
       fresh_install: command([host === "codex-cli" ? "codex" : "claude", "plugin", "install", "vh-adlc@vhco-tools"]),
@@ -33,7 +33,7 @@ afterEach(() => { for (const directory of directories.splice(0)) rmSync(director
 test("audit cutover requires matching published targets, both native hosts and actual bound policy/review artifacts", () => {
   const c = context(), result = c.check(); expect(result.pass).toBe(true); expect(result.limit).toContain("attestations");
 });
-test.each(["local-catalog", "operation", "version", "source", "consumer", "payload", "review-model", "review-bytes", "helper-operation", "policy-commit", "policy-blob", "policy-grant", "policy-effects", "policy-absent", "missing-host", "duplicate-host", "upgrade", "native-failure", "source-drift", "index-drift", "credentials-copied"])("%s cannot pass audit adoption", kind => {
+test.each(["local-catalog", "operation", "version", "source", "consumer", "payload", "review-model", "review-bytes", "helper-operation", "policy-commit", "policy-blob", "policy-grant", "policy-effects", "policy-transcript-commit", "policy-transcript-bindings", "policy-absent", "missing-host", "duplicate-host", "upgrade", "native-failure", "source-drift", "index-drift", "credentials-copied"])("%s cannot pass audit adoption", kind => {
   const c = context(), r = c.receipt;
   if (kind === "local-catalog") r.kind = "local-catalog";
   if (kind === "operation") r.operation = "vh-adlc-maintenance";
@@ -48,6 +48,8 @@ test.each(["local-catalog", "operation", "version", "source", "consumer", "paylo
   if (kind === "policy-blob") r.candidate_policy.bindings = { ...r.candidate_policy.bindings, settings_blob: "0".repeat(40) };
   if (kind === "policy-grant") r.candidate_policy.allowed = true;
   if (kind === "policy-effects") r.candidate_policy.command.transcript = c.artifact(JSON.stringify({ valid: true, allowed: false, declaration: { effects: { ...effects, fix: ["branch-push"] } } }));
+  if (kind === "policy-transcript-commit") r.candidate_policy.command.transcript = c.artifact(JSON.stringify({ valid: true, allowed: false, adopted: false, consumer_commit: "0".repeat(40), bindings: c.expected.policy, declaration: { effects } }));
+  if (kind === "policy-transcript-bindings") r.candidate_policy.command.transcript = c.artifact(JSON.stringify({ valid: true, allowed: false, adopted: false, consumer_commit: c.expected.consumer_commit, bindings: { ...c.expected.policy, agents_blob: "0".repeat(40) }, declaration: { effects } }));
   if (kind === "policy-absent") delete (r as { candidate_policy?: unknown }).candidate_policy;
   if (kind === "missing-host") r.hosts.pop();
   if (kind === "duplicate-host") r.hosts[1].host = r.hosts[0].host;

@@ -104,8 +104,8 @@ identity, provenance, mode, IDs and effect; the operator must still observe ever
 
 ## Inspecting candidate and adopted policy
 
-`bun <plugin>/scripts/audit/cli.ts policy-candidate --repo <checkout> --default-branch main`
-checks the proposed declaration and fragment pointers. It grants no effect.
+`bun <plugin>/scripts/audit/cli.ts policy-candidate --repo <checkout> --default-branch main --commit <full-commit> --parity <consumer-parity.json>`
+checks exact committed AGENTS/settings/procedure/parity objects, current remote default identity, the proposed declaration and fragment pointers. Dirty policy bytes cannot stand in for that commit. The parity argument is optional for generic consumers; migration receipts bind their actual map. The emitted commit/blob/effect bindings must match adoption preflight. It grants no effect.
 After an authorized migration merge, run `policy-adopted --repo <checkout>` from the same helper.
 It refreshes the actual remote default, follows committed AGENTS/settings/procedure, and reports all
 resolved mode effects. Compare them with the consumer parity map; a mismatch blocks adoption.
