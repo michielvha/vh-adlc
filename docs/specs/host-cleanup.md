@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-5 findings applied on 2026-11-02. The owner accepts this document if the next independent review has no blocking finding."
+status_description: "R-6 F-01, F-03, F-04, F-06 and F-10 applied on 2026-11-02. F-02, F-05, F-08 and F-09 carry into tasks, and F-07 waits on the owner's decision to push. The owner accepts this document if the next independent review has no blocking finding."
 issue: null
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
 covers:
@@ -78,9 +78,9 @@ replacing a project's own cleanup code.
 ## Design
 
 The threat is accidents. Agents already act as the owner on this machine, so nothing here tries to
-stop one on purpose. The owner's answer on 2026-11-02: a run nobody asked for may remove `/tmp` files only.
-Compose and kind sit behind `--compose` and `--kind`, and an agent passes those flags only when the user
-asks. `references/authority.md` gains the matching row.
+stop one on purpose. The owner's answer on 2026-11-02: a run nobody asked for may remove `/tmp` entries and
+the project's temp root only. Compose and kind sit behind `--compose` and `--kind`, and an agent passes those
+flags only when the user asks. `references/authority.md` gains a row in those words.
 
 ### Commands
 
@@ -95,7 +95,8 @@ engine socket.
   reports `answered`. `--sh` prints shell-quoted `export` lines, the second exception to the JSON contract
   after `--version`. On failure it prints nothing to stdout and exits non-zero.
 - `vh-adlc clean [--repo DIR] [--dry-run] [--older-than DURATION] [--compose] [--kind]` plans and removes.
-  `--older-than` applies to `tmp` and `temp_root` ages, and can only raise them.
+  `--older-than` applies to `tmp` and `temp_root` ages, and can only raise them. A dry run without
+  `--compose` or `--kind` also lists abandoned Compose projects and clusters, marked as needing their flag.
 
 Those refusals report `error`. A dry run reports `answered`. An applied run reports `pass`, or `fail` on
 `removal-failed`, `manifest-invalid`, `engine-unreachable` or `kind-unavailable`. `temp-base-refused` and
@@ -132,8 +133,8 @@ kind:
 
 Liveness has two kinds. `pid`: a label holds `<host>/<pid>`, and the object is abandoned only when the
 host is this host and `kill(pid, 0)` returns `ESRCH`. `path`: a label holds a path, and the object is
-abandoned when that path is gone. Compose liveness is `path`, decided per project from its containers'
-`com.docker.compose.project.working_dir`. A project with no containers left is not matched and stays, even
+abandoned when that path is gone. Compose liveness is `path`, decided per project: a project is abandoned
+only when the `com.docker.compose.project.working_dir` path of every one of its containers is gone. A project with no containers left is not matched and stays, even
 if an earlier removal of its volumes failed, a stated limit. Built images and slot state stay with the
 project's own teardown.
 
@@ -213,7 +214,7 @@ vh-adlc adds its manifest for `vh-triage-*` and its other test prefixes. Stackwe
 - takes its environment from `vh-adlc env --sh`, when that succeeds, in `make test`, `make test-integration`
   (which runs `TestConformance_*`), `make verify`, `e2e/k8s/run.sh` and `e2e/k8s/driver-conformance.sh`, and
   otherwise runs unchanged. A direct `go test` stays outside and relies on the `tmp` globs;
-- creates and removes the kind marks in `e2e/k8s/run.sh`.
+- creates and removes the kind marks in `e2e/k8s/run.sh` and `e2e/k8s/driver-conformance.sh`.
 
 `clean` keeps to Stackweaver's `/tmp` entries, Compose slots and kind cluster. Everything a test run marks
 stays with `sweepEndedRuns` (at `cc2cbbed`), which removes a killed run's jobs network and firewall objects
@@ -243,12 +244,13 @@ An untouched row passes by appearing in no removal or stop in the report.
 
 ### Order
 
-Every criterion is proved on the feature branch. The rest is recorded here afterwards:
+Every criterion is proved on the feature branch. The rest follows `complete`, and its outcomes go in
+`status_description`, outside the normative baseline:
 
 1. This PR lands with a `feat` commit, so `main` tags a stable minor release.
 2. The lock moves to that release, in `yaml-settings.md`'s PR if that lands next.
 3. The owner installs the binary and adds the rule for each harness.
-4. Stackweaver's adoption PR merges after its PR #1002, and a first real run is recorded here.
+4. Stackweaver's adoption PR merges after its PR #1002, and a first real run follows.
 
 ## Acceptance Criteria
 
@@ -256,7 +258,8 @@ Every criterion is proved on the feature branch. The rest is recorded here after
       there. `temp_base` moves every root, defaulting to `/tmp/vh-adlc-<uid>`, a symlinked or foreign base is refused,
       and a missing one is recreated.
 - [ ] AC-02: `vh-adlc clean --dry-run` reports every declared, abandoned resource with its reason and changes nothing,
-      and an applied run reports what it removed and kept, with reasons, the space freed, and the count and size of
+      lists abandoned Compose projects and clusters marked as needing their flag, and an applied run reports what
+      it removed and kept, with reasons, the space freed, and the count and size of
       user-owned `/tmp` entries no rule matched.
 - [ ] AC-03: `vh-adlc clean` removes those and keeps other users' entries, unmatched entries, symlinks, entries with
       a mount point, entries in use and entries younger than their age. No Docker removal is forced, apart from
@@ -269,7 +272,8 @@ Every criterion is proved on the feature branch. The rest is recorded here after
       and `env` creates nothing for it.
 - [ ] AC-07: Run as root, outside the initial PID namespace, outside Linux or with Git older than 2.45, `vh-adlc clean`
       removes nothing and reports why.
-- [ ] AC-08: Compose projects change only with `--compose`, and one with its working directory present stays. kind
+- [ ] AC-08: Compose projects change only with `--compose`, and a project stays unless the `working_dir` path of every
+      one of its containers is gone. kind
       clusters change only with `--kind`. A cluster with no mark, or any live mark, stays, including one a run
       reused from a killed run and kept. A cluster whose marks have all ended is stopped and deleted.
 - [ ] AC-11: With the candidate binary on `PATH`, the plugin from this branch and the one documented rule, a Claude
@@ -284,8 +288,8 @@ Every criterion is proved on the feature branch. The rest is recorded here after
       checker accepts the operation.
 - [ ] AC-18: With the `/tmp` quota exhausted, an applied run frees space and writes nothing to `/tmp`.
 - [ ] AC-23: On Stackweaver's reviewed branch, `make test`, `make test-integration`, `make verify`, `e2e/k8s/run.sh`
-      and `e2e/k8s/driver-conformance.sh` keep their temp files under its temp root, and a harness run marks its
-      cluster and removes the mark on exit. Without the binary, or when `env` fails, those run unchanged.
+      and `e2e/k8s/driver-conformance.sh` keep their temp files under its temp root, and `e2e/k8s/run.sh` and
+      `e2e/k8s/driver-conformance.sh` each mark the cluster and remove the mark on exit. Without the binary, or when `env` fails, those run unchanged.
 - [ ] AC-24: `--older-than` below a rule's age changes nothing, a repository with no manifest still gets the built-in
       globs, and a missing `kind` skips only the kind step. An invalid `host.yaml`, including a relative `temp_base`,
       `$HOME`, or one inside a Git work tree or above the repository, stops the run before it removes anything. A
@@ -298,14 +302,14 @@ Every criterion is proved on the feature branch. The rest is recorded here after
 | AC-01 | `internal/clean` tests on a temporary home, and a `cmd/vh-adlc` test running `go test` on a fixture module. |
 | AC-02, AC-03, AC-07 | Fake-filesystem table tests: a `t.TempDir` stands in for `/tmp`, with injected uid, platform, PID namespace, Git version, clock, `/proc` and mount data. Cases include a recent nested file, an unreadable same-uid process and a pid that exits during the scan. The dry-run case compares a tree snapshot. |
 | AC-07 | A `cmd/vh-adlc` test runs the real binary under `bwrap --unshare-pid` and asserts `pid-namespace` with nothing removed. |
-| AC-02, AC-03, AC-08 | Fake-engine tests: an `httptest` server on a Unix socket records every call and fails on any `force` parameter, across Compose projects and clusters with ended and live marks, a killed run's cluster reused and kept, a bind mount, failed listings, and an absent, refused and denied socket. |
+| AC-02, AC-03, AC-08 | Fake-engine tests: an `httptest` server on a Unix socket records every call and fails on any `force` parameter, across Compose projects and clusters with ended and live marks, a mixed-label Compose project, a killed run's cluster reused and kept, a bind mount, failed listings, and an absent, refused and denied socket. |
 | AC-03, AC-08 | Integration test behind a build tag on the real engine, with disposable objects and clusters. |
 | AC-05, AC-06 | Table tests on fixture repositories: each refusal, a branch edit and an uncommitted edit. A missing object in a partial clone must not fetch. |
 | AC-11 | Written manual procedure in disposable sessions, recorded under `tests/vh-adlc/evidence/clean/`, with `codex execpolicy check` output, the default Codex session's outcome, and a session blocked on space with no request for cleanup. |
 | AC-12 | The real-host sequence in Adoption, with each row's outcome recorded. |
 | AC-14 | `bun test tests/vh-adlc`, a golden JSON report against the updated schema, and a read of the documentation against the flags. |
 | AC-18 | A `cmd/vh-adlc` test under Bubblewrap, without a new PID namespace, with a filled, size-limited tmpfs at `/tmp`. |
-| AC-23 | On Stackweaver's adoption branch: each named entry point with the candidate binary, without it, and with a refused base so `env` fails; and an `e2e/k8s/run.sh` run observing the mark during the run and its removal on exit, with and without `KEEP_CLUSTER=1`. |
+| AC-23 | On Stackweaver's adoption branch: each named entry point with the candidate binary, without it, and with a refused base so `env` fails; and an `e2e/k8s/run.sh` run observing the mark during the run and its removal on exit, with and without `KEEP_CLUSTER=1`, and a `driver-conformance.sh` run observing the same. |
 | AC-24 | `internal/clean` table tests, and a `cmd/vh-adlc` test capturing stdout of a failing `env --sh`. |
 
 ## Tasks
