@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner answered all eight questions and confirmed the trusted remotes on 2026-11-02; waits for an independent spec review."
+status_description: "R-1 found seven blockers; factual findings are applied and judgement findings resolved. Two owner questions are open, and a new independent review must clear the blockers."
 issue: null
 goal: "Any agent session on a shared workstation can remove what a project's killed runs left behind, through one reviewed vh-adlc command that touches only what that project's default branch declares it owns and has abandoned."
 covers:
@@ -16,11 +16,14 @@ covers:
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/vh-adlc.lock.json
   - plugins/vh-adlc/plugin.json
+  - plugins/vh-adlc/.claude-plugin/plugin.json
+  - plugins/vh-adlc/references/loop.md
   - .vh-adlc/cleanup.yaml
   - plugins/vh-adlc/scripts/ensure-vh-adlc.sh
   - tests/vh-adlc/
   - docs/reference/cli.md
   - docs/reference/compatibility.md
+  - docs/get-started/installation.md
   - docs/user-guides/workflows.md
   - README.md
 ---
@@ -30,7 +33,7 @@ covers:
 One shared, reviewed way for every project on a workstation to keep its temporary files in a known
 place, declare what it owns, and let any agent session remove what killed runs left behind. The
 `vh-adlc` binary gains `env` and `clean` commands, the plugin gains a `vh-adlc-clean` operation, and
-the owner adds one allow rule per harness so sessions stop getting blocked. Only rules merged to a
+the owner adds a few permission rules per harness so sessions stop getting blocked. Only rules on a
 project's default branch can delete anything.
 
 ## Context
@@ -72,8 +75,10 @@ are 64 hex characters and their only label is `com.docker.volume.anonymous`.
 
 - A live run's resources carry an ownership mark. `sw-test-db-87d6380a` and its siblings carry
   `sh.stackweaver.test-run=fedora-43/461166`, the pid above, which was still running.
-- Older networks `sw-test-jobs-5f77d912` and `sw-test-jobs-b4d91316` carry `sh.stackweaver.managed=true`
-  but no `test-run` mark, so nothing records which run made them.
+- Networks `sw-test-jobs-5f77d912` and `sw-test-jobs-b4d91316` carry `sh.stackweaver.managed=true` but no
+  `test-run` mark, so nothing records which run made them. `EnsureNetwork` gives every jobs network
+  only `LabelManaged` (`backend/internal/launcher/driver/network.go:140` at `96eaff82`), and test jobs
+  networks come through it, so a live run's jobs network has no mark today either.
 - Compose slot stacks record their checkout. The `swc-6-*` containers carry
   `com.docker.compose.project.working_dir=/home/m/code/stackweaver/.claude/worktrees/agent-a6bdb414ef2821af6/deploy`
   (`docker inspect swc-6-api`), and that worktree still exists.
@@ -121,6 +126,11 @@ while narrow rules stay. Codex resolves commands against `prefix_rule` entries i
 `prefix_rule(pattern=["vh-adlc", "clean"], decision="allow")` returned `"decision": "allow"`, and a
 command outside that prefix matched no rule. Claude Code here is 2.1.309 (`claude --version`).
 
+Sessions act as the owner on GitHub: `gh api user` returns `michielvha`, the Git author on both
+repositories. `stackweaver` is private and `vh-adlc` is public (`gh repo view`, `gh api`).
+`gh api repos/michielvha/stackweaver/branches/main/protection` returns HTTP 403, "Upgrade to GitHub Pro or
+make this repository public to enable this feature", and Stackweaver has no `.github/CODEOWNERS`.
+
 ### The vh-adlc binary and plugin today
 
 - Every command is about feature documents: `knowledge`, `find`, `lint`, `gate`, `fresh`, `next` and
@@ -163,11 +173,11 @@ In scope:
 - Proof that the rules came from the default branch the remote names, and an automatic host list that
   holds paths only.
 - The `vh-adlc-clean` operation, its references, its lifecycle routing row and package checks.
-- Documented allow rules for Claude Code and Codex, and `vh-adlc` on `PATH` as the binary they name.
+- Documented permission rules for Claude Code and Codex, and `vh-adlc` on `PATH` as the binary they name.
 - Firewall object removal through a digest-pinned image, behind `--firewall`.
 - vh-adlc's own manifest for its test leftovers, and the Stackweaver adoption described under
-  [Stackweaver adoption](#stackweaver-adoption). Stackweaver's manifest and script changes land in the
-  Stackweaver repository, in its own reviewed change.
+  [Stackweaver adoption](#stackweaver-adoption). Stackweaver's manifest, entry point, network mark and
+  kind mark changes land in the Stackweaver repository, in its own reviewed change.
 - A binary release and the plugin lock bump that makes the new commands available to the plugin.
 
 Out of scope:
@@ -191,7 +201,7 @@ Out of scope:
 - Replacing each project's own cleanup code. Projects still clean up after themselves; this catches what
   killed runs and ended sessions leave.
 - A timer, a registration command and manifest commands. Scheduled cleanup would be a later feature.
-- Hosts other than Linux and macOS.
+- Hosts other than Linux. The binary refuses them; macOS would need its own in-use checks and deny rule.
 
 ## Design
 
@@ -210,6 +220,9 @@ The owner answered every question on 2026-11-02. This design folds in those answ
 | Firewall | A firewall rule behind `--firewall`, through a digest-pinned image. |
 | Binary | `vh-adlc` on `PATH`, rule `Bash(vh-adlc clean *)`. |
 
+The owner has not settled what a default-branch commit proves about review, or which repository owns
+shared globs. Those are Q1 and Q2 under Open Questions.
+
 ```mermaid
 flowchart LR
   S[Session or owner] --> K[vh-adlc-clean operation]
@@ -218,7 +231,7 @@ flowchart LR
   H --> V[Default-branch manifest, proven against the remote]
   V --> P[Candidates from declared rules]
   P --> L{Liveness and hard limits}
-  L -- abandoned --> X[Remove, never forced]
+  L -- abandoned --> X[Remove]
   L -- live or unsure --> Y[Keep and report why]
   X --> O[JSON report: removed, kept, bytes freed, unattributed]
   Y --> O
@@ -229,7 +242,7 @@ flowchart LR
 
 The host list says which repositories to visit and holds no rules. Each repository's rules are read
 from the commit its remote names as the default branch head. A candidate is anything a rule matches.
-Liveness and the hard limits decide removal; a failed check counts as live.
+Liveness and the hard limits decide removal, and any rule that reads live keeps the object.
 
 </details>
 
@@ -237,25 +250,36 @@ Liveness and the hard limits decide removal; a failed check counts as live.
 
 `vh-adlc clean` and `env` do not resolve conventions, so `dispatch` exempts them from the
 `--plugin-pin` requirement and their reports carry `knowledge: null`. The logic lives in a new
-`internal/clean` package; `cmd/vh-adlc/main.go` only wires flags.
+`internal/clean` package; `cmd/vh-adlc/main.go` only wires flags. v1 supports Linux only, because the
+in-use checks, the socket paths and the deny rule are all Linux-shaped. On any other platform both
+commands report `unsupported-platform` and do nothing.
 
 - `vh-adlc env [--repo DIR] [--sh]` creates the project's temp root if needed and reports `TMPDIR` and
   `GOTMPDIR` for it. `--sh` prints `export` lines for `eval` instead of JSON; the schema description
-  lists it beside `--version` as the second exception to the JSON contract. `env` deletes nothing, so
+  lists it beside `--version` as the second exception to the JSON contract. On failure `--sh` prints
+  nothing to stdout, writes the JSON report to stderr and exits non-zero. `env` deletes nothing, so
   it reads the manifest from the working tree.
-- `vh-adlc clean [--repo DIR | --all-projects] [--dry-run] [--older-than DURATION] [--kind] [--firewall]`
+- `vh-adlc clean [--firewall] [--kind] [--repo DIR | --all-projects] [--dry-run] [--older-than DURATION]`
   plans and applies removal. `--repo` defaults to the current directory. `--older-than` can only raise
-  a rule's age, never lower it, so an allowed session cannot widen what is removed. `--kind` and
-  `--firewall` enable the heavy kinds.
+  a rule's age, never lower it, so an allowed session cannot widen what is removed. `--firewall` and
+  `--kind` enable the heavy kinds, and the binary accepts them only directly after `clean`, so a
+  permission rule can see them.
 
 No flag names a manifest, a remote or a host list, so the allow rule cannot be pointed at other rules.
 Tests reach those seams through `internal/clean` options, never through the command line.
 
-Results reuse the existing values: `answered` for a dry run, `pass` when every planned removal
-succeeded, `fail` when a removal failed or a project could not be proven, and `usage` and `error` as
-today. New finding codes, added in the same minor release: `manifest-invalid`, `manifest-missing`,
-`manifest-overlap`, `manifest-unmerged`, `remote-unverified`, `remote-untrusted`, `temp-base-refused`,
-`running-as-root`, `engine-unreachable`, `removal-failed`, `kind-unavailable` and `busy`.
+New finding codes, added in the same minor release, and how they set the result. A dry run reports
+`answered` unless a code below says `error`. An applied run reports `pass` when nothing below sets `fail`.
+
+| Code | Applied result |
+| --- | --- |
+| `running-as-root`, `unsupported-platform`, `busy`, `host-settings-invalid` | `error`, exit 4; nothing ran |
+| `removal-failed`, `manifest-invalid`, `manifest-overlap`, `remote-unverified`, `temp-base-refused`, `engine-unreachable`, `kind-unavailable` | `fail`, exit 1; other projects still ran |
+| `remote-untrusted`, `manifest-missing` | `fail` with `--repo`; only counted with `--all-projects`, where such a repository was never in question |
+| `manifest-unmerged`, `temp-root-undeclared` | Reported; no effect on the result |
+
+`env` uses the same codes. It fails on `temp-root-undeclared`, so a project that calls `env` without
+declaring `temp_root` finds out.
 
 ### Host settings and the host list
 
@@ -264,14 +288,15 @@ Two per-user files hold host state. Neither lives in a repository, and neither h
 `<user config dir>/vh-adlc/host.yaml` is the owner's optional setting, `schema_version: 1`. It has
 `temp_base`, the base of every temp root, and `trusted_remotes`, a list of normalized prefixes. This
 host's list is `github.com/michielvha/` and `github.com/vhco-pro/`. With no list, applied runs remove
-nothing.
+nothing. An invalid file reports `host-settings-invalid`.
 
 `<user cache dir>/vh-adlc/projects.yaml` is the host list. `vh-adlc knowledge`, `env` and `clean` add the
 repository's canonical path on first use, from `git rev-parse --git-common-dir`, so every worktree
-counts as one repository. Every vh-adlc operation starts with `knowledge`
-(`plugins/vh-adlc/references/loop.md`), so a project gets on the list by using vh-adlc. The file holds
-paths and nothing else. Losing it costs nothing, because the next use rebuilds it, and adding a path
-to it grants nothing, because rules still come through the proof below.
+counts as one repository. Operations that resolve conventions start with `knowledge`
+(`plugins/vh-adlc/references/loop.md`), and the cleanup operation calls `clean` directly, so a project
+gets on the list by using vh-adlc. The file holds paths and nothing else, and adding a path grants
+nothing, because rules still come through the proof below. A write that fails, for example on a full
+disk, is reported and does not stop the run.
 
 `vh-adlc clean --all-projects` visits every listed repository. A path that no longer holds a Git
 repository is dropped and reported. A repository with no manifest on its default branch has nothing
@@ -279,34 +304,48 @@ to clean and is counted. One project's failure does not stop the others.
 
 ### Where the rules come from
 
-Only rules merged to the default branch delete anything. An applied run proves that for each listed
-repository in these steps:
+Only rules on the default branch delete anything. Every `clean` run, dry or applied, proves that for
+each listed repository in these steps:
 
-1. Read `remote.origin.url`. Normalize it to `<host>/<owner>/<repo>`, dropping any user name and a
-   trailing `.git`, as Stackweaver's `https://michielvha@github.com/michielvha/stackweaver.git` needs.
-   Accept only `https://` and SSH forms. A local path, `file://`, `http://` and `ext::` report
-   `remote-unverified`. A URL under no `trusted_remotes` prefix reports `remote-untrusted`.
-2. From a neutral working directory, with every `GIT_*` variable removed from the environment, run
+1. Read `remote.origin.url`. It must parse as exactly `<host>/<owner>/<repo>` in an `https://` or SSH
+   form, after dropping any user name and a trailing `.git`, as Stackweaver's
+   `https://michielvha@github.com/michielvha/stackweaver.git` needs. Dot segments, percent escapes,
+   queries, fragments, extra path segments, local paths, `file://`, `http://` and `ext::` report
+   `remote-unverified`. Those checks are on the text, because Git collapses
+   `https://github.com/michielvha/../octocat/Hello-World.git` before any request, so
+   `http.followRedirects=false` alone does not stop it. A URL under no `trusted_remotes` prefix reports
+   `remote-untrusted`.
+2. From a neutral working directory, with every `GIT_*` variable removed from the environment,
+   `GIT_TERMINAL_PROMPT=0` set and `http.followRedirects=false`, run
    `git ls-remote --symref -- <url> HEAD`. That gives the default branch and its head commit as the
-   remote states them. The owner's global Git configuration still applies, so credentials work.
-3. In a new empty bare repository in a per-run temporary directory, fetch that branch with `--depth=1`,
-   `--no-tags` and `--filter=blob:none`, require the fetched commit to equal the head from step 2
-   (retrying once if the branch moved), and read the manifest with
-   `git cat-file blob <commit>:.vh-adlc/cleanup.yaml`.
+   remote states them. A redirect to another repository fails the proof. The owner's global Git
+   configuration still applies, so credentials work.
+3. In a new empty bare repository, fetch that branch with `--depth=1`, `--no-tags` and
+   `--filter=blob:none`, require the fetched commit to equal the head from step 2 (retrying once if the
+   branch moved), and read the manifest with `git cat-file blob <commit>:.vh-adlc/cleanup.yaml`.
+
+Each remote step has a 30-second timeout. Proof directories live under `$XDG_RUNTIME_DIR/vh-adlc/`, a
+private tmpfs apart from `/tmp` (3.2G free on this host, `df -h /run/user/1000`), falling back to the
+user cache directory, never `/tmp`. Git's own `TMPDIR` points there too. Each directory is removed as
+soon as its project is read, with a budget of 1 MiB, and Stackweaver measured 280K. The binary writes
+nothing to `/tmp` and keeps its lock in the same place, so `clean` works with the `/tmp` quota full.
 
 The local `origin/<default>` ref is not evidence: any local process can move it, and it is what
 `internal/fresh/fresh.go:97` resolves today. Git commands that talk to the remote also never run inside
 the project's repository, because `core.sshCommand` in a repository's `.git/config` would make Git run
-that command under the allow rule. Measured on Stackweaver, steps 2 and 3 took under three seconds
-and 280K. Every run does this for each listed trusted repository, four at a time, because the overlap
-check below needs all of them.
+that command under the allow rule. Inside a project repository the binary runs only
+`git rev-parse --git-common-dir`, `git config --local --get remote.origin.url`,
+`git symbolic-ref refs/remotes/origin/HEAD` and `git cat-file blob`, each with `GIT_NO_LAZY_FETCH=1`,
+because a read of a missing object in a partial clone can otherwise fetch and run that same command.
+Proofs run four at a time for every listed trusted repository, because the overlap check below needs them.
 
-A failed step removes nothing for that project and the run reports why. A dry run needs no proof: it
-falls back to the local default-branch ref and reports `remote-unverified`, so it works offline.
+A failed step removes nothing for that project and the run reports why. A dry run with no proof falls
+back to the local default-branch ref for its plan, reports `remote-unverified`, and marks the plan's
+`rules_source` as `local`. Otherwise `rules_source` is `proven`, so a dry run works offline and says so.
 
 When the working tree's manifest differs from the proven one, or a branch introduces the file, an
 applied run still uses the proven rules and reports `manifest-unmerged`. A dry run also plans the
-working-tree copy and marks each of those lines as unmerged, so a change can be tried before review.
+working-tree copy with `rules_source: worktree`, so a change can be tried before it merges.
 
 ### Temp root
 
@@ -314,7 +353,8 @@ Each project gets `<temp_base>/<project>`, mode 0700 and owned by the user. `tem
 `/tmp/vh-adlc-<uid>`, which is tmpfs on this host, keeps paths short for Unix sockets and clears at
 reboot. `<project>` comes from the manifest and matches `^[a-z0-9][a-z0-9-]{1,38}$`. A project opts in
 with one manifest setting (`temp_root`), and its build and test entry points take their environment
-from `vh-adlc env --sh`.
+from `vh-adlc env --sh`. A base missing after a reboot is normal: `env` recreates it, and `clean` has
+nothing to do there.
 
 `/tmp` is shared, so `env` and `clean` report `temp-base-refused` for a base that is a symlink, is owned
 by someone else, or is not mode 0700. `env` writes a marker file when it creates a base, and `clean`
@@ -323,58 +363,100 @@ is inside or an ancestor of a listed repository, so a changed `temp_base` cannot
 checkout.
 
 Inside the root, an entry is abandoned when nothing in its tree changed for longer than the configured
-age and no live process uses it. The walk uses `lstat`, never follows symlinks, and stops at a device
-boundary. On Linux, a process uses an entry when its `cwd`, `root`, `exe` or an open file descriptor in
-`/proc/<pid>` resolves inside it. macOS has no `/proc`, so there the age is the only liveness check,
-and the reference says so.
+age and the in-use check below clears it. The walk uses `lstat`, never follows symlinks, and stops at a
+device boundary.
+
+### In-use check
+
+A file entry in `/tmp` or a temp root is in use, and is kept, when any of these holds:
+
+- A process of the same uid has its `cwd`, `root`, `exe`, an open file descriptor or a mapping in
+  `/proc/<pid>/maps` inside the entry. A pid that exits during the scan is skipped. Any other read error
+  on a same-uid pid counts as in use.
+- `/proc/net/unix` lists a bound socket path inside the entry, whichever user bound it.
+- A container on the Docker or Podman socket, running or not, has a bind mount whose `Mounts` source is
+  inside the entry. This is how a root process in a container is seen. A missing socket or a refused
+  connection means no engine is running there. Any other engine error keeps every file entry in that
+  run and reports `engine-unreachable`.
+
+Processes of other uids are not inspected, because `/proc/<pid>/cwd` and `fd` are unreadable to the user:
+as uid 1000, 429 of 532 pids here had an unreadable `cwd`. So a root process outside any container that
+holds a user's `/tmp` entry is not seen. The age is the only protection in that case, and the
+reference says so.
 
 ### Ownership manifest
 
 `.vh-adlc/cleanup.yaml` is data with `schema_version: 1`, parsed by the strict `internal/settings` package
 that [yaml-settings.md](yaml-settings.md) defines, which uses `yaml.v3`. It holds one document, unknown
-keys and duplicate keys fail, and aliases are refused. No field holds a command. The fields are:
+keys and duplicate keys fail, and aliases are refused. No field holds a command. In full:
 
-| Field | Meaning |
-| --- | --- |
-| `project` | Host-unique name; also the temp root name. |
-| `temp_root` | `max_age` opts the project into the temp root. |
-| `tmp` | Top-level `/tmp` entries, each with a `glob` such as `TestConformance_*` and a `max_age`. |
-| `label_namespace` | The label key prefix the project owns, for example `sh.stackweaver.`. |
-| `docker` | Engine rules: `engines` (`docker`, `podman`) and `rules`, each with `kinds` (container, network, volume, image), a label `match` inside the namespace, an optional `name` glob, a `liveness` and `anonymous_volumes`. |
-| `compose` | Entries with a `project` glob such as `swc-*` and `volumes`; liveness is always the Compose working directory. |
-| `kind` | Entries with a `cluster` name and a `max_age`, acted on only with `--kind`. |
-| `firewall` | `image`, `iptables_chain_prefix` and `nft_table_prefix`, acted on only with `--firewall`. |
+```yaml
+schema_version: 1
+project: stackweaver
+temp_root: {max_age: 24h}
+tmp:
+  - {glob: "TestConformance_*", max_age: 12h}
+label_namespace: sh.stackweaver.
+docker:
+  engines: [docker, podman]
+  rules:
+    - kinds: [container, network, volume, image]
+      match: {sh.stackweaver.managed: "true"}
+      liveness: {kind: pid, label: sh.stackweaver.test-run}
+      anonymous_volumes: true
+    - kinds: [container]
+      match: {sh.stackweaver.role: slot-tool}
+      liveness: {kind: path, label: sh.stackweaver.worktree}
+compose:
+  - {project: "swc-*", volumes: true}
+kind:
+  - {cluster: sw-e2e, mark_label: sh.stackweaver.kind-run}
+firewall:
+  image: ghcr.io/example/tools@sha256:<64 hex>
+  iptables_chain_prefix: SW-JOBS-
+  nft_table_prefix: sw_jobs_
+```
 
-Liveness is a fixed vocabulary in the binary:
+`match` is exact key and value pairs. The second Docker rule shows the `path` form; Stackweaver's own
+manifest needs only the first. An object without the rule's liveness label is not matched, so it stays. When several rules match an object, any rule that
+reads live keeps it. Liveness is a fixed vocabulary in the binary:
 
-- `pid`: a label holds `<host>/<pid>`. The resource is abandoned only when the host is this host and
+- `pid`: the label holds `<host>/<pid>`. The resource is abandoned only when the host is this host and
   `kill(pid, 0)` returns `ESRCH`. Another host, an unparseable value, a live pid of any user and a reused
   pid all count as live. This is Stackweaver's `runEnded`.
-- `path`: a label holds an absolute path; the resource is abandoned when `lstat` returns `ENOENT`.
+- `path`: the label holds an absolute path; the resource is abandoned when `lstat` returns `ENOENT`.
   Compose rules always use `com.docker.compose.project.working_dir`.
-- `age`: created longer than `max_age` ago and, for networks, volumes and images, used by no container.
-  It needs a namespaced `match`, and a `name` glob when the label is shared with live production
-  objects.
 
-A project that needs another kind asks for one in vh-adlc, where it is reviewed and tested.
+Engine objects have no age rule. An age cannot tell an idle live object from an abandoned one, and
+Stackweaver's jobs networks sit idle between jobs. A project that needs another kind asks for one in
+vh-adlc, where it is reviewed and tested.
 
-Shared tool patterns such as `go-build*` and `gopls-tempmod*` belong to no single project. They go in
-one manifest on the default branch of a repository the owner keeps for the host, for example dotfiles,
-and the overlap check stops any other project from claiming the same pattern.
+A kind cluster has no owner mark of its own, so its harness creates one: a Docker volume labelled
+`<mark_label>=<host>/<pid>` and `io.x-k8s.kind.cluster=<name>`, read with the `pid` rule. A cluster with no
+mark is never touched, which is how a harness keeps one for debugging: it removes its mark.
+
+Shared tool patterns such as `go-build*` and `gopls-tempmod*` belong to no single project. Q2 settles
+which repository declares them, and the overlap check stops any other project from claiming them.
 
 The binary refuses a manifest, reporting `manifest-invalid`, when:
 
-- a `tmp` glob has fewer than four literal characters before its first metacharacter;
-- a Docker rule has no liveness, or a `match` key lies outside the namespace;
+- any `tmp`, `compose.project` or `kind.cluster` glob has fewer than four literal characters
+  before its first metacharacter;
+- `label_namespace` has fewer than eight characters, does not end in `.`, or starts with a namespace a
+  tool owns: `com.docker.`, `io.x-k8s.`, `io.containers.`, `org.opencontainers.`;
+- a Docker rule has no liveness, or a `match`, liveness or `mark_label` key lies outside the namespace;
 - a glob matches a reserved entry such as `claude-<uid>`, `systemd-private-*`, `.X11-unix`,
   `tmux-<uid>` or the temp base itself;
 - a `firewall.image` is not `<name>@sha256:<64 hex>`, or a firewall prefix has fewer than four characters;
 - an age is below one hour.
 
-With no registration step, overlap is checked on every run across all proven manifests. When a glob's
-literal prefix is a prefix of another project's, or two projects share a name, a label namespace, a
-firewall prefix or a Compose or kind pattern, both projects report `manifest-overlap` and remove
-nothing, and every other project proceeds.
+Overlap is checked on every run across the manifests the run could read. When a glob's literal prefix
+is a prefix of another project's, or two projects share a name, a label namespace, a firewall prefix or
+a Compose or kind pattern, both projects report `manifest-overlap` and remove nothing, and every other
+project proceeds. A listed repository that cannot be proven this run takes part through its local
+default-branch copy, which can only hold others back. The check sees listed repositories only, so a lost
+or new host list narrows it, and the report's `overlap_checked_against` count shows that. Overlap catches
+mistakes between trusted projects. The trust boundary is `trusted_remotes` and the default branch.
 
 ### Removal and hard limits
 
@@ -392,13 +474,15 @@ These hold regardless of what a manifest declares:
 4. A running container is stopped, with a ten-second timeout, only when its rule's liveness says it is
    abandoned. A process outside an engine is never signalled.
 5. Only Unix sockets are used: `DOCKER_HOST` when it is `unix://`, otherwise `/var/run/docker.sock`,
-   and `$XDG_RUNTIME_DIR/podman/podman.sock` for Podman. An unreachable engine reports
-   `engine-unreachable` and the file work continues.
-6. One run at a time per user: an exclusive lock on `<user cache dir>/vh-adlc/clean.lock`. A second run
-   reports `busy`.
-7. `kind` clusters are deleted only with `--kind`, by running `kind delete cluster --name <name>` with a
-   fixed argument list, when node containers labelled `io.x-k8s.kind.cluster=<name>` are older than the
-   rule's age. Without `kind` on `PATH`, the run reports `kind-unavailable`. The shared `kind` network is
+   and `$XDG_RUNTIME_DIR/podman/podman.sock` for Podman. A declared engine that is not running reports
+   `engine-unreachable`, and file work follows the in-use check.
+6. One run at a time per user: an exclusive lock on `$XDG_RUNTIME_DIR/vh-adlc/clean.lock`, falling back
+   to the user cache directory. A second run reports `busy`.
+7. `kind` clusters are deleted only with `--kind`, only when their mark's `pid` rule says abandoned. The
+   binary first stops the node containers under rule 4, and then runs `kind delete cluster --name <name>`
+   with a fixed argument list, because kind removes nodes with `docker rm -f -v`. Stopping first means
+   that force kills nothing, and it holds only for nodes already called abandoned. The mark goes last.
+   `kind` must be on `PATH`, otherwise the run reports `kind-unavailable`. The shared `kind` network is
    never removed.
 8. Without `--firewall`, a network with a firewall rule is kept with reason `firewall-chain-pending`, so
    a cleanup never creates the orphan chains it is meant to remove.
@@ -415,64 +499,92 @@ the binary, so a manifest cannot add a command. Names reach the script only afte
 `^[A-Za-z0-9_-]{1,32}$`. The image is pulled by digest and must provide `iptables`; `nft` is used when
 present. A rootless engine has no host firewall access, so the rule is skipped there.
 
-The script lists iptables chains and nftables tables that carry the declared prefixes. An object's
-owner is found by name: the prefix followed by the first eight hex characters of the SHA-256 of a
-network name, which is Stackweaver's `chainName` and `nftTableName`, with a `-IN` sibling chain. Other
-naming schemes need a change in vh-adlc. An object that hashes to no network on the engine is an
-orphan, which covers chains whose networks are already gone. If the network listing fails, nothing is
-orphaned. For an orphan or a network being removed, the script deletes the jumps from `DOCKER-USER`
-and `INPUT`, flushes and deletes the chains, and deletes the nftables tables, in that order and before
-the network goes. Stackweaver's test-only forward allowances, keyed by subnet
-(`dockerForwardAllowanceRemoval`), stay with its own sweep.
+The order prevents a false orphan. The script first lists iptables and ip6tables chains and nftables
+tables in the `inet` and `bridge` families that carry the declared prefixes. Only then does the binary
+list networks on every engine in the manifest, because a network always exists before its firewall
+objects. An object's owner is found by name: the prefix followed by the first eight hex characters of
+the SHA-256 of a network name, compared without case, because `chainName` is uppercase and `nftTableName`
+lowercase, with a `-IN` sibling chain. Other naming schemes need a change in vh-adlc. An object that
+hashes to no network is an orphan, which covers chains whose networks are already gone. Any failed
+listing, including a declared engine that is not running, orphans nothing.
+
+For an orphan or a network being removed, the script deletes the jumps from `DOCKER-USER` and `INPUT`,
+flushes and deletes the chains, and deletes the nftables tables, in that order and before the network
+goes. Stackweaver's test-only forward allowances, keyed by subnet (`dockerForwardAllowanceRemoval`), stay
+with its own sweep.
 
 ### Report
 
-`data` holds one entry per project, each with the commit its rules came from, its candidates (kind, name
-or ID, rule, reason such as `pid ended fedora-43/461166` or `working dir missing`, action and bytes), its
-totals and its findings. Actions are `would-remove`, `removed`, `kept-live`, `kept-in-use`, `kept-young`,
-`skipped-symlink`, `skipped-mount`, `firewall-chain-pending` and `failed`. A host section lists
-unattributed leftovers by count and size: user-owned `/tmp` entries that no manifest matches, anonymous
-volumes, and stopped containers with no rule.
+`data` holds the binary's `version`, then one entry per project with its `rules_source`, the commit its
+rules came from, `overlap_checked_against`, its candidates (kind, name or ID, rule, reason such as
+`pid ended fedora-43/461166` or `working dir missing`, action and bytes), its totals and its findings.
+Actions are `would-remove`, `removed`, `kept-live`, `kept-in-use`, `kept-young`, `skipped-symlink`,
+`skipped-mount`, `firewall-chain-pending` and `failed`. A host section lists unattributed leftovers by
+count and size: user-owned `/tmp` entries that no manifest matches, anonymous volumes, stopped containers
+with no rule, dangling images and the build cache.
 
 ### The operation
 
 `plugins/vh-adlc/skills/vh-adlc-clean/SKILL.md` runs `vh-adlc clean --dry-run` for the current project,
 or with `--all-projects` on request, and summarises the plan. It applies the plan when the user asked
-for cleanup or the session is blocked on space. When a project's rules are unmerged, unproven or
-untrusted, it reports the finding and what clears it, and removes nothing. It never removes these
-resources with `rm`, `docker rm` or `pkill`. `references/clean.md` holds the procedure and
-`references/clean-settings.md` the manifest and host fields, following the triage and maintenance
-settings references. `references/lifecycle.md` gains a "Host cleanup" row.
+for cleanup or the session is blocked on space. It stops only for projects with no proven rules, reports
+the finding and what clears it, and carries on with the rest. `manifest-unmerged` alone does not stop it.
+It passes `--firewall` or `--kind` only when the user named them. It never removes these resources with
+`rm`, `docker rm` or `pkill`.
 
-Because `clean` needs no conventions, the operation skips `knowledge` and calls `vh-adlc` from `PATH`,
-which is the form the allow rule matches. The owner installs the verified binary once:
-`install -m 755 "$(bash <plugin directory>/scripts/ensure-vh-adlc.sh)" ~/.local/bin/vh-adlc`. The
-operation runs `ensure-vh-adlc.sh`, which already accepts a `PATH` binary only when its digest matches
-the lock (`:83-94`). After a lock bump the script ignores the old copy, so the operation prints the
-install line and stops.
+`references/clean.md` holds the procedure and `references/clean-settings.md` the manifest and host
+fields, following the triage and maintenance settings references. `references/lifecycle.md` gains a
+"Host cleanup" row. The reference also says what to do when `/tmp` is so full that a session's own shell
+cannot run: the owner runs `vh-adlc clean --all-projects` in a terminal.
+
+`clean` needs no conventions, so this operation skips `knowledge`. `references/loop.md` names that
+exception, and `tests/vh-adlc/check.test.ts` gains a host-operation category beside
+`CONTENT_OPERATIONS` that does not require the `vh-adlc knowledge` line.
+
+It calls `vh-adlc` from `PATH`, the form the allow rule matches. The Bash tool's `PATH` on this host is
+`/usr/local/bin:/usr/bin`, so `~/.local/bin` and `~/go/bin` are absent, and `/usr/local/bin` is the one
+location on it. It is also root-owned, so no session can replace the binary. The owner installs once per
+lock bump:
+`sudo install -m 755 "$(bash <plugin directory>/scripts/ensure-vh-adlc.sh)" /usr/local/bin/vh-adlc`, and
+`kind` the same way if `--kind` is wanted. The operation does not run `ensure-vh-adlc.sh`, which needs a
+rule of its own and executes a mismatched candidate to read its version. It compares the report's
+`version` with the plugin lock instead, and prints the install line when they differ or `vh-adlc` is missing.
 
 ### Permission rules
 
 The owner adds the rules once, in user scope, so they apply in every project:
 
 - Claude Code, `~/.claude/settings.json`: `"allow": ["Bash(vh-adlc clean *)", "Bash(vh-adlc env *)"]`,
-  plus `"deny": ["Edit(~/.config/vh-adlc/**)"]`. The deny rule stays because `host.yaml` decides the
-  temp base and which remotes are trusted. Claude Code splits compound commands before matching and
-  does not match an allow rule past an unknown leading variable assignment, so
-  `vh-adlc clean && rm -rf /tmp/x` and `PATH=/x vh-adlc clean` still go to the classifier.
+  `"ask": ["Bash(vh-adlc clean --firewall *)", "Bash(vh-adlc clean --kind *)"]`, and
+  `"deny": ["Edit(~/.config/vh-adlc/**)"]`. An ask rule wins over an allow rule, so the heavy kinds are
+  opt-in for a person as well as a session. The deny rule stays because `host.yaml` decides the temp base
+  and which remotes are trusted. Claude Code splits compound commands before matching and does not match
+  an allow rule past an unknown leading variable assignment, so `vh-adlc clean && rm -rf /tmp/x` and
+  `PATH=/x vh-adlc clean` still go to the classifier.
 - Codex, `~/.codex/rules/default.rules`:
-  `prefix_rule(pattern=["vh-adlc", "clean"], decision="allow")` and the same for `env`. The reference
-  documents the `codex execpolicy check` command that verifies them.
+  `prefix_rule(pattern=["vh-adlc", "clean"], decision="allow")`, the same for `env`, and
+  `prefix_rule(pattern=["vh-adlc", "clean", ["--firewall", "--kind"]], decision="prompt")`, where the most
+  restrictive match wins. On codex-cli 0.163.0, `codex execpolicy check` returned `prompt` for
+  `vh-adlc clean --firewall --all-projects` and `allow` for `vh-adlc clean --dry-run`. The reference
+  documents that check.
 
 The classifier keeps refusing raw sweeps such as `rm -rf /tmp/*` and `docker volume prune`.
 
 ### Stackweaver adoption
 
-Stackweaver adopts first, in its own repository: it merges `.vh-adlc/cleanup.yaml` to its default branch
-and takes its test and build environment from `vh-adlc env --sh`. vh-adlc merges its own manifest for
-`vh-triage-locks-*`, `vh-triage-verification-*`, `vh-adlc-ensure.*` and the `vh-*` test fixtures, which
-also exercises the overlap check with two projects. The owner sets `trusted_remotes` once per host, to
-the list above on this host.
+Stackweaver adopts first, in its own repository. It:
+
+- merges `.vh-adlc/cleanup.yaml` to its default branch;
+- takes its test and build environment from `vh-adlc env --sh` in its entry points, guarded by
+  `command -v vh-adlc`. Without the binary, as in CI or on a contributor's or self-hoster's machine, the
+  entry point runs unchanged and prints one notice to stderr;
+- adds `sh.stackweaver.test-run` to test jobs networks in `EnsureNetwork`, because
+  `backend/internal/launcher/driver/network.go:140` gives them only `LabelManaged` at `96eaff82`;
+- creates and removes the kind mark in `e2e/k8s/run.sh`, removing it when `KEEP_CLUSTER=1`.
+
+vh-adlc merges its own manifest for `vh-triage-locks-*`, `vh-triage-verification-*`, `vh-adlc-ensure.*` and
+each real test prefix, such as `vh-maintenance-*` and `vh-lifecycle-*`, which also exercises the overlap
+check with two projects. None may match the temp base `vh-adlc-<uid>`.
 
 The table is the acceptance fixture: the classes of leftover this host held on 2026-11-02 and the
 outcome the design requires. The reboot cleared the `/tmp` rows and the firewall chains, and Stackweaver's
@@ -482,18 +594,20 @@ same names, marks and ages.
 | Leftover | Rule | Required outcome |
 | --- | --- | --- |
 | `/tmp/TestConformance_InProcessAndContainerReportTheSame*`, 2 x 454 MB | `tmp` glob `TestConformance_*` | Removed once older than its age and not in use |
-| `/tmp/stackweaver-visuals-*`, up to 94 MB each | `tmp` glob `stackweaver-visuals-*` | Removed |
-| `/tmp/go-build*`, 22 entries | Shared host manifest, not Stackweaver | Removed when older than its age and not in use |
-| `/tmp/stackweaver-wt-api-*`, `/tmp/sw-kind*`, Podman gate logs | Globs reviewed in Stackweaver's manifest | As declared |
-| Containers, networks and volumes marked with a live `test-run` | `pid` on `sh.stackweaver.test-run` | Kept while the pid lives, removed after it ends |
-| Networks `sw-test-jobs-*` without a `test-run` mark | `age` on `sh.stackweaver.managed=true` with name `sw-test-*` | Kept as `firewall-chain-pending` without `--firewall`; with it, firewall objects then networks removed |
-| `stackweaver-jobs-slot-3*` networks | Not matched by `sw-test-*` | Untouched |
+| `/tmp/stackweaver-visuals-*`, up to 94 MB each | `tmp` glob `stackweaver-visuals-*` | Removed once older than its age and not in use |
+| `/tmp/go-build*`, 22 entries | The shared manifest Q2 names | Removed once older than its age and not in use |
+| `/tmp/stackweaver-wt-api-*`, `/tmp/sw-kind*`, Stackweaver's Podman gate logs | `tmp` globs in Stackweaver's manifest | Removed once older than their age and not in use |
+| Containers, networks and volumes with a live `test-run` mark | `pid` on `sh.stackweaver.test-run` | Kept while the pid lives, removed after it ends |
+| A marked `sw-test-jobs-*` network whose run ended | `pid` on `sh.stackweaver.test-run` | Kept as `firewall-chain-pending` without `--firewall`; with it, firewall objects then the network removed |
+| Networks `sw-test-jobs-*` with no `test-run` mark | None | Untouched, counted as unattributed |
+| `stackweaver-jobs-slot-3*` networks | No `test-run` mark | Untouched |
 | Compose `swc-N`, worktree present | `compose` `swc-*` | Kept as live |
 | Compose `swc-N` whose worktree was removed | `compose` `swc-*` | Stopped and removed with its volumes |
 | Compose `deploy`, the main dev stack | No rule matches | Untouched |
 | `launcher-wt-3*` containers, labelled `deploy` without a working dir | No rule matches | Untouched, counted as unattributed |
 | Anonymous volumes with no rule, 45 on the day | None | Untouched, counted as unattributed |
-| kind cluster `sw-e2e` left by a killed harness | `kind` with `--kind` | Deleted once older than its age |
+| kind cluster `sw-e2e` whose marked harness was killed | `kind` with `--kind` | Stopped and deleted |
+| kind cluster `sw-e2e` with a live mark, or with no mark | `kind` | Untouched |
 | `SW-JOBS-*` chains and `sw_jobs_*` tables of removed networks | `firewall` with `--firewall` | Removed; without the flag, untouched |
 | `~/.cache/sw-p8` and the other ad hoc roots | Outside `/tmp` and the temp root | Untouched |
 
@@ -501,95 +615,126 @@ same names, marks and ages.
 
 | Risk | Safeguard |
 | --- | --- |
-| Deleting a live run's files | Age, the `/proc` usage check, and skipping symlinks and mounts. A failed check counts as live. |
-| Deleting a live run's engine objects | `pid` and `path` liveness, never forcing, the in-use check before removing networks, volumes and images, and `kill(pid, 0)` errors other than `ESRCH` counting as live. |
-| Deleting another project's files | Only declared globs and labels, overlap refusal on every run, the four-character prefix floor and the reserved names. |
-| Deleting the Stackweaver dev database | The `deploy` project matches no rule, Compose liveness keys on the working directory, and named volumes go only with a Compose rule that sets `volumes`. |
+| Deleting a live run's files | Age and the in-use check, which covers same-uid processes, bound sockets and container mounts. A root process outside any container is not seen; age is the only protection there. |
+| Deleting a live run's engine objects | `pid` and `path` liveness, any live rule winning, never forcing, and the in-use check before removing networks, volumes and images. `kill(pid, 0)` errors other than `ESRCH` count as live. |
+| Deleting a live kind cluster | An unmarked cluster is never touched, and a marked one needs an ended pid. |
+| Deleting another project's files | Only declared globs and labels, overlap refusal between listed projects, the four-character floor on every glob and the reserved names. |
+| Deleting the Stackweaver dev database | The `deploy` project matches no rule, Compose liveness keys on the working directory, tool namespaces such as `com.docker.` are refused, and named volumes go only with a Compose rule that sets `volumes`. |
 | An agent widening the rules on a branch | Branch and uncommitted manifests only dry-run. |
-| An agent with push rights changing the default branch | "Merged" means "reviewed" only where the remote enforces review. Stackweaver's own instructions allow small verified changes straight to `main`, so its manifest needs branch protection or a code owner for that one path. The hard limits still hold for any merged manifest. |
-| Moving the local `origin/<default>` ref | Applied runs ignore local refs and read the commit the remote states. |
-| Pointing `origin` somewhere else | Local and `file://` remotes are refused, and any other URL must match `trusted_remotes`. |
-| A planted `core.sshCommand` or `url.*.insteadOf` in `.git/config` | Remote commands run outside the repository with `GIT_*` variables removed, so repository configuration is never read for them. |
-| A third-party clone with a hostile manifest | `trusted_remotes` leaves it at a dry run, whatever its default branch says. |
+| An agent with push rights changing the default branch | Open as Q1. Any session holding the owner's token can push a wider manifest today, and the rule then applies with no classifier. The hard limits still hold for any manifest. |
+| Moving the local `origin/<default>` ref | Runs read the commit the remote states; a local ref is only a labelled dry-run fallback. |
+| Pointing `origin` somewhere else | Only an exact `<host>/<owner>/<repo>` under `trusted_remotes` is accepted. |
+| A planted `core.sshCommand` or `url.*.insteadOf` in `.git/config` | Remote commands run outside the repository with `GIT_*` variables removed, and the short list of local reads runs with `GIT_NO_LAZY_FETCH=1`. |
+| A third-party clone with a hostile manifest | `trusted_remotes` leaves it unproven, whatever its default branch says. |
 | Editing `host.yaml` to redirect `temp_base` or trust a remote | The `Edit` deny rule and the base checks. A Bash write to the file still depends on the classifier, and Codex has no equivalent rule; the reference states both limits. |
-| A manifest image with `NET_ADMIN` | Only a digest pin merged to the default branch, a fixed script, and only with `--firewall`. It is root-equivalent through the Docker socket, and the reference says so. |
-| A fake `vh-adlc` on `PATH` | The allow rule trusts what `PATH` resolves to; the operation checks the digest against the lock before each use. |
+| A session opting into the heavy kinds | The `ask` and `prompt` rules, and the first-position flag rule that lets them see the flags. |
+| A manifest image with `NET_ADMIN` | Only a digest pin on the default branch, a fixed script, and a person's approval of `--firewall`. It is root-equivalent through the Docker socket, and the reference says so. |
+| A fake `vh-adlc` on `PATH` | `/usr/local/bin` is root-owned and first on the Bash tool's `PATH`, and an allow rule does not match past a `PATH=` assignment. |
 | Docker has no per-user ownership on a rootful engine | Ownership is the project's label plus liveness; the reference says the user check covers files only. |
 | Following a symlink or bind mount out of `/tmp` | `lstat` walk, `os.Root`, the `mountinfo` check and the device boundary. |
+| A false firewall orphan stripping a live network's isolation | Firewall objects are listed before networks, across every declared engine, and any failed listing orphans nothing. |
 | Creating orphan firewall chains | `firewall-chain-pending` keeps those networks until `--firewall` removes their firewall objects first. |
-| Temp roots filling the `/tmp` quota | The default base still counts against the quota, so a project can fill it between runs; the session operation clears it on demand and `temp_base` can move it. |
+| Temp roots filling the `/tmp` quota | The default base still counts against the quota, so a project can fill it between runs. `clean` writes nothing to `/tmp`, so it still works then, and `temp_base` can move the roots. |
+| A remote that hangs | `GIT_TERMINAL_PROMPT=0` and a 30-second timeout per step, so a stuck remote cannot hold the lock. |
 | Long temp paths breaking Unix sockets | The default base is short, and `env` reports the remaining budget against the 108-byte limit. |
 | A pid reused by another process | Reuse reads as live, so the resource waits for a later run. |
 
 ## Acceptance Criteria
 
-- [ ] AC-01: For a project with a manifest, `vh-adlc env --repo <dir>` reports `TMPDIR` and `GOTMPDIR` under the
-      project's temp root, which exists with mode 0700 and the user as owner. A `go test` run with that
-      environment leaves its `go-build*` and test temp directories only under that root.
+- [ ] AC-01: For a project with a manifest that declares `temp_root`, `vh-adlc env --repo <dir>` reports `TMPDIR`
+      and `GOTMPDIR` under the project's temp root, which exists with mode 0700 and the user as owner. A
+      `go test` run with that environment leaves its `go-build*` and test temp directories only under that root.
 - [ ] AC-02: `vh-adlc clean --dry-run` reports every declared, abandoned resource of the project with its rule,
-      reason and size, and leaves the filesystem and the engine unchanged.
+      reason and size, and leaves the filesystem and the engine unchanged, apart from vh-adlc's own host list
+      and short-lived proof directories.
 - [ ] AC-03: `vh-adlc clean` removes those resources and keeps entries owned by another user, entries no
-      declared glob matches, symlinks and their targets, entries containing a mount point, entries a live
-      process uses, entries younger than their age, objects whose `pid` mark names a live process or
-      another host, and Compose projects whose working directory exists.
-- [ ] AC-04: No removal is forced: a network, volume or image that a container still uses, or whose usage
-      cannot be listed, remains and is reported as kept.
+      declared glob matches, symlinks and their targets, entries containing a mount point, entries a same-uid
+      process uses through its working directory, a descriptor or a mapping, entries with a bound Unix socket
+      or a container bind mount, entries younger than their age, objects that any matching rule reads as live,
+      and Compose projects whose working directory exists.
+- [ ] AC-04: No object in use is forced: a network, volume or image that a container still uses, or whose usage
+      cannot be listed, remains and is reported as kept, and no running container is killed except by the
+      stop that follows an abandoned verdict.
 - [ ] AC-05: A manifest that exists only on a branch or as an uncommitted edit changes nothing when applied: a dry
-      run shows its plan marked as unmerged with `manifest-unmerged`, and an applied run removes only what
-      the proven default-branch rules declare.
+      run shows its plan with `rules_source: worktree` and `manifest-unmerged`, and an applied run removes only
+      what the proven default-branch rules declare.
 - [ ] AC-06: The binary refuses a manifest with unknown or duplicate keys, aliases, more than one document, ages
-      under one hour, short glob prefixes, reserved names, or Docker rules without liveness or outside the
-      namespace, and two projects with overlapping names, patterns, namespaces or firewall prefixes both
-      remove nothing while other projects proceed.
-- [ ] AC-07: Run as effective uid 0, `vh-adlc clean` removes nothing and reports `running-as-root`.
-- [ ] AC-08: kind clusters and firewall objects change only with `--kind` or `--firewall`. Without `--firewall`,
-      a network with a firewall rule remains, reported as `firewall-chain-pending`. With it, firewall objects
-      that hash to no existing network are removed, those of a live network remain, and an image not pinned
-      by digest is refused.
-- [ ] AC-09: The report lists each removed and kept item with its reason, the commit its rules came from, the
+      under one hour, a short prefix on any glob, reserved names, a tool-owned or short label namespace, or
+      Docker rules without liveness or outside the namespace. Two projects with overlapping names, patterns,
+      namespaces or firewall prefixes both remove nothing while other projects proceed.
+- [ ] AC-07: Run as effective uid 0, `vh-adlc clean` removes nothing and reports `running-as-root`, with result
+      `error`.
+- [ ] AC-08: kind clusters and firewall objects change only with `--kind` or `--firewall`, which the binary accepts
+      only directly after `clean`. Without `--firewall`, a network with a firewall rule remains, reported as
+      `firewall-chain-pending`. With it, firewall objects that hash to no network on any declared engine are
+      removed in every family, those of a live network remain, a network created during the run keeps its
+      objects, a failed listing orphans nothing, and an image not pinned by digest is refused. A cluster with
+      no mark or a live mark remains, and a cluster with an ended mark is stopped and deleted.
+- [ ] AC-09: The report lists each removed and kept item with its reason, its `rules_source` and commit, the
       bytes freed per project and in total, and the unattributed leftovers it left alone, by count and size.
 - [ ] AC-10: `vh-adlc clean --all-projects` visits every repository on the host list, reports a failing project
-      without skipping the others, and exits with `fail` when any removal or proof failed.
-- [ ] AC-11: With the documented user-scope rules, a Claude Code session in auto mode and a Codex session run the
-      `vh-adlc-clean` operation, dry run and apply, without a permission prompt or refusal, while a direct
+      without skipping the others, exits with `fail` when any removal or proof failed, and treats a listed
+      repository that is untrusted or has no origin or manifest as counted, not failed.
+- [ ] AC-11: With the documented user-scope rules, and `vh-adlc` resolving from each harness's own `PATH`, a Claude
+      Code session in auto mode and a Codex session run the `vh-adlc-clean` operation, dry run and apply,
+      without a permission prompt or refusal. `--firewall` and `--kind` ask a person first, and a direct
       `rm -rf` of a `/tmp` entry in the same session still goes to the classifier or approval.
-- [ ] AC-12: With Stackweaver's and vh-adlc's manifests merged and this host's `trusted_remotes` set, a dry run
-      classifies every row of the Stackweaver adoption fixture as the table requires, and the owner accepts
-      that report before the first applied run.
-- [ ] AC-13: After the first applied run on this host, the fixture's removable rows are gone, every row the
-      table keeps is still present, and the report's bytes freed match the measured change in `/tmp` usage
-      and `docker system df` within the stated image-size bound.
-- [ ] AC-14: The CLI reference, the workflows guide, the compatibility table and the operation's references
-      document `env`, `clean`, `host.yaml`, the host list, the manifest fields and both permission rules, and
-      the package checker accepts the new operation.
-- [ ] AC-15: An applied run acts only on the manifest at the commit the remote names as its default branch head.
-      A moved local `origin/<default>` ref, an `origin` URL that is local, `file://` or outside `trusted_remotes`,
-      and an unreachable remote all remove nothing for that project, and a `core.sshCommand` planted in the
-      repository's Git configuration never runs.
+- [ ] AC-12: With Stackweaver's and vh-adlc's manifests merged, the shared manifest Q2 names merged, and this host's
+      `trusted_remotes` set, a dry run classifies every row of the Stackweaver adoption fixture as the table
+      requires, and the owner accepts that report before the first applied run.
+- [ ] AC-13: After the first applied run on this host, the fixture's removable rows are gone and every row the
+      table keeps is still present. For stand-ins of known size, the report's bytes freed equal the files'
+      `st_blocks` total and the engine's reported sizes for disposable objects.
+- [ ] AC-14: The CLI reference, the installation and workflows guides, the compatibility table and the operation's
+      references document `env`, `clean`, `host.yaml`, the host list, the manifest fields, the install step and
+      all the permission rules, and the package checker accepts the new operation in its own category.
+- [ ] AC-15: An applied run acts only on the manifest at the commit the remote names as its default branch head. A
+      moved local `origin/<default>` ref, an `origin` URL that is local, `file://`, outside `trusted_remotes` or
+      not exactly `<host>/<owner>/<repo>`, a redirect to another repository, and an unreachable remote all remove
+      nothing for that project. A dry run proves first and labels any fallback. A `core.sshCommand` planted in the
+      repository's Git configuration never runs in a dry or applied run, including through a lazy fetch.
 - [ ] AC-16: Using vh-adlc in a repository records its canonical path on the host list with no rule data; every
-      worktree counts as that one repository; a path no longer holding a repository is dropped; and adding a
-      path by hand grants nothing the proof does not.
+      worktree counts as that one repository; a path no longer holding a repository is dropped; adding a
+      path by hand grants nothing the proof does not; and a failed list write does not stop the run.
 - [ ] AC-17: `temp_base` in `host.yaml` moves every temp root, the default is `/tmp/vh-adlc-<uid>`, and `env` and
       `clean` refuse a base that is a symlink, foreign-owned, not mode 0700, missing the marker, the home
-      directory, or inside or an ancestor of a listed repository.
+      directory, or inside or an ancestor of a listed repository. A base missing after a reboot is recreated
+      by `env` and is not a failure for `clean`.
+- [ ] AC-18: With the `/tmp` quota exhausted, an applied run frees space and writes nothing to `/tmp`.
+- [ ] AC-19: The plugin lock names a release containing `env` and `clean` for all four platforms, and the operation
+      reports a mismatch between the installed binary and the lock with the install line.
+- [ ] AC-20: `--older-than` below a rule's age changes nothing that rule removes, a second concurrent run reports
+      `busy`, and with no engine running the file work still completes.
+- [ ] AC-21: Every finding code maps to its documented result and exit code, and a failing `env --sh` prints nothing
+      to stdout.
+- [ ] AC-22: On a platform other than Linux, `env` and `clean` do nothing and report `unsupported-platform`.
+- [ ] AC-23: On a host with `vh-adlc`, a Stackweaver test run leaves its temp files under the project's temp root and
+      its jobs networks and kind cluster carry their marks. Without the binary, its entry points run unchanged
+      and print one notice to stderr.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | `internal/clean` test on a temporary home: `env` creates the root with mode 0700. A `cmd/vh-adlc` test runs `go test` on a fixture module with the printed environment and asserts no new `go-build*` or test directory appears in the fake `/tmp`. |
-| AC-02, AC-03, AC-07 | Fake-filesystem table tests in `internal/clean`: a `t.TempDir` stands in for `/tmp`, with injected uid lookup, clock, process table (`cwd` and `fd` links), `mountinfo` and euid. Cases cover each kept category and a symlink pointing outside the root. The dry-run case compares a full tree snapshot before and after. |
-| AC-03, AC-04 | Fake-engine tests: an `httptest` server on a Unix socket implements the engine endpoints used, records every call, and fails the test on any `force` parameter. Cases cover ended and live `pid` marks, other hosts, a missing and a present working directory, in-use objects and a failed usage listing. |
-| AC-03, AC-04, AC-08 | Integration test behind a build tag against the real Docker engine and Podman where present: labelled objects with an ended mark (made like Stackweaver's `endedRunMark`) and a live mark, asserting only the ended ones go. `--firewall` uses disposable networks and chains on a rootful engine only, including an orphan chain and a live network's chain. |
-| AC-05, AC-06 | Manifest table tests on local fixture repositories, through the `internal/clean` seam: each refusal, branch and uncommitted edits, two projects overlapping, and a third project still proceeding. |
-| AC-08 | Fake-engine tests assert the firewall container's image reference, capabilities and exact script, the refused image forms, and that a failed network listing orphans nothing. |
-| AC-09, AC-10 | Golden JSON reports for a two-project fixture with one failing removal, validated against the updated schema in `cmd/vh-adlc/schema_test.go`. |
-| AC-11 | Written manual procedure, recorded under `tests/vh-adlc/evidence/clean/`: in disposable Claude Code (auto mode) and Codex sessions with only the documented rules, invoke the operation, then request a direct `rm -rf` of a fixture entry, and record the prompts and refusals. `codex execpolicy check` output is recorded beside it. |
-| AC-12, AC-13 | Real-host procedure: create the fixture's stand-ins, save the dry-run report and `/tmp` and `docker system df` readings, have the owner review them against the table, apply, and record the after readings and report under `tests/vh-adlc/evidence/clean/`. |
-| AC-14 | `bun test tests/vh-adlc` with checks for the new skill, references and lifecycle row, plus a review of the documentation pages against the implemented flags. |
-| AC-15 | Tests with a local bare repository behind the `internal/clean` remote seam: move the local ref, change the URL to each refused form, make the remote unreachable, and move the branch between the two steps. A planted `core.sshCommand` writes a canary file that must not appear. A test asserts the command line has no flag that reaches the seam. One real-host check against a private GitHub repository. |
-| AC-16 | Table tests with a temporary cache directory: first use from a checkout and a worktree, a removed path, a hand-added path and a file holding anything but paths. |
-| AC-17 | Table tests on temporary directories for each refused base, including a pre-created foreign-owned base through the injected uid lookup. |
+| AC-02, AC-03, AC-07 | Fake-filesystem table tests in `internal/clean`: a `t.TempDir` stands in for `/tmp`, with injected uid lookup, clock, process table (`cwd`, `fd` and `maps`), `/proc/net/unix`, `mountinfo` and euid. Cases cover each kept category, an unreadable foreign pid, a same-uid read error and a symlink pointing outside the root. The dry-run case compares a full tree snapshot before and after. |
+| AC-02, AC-03, AC-04 | Fake-engine tests: an `httptest` server on a Unix socket implements the engine endpoints used, records every call, and fails the test on any `force` parameter. Cases cover ended and live `pid` marks, other hosts, a missing and a present working directory, two rules disagreeing, a bind mount into a `/tmp` entry, in-use objects, a failed usage listing and a dry run making no mutating call. |
+| AC-03, AC-04, AC-08 | Integration test behind a build tag against the real Docker engine and Podman where present: labelled objects with an ended mark (made like Stackweaver's `endedRunMark`) and a live mark, asserting only the ended ones go. `--firewall` uses disposable networks, chains and tables on a rootful engine only, including an orphan, a live network's objects and a network created between the two listings. `--kind` uses a disposable cluster with no mark, a live mark and an ended mark. |
+| AC-05, AC-06 | Manifest table tests on local fixture repositories, through the `internal/clean` seam: each refusal, branch and uncommitted edits, two projects overlapping, a third project still proceeding, and an emptied host list showing `overlap_checked_against: 0`. |
+| AC-08 | Fake-engine tests assert the firewall container's image reference, capabilities and exact script, the refused image forms, case-insensitive matching, both nftables families and ip6tables. A `cmd/vh-adlc` test asserts each heavy flag is refused outside the first position. |
+| AC-09, AC-10 | Golden JSON reports for a two-project fixture with one failing removal and one untrusted repository, validated against the updated schema in `cmd/vh-adlc/schema_test.go`. |
+| AC-11 | Written manual procedure, recorded under `tests/vh-adlc/evidence/clean/`: in disposable Claude Code (auto mode) and Codex sessions with only the documented rules, confirm `command -v vh-adlc`, invoke the operation, try each heavy flag, then request a direct `rm -rf` of a fixture entry, and record the prompts and refusals. `codex execpolicy check` output is recorded beside it. |
+| AC-12, AC-13 | Real-host procedure: create the fixture's stand-ins, with some of known size in an isolated temp base, save the dry-run report, have the owner review it against the table, apply, and record the report and each row's after state under `tests/vh-adlc/evidence/clean/`. |
+| AC-14 | `bun test tests/vh-adlc` with checks for the new skill, references, lifecycle row and host-operation category, plus a review of the documentation pages against the implemented flags. |
+| AC-15 | Tests with a local bare repository behind the `internal/clean` remote seam: move the local ref, change the URL to each refused form, make the remote unreachable, and move the branch between the two steps. A canary uses an `ssh://` origin with a planted `core.sshCommand`: it must not appear from the binary, and a control fetch inside the repository must create it. A second canary uses a partial clone with a missing blob on the dry-run path. A test asserts the command line has no flag that reaches the seam. One real-host check against a private GitHub repository. |
+| AC-16 | Table tests with a temporary cache directory: first use from a checkout and a worktree, a removed path, a hand-added path, a read-only list file and a file holding anything but paths. |
+| AC-17 | Table tests on temporary directories for each refused base, including a pre-created foreign-owned base through the injected uid lookup, and a missing base. |
+| AC-18 | A `cmd/vh-adlc` test under Bubblewrap with a filled, size-limited tmpfs at `/tmp` and a separate runtime directory: an applied run removes a stand-in, and a file-change listing shows no new `/tmp` entry. |
+| AC-19 | `tests/vh-adlc/ensure.test.ts` and `bun test tests/vh-adlc` against the bumped lock, and a package check that the operation's mismatch text names the install line. |
+| AC-20 | `internal/clean` tests: a lower `--older-than` plans the same removals, two runs contend for the lock, and a missing engine socket leaves file removal complete. |
+| AC-21 | A table test walks every code in `report.Codes` that `internal/clean` emits and asserts its result and exit code; a `cmd/vh-adlc` test captures stdout of a failing `env --sh`. |
+| AC-22 | A test with the platform injected through the `internal/clean` seam, and a check that the darwin builds compile. |
+| AC-23 | In Stackweaver: run its driver tests through the entry point with `vh-adlc` installed and list the temp root, inspect the network and kind marks, then run the entry point with the binary absent from `PATH` and compare its behaviour. |
 
 ## Tasks
 
@@ -597,7 +742,30 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q1: What should a commit on the default branch have to prove before `vh-adlc clean` trusts it?
+
+**Recommendation:** A. Accept that on the default branch means pushed by someone with write access, because every session already acts as `michielvha`, so paid protection would not separate an agent from you without a second GitHub identity.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Accept "pushed", keep the hard limits** | No plan change and no owner step. Limits on globs, namespaces, ages, liveness and `--firewall` approval hold for any manifest | A session with your token can widen what `clean` deletes, inside those limits, with no classifier |
+| **B. GitHub Pro, a required pull request and a code owner for `.vh-adlc/cleanup.yaml`** | Direct pushes to that path are blocked on private repositories | A paid plan, and a separate agent identity, because authors cannot approve their own pull requests and sessions act as you |
+| **C. Make `stackweaver` public** | Free protection, with the same identity limit as B | A product decision about source visibility, far beyond cleanup |
+| **D. A per-host acknowledgement of each changed manifest, outside the allow rule** | You see every rule change before it deletes anything, with no plan change | Brings back the owner step you removed by choosing no registration |
+
+**Why this is yours:** the design promised "reviewed, merged rules", and on this account a merge proves neither review nor who did it. Whatever you pick becomes a Scope item and a criterion here. `vh-adlc` is public, so it can have branch protection for free under any option.
+
+### Q2: Which repository owns shared globs such as `go-build*` and `gopls-tempmod*`?
+
+**Recommendation:** A. `michielvha/vh-adlc`, because it already carries a manifest and needs no new repository, and it is public, so its default branch can be protected for free.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. `michielvha/vh-adlc`** | One manifest to review, listed on any host that uses vh-adlc, and AC-12 can pass with no new repository | A tool repository declares rules for files other projects leave; an adopter's own glob for those names overlaps it and stops both |
+| **B. A new private repository for this workstation** | Host-specific rules stay with the host and out of the public tool | One more repository to create, list and keep; it has Q1's protection gap |
+| **C. Nobody owns them** | Nothing new; temp roots stop new `go-build*` entries for adopted projects | Leftovers from other tools stay in `/tmp`, counted as unattributed, and the fixture row changes to untouched |
+
+**Why this is yours:** `go-build*` is one of the largest recurring classes, and no project can claim it without you deciding who speaks for the whole host.
 
 ## Review Log
 
@@ -804,4 +972,6 @@ PROPOSAL: List the real prefixes in the manifest, or move the tests under a sing
 - [docker container prune](https://docs.docker.com/reference/cli/docker/container/prune/): `label` and `until` filters; prune removes stopped containers by filter without ownership, which is why this design avoids prune.
 - [docker volume prune](https://docs.docker.com/reference/cli/docker/volume/prune/): removes anonymous volumes by default, supports only the `label` filter and has no `until`.
 - [docker container rm](https://docs.docker.com/reference/cli/docker/container/rm/): `--volumes` removes a container's anonymous volumes and keeps named ones; `--force` kills a running container.
+- [GitHub: approving a pull request with required reviews](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/approving-a-pull-request-with-required-reviews): pull request authors cannot approve their own pull requests.
+- [kind Docker provider](https://github.com/kubernetes-sigs/kind/blob/main/pkg/cluster/internal/providers/docker/provider.go): `DeleteNodes` runs `docker rm -f -v`, as R-1 F-04 reports; rule 7 stops the nodes first for that reason.
 - [kind Docker provider constants](https://raw.githubusercontent.com/kubernetes-sigs/kind/main/pkg/cluster/internal/providers/docker/constants.go): node containers carry `io.x-k8s.kind.cluster`.

@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner answered all four questions on 2026-11-02 and they are folded in; waits for an independent spec review."
+status_description: "R-1 found one blocker; factual findings are applied and judgement findings resolved. A new independent review must clear it."
 issue: null
 goal: "Every vh-adlc setting a person edits is YAML, adopting repositories have moved without losing a grant or a report, and the pinned conventions forbid choosing JSON over YAML."
 covers:
@@ -30,6 +30,7 @@ covers:
   - tests/vh-adlc/
   - AGENTS.md
   - docs/user-guides/workflows.md
+  - docs/reference/cli.md
 ---
 
 # Plan: YAML settings
@@ -41,8 +42,9 @@ and adds the rule to the pinned conventions.
 
 The owner decided on 2026-11-02, while answering the [host cleanup](host-cleanup.md) questions, to
 standardize on YAML, to rework the existing JSON settings, and that JSON is never picked over YAML
-again. Host cleanup starts on YAML and needs nothing from this feature. This is a separate document
-because it is a separate outcome: it changes shipped operations and their adopters, and has its own
+again. Host cleanup starts on YAML and shares two things with this feature, the `internal/settings`
+package and the `dispatch` exemption from `--plugin-pin`, and whichever lands first adds both. This is a
+separate document because it is a separate outcome: it changes shipped operations and their adopters, and has its own
 release order.
 
 - `loadSettings` reads `.vh-adlc/triage.json` with `JSON.parse`
@@ -56,8 +58,18 @@ release order.
   `10f5a25c` has the adapter. Neither has merged, so no audit JSON file has shipped.
 - Stackweaver is the only adopter this host shows (`ls /home/m/code/*/.vh-adlc`). It tracks
   `.vh-adlc/maintenance.json` and `.vh-adlc/triage.json` (`git ls-files .vh-adlc`) and names them in
-  `AGENTS.md:14,16`, `.claude/commands/`, `agents/` and `tests/agent-triage/`, where
-  `contract.test.ts:14` calls `JSON.parse` on one.
+  `AGENTS.md:14,16`, `.claude/commands/`, `agents/`, `tests/agent-triage/` and `tests/agent-maintenance/`,
+  whose `contract.test.ts` files call `JSON.parse` on them (`:14` and `:8`).
+- The file name is part of today's digests. Both loaders put `settings_path` in the normalized object
+  (`plugins/vh-adlc/scripts/triage/settings.ts:106`, `plugins/vh-adlc/scripts/maintenance/settings.ts:121`).
+  Triage hashes that object for approved batches (`execute.ts:318-319`), and an open maintenance journal
+  compares it (`journal.ts:129,194`).
+- A plugin older than this feature ignores a YAML file: triage falls through to defaults
+  (`settings.ts:78-82`), which would drop Stackweaver's `protected_ids` silently, and its adapter has no
+  minimum version check (`agents/issue-triage.md:7-8`).
+- Binary and plugin versions are separate, and stable tags come only from `main`
+  (`docs/internal/releasing.md`). `ensure-vh-adlc.sh` reads the lock version as `[0-9][0-9.]*`, so a
+  prerelease cannot be locked.
 - 32 files in this repository name those two files (`grep -rl`, excluding evidence), mostly tests and fixtures.
 - Other JSON here is not hand-written settings: host-defined `plugin.json` and `marketplace.json`, the
   generated `plugins/vh-adlc/vh-adlc.lock.json`, `schema/vh-adlc.schema.json`, golden outputs, and the
@@ -82,8 +94,8 @@ release order.
 
 In scope: a strict `vh-adlc settings read` command, the binary release and lock bump that make it
 available, one shared settings loader, YAML for triage and maintenance settings, reading both formats
-until the next minor release after Stackweaver migrates, a checked migration helper, Stackweaver's
-migration, the conventions rule and the pin bump that brings it here. The move of shared audit to
+until the next minor plugin version after Stackweaver migrates, a checked migration helper, Stackweaver's
+migration and minimum plugin version check, the conventions rule and the pin bump that brings it here. The move of shared audit to
 YAML is defined here and carried out as a revision of its own document.
 
 Out of scope: changing any setting's fields or meaning, or `schema_version`; `.yml` as a second
@@ -97,35 +109,56 @@ external tool defines stay JSON.
 
 `vh-adlc settings read --stdin` takes one file's bytes and returns its parsed value in `data.value`
 of the usual JSON report. It knows nothing about repositories, so working-tree files and Git blobs
-go through the same path. Like the cleanup commands, it needs no conventions, so `dispatch` exempts it
-from `--plugin-pin`. It adds the finding code `settings-invalid`.
+go through the same path. It needs no conventions, so `dispatch` exempts it from `--plugin-pin`, and
+`docs/reference/cli.md` says so. Invalid input reports result `malformed`, exit 3, with the finding code
+`settings-invalid`, naming the line, column and reason and never a value from the file.
 
 The logic lives in `internal/settings`, which `vh-adlc clean` also uses for `.vh-adlc/cleanup.yaml` and
 `host.yaml`. It decodes to `yaml.v3` nodes and walks them, because decoding to a node does not itself
-reject duplicate keys. It accepts one document with strings, integers, booleans, null, sequences and
-mappings. It refuses aliases, merge keys and duplicate keys, and returns an unquoted date as the text
-written, so the value matches what JSON would have held.
+reject duplicate keys. It accepts one document whose top level is a mapping, with string keys and with strings, plain
+decimal integers, `true`, `false`, null, sequences and mappings as values. It refuses empty input,
+aliases, anchors, merge keys, duplicate keys, explicit tags, floats and hex or octal integers, none of
+which any setting uses. An unquoted date comes back as the text written, so the value matches what JSON
+would have held. Mapping keys come back sorted, so their order in a file changes no digest.
 
 ### Shared loader
 
 `plugins/vh-adlc/scripts/settings-file.ts` is the one place that finds a `.vh-adlc/<name>` file, from the
 working tree or from a Git blob, and sends it to the strict reader. It obtains the binary the way
 `engineeringInputs` does, through `ensure-vh-adlc.sh` (`plugins/vh-adlc/scripts/triage/controller.ts:158`).
-Triage, maintenance and audit call it and keep their existing field validators unchanged. Digests stay
-bound to the parsed, normalized values, so converting a file changes no setting's meaning.
+Triage, maintenance and audit call it and keep their existing field validators. Maintenance's committed
+path now runs the full validator on the blob's value, where `authority.ts:99-100` checks only top-level
+keys today, so unknown keys fail the same way on both paths. The loader calls the installer with
+`--offline`, because the operation already obtained the binary, so "Loading settings creates no files"
+(`references/triage-settings.md:39`) stays true.
 
-Until JSON reading stops, the loader looks for `<name>.yaml`, then `<name>.json`. Both present is an
-error naming the two files, so nobody edits the one that is ignored. Reading JSON adds a report line
-naming the migration. `authority.ts` accepts an `AGENTS.md` link to whichever file the commit holds, and
-the grant still needs that exact link and blob. Audit has no JSON path.
+Format follows the file. A `.yaml` file goes to the strict reader and needs the binary. Until JSON reading
+stops, a `.json` file stays on `JSON.parse` and needs no binary, so it keeps working exactly as today, and
+reading it adds a report line naming the migration. With no settings file, defaults apply and no binary
+is needed. A `.vh-adlc/<name>.yml` file fails, naming the expected path, because a person who writes one
+would otherwise get a clean run with none of their settings. Audit has no JSON path.
+
+Without an explicit path, the loader looks for `<name>.yaml`, then `<name>.json`, and both present is an
+error naming the two files, so nobody edits the one that is ignored. An explicit `--settings` path picks
+its format by suffix, and any suffix but `.yaml` or, until JSON reading stops, `.json` is refused.
+`authority.ts` accepts an `AGENTS.md` link to whichever file the commit holds, and the grant still needs
+that exact link and blob.
+
+`settings_path` stays in the digests. Migration therefore changes them once, which is correct: it is a
+settings change. A batch approved against the JSON file stops at `execute.ts:318` and needs approving
+again, and an open maintenance journal reports `settings_changed`. Both fail closed. The migration step
+below says to finish or abandon them first.
 
 ### Binary availability
 
-The lock names 0.1.0, so `settings read` needs a release and a lock bump with digests for all four
-platforms. The bump moves every operation from 0.1.0 to that release at once, so the full package suite
-and the installer tests run against the new lock before it merges. A failed binary installation
-already stops status changes (`plugins/vh-adlc/references/loop.md`); a settings read that cannot
-reach the binary fails visibly and never falls back to another parser.
+The lock names 0.1.0, and a lock needs a published stable release, so this feature takes separate merges
+to `main`. The first carries `settings read`, and its stable minor tag publishes the binary. The second
+carries the lock bump with digests for all four platforms, the loader and the plugin version bump. The
+last, after Stackweaver migrates, removes JSON reading. The bump moves every operation from 0.1.0 to that
+release at once, so the full package suite and the installer tests run against the new lock before it
+merges. A failed binary installation already stops status changes
+(`plugins/vh-adlc/references/loop.md`); a `.yaml` read that cannot reach the binary fails visibly and never
+falls back to another parser.
 
 The confined controller has no binary and needs none: every `loadSettings` call runs outside the
 boundary, and the confined process reads only the hash-checked normalized export. That export stays
@@ -136,21 +169,26 @@ a new review of the boundary.
 
 ### Migration for adopting repositories
 
-1. vh-adlc releases the binary with `settings read` and the plugin version that reads both formats.
-   Nothing changes for an adopter yet.
-2. In each adopting repository, one commit: run
-   `bun <plugin directory>/scripts/settings-migrate.ts --repo <dir>`. It writes each YAML file, confirms
-   the parsed values equal the JSON's, removes the JSON, and lists every file that still names the old
-   path. Update those references in the same commit.
-3. Stackweaver's list is `AGENTS.md`, `.claude/commands/{triage,maintenance}.md`,
-   `agents/{issue-triage,maintenance,maintenance-project}.md` and `tests/agent-triage/`, including its
-   `JSON.parse` call. Its standing maintenance grant is re-read from the merged default branch, so the
-   proof runs after the merge.
-4. The next minor plugin release after Stackweaver's migration merges stops reading JSON. A
-   `.vh-adlc/*.json` settings file then fails with a pointer to the migration. A public adopter we
-   cannot see gets that failure and the pointer.
+1. vh-adlc publishes the plugin version that reads both formats, and every host that runs the adopter
+   installs it. Nothing changes for an adopter yet.
+2. In each adopting repository, finish or abandon open maintenance journals and approved batches, then in
+   one commit run `bun <plugin directory>/scripts/settings-migrate.ts --repo <dir>`. The helper writes the
+   YAML with `Bun.YAML.stringify` to memory, sends those bytes through the strict reader, and compares the
+   values with the JSON's. Only then does it write the YAML and remove the JSON. It lists every file that
+   still names the old path, so update those references in the same commit. It changes nothing when the
+   values differ, a `.yaml` file already exists, or the binary is unavailable.
+3. The same commit makes the adapter refuse an older plugin. Stackweaver's entry points and contract tests
+   require the plugin version from step 1, because an older plugin would silently run on defaults.
+4. Stackweaver's list is `AGENTS.md`, `.claude/commands/{triage,maintenance}.md`,
+   `agents/{issue-triage,maintenance,maintenance-project}.md`, `tests/agent-triage/` and
+   `tests/agent-maintenance/`, including both `JSON.parse` calls. Its standing maintenance grant is re-read
+   from the merged default branch, so the proof runs after the merge.
+5. The next minor plugin version after Stackweaver's migration merges stops reading JSON and removes
+   the JSON loader tests. A `.vh-adlc/*.json` settings file then fails with a pointer to the migration in
+   `docs/reference/cli.md` and the settings references. A public adopter we cannot see gets that failure
+   and the pointer.
 
-Rollback before step 4 is reverting the adopter's commit, because the plugin still reads JSON.
+Rollback before step 5 is reverting the adopter's commit, because the plugin still reads JSON.
 
 ### Shared audit revision
 
@@ -182,7 +220,7 @@ Stored review records, such as those at `:999` and `:1008`, stay verbatim. The n
 | --- | --- | --- |
 | vh-adlc | `plugins/vh-adlc/scripts/audit/settings.ts:46,51` | Default path and parsing go through the shared loader. |
 | vh-adlc | `plugins/vh-adlc/scripts/audit/authority.ts:95,145` | Replace both `JSON.parse` calls; the second compares committed text, so it compares parsed values or the raw bytes from the same read. |
-| vh-adlc | `plugins/vh-adlc/references/audit-settings.md:3,43`, `plugins/vh-adlc/examples/audit/basic/.vh-adlc/audit.json` | New name, and the example is converted. |
+| vh-adlc | `plugins/vh-adlc/references/audit-settings.md:3,43`, `plugins/vh-adlc/examples/audit/basic/.vh-adlc/audit.json`, `docs/user-guides/workflows.md:73` | New name, and the example is converted. |
 | vh-adlc | `tests/vh-adlc/audit/{authority.test,fixtures,ledger.test,settings.test}.ts` | Fixtures write YAML, and a test confirms `audit.json` is not read. |
 | Stackweaver, `feat/shared-audit-migration` | `.vh-adlc/audit.json`, `AGENTS.md`, `agents/audit-project.md`, `agents/codebase-audit.md`, `.claude/commands/audit.md`, `tests/agent-audit/{contract.test,preflight,preflight.test,rehearsal.test,rehearse}.ts`, `tests/agent-audit/manifest.json` | Rename the file, update references and rerun the contract, preflight and rehearsal. |
 
@@ -191,13 +229,16 @@ again. No transition is needed, because no audit JSON has shipped.
 
 ### Delivery order
 
-1. The `vhco-pro/docs` rule, which depends on nothing here.
-2. `settings read`, its release, the lock bump, the shared loader, and triage and maintenance reading both
-   formats.
-3. Shared audit's revision, review, acceptance and new tasks. Its publication waits for step 2, because
+1. The `vhco-pro/docs` rule, which depends on nothing here. No repository sees it until its pin moves.
+2. `settings read`, merged to `main`, and its stable binary release.
+3. The lock bump, the shared loader, and the plugin version that reads both formats.
+4. The pin bump to the rule's merge commit, in its own reviewed change, because it also brings the other
+   commits between `e4d58d2` and that merge. It follows step 3 so the rule never requires YAML that no
+   published plugin reads.
+5. Shared audit's revision, review, acceptance and new tasks. Its publication waits for step 3, because
    its loader needs that binary.
-4. Stackweaver's migration, including audit on its own branch.
-5. The next minor release, which stops reading JSON.
+6. Stackweaver's migration, including audit on its own branch.
+7. The next minor plugin version, which stops reading JSON.
 
 ### Conventions change
 
@@ -206,60 +247,67 @@ In `vhco-pro/docs`, `conventions/coding.md` gains this section before "Inputs an
 ```markdown
 ## Configuration format
 
-Configuration a person writes or reviews is YAML, in a `.yaml` file. Never choose JSON for it, and
-move an existing JSON configuration file of ours to YAML when you change it. JSON stays only where we
-do not choose the format: a file an external tool defines, generated files, and machine-to-machine
-output. Load YAML settings strictly: one document, no aliases, and unknown or duplicate keys fail.
+Configuration a person writes or reviews is YAML. Never choose JSON for it, and move an existing JSON
+configuration file of ours to YAML when you change it. Settings files we define use the `.yaml` suffix
+and load strictly: one document, no aliases, and unknown or duplicate keys fail. A file an external tool
+defines keeps that tool's format and spelling. Generated files and machine-to-machine output may be JSON.
 ```
 
 Routing needs no change, because every code task already
 reads `conventions/coding.md`. The change is a pull request in `vhco-pro/docs`.
-After it merges, the pin in `AGENTS.md` and `plugins/vh-adlc/knowledge.md` moves to the merge commit
-with a plugin version bump, as `knowledge.md` requires. That bump also brings in the other commits
-between `e4d58d2` and that merge, so it gets its own review.
+The pin in `AGENTS.md` and `plugins/vh-adlc/knowledge.md` then moves to the merge commit with a plugin
+version bump, as `knowledge.md` requires, at step 4 of the delivery order.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Triage and maintenance read `.vh-adlc/<name>.yaml` with the same results as the JSON file holding
-      the same values, including normalized digests.
+- [ ] AC-01: Triage and maintenance read `.vh-adlc/<name>.yaml` and produce the same validated settings a JSON
+      file with those values gave, apart from `settings_path`. Mapping order in the file changes no digest.
 - [ ] AC-02: A YAML settings file with more than one document, an alias, a merge key, a duplicate key or an
-      unknown key fails visibly, in the working tree and from a Git blob, and `.yml` is not read.
-- [ ] AC-03: Until JSON reading stops, a repository with only JSON keeps working and is told how to migrate, and a
-      repository with both formats fails naming both files. In the next minor release after Stackweaver's
-      migration merges, a `.vh-adlc/*.json` settings file fails with a pointer to the migration.
+      unknown key at any depth fails visibly, in the working tree and from a Git blob. A `.vh-adlc/<name>.yml`
+      file fails naming the expected path, and an explicit path with any other suffix is refused.
+- [ ] AC-03: A `.vh-adlc/*.json` settings file fails with a pointer to the migration, in a plugin version published
+      after Stackweaver's migration merged. The evidence names the earlier published version, in which a
+      JSON-only repository kept working without the binary, was told how to migrate, and a repository with
+      both formats failed naming both.
 - [ ] AC-04: `settings-migrate.ts` leaves a repository with equal parsed values, no JSON settings and a list of
-      remaining references, and changes nothing when the values cannot be proven equal.
+      remaining references, and changes nothing when the generated bytes cannot be proven equal, a `.yaml` file
+      exists or the binary is unavailable.
 - [ ] AC-05: The maintenance standing grant holds from a merged `AGENTS.md` link to the YAML file, and fails
       when the link and the file disagree.
-- [ ] AC-06: Stackweaver runs triage and maintenance from YAML settings on its default branch, with its
-      contract tests and rollback rehearsal passing.
+- [ ] AC-06: Stackweaver runs triage and maintenance from YAML settings on its default branch, with both sets of
+      contract tests and rollback rehearsals passing, and an older plugin cannot silently run on that checkout.
 - [ ] AC-07: `conventions/coding.md` at the revision this repository pins carries the configuration format
       rule, and no vh-adlc setting a person edits is JSON once the transition ends, while the lock, evidence
       and command output stay JSON.
-- [ ] AC-08: `vh-adlc settings read --stdin` returns the parsed value for valid YAML and `settings-invalid` for
-      each refused form, with no conventions pin.
-- [ ] AC-09: The plugin lock names a release with `settings read` for all four platforms, every operation runs on
-      it, and a settings read with no verified binary fails visibly without another parser.
+- [ ] AC-08: `vh-adlc settings read --stdin` returns the parsed value for valid YAML and result `malformed` with
+      `settings-invalid` for each refused form, with no conventions pin and no file value in any message.
+- [ ] AC-09: The plugin lock names a stable release with `settings read` for all four platforms, every operation runs
+      on it, and a `.yaml` read with no verified binary fails visibly without another parser.
 - [ ] AC-10: On a YAML checkout, the confined triage controller receives settings equal to the outside load through
       its hash-checked export, with no binary inside the boundary.
 - [ ] AC-11: Shared audit reads only `.vh-adlc/audit.yaml`, its document passed a new spec review and owner acceptance
-      after returning to draft, and no `.vh-adlc/audit.json` reached a published plugin or an adopter's
-      default branch.
+      after returning to draft, and no `.vh-adlc/audit.json` reached a published plugin, a user guide or an
+      adopter's default branch.
+- [ ] AC-12: Reports written before the migration stay readable. A batch approved or a maintenance journal opened
+      against the JSON file stops at its next check after the migration and changes nothing until approved
+      or restarted.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Parametrize the existing `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/maintenance/settings.test.ts` over both formats and compare normalized digests. |
-| AC-02, AC-03 | Loader table tests for each refused form, `.yml`, JSON only, YAML only and both present, plus a test of the JSON-refusing release's behaviour. |
+| AC-01 | While both formats exist, parametrize `tests/vh-adlc/triage/settings.test.ts` and `tests/vh-adlc/maintenance/settings.test.ts` over both and compare everything but `settings_path`. Fixture copies of Stackweaver's JSON values stay as expected data after step 7. |
+| AC-02 | Reader and loader table tests for each refused form, `.yml` and explicit suffixes. Validator tests for unknown keys on the working-tree path and the blob path. |
+| AC-03 | At the final commit, a loader test that JSON fails with the pointer. The earlier behaviour is an evidence line naming the published plugin version and its test run, taken before step 7 removes those tests. |
 | AC-04 | Helper tests on fixture repositories, including a value that YAML would read differently, plus a run on a disposable Stackweaver checkout. |
 | AC-05 | Extend `tests/vh-adlc/maintenance/publication.test.ts` with YAML adoption chains and a mismatched link. |
-| AC-06 | Stackweaver's `tests/agent-triage` contract and rehearsal on the migration branch, then an installed-plugin run from the published release, as earlier adoptions did. |
+| AC-06 | Stackweaver's `tests/agent-triage` and `tests/agent-maintenance` contract, preflight and rehearsal on the migration branch, a test that the older plugin version is refused, then an installed-plugin run from the published release, as earlier adoptions did. |
 | AC-07 | Read the rule at the pinned revision through `vh-adlc knowledge`, and run a test that lists `.vh-adlc/*.json` across fixtures and this repository's examples. |
-| AC-08 | `internal/settings` table tests, including unquoted dates, and a `cmd/vh-adlc` golden report validated against the updated schema. |
+| AC-08 | `internal/settings` table tests for every form the reader refuses or accepts, including unquoted dates, comment-only input, non-string keys and a canary value absent from messages, and a `cmd/vh-adlc` golden report validated against the updated schema. |
 | AC-09 | `tests/vh-adlc/ensure.test.ts` and the full `bun test tests/vh-adlc` against the bumped lock, plus a loader test with the installer failing. |
 | AC-10 | A test in `tests/vh-adlc/triage/` runs `exportInputs` on a YAML checkout, starts the real `boundaryCommand` under Bubblewrap and compares what `serveReadOnly` loads. It also asserts no `loadSettings` call is reachable from `serve`. |
-| AC-11 | Read `shared-audit.md`'s review log and acceptance row, run its gates on its branch, and inspect the published plugin payload and Stackweaver's default branch for the old path. |
+| AC-11 | Read `shared-audit.md`'s review log and acceptance row, run its gates on its branch, and inspect the published plugin payload, `docs/user-guides/workflows.md` and Stackweaver's default branch for the old path. |
+| AC-12 | Extend the triage batch and maintenance journal tests with a settings file migrated mid-run, and read an existing report fixture after migration. |
 
 ## Tasks
 
