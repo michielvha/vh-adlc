@@ -160,6 +160,7 @@ None.
 | 2026-11-02 | R-1 | spec | `5dbeab86b1c11bf1cd5affd42e0d5e50fd04d140` | claude-opus-5-5 | procedural | 18 findings, 1 blocking |
 | 2026-11-02 | R-2 | spec | `3ebea55efee3e8eb9765ef805a0a47e11c4e1584` | claude-opus-5-5 | procedural | 15 findings, 1 blocking |
 | 2026-11-02 | R-3 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 11 findings, 1 blocking |
+| 2026-11-02 | R-4 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 10 findings, 0 blocking |
 
 ### R-1
 
@@ -474,6 +475,78 @@ SEVERITY: nit
 WHERE: Design, Order step 3
 EVIDENCE: Step 3 moves the pin inside this feature's PR. `gh api repos/vhco-pro/docs/compare/e4d58d2...main` shows 32 commits, with conventions/delivery.md (96 changed lines), coding.md (47) and documentation.md (27) among the files. New rules include `delete_branch_on_merge` and component naming. conventions/feature-documents.md is not in the diff, so the rules block stays the same. plugins/vh-adlc/knowledge.md calls moving the pin "a reviewed plugin change". R-1 F-12 raised this, and it was superseded with no statement of who checks the plugin and repository against the new text.
 PROPOSAL: Add one line to step 3 saying the implementer reads the conventions diff and records what applies, or pin a revision that adds only the rule.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-06; Design, Order step 3
+EVIDENCE: The AC-06 proof runs "Stackweaver's `tests/agent-triage` and `tests/agent-maintenance` tests on its branch". tests/agent-maintenance/contract.test.ts:46-47 on Stackweaver origin/main requires `git diff --name-only 72186d3 -- <every agents/* except the two maintenance files, every .claude/commands/* except maintenance.md, CLAUDE.md, ...>` to be empty. Step 3 has the branch update its references, and agents/issue-triage.md and .claude/commands/triage.md both name .vh-adlc/triage.json, so the move itself makes this test fail. It already fails without the move: `bun test tests/agent-maintenance/contract.test.ts` in /home/m/code/stackweaver at 4e14bd50 gave 3 pass, 1 fail, with received ".claude/commands/seo.md .claude/commands/spec.md agents/seo.md agents/spec.md". `git diff --name-only 72186d3 origin/main` also lists agents/seo.md and .claude/commands/seo.md. As written, the proof cannot pass, and "updates its references" does not cover moving a frozen baseline.
+PROPOSAL: Say in step 3 that Stackweaver's branch re-baselines or narrows this contract test, with the reason recorded, or name this test in the AC-06 proof as a known exclusion with its failure stated.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: AC-06; Test Plan AC-06
+EVIDENCE: The proof says the `settings` output at the last JSON commit and the YAML commit "must match apart from `settings_path`". settings-reader.md returns mappings "with keys sorted", and triage/settings.ts:97-98 builds label_map in input order. Stackweaver's .vh-adlc/triage.json has label_map in the order bug, enhancement, documentation, refactor, security, major-upgrade, which is not sorted. I ran `bun plugins/vh-adlc/scripts/triage/cli.ts settings` on two scratch repositories holding those keys in file order and in sorted order. The outputs differed at byte 673 inside label_map. So a text or `json()` comparison fails on Stackweaver's real file with no value lost. The proof also does not say that the two sides need different plugins, because the candidate refuses `.json`, or that `root` is in the output and differs between two checkouts (triage/settings.ts:106).
+PROPOSAL: State the pass condition as deep equality ignoring mapping key order and excluding `settings_path`, with the JSON side run on the plugin version before this feature and both sides run from the same checkout path, or excluding `root`.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Order steps 3 and 4; Frontmatter goal
+EVIDENCE: Step 4 says Stackweaver "merges that branch" after the plugin publishes, with nothing run again. Stackweaver tests/agent-maintenance/README.md says "Cutover requires matching published-marketplace evidence and an owner-authorized merge. A local shared source checkout or candidate catalog is development proof only." tests/agent-maintenance/manifest.json records published_plugin_version 0.6.0, published_shared_commit, published_payload_digest and adoption_state "published-marketplace-verified". tests/agent-triage/README.md says "Installation must match the recorded payload, not merely a version string; changes invalidate dependent evidence." The published commit does not exist when step 3 reviews the branch. So either the merged head differs from the reviewed head, or the manifest and README keep describing 0.6.0 after the branch needs a newer plugin. "Ready to merge" in the goal is not true by Stackweaver's own rule.
+PROPOSAL: Add to step 4 that the branch records the published commit and payload digest, reruns the AC-06 comparison against the published plugin, and gets its update reviewed before merging. Say where that result is recorded.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope; Design, Order step 5; Frontmatter goal
+EVIDENCE: Scope says shared audit's revision is "a dependency it records itself", and step 5 says "its own document tracks" it. Neither copy records it: `grep -i 'yaml'` over docs/specs/shared-audit.md at feat/shared-audit (7e161c5) returned nothing, and `grep -i 'yaml-settings\|audit\.yaml'` over origin/main:docs/specs/shared-audit.md returned nothing. That document is in-progress under issue 40, while this one has `issue: null`, no criterion on audit and no tracker. With every box here ticked, shared audit can still merge `.vh-adlc/audit.json`. The goal "Every vh-adlc setting a person edits is YAML" and the new rule would then be false, and only this document knows.
+PROPOSAL: Before this document goes to `planned`, record the dependency in shared-audit.md or in issue 40 and cite that record here. Otherwise narrow the goal to triage and maintenance and name audit as a known exception until its revision lands.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Shared audit
+EVIDENCE: The text says to run `vh-adlc gate draft docs/specs/shared-audit.md`. Run exactly so, the binary returned result `usage` with "--plugin-pin must be a full 40-character lowercase SHA". With `--repo . --plugin-pin <pin>` the same gate returned `pass`, with transition allowed from in-progress to draft.
+PROPOSAL: Write the command with `--repo` and `--plugin-pin`.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-10; Context
+EVIDENCE: The proof says the test "starts the real `boundaryCommand`, which verifies its hash", and Context calls the export "hash-checked". serveReadOnly at plugins/vh-adlc/scripts/triage/controller.ts:287 parses settings.json at startup with no hash check. The check runs only in the parent's verifyInputs (:143) and when the `read` tool fetches that entry (`if(digest(bytes)!==entry.sha256)` in the tools/call branch). A test that only starts the session passes without any hash check.
+PROPOSAL: Have the test read settings.json through the session's `read` tool and call verifyInputs, and name both in the proof.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: AC-06; Test Plan AC-06
+EVIDENCE: The proof says "with the candidate plugin installed". The only test under those directories that loads settings through the plugin is in tests/agent-maintenance/installed.test.ts, and it is `(plugin ? test : test.skip)` on VH_ADLC_PLUGIN_DIR, so installing is not enough and it skips silently. Nothing in tests/agent-triage loads the plugin. The clause "its adapter states the plugin version it needs" has no proof, and "adapter" is not one place: manifest.json has minimum_plugin_version, while tests/agent-maintenance/installed.ts holds an executable 0.6 floor (`major === 0 && minor < 6`) and the "0.6.0+" text.
+PROPOSAL: Name VH_ADLC_PLUGIN_DIR in the proof, name the file that states the version, and add a contract assertion for it.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Loader and Order step 4
+EVIDENCE: Loader says "finish open runs before upgrading". Step 4 says Stackweaver finishes open runs after the plugin publishes. No step says when a host upgrades. Between an upgrade and the merge, Stackweaver's main holds `.vh-adlc/*.json`, which the new plugin refuses. The vh-adlc entry in .claude-plugin/marketplace.json uses source ./plugins/vh-adlc, so a marketplace update can reach a host as soon as the change is on main.
+PROPOSAL: Add one sentence to step 4: finish open runs on the old plugin, upgrade each host, then merge.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Frontmatter goal; Design, Conventions rule
+EVIDENCE: The goal says every vh-adlc setting a person edits is YAML, and the rule says never choose JSON for configuration a person writes. The standing declaration's `index_paths` is person-written and is documented as "a JSON array" (references/maintenance-settings.md, Adopted report-publication declaration), and authority.ts:81 parses it with JSON.parse. Scope excludes changes to fields, and this is a Markdown table cell, so the conflict is small but unstated.
+PROPOSAL: Note `index_paths` as a deliberate exception in Scope, or stop calling it JSON in the reference and accept the same inline list syntax.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: "needs a published stable release (`docs/internal/releasing.md`)" repeats the citation that settings-reader.md R-1 F-08 corrected. releasing.md describes stable and prerelease tags and does not state the limit. The limit is the version pattern at plugins/vh-adlc/scripts/ensure-vh-adlc.sh:43 and the test at tests/vh-adlc/check.test.ts:385.
+PROPOSAL: Cite ensure-vh-adlc.sh:43.
 
 ## Sources
 

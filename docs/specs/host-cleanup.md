@@ -332,6 +332,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-02 | R-1 | spec | `5dbeab86b1c11bf1cd5affd42e0d5e50fd04d140` | claude-opus-5-5 | procedural | 26 findings, 7 blocking |
 | 2026-11-02 | R-2 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 15 findings, 3 blocking |
+| 2026-11-02 | R-3 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 15 findings, 1 blocking |
 
 ### R-1
 
@@ -623,6 +624,113 @@ SEVERITY: nit
 WHERE: Design, Operation and allow rules
 EVIDENCE: Line 199 gives the Claude Code setting as `"allow": ["Bash(vh-adlc clean *)"]` in `~/.claude/settings.json` with no `permissions` object, so copied as written it does not sit where allow rules are read. The rule pattern itself is correct: the permissions page says a trailing ` *` also matches the bare command.
 PROPOSAL: Show the rule inside `"permissions": {"allow": [...]}`, since AC-14 has the guides document it.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria, AC-12 and AC-13; Design, Adoption table; Test Plan
+EVIDENCE: AC-12 says "a dry run on this host classifies every row of the adoption table as required", and AC-13 says "After that applied run, the removable rows are gone and every kept row is present". Lines 247-248 need `sw-e2e` to be ended (deleted), live and unmarked (both untouched). The manifest names one literal `cluster: sw-e2e` (line 125), `e2e/k8s/run.sh:14` at `96eaff82` fixes that name, and an engine holds one cluster of that name, so one run cannot show these states. Line 243 needs networks "Reported as `firewall-chain-pending`" and also "removed with `--firewall`", which are two different invocations, and lines 247 and 249 need the flags. A single run with `--firewall --kind` never exercises the pending row, and one without them never exercises the kind and chain rows. An implementation review must return `not met` for AC-12 and AC-13 as written. Test Plan line 315 repeats the single sequence: "save the dry-run report, owner review, apply".
+PROPOSAL: Restate AC-12 and AC-13 as a named sequence of runs, one per mutually exclusive state, each with its flags, and record the outcome per row. Change the Test Plan row to match.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, kind and firewall
+EVIDENCE: Line 197: `clean` "runs one short-lived host-network `NET_ADMIN` container". Line 199: "The script lists chains and tables first and networks second". The design gives that container host network and `NET_ADMIN` and no engine socket, so the script cannot list Docker networks. Stackweaver's writer is a one-shot `sh -c script` whose result is its exit code (`runFirewall`, `network.go:469` at `96eaff82`). If the binary lists networks and hands them to the script, networks come first, which is the race line 199 exists to prevent. If the binary lists chains from one container, lists networks, then deletes from a second, that is two containers, not the "one" of line 197. Mounting the socket into a `NET_ADMIN` container is a new privilege the design does not state.
+PROPOSAL: State the mechanism: a listing container whose output the binary reads, then the binary's network listing through the engine API, then a separate delete container given the exact names. Keep the socket out of the container and correct "one".
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, kind and firewall; AC-02, AC-08, AC-12
+EVIDENCE: Lines 205-206 claim "`clean` therefore never creates orphan chains". Nothing orders network removal against the firewall step on a `--firewall` run. If networks go first and the firewall listing then fails, the chains of removed networks are orphans, which line 206 denies and "Any failed listing removes nothing" leaves in place. If chains are scanned first, the chains of networks removed in this run still hash to a network and survive to a later run, so "An orphan chain goes" fails for row 249. If the scan treats planned removals as gone, a network that stays because a container uses it (line 173) loses its chain, which AC-08 forbids ("a live network's objects stay"). A dry run removes no network, so its listing shows those chains as live, and AC-02's "every declared, abandoned resource" and AC-12's chain row do not hold unless the plan predicts them.
+PROPOSAL: Specify the sequence: a listing preflight that holds all network removal if it fails, then network removal, then a chain pass that only sees networks actually gone. State how a dry run reports the chains of planned network removals, and add a case for a network kept in use.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Manifest, kind and firewall, and Adoption; AC-02
+EVIDENCE: Line 127 is a placeholder, `ghcr.io/example/tools@sha256:<64 hex>`, and Adoption (lines 226-233) names no real image for Stackweaver, though AC-12 and AC-13 run its manifest with `--firewall`. Stackweaver's own sweep uses a locally built `sw-tools-*` tag (`leftovers_integration_test.go` at `96eaff82`, `buildToolsImage` in `container_integration_test.go`), which has no stable digest across hosts. `network.go` requires `nft` in the image, and the listing needs iptables, ip6tables and nft together. The design does not say whether `clean` pulls. If it does, a dry run leaves an image behind, which AC-02's exception ("the short-lived listing container") does not allow, and a private image needs registry auth. If it does not, a missing image is a failed listing and `--firewall` can never remove anything on that host.
+PROPOSAL: Name the published image and digest Stackweaver's manifest will use, and check that it holds all three tools. State whether `clean` pulls, and widen AC-02 to match if it does.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, kind and firewall; Adoption; AC-08
+EVIDENCE: Line 189: "A cluster with no mark is never touched, which is how a harness keeps one for debugging." Lines 190-191 and 233 have each run remove only its own mark, and a cluster is abandoned when all its marks have ended. `e2e/k8s/run.sh:140` at `96eaff82` reuses an existing cluster. Take run A killed (its ended mark stays), then run B with `KEEP_CLUSTER=1` reusing the cluster. B removes its own mark on exit, leaving only A's ended mark, so `clean --kind` deletes the cluster B kept for debugging. Likewise, a later run without `KEEP_CLUSTER` deletes the cluster at `run.sh:64-66` but leaves A's mark, which then applies to the next cluster of that name created by hand. The Test Plan's "reused cluster with mixed marks" covers neither case.
+PROPOSAL: Have the harness remove every mark of the cluster on exit, or remove ended marks when it starts. State what `clean` does with a mark whose cluster is gone, and add the killed-then-kept sequence to the Test Plan.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Manifest liveness and What clean will and will not touch; AC-03; Test Plan
+EVIDENCE: Line 133 reads a mark as ended when `kill(pid, 0)` returns `ESRCH`, and the in-use check reads `/proc`. Inside a PID namespace both are silently wrong rather than failed, so "A failed check counts as live" does not apply. `bwrap --ro-bind / / --dev /dev --unshare-pid --proc /proc bash -c 'kill -0 <live host pid>'` printed "No such process", rc=1, with 4 pids visible. The same call without `--unshare-pid` returned rc=0. `codex sandbox -- bash -c ...` gave pids=5 and the same "No such process", and `~/.codex/config.toml` here has `sandbox_mode = "workspace-write"`. In both, `/var/run/docker.sock` appears owned by `nobody`. I did not try connecting, so a denied socket may stop the run in those two cases, but a sandbox that hides the socket reads as "absent", which line 176 treats as no engine, and file removal then runs with only age as protection. I did not observe whether a Codex `allow` rule leaves the sandbox, and AC-11 does not state it. Nothing in the design or Test Plan covers this.
+PROPOSAL: Have `clean` refuse with a new finding code unless it runs in the initial PID namespace, for example `/proc/self/ns/pid` reading `pid:[4026531836]`, as a normal session here does. Add a Test Plan case, and have AC-11 record that the Codex run was not sandboxed.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Manifest and Operation and allow rules; Goal; AC-11, AC-12
+EVIDENCE: Lines 147-148 make `go-build*` reachable only by `vh-adlc clean --repo <vh-adlc checkout>`, and line 211 has the operation run `vh-adlc clean --dry-run` with no `--repo`, so it covers the session's own repository. Go builds in every project leave `go-build*`, the Context's count of 22 includes them, and Stackweaver's `CLAUDE.md` tells sessions to run `cd backend && go test` directly, which bypasses the entry points that take `vh-adlc env`. A Stackweaver session blocked on space therefore cannot reach those entries. A session in a repository with no manifest gets `manifest-missing` and frees nothing. With every box ticked, AC-12 still passes, because it runs on a vh-adlc clone, while the operation does not clear this class from the sessions that hit the problem. The goal says "Any agent session".
+PROPOSAL: State how the operation chooses the repository, including how it finds a vh-adlc checkout on the host, or state that `go-build*` is cleared only from a named checkout and have `references/clean.md` tell the session to report that. Add this case to AC-11's procedure.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Operation and allow rules; AC-11
+EVIDENCE: `plugins/vh-adlc/references/loop.md` step 1 has every operation run `ensure-vh-adlc.sh` and "use the path it prints for every later call", and line 9-16 of that page define what to do when the installer fails. Design line 214 names only one exception to the loop, skipping `knowledge`. The skill must instead call bare `vh-adlc clean`, because the printed cache path does not match `Bash(vh-adlc clean *)`, so step 1 is skipped too, and the binary used is not verified against the lock. The design does not say what the skill does when `vh-adlc` is not on `PATH`, which is the state before step 3 of Order, or when the installed binary predates the lock, which `ensure-vh-adlc.sh` tolerates with "ignoring ...".
+PROPOSAL: Have the loop exception cover step 1 as well, state that the operation uses the `PATH` binary unverified, and define the report for a missing or older binary.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-23
+EVIDENCE: AC-23 has four claims: temp files stay under the temp root, jobs networks are marked, the kind cluster is marked, and entry points run unchanged "Without the binary, or when `env` fails". The proof at line 318 is "run driver tests through the entry point with the candidate binary and without it". Driver tests do not run `e2e/k8s/run.sh`, so the kind mark goes unproved, and removal of that mark on exit, including with `KEEP_CLUSTER=1`, goes unproved too. The `env` failure case has no proof. Under the standard, a passing subset never upgrades a composite criterion.
+PROPOSAL: Add a harness run that observes the mark during the run and its removal on exit, and add a run with `env` failing, for example with a refused base.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Where the rules come from; AC-05 proof; Test Plan
+EVIDENCE: Lines 153-154 rely on `GIT_NO_LAZY_FETCH=1`, and the Test Plan requires "A missing object in a partial clone must not fetch". `docs/get-started/installation.md:10` says the binary requires "Git 2.35 or newer". Git's release notes first mention `--no-lazy-fetch` in 2.45.0 (`RelNotes/2.45.0.adoc:120`; 2.43.0 and 2.44.0 have no match). On 2.35 to 2.44 the variable is ignored, so the guard is silently absent, and the test passes here only because this host has Git 2.55.0.
+PROPOSAL: Raise the stated floor for `clean` to 2.45 and have it refuse on an older Git, or give a way to detect a partial clone and refuse there. Update `docs/reference/compatibility.md` and the installation page to match.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: should-fix
+WHERE: Review Log; frontmatter
+EVIDENCE: The pinned `conventions/delivery.md:36-37`: until a document has a `branch` field, "it is committed and pushed to the default branch". This document has no `branch`. `git branch -a --contains 22769c0` lists only local `spec/host-cleanup`, and `git log origin/main..HEAD` has 9 commits. The standard counts an unreachable reviewed commit as stale, so rebasing this branch onto `main` voids this review and any acceptance built on it.
+PROPOSAL: Push the document to the default branch at its current content, or get the commit into `main` without rewriting it, before the review the acceptance names.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, kind and firewall; AC-24
+EVIDENCE: Lines 192-193 say a missing `kind` reports `kind-unavailable`. AC-24 says a "missing `kind` removes nothing and reports why". The text does not say whether that means the whole run or only the cluster step, and the two give different results for the `/tmp` entries and Docker objects in the same run.
+PROPOSAL: State which, and word AC-24 to match.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Temp root and Manifest; AC-06
+EVIDENCE: Line 103 says "`tmp` globs never match the base", which reads as skipping. AC-06 says a glob "matching the temp base" is refused. Lines 142-145 list the refusals and include neither this one nor AC-06's "a Docker rule without liveness". `temp_base` is a per-host setting (line 102), so a refusal makes one manifest valid on one host and invalid on another.
+PROPOSAL: Choose skip or refuse, list every refusal in Design, and say which base a glob is checked against.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Commands and Manifest; AC-24
+EVIDENCE: `--older-than` "can only raise a rule's age" (line 91), but `docker`, `compose`, `kind` and `firewall` rules have no age, so the flag's effect on them is undefined. The manifest section does not say which keys are required, and `env` with a manifest that has no `temp_root` is undefined, which R-1 F-22 asked about.
+PROPOSAL: State that `--older-than` applies only to `tmp` and `temp_root` rules. State whether `temp_root` is required, and what `env` reports when it is absent.
+
+FINDING: F-15
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Adoption and adoption table
+EVIDENCE: `e2e/k8s/run.sh:171` at `96eaff82` starts a `registry:2` container on the `kind` network with `-v "$CERT_DIR/registry:/auth:ro"`, and `CERT_DIR` comes from `mktemp -d`. A killed run leaves that container, which `kind delete cluster` does not remove and which carries no mark, so no rule matches it. After adoption, `CERT_DIR` sits in the temp root, and the bind mount keeps that entry in use until the next harness run removes the container at line 170.
+PROPOSAL: Have the harness put its run mark on the registry container and add a `docker` rule for that label, or add it to the untouched row so the gap is explicit.
 
 ## Sources
 

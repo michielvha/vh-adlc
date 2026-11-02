@@ -86,6 +86,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-02 | R-1 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 11 findings, 0 blocking |
+| 2026-11-02 | R-2 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 
 ### R-1
 
@@ -165,3 +166,33 @@ SEVERITY: nit
 WHERE: Document location
 EVIDENCE: The pinned delivery.md says that until a document has a `branch` field it "is committed and pushed to the default branch". `git branch -a --contains 443b34d` lists only local `spec/host-cleanup`, seven commits ahead of origin/main. internal/fresh/fresh.go:154 requires the reviewed commit to be an ancestor of HEAD, so a rebase onto main makes this review stale with `commit-unreachable`.
 PROPOSAL: Land the branch on main by fast-forward or merge, not rebase, before the acceptance row is relied on.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design; Acceptance Criteria; Test Plan
+EVIDENCE: Design makes commitments that neither criterion holds. "Without `--stdin` it reports `usage`, and a failed read reports `error`" has no criterion and no proof. AC-01 covers `answered` and the absent pin. AC-02 covers `malformed`, `settings-invalid` and file text. Neither states `data: null`, exactly one finding, or the line rule (node line, library `line N`, otherwise 0). "`docs/reference/cli.md` says so" also has no criterion. docs/reference/cli.md:26-36 lists the commands and :38 says "Every command above requires `--plugin-pin`". With both boxes ticked, the reference can omit `settings read` and keep that sentence, and a failed stdin read can come back as an empty-input refusal, while an implementation review rates only the two criteria. conventions/coding.md says "Unreadable input and failed commands must fail the check". yaml-settings.md's loader consumes this contract once it is released and locked, and internal/report/codes.go:3 treats codes as API.
+PROPOSAL: Add a criterion for the command's edges: `usage` without `--stdin`, `error` on a failed read, and on a refusal `data: null`, one finding and the stated line, proved in `TestUsage` and the stdin harness. Add one for the reference page naming the command and its pin exemption, with a Test Plan row for each.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan AC-02
+EVIDENCE: AC-02 is per form: "Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from the file." The proof is "Table tests for each refused form" plus "A golden refusal report with a canary value", so the canary is proved for one form only. The table tests have no stated pass condition for the text half. Refusals take two paths: the node walk, and the library error mapped to a fixed reason. A probe of go.yaml.in/yaml/v3 v3.0.5 gave the only file-text echo on the library path: `a: *SECRET` returned `yaml: unknown anchor 'SECRET' referenced`. `a: "\q SECRET"` and `a: !e!x SECRET` returned fixed text. A golden built on a walk refusal, such as a duplicate key, leaves that path unproved at the report. The standard says "A passing subset never upgrades a composite criterion".
+PROPOSAL: State that every table row carries a canary and asserts the code, the fixed reason and the canary's absence from the produced finding. Require one golden for a walk refusal and one for a library refusal, the second being the unknown anchor.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, accepted values and refusals
+EVIDENCE: Three edges of the accepted set remain open. (1) "a `%YAML` directive ... accepted" is too broad: in a Decoder probe `%YAML 1.1` decoded, while `%YAML 2.0\n---\na: 1\n` returned `yaml: found incompatible YAML document`. (2) `-0` matches `^-?(0|[1-9][0-9]*)$` and resolves to !!int with Value "-0", but the expected value is unstated. A reader using ParseInt reports 0. One copying the text reports -0, and `Object.is(JSON.parse("-0"),-0)` is true under Bun 1.4.3. (3) `a: <<` as a value resolves to !!merge. Design refuses "merge keys" and accepts "strings", so a value falls to "Anything else" only if it counts as not being a string. `Bun.YAML.parse` gave "<<", and the `yes` reasoning points the same way. R-1 F-02 listed this spelling and the document did not settle it.
+PROPOSAL: Say `%YAML` versions the library accepts. State that `-0` comes back as 0, or exclude it from the pattern. Name `a: <<` as refused or accepted, and add the last two to the AC-01 or AC-02 tables.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, accepted values; yaml-settings.md AC-01, AC-06
+EVIDENCE: "with keys sorted" changes object order for the next document. plugins/vh-adlc/scripts/triage/settings.ts:96-98 copies `label_map` in input order and triage/cli.ts returns that object for `settings`. Stackweaver's .vh-adlc/triage.json has `bug`, `enhancement`, `documentation`, and so on, which is not sorted. Through this reader the same settings serialize in a different order, and `json` in triage/controller.ts:25 is plain `JSON.stringify`. yaml-settings.md's AC-06 proof says the `settings` output "must match apart from `settings_path`", which a byte diff would fail with no value changed. `label_map` has no other reader under scripts/triage, so behaviour is unaffected.
+PROPOSAL: Note in Design that mapping order is not preserved, so comparisons of the value must ignore key order, and make the yaml-settings.md proofs compare parsed values.
