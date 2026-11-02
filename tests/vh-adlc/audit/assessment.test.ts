@@ -96,3 +96,20 @@ test("a fully observed still-present finding has complete assessment coverage wi
   const result = evaluateAssessments(c.config, c.snap, doc);
   expect(result.pass).toBe(true); expect(result.coverage).toBe("complete"); expect(result.eligible_ids).toEqual([]);
 });
+
+test.each(["empty-required", "wrong-green-command", "terminal-with-no-observed-check"])("%s cannot establish terminal authored/final evidence", kind => {
+  const c = context(), base = c.snap.source.commit; c.f.write("src/app.ts", "export const answer = 43;\n"); const target = c.f.commit();
+  const required = kind === "wrong-green-command" ? ["unit"] : [], snap = captureSnapshot(c.config, { mode: "fix", ids: ["AUD-001"], artifact_root: c.f.artifacts, required_checks: { "AUD-001": required } });
+  const doc: any = c.document(), row = doc.assessments[0]; doc.snapshot_digest = snap.digest;
+  row.evidence[0].commit = target; row.evidence[0].sha256 = createHash("sha256").update(readFileSync(join(c.f.root, "src/app.ts"))).digest("hex");
+  row.challenge.source_commit = target;
+  const red = { ...row.checks[0], commit: base, exit_code: 1, artifact: c.f.artifact("red-final-link.txt") };
+  row.checks[0].commit = target;
+  if (kind !== "terminal-with-no-observed-check") {
+    row.disposition = "authored-repair"; row.red = red;
+    row.batch_review = { producer: "author", reviewer: "independent", source_commit: target, result: "NO FINDINGS", artifact: c.f.artifact("current-review.txt") };
+  }
+  if (kind === "wrong-green-command") row.checks[0].argv = ["fixture-check", "different-regression"];
+  else row.checks = [];
+  expect(evaluateAssessments(c.config, snap, doc).eligible_ids).toEqual([]);
+});

@@ -113,7 +113,7 @@ export function checkBatch(config: Settings, input: {
     for (const member of def.members) {
       const row = rows?.find(row => row.id === member.id);
       if (!member.contract?.trim() || member.eligibility !== "restoration" || row?.disposition !== member.disposition ||
-          !Array.isArray(member.required_checks) || digest(member.required_checks.slice().sort()) !== digest((input.snapshot.required_checks[member.id] ?? []).slice().sort())) errors.push("Member contract, eligibility, disposition or required checks are missing: " + member.id);
+          !Array.isArray(member.required_checks) || !member.required_checks.length || digest(member.required_checks.slice().sort()) !== digest((input.snapshot.required_checks[member.id] ?? []).slice().sort())) errors.push("Member contract, eligibility, disposition or required checks are missing: " + member.id);
       if (member.disposition === "authored-repair") {
         repair_batch = true;
         if (!member.pre_fix || !member.repair_commit || !ancestor(config, def.task_base, member.pre_fix) ||

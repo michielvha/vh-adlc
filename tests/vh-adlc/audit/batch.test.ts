@@ -8,13 +8,13 @@ import { fixture, git } from "./fixtures";
 import { terminal } from "./evidence";
 import { createLedgerCandidate } from "../../../plugins/vh-adlc/scripts/audit/ledger";
 const projects: ReturnType<typeof fixture>[] = [];
-function context(carry = false, allAssessment = false, priorLedger = false) {
+function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"]) {
   const f = fixture(); projects.push(f); const config = loadSettings(f.root), base = git(f.root, "rev-parse", "HEAD");
   git(f.root, "update-ref", "refs/remotes/origin/main", base); git(f.root, "switch", "-qc", "fix/audit-batch");
   let taskBase = base, carried: Definition["carried"] = null;
   if (carry) {
     const snapshot = captureSnapshot(config, { mode: "reverify", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts,
-      required_checks: { "AUD-001": ["unit"], "AUD-002": ["unit"] } });
+      required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
     const document = { schema_version: 1, snapshot_digest: snapshot.digest, assessments: snapshot.selected_ids.map(id => terminal(f, snapshot, id)) };
     const candidate = createLedgerCandidate(config, snapshot, { document, at: "2026-11-02", run_id: "carried-ledger" });
     f.write(config.ledger_path, candidate.bytes); taskBase = f.commit("test: private ledger report");
@@ -28,9 +28,9 @@ function context(carry = false, allAssessment = false, priorLedger = false) {
   const definition: Definition = { schema_version: 1, repository: config.repository, hostname: config.hostname, default_branch: "main", run_id: "batch-test", workstream: "A",
     scope_baseline: base, task_base: taskBase, source_target: repaired, ledger_path: config.ledger_path, record_path: path,
     affected_paths: ["src/app.ts", config.ledger_path, path], verification_inputs: ["src/app.ts"],
-    members: ["AUD-001", "AUD-002"].map((id, i) => ({ id, disposition: i === 0 && !allAssessment ? "authored-repair" : "assessment-only", contract: "Existing documented return-value contract.", eligibility: "restoration", required_checks: ["unit"], ...(i === 0 && !allAssessment ? { pre_fix: taskBase, repair_commit: repaired } : {}) })),
+    members: ["AUD-001", "AUD-002"].map((id, i) => ({ id, disposition: i === 0 && !allAssessment ? "authored-repair" : "assessment-only", contract: "Existing documented return-value contract.", eligibility: "restoration", required_checks: checkNames, ...(i === 0 && !allAssessment ? { pre_fix: taskBase, repair_commit: repaired } : {}) })),
     carried };
-  const sourceSnapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": ["unit"], "AUD-002": ["unit"] } });
+  const sourceSnapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
   const sourceRows = sourceSnapshot.selected_ids.map(id => terminal(f, sourceSnapshot, id));
   sourceRows[0].disposition = allAssessment ? "assessment-only" : "authored-repair";
   if (!allAssessment) sourceRows[0].red = { ...sourceRows[0].checks[0], commit: taskBase, exit_code: 1, artifact: f.artifact("source-red.txt") };
@@ -39,9 +39,9 @@ function context(carry = false, allAssessment = false, priorLedger = false) {
   const provisional = { snapshot: sourceSnapshot, document: sourceDocument, candidate };
   f.write(path, renderRecord(definition)); f.write(config.ledger_path, candidate.bytes);
   const target = f.commit("test: finalize fixture ledger and record");
-  const snapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": ["unit"], "AUD-002": ["unit"] } });
+  const snapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
   const rows = snapshot.selected_ids.map(id => terminal(f, snapshot, id)); rows[0].disposition = allAssessment ? "assessment-only" : "authored-repair";
-  rows[0].red = { ...rows[0].checks[0], commit: taskBase, exit_code: 1, artifact: f.artifact("red.txt") };
+  if (!allAssessment) rows[0].red = { ...rows[0].checks[0], commit: taskBase, exit_code: 1, artifact: f.artifact("red.txt") };
   rows[0].batch_review = { producer: "author", reviewer: "independent", result: "NO FINDINGS", source_commit: target, artifact: f.artifact("review.txt", "MODEL: claude-opus-5.5\nNO FINDINGS\n") };
   const input = { record_path: path, review_target: target, snapshot, provisional, document: { schema_version: 1, snapshot_digest: snapshot.digest, assessments: rows },
     selection: { ids: ["AUD-001", "AUD-002"], workstream: "A", carried },
@@ -146,4 +146,8 @@ test("a verbatim clean review may separate its model header and records with a b
   const c = context(); c.input.review.artifact = c.f.artifact("blank-separated-review.txt", "MODEL: claude-opus-5.5\n\nNO FINDINGS\n");
   expect(checkBatch(c.config, c.input).pass).toBe(true);
   c.input.review.artifact = c.f.artifact("review-footer.txt", "MODEL: claude-opus-5.5\nNO FINDINGS\nAn extra claim.\n"); expect(checkBatch(c.config, c.input).pass).toBe(false);
+});
+
+test("even an all-assessment terminal batch must declare nonempty per-member final checks", () => {
+  const c = context(false, true, false, []); expect(checkBatch(c.config, c.input).pass).toBe(false);
 });

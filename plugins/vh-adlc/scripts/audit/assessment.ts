@@ -78,7 +78,7 @@ function evaluate(config: Settings, snap: Snapshot, document: unknown, committed
         } catch { return true; }
       })) errors.push("Original scenario needs current source evidence: " + row.id);
       const required = snap.required_checks[row.id] ?? [];
-      if (!Array.isArray(row.checks) || new Set(row.checks.map(c => c.name)).size !== row.checks.length ||
+      if (!Array.isArray(row.checks) || terminal && !row.checks.length || new Set(row.checks.map(c => c.name)).size !== row.checks.length ||
           required.some(name => !row.checks.some(c => c.name === name)) || row.checks.some(c => c.commit !== snap.source.commit || !Number.isInteger(c.exit_code) || terminal && c.exit_code !== 0 ||
             !Array.isArray(c.argv) || !c.argv.length || c.argv.some(a => typeof a !== "string" || !a) || !validArtifact(snap.artifact_root, c.artifact))) errors.push("Required checks are missing, failed or stale: " + row.id);
       const challenge = row.challenge;
@@ -90,6 +90,7 @@ function evaluate(config: Settings, snap: Snapshot, document: unknown, committed
         if (red && /^[a-f0-9]{40,64}$/.test(red.commit)) {
           try { git(config.root, "merge-base", "--is-ancestor", red.commit, snap.source.commit); ancestor = red.commit !== snap.source.commit; } catch { /* Missing/non-ancestor targets cannot supply red. */ }
         }
+        if (!required.length || !red || !row.checks.some(check => check.exit_code === 0 && digest(check.argv) === digest(red.argv))) errors.push("Authored repair needs declared checks and the original regression's final-head green: " + row.id);
         if (!red || red.exit_code === 0 || !Number.isInteger(red.exit_code) || red.commit === snap.source.commit || !red.argv?.length || !validArtifact(snap.artifact_root, red.artifact) ||
             !ancestor ||
             (!provisional && (!review || review.result !== "NO FINDINGS" || review.source_commit !== snap.source.commit || !review.producer || !review.reviewer || review.producer === review.reviewer ||
