@@ -330,6 +330,7 @@ None.
 | 2026-11-02 | R-4 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 13 findings, 0 blocking |
 | 2026-11-02 | R-5 | spec | `d875e20f90e14d3d059de04fc3bf71203f45b386` | claude-opus-5-5 | procedural | 14 findings, 1 blocking |
 | 2026-11-02 | R-6 | spec | `104d96968de60313f1c940edc464180edf015fbb` | claude-opus-5-5 | procedural | 10 findings, 1 blocking |
+| 2026-11-02 | R-7 | spec | `ffe9dd6e7f388e7cfd20918e7f85ddf67b9c54ec` | claude-opus-5-5 | procedural | 9 findings, 0 blocking |
 
 ### R-1
 
@@ -993,6 +994,71 @@ SEVERITY: nit
 WHERE: Design, opening paragraph; Temp root
 EVIDENCE: Line 81 says "a run nobody asked for may remove `/tmp` files only", and `references/authority.md` gains that row. Line 110 lets `temp_base` move every temp root out of `/tmp`, and line 161 removes entries inside the root wherever it is. With a moved base, an unrequested run removes files outside `/tmp`, which the sentence says it may not.
 PROPOSAL: Word the rule and the authority row as "`/tmp` entries and the project's temp root".
+
+### R-7
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, kind and Adoption; AC-08
+EVIDENCE: Lines 183-186 treat "has marks and all have ended" as abandoned, and line 183 says a cluster with no mark is how a harness keeps one for debugging. R-6 F-04 closed this gap for `driver-conformance.sh` only, and two more cases remain. First, unmarked live work: Stackweaver `e2e/k8s/gitops-controllers.sh:4-11` at `cc2cbbed` installs into the running `sw-e2e` and says it can run on its own, and `conformance_kubernetes_integration_test.go:18` documents a direct `SW_KIND_CONTEXT=kind-sw-e2e go test`. Neither makes a mark, so on a killed run's cluster `clean --kind` stops the nodes under them. Second, a kept cluster becomes abandoned: `run.sh` with `KEEP_CLUSTER=1` leaves no mark, then a `driver-conformance.sh` on it, now marked by line 217, is killed. That leaves one ended mark, so the cluster kept for debugging is stopped and deleted. AC-08 protects only "no mark" and "any live mark", and the fake-engine row has neither case. What `clean` does with a mark whose cluster is gone is still unstated, as R-3 F-05 asked. `run.sh` itself prints `kind delete cluster` as the manual route, so an ended mark can outlive its cluster and then apply to the next hand-made `sw-e2e`.
+PROPOSAL: Record on the mark whether its run created the cluster, and make a cluster eligible only while such a mark exists and all marks have ended, or state both cases as limits in Design. Say that `clean` removes a mark with no cluster, and add these cases to AC-08 and the fake-engine row.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, What clean will and will not touch and Operation; AC-02; AC-18
+EVIDENCE: Context says the named classes are at most 43% of the incident's use and "the rest is unknown". Line 178 reports only the count and total size of unmatched entries, which sizes that unknown but does not attribute it. On this host now, `ls -A /tmp` gives 73 top-level entries and 1 matches any named class. The next largest are `playwright_firefoxdev_profile-ESCJ53` at 58 MB, `node-compile-cache` at 37 MB and `sw-seo-polish-e2e-pgvcdcdp` at 24 MB. Ages are floors: built-in globs wait 24 hours (line 147) and `--older-than` can only raise an age (line 98), so a same-day killed run is kept. Line 192 stops at applying the plan and gives no next step for a session still blocked. `rm` goes back to the classifier, which Context says refuses this sweep. AC-18 needs only that a run "frees space". With every box ticked, a session at the quota can free a small part and learn one number.
+PROPOSAL: Have the report name the largest unmatched and age-kept entries with size and age, for example the top ten, removing nothing. Have `references/clean.md` tell a session that is still blocked to hand that list to the user, and add both to AC-02.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Frontmatter status_description; Design, Commands; Test Plan, AC-07, AC-18 and AC-23; covers
+EVIDENCE: The status line says R-6 F-02, F-05, F-08 and F-09 "carry into tasks". All four are still in the text and all four are baseline matters, while the standard's normative list has Scope, Design, Acceptance Criteria, Test Plan and `covers`, and not Tasks. The AC-23 row still gives no observation or pass condition for temp files, so a task cannot make an implementation review return `met`. Lines 101-103 still give no dry-run result for `host-settings-invalid`, `temp-base-refused`, `engine-unreachable` or `manifest-invalid`, and the operation acts on that result. Line 98 and line 147 still leave `--older-than` on built-in globs open. The AC-07 and AC-18 rows still need Bubblewrap from a `cmd/vh-adlc` test, while `.github/workflows/ci.yml:36-38` installs it only in `checker`, and `ci.yml` is not in `covers`. Fixing any of these after acceptance is a revision: the document moves back to `draft` and acceptance is repeated.
+PROPOSAL: Fold these four small edits in before the acceptance review. That means a pass condition per entry point in the AC-23 row, one sentence on dry-run results, one on `--older-than`, and the named CI job with `ci.yml` in `covers`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Commands and Operation; Acceptance Criteria; Test Plan, AC-14
+EVIDENCE: Lines 101-107 map every code to a result, and `references/loop.md` says the operation acts only on the binary's JSON result, but no criterion states a result. AC-07 says "reports why", AC-02 and AC-03 describe entries, and AC-14 mentions no result. Only the AC-14 row names "a golden JSON report", and that checks shape against the schema. A build that reports `pass` on `removal-failed` or `engine-unreachable`, or `answered` on `running-as-root`, ticks every box while a session reads a failed run as clean. Lines 198-200 have the same gap: the one-line report for a missing or older binary and the terminal instruction on `pid-namespace` have no criterion or proof. AC-11 records the `pid-namespace` outcome, but not what the session told the user.
+PROPOSAL: Add a criterion that each code reports the result Design gives, with exit codes, and add that table to the `internal/clean` proof. Add the missing-binary, older-binary and `pid-namespace` reports to AC-11 and its procedure.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Review Log; frontmatter status_description
+EVIDENCE: This repeats R-3 F-11, R-4 F-09, R-5 F-09 and R-6 F-07, and the status line says it waits on the owner. `git ls-remote origin main spec/host-cleanup` returns only `refs/heads/main` at `c8343c5`. `git branch -a --contains HEAD` lists only local `spec/host-cleanup`, and `git log origin/main..HEAD` has 19 commits. The document has no `branch`, and the pinned `conventions/delivery.md` says such a document is committed and pushed to the default branch. `origin/main` is an ancestor of HEAD, so a fast-forward still works. An acceptance row would bind to a commit that exists in one clone, and a rebase makes it `commit-unreachable`.
+PROPOSAL: Put the push to the owner together with the acceptance question, and fast-forward `origin/main` to the accepted commit without rebasing.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context; Design, Adoption; Scope
+EVIDENCE: Lines 48 and 220 cite "`feat/runner-architecture` at `cc2cbbed`". `git branch -a --contains cc2cbbed` prints nothing, and it is an ancestor of neither local `feat/runner-architecture` (`f4d05d2a`) nor PR #1002's head (`df83bf91`). The branch was rewritten, so the commit can be pruned. On the cited paths the local tip differs only in `Makefile`, so the claims hold today. PR #1002's head has no `e2e/k8s/driver-conformance.sh`, which Adoption and AC-23 change: `git cat-file -e origin/feat/runner-architecture:e2e/k8s/driver-conformance.sh` fails. Scope's base and Order step 4 therefore mean the local branch, not the PR as published.
+PROPOSAL: Cite a commit that a ref holds, and say the adoption branch needs that work pushed to PR #1002 first.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Manifest; AC-06
+EVIDENCE: Lines 141-145 list the refusals, and AC-06 covers only that list. I decoded with `go.yaml.in/yaml/v3` and `KnownFields(true)`: a manifest with a second YAML document decoded with no error and dropped that document, whereas `settings-reader.md` accepts one document only. `path.Match("abcd[", ...)` returned `syntax error in pattern` on every name, and `abcd[` passes the four-character floor. A syntax error, an unparseable age and an empty `label` are not listed either. Nothing says whether `compose.project` and `kind.cluster` count as "a glob". The example uses another key, so `project: "*"` with `volumes: true` reads as valid, which R-1 F-11 raised.
+PROPOSAL: Add these refusals, and state that the literal floor applies to `compose.project` and `kind.cluster`.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Scope; Design, Adoption table
+EVIDENCE: Row "Compose `swc-N`" says "stopped and removed with its volumes", and line 169 removes "its networks". `docker network inspect swc-8_jobs` shows only `{"sh.stackweaver.managed":"true"}`, with no Compose label, so that network matches no project. The launcher programs its firewall (`backend/internal/launcher/main.go:206`, with `RUNNER_NETWORK` defaulting to `${COMPOSE_PROJECT_NAME}_jobs` at `deploy/docker-compose.yml:495`). Stackweaver's `cmd_down` filters by the same label, so this is no regression. Scope and the limits at line 223 still name only `stackweaver-jobs-slot-*` and `sw-test-jobs-*`, so an abandoned slot's `swc-N_jobs` stays with no stated owner. I did not read the firewall itself, which needs root.
+PROPOSAL: Name `swc-N_jobs` and its firewall objects in the untouched row or the limits at line 223.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-03
+EVIDENCE: AC-03 opens "`vh-adlc clean` removes those", which points at AC-02's "every declared, abandoned resource". That set includes Compose projects and clusters, which a flagless `clean` must not change under AC-08. The criterion is not readable alone, and a review has to infer the flags.
+PROPOSAL: Write it as `/tmp` entries and temp-root entries past their age, leaving Compose and kind to AC-08.
 
 ## Sources
 
