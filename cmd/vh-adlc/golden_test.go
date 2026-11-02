@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -71,8 +72,16 @@ type outcome struct {
 
 func runBinary(t *testing.T, home string, args ...string) outcome {
 	t.Helper()
+	return runBinaryStdin(t, home, nil, args...)
+}
+
+// runBinaryStdin gives the binary stdin. An *os.File is passed as the process's
+// own file, so a test can make the read itself fail.
+func runBinaryStdin(t *testing.T, home string, stdin io.Reader, args ...string) outcome {
+	t.Helper()
 	cmd := exec.Command(binary, args...)
 	cmd.Env = testrepo.Env(home)
+	cmd.Stdin = stdin
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
@@ -100,10 +109,10 @@ type goldenCase struct {
 	args []string
 }
 
-func checkGolden(t *testing.T, home string, c goldenCase) {
+func checkGolden(t *testing.T, home, stdin string, c goldenCase) {
 	t.Helper()
-	first := runBinary(t, home, c.args...)
-	second := runBinary(t, home, c.args...)
+	first := runBinaryStdin(t, home, strings.NewReader(stdin), c.args...)
+	second := runBinaryStdin(t, home, strings.NewReader(stdin), c.args...)
 	if !bytes.Equal(first.stdout, second.stdout) || first.exit != second.exit {
 		t.Fatalf("%s: two runs differ:\n%s\n%s", c.name, first.stdout, second.stdout)
 	}
@@ -200,7 +209,7 @@ func TestGolden(t *testing.T) {
 	}
 	home := t.TempDir()
 	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) { checkGolden(t, home, c) })
+		t.Run(c.name, func(t *testing.T) { checkGolden(t, home, "", c) })
 	}
 }
 
