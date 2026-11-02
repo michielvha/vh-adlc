@@ -1,6 +1,7 @@
 import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { createHash } from "node:crypto";
 
 export function git(root: string, ...args: string[]): string {
   const child = Bun.spawnSync(["git", "-C", root, ...args], {
@@ -34,6 +35,8 @@ export function fixture(options: { configured?: boolean } = {}) {
   const outer = realpathSync(mkdtempSync(join(tmpdir(), "vh-audit-")));
   const root = join(outer, "repo");
   mkdirSync(root);
+  const artifacts = join(outer, "artifacts");
+  mkdirSync(artifacts, { mode: 0o700 });
   const write = (path: string, text: string) => {
     mkdirSync(dirname(join(root, path)), { recursive: true });
     writeFileSync(join(root, path), text);
@@ -56,7 +59,11 @@ export function fixture(options: { configured?: boolean } = {}) {
   };
   commit();
   return {
-    root, outer, write, settings, commit,
+    root, outer, artifacts, write, settings, commit,
+    artifact: (name: string, value = "Synthetic fixture observation.\n") => {
+      writeFileSync(join(artifacts, name), value, { mode: 0o600 });
+      return { path: name, sha256: createHash("sha256").update(value).digest("hex") };
+    },
     // This entire directory and its optional sibling worktrees belong to this fixture.
     dispose: () => rmSync(outer, { recursive: true, force: true }),
   };
