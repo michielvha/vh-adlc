@@ -2,7 +2,7 @@ import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createRun, readRun, intent, noteResource } from "../../../plugins/vh-adlc/scripts/audit/journal";
-import { cleanupPending, liveReady } from "../../../plugins/vh-adlc/scripts/audit/recovery";
+import { cleanupPending, liveReady, recoverEffect } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture } from "./fixtures";
 
@@ -62,4 +62,13 @@ test("the server-assigned resource ID is retained and a replacement with the sam
   });
   expect(result.ready).toBe(false); expect(deleted).toBe(false);
   expect(c.reload().events.some(e => e.kind === "resource")).toBe(true);
+});
+
+test.each(["key", "row"] as const)("generic effect recovery cannot mark %s creation as completed cleanup", async kind => {
+  const c = context(); c.pending("owned-resource", kind); let observed = false;
+  await expect(recoverEffect(c.reload(), "owned-resource", { authorized: true,
+    observe: async () => { observed = true; return { state: "done", receipt: { state: "observed", resource_id: "created-id" } }; },
+  })).rejects.toThrow("cleanup");
+  expect(observed).toBe(false); expect(liveReady(c.reload())).toBe(false);
+  expect(c.reload().events.some(event => event.kind === "outcome")).toBe(false);
 });

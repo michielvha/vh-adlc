@@ -167,3 +167,19 @@ Ordinary cleanup covers clean owned audit-ledger and audit-repair roles only aft
 are retained/published/safely superseded. Keep pending/unpublished ledger commits and evidence refs.
 If non-forced branch deletion refuses after squash, retain the ref and report it. Never prune, reset,
 force-delete or clean unrelated worktrees/index entries. Cleanup cannot discard a pending resource intent.
+
+### Native journal completion and pending inspection
+
+`journal-pending --repo <consumer> --directory <run> --batch-digest <digest>` lists outstanding
+intents and recorded resource IDs. It remains read-only after valid policy changes, reports
+`policy-changed`, and grants no journal mutation, cleanup or live retry.
+Use `journal-handoff` with `--action-id` and an identifier-only `--reason` to retain a current-policy
+handoff. For observed report/commit/issue/push/PR/merge effects, `journal-outcome` takes `--action-id`
+and `--input <receipt.json>` using the validated Receipt schema. Reconcile actual state first.
+
+Key/row creation is never completion. Record its server ID using `journal-resource`; use the scoped
+`cleanupPending` adapter for actual lookup/cleanup/absence observation. After independently observing
+absence through the currently authorized consumer method, the native `journal-cleanup-outcome`
+operation can retain its receipt with explicit `--absence-confirmed true`. This flag is an operator
+attestation, not execution or proof of cleanup. Generic `journal-outcome` and `recoverEffect` reject
+resource completion so a creation reply cannot accidentally retire a pending cleanup intent.

@@ -10,7 +10,7 @@ export type Intent = { id: string; kind: "report" | "local-commit" | "issue" | "
 export type Receipt = { state: "observed"; resource_id?: string; commit?: string; pull_number?: number; artifact_path?: string; artifact_digest?: string };
 type Event = { revision: number; previous: string; kind: "intent" | "resource" | "outcome" | "handoff"; action_id: string; payload: Intent | Receipt | { reason_code: string } | { resource_id: string } };
 type Header = { schema_version: 1; run_id: string; repository: string; hostname: string; common_dir: string; batch_digest: string; settings_digest: string; policy_digest: string };
-export type Run = { directory: string; config: Settings; header: Header; events: Event[]; revision: number; digest: string };
+export type Run = { policy_current: boolean; directory: string; config: Settings; header: Header; events: Event[]; revision: number; digest: string };
 function fail(): never { throw Error("audit journal conflict, unsafe input or changed scope; reconcile owned state"); }
 function identifier(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:#/@-]{0,159}$/.test(value); }
 function exact(value: object, allowed: string[], required = allowed) {
@@ -56,12 +56,13 @@ export function createRun(config: Settings, options: { artifact_root: string; ru
   publishJSON(join(directory, "header.json"), header);
   return readRun(config, directory, options.batch_digest);
 }
-export function readRun(config: Settings, directory: string, batch_digest: string): Run {
+export function readRun(config: Settings, directory: string, batch_digest: string, options: { inspect?: boolean } = {}): Run {
   privateDirectory(directory, config.root); privateDirectory(join(directory, "events"), config.root);
   const header = privateJSON(join(directory, "header.json")) as Header;
   exact(header, ["schema_version", "run_id", "repository", "hostname", "common_dir", "batch_digest", "settings_digest", "policy_digest"]);
+  const bindings = inputBindings(config), policy_current = header.settings_digest === bindings.settings_digest && header.policy_digest === bindings.policy_digest;
   if (header.schema_version !== 1 || header.repository !== config.repository || header.hostname !== config.hostname || header.batch_digest !== batch_digest ||
-      Object.entries(inputBindings(config)).some(([k, v]) => header[k as keyof Header] !== v)) fail();
+      header.common_dir !== bindings.common_dir || !policy_current && !options.inspect) fail();
   const events: Event[] = [];
   let previous = digest(header);
   const files = readdirSync(join(directory, "events")).filter(name => !name.startsWith(".tmp-")).sort();
@@ -89,7 +90,18 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
     }
     events.push(event); previous = digest(event);
   }
-  return { directory, config, header, events, revision: events.length, digest: previous };
+  return { policy_current, directory, config, header, events, revision: events.length, digest: previous };
+}
+/** Read-only recovery inventory remains available after valid policy edits. Never grants retry/cleanup authority. */
+export function inspectPending(config: Settings, directory: string, batch_digest: string) {
+  const run = readRun(config, directory, batch_digest, { inspect: true });
+  const pending = run.events.filter(event => event.kind === "intent" && !run.events.some(done => done.kind === "outcome" && done.action_id === event.action_id)).map(event => {
+    const action = event.payload as Intent;
+    const resource = run.events.find(value => value.kind === "resource" && value.action_id === action.id)?.payload as { resource_id: string } | undefined;
+    return { ...action, ...(resource ?? {}) };
+  });
+  return { policy_current: run.policy_current, live_ready: run.policy_current && !pending.some(action => ["key", "row"].includes(action.kind)), pending,
+    handoff: run.policy_current ? null : "policy-changed", limit: "Read-only pending-state inspection. Changed policy requires explicit reconciliation; no retry, cleanup or journal mutation is authorized." };
 }
 function append(run: Run, kind: Event["kind"], action_id: string, payload: Event["payload"]) {
   const actual = readRun(run.config, run.directory, run.header.batch_digest);

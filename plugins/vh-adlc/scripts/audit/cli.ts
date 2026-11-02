@@ -10,7 +10,7 @@ import { saveReport } from "./report";
 import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "./authority";
 import { createLedgerCandidate, applyLedgerCandidate, appendFindings } from "./ledger";
 import { checkBatch } from "./batch";
-import { createRun, intent, noteResource, readRun } from "./journal";
+import { createRun, intent, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
 import type { AuditMode } from "./types";
 
 const argumentsByOperation: Record<string, string[]> = {
@@ -19,6 +19,10 @@ const argumentsByOperation: Record<string, string[]> = {
   "new-findings": ["snapshot", "input", "name"], apply: ["snapshot", "input", "candidate", "request", "path", "commit"],
   "policy-candidate": ["default-branch", "commit", "parity"], "policy-adopted": [], authority: ["input"], "batch-check": ["input"],
   "journal-new": ["artifact-root", "run-id", "batch-digest"], "journal-read": ["directory", "batch-digest"],
+  "journal-pending": ["directory", "batch-digest"],
+  "journal-cleanup-outcome": ["directory", "batch-digest", "action-id", "input", "absence-confirmed"],
+  "journal-outcome": ["directory", "batch-digest", "action-id", "input"],
+  "journal-handoff": ["directory", "batch-digest", "action-id", "reason"],
   "journal-intent": ["directory", "batch-digest", "input"], "journal-resource": ["directory", "batch-digest", "action-id", "resource-id"],
 };
 export function runCLI(argv: string[]) {
@@ -68,7 +72,15 @@ export function runCLI(argv: string[]) {
   if (operation === "authority") return inspectAuthority(config, json(requireOption("input")));
   if (operation === "batch-check") return checkBatch(config, json(requireOption("input")));
   if (operation === "journal-new") { const run = createRun(config, { artifact_root: requireOption("artifact-root"), run_id: requireOption("run-id"), batch_digest: requireOption("batch-digest") }); return { directory: run.directory, revision: run.revision }; }
+  if (operation === "journal-pending") return inspectPending(config, requireOption("directory"), requireOption("batch-digest"));
   const run = readRun(config, requireOption("directory"), requireOption("batch-digest"));
+  if (["journal-outcome", "journal-cleanup-outcome"].includes(operation)) {
+    const id = requireOption("action-id"), action = run.events.find(event => event.kind === "intent" && event.action_id === id);
+    const resource = action && ["key", "row"].includes((action.payload as { kind: string }).kind);
+    if (operation === "journal-outcome" && resource || operation === "journal-cleanup-outcome" && (!resource || requireOption("absence-confirmed") !== "true")) throw Error("audit resource completion requires an explicit observed cleanup absence, never creation acknowledgement");
+    outcome(run, id, json(requireOption("input")));
+  }
+  if (operation === "journal-handoff") handoff(run, requireOption("action-id"), requireOption("reason"));
   if (operation === "journal-intent") intent(run, json(requireOption("input")));
   if (operation === "journal-resource") noteResource(run, requireOption("action-id"), requireOption("resource-id"));
   return { header: run.header, events: run.events, revision: run.revision, directory: run.directory };

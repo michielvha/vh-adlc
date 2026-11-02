@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, readFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
-import { createRun, readRun, intent, outcome } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { createRun, readRun, intent, outcome, inspectPending } from "../../../plugins/vh-adlc/scripts/audit/journal";
 import { recoverEffect } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git } from "./fixtures";
@@ -68,4 +68,13 @@ test("journal conflicts, scope drift, public modes, secret fields and symlinks f
   chmodSync(join(c.run.directory, "header.json"), 0o600);
   const linked = join(c.f.artifacts, "linked"); symlinkSync(c.run.directory, linked); expect(() => readRun(c.config, linked, "a".repeat(64))).toThrow();
   expect(existsSync(join(c.f.root, "audit-run-synthetic-run"))).toBe(false);
+});
+
+test("changed policy leaves resource intents inspectable without conferring journal mutation or retry authority", () => {
+  const c = context(); intent(c.run, { id: "owned-key", kind: "key", correlation: "unique-owned-key", target: "development:slot", actor: "fixture", organization: "org", cleanup_method: "#cleanup" });
+  c.f.write("audit-project.md", "# Updated current policy\n");
+  const result = inspectPending(loadSettings(c.f.root), c.run.directory, c.run.header.batch_digest);
+  expect(result.policy_current).toBe(false); expect(result.handoff).toBe("policy-changed"); expect(result.live_ready).toBe(false);
+  expect(result.pending.map(row => row.id)).toEqual(["owned-key"]);
+  expect(() => outcome(c.run, "owned-key", { state: "observed" })).toThrow();
 });

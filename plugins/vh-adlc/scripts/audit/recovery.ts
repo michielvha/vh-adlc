@@ -8,6 +8,7 @@ export async function recoverEffect(run: Run, id: string, transport: {
   run = reload(run);
   const action = run.events.find(e => e.kind === "intent" && e.action_id === id)?.payload as Intent | undefined;
   if (!action) throw Error("audit effect has no durable intent; inspect actual state before a new action");
+  if (["key", "row"].includes(action.kind)) throw Error("audit resource intents require scoped cleanup reconciliation, never generic effect completion");
   const completed = run.events.find(e => e.kind === "outcome" && e.action_id === id);
   if (completed) return completed.payload as Receipt;
   const observed = await transport.observe(action);
