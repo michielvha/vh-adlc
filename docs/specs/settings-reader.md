@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Implemented on feat/settings-reader, local only at the owner's direction; the claim is on that branch, not on main. R-4 returned AC-02 as not met, with one blocking finding to fix."
+status_description: "Implemented on feat/settings-reader, local only at the owner's direction; the claim is on that branch, not on main. R-4 returned AC-02 as not met with one blocking finding, fixed at T7. The next step is a new implementation review."
 issue: null
 branch: feat/settings-reader
 goal: "`vh-adlc settings read` turns a YAML settings file into a checked value, or refuses it, for the TypeScript operations."
@@ -68,10 +68,11 @@ part of the report holds text from the file or from the library's error.
 - [x] AC-01: For input in the accepted forms, with no `--plugin-pin`, `vh-adlc settings read --stdin` reports
       `answered`, and `data.value` equals the expected value, with keys sorted and timestamps as written.
       Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, `TestAccepted`, `TestSortedKeys`, the `settings-read` golden and `TestSchema` passed with no `--plugin-pin`; `TestSchema` checks keys and enums, not a full JSON Schema validation.
-- [ ] AC-02: Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from
+- [x] AC-02: Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from
       the file.
       Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, 68 `TestRefused` rows and both refusal goldens passed, each asserting the result, code and reason, and that the canary is absent from the whole report; limited to the listed forms.
       Evidence: R-4 at `800fc8e`, verdict not met: plain numbers past the library's range came back as strings, so these spellings were answered and not refused.
+      Evidence: `go test -count=1 ./...` and the binary built from `a78a82e`: all 88 `TestRefused` rows and both refusal goldens passed, the plain spellings R-4 F-01 named are refused with exit 3, and quoted `"1e400"`, `1.2.3` and `2026-13-45` still answer as strings; limited to the listed forms, and not yet re-reviewed.
 - [x] AC-03: Without `--stdin` the command reports `usage`, a failed read reports `error`, and a refusal has `data: null`,
       one finding and the stated line.
       Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, `TestUsage`, `TestSettingsReadFailedRead`, `TestSettingsReadRefusal` and 19 `TestRefusalLine` cases covering each branch of the line rule passed.
