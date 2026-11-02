@@ -33,3 +33,11 @@ test("citations may include supplied canonical policy as well as the required sc
   const r = response(); r.cases[0].evidence.push({ path: "policy.md", line: 1 });
   expect(gradeTrial(r, expected, { "source.ts": "first\nsecond\n", "policy.md": "Retain sibling residuals.\n" }, proof()).pass).toBe(true);
 });
+
+test("mixed incomplete selection permits UNKNOWN or PARTIAL but never a terminal verdict", () => {
+  const oracle = structuredClone(expected); oracle.cases[0].verdict = ["UNKNOWN", "PARTIAL"];
+  const r = response(); r.cases[0].verdict = "UNKNOWN";
+  expect(gradeTrial(r, oracle, { "source.ts": "first\nsecond\n" }, proof()).pass).toBe(true);
+  r.cases[0].verdict = "FIXED";
+  expect(gradeTrial(r, oracle, { "source.ts": "first\nsecond\n" }, proof()).pass).toBe(false);
+});
