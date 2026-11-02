@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Implementing on feat/settings-reader, with the claim local to that branch at the owner's direction. Accepted at R-3; its findings are covered in the task list."
+status_description: "Implemented on feat/settings-reader, local only at the owner's direction; the claim is on that branch, not on main. Every task is done and the next step is an implementation review."
 issue: null
 branch: feat/settings-reader
 goal: "`vh-adlc settings read` turns a YAML settings file into a checked value, or refuses it, for the TypeScript operations."
@@ -65,13 +65,17 @@ part of the report holds text from the file or from the library's error.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: For input in the accepted forms, with no `--plugin-pin`, `vh-adlc settings read --stdin` reports
+- [x] AC-01: For input in the accepted forms, with no `--plugin-pin`, `vh-adlc settings read --stdin` reports
       `answered`, and `data.value` equals the expected value, with keys sorted and timestamps as written.
-- [ ] AC-02: Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from
+      Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, `TestAccepted`, `TestSortedKeys`, the `settings-read` golden and `TestSchema` passed with no `--plugin-pin`; `TestSchema` checks keys and enums, not a full JSON Schema validation.
+- [x] AC-02: Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from
       the file.
-- [ ] AC-03: Without `--stdin` the command reports `usage`, a failed read reports `error`, and a refusal has `data: null`,
+      Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, 68 `TestRefused` rows and both refusal goldens passed, each asserting the result, code and reason, and that the canary is absent from the whole report; limited to the listed forms.
+- [x] AC-03: Without `--stdin` the command reports `usage`, a failed read reports `error`, and a refusal has `data: null`,
       one finding and the stated line.
-- [ ] AC-04: `docs/reference/cli.md` names the command and its pin exemption.
+      Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, `TestUsage`, `TestSettingsReadFailedRead`, `TestSettingsReadRefusal` and 19 `TestRefusalLine` cases covering each branch of the line rule passed.
+- [x] AC-04: `docs/reference/cli.md` names the command and its pin exemption.
+      Evidence: Read `docs/reference/cli.md` against the binary built from `3d13710`: the page names `settings read --stdin` and its pin exemption, and the binary answered with no pin and with a bad pin.
 
 ## Test Plan
 
