@@ -297,6 +297,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-02 | R-1 | spec | `5dbeab86b1c11bf1cd5affd42e0d5e50fd04d140` | claude-opus-5-5 | procedural | 26 findings, 7 blocking |
+| 2026-11-02 | R-2 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 15 findings, 3 blocking |
 
 ### R-1
 
@@ -481,6 +482,113 @@ SEVERITY: nit
 WHERE: Stackweaver adoption
 EVIDENCE: Line 473 gives vh-adlc's manifest "the `vh-*` test fixtures". `vh-` has three literal characters, so line 367 refuses that glob, and it also matches the reserved temp base `vh-adlc-<uid>` under line 370. The tests use over 20 distinct `vh-` prefixes (`vh-maintenance-`, `vh-lifecycle-`, `vh-feature-review-`) plus `triage-*`, `maintenance-*` and `quiet-*` names.
 PROPOSAL: List the real prefixes in the manifest, or move the tests under a single four-character prefix that does not match the temp base.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Scope; Acceptance Criteria, AC-11, AC-12, AC-13 and AC-19; Test Plan
+EVIDENCE: `docs/specs/settings-reader.md:22-23`: "A lock can name only a stable release, which comes from `main` ... so this has to merge and publish before the plugin can use it." `docs/internal/releasing.md:16-17` gives stable tags on `main` and only prereleases on a feature branch, and `tests/vh-adlc/check.test.ts:385` requires `^\d+\.\d+\.\d+$` in the lock. `plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:17-18,39-42,66` runs `gate complete` on the feature branch and never merges, tags or releases. The `complete` gate needs `all_met` and `impl_review_clean`. So AC-19 cannot be met before the merge it must precede. The same holds for AC-12 and AC-13: `clean` reads only `origin/<default>` (lines 145-147), so vh-adlc's manifest and the `go-build*` row count only after merge. The AC-11 install also comes from the lock (line 196). The design gives no sequence, and `issue: null` leaves no tracker for a residual. The Test Plan proof for AC-19, `bun test tests/vh-adlc`, checks only the lock's shape (`check.test.ts:380-391`), so it does not show that the release has `env` and `clean`.
+PROPOSAL: Split this as settings-reader and yaml-settings were split: a first feature ships `env`, `clean` and the manifest parser to `main` and a stable release, and a second carries the lock bump, operation, rules and adoption. Otherwise record which criteria close after merge, and give AC-19 a proof that runs the locked binary's `env` and `clean`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, kind and firewall; AC-08; adoption table
+EVIDENCE: Line 184: "Without `--firewall`, a network with a firewall rule is kept as `firewall-chain-pending`". The binary cannot observe that without the privileged container. As uid 1000 here, `iptables -S` printed "Permission denied (you must be root)" and `nft list tables` printed "Operation not permitted (you must be root)". The chain name is a hash, and a jobs network carries only `LabelManaged` (`network.go:140` at `96eaff82`), so no label or name marks it. Either every network of a manifest with `firewall:` is held, or `clean` runs the container that line 172 makes opt-in. Under the first reading, the row "Docker objects with a live `test-run` mark ... removed after" (line 218) and AC-03 fail for networks on any run without `--firewall`, which the operation does not pass unless the user names it.
+PROPOSAL: Define the test the binary applies, for example a rule field or label that declares a network firewalled, or state that every matched network of such a manifest waits for `--firewall`. Align row 218 and AC-03 with that choice, and add a case for a plain network without a chain.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, What clean will and will not touch; AC-03; Test Plan
+EVIDENCE: Lines 157-159 check "a same-uid process's `cwd`, `exe`, open file or mapping" and exempt only "Other users' processes". Line 163: "A failed check counts as live." Reading `/proc` for the 87 uid-1000 processes here, 6 failed with PermissionError: `systemd` and `(sd-pam)` (`cwd`, `exe`, `maps`, and `fd` for `(sd-pam)`), `sshd-session` (all four), and 3 `firefox` processes (`fd`). Taken literally, one such process makes the check fail for every entry, so nothing is ever removed on this host, and AC-03 cannot pass. If they are skipped instead, the stated limit is wrong, because those firefox processes are the user's own and can hold files in a `/tmp` entry. R-1 F-03 raised this for other uids, and the same shape remains for the same uid. The Test Plan has no unreadable-entry case, and a process that exits during the scan is not defined either.
+PROPOSAL: State that an unreadable same-uid process is treated like another user's process, leaving age as the only protection, and that a vanished pid is not a failed check. Add both as cases in the fake-`/proc` table test.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, kind and firewall; AC-02; AC-12
+EVIDENCE: AC-02: `--dry-run` "reports every declared, abandoned resource ... and changes nothing". AC-12 needs a dry run to classify the row "`SW-JOBS-*` chains of removed networks, using `--firewall`" (line 224). Chains can be listed only from the host-network `NET_ADMIN` container (lines 181-183 and the output in F-02), which creates a container and may pull an image. The design does not say whether a dry run starts it, so AC-02 and AC-12 cannot both hold as written.
+PROPOSAL: State that a `--firewall` dry run starts the listing container and removes nothing, and narrow AC-02 to allow that one container. Otherwise state that a dry run reports chains as unknown and change AC-12.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, kind and firewall; AC-08; R-1 findings table
+EVIDENCE: Line 180 defines the match as the prefix plus eight hex characters, and AC-08 says "An orphan chain goes". `FirewallScript` also creates `chain + "-IN"` jumped from INPUT (`network.go:284` at `96eaff82`), which that form does not match. Stackweaver's own removal (`removeFirewallChains`, `container_integration_test.go:741`) first deletes the jumps from DOCKER-USER and INPUT, then flushes and deletes both chains, then deletes the table in both `inet` and `bridge`. The design mentions neither jumps, `-IN`, ip6tables nor the two families, and `iptables -X` needs the jumps gone first. So AC-08 can pass while the `-IN` chain and its INPUT jump stay, and that jump rejects by source subnet, which a later network can reuse. Line 236 lists R-1 F-14 as applied, but its proposal to name both nft families and ip6tables and to add a Test Plan case for a network created during the run is not in the text. `/usr/bin/podman` is installed, and the removal of `engines` leaves a rootful Podman network's table reading as an orphan.
+PROPOSAL: Specify what the fixed script removes, in order: jumps, both chains, ip6tables and both nft families, and how the suffix is declared. Add these and the created-during-run case to AC-08's proof, and state the Podman limit.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Manifest; adoption table
+EVIDENCE: The example rule (lines 116-120) has `match: {sh.stackweaver.managed: "true"}` with `kinds` including `image`. `conformance_integration_test.go:206` builds its image with only `LABEL sh.stackweaver.test-run`, and `buildToolsImage` passes `withTestRun(nil)` (`container_integration_test.go:140`), so neither carries the managed label. `sweepEndedRuns` filters on the test-run label alone. Those images match no rule, and row 218 ("removed after") fails for them. `sw-probe-*` images do carry both labels, so a test using only those would pass.
+PROPOSAL: Drop `match` from this rule, or have Stackweaver's adoption add the managed label to both builds, and include a conformance or tools image in the AC-12 stand-ins.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, kind and firewall; Adoption; AC-08
+EVIDENCE: Lines 174-177 and 211 give the mark no name and no removal when a run ends normally, and they do not say what happens with several marks on one cluster. `e2e/k8s/run.sh:140` at `96eaff82` reuses an existing cluster. On the engine here, a second `docker volume create --label sh.test.run=b/2 <name>` on an existing volume returned rc=0 and kept `{"sh.test.run":"a/1"}`. A fixed-name mark left by an ended run therefore keeps its ended pid during a new live run, and `clean --kind` stops that live cluster. With per-run names, a cluster can hold an ended and a live mark, and "if two rules disagree, live wins" covers rules, not marks.
+PROPOSAL: Specify the mark's name and lifecycle: a per-run name, removal on every harness exit, and a cluster counts as abandoned only when all its marks have ended. Add a reused-cluster case to the Test Plan.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Manifest; adoption table
+EVIDENCE: Line 133: "An object without the label is not matched." Line 134 uses `com.docker.compose.project.working_dir`. `docker volume inspect swc-7_postgres_data` shows only `config-hash`, `project`, `version` and `volume`, so the working directory is on containers alone. Once a slot's containers are gone (a partial run or `docker rm`), its volumes and networks have no liveness and stay forever. `scripts/compose-slot.sh` `cmd_down` also removes `swc-N-*` images and the state directory; the `compose` rule has no image key, and 8 such image repositories exist here. `cmd_status` lists a slot from that state directory, so a slot `clean` removed still appears. Row 220 says only "removed with its volumes".
+PROPOSAL: State that Compose liveness is decided per project from its containers, what a project with no containers gets, and whether built images and project state are removed or left to the project's own teardown.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Commands and Where the rules come from; R-1 findings table
+EVIDENCE: Line 236 lists R-1 F-20 as applied. Lines 93-96 give a result only for a dry run, removal success or failure, `running-as-root` and `unsupported-platform`. Nothing maps `manifest-invalid`, `manifest-missing`, `manifest-unmerged`, `engine-unreachable` or `kind-unavailable`, so an applied run that refuses its manifest reads as `pass` because no removal failed. `env` has no result at all, its refusal of a bad base (line 101) has no code, and an invalid `host.yaml` has no code. A failed `git symbolic-ref refs/remotes/origin/HEAD` has no code either, though `/home/m/code/claude-plugins` printed "fatal: ref refs/remotes/origin/HEAD is not a symbolic ref" here. The binary already has `default-branch-unknown` and a no-remote path (`internal/report/codes.go:47`, `internal/fresh/fresh.go:97-118`), and the design neither reuses nor rejects them.
+PROPOSAL: Add one table from every finding code to its result, for `clean` and `env`, with codes for temp-base and host-settings refusal. Reuse `default-branch-unknown` and state whether `internal/fresh`'s default-branch resolution applies.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Where the rules come from; Commands; AC-05
+EVIDENCE: Lines 147-148: a changed manifest "gets a dry run". AC-05 adds that "an applied run removes only what the default-branch manifest declares". These can be read as an applied run downgraded to a dry run, or as an applied run using the default-branch rules while reporting the change, and the text does not say which rules the dry run uses. A manifest present only on a branch satisfies both `manifest-unmerged` and `manifest-missing` (lines 147-150). `env` reads a project name (lines 87, 100), but line 145 gives the source only for `clean`, so `env` with no manifest, or one only on a branch, is undefined, and that is the state of a Stackweaver adoption branch.
+PROPOSAL: State for each case (working-tree change, branch change, branch only) which rules a dry run and an applied run use and what they report. State where `env` reads `project` and what it does with none.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, What clean will and will not touch
+EVIDENCE: Lines 163-164 keep removing file entries when the socket "is simply absent or refuses, which means no engine is running". That is the only path where a failed engine check allows removal, because the bind-mount check is then skipped. The design never says which socket is read. `docker context ls` here reports "Current DOCKER_HOST based configuration", Stackweaver's tests accept `STACKWEAVER_TEST_ENGINE_SOCKET`, and `/usr/bin/podman` is installed. A binary reading a fixed path while the engine is elsewhere sees "absent" and removes entries a running container has bind-mounted. Permission denied is not classified either, and neither is covered by a criterion or Test Plan row.
+PROPOSAL: Resolve the engine as the Docker CLI does and state the order, count permission denied as a failed listing, and add the absent, refused and denied cases to AC-04's proof.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Temp root and Manifest; AC-06
+EVIDENCE: The default base `/tmp/vh-adlc-<uid>` is a top-level `/tmp` entry the user owns, and R-1's reserved base is no longer in the text. vh-adlc's manifest must list "its other test prefixes" (line 204), and the tests use `vh-adlc-fixtures-`, `vh-adlc-claude-` and `vh-adlc-golden-` (`tests/vh-adlc/fixtures.test.ts:11`, `tests/vh-adlc/scenarios/host.ts:27`, `cmd/vh-adlc/golden_test.go:28`). A shortened `vh-adlc-*` passes the four-character floor and matches the base, removing every project's idle temp root. `project` has no format rule, so `..` or `.` in `<temp_base>/<project>` escapes or widens the root, and AC-06 does not cover it.
+PROPOSAL: Exclude the temp base from `tmp` matching, and require `project` to be a single plain path segment. Add both refusals to AC-06.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria; Test Plan
+EVIDENCE: Several behaviours the design states have no criterion or proof row: `--older-than` "can only raise a rule's age" (line 91, raised in R-1 F-21 and still uncovered), `manifest-missing` removing nothing (line 150), `kind-unavailable` (line 177), and `--sh` printing nothing to stdout on failure (lines 88-89). `--sh` output is what the Stackweaver entry points consume, and line 235 records F-21 only as "Criteria reduced with the scope".
+PROPOSAL: Add criteria and Test Plan rows for these four, or remove the behaviours from the design.
+
+FINDING: F-14
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Manifest; AC-03
+EVIDENCE: Line 136 and AC-03 use an age, but nothing says what it is measured from. A directory's mtime does not change when a nested file is written, so a tree in active use can read as old. An extracted tree with preserved times reads as old too. The in-use check sees only open files, not a process between writes.
+PROPOSAL: Define age, for example as the newest mtime in the entry, and add a table case with a recent nested file.
+
+FINDING: F-15
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Operation and allow rules
+EVIDENCE: Line 199 gives the Claude Code setting as `"allow": ["Bash(vh-adlc clean *)"]` in `~/.claude/settings.json` with no `permissions` object, so copied as written it does not sit where allow rules are read. The rule pattern itself is correct: the permissions page says a trailing ` *` also matches the bare command.
+PROPOSAL: Show the rule inside `"permissions": {"allow": [...]}`, since AC-14 has the guides document it.
 
 ## Sources
 

@@ -166,6 +166,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-02 | R-1 | spec | `5dbeab86b1c11bf1cd5affd42e0d5e50fd04d140` | claude-opus-5-5 | procedural | 18 findings, 1 blocking |
 | 2026-11-02 | R-2 | spec | `3ebea55efee3e8eb9765ef805a0a47e11c4e1584` | claude-opus-5-5 | procedural | 15 findings, 1 blocking |
+| 2026-11-02 | R-3 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 11 findings, 1 blocking |
 
 ### R-1
 
@@ -401,6 +402,85 @@ SEVERITY: nit
 WHERE: Design, Migration and Delivery order; Test Plan
 EVIDENCE: Two numbered lists share step numbers with different meanings. "Rollback before step 5" refers to the Migration list, where step 5 stops JSON reading. "after step 7" in the AC-01 and AC-03 proofs refers to Delivery order, where step 5 is shared audit's revision.
 PROPOSAL: Refer to steps by name, or prefix them, for example "delivery step 7".
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Acceptance Criteria AC-06, AC-11; Design, Order, one PR each; Design, R-2 findings row F-01
+EVIDENCE: The R-2 table says F-01 is resolved by "one PR per piece", but this document still holds criteria that only become true after its own PR has merged. AC-06 needs Stackweaver running from YAML "on its default branch", and Order step 4 comes after step 3. A merged Stackweaver on the current plugin would run on defaults, so that merge cannot safely come first. AC-11 needs shared audit to read `audit.yaml` "after a new review and acceptance", and step 5 says "neither this feature nor its branch changes it". That revision uses the shared loader, reached "after `git fetch origin main`", so it follows this PR's merge. The pinned gates.complete requires all_met, impl_review_fresh and on_feature_branch_if_set. conventions/delivery.md:41 says the document "is edited only on that branch and returns to the default branch with the PR", :42 says "One PR per feature", and plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:79 says a merge "ends the remote PR branch's lifetime". So `gate complete` cannot pass before the merge, because two criteria are unmet. After the merge the document sits in-progress on main with a `branch` that no longer exists, and the first `next` rules report an owner decision. Residuals are the only exit, and the document plans none (`issue: null`, no tracker). Precedent avoided this: shared-triage's goal stopped at "a reviewed Stackweaver migration branch ready to publish", and shared-maintenance has commit 6200787 "complete verified" before 3ccbf40 "record verified maintenance publication and adoption".
+PROPOSAL: Restate AC-06 as a reviewed Stackweaver branch that passes against the exact candidate plugin, and move the default-branch adoption to a post-merge record as the earlier adoptions did. Move AC-11 out of this document: make it a dependency recorded in shared-audit.md, or an owner-approved residual with a named tracker. The status text must not claim the blocker is resolved until one of these is done.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Loader and Order step 3; Acceptance Criteria; Test Plan
+EVIDENCE: plugins/vh-adlc/references/triage-settings.md:7 says "Create `.vh-adlc/triage.json` when a project needs its own scope or ownership rules", followed by a ```json example. references/maintenance-settings.md:3 and :48 name `.vh-adlc/maintenance.json`, and :48 is the standing grant's documented chain. The Design names only one edit to these files, the sentence at triage-settings.md:39. Order step 3 lists "lock bump, loader, the pin ..., and the plugin version bump" plus fixtures. No criterion or proof touches the references. With every box ticked, the shipped contract can still tell a person to create a file that the new loader refuses.
+PROPOSAL: Add both reference files to step 3, including the YAML example and the grant chain. Add a criterion that the settings contract documents only the `.yaml` path, proved by a package test that also parses the example through the loader.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Order step 4; AC-06; Test Plan AC-06
+EVIDENCE: Step 4 says "convert both files by hand", and the migration helper with its equality check was cut. AC-01's proof runs on vh-adlc fixtures, so it does not cover Stackweaver's real files, and the AC-06 proof names only adapter tests and an installed-plugin run. tests/agent-triage/contract.test.ts on Stackweaver origin/main asserts a subset of keys: repository, protected_ids, generated_mirrors, report_dir, priority_order, milestone_order and workstreams. It does not check bot_authors, owned_labels, label_map, index_ids or index_rules. tests/agent-maintenance/contract.test.ts reads the file through a small `config()` helper; the assertions I read cover schema_version, repository and hostname. A value lost or changed by hand would pass the validators and these proofs, and silently change what triage protects or what maintenance scopes.
+PROPOSAL: Add a pass condition to the AC-06 proof: the `settings` operation output at Stackweaver's last JSON commit and at the YAML commit are identical apart from `settings_path`, for both triage and maintenance.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Order step 3; R-2 findings row F-13
+EVIDENCE: "Its fixtures move to YAML" collides with fixtures frozen from real Stackweaver commits. tests/vh-adlc/triage/fixtures/migration/manifest.json:7 hashes `.vh-adlc/triage.json`. The test "the migration snapshot was exported from one exact adapter commit and only allowed paths" (tests/vh-adlc/triage/migration.test.ts) checks every hash against manifest.commit, and with STACKWEAVER_TRIAGE_CHECKOUT set it compares against that checkout. The fixture also carries Stackweaver's own contract.test.ts and rehearse.ts with the JSON path. A YAML snapshot from an exact commit cannot exist at step 3, because Stackweaver's move is step 4. Separately, tests/vh-adlc/maintenance/policy-corpus.ts:14-18 runs `JSON.parse(frozen(".vh-adlc/maintenance.json"))` at an exact consumer commit and writes that path into the project, where the new loader refuses it. trial-proof.test.ts:70 and report-trial.ts:89 use this corpus.
+PROPOSAL: State which fixtures are frozen evidence and how each is handled, for example keep frozen exports as JSON data outside `.vh-adlc/` semantics and have test setup write YAML into the fixture checkout, or export them from the head of Stackweaver's PR and say so.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, R-2 findings row F-05, F-10, F-12, F-15; Design, Loader
+EVIDENCE: The table says F-12 is "Resolved by removal", but R-2 F-12 concerned repositories with no settings file, and the removed both-format period does not touch that case. plugins/vh-adlc/scripts/triage/settings.ts:76,106 and maintenance/settings.ts:66,121 put the default path into `settings_path` even when nothing is configured. Moving the default to `.yaml` changes the digests of every unconfigured repository on plugin upgrade. The Design says only that digests "change once at migration", and such a repository has no migration step and no "finish open runs first" instruction.
+PROPOSAL: State the no-file `settings_path` value and that those digests change on upgrade, then correct the table row.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Loader; AC-02
+EVIDENCE: The Loader section covers the working tree "or a Git blob" and then says `.json` and `.yml` files fail, naming the expected path. plugins/vh-adlc/scripts/maintenance/authority.ts:95 tests the AGENTS.md link before reading any blob and returns status `unadopted` with reason "committed adoption chain absent" when the link is absent. A default branch still linking the JSON or `.yml` file therefore reports unadopted and names no path. That fails closed, but it differs from what AC-02 says.
+PROPOSAL: Limit the AC-02 failure to the working-tree path and state that the blob path reports unadopted, or add the check to authority.ts and to the loader table.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context; Design, Shared audit
+EVIDENCE: `git cat-file -t 7e161c5` in /home/m/code/vh-adlc-host-cleanup gives "fatal: Not a valid object name". `git ls-remote origin 'refs/heads/*audit*'` returned nothing. The commit exists only in the separate clone /home/m/code/vh-adlc-triage-spec, where feat/shared-audit resolves to 7e161c58ac2377e86503384744d3f03dc71f557a. All cited lines checked out there: shared-audit.md:262,268,616, audit/settings.ts:46,51, audit/authority.ts:95,145, audit-settings.md:3,43 and workflows.md:73. A reader of this repository cannot follow "local `feat/shared-audit`".
+PROPOSAL: Name the clone that holds the branch, and give the full commit SHA.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Shared audit
+EVIDENCE: The Loader section drops "Loading settings creates no files" because the installer can fill its cache. The same promise exists at 7e161c5 in plugins/vh-adlc/scripts/audit/settings.ts:40, "Reading settings performs no setup, permission refresh, or filesystem mutation." The shared audit list cites only lines 46 and 51 of that file.
+PROPOSAL: Add settings.ts:40 to the list.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter covers
+EVIDENCE: The Design makes the loader depend on plugins/vh-adlc/scripts/ensure-vh-adlc.sh, and AC-10 and its proof depend on `exportInputs` and `boundaryCommand` in plugins/vh-adlc/scripts/triage/controller.ts. Neither path is in `covers`, while the standard says it lists "every path whose change can affect the feature". A change to either would not make the implementation review stale.
+PROPOSAL: Add both paths to `covers`.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-10; Test Plan AC-07, AC-10
+EVIDENCE: AC-10 says the controller "receives equal settings" without saying equal to what, and its proof ("runs `exportInputs` ... and starts the real `boundaryCommand`") has no pass condition. The standard asks for a check with one. For AC-07, `vh-adlc knowledge --repo . --plugin-pin <pin>` returned `"data":{"pages":[]}`, so "Read the rule through `vh-adlc knowledge`" shows no rule unless `--page conventions/coding.md` is given.
+PROPOSAL: Say AC-10's export equals `json(loadSettings(checkout))` and the served session starts, with the export's hash verified. Name `--page conventions/coding.md` in the AC-07 proof.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Order step 3
+EVIDENCE: Step 3 moves the pin inside this feature's PR. `gh api repos/vhco-pro/docs/compare/e4d58d2...main` shows 32 commits, with conventions/delivery.md (96 changed lines), coding.md (47) and documentation.md (27) among the files. New rules include `delete_branch_on_merge` and component naming. conventions/feature-documents.md is not in the diff, so the rules block stays the same. plugins/vh-adlc/knowledge.md calls moving the pin "a reviewed plugin change". R-1 F-12 raised this, and it was superseded with no statement of who checks the plugin and repository against the new text.
+PROPOSAL: Add one line to step 3 saying the implementer reads the conventions diff and records what applies, or pin a revision that adds only the rule.
 
 ## Sources
 
