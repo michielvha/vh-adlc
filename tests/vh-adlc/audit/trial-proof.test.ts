@@ -28,3 +28,8 @@ test.each(["wrong-verdict", "eligible", "missing-member", "duplicate", "wrong-so
   if (kind === "no-transcript") p.transcript_sha256 = "";
   expect(gradeTrial(r, expected, { "source.ts": "first\nsecond\n" }, p).pass).toBe(false);
 });
+
+test("citations may include supplied canonical policy as well as the required scenario", () => {
+  const r = response(); r.cases[0].evidence.push({ path: "policy.md", line: 1 });
+  expect(gradeTrial(r, expected, { "source.ts": "first\nsecond\n", "policy.md": "Retain sibling residuals.\n" }, proof()).pass).toBe(true);
+});
