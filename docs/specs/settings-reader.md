@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-2 findings applied on 2026-11-02; it had no blockers, and its changes wait for a new independent review."
+status: planned
+status_description: "Accepted by the owner on 2026-11-02 at R-3. R-3's non-blocking findings carry into the task list, outside the normative baseline."
 issue: null
 goal: "`vh-adlc settings read` turns a YAML settings file into a checked value, or refuses it, for the TypeScript operations."
 covers:
@@ -96,6 +96,7 @@ None.
 | 2026-11-02 | R-1 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 11 findings, 0 blocking |
 | 2026-11-02 | R-2 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 | 2026-11-02 | R-3 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
+| 2026-11-02 | R-3 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | n/a | n/a | accepted by owner |
 
 ### R-1
 
