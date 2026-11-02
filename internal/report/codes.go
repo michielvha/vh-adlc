@@ -53,6 +53,8 @@ const (
 	CodeReviewNotFound = "review-not-found"
 	CodeRecordsDiffer  = "records-differ"
 
+	CodeSettingsInvalid = "settings-invalid"
+
 	CodeError = "error"
 )
 
@@ -89,5 +91,6 @@ var Codes = []string{
 	CodeGitTooOld,
 	CodeTransitionNotAllowed,
 	CodeReviewNotFound, CodeRecordsDiffer,
+	CodeSettingsInvalid,
 	CodeError,
 }
