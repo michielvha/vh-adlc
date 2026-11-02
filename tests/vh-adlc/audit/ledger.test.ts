@@ -128,3 +128,17 @@ test("legacy title annotations and inline reverify markers preserve the original
   expect(candidate.bytes).toContain("**Re-verify (2026-11-02):**"); expect(candidate.bytes).toContain("✅ **FIXED");
   expect(candidate.bytes).toContain("### AUD-001 - Incorrect result\nThe return value needs a current check.");
 });
+
+test.each(["missing", "older"])("a %s comparison remains honest while the next scope baseline permits isolated default application", kind => {
+  const c = context(), comparison = kind === "missing" ? "0".repeat(40) : c.base;
+  c.f.write("src/app.ts", "export const answer = 43; // current default delta\n"); const head = c.f.commit(); git(c.f.root, "update-ref", "refs/remotes/origin/main", head);
+  const snap = captureSnapshot(c.config, { mode: "reverify", ids: ["AUD-001"], baseline: comparison, artifact_root: c.f.artifacts, required_checks: { "AUD-001": ["unit"] } });
+  const document = { schema_version: 1, snapshot_digest: snap.digest, assessments: [terminal(c.f, snap)] };
+  const candidate = createLedgerCandidate(c.config, snap, { document, at: "2026-11-02", run_id: "comparison-scope",
+    ...(kind === "older" ? { new_findings: [{ id: "AUD-003", severity: "High", title: "New related cause", body: "Observed in current related source delta.", delta_paths: ["src/app.ts"] }] } : {}) });
+  expect(candidate.scope_baseline).toBe(head); expect(candidate.bytes).toContain("Scope baseline: " + head);
+  if (kind === "missing") { expect(snap.history.status).toBe("unscoped"); expect(candidate.bytes).toContain("Comparison: unscoped"); }
+  else { expect(snap.history.baseline).toBe(c.base); expect(candidate.bytes).toContain("### AUD-003"); }
+  const result = applyLedgerCandidate(c.config, snap, candidate, document, { ...c.options, path: join(c.f.outer, "comparison-worktree") });
+  expect(result.base).toBe(head); expect(readFileSync(join(result.path, "docs/audit.md"), "utf8")).toBe(candidate.bytes);
+});

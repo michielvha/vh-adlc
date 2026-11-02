@@ -48,7 +48,7 @@ function source(root: string) {
 }
 export type Snapshot = ReturnType<typeof captureSnapshot>;
 export function captureSnapshot(config: Settings, options: {
-  mode: AuditMode; ids?: string[]; artifact_root: string; baseline?: string; required_checks?: Record<string, string[]>;
+  mode: AuditMode; ids?: string[]; artifact_root: string; baseline?: string; scope_baseline?: string; required_checks?: Record<string, string[]>;
 }) {
   if (!["status", "reverify", "full", "fix"].includes(options.mode)) throw Error("unknown audit mode");
   const fresh = loadSettings(config.root, { settingsPath: config.settings_path });
@@ -70,7 +70,13 @@ export function captureSnapshot(config: Settings, options: {
       history = { status: "scoped", baseline: options.baseline, reason: "Resolved ancestor of assessed source." };
     } catch { /* Missing, shallow and non-ancestor history all require direct reassessment. */ }
   }
+  const scope_baseline = options.scope_baseline ?? (options.mode === "fix" ? history.status === "scoped" ? history.baseline : null : target.commit);
+  if (scope_baseline) {
+    if (!/^[a-f0-9]{40,64}$/.test(scope_baseline)) throw Error("invalid audit scope baseline");
+    git(config.root, "merge-base", "--is-ancestor", scope_baseline, target.commit);
+  }
   const body = {
+    scope_baseline,
     schema_version: 1 as const, repository: config.repository, hostname: config.hostname,
     mode: options.mode, selected_ids: [...selected_ids], required_checks: structuredClone(required_checks), artifact_root,
     source: target, bindings: {
@@ -87,7 +93,7 @@ export function checkSnapshot(config: Settings, snap: Snapshot): { current: bool
     if (digest(body) !== claimed) return { current: false, reason: "Snapshot identity changed." };
     const current = captureSnapshot(loadSettings(config.root, { settingsPath: config.settings_path }), {
       mode: snap.mode, ids: snap.selected_ids, artifact_root: snap.artifact_root,
-      baseline: snap.history.baseline ?? undefined, required_checks: snap.required_checks,
+      baseline: snap.history.baseline ?? undefined, scope_baseline: snap.scope_baseline ?? undefined, required_checks: snap.required_checks,
     });
     return { current: current.digest === claimed, reason: current.digest === claimed ? "Current bindings match." : "Source or audit inputs changed." };
   } catch { return { current: false, reason: "Current audit inputs cannot be validated." }; }

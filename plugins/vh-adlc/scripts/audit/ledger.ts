@@ -39,7 +39,7 @@ export function createLedgerCandidate(config: Settings, snap: Snapshot, options:
   return renderCandidate(config, snap, options, readFileSync(join(config.root, config.ledger_path), "utf8"));
 }
 function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOptions, original: string): Candidate {
-  if (snap.history.status !== "scoped" || !snap.history.baseline) fail("a reachable current scope baseline is required for this update");
+  if (!snap.scope_baseline) fail("a reachable next scope baseline is required for this update");
   const lines = original.split("\n");
   for (const row of options.document.assessments) {
     const finding = snap.inventory.findings.find(f => f.id === row.id);
@@ -76,20 +76,20 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     const safe = (value: string) => value.replace(/[\r\n]/g, " ").replaceAll("<!--", "&lt;!--");
     const stateMarker = row.verdict === "FIXED" ? "✅" : row.verdict === "MOOT" ? "🗑️" : "⚠️";
     lines.splice(end, 0, "", marker, `**Re-verify (${options.at}):** ${stateMarker} **${row.verdict}** (previous recorded state: ${finding.recorded_status}).`,
-      `Scope baseline: ${snap.history.baseline}`, `Verified source: ${snap.source.commit}`, `Run: ${options.run_id}; snapshot: ${snap.digest}`,
+      `Scope baseline: ${snap.scope_baseline}`, `Verified source: ${snap.source.commit}`, `Comparison: ${snap.history.status}; baseline: ${snap.history.baseline ?? "unavailable"}. ${snap.history.reason}`, `Run: ${options.run_id}; snapshot: ${snap.digest}`,
       "Scenario: " + safe(row.reason), "Evidence: " + row.evidence.map(e => safe(e.path + "#" + e.symbol)).join(", "),
       "Checks: " + row.checks.map(c => safe(c.name + " exit " + c.exit_code)).join(", "),
       "Residuals: " + (row.residuals.map(safe).join("; ") || "none recorded"), "");
   }
   const gaps = options.document.assessments.filter(row => !snap.inventory.findings.find(f => f.id === row.id)?.identity_valid);
   if (gaps.length) {
-    lines.push("", `## Audit coverage ${options.at} (${options.run_id})`, "", `Scope baseline: ${snap.history.baseline}`, `Verified source: ${snap.source.commit}`,
+    lines.push("", `## Audit coverage ${options.at} (${options.run_id})`, "", `Scope baseline: ${snap.scope_baseline}`, `Verified source: ${snap.source.commit}`,
       "Incomplete identities below were not converted into individual terminal verdicts; original index/history remains unchanged.");
     for (const row of gaps) lines.push(`- ${row.id}: ${row.verdict}. ${row.reason.replace(/[\r\n]/g, " ")} Gap: ${row.residuals.join("; ").replace(/[\r\n]/g, " ")}`);
     lines.push("");
   }
   const body = { schema_version: 1 as const, run_id: options.run_id, at: options.at, snapshot_digest: snap.digest,
-    assessments_digest: digest(options.document), source_target: snap.source.commit, scope_baseline: snap.history.baseline,
+    assessments_digest: digest(options.document), source_target: snap.source.commit, scope_baseline: snap.scope_baseline,
     ids: [...snap.selected_ids, ...(options.new_findings ?? []).map(f => f.id)], new_findings: options.new_findings ?? [],
     verdict_eligibility: options.provisional ? "provisional" as const : "checked-proposal" as const,
     bytes: options.new_findings?.length ? appendBytes(config, snap, lines.join("\n"), options.new_findings) : lines.join("\n") };
@@ -153,7 +153,7 @@ export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate
   if (!["reverify", "full"].includes(snap.mode) || candidate.verdict_eligibility !== "checked-proposal") fail("provisional fix candidate stays on its selected repair branch pending final review");
   if (!validateLedgerCandidate(config, snap, candidate, document).valid) fail("invalid or stale candidate");
   const observed = (options.refresh ?? (() => refreshDefault(config)))();
-  if (observed.default_commit !== snap.source.commit || observed.default_commit !== snap.history.baseline ||
+  if (observed.default_commit !== snap.source.commit || observed.default_commit !== snap.scope_baseline ||
       snap.source.branch !== observed.default_branch || !snap.source.clean ||
       git(config.root, "rev-parse", "refs/remotes/origin/" + observed.default_branch) !== observed.default_commit) fail("assessment must use the same clean fetched default source");
   for (const effect of ["ledger-update", ...(options.commit ? ["ledger-commit"] : [])] as const) {

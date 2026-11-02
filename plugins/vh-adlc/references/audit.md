@@ -45,7 +45,7 @@ Re-locate the original symbols and failure/applicability scenario. Resolve each 
 check ancestry against the assessed source before a change scan. Missing/shallow/non-ancestor
 history is unscoped, never an empty unchanged delta: directly reassess selected current findings,
 show the comparison gap and do not silently enter full. A new dated update can use the current
-fetched default ancestor as Scope baseline after that direct reassessment. Keep old targets honest.
+fetched default ancestor as Scope baseline after that direct reassessment. Comparison history and this next Scope baseline are separate: `--baseline` records the old comparison, including its unscoped gap; `--scope-baseline` can name the next reachable default ancestor explicitly. Reverify/full proposals default the next baseline to assessed source; application still requires that source to equal freshly fetched clean default. Fix proposals name the fetched default ancestor separately from their frozen repair source. Keep old targets honest.
 For heavily changed relevant areas, scan related known defect classes. Class growth stays on its
 existing ID as REGRESSED; a genuinely different root cause may get a fresh ID from this lightweight
 delta pass. `new-findings`/candidate inputs in reverify must name `delta_paths` that actually changed

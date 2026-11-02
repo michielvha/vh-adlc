@@ -14,7 +14,7 @@ import { createRun, intent, noteResource, readRun } from "./journal";
 import type { AuditMode } from "./types";
 
 const argumentsByOperation: Record<string, string[]> = {
-  settings: [], status: [], inventory: [], snapshot: ["mode", "ids", "artifact-root", "baseline", "requirements", "name"],
+  settings: [], status: [], inventory: [], snapshot: ["mode", "ids", "artifact-root", "baseline", "scope-baseline", "requirements", "name"],
   check: ["snapshot", "input"], report: ["snapshot", "input", "name"], candidate: ["snapshot", "input", "run-id", "date", "name", "new-findings", "provisional"],
   "new-findings": ["snapshot", "input", "name"], apply: ["snapshot", "input", "candidate", "request", "path", "commit"],
   "policy-candidate": ["default-branch"], "policy-adopted": [], authority: ["input"], "batch-check": ["input"],
@@ -43,7 +43,7 @@ export function runCLI(argv: string[]) {
   if (["status", "inventory"].includes(operation)) return inventory(config);
   if (operation === "snapshot") {
     const value = captureSnapshot(config, { mode: requireOption("mode") as AuditMode, ids: options.ids?.split(","),
-      artifact_root: requireOption("artifact-root"), baseline: options.baseline,
+      artifact_root: requireOption("artifact-root"), baseline: options.baseline, scope_baseline: options["scope-baseline"],
       required_checks: options.requirements ? json(options.requirements) : undefined });
     return save(value.artifact_root, value);
   }

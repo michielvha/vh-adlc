@@ -23,7 +23,7 @@ export function saveReport(config: Settings, snap: Snapshot, name: string, asses
     `Source: ${snap.source.commit}`, `Snapshot: ${snap.digest}`, "", "## Recorded status", "",
     ...Object.entries(snap.inventory.recorded_counts).map(([state, count]) => `- ${state}: ${count}`), "",
     checked ? `Current verification: ${checked.coverage}; eligible terminal updates: ${checked.eligible_ids.join(", ") || "none"}.` : "Current verification: not performed",
-    `History comparison: ${snap.history.status}. ${snap.history.reason}`, "",
+    `History comparison: ${snap.history.status}. ${snap.history.reason}`, `Proposed next Scope baseline: ${snap.scope_baseline ?? "unavailable"}; fresh default/source validation remains required before application.`, "",
     ...snap.inventory.diagnostics.map(d => `- Inventory gap: ${d.code}${d.id ? " (" + d.id + ")" : ""}`),
     ...(checked ? [checked.limit, ...checked.errors.map(error => "- Evidence gap: " + error)] : []), "",
     ...(details.length ? ["## Current assessments", "", ...details] : []),
