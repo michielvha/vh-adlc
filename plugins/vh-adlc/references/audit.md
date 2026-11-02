@@ -54,7 +54,12 @@ Missing comparison history is a reported gap, not permission to invent a delta o
 
 Use STILL_PRESENT, FIXED, PARTIAL, REGRESSED, MOOT or UNKNOWN for current assessments. Each row
 records original state, disposition, reason/scenario, actual current file/symbol hashes and commit,
-check argv/exit/target/log artifacts, residuals and any independent challenge. FIXED/MOOT requires
+check argv/exit/target/log artifacts, residuals and any independent challenge.
+Use PARTIAL when part of the original scope is repaired while another required surface still reproduces.
+A recorded FIXED label alone does not establish a regression: it is historical context, not proof that
+the entire original scenario previously passed. REGRESSED needs observed worsening/class growth or
+current failure against an independently established earlier fix, on the existing finding ID.
+FIXED/MOOT requires
 all required checks plus an independent original-scenario challenge. Removed applicability, not
 just missing/renamed code, establishes MOOT. Authored repairs also need actual regression red/green
 and current independent audit batch review. Keep sibling/surface residuals explicit.
