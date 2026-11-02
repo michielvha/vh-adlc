@@ -1,8 +1,8 @@
 ---
 status: draft
-status_description: "R-3 findings applied on 2026-11-02 and `--firewall` dropped by the coordinator's decision. R-3's blocker still needs a new independent review."
+status_description: "R-4 findings applied on 2026-11-02. The owner accepts this document if the next independent review has no blocking finding."
 issue: null
-goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only what that repository's default branch says it owns and has abandoned."
+goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned."
 covers:
   - cmd/vh-adlc/
   - internal/clean/
@@ -61,11 +61,11 @@ process" (a `bwrap --unshare-pid` probe, and `codex sandbox` the same).
 
 In scope: `.vh-adlc/cleanup.yaml`, `vh-adlc env`, `vh-adlc clean` per repository, the `vh-adlc-clean`
 operation for Claude Code and Codex, one allow rule each, vh-adlc's own manifest, and a reviewed Stackweaver
-adoption branch. The release, lock bump and first real run follow the merge, under [Order](#order).
+adoption branch based on `feat/runner-architecture`. The release, lock bump and first real run follow the merge, under [Order](#order).
 
-Host firewall chains are out of scope: the coordinator's decision on 2026-11-02, overriding the owner's
-earlier answer to keep a `--firewall` option. They stay with Stackweaver's own sweep, with the limits
-under Adoption.
+Host firewall chains are out of scope: the owner's answer on 2026-11-02, replacing the earlier `--firewall`
+option. The owner accepted the cost: firewall objects of `stackweaver-jobs-slot-*` networks and of networks
+already removed last until a reboot. The rest stay with Stackweaver's own sweep, with the limits under Adoption.
 
 Also out of scope: defending against a hostile agent; a registry, host list or `--all-projects`; any check
 of the remote; a timer; hosts other than Linux; killing host processes; engine-wide pruning and the build
@@ -83,7 +83,8 @@ stop one on purpose.
 carry `knowledge: null`. The logic lives in `internal/clean`. Outside Linux, both report
 `unsupported-platform` and do nothing. `clean` also refuses with `running-as-root`, with `git-too-old` on
 Git older than 2.45, and with `pid-namespace` unless `/proc/self/ns/pid` is the initial namespace, because
-`kill` and `/proc` give wrong answers inside one. That also covers a sandbox that hides the engine socket.
+`kill` and `/proc` give wrong answers inside one. That also covers a PID-namespace sandbox that hides the
+engine socket.
 
 - `vh-adlc env [--repo DIR] [--sh]` creates the project's temp root and reports `TMPDIR` and `GOTMPDIR`.
   `--sh` prints `export` lines, the second exception to the JSON contract after `--version`. On failure,
@@ -92,10 +93,12 @@ Git older than 2.45, and with `pid-namespace` unless `/proc/self/ns/pid` is the 
 - `vh-adlc clean [--repo DIR] [--dry-run] [--older-than DURATION] [--kind]` plans and removes.
   `--older-than` applies to `tmp` and `temp_root` ages, and can only raise them.
 
-Those refusals report `error`. A dry run reports `answered`. An applied run or `env` reports `pass`, or
-`fail` on `removal-failed`, `manifest-invalid`, `engine-unreachable`, `kind-unavailable`, `temp-base-refused`
-or `host-settings-invalid`. `manifest-missing`, `default-branch-unknown` and `manifest-unmerged` are notes.
-All but `git-too-old` and `default-branch-unknown` are new finding codes.
+Those refusals report `error`. A dry run reports `answered`. An applied run reports `pass`, or `fail` on
+`removal-failed`, `manifest-invalid`, `engine-unreachable` or `kind-unavailable`. `temp-base-refused` and
+`host-settings-invalid` also report `fail`, and stop the run before it removes anything.
+`manifest-missing`, `default-branch-unknown`, `manifest-unmerged` and `engine-absent` are notes. `env` fails
+on `manifest-missing`, `temp-root-undeclared`, `temp-base-refused` or `host-settings-invalid`. All but
+`git-too-old` and `default-branch-unknown` are new finding codes.
 
 ### Temp root
 
@@ -111,18 +114,18 @@ holds no commands.
 
 ```yaml
 schema_version: 1
-project: stackweaver
+project: example
 temp_root: {max_age: 24h}
 tmp:
-  - {glob: "TestConformance_*", max_age: 12h}
+  - {glob: "example-run-*", max_age: 12h}
 docker:
-  - kinds: [container, network, volume]
-    liveness: {kind: pid, label: sh.stackweaver.test-run}
+  - kinds: [container, network, volume, image]
+    liveness: {kind: pid, label: example.test-run}
     anonymous_volumes: true
 compose:
-  - {project: "swc-*", volumes: true}
+  - {project: "example-*", volumes: true}
 kind:
-  - {cluster: sw-e2e, liveness: {kind: pid, label: sh.stackweaver.kind-run}}
+  - {cluster: example-e2e, liveness: {kind: pid, label: example.kind-run}}
 ```
 
 Liveness has two kinds. `pid`: a label holds `<host>/<pid>`, and the object is abandoned only when the
@@ -133,9 +136,10 @@ live wins. Compose liveness is decided per project from its containers, using `p
 built images and slot state stay with the project's own teardown.
 
 An age is measured from the newest modification time in the entry, and `temp_root` is optional. A manifest
-is refused with `manifest-invalid`, and its rules remove nothing, for unknown keys, a glob with
-fewer than four literal characters before its first wildcard, an age under one hour, a `project` that is not
-one plain path segment, or a Docker rule without liveness.
+is refused with `manifest-invalid`, and its rules remove nothing, for unknown keys, a `schema_version` other
+than 1, a glob with fewer than four literal characters before its first wildcard or holding a path separator,
+an age under one hour, a `project` that is not one plain path segment, an unknown value in `kinds`, or a
+Docker or `kind` rule without liveness. Globs match single top-level names.
 
 The binary itself owns `go-build*` and `gopls-tempmod*`, with an age of 24 hours, so every `clean` run
 clears them under the same limits, including in a repository with no manifest.
@@ -159,12 +163,14 @@ branch" means pushed; it does not mean reviewed.
   socket in `/proc/net/unix`, or a container bind mount. Age is the only protection against other users'
   processes, same-uid processes with unreadable `/proc` entries, and Podman's bind mounts. A pid that exits
   during the scan is not a failed check.
-- It never forces a Docker removal. It removes containers (with their anonymous volumes when the rule
+- It never forces a Docker removal, with one exception: `kind delete cluster` on nodes already stopped. It
+  removes containers (with their anonymous volumes when the rule
   says so), then networks, volumes and images, and keeps anything in use. A container is stopped only
   when its rule says it is abandoned.
 - A failed check counts as live. If the engine cannot be listed, no file entry is removed either, unless
-  the socket is absent or refuses, which means no engine is running. The socket is `DOCKER_HOST` when it is
-  `unix://`, otherwise `/var/run/docker.sock`. Permission denied is a failed listing.
+  the socket is absent or refuses, which means no engine is running, reported as `engine-absent`. The socket
+  is `DOCKER_HOST` when it is `unix://`, otherwise `/var/run/docker.sock`. Permission denied is a failed
+  listing. A `tcp://` or `ssh://` `DOCKER_HOST` or another Docker context reads as no engine, a stated limit.
 - It writes nothing to `/tmp`, so it works with the quota full. If a session's shell cannot run, the owner
   runs `vh-adlc clean` in a terminal. The report lists what was removed and kept, why, and the space freed.
 
@@ -201,16 +207,18 @@ vh-adlc adds its manifest for `vh-triage-*` and its other test prefixes. Stackwe
 - takes its environment from `vh-adlc env --sh` when that succeeds, and otherwise runs unchanged;
 - creates and removes the kind marks in `e2e/k8s/run.sh`.
 
-`clean` does not match Stackweaver's jobs networks, which carry the run's mark in their name, not a label.
-Its manifest leaves images out, because `sweepEndedRuns` needs an ended run's `sw-tools-*` image. That sweep,
-on `feat/runner-architecture` at `cc2cbbed`, removes a killed run's jobs network and firewall objects
+Stackweaver's manifest has no `docker` rules, so `clean` keeps to its `/tmp` entries, Compose slots and kind
+cluster, and everything a test run marks stays with `sweepEndedRuns` (at `cc2cbbed`). That sweep depends on
+those objects: ended containers lead it to executor volumes and unlabelled `sw-test-*` networks, and it needs
+an ended run's `sw-tools-*` image. It removes a killed run's jobs network and firewall objects
 (`TestSweepRemovesAnEndedRunsJobsNetworkAndItsFirewall`). Its limits: it runs only when the driver integration
 tests next run; without that image the network stays and it says so; and it does not reach the firewall
 objects of `stackweaver-jobs-slot-*` networks, unmarked `sw-test-jobs-*` networks or networks already
 removed. Those last until a reboot.
 
 The real-host sequence uses the candidate binary and disposable clones whose `origin/<default>` holds this
-branch's manifest and Stackweaver's reviewed one, with stand-ins for the rows the reboot cleared:
+branch's manifest and Stackweaver's reviewed one, with stand-ins for the rows the reboot cleared. Each run
+happens once per clone:
 
 1. `clean --dry-run`: every row without `--kind` reports its outcome, and the owner accepts the report.
 2. `clean`: those rows end as the table requires.
@@ -218,13 +226,11 @@ branch's manifest and Stackweaver's reviewed one, with stand-ins for the rows th
 
 | Leftover | Required outcome |
 | --- | --- |
-| `/tmp/TestConformance_*`, `/tmp/stackweaver-visuals-*`, and built-in `/tmp/go-build*` | Removed once older than their age and not in use |
-| Docker objects with a live `test-run` mark | Kept while the pid lives |
-| Containers, labelled networks and volumes with an ended `test-run` mark | Removed |
+| `/tmp/TestConformance_*`, `/tmp/stackweaver-visuals-*`, `/tmp/vh-triage-*` and vh-adlc's other declared prefixes, and built-in `/tmp/go-build*` | Removed once older than their age and not in use |
 | Compose `swc-N` with its worktree present | Kept |
 | Compose `swc-N` with its worktree gone | Stopped and removed with its volumes |
 | Compose `deploy`, `~/.cache/sw-*`, and anything else no rule matches, including the `e2e/k8s/run.sh` registry container, a stated gap | Untouched |
-| Stackweaver's jobs networks, their firewall objects, and its images | Untouched; its own sweep owns them |
+| Everything a Stackweaver test run marks, including containers, images, jobs networks and their firewall objects | Untouched; its own sweep owns them |
 | kind `sw-e2e`, using `--kind` | Stopped and deleted with an ended mark; untouched with a live mark or none |
 
 ### Order
@@ -235,7 +241,7 @@ here afterwards, as `shared-maintenance.md` did:
 1. This PR lands with a `feat` commit, so `main` tags a stable minor release.
 2. The lock moves to that release, in `yaml-settings.md`'s PR if that lands next.
 3. The owner installs the binary and adds the rule for each harness.
-4. Stackweaver's adoption PR merges, and a first real run is recorded here.
+4. Stackweaver's adoption PR merges after its PR #1002, and a first real run is recorded here.
 
 ## Acceptance Criteria
 
@@ -246,7 +252,9 @@ here afterwards, as `shared-maintenance.md` did:
       and an applied run reports what it removed and kept, with reasons and the space freed.
 - [ ] AC-03: `vh-adlc clean` removes those and keeps other users' entries, unmatched entries, symlinks, entries with
       a mount point, entries in use, entries younger than their age, and objects any matching rule reads as live.
-      No Docker removal is forced, and an object in use, or whose usage cannot be listed, stays.
+      No Docker removal is forced, apart from `kind delete cluster` on stopped nodes, and an object in use, or whose
+      usage cannot be listed, stays. With a denied or failed engine listing no file entry is removed, and with
+      an absent or refused socket file entries still are.
 - [ ] AC-05: A dry run plans a changed working-tree manifest, and an applied run removes only what the default-branch
       manifest declares.
 - [ ] AC-06: Each manifest refusal listed in Design reports `manifest-invalid`, and that manifest's rules remove nothing.
@@ -255,9 +263,10 @@ here afterwards, as `shared-maintenance.md` did:
 - [ ] AC-08: kind clusters change only with `--kind`. A cluster with no mark, or any live mark, stays, including one
       a run reused from a killed run and kept. A cluster whose marks have all ended is stopped and deleted.
 - [ ] AC-11: With the candidate binary on `PATH`, the plugin from this branch and the one documented rule, a Claude
-      Code session in auto mode and a Codex session that is not sandboxed run the operation with no prompt or
-      refusal, and a direct `rm -rf` of a `/tmp` entry still goes to the classifier or approval.
-- [ ] AC-12: Run 1 of the real-host sequence reports every row of the adoption table as required, the owner accepts
+      Code session in auto mode and a default `workspace-write` Codex session run the operation with no prompt,
+      and a direct `rm -rf` of a `/tmp` entry still goes to the classifier or approval. If `clean` refuses with
+      `pid-namespace` in the Codex session, that is a stated limit recorded in the evidence, not a failure here.
+- [ ] AC-12: Run 1 of the real-host sequence reports every row without `--kind` as required, the owner accepts
       that report before run 2, and runs 2 and 3 leave every row as the table requires.
 - [ ] AC-14: The guides, the CLI reference, the compatibility table and `references/clean.md` document the commands,
       the manifest, the Git floor and both rules, and the package checker accepts the operation.
@@ -266,7 +275,8 @@ here afterwards, as `shared-maintenance.md` did:
       marks its cluster and removes the mark on exit. Without the binary, or when `env` fails, its entry points
       run unchanged.
 - [ ] AC-24: `--older-than` below a rule's age changes nothing, a repository with no manifest still gets the built-in
-      globs, a missing `kind` skips only the kind step, and a failing `env --sh` prints nothing to stdout.
+      globs, a missing `kind` skips only the kind step, an invalid `host.yaml` stops the run before it removes
+      anything, and a failing `env --sh`, including with no manifest, prints nothing to stdout.
 
 ## Test Plan
 
@@ -277,7 +287,7 @@ here afterwards, as `shared-maintenance.md` did:
 | AC-02, AC-03, AC-08 | Fake-engine tests: an `httptest` server on a Unix socket records every call and fails on any `force` parameter, across ended and live marks, disagreeing rules, a killed run's cluster reused and kept, a bind mount, failed listings, and an absent, refused and denied socket. |
 | AC-03, AC-08 | Integration test behind a build tag on the real engine, with disposable objects and clusters. |
 | AC-05, AC-06 | Table tests on fixture repositories: each refusal, a branch edit and an uncommitted edit. A missing object in a partial clone must not fetch. |
-| AC-11 | Written manual procedure in disposable sessions, recorded under `tests/vh-adlc/evidence/clean/`, with `codex execpolicy check` output and a note that the Codex run was not sandboxed. |
+| AC-11 | Written manual procedure in disposable sessions, recorded under `tests/vh-adlc/evidence/clean/`, with `codex execpolicy check` output and the default Codex session's outcome. |
 | AC-12 | The real-host sequence in Adoption, with each row's outcome recorded. |
 | AC-14 | `bun test tests/vh-adlc`, a golden JSON report against the updated schema, and a read of the documentation against the flags. |
 | AC-18 | A `cmd/vh-adlc` test under Bubblewrap, without a new PID namespace, with a filled, size-limited tmpfs at `/tmp`. |
