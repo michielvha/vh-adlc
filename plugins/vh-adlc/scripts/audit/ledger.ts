@@ -1,7 +1,7 @@
 import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
-import { inspectAuthority, refreshDefault, type AuthorityOptions } from "./authority";
+import { inspectAuthority, refreshDefault, validRequest, validConstraints, type AuthorityOptions } from "./authority";
 import { evaluateAssessments, evaluateCandidateAssessments, evaluateCommittedAssessments, evaluateFrozenCandidateAssessments, type Assessment } from "./assessment";
 import { tableCells, visibleLines } from "./inventory";
 import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
@@ -192,8 +192,13 @@ export function appendFindings(config: Settings, snap: Snapshot, findings: NewFi
   return { bytes, digest: hash(bytes), eligible: false, reason: "Private proposal only; checked candidate and separate ledger authority are required for application." };
 }
 export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate: Candidate, document: Document, options: {
-  path: string; commit: boolean; request: AuthorityOptions["request"]; refresh?: AuthorityOptions["refresh"];
+  path: string; commit: boolean; request: AuthorityOptions["request"]; refresh?: AuthorityOptions["refresh"]; restrictions?: AuthorityOptions["restrictions"]; prohibited_effects?: AuthorityOptions["prohibited_effects"];
 }): OwnedLedger {
+  if (!validRequest(options.request) || !options.request.authorized || !validConstraints(options.restrictions, options.prohibited_effects) ||
+      options.request.mode !== snap.mode || digest(options.request.ids.slice().sort()) !== digest(snap.selected_ids.slice().sort())) fail("invalid current request or constraints");
+  const restrictions = new Set([...(options.restrictions ?? []), ...(options.request.restrictions ?? [])]);
+  const prohibited = new Set([...(options.prohibited_effects ?? []), ...(options.request.prohibited_effects ?? [])]);
+  if (restrictions.has("read-only") || restrictions.has("no-write") || options.commit && restrictions.has("no-commit") || prohibited.has("ledger-update") || options.commit && prohibited.has("ledger-commit")) fail("current request restriction forbids ledger effect before refresh");
   if (!["reverify", "full"].includes(snap.mode) || candidate.verdict_eligibility !== "checked-proposal") fail("provisional fix candidate stays on its selected repair branch pending final review");
   if (!validateLedgerCandidate(config, snap, candidate, document).valid) fail("invalid or stale candidate");
   const observed = (options.refresh ?? (() => refreshDefault(config)))();
@@ -202,7 +207,7 @@ export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate
       git(config.root, "rev-parse", "refs/remotes/origin/" + observed.default_branch) !== observed.default_commit) fail("assessment must use the same clean fetched default source");
   for (const effect of ["ledger-update", ...(options.commit ? ["ledger-commit"] : [])] as const) {
     if (!inspectAuthority(config, { mode: snap.mode, ids: snap.selected_ids, effect: effect as "ledger-update" | "ledger-commit", request: options.request,
-      refresh: () => observed }).allowed) fail("required current/adopted permission is missing");
+      refresh: () => observed, restrictions: [...restrictions], prohibited_effects: [...prohibited] }).allowed) fail("required current/adopted permission is missing");
   }
   const branch = "chore/audit-ledger-" + candidate.run_id;
   const parent = realpathSync(dirname(options.path));

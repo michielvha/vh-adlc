@@ -111,3 +111,12 @@ It refreshes the actual remote default, follows committed AGENTS/settings/proced
 resolved mode effects. Compare them with the consumer parity map; a mismatch blocks adoption.
 This read-only inspection does not invent a selected fix request and never authorizes execution.
 Current selection, restrictions and semantic gates still apply to each later action.
+
+## Current request constraints
+
+Current request JSON requires `authorized`, `mode` and `ids`. Optional keys are `workstream`,
+`eligible_repair`, `effects`, `skip_ci`, `restrictions` and `prohibited_effects`; unknown keys fail closed.
+Restriction tokens are `read-only`, `no-write`, `no-commit`, `no-push`, `no-merge` and `no-live`.
+Prohibited effects use the declared effect vocabulary. Constraints from the current request and helper
+options accumulate; neither a standing declaration nor explicit effects override them. Ledger apply
+rejects a prohibited write/commit before refreshing refs or creating an owned branch/worktree.

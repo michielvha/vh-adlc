@@ -7,12 +7,28 @@ import type { AuditMode, Settings } from "./types";
 
 export type Effect = "source-edit" | "ledger-update" | "ledger-commit" | "local-commit" | "live-verify" | "issue-write" | "branch-push" | "pr-write" | "conditional-merge";
 type Observed = { default_branch: string; default_commit: string };
-type Request = { authorized: boolean; mode: AuditMode; ids: string[]; workstream?: string; eligible_repair?: boolean; skip_ci?: boolean; effects?: Effect[] };
+export type Request = { authorized: boolean; mode: AuditMode; ids: string[]; workstream?: string; eligible_repair?: boolean; skip_ci?: boolean; effects?: Effect[]; restrictions?: string[]; prohibited_effects?: Effect[] };
 export type AuthorityOptions = { mode: AuditMode; ids: string[]; workstream?: string; effect: Effect; request: Request; no_fetch?: boolean;
   restrictions?: string[]; prohibited_effects?: Effect[]; refresh?: () => Observed };
 const local = ["source-edit", "ledger-update", "local-commit"] as const;
 const remote = ["live-verify", "issue-write", "branch-push", "pr-write", "conditional-merge"] as const;
 const modes: Record<AuditMode, readonly Effect[]> = { status: [], reverify: ["ledger-update", "ledger-commit"], full: ["ledger-update", "ledger-commit"], fix: [...local, ...remote] };
+const restrictionNames = ["read-only", "no-write", "no-commit", "no-push", "no-merge", "no-live"];
+function enumArray(value: unknown, names: readonly string[]) {
+  return value === undefined || Array.isArray(value) && new Set(value).size === value.length && value.every(item => typeof item === "string" && names.includes(item));
+}
+export function validConstraints(restrictions: unknown, prohibited_effects: unknown) {
+  return enumArray(restrictions, restrictionNames) && enumArray(prohibited_effects, [...new Set(Object.values(modes).flat())]);
+}
+export function validRequest(value: unknown): value is Request {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const request = value as Request;
+  if (Object.keys(value).some(key => !["authorized", "mode", "ids", "workstream", "eligible_repair", "skip_ci", "effects", "restrictions", "prohibited_effects"].includes(key)) ||
+      typeof request.authorized !== "boolean" || !Object.hasOwn(modes, request.mode) || !Array.isArray(request.ids) || new Set(request.ids).size !== request.ids.length || request.ids.some(id => typeof id !== "string" || !id.trim()) ||
+      request.workstream !== undefined && (typeof request.workstream !== "string" || !request.workstream.trim()) ||
+      request.eligible_repair !== undefined && typeof request.eligible_repair !== "boolean" || request.skip_ci !== undefined && typeof request.skip_ci !== "boolean") return false;
+  return enumArray(request.effects, modes[request.mode]) && validConstraints(request.restrictions, request.prohibited_effects);
+}
 const fields = ["repository", "hostname", "default_branch", "ledger_path", "status_effects", "reverify_effects", "full_effects", "fix_effects", "selection_policy", "verification_policy", "merge_policy"];
 function fail(): never { throw Error("invalid audit authorization declaration"); }
 function visible(input: string): string {
@@ -140,28 +156,28 @@ export function inspectAdoptedPolicy(config: Settings, options: { refresh?: () =
 export function inspectAuthority(config: Settings, options: AuthorityOptions) {
   const sources: { path: string; digest: string }[] = [];
   let default_commit: string | null = null, default_branch: string | null = null;
+  const request = options.request, effect = options.effect;
+  const list = (value: unknown) => Array.isArray(value) ? value : [];
+  const restrictions = new Set<string>([...list(options.restrictions), ...list(request?.restrictions)]), prohibited = new Set<Effect>([...list(options.prohibited_effects), ...list(request?.prohibited_effects)]);
   const response = (allowed: boolean, basis: "adopted" | "current-request" | "none", reason: string) => ({
     allowed, basis, reason, sources, default_commit, default_branch,
     scope: { mode: options.mode, ids: options.ids, workstream: options.workstream ?? null, effect: options.effect },
-    restrictions: [...new Set(options.restrictions ?? [])], prohibited_effects: [...new Set(options.prohibited_effects ?? [])],
+    restrictions: [...restrictions], prohibited_effects: [...prohibited],
     pending_conditions: allowed && remote.includes(options.effect as typeof remote[number]),
     limit: "Operator policy inspection; no OS capability or proof that semantic delivery gates passed.",
   });
-  const request = options.request, restrictions = new Set(options.restrictions ?? []), effect = options.effect;
   try {
     if (digest(loadSettings(config.root, { settingsPath: config.settings_path })) !== digest(config)) return response(false, "none", "Settings changed.");
     const identity = auditOrigin(config.root);
     if (identity.repository.toLowerCase() !== config.repository || identity.hostname !== config.hostname) return response(false, "none", "Origin changed.");
-    if ((options.restrictions ?? []).some(value => !["read-only", "no-write", "no-commit", "no-push", "no-merge", "no-live"].includes(value)) ||
-        options.prohibited_effects?.some(value => !Object.values(modes).some(effects => effects.includes(value))) ||
-        request?.effects !== undefined && (!Array.isArray(request.effects) || request.effects.some(value => !Object.values(modes).some(effects => effects.includes(value))))) return response(false, "none", "Unknown restriction or effect fails closed.");
+    if (!validRequest(request) || !validConstraints(options.restrictions, options.prohibited_effects)) return response(false, "none", "Invalid request, restriction or effect fails closed.");
     if (options.mode === "fix" && request?.eligible_repair !== true) return response(false, "none", "Ineligible fix needs the feature/owner route before any fix effect.");
     const known = new Set(inventory(config).findings.map(f => f.id));
     if (options.ids.some(id => !known.has(id)) || options.mode === "fix" && !options.ids.length) return response(false, "none", "Unknown or empty selected finding scope.");
     if (!modes[options.mode]?.includes(effect) || !request?.authorized || request.mode !== options.mode ||
         digest([...request.ids].sort()) !== digest([...options.ids].sort()) || new Set(options.ids).size !== options.ids.length ||
         (request.workstream ?? null) !== (options.workstream ?? null)) return response(false, "none", "Mode or current selected scope does not authorize this effect.");
-    if (restrictions.has("read-only") || restrictions.has("no-write") || options.prohibited_effects?.includes(effect) ||
+    if (restrictions.has("read-only") || restrictions.has("no-write") || prohibited.has(effect) ||
         restrictions.has("no-commit") && ["ledger-commit", "local-commit"].includes(effect) ||
         restrictions.has("no-push") && ["branch-push", "pr-write", "conditional-merge"].includes(effect) ||
         restrictions.has("no-merge") && effect === "conditional-merge" || restrictions.has("no-live") && effect === "live-verify") return response(false, "none", "Current restriction or local prohibition wins.");

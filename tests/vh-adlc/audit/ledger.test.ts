@@ -211,3 +211,20 @@ test("a new finding body cannot introduce a sibling/parent heading, while fenced
   expect(() => appendFindings(c.config, snap, [finding])).toThrow();
   expect(appendFindings(c.config, snap, [{ ...finding, body: "```sh\n# Reproduction comment\n```\n#### Evidence\nObserved scenario." }]).bytes).toContain("# Reproduction comment");
 });
+
+test.each(["no-commit", "read-only", "option-no-write", "prohibited-update", "unknown-request-field"])("apply honors %s before any refresh, worktree, commit or ref change", kind => {
+  const c = context();
+  c.f.write("AGENTS.md", "Audit: [settings](.vh-adlc/audit.json).\n");
+  const fields = { repository: "example/project", hostname: "github.com", default_branch: "main", ledger_path: "docs/audit.md", status_effects: "none", reverify_effects: "ledger-update,ledger-commit", full_effects: "none", fix_effects: "none", selection_policy: "#selection", verification_policy: "#verification", merge_policy: "#merge" };
+  c.f.write("audit-project.md", ["# Policy", "", "## Standing audit workflow authorization", "", "| Field | Value |", "| --- | --- |", ...Object.entries(fields).map(([key,value]) => `| ${key} | ${value} |`), "", "## Selection", "Selected IDs only.", "## Verification", "Required checks.", "## Merge", "No merge grant.", ""].join("\n"));
+  const base = c.f.commit(); git(c.f.root, "update-ref", "refs/remotes/origin/main", base);
+  const config = loadSettings(c.f.root), snap = captureSnapshot(config, { mode: "reverify", ids: ["AUD-001"], baseline: base, artifact_root: c.f.artifacts, required_checks: { "AUD-001": ["unit"] } });
+  const document = { schema_version: 1, snapshot_digest: snap.digest, assessments: [terminal(c.f,snap)] }, candidate = createLedgerCandidate(config,snap,{document,at:"2026-11-02",run_id:"restricted-write"});
+  const request: any = { authorized: true, mode: "reverify", ids: ["AUD-001"], effects: [] };
+  if (["no-commit","read-only"].includes(kind)) request.restrictions = [kind];
+  if (kind === "prohibited-update") request.prohibited_effects = ["ledger-update"];
+  if (kind === "unknown-request-field") request.assumed_permission = true;
+  let refreshes=0; const before = git(c.f.root,"show-ref"), index=hash(readFileSync(join(c.f.root,".git/index")));
+  expect(() => applyLedgerCandidate(config,snap,candidate,document,{...c.options,request, ...(kind === "option-no-write" ? { restrictions: ["no-write"] } : {}), refresh:()=>{refreshes++;return {default_branch:"main",default_commit:base};}})).toThrow();
+  expect(refreshes).toBe(0); expect(git(c.f.root,"show-ref")).toBe(before); expect(hash(readFileSync(join(c.f.root,".git/index")))).toBe(index); expect(git(c.f.root,"status","--porcelain")).toBe("");
+});
