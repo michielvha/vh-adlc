@@ -7,13 +7,15 @@ import { tableCells } from "./inventory";
 import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
 import { loadSettings } from "./settings";
+import { repositoryPath } from "../maintenance/authority";
 
 type Document = { schema_version: number; snapshot_digest: string; assessments: Assessment[] };
-type NewFinding = { id: string; severity: string; title: string; body: string };
+type NewFinding = { id: string; severity: string; title: string; body: string; delta_paths?: string[] };
 type Candidate = { schema_version: 1; run_id: string; at: string; snapshot_digest: string; assessments_digest: string;
   source_target: string; scope_baseline: string; ids: string[]; new_findings: NewFinding[]; verdict_eligibility: "provisional" | "checked-proposal"; bytes: string; digest: string };
 type OwnedLedger = { path: string; branch: string; base: string; commit: string | null; candidate_digest: string; owner_file: string };
 function fail(message: string): never { throw Error("audit ledger: " + message); }
+function marker(verdict: string) { return verdict === "FIXED" ? "✅" : verdict === "MOOT" ? "🗑️" : "⚠️"; }
 function replaceCell(line: string, index: number, value: string) {
   const delimiters: number[] = []; let escaped = false;
   for (let i = 0; i < line.length; i++) {
@@ -41,8 +43,12 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
   const lines = original.split("\n");
   for (const row of options.document.assessments) {
     const finding = snap.inventory.findings.find(f => f.id === row.id);
-    if (!finding?.identity_valid || finding.aggregate) fail("individual finding identity is incomplete");
+    if (!finding) fail("finding identity is unknown");
     if (["UNKNOWN", "PARTIAL"].includes(row.verdict) && !row.residuals.length) fail("incomplete assessment requires its actual gap");
+    if (!finding.identity_valid || finding.aggregate) {
+      if (!["UNKNOWN", "PARTIAL"].includes(row.verdict)) fail("individual finding identity is incomplete");
+      continue; // Preserve the ambiguous/range index; record its gap separately below.
+    }
     const index = finding.index_lines[0] - 1;
     let header: string[] | undefined;
     for (let i = index - 1; i >= 0; i--) {
@@ -56,10 +62,10 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     if (title) column = header.findIndex(c => /^(title|finding|description)$/i.test(c));
     if (column < 0) fail("supported status/title column is missing");
     const existing = tableCells(lines[index])[column];
-    lines[index] = replaceCell(lines[index], column, title ? existing.replaceAll("|", "\\|") + ` - **${row.verdict}** (${options.at})` : row.verdict);
+    lines[index] = replaceCell(lines[index], column, title ? existing.replaceAll("|", "\\|") + ` - ${marker(row.verdict)} **${row.verdict} (${options.at})**` : row.verdict);
   }
   // Append dated notes inside each finding section, without rewriting prior content or anchors.
-  const rows = [...options.document.assessments].sort((a, b) =>
+  const rows = [...options.document.assessments].filter(row => snap.inventory.findings.find(f => f.id === row.id)?.identity_valid).sort((a, b) =>
     snap.inventory.findings.find(f => f.id === b.id)!.entry_lines[0] - snap.inventory.findings.find(f => f.id === a.id)!.entry_lines[0]);
   for (const row of rows) {
     const finding = snap.inventory.findings.find(f => f.id === row.id)!;
@@ -68,11 +74,19 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     const marker = `<!-- audit-run:${options.run_id}:${row.id} -->`;
     if (lines.includes(marker)) fail("run note already exists; reconcile the actual ledger");
     const safe = (value: string) => value.replace(/[\r\n]/g, " ").replaceAll("<!--", "&lt;!--");
-    lines.splice(end, 0, "", marker, `Audit ${options.at}: ${row.verdict} (previous recorded state: ${finding.recorded_status}).`,
+    const stateMarker = row.verdict === "FIXED" ? "✅" : row.verdict === "MOOT" ? "🗑️" : "⚠️";
+    lines.splice(end, 0, "", marker, `**Re-verify (${options.at}):** ${stateMarker} **${row.verdict}** (previous recorded state: ${finding.recorded_status}).`,
       `Scope baseline: ${snap.history.baseline}`, `Verified source: ${snap.source.commit}`, `Run: ${options.run_id}; snapshot: ${snap.digest}`,
       "Scenario: " + safe(row.reason), "Evidence: " + row.evidence.map(e => safe(e.path + "#" + e.symbol)).join(", "),
       "Checks: " + row.checks.map(c => safe(c.name + " exit " + c.exit_code)).join(", "),
       "Residuals: " + (row.residuals.map(safe).join("; ") || "none recorded"), "");
+  }
+  const gaps = options.document.assessments.filter(row => !snap.inventory.findings.find(f => f.id === row.id)?.identity_valid);
+  if (gaps.length) {
+    lines.push("", `## Audit coverage ${options.at} (${options.run_id})`, "", `Scope baseline: ${snap.history.baseline}`, `Verified source: ${snap.source.commit}`,
+      "Incomplete identities below were not converted into individual terminal verdicts; original index/history remains unchanged.");
+    for (const row of gaps) lines.push(`- ${row.id}: ${row.verdict}. ${row.reason.replace(/[\r\n]/g, " ")} Gap: ${row.residuals.join("; ").replace(/[\r\n]/g, " ")}`);
+    lines.push("");
   }
   const body = { schema_version: 1 as const, run_id: options.run_id, at: options.at, snapshot_digest: snap.digest,
     assessments_digest: digest(options.document), source_target: snap.source.commit, scope_baseline: snap.history.baseline,
@@ -96,12 +110,18 @@ export function validateHistoricalCandidate(config: Settings, snap: Snapshot, ca
   } catch { return false; }
 }
 function appendBytes(config: Settings, snap: Snapshot, original: string, findings: NewFinding[]) {
-  if (snap.mode !== "full" || snap.inventory.next_id === null || !findings.length) fail("new findings require explicit full mode and safe allocation");
+  if (!["full", "reverify"].includes(snap.mode) || snap.inventory.next_id === null || !findings.length) fail("new findings require a selected audit pass and safe allocation");
+  const delta = snap.mode === "reverify" && snap.history.status === "scoped" && snap.history.baseline ?
+    new Set(git(config.root, "diff", "--name-only", "-z", snap.history.baseline, snap.source.commit, "--").split("\0").filter(Boolean)) : null;
   let next = snap.inventory.highest_id + 1;
   for (const finding of findings) {
+    if (!Number.isSafeInteger(next) || !finding || Object.keys(finding).some(key => !["id", "severity", "title", "body", "delta_paths"].includes(key))) fail("unsafe new-finding fields or ID allocation");
     const expected = config.id_prefix + "-" + String(next++).padStart(3, "0");
     if (finding.id !== expected || !finding.severity?.trim() || !finding.title?.trim() || !finding.body?.trim() ||
-        /[\r\n|]/.test(finding.title + finding.severity) || new RegExp("^#{1,6}\\s+" + config.id_prefix + "-", "m").test(finding.body)) fail("new IDs must follow the reserved high-water mark with a single supported finding identity");
+        /[\x00-\x1f\x7f|]/.test(finding.title + finding.severity) || finding.body.includes("\0") || new RegExp("^#{1,6}\\s+" + config.id_prefix + "-", "m").test(finding.body)) fail("new IDs must follow the reserved high-water mark with a single supported finding identity");
+    if (snap.mode === "reverify" && (!delta || !Array.isArray(finding.delta_paths) || !finding.delta_paths.length ||
+        finding.delta_paths.some(path => repositoryPath(path) !== path || !delta.has(path) || [config.ledger_path, config.settings_path, config.project_procedure].includes(path) ||
+          !/^100(?:644|755) blob /.test(git(config.root, "ls-tree", snap.source.commit, "--", path))))) fail("reverify new findings must cite actual related changed source paths; missing history never triggers full audit");
   }
   const lines = original.split("\n");
   const section = lines.findIndex(line => line.replace(/^#{1,6}\s+/, "").trim() === config.profile.index_heading);

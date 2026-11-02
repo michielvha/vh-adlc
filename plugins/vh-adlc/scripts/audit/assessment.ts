@@ -34,9 +34,9 @@ export function evaluateCandidateAssessments(config: Settings, snap: Snapshot, d
   return { ...checked, coverage: "provisional", eligible_ids: [], limit: checked.limit + " A provisional candidate supplies no completion/publication eligibility." };
 }
 function evaluate(config: Settings, snap: Snapshot, document: unknown, committed: boolean, provisional: boolean) {
-  const errors: string[] = [], eligible: string[] = [];
+  const errors: string[] = [], eligible: string[] = [], assessed: string[] = [];
   const limit = "Evidence records are operator attestations; structural checks do not establish semantic truth or shell-resistant proof.";
-  const result = () => ({ pass: !errors.length, coverage: errors.length || eligible.length !== snap.selected_ids.length ? "incomplete" : "complete",
+  const result = () => ({ pass: !errors.length, coverage: errors.length || assessed.length !== snap.selected_ids.length ? "incomplete" : "complete",
     eligible_ids: errors.length ? [] : eligible, errors, limit });
   try {
     privateDirectory(snap.artifact_root, config.root);
@@ -55,12 +55,17 @@ function evaluate(config: Settings, snap: Snapshot, document: unknown, committed
     for (const row of doc.assessments) {
       const before = errors.length;
       const finding = snap.inventory.findings.find(f => f.id === row.id);
-      if (!finding?.identity_valid || finding.aggregate) errors.push("Finding identity is incomplete: " + row.id);
+      const gap = ["UNKNOWN", "PARTIAL"].includes(row.verdict);
+      if (!finding || (!finding.identity_valid || finding.aggregate) && !gap) errors.push("Finding identity is incomplete: " + row.id);
       if (!["assessment-only", "authored-repair"].includes(row.disposition) || !["STILL_PRESENT", "FIXED", "PARTIAL", "REGRESSED", "MOOT", "UNKNOWN"].includes(row.verdict) ||
-          typeof row.reason !== "string" || !row.reason.trim() || !Array.isArray(row.residuals) || row.residuals.some(r => typeof r !== "string" || !r.trim())) errors.push("Invalid finding assessment: " + row.id);
+          typeof row.reason !== "string" || !row.reason.trim() || !Array.isArray(row.evidence) || !Array.isArray(row.checks) ||
+          !Array.isArray(row.residuals) || row.residuals.some(r => typeof r !== "string" || !r.trim())) errors.push("Invalid finding assessment: " + row.id);
       const terminal = ["FIXED", "MOOT"].includes(row.verdict);
-      if (!terminal) continue;
-      if (row.residuals.length) errors.push("Terminal verdict has unresolved residuals: " + row.id);
+      if (gap) {
+        if (!row.residuals.length) errors.push("An incomplete assessment must retain its actual gap: " + row.id);
+        continue;
+      }
+      if (terminal && row.residuals.length) errors.push("Terminal verdict has unresolved residuals: " + row.id);
       if (!Array.isArray(row.evidence) || !row.evidence.length || row.evidence.some(e => {
         try {
           const path = resolveInside(config.root, e.path);
@@ -71,12 +76,12 @@ function evaluate(config: Settings, snap: Snapshot, document: unknown, committed
       })) errors.push("Original scenario needs current source evidence: " + row.id);
       const required = snap.required_checks[row.id] ?? [];
       if (!Array.isArray(row.checks) || new Set(row.checks.map(c => c.name)).size !== row.checks.length ||
-          required.some(name => !row.checks.some(c => c.name === name)) || row.checks.some(c => c.commit !== snap.source.commit || c.exit_code !== 0 ||
+          required.some(name => !row.checks.some(c => c.name === name)) || row.checks.some(c => c.commit !== snap.source.commit || !Number.isInteger(c.exit_code) || terminal && c.exit_code !== 0 ||
             !Array.isArray(c.argv) || !c.argv.length || c.argv.some(a => typeof a !== "string" || !a) || !validArtifact(snap.artifact_root, c.artifact))) errors.push("Required checks are missing, failed or stale: " + row.id);
       const challenge = row.challenge;
-      if ((!provisional || challenge) && (!challenge || !challenge.producer?.trim() || !challenge.reviewer?.trim() || challenge.producer === challenge.reviewer || challenge.id !== row.id ||
+      if (terminal && (!provisional || challenge) && (!challenge || !challenge.producer?.trim() || !challenge.reviewer?.trim() || challenge.producer === challenge.reviewer || challenge.id !== row.id ||
           challenge.source_commit !== snap.source.commit || challenge.result !== "supports-verdict" || !validArtifact(snap.artifact_root, challenge.artifact))) errors.push("Independent member challenge is missing or stale: " + row.id);
-      if (row.disposition === "authored-repair") {
+      if (terminal && row.disposition === "authored-repair") {
         const review = row.batch_review, red = row.red;
         let ancestor = false;
         if (red && /^[a-f0-9]{40,64}$/.test(red.commit)) {
@@ -87,7 +92,7 @@ function evaluate(config: Settings, snap: Snapshot, document: unknown, committed
             (!provisional && (!review || review.result !== "NO FINDINGS" || review.source_commit !== snap.source.commit || !review.producer || !review.reviewer || review.producer === review.reviewer ||
             !validArtifact(snap.artifact_root, review.artifact)))) errors.push("Authored repair needs actual red and current independent batch review: " + row.id);
       }
-      if (errors.length === before) eligible.push(row.id);
+      if (errors.length === before) { assessed.push(row.id); if (terminal) eligible.push(row.id); }
     }
   } catch { errors.push("Assessment document or evidence cannot be validated."); }
   return result();

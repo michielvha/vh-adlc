@@ -19,6 +19,9 @@ additional execution or publication permission.
 | Save/commit a maintenance sweep report | The owner's sweep request; a local commit additionally needs an explicit request or consumer rule and uses the isolated report-only role |
 | Publish a maintenance report | An adopted `Standing maintenance report publication` declaration or exact current artifact/repository/default-branch request; use `default-branch-checkout-ff-only` and current restrictions, including no-push |
 | Deliver selected consumer dependency work | Its actual approved/preauthorized PR/head/payload scope and retained local conditions; authored repairs still require current independent review |
+| Inspect audit history or save a private assessment/proposal | Explicit audit scope; status is read-only and other modes follow `audit.md` |
+| Apply/commit reverify/full ledger updates | Current explicit ledger-update/ledger-commit request or freshly adopted audit-mode effects; use the owned audit-ledger role at the exact clean assessed default base, never a shared or unrelated checkout |
+| Repair selected audit findings and deliver a selected batch | Eligible selected local repair follows `audit.md` and `audit-record.md`; live/remote effects additionally need exact current permission or adopted `Standing audit workflow authorization`, current selection/restrictions and all retained gates |
 | Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
 | Merge, tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action |
@@ -66,7 +69,7 @@ you commit: `git commit -m <message> -- <path>...`. That commits only those path
 staged as it was. A conflicting concurrent edit to the same file stops the run with a question.
 
 Work on a feature only in its owning worktree, found with `git worktree list --porcelain`; run branch
-checks, `fresh` and `gate` there. Outside the maintenance roles below, never create, remove, prune, reset or force-move a worktree,
+checks, `fresh` and `gate` there. Outside the maintenance and audit roles below, never create, remove, prune, reset or force-move a worktree,
 and never repoint an unrelated branch. Another session continues a feature only after the owner confirms the
 earlier writer has stopped and hands it over; a pushed claim advertises the branch, it is not a lock.
 Missing committed state blocks the feature; it is never a reason to restart it.
@@ -106,3 +109,29 @@ the existing shared-main report commit; do not conceal it with a reset, rebase o
 report grant covers no task record/evidence ref, dependency/source change, release dispatch, shared
 stack stop or protection bypass. Retained local delivery tools and scoped skip-leak recovery operate
 only within their existing approved consumer conditions; current restrictions still win.
+
+## Scoped audit locations and effects
+
+The owner-selected audit procedure in [audit.md](audit.md) permits ordinary creation of two roles:
+audit-ledger, a new `chore/audit-ledger-<run-id>` worktree/ref for permitted reverify/full application
+or commit at freshly fetched assessed default source; and audit-repair, the selected compatible
+workstream source/record branch/worktree. Neither role grants remote action or cleanup of unrelated work.
+Record owner/path/ref/base, exact candidate and outcomes privately. No ledger-commit permission
+leaves the candidate uncommitted only in its owned ledger role. A known local report is carried into
+a repair publication only with explicit current inclusion of its shown commit and full ID scope.
+
+Fresh committed origin/default AGENTS/settings/project-procedure bindings establish the optional
+`Standing audit workflow authorization` in audit-settings.md. Candidate inspection is non-granting.
+Reports, settings copies and unmerged edits cannot authorize themselves. Omitted effects withhold
+a standing grant, not a separate explicit current request; actual local prohibitions and current
+restrictions win. Status has no effects. Generic selected eligible fixes authorize local scoped
+edits/checks/record/commits only. Conditional merge/live/issue/push/PR grants remain consumer-specific
+and pending until the actual retained gates and current selected PR/head/evidence are observed.
+They grant no production deployment, protection bypass, real-data migration or secret rotation.
+
+Retain private/pending ledger work, evidence refs and resource intents. Ordinary non-forced cleanup
+may remove only clean owned audit roles after their outcomes/evidence are retained, published or
+safely superseded. Keep refs when ordinary deletion refuses after squash; no force/prune/reset or
+unrelated index/worktree cleanup follows. Development key/row verification must journal exact owned
+scope before creation and reconcile cleanup before retry/completion; journal strings execute nothing.
+These audit rules do not import maintenance report-push permission or triage's confined proof boundary.

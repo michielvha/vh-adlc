@@ -111,7 +111,7 @@ export function checkBatch(config: Settings, input: {
     }
     if (input.snapshot.source.commit !== target || input.snapshot.mode !== "fix") errors.push("Final per-member checks must target the actual final batch head.");
     const evidence = evaluateCommittedAssessments(config, input.snapshot, input.document);
-    if (!evidence.pass || evidence.coverage !== "complete") errors.push(...evidence.errors, "Every requested member needs its final disposition-specific evidence.");
+    if (!evidence.pass || evidence.coverage !== "complete" || evidence.eligible_ids.length !== def.members.length) errors.push(...evidence.errors, "Every requested member needs its final disposition-specific terminal evidence.");
     const review = input.review;
     if (review.target !== target || !review.producer?.trim() || !review.reviewer?.trim() || review.producer === review.reviewer ||
         !review.model?.trim() || !validArtifact(input.snapshot.artifact_root, review.artifact) ||

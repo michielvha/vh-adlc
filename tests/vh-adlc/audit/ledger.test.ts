@@ -100,3 +100,31 @@ test("a fix candidate can be explicitly provisional while missing independent fi
   expect(candidate.verdict_eligibility).toBe("provisional"); expect(candidate.bytes).toContain("Verified source: " + snap.source.commit);
   expect(() => applyLedgerCandidate(c.config, snap, candidate, document, c.options)).toThrow();
 });
+test("legacy range gaps can be recorded honestly without changing a shared historical range to a terminal member verdict", () => {
+  const c = context(), original = ledger.replace("| AUD-002 | Low | Historical observation | FIXED |", "| AUD-002..AUD-003 | Low | Historical group | FIXED |");
+  c.f.write("docs/audit.md", original); const base = c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "reverify", ids: ["AUD-003"], baseline: base, artifact_root: c.f.artifacts });
+  const row = terminal(c.f, snap, "AUD-003"); row.verdict = "UNKNOWN"; row.reason = "The range has no individual historical scenario.";
+  row.residuals = ["Individual identity and evidence unavailable."]; row.checks = []; row.challenge = null;
+  const candidate = createLedgerCandidate(c.config, snap, { document: { schema_version: 1, snapshot_digest: snap.digest, assessments: [row] }, at: "2026-11-02", run_id: "range-gap" });
+  expect(candidate.bytes).toContain("| AUD-002..AUD-003 | Low | Historical group | FIXED |");
+  expect(candidate.bytes).toContain("The range has no individual historical scenario."); expect(candidate.bytes).not.toContain("### AUD-003");
+});
+test("a lightweight reverify delta can propose a genuinely new related finding without triggering full mode", () => {
+  const c = context(); c.f.write("src/app.ts", "export const answer = 43; // related class instance\n"); c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "reverify", ids: ["AUD-001"], baseline: c.base, artifact_root: c.f.artifacts });
+  const findings = [{ id: "AUD-003", severity: "High", title: "Related new root cause", body: "Observed in the changed source.", delta_paths: ["src/app.ts"] }];
+  expect(appendFindings(c.config, snap, findings).bytes).toContain("### AUD-003");
+  expect(() => appendFindings(c.config, snap, [{ ...findings[0], delta_paths: ["docs/audit.md"] }])).toThrow();
+  expect(snap.mode).toBe("reverify");
+});
+test("legacy title annotations and inline reverify markers preserve the original finding heading and anchor", () => {
+  const c = context(), original = ledger.replace("| ID | Sev | Finding | Status |", "| ID | Sev | Area | Title |")
+    .replace("| AUD-001 | High | Incorrect result | OPEN |", "| AUD-001 | High | Example | Incorrect result |")
+    .replace("| AUD-002 | Low | Historical observation | FIXED |", "| AUD-002 | Low | Example | Historical observation - **FIXED** |");
+  c.f.write("docs/audit.md", original); const base = c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "reverify", ids: ["AUD-001"], baseline: base, artifact_root: c.f.artifacts });
+  const candidate = createLedgerCandidate(c.config, snap, { document: { schema_version: 1, snapshot_digest: snap.digest, assessments: [terminal(c.f, snap)] }, at: "2026-11-02", run_id: "legacy-format" });
+  expect(candidate.bytes).toContain("**Re-verify (2026-11-02):**"); expect(candidate.bytes).toContain("✅ **FIXED");
+  expect(candidate.bytes).toContain("### AUD-001 - Incorrect result\nThe return value needs a current check.");
+});

@@ -90,3 +90,9 @@ test("a fabricated missing pre-fix target cannot supply authored red evidence", 
     result: "NO FINDINGS", artifact: c.f.artifact("batch-review.txt") };
   expect(evaluateAssessments(c.config, c.snap, doc).eligible_ids).toEqual([]);
 });
+test("a fully observed still-present finding has complete assessment coverage without terminal eligibility", () => {
+  const c = context(), doc = c.document(); doc.assessments[0].verdict = "STILL_PRESENT";
+  doc.assessments[0].checks[0].exit_code = 1; doc.assessments[0].challenge = null as never;
+  const result = evaluateAssessments(c.config, c.snap, doc);
+  expect(result.pass).toBe(true); expect(result.coverage).toBe("complete"); expect(result.eligible_ids).toEqual([]);
+});

@@ -40,6 +40,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | --- | --- |
 | Answer or advice | Inspect the relevant source and answer with its practical limits. No saved artifact unless requested. |
 | Backlog triage | Use `skills/vh-adlc-triage/SKILL.md` to verify scope, rank ready work and save a report; GitHub writes require exact triage approval; every published verdict and local assessment patch also needs current proof in the confined controller from [the boundary guide](triage-boundary.md). |
+| Persistent codebase audit or selected audit-finding repair | Use `skills/vh-adlc-audit/SKILL.md` for the named mode/ledger/source scope; status reads history, reverify/full proposes before selection, and selected fixes use `audit-record.md` and independent audit review. |
 | Diagnosis or findings | Use `skills/vh-adlc-investigate/SKILL.md` with the selected investigation intent. Reproduce the issue and respect report-only limits. |
 | Article authoring, revision or promotion drafts | Use `skills/vh-adlc-blog/SKILL.md`; promotion mode prepares article-linked social copy only on request. Writing an article needs no software feature document. A request for implementing a blog or changing application behavior stays in the feature procedure. |
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
@@ -56,6 +57,14 @@ diagnose and fix can finish diagnosis, then enter maintenance or feature work
 within the original authority. A report-only request stops after its findings.
 An unresolved mixed request gets a focused scope question before dependent
 runtime edits. Do not classify YAML or a small diff as documentation by filename.
+
+Audit routing requires persistent source-audit intent: a named audit mode, maintaining/reverifying
+the findings ledger, an explicit full persistent source audit or selected audit-finding repair.
+Explicit audit without settings gets its onboarding handoff; configuration alone never changes
+another route. Dependency/bot/advisory security sweeps stay maintenance, one-off failure diagnosis
+stays investigation and backlog ranking stays triage, even with audit settings. Ambiguous "audit security"
+or "audit the code for security issues" needs one focused persistent/full/dependency/diagnosis scope
+question before dependent work. Never silently invoke full mode. Continue independent reads while waiting.
 
 For an explicitly requested change that needs the feature procedure, continue
 with its spec operation: locate the existing document or draft the requested
@@ -93,6 +102,12 @@ stored-data formats/migrations, or tagging/release/deployment policy use the
 feature route. If eligibility is uncertain, resolve that question before the
 dependent change. Explicit repository requirements for a feature spec take
 precedence; report that concrete requirement rather than overriding it.
+
+For selected audit work, [audit.md](audit.md) makes the restoration distinction explicit: repairing
+an already documented intended behavior, permission or data invariant may use bounded maintenance
+without introducing a new boundary or promise. New semantics/boundary/format/migration/delivery policy
+still needs the feature/owner route. The audit record/reviewer checks every selected disposition and
+the full carried publication scope; ordinary maintenance review alone does not establish those facts.
 
 A clearly requested eligible maintenance task authorizes its scoped local
 edits, checks, record and commits. It authorizes no push, PR, merge or live
@@ -151,3 +166,8 @@ exact source/Definition comparison and renewed review after changes still apply.
 never grants publication or removes review. Ordinary repairs keep their existing one-target contract.
 The authority guide's five declared maintenance location roles permit only scoped ordinary creation
 and non-forced cleanup; unrelated worktrees and evidence remain preserved.
+
+Audit resumes from its private snapshot/report/journal and actual owned branch/record using
+`audit.md`. Its two declared audit roles are separate from dependency/report-publication grants.
+Selected live/remote audit effects need current exact permission or the adopted audit declaration
+plus its retained gates. Reverify/full has no standing remote delivery permission.
