@@ -166,6 +166,7 @@ None.
 | 2026-11-02 | R-2 | spec | `3ebea55efee3e8eb9765ef805a0a47e11c4e1584` | claude-opus-5-5 | procedural | 15 findings, 1 blocking |
 | 2026-11-02 | R-3 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 11 findings, 1 blocking |
 | 2026-11-02 | R-4 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 10 findings, 0 blocking |
+| 2026-11-02 | R-5 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 8 findings, 0 blocking |
 
 ### R-1
 
@@ -552,6 +553,64 @@ SEVERITY: nit
 WHERE: Context
 EVIDENCE: "needs a published stable release (`docs/internal/releasing.md`)" repeats the citation that settings-reader.md R-1 F-08 corrected. releasing.md describes stable and prerelease tags and does not state the limit. The limit is the version pattern at plugins/vh-adlc/scripts/ensure-vh-adlc.sh:43 and the test at tests/vh-adlc/check.test.ts:385.
 PROPOSAL: Cite ensure-vh-adlc.sh:43.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-01; AC-06; Test Plan AC-01, AC-06; Design, Order step 3
+EVIDENCE: With every box ticked, the original problem can survive as a rename. JSON text is valid YAML to the reader. A throwaway probe of go.yaml.in/yaml/v3 v3.0.5 Decoder on pretty-printed JSON gave one document, a !!map top level, !!str keys and !!int values, all forms settings-reader.md accepts. `Bun.YAML.parse` on the same text (Bun 1.4.3) returned the object. So `git mv .vh-adlc/triage.json .vh-adlc/triage.yaml` meets AC-01, makes the AC-06 deep equality pass, and leaves Stackweaver's `JSON.parse(read(...))` calls (tests/agent-triage/contract.test.ts:14, tests/agent-maintenance/contract.test.ts:8) working once the path changes. The same holds for the test fixtures. tests/vh-adlc/triage/fixtures.ts:33 and tests/vh-adlc/maintenance/fixtures.ts:31 write `JSON.stringify(value)`, so changing only the file name there satisfies "its fixtures move to YAML", and the AC-01 proof "on YAML" would never see a block mapping. Step 3 says "converts both files by hand", but no criterion or proof checks the result.
+PROPOSAL: Require block style in the end state: AC-06's proof asserts both Stackweaver files parse as YAML and fail `JSON.parse`, and the fixture writers emit block YAML, with a comment line in at least one AC-01 case.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: AC-06; Test Plan AC-06; Design, Order step 3
+EVIDENCE: AC-06 opens "A reviewed Stackweaver branch". The Test Plan row proves only the tests and the settings comparison, so nothing establishes "reviewed". The document names no branch, commit, reviewer, record or location. git grep across Stackweaver origin/main shows it has no feature-document review log for this adapter, and the vh-adlc implementation review runs in this repository. The standard says "A passing subset never upgrades a composite criterion", so an implementation reviewer has either to mark AC-06 `not verified` or `untested`, or to accept a word with no check behind it. The standard also requires Proof to name a real check.
+PROPOSAL: Name the Stackweaver branch, and state where its review record lives and what it must hold, such as the exact Stackweaver commit, candidate plugin commit and reviewer. Add that record to the AC-06 proof, or drop "reviewed" from the criterion.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Loader; AC-02; AC-05; AC-09; Test Plan
+EVIDENCE: Four Loader rules have no criterion, so an implementation can break them with every box ticked. "With no settings file, defaults apply and no binary is needed": AC-09 covers only "a `.yaml` read with no binary", so a loader that always resolves the binary passes, and every unconfigured repository then depends on the installer. "An explicit `--settings` path must end in `.yaml`": AC-02 names only `.vh-adlc/<name>.json` and `.yml`. It is a live path (triage/cli.ts:30, maintenance/cli.ts:46, execute.ts:318). "With no settings file it reads `.vh-adlc/<name>.yaml`" as `settings_path`: no criterion states this, and it is the only stated cause of the digest change for unconfigured repositories. "A stale `AGENTS.md` link reports `unadopted`": AC-05 and its proof cover only a holding chain. The text also leaves one case open: whether a leftover `.vh-adlc/<name>.json` fails when `--settings` selects another `.yaml` file.
+PROPOSAL: Extend AC-02, AC-05 and AC-09 with these cases and add them to the loader table, including a no-file load with the installer failing. State whether the leftover check runs when an explicit path is given.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Loader; AC-09
+EVIDENCE: AC-09 says a `.yaml` read with no binary "fails". On the blob path the read sits inside the `try` at plugins/vh-adlc/scripts/maintenance/authority.ts:96-110, so a loader error becomes status `invalid` with reason "invalid or ambiguous committed publication declaration". This fails closed, but a missing binary is reported as a defect in the committed declaration, and the AC-09 "loader test with the installer failing" does not reach this path.
+PROPOSAL: State the blob outcome for an unavailable binary, either a distinct reason or a throw before the `try`, and add it to the AC-05 or AC-09 proof.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Loader and Order step 3; AC-13
+EVIDENCE: The Loader names one stale sentence in plugins/vh-adlc/references/triage-settings.md, line 39. Line 4 of the same file says "Runtime helpers require Bun; GitHub CLI is needed only for the CLI adapter." After this feature a configured repository also needs the verified binary, and possibly bash and curl through ensure-vh-adlc.sh. AC-13 greps only for file names, so this line stays and passes.
+PROPOSAL: Add triage-settings.md:4 to the Loader's edit, stating that reading a settings file needs the verified binary.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-06
+EVIDENCE: The proof runs `tests/agent-triage` tests "with `VH_ADLC_PLUGIN_DIR` pointing at the candidate plugin". On Stackweaver origin/main that directory's only test file is contract.test.ts, which loads no plugin and reads no such variable. The plugin-loading check there is tests/agent-triage/rehearse.ts, which is not a test file (README.md:88 runs it as `bun tests/agent-triage/rehearse.ts`) and which reads `VH_ADLC_TRIAGE_PLUGIN`. It lists `.vh-adlc/triage.json` in `runtime` at line 8 and calls `loadSettings(checkout)`. So step 3's edit to that script goes unexercised by the named proof.
+PROPOSAL: Add `VH_ADLC_TRIAGE_PLUGIN=<candidate> bun tests/agent-triage/rehearse.ts` to the AC-06 proof.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Shared audit
+EVIDENCE: The steps run "after `git fetch origin main`", and the first change says audit is "read through the shared loader". A fetch moves only the remote ref. `git ls-tree -r --name-only 7e161c5 plugins/vh-adlc/scripts` holds no settings-file.ts, so the loader is not on the branch until main is merged in, and the text does not say to merge. A rebase would be the wrong reading, because internal/fresh/fresh.go:154 needs reviewed commits to stay ancestors of HEAD (settings-reader.md R-1 F-11).
+PROPOSAL: Write "after merging `origin/main`, not rebasing", or state where in the sequence the merge happens.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Document location
+EVIDENCE: conventions/delivery.md:36-37 says that until a document has a `branch` field it "is committed and pushed to the default branch". `git branch -a --contains d225d01` lists only local `spec/host-cleanup`, and `vh-adlc fresh` reports remote_sha c8343c5, which does not contain it. Local main (930541c) is not an ancestor of d225d01 either. Reviews R-1 to R-4 and this pass are all bound to unpushed commits, and a rebase onto main would make them stale with `commit-unreachable`. settings-reader.md R-1 F-11 raised this for that document on the same branch.
+PROPOSAL: Land the branch by merge or fast-forward before an acceptance row relies on this review.
 
 ## Sources
 

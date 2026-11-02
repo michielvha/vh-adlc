@@ -299,6 +299,7 @@ None.
 | 2026-11-02 | R-1 | spec | `5dbeab86b1c11bf1cd5affd42e0d5e50fd04d140` | claude-opus-5-5 | procedural | 26 findings, 7 blocking |
 | 2026-11-02 | R-2 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 15 findings, 3 blocking |
 | 2026-11-02 | R-3 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 15 findings, 1 blocking |
+| 2026-11-02 | R-4 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 13 findings, 0 blocking |
 
 ### R-1
 
@@ -697,6 +698,99 @@ SEVERITY: nit
 WHERE: Design, Adoption and adoption table
 EVIDENCE: `e2e/k8s/run.sh:171` at `96eaff82` starts a `registry:2` container on the `kind` network with `-v "$CERT_DIR/registry:/auth:ro"`, and `CERT_DIR` comes from `mktemp -d`. A killed run leaves that container, which `kind delete cluster` does not remove and which carries no mark, so no rule matches it. After adoption, `CERT_DIR` sits in the temp root, and the bind mount keeps that entry in use until the next harness run removes the container at line 170.
 PROPOSAL: Have the harness put its run mark on the registry container and add a `docker` rule for that label, or add it to the untouched row so the gap is explicit.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-12; Design, Adoption sequence
+EVIDENCE: AC-12 (line 260): "Run 1 of the real-host sequence reports every row of the adoption table as required". Design line 215 defines run 1 as `clean --dry-run` where "every row without `--kind` reports its outcome", and the table's last row (line 228) is "kind `sw-e2e`, using `--kind`". So the criterion asks run 1 for a row it cannot report, and the standard's composite rule makes that `not met` as written. This is what remains of R-3 F-01. Lines 212-217 also use two disposable clones but name no `--repo`, and `clean` takes one repository per run, so the sequence does not say which run covers which rows.
+PROPOSAL: Change AC-12 to "every row without `--kind`", matching line 215. State which clone each run targets, or that each run happens once per clone.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Adoption and adoption table
+EVIDENCE: At Stackweaver `cc2cbbed`, `backend/internal/launcher/driver/container.go:295` creates the per-job executor volume with only `LabelManaged` and `LabelJob`, so it has no `test-run` label. `:182` records its name on the container in `sh.stackweaver.executor-volume`, and `removeContainer` (`:460-468`) deletes it from that label. `sweepEndedRuns` calls `d.removeContainer`, so today the sweep clears it. After adoption, `clean` removes the ended container first (line 223). The volume is named, so `anonymous_volumes` does not take it (Sources: `docker container rm --volumes` keeps named volumes). No rule matches it, and the sweep has lost the only pointer to it. `clean` therefore turns a leftover the sweep clears into a permanent one. The sweep also finds unlabelled `sw-test-*` networks through ended containers' `NetworkSettings.Networks`, and `clean` removes that link too. Lines 204-210 present the two tools as not conflicting.
+PROPOSAL: Have Stackweaver's adoption put the run's mark on the executor volume, for example from `Request.Labels`, and add a stand-in row to the adoption table. Otherwise leave containers to the sweep and say so.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-11; Test Plan, AC-11; Goal
+EVIDENCE: AC-11 proves "a Codex session that is not sandboxed". `~/.codex/config.toml:6` here is `sandbox_mode = "workspace-write"`, so the session the owner actually runs is the unproved one. Line 85 refuses `clean` with `pid-namespace` inside a PID namespace, and Context line 57 records `codex sandbox` as one. The Codex rules page the document cites says "allow: Run the command outside the sandbox without prompting", which suggests the rule may make the default session work, but nothing proves it and Sources cites that page only for syntax. With every box ticked, a default Codex session may still get `pid-namespace`, and the goal says "Any agent session".
+PROPOSAL: Run AC-11's Codex case in a default `workspace-write` session and require that `clean` runs without `pid-namespace`. If it does not, state that limit in Design and keep the current wording.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope; Open Questions
+EVIDENCE: Lines 66-67: "the coordinator's decision on 2026-11-02, overriding the owner's earlier answer to keep a `--firewall` option." The draft's Q7 (`git show 4b32379:docs/specs/host-cleanup.md`, line 532 onward) said "Why this is yours", and the document at `22769c0` still carried `--firewall` as the owner's answer. The standard says "Only the owner answers them", and "None." under Open Questions means every question has been answered. The owner's general direction that day was to cut oversized designs, which may cover this, but no owner statement on this reversal is in the document or Git. The cost is also real: firewall objects of `stackweaver-jobs-slot-*` networks and of removed networks now last until a reboot (lines 208-210).
+PROPOSAL: Name this reversal and its cost explicitly when asking for acceptance, and record the owner's answer in Scope in place of "coordinator's decision". If the owner wants it kept, reopen it as a question.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Commands and What clean will and will not touch
+EVIDENCE: Lines 89-91 make `temp-root-undeclared` a failure, but line 96's list of `fail` codes omits it. Line 97 makes `manifest-missing` a note, so `env` in a repository with no manifest, which R-2 F-10 asked about, reports `pass` with no `project` to name a root, and what `--sh` prints is undefined. Most repositories start in that state, and AC-23's proof covers only a refused base. Separately, line 165 continues file work when the socket is absent or refuses, but no code or result is given for that case: if it reports `engine-unreachable`, line 96 makes every applied run on a Docker-free host `fail`. Line 96 also does not say whether `temp-base-refused` or `host-settings-invalid` stops `clean`'s other work, though without a known base the `tmp` skip at line 104 cannot be applied.
+PROPOSAL: State that `env` with no working-tree manifest fails, with `manifest-missing`, and add `temp-root-undeclared` to the `fail` list. Give the absent-socket case its own note, and say what `clean` does after each of the two host-level failures.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope; Acceptance Criteria; Adoption table
+EVIDENCE: Scope line 63 includes "vh-adlc's own manifest", and Context names over 100 `vh-triage-*` entries from this repository. Line 212 uses this branch's manifest in the sequence, yet the table (lines 219-228) has no `vh-triage-*` row, and no criterion mentions the manifest. With every box ticked, `.vh-adlc/cleanup.yaml` could be missing or match nothing, and this repository's own recurring leftover would survive.
+PROPOSAL: Add a table row for `/tmp/vh-triage-*` and the other declared prefixes, required removed once older than their age and not in use, so AC-12 covers it.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope; Design, Adoption and Order; Test Plan, AC-23
+EVIDENCE: Everything Stackweaver's manifest and AC-23's driver proof rely on is unmerged. On Stackweaver `main`, `git cat-file -e main:backend/internal/launcher/driver/container.go` and the same for `scripts/compose-slot.sh` both fail, and `git grep -c sh.stackweaver.test-run main -- backend` finds nothing. They exist on `feat/runner-architecture`, whose PR #1002 is open (`gh pr list --head feat/runner-architecture`). The document cites that branch for the sweep, but Scope's "reviewed Stackweaver adoption branch" and Order step 4 name no base and no dependency on that PR.
+PROPOSAL: State that the adoption branch is based on `feat/runner-architecture` and that step 4 follows PR #1002, or give the order if the adoption must land first.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-03; Test Plan
+EVIDENCE: Line 165 says "If the engine cannot be listed, no file entry is removed either". That rule is the only protection for a `/tmp` entry a running container has bind-mounted when the engine cannot be read, and no criterion states it. AC-03 says only that "an object in use, or whose usage cannot be listed, stays", which is about engine objects. The Test Plan lists "failed listings, and an absent, refused and denied socket" against AC-02, AC-03 and AC-08, so the cases run with no end state to check against. `host-settings-invalid` has neither a criterion nor a proof row.
+PROPOSAL: Add to AC-03 that with a denied or failed engine listing no file entry is removed, and that with an absent or refused socket file entries are still removed. Add the invalid `host.yaml` case to AC-01 or AC-24 and its proof.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Review Log; frontmatter
+EVIDENCE: This repeats R-3 F-11. The status line says R-3's findings were applied, but `git ls-remote origin main spec/host-cleanup` returns only `refs/heads/main` at `c8343c5`, `git branch -a --contains d225d01` lists only local `spec/host-cleanup`, and `git log origin/main..HEAD` has 11 commits. The document has no `branch`, and the pinned `conventions/delivery.md:36-37` says such a document is committed and pushed to the default branch. Local `main` (`930541c`) does not contain `origin/main`, so a rebase of this branch to land it is a live risk, and a rebase would make this review's commit unreachable.
+PROPOSAL: Fast-forward `origin/main` to this branch's commit, which is possible today, before the review the acceptance names. Do not rebase it.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter goal; Design, Manifest
+EVIDENCE: The goal says the command "touches only what that repository's default branch says it owns". Lines 140-141 and AC-24 have the binary remove `go-build*` and `gopls-tempmod*` in every run, "including in a repository with no manifest".
+PROPOSAL: Add the binary's built-in Go temp globs to the goal.
+
+FINDING: F-11
+KIND: factual
+SEVERITY: nit
+WHERE: Design, What clean will and will not touch and kind; AC-03
+EVIDENCE: Line 162 says "It never forces a Docker removal" and AC-03 says "No Docker removal is forced", while line 178 runs `kind delete cluster`, and Sources records that it runs `docker rm -f -v`. The nodes are stopped first, so the effect is harmless, but the sentences are false as written, and the fake engine's force check cannot see kind's own CLI calls.
+PROPOSAL: Name `kind delete cluster` on already stopped nodes as the one exception, in Design and AC-03.
+
+FINDING: F-12
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Commands and What clean will and will not touch
+EVIDENCE: Line 86: "That also covers a sandbox that hides the engine socket." It covers only a sandbox with a PID namespace; one that hides the socket without one reads as "absent" at line 165, leaving age as the only protection. Line 166 falls back to `/var/run/docker.sock` when `DOCKER_HOST` is `tcp://` or `ssh://`, or a Docker context points elsewhere, so a running remote or relocated engine also reads as no engine.
+PROPOSAL: Narrow line 86 to PID-namespace sandboxes and state the non-`unix://` case as a limit in line 166, or treat it as a failed listing.
+
+FINDING: F-13
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Manifest; AC-06
+EVIDENCE: Lines 135-138 list the refusals. Not listed: a `schema_version` other than 1, an unknown value in `kinds`, a `kind` rule without liveness, and a glob holding a path separator. `../home/m/x*` has four literal characters, so it passes the floor; it is harmless only if matching is done on directory entry names, which the design implies but does not state. AC-06 covers only what Design lists.
+PROPOSAL: Add these four to the refusal list, and state that globs match single top-level names.
 
 ## Sources
 

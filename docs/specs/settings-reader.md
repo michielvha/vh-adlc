@@ -95,6 +95,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-02 | R-1 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 11 findings, 0 blocking |
 | 2026-11-02 | R-2 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
+| 2026-11-02 | R-3 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 
 ### R-1
 
@@ -204,3 +205,33 @@ SEVERITY: nit
 WHERE: Design, accepted values; yaml-settings.md AC-01, AC-06
 EVIDENCE: "with keys sorted" changes object order for the next document. plugins/vh-adlc/scripts/triage/settings.ts:96-98 copies `label_map` in input order and triage/cli.ts returns that object for `settings`. Stackweaver's .vh-adlc/triage.json has `bug`, `enhancement`, `documentation`, and so on, which is not sorted. Through this reader the same settings serialize in a different order, and `json` in triage/controller.ts:25 is plain `JSON.stringify`. yaml-settings.md's AC-06 proof says the `settings` output "must match apart from `settings_path`", which a byte diff would fail with no value changed. `label_map` has no other reader under scripts/triage, so behaviour is unaffected.
 PROPOSAL: Note in Design that mapping order is not preserved, so comparisons of the value must ignore key order, and make the yaml-settings.md proofs compare parsed values.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, refusals; AC-03; Test Plan AC-03
+EVIDENCE: Design says "Its line is the node's line, or the number from a library `line N` error, otherwise 0", and AC-03 requires "the stated line". Which node is not stated, and the obvious choice can name a line past the end of the file. A Decoder probe of go.yaml.in/yaml/v3 v3.0.5 gave, for `a: 1\n---\n` (two lines), DocumentNode line 2 and its null content node line 3. For `---\n` (one line) it gave DocumentNode line 1 and null node line 2. A duplicate key also has two candidate nodes. The rule has three branches, but the proof names only "a refusal's `data`, finding count and line", and the named goldens are a walk refusal and the unknown anchor, which cover the node line and 0. `a: *SECRET` returned `yaml: unknown anchor 'SECRET' referenced`, with no line. The `line N` branch has no named case, though `x: 1\nb: *.md\n` returned `yaml: line 2: did not find expected alphabetic or numeric character`. An implementation that reports 0 for every library error passes the named proof. The standard says "A passing subset never upgrades a composite criterion".
+PROPOSAL: State the node: the second occurrence of a duplicate key, the offending key or value otherwise, and the DocumentNode's line for a refusal of a whole document. Name one AC-03 case per branch, for example `x: 1\nb: *.md\n` for the library line.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-02
+EVIDENCE: Design refuses anchors and explicit tags everywhere, but the proof's named rows do not reach key or collection positions. In a probe, `&x a: 1` gave a key node with Tag !!str and Anchor "x", and `!!map {a: 1}` gave a mapping with Tag !!map and Style 33, while `a: !!str 1` gave Style 1 on the value. A walk that tests only scalar values passes every value row and accepts both forms, because the first key is still a string key and the second mapping is still a mapping.
+PROPOSAL: Add rows for an anchor on a key, a tag on a key, and a tag or anchor on the root mapping and on a nested collection.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, accepted values and refusals; Test Plan AC-01
+EVIDENCE: "a `%YAML` directive of a version the library accepts" means exactly one version. In the probe `%YAML 1.1` decoded, while `%YAML 1.2`, `%YAML 1.3` and `%YAML 2.0` each returned `yaml: found incompatible YAML document`. So a file declaring the version this Design reasons from ("which YAML 1.2 reads as strings") is refused, and only a file declaring 1.1 passes. The bare `!` has no stated value either. `a: ! 1` gave Tag !!int Value "1", so the reader returns the integer 1, while R-1 F-04 recorded that Bun returned "1". `a: ! 007` gave !!int Value "007", which fails the integer pattern, so a bare `!` is accepted only where the scalar under it is. AC-01 needs "the expected value", so the table's author decides these.
+PROPOSAL: Say `%YAML 1.1` by number and name `%YAML 1.2` as refused. State that a bare `!` changes nothing, so `a: ! 1` returns 1 and `a: ! 007` is refused, and add these cases to the AC-01 and AC-02 tables.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, command contract
+EVIDENCE: Design gives `knowledge: null` only for the success report. A refusal is specified as "result `malformed`, `data: null` and one finding", with no `knowledge` and no finding `path`, and the schema requires both keys (schema/vh-adlc.schema.json:7-14, :94-99). "`dispatch` exempts it from `--plugin-pin`" also leaves a supplied bad pin open: cmd/vh-adlc/main.go:158 reports `usage` for any other command, and AC-01 covers only "no `--plugin-pin`". yaml-settings.md's loader consumes these reports, and R-1 F-05 asked that such choices be made here and not by the golden file.
+PROPOSAL: Add one sentence: every `settings read` report has `knowledge: null`, findings have an empty `path`, and a supplied `--plugin-pin` is ignored or still checked, whichever is chosen.
