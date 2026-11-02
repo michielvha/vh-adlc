@@ -47,3 +47,10 @@ test("missing and non-ancestor legacy history is unscoped rather than an empty d
   expect(capture("0".repeat(40)).history.status).toBe("unscoped");
   expect(capture(other).mode).toBe("reverify");
 });
+
+test("an exact detached review target can be assessed without creating a branch", () => {
+  const f = project(); git(f.root, "switch", "--detach", "-q");
+  const snap = captureSnapshot(loadSettings(f.root), { mode: "status", artifact_root: f.artifacts });
+  expect(snap.source.branch).toBe(null);
+  expect(checkSnapshot(loadSettings(f.root), snap).current).toBe(true);
+});

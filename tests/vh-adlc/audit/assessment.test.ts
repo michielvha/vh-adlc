@@ -81,3 +81,12 @@ test("an authored repair cannot borrow a reassessment proof and requires real re
   expect(result.pass).toBe(false);
   expect(result.eligible_ids).toEqual([]);
 });
+
+test("a fabricated missing pre-fix target cannot supply authored red evidence", () => {
+  const c = context(), doc: any = c.document(), row = doc.assessments[0];
+  row.disposition = "authored-repair";
+  row.red = { ...row.checks[0], commit: "0".repeat(40), exit_code: 1 };
+  row.batch_review = { producer: "author", reviewer: "reviewer", source_commit: c.snap.source.commit,
+    result: "NO FINDINGS", artifact: c.f.artifact("batch-review.txt") };
+  expect(evaluateAssessments(c.config, c.snap, doc).eligible_ids).toEqual([]);
+});
