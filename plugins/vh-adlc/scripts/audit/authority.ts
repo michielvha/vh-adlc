@@ -1,8 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { origin } from "../triage/settings";
 import { inventory, tableCells } from "./inventory";
-import { loadSettings } from "./settings";
+import { auditOrigin, loadSettings } from "./settings";
 import { digest, git, gitBytes, hash } from "./snapshot";
 import type { AuditMode, Settings } from "./types";
 
@@ -97,7 +96,7 @@ export function inspectAuthority(config: Settings, options: AuthorityOptions) {
   const request = options.request, restrictions = new Set(options.restrictions ?? []), effect = options.effect;
   try {
     if (digest(loadSettings(config.root, { settingsPath: config.settings_path })) !== digest(config)) return response(false, "none", "Settings changed.");
-    const identity = origin(config.root);
+    const identity = auditOrigin(config.root);
     if (identity.repository.toLowerCase() !== config.repository || identity.hostname !== config.hostname) return response(false, "none", "Origin changed.");
     const known = new Set(inventory(config).findings.map(f => f.id));
     if (options.ids.some(id => !known.has(id)) || options.mode === "fix" && !options.ids.length) return response(false, "none", "Unknown or empty selected finding scope.");

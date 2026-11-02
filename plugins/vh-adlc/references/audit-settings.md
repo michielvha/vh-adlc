@@ -25,6 +25,9 @@ Identity comes from origin. Optional repository/hostname values must match it; a
 must be explicit. Paths must name existing regular files contained in the checkout. Unknown keys,
 profiles, traversal, Git metadata and symlink escapes are errors. The prefix uses uppercase letters
 and digits; it is not hardcoded to AUD. Heading level is 2 through 6.
+An HTTPS login prefix equal to the public repository owner identifies the same origin without
+changing Git's configured transport. Other userinfo, passwords and query/fragment values are refused;
+no transport username or credential becomes a report field or an effect grant.
 
 The supported profile preserves an existing ID/severity/status table, or an ID/Sev/Area/Title table
 whose historical status annotations are in the title. The designated index heading must be unique.

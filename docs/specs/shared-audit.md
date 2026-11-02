@@ -88,11 +88,27 @@ cover those shapes. Inventory expands the reserved range IDs only as aggregate/i
 it does not invent per-member evidence or rewrite the private ledger. The read-only observed hash
 remains the original `c0eb6250` value, and ordinary ID allocation advances to AUD-160.
 
+The isolated Stackweaver migration reconciled current remote main `5065633399ffdbec6a891e352f1694354ffebf18`
+with local merge `d9447729`; all five bound legacy policy/command objects remain unchanged from
+the original map baseline. T16 contracts observed the intended shared-route red (2 pass, 41 fail),
+but their test-only commit is blocked by current-main visual evidence: CookieConsent/PublicNav
+inputs no longer match the guide manifest. Normal host hooks pass three checks and fail that one,
+with no skips. The owner separately authorized refreshing, verifying and publishing this baseline
+correction; it is isolated from the migration and changes no docs workflow logic. The real ledger
+retains its original hash. A pre-existing maintenance preservation test also predates the SEO
+extraction; update its baseline guard when the audit adapter lands without changing that workflow.
+
+The actual consumer Git transport includes a public owner-login HTTPS prefix. T27 adds only that
+bounded audit identity normalization: repository/hostname remain origin-bound, other userinfo and
+credential-bearing forms stay rejected, and neither the configured transport nor older helpers change.
+
 ### Latest spec review and implementation obligation
 
 Actual Copilot `claude-opus-5.5` R-12 reviewed `67a91a17944bb219ce956364963531532577c396`
 with no blocking findings and one should-fix recommendation about the post-merge outcome artifact.
-That recommendation is not claimed fixed or tested. Carry it into the AC-04 implementation tasks:
+T11 implements this structurally and retains synthetic lost-acknowledgement recovery evidence.
+Actual model recovery and final criterion review remain T22/T25; AC-04 is still unchecked.
+Its required behavior remains:
 use the existing private run journal/external run directory for the durable observed merge outcome,
 with optional deduplicated workstream-issue updates only under the existing `issue-write` scope.
 Do not invent an additional default-branch commit/push, which the existing grant does not authorize.
@@ -745,6 +761,8 @@ live operations remain separate owner-selected tasks.
       Evidence: Discovery/intake/package tests were run before the new skill/routes and fail (`T14-discovery-red.log`). Static contracts check portable metadata, shared references and route boundaries; exported positive/negative cases await actual model execution in T22, not a regex router pretending to execute an agent.
 - [x] T15 `plugins/vh-adlc/skills/vh-adlc-audit/SKILL.md` and `references/audit*.md`, `lifecycle.md`, `authority.md` - package the accepted procedure, exact settings/record/reviewer and authority contracts; T14 passes and no harness/model pin is added (AC-01, AC-03, AC-04).
       Evidence: Missing-skill/route reds and observed report, coverage, legacy-range and lightweight-delta/format regressions became 228 passing combined audit/package/direct-operation tests with 676 assertions (`T15-final-green.log`). Shared audit skill/references have no model or harness pin; unrelated route bodies stay unchanged. Fully observed STILL_PRESENT is complete assessment coverage without terminal eligibility; UNKNOWN/range gaps stay incomplete and preserve history. Reverify related-delta new IDs require actual changed source paths, and established inline markers preserve original heading text/anchors. Actual model routing remains T22, not inferred from static text contracts.
+- [x] T27 `plugins/vh-adlc/scripts/audit/settings.ts`, `authority.ts`, `references/audit-settings.md` and `tests/vh-adlc/audit/settings.test.ts` - support the actual public-owner-login origin form without mutating Git transport or neutral helpers; observed origin rejection becomes green while credential/userinfo denials stay redacted (AC-02, AC-05).
+      Evidence: `T27-owner-origin-red.log` reproduces the missing owner-login form before implementation (25 pass/1 fail). The focused settings/authority/package rerun passes 125 tests/311 assertions (`T27-owner-origin-green.log`); password, query and other-login negatives remain rejected. Real committed consumer-policy inspection remains T17/T24.
 - [ ] T16 `Stackweaver:tests/agent-audit/` - write command/model/arguments, row-by-row parity, real candidate-policy and preserved-ledger/other-route contracts first; observe the local legacy-only route fail the shared-operation expectations (AC-05).
 - [ ] T17 `Stackweaver:AGENTS.md`, `agents/codebase-audit.md`, `agents/audit-project.md`, `.claude/commands/audit.md` and `.vh-adlc/audit.json` - implement the thin adapter and retained local policy; T16 passes using the actual shared helper in non-granting candidate mode (AC-05).
 - [ ] T18 `tests/vh-adlc/audit/adoption.test.ts` and `Stackweaver:tests/agent-audit/preflight.test.ts`, `rehearsal.test.ts` - write wrong-operation/artifact/target/model/version and unadopted-policy cutover denials plus rollback/reapply first; observe the absent audit verifier fail (AC-05, AC-07).

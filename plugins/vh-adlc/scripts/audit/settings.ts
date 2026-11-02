@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { relative, sep } from "node:path";
-import { origin, resolveInside } from "../triage/settings";
+import { git, origin, resolveInside } from "../triage/settings";
 import type { Settings } from "./types";
 
 export function invalid(field: string): never {
@@ -17,6 +17,17 @@ export function text(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim() || value !== value.trim() || /[\u0000-\u001f\u007f]/.test(value)) invalid(field);
   return value;
 }
+/** A public repository-owner login is transport metadata, never an auth/effect grant. */
+export function auditOrigin(root: string): { repository: string; hostname: string } {
+  try { return origin(root); } catch { /* Keep the neutral parser unchanged; handle only this bounded form. */ }
+  let url: URL;
+  try { url = new URL(git(root, "remote", "get-url", "origin")); } catch { invalid("origin"); }
+  const repository = url.pathname.replace(/^\//, "").replace(/\.git$/, "");
+  if (url.protocol !== "https:" || url.password || url.port || url.search || url.hash ||
+      !/^[A-Za-z0-9-]{1,39}$/.test(url.username) || !/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(repository) ||
+      repository.split("/").some(part => [".", ".."].includes(part)) || url.username.toLowerCase() !== repository.split("/")[0].toLowerCase()) invalid("origin");
+  return { repository, hostname: url.hostname.toLowerCase() };
+}
 function file(root: string, value: unknown, field: string): string {
   const path = text(value, field);
   if (path.split("/").includes(".git")) invalid(field);
@@ -30,7 +41,7 @@ function file(root: string, value: unknown, field: string): string {
 export function loadSettings(directory: string, options: { settingsPath?: string } = {}): Settings {
   const root = realpathSync(directory);
   let identity: { repository: string; hostname: string };
-  try { identity = origin(root); } catch { invalid("origin"); }
+  try { identity = auditOrigin(root); } catch { invalid("origin"); }
   const repository = identity.repository.toLowerCase(), hostname = identity.hostname.toLowerCase();
   const requested = options.settingsPath ?? ".vh-adlc/audit.json";
   let settingsFile: string;

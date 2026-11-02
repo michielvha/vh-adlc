@@ -83,6 +83,19 @@ test("SSH and explicitly configured enterprise origin retain their actual identi
   expect(loadSettings(f.root).hostname).toBe("git.example.test");
 });
 
+test("a public owner-login HTTPS prefix identifies the same repository without changing the configured transport or neutral helpers", () => {
+  const f = project(), remote = "https://example@github.com/example/project.git";
+  git(f.root, "remote", "set-url", "origin", remote);
+  const config = loadSettings(f.root);
+  expect(config.repository).toBe("example/project"); expect(config.hostname).toBe("github.com");
+  expect(git(f.root, "remote", "get-url", "origin")).toBe(remote);
+});
+test.each(["https://other-login@github.com/example/project.git", "https://example:private-value@github.com/example/project.git", "https://example@github.com/example/project.git?token=private-value"])("userinfo outside the public owner-login exception is refused without disclosure", remote => {
+  const f = project(); git(f.root, "remote", "set-url", "origin", remote);
+  let failure: unknown; try { loadSettings(f.root); } catch (error) { failure = error; }
+  expect(failure).toBeInstanceOf(Error); expect(String(failure)).not.toContain(remote); expect(String(failure)).not.toContain("private-value");
+});
+
 test("a standalone adopter can copy the complete example and load all referenced files", () => {
   const f = project(), example = resolve(import.meta.dir, "../../../plugins/vh-adlc/examples/audit/basic");
   cpSync(example, f.root, { recursive: true });
