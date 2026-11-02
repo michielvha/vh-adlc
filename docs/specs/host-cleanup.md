@@ -310,6 +310,7 @@ None.
 | 2026-11-02 | R-2 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 15 findings, 3 blocking |
 | 2026-11-02 | R-3 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 15 findings, 1 blocking |
 | 2026-11-02 | R-4 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 13 findings, 0 blocking |
+| 2026-11-02 | R-5 | spec | `d875e20f90e14d3d059de04fc3bf71203f45b386` | claude-opus-5-5 | procedural | 14 findings, 1 blocking |
 
 ### R-1
 
@@ -801,6 +802,106 @@ SEVERITY: nit
 WHERE: Design, Manifest; AC-06
 EVIDENCE: Lines 135-138 list the refusals. Not listed: a `schema_version` other than 1, an unknown value in `kinds`, a `kind` rule without liveness, and a glob holding a path separator. `../home/m/x*` has four literal characters, so it passes the floor; it is harmless only if matching is done on directory entry names, which the design implies but does not state. AC-06 covers only what Design lists.
 PROPOSAL: Add these four to the refusal list, and state that globs match single top-level names.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Operation and allow rules; frontmatter covers; Open Questions
+EVIDENCE: Lines 189-190 have the operation apply the plan "when the user asked for cleanup or the session is blocked on space", so an agent can apply with no request from anyone. An applied run can stop a Compose slot and remove its named volumes (lines 126, 231). `plugins/vh-adlc/references/authority.md:25` says "Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action", and the paragraph after the table says "Host approval cannot supply missing task authority". So the allow rule cannot grant this. `authority.md` is not in `covers`, the Design, any criterion or the Test Plan. Stackweaver `CLAUDE.md:146` says to remove named volumes individually and "ask first, naming the exact volume", and `loop.md:57` says local instructions win over central pages and that conflicts are reported. Its slot tool does remove them on request (`scripts/compose-slot.sh down N`), so the conflict there is about an unrequested run. A session that follows the shipped authority page must stop when it is only blocked on space, while the Design and AC-11 ("with no prompt") say it proceeds. The first draft (`4b32379`) already had this line, but the owner decisions folded at `a842b58` do not cover it. Open Questions "None." therefore does not hold for it.
+PROPOSAL: Get the owner's decision on what an unrequested apply may remove, for example file entries only with Compose volumes held back unless the user asked. Record it in Design, add the matching row to `authority.md`, add that path to `covers`, and add the case to AC-11's procedure.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Temp root; AC-24
+EVIDENCE: Lines 105-107 place the root at `<temp_base>/<project>`, and the only checks on `temp_base` are "symlinked or foreign". Line 159 has `clean` act on entries inside that root, and the Scope exclusion "directories outside `/tmp` and the temp root" follows wherever the setting points. `temp_base: /home/m/code` with `project: stackweaver` gives `/home/m/code/stackweaver`, the main checkout, which the user owns and which is not a symlink. Every top-level entry older than `max_age` and not in use is then removed, through a command the allow rule runs unprompted. The stated threat is accidents (line 77). Nothing says what makes `host.yaml` invalid beyond existing, so AC-24's "invalid `host.yaml`" has no content for this field. A relative path or `~/tmp` is undefined, and nothing says `--sh` quotes a value that goes to `eval`.
+PROPOSAL: Define a valid `temp_base`: absolute, not a parent of or inside a Git work tree or `$HOME` itself, and refused with `host-settings-invalid` otherwise. Have `clean` act only on a root with mode 0700 owned by the user, state that `--sh` shell-quotes its values, and add these cases to AC-24.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Commands; AC-06
+EVIDENCE: Line 99-100 lists `env`'s failures as `manifest-missing`, `temp-root-undeclared`, `temp-base-refused` or `host-settings-invalid`, with no `manifest-invalid`. Line 108 has `env` read the working-tree manifest, and that path has no default-branch step before it. The refusal of a `project` that is not one plain path segment (line 141) is what keeps `<temp_base>/<project>` inside the base, and `env` creates that directory. AC-06 only says the manifest's "rules remove nothing", which `env` satisfies while still creating a directory for `project: ../x`. The result of a successful `env` is also unstated: lines 96-98 cover refusals, dry runs and applied runs only.
+PROPOSAL: Add `manifest-invalid` to `env`'s failures, name its result on success, and extend AC-06 to say `env` creates nothing for a refused manifest.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context; Scope; Goal
+EVIDENCE: Context says `/tmp` held 9252M across 4152 entries and names the classes the design covers. The first draft (`git show 4b32379:docs/specs/host-cleanup.md`, lines 41-52) gives their sizes: 2 x 454 MB, 22 `go-build*` with the three largest at 145, 134 and 108 MB, and seven `stackweaver-visuals-*` at about 94 MB. That bounds them at 908 + 2439 + 658 = 4005 MB, 43% of the measured use, and the real figure is lower. The named classes plus the 105 `vh-triage-*` entries are 136 of 4152 entries. The same draft names `crossplane-docs-tools` (279 MB) and `stack-triage-rehearsal-*` (175 MB), which belong to repositories with no manifest in Scope. What held the other 5.2G or more was never identified, and the reboot cleared it. `clean` is also per repository, and line 175 reports only what was removed and kept, so an unmatched entry is invisible. With every box ticked, a session at the quota can free under half of it and get no sign of what holds the rest. R-1 F-25 pointed at the earlier counts of unmatched leftovers, and that report was cut.
+PROPOSAL: State in Context that the named classes account for at most 43% and the rest is unknown. Add to the report the count and total size of user-owned `/tmp` entries no rule matched, removing nothing, so the next incident can be attributed from the report.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Manifest and What clean will and will not touch; AC-03; Test Plan
+EVIDENCE: Since R-4, line 210 says "Stackweaver's manifest has no `docker` rules", and line 204 limits vh-adlc's manifest to `/tmp` prefixes. So the `docker:` section (lines 121-124), `kinds`, `anonymous_volumes`, image removal and rule disagreement for those objects have no consumer. The real-host table (lines 227-234) has no row that uses a `docker` rule, and AC-12 never runs one. Only the fake engine and an integration test would. The `conventions/coding.md` Scope and structure section says "Make the smallest change that satisfies the request". Compose and kind need only part of this: containers, networks and volumes by project label, and marks. The `pid` liveness kind stays because `kind` uses it, and the `path` kind stays for Compose only as a fixed rule.
+PROPOSAL: Remove the `docker` rule type from v1 and narrow AC-03 and the Test Plan to `compose` and `kind`, leaving `schema_version` to add it later. If it stays, name the consumer and add a real-host row.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Adoption; AC-23; Test Plan, AC-23
+EVIDENCE: Line 108 says "A project's entry points take their environment from `env --sh`", line 207 repeats it for Stackweaver, and AC-23 says "its entry points run unchanged", but no entry point is named. At `cc2cbbed` the candidates include the `Makefile` targets `test`, `test-integration` and `verify`, `e2e/k8s/run.sh`, `e2e/k8s/driver-conformance.sh` and `scripts/docs-visuals/index.js:92`, which is the source of `stackweaver-visuals-*`. Stackweaver's `CLAUDE.md` tells sessions to run `cd backend && go test` directly, and `scripts/tfe-compat/run.sh:70` hard-codes `/tmp`. The AC-23 proof says "driver tests through the entry point", so wiring one target ticks the criterion while `TestConformance_*` runs from any other path still land in `/tmp`. An implementation review cannot decide "its entry points" from the text.
+PROPOSAL: List the exact Stackweaver entry points that adopt `env`, including the one that runs `TestConformance_*`, in Adoption and in AC-23. State that a direct `go test` stays outside and relies on the `tmp` globs.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-11; Goal; Design, Operation and allow rules
+EVIDENCE: AC-11 now ends "If `clean` refuses with `pid-namespace` in the Codex session, that is a stated limit recorded in the evidence, not a failure here." `~/.codex/config.toml:6` is `sandbox_mode = "workspace-write"`, and Context records that sandbox as a PID namespace. I repeated the namespace effect with `bwrap --unshare-pid`: `kill -0` on a live pid printed "No such process", and `/proc/self/ns/pid` read `pid:[4026535966]`, not the `pid:[4026531836]` of a normal session here. So AC-11 can tick while the owner's default Codex session frees nothing, which leaves a Scope item ("for Claude Code and Codex, one allow rule each") as a rule that reaches only a refusal. The goal still says "Any agent session". The limit is not stated in Design, and lines 189-193 give the operation a report only for a missing binary, not for this refusal. The outcome is not recorded, though one disposable session would settle it before the design is accepted.
+PROPOSAL: Run one default Codex session with the rule now and record the result in Context. Then either drop the escape clause, or state the limit in the Goal and Design and say what the operation tells the user, such as running the command in a terminal.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-07
+EVIDENCE: The AC-07 row proves root, PID namespace, platform and Git version only through "injected uid, platform, PID namespace, Git version". The PID namespace refusal exists because `kill` and `/proc` give wrong answers without failing (line 85), so a mistake in reading `/proc/self/ns/pid` would turn ended-run decisions on live objects into removals. An injected value never runs that read. The AC-18 proof already uses Bubblewrap and deliberately avoids a new PID namespace, and `.github/workflows/ci.yml:36-38` sets up `bwrap` for CI.
+PROPOSAL: Add a `cmd/vh-adlc` test that runs the real binary under `bwrap --unshare-pid` and asserts `pid-namespace` with nothing removed.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: should-fix
+WHERE: Review Log; frontmatter status_description
+EVIDENCE: This repeats R-3 F-11 and R-4 F-09. `status_description` says "R-4 findings applied", but `git ls-remote origin main spec/host-cleanup` returns only `refs/heads/main` at `c8343c5`, `git branch -a --contains HEAD` lists only local `spec/host-cleanup`, and `git log origin/main..HEAD` has 15 commits. The document has no `branch`, and `conventions/delivery.md` says such a document is "committed and pushed to the default branch". `origin/main` is still an ancestor of HEAD, so a fast-forward works today. Local `main` at `930541c` is not an ancestor of HEAD (`git log HEAD..main` lists commits, including a merge), so landing through local `main` invites a rebase, which would make every reviewed commit in this log unreachable and stale.
+PROPOSAL: Fast-forward `origin/main` to the commit this review covers without rebasing, or correct the status line and state why it waits.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: Lines 46-48 say `sweepEndedRuns` "never forces a removal". At Stackweaver `cc2cbbed` it calls `d.removeContainer`, which calls `engine.remove`, and `backend/internal/launcher/driver/engineapi.go:287` sends `url.Values{"force": {"1"}, "v": {"1"}}`. The sweep's comment holds for networks, volumes and images only. The sentence is used as the model for this design's own never-forced rule.
+PROPOSAL: Write that it forces no removal of a network, volume or image.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Manifest; What clean will and will not touch
+EVIDENCE: Lines 134-136 say a Compose project with no containers left "is not matched and stays". Line 167 removes containers first, then networks and volumes. If a volume removal fails or the volume is in use on the first run, `removal-failed` is reported once, and every later run finds no containers and no liveness, so that run's own remainder is never retried. The Test Plan has no such case.
+PROPOSAL: State this as a limit, or keep one container until its project's networks and volumes are gone.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Operation and allow rules; Order
+EVIDENCE: Line 193 covers only a missing binary. Running the locked 0.1.0 binary as `clean --dry-run` returned result `usage`, exit 2, with "unknown command \"clean\"". Order merges the skill at step 1 and moves the lock at step 2, and the documented install at line 196 prints the locked binary, so between those steps it installs one with no `clean`. R-3 F-08 asked for the older-binary case.
+PROPOSAL: Have the operation treat that `usage` result like a missing binary, with the same one line, and say the install step needs the lock from Order step 2.
+
+FINDING: F-13
+KIND: factual
+SEVERITY: nit
+WHERE: Sources; frontmatter covers
+EVIDENCE: Line 56 cites Git's "release notes" for the 2.45 floor, and Sources does not list them, while the standard says Sources lists every external page read. `covers` omits `internal/gitcmd/`, which holds `MinMinor = 35` and a `TooOldError` message fixed to that value, and which line 150's calls run through, so a 2.45 check for `clean` touches or depends on it.
+PROPOSAL: Add the Git release notes page to Sources and `internal/gitcmd/` to `covers`.
+
+FINDING: F-14
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-12; Design, Adoption table
+EVIDENCE: AC-12 says run 1 "reports every row without `--kind` as required". The rows at lines 232-233 require "Untouched" for objects no rule matches, and line 175 and AC-02 report only declared resources, so run 1 says nothing about them. A review must read absence as a report. AC-06 covers only what Design lists, and lines 139-141 name unknown values in `kinds` but not in `liveness.kind`.
+PROPOSAL: Say that an untouched row passes by appearing in no removal or stop in the report, and add an unknown `liveness.kind` to the refusals.
 
 ## Sources
 
