@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createRun, readRun, intent } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { createRun, readRun, intent, noteResource } from "../../../plugins/vh-adlc/scripts/audit/journal";
 import { cleanupPending, liveReady } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture } from "./fixtures";
@@ -51,4 +51,15 @@ test.each(["denied", "ambiguous", "target", "owner", "method"])("a %s cleanup bo
   });
   expect(result.ready).toBe(false); expect(result.handoffs.length).toBeGreaterThan(0); expect(deleted).toBe(false);
   expect(liveReady(c.reload())).toBe(false); expect(c.reload().events.some(e => e.kind === "handoff")).toBe(true);
+});
+
+test("the server-assigned resource ID is retained and a replacement with the same correlation is not deleted", async () => {
+  const c = context(); c.pending("temporary-key", "key");
+  noteResource(c.reload(), "temporary-key", "original-key-id");
+  let deleted = false;
+  const result = await cleanupPending(c.reload(), c.scope, { authorized: true,
+    lookup: async () => [{ id: "replacement-key-id", ...c.scope }], cleanup: async () => { deleted = true; },
+  });
+  expect(result.ready).toBe(false); expect(deleted).toBe(false);
+  expect(c.reload().events.some(e => e.kind === "resource")).toBe(true);
 });
