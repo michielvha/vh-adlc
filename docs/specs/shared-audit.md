@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner after Copilot Opus 5.5 R-12. Documentation, tracking issue and implementation claim are authorized; R-12 recovery proof remains mandatory implementation work."
+status: in-progress
+branch: feat/shared-audit
+status_description: "Implementation claimed after owner acceptance of R-12; tasks start with the bound Stackweaver parity map, then test-first helpers and migration. Publication/marketplace/adoption evidence is not yet established."
 issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
