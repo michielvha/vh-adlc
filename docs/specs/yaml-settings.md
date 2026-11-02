@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-4 findings applied on 2026-11-02, and every question is decided. Waits for a new independent review."
+status: planned
+status_description: "Accepted by the owner on 2026-11-02 at R-5. R-5's non-blocking findings carry into the task list, outside the normative baseline."
 issue: null
 goal: "Triage and maintenance settings are YAML, Stackweaver's move is reviewed, and the pinned conventions forbid choosing JSON over YAML. Audit is a known exception until its revision lands."
 covers:
@@ -167,6 +167,7 @@ None.
 | 2026-11-02 | R-3 | spec | `443b34d47ad543865cb2892ea12a3d5633924006` | claude-opus-5-5 | procedural | 11 findings, 1 blocking |
 | 2026-11-02 | R-4 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 10 findings, 0 blocking |
 | 2026-11-02 | R-5 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 8 findings, 0 blocking |
+| 2026-11-02 | R-5 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | n/a | n/a | accepted by owner |
 
 ### R-1
 
