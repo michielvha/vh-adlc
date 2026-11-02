@@ -33,8 +33,11 @@ Its local structural tests cover historical inventory, current-source bindings, 
 owned ledger updates, selected repair batches, scoped policy, interruption recovery and cutover denials.
 These tests do not establish that a model actually followed the procedure.
 
-Actual Copilot Opus 5.5 behavior trials, independent implementation/parity review and isolated native
-Codex/Claude install/discovery/helper trials remain pending in the
+Local-catalog Codex/Claude install/discovery/helper and reinstall trials passed at committed source
+`a6c4f282e056c9e8d96cddc8632ccddab891a46f`, with all twelve skills and matching payload bytes/modes.
+The bounded Copilot Opus 5.5 read-only behavior and two-context recovery trials passed at their recorded
+targets. Later independent review fixes require a final evidence refresh and exact-commit review;
+Stackweaver semantic parity and actual marketplace adoption remain pending in the
 [audit feature evidence](../specs/shared-audit.md). Actual Claude model invocation and GUI behavior
 remain deferred. No live Stackweaver audit, production token/database operation or bug repair has run.
 Published marketplace and post-merge adopted-policy checks follow source completion in that order;

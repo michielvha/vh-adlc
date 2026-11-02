@@ -18,3 +18,12 @@ test("audit documentation separates historical status, provisional proposals, ac
   for (const requirement of ["STILL_PRESENT", "FIXED", "PARTIAL", "REGRESSED", "MOOT", "UNKNOWN", "Scope baseline", "Verified source", "source_target", "assessment-only", "authored-repair", "Standing audit workflow authorization", "provisional", "operator attestations", "lost acknowledgement", "cleanup", "full publication diff"]) expect(text).toContain(requirement);
   expect(text).not.toContain("claude-opus-5.5"); // The owner chooses review model; the operation stays portable.
 });
+
+test("ship/live intake and merge authority explicitly preserve the scoped audit exception", () => {
+  const lifecycle = readFileSync(resolve(plugin, "references/lifecycle.md"), "utf8"), authority = readFileSync(resolve(plugin, "references/authority.md"), "utf8");
+  const ship = lifecycle.split("\n").find(line => line.startsWith("| Ship or a live operation |"))!;
+  expect(ship).toContain("audit.md"); expect(ship).toContain("adopted"); expect(ship).toContain("retained gates");
+  const merge = authority.split("\n").find(line => line.startsWith("| Merge |"))!;
+  expect(merge).toContain("audit.md"); expect(merge).toContain("conditional-merge");
+  const other = authority.split("\n").find(line => line.startsWith("| Tag, release, deploy"))!; expect(other).toContain("Separate approval");
+});

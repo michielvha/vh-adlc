@@ -24,7 +24,8 @@ additional execution or publication permission.
 | Repair selected audit findings and deliver a selected batch | Eligible selected local repair follows `audit.md` and `audit-record.md`; live/remote effects additionally need exact current permission or adopted `Standing audit workflow authorization`, current selection/restrictions and all retained gates |
 | Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
-| Merge, tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action |
+| Merge | Separate approval for that exact action, or the explicitly selected audit batch's current/adopted `conditional-merge` permission and all retained gates in [audit.md](audit.md) |
+| Tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action; audit grants none of these effects |
 | Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
 | Enabling automatic merged-branch deletion or cleaning stale merged branches | Owner-authorized repository configuration or branch cleanup; verify current tips are merged and preserve active worktrees |
 | Another repository, account or feature | A new scope decision |
