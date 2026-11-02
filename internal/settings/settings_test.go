@@ -35,6 +35,13 @@ func decoded(t *testing.T, input string) any {
 
 type object = map[string]any
 
+// Spellings too long for any number the library can hold, so it leaves them
+// tagged as strings.
+var (
+	digits400 = "1" + strings.Repeat("0", 399)
+	hex96     = "0x" + strings.Repeat("F", 24)
+)
+
 const (
 	maxSafe    = 9007199254740991.0
 	prettyJSON = `{
@@ -89,6 +96,25 @@ func TestAccepted(t *testing.T) {
 			"archived":  false,
 			"owner":     nil,
 		}},
+		{"quoted long exponent", "a: \"1e400\"\n", object{"a": "1e400"}},
+		{"single-quoted long hex", "a: '" + hex96 + "'\n", object{"a": hex96}},
+		{"quoted long integer", "a: \"" + digits400 + "\"\n", object{"a": digits400}},
+		{"block scalar holding a long exponent", "a: |-\n  1e400\n", object{"a": "1e400"}},
+		{"quoted number-shaped key", "\"" + digits400 + "\": 1\n", object{digits400: 1.0}},
+		{"version string", "a: 1.2.3\n", object{"a": "1.2.3"}},
+		{"impossible date", "a: 2026-13-45\n", object{"a": "2026-13-45"}},
+		{"digits then a word", "a: 2nd\n", object{"a": "2nd"}},
+		{"bare exponent marker", "a: 1e\n", object{"a": "1e"}},
+		{"bare hex prefix", "a: 0x\n", object{"a": "0x"}},
+		{"hex prefix with a bad digit", "a: 0xZZ\n", object{"a": "0xZZ"}},
+		{"octal prefix with a bad digit", "a: 0o9\n", object{"a": "0o9"}},
+		{"binary prefix with a bad digit", "a: 0b2\n", object{"a": "0b2"}},
+		{"hex float", "a: 0x1p-2\n", object{"a": "0x1p-2"}},
+		{"time of day", "a: 12:30:00\n", object{"a": "12:30:00"}},
+		{"leading underscore", "a: _1\n", object{"a": "_1"}},
+		{"lone sign", "a: +\n", object{"a": "+"}},
+		{"lone dot", "a: .\n", object{"a": "."}},
+		{"version as a key", "1.2.3: a\n", object{"1.2.3": "a"}},
 		{"explicit document start", "---\na: 1\n", object{"a": 1.0}},
 		{"document end marker", "a: 1\n...\n", object{"a": 1.0}},
 		{"bare tag on an integer", "a: ! 1\n", object{"a": 1.0}},
@@ -156,6 +182,10 @@ func TestRefused(t *testing.T) {
 		{"empty key", "? \n: " + canary + "\n", key},
 		{"timestamp key", "2026-11-02: " + canary + "\n", key},
 		{"float key", "1.5: " + canary + "\n", key},
+		{"400-digit key", digits400 + ": " + canary + "\n", key},
+		{"96-bit hex key", hex96 + ": " + canary + "\n", key},
+		{"huge exponent key", "1e400: " + canary + "\n", key},
+		{"nested number-shaped key", "a:\n  " + digits400 + ": " + canary + "\n", key},
 		{"sequence key", "? [" + canary + "]\n: 1\n", key},
 		{"mapping key", "? {" + canary + ": 1}\n: 1\n", key},
 		{"nested bad key", "a:\n  1: " + canary + "\n", key},
@@ -189,6 +219,22 @@ func TestRefused(t *testing.T) {
 		{"below the safe range", canary + ": -9007199254740992\n", number},
 		{"past 64 bits", canary + ": 99999999999999999999\n", number},
 		{"past 64 bits, negative", canary + ": -99999999999999999999\n", number},
+		{"400-digit integer", canary + ": " + digits400 + "\n", number},
+		{"400-digit negative integer", canary + ": -" + digits400 + "\n", number},
+		{"400-digit integer with a plus sign", canary + ": +" + digits400 + "\n", number},
+		{"400 digits with a leading zero", canary + ": 0" + digits400 + "\n", number},
+		{"400 digits with underscores", canary + ": 1_" + digits400 + "\n", number},
+		{"400 digits after a sign and an underscore", canary + ": +_" + digits400 + "\n", number},
+		{"400-digit float", canary + ": " + digits400 + ".5\n", number},
+		{"huge exponent", canary + ": 1e400\n", number},
+		{"huge negative exponent", canary + ": -1e400\n", number},
+		{"huge exponent without a leading digit", canary + ": .5e400\n", number},
+		{"96-bit hex", canary + ": " + hex96 + "\n", number},
+		{"96-bit negative hex", canary + ": -" + hex96 + "\n", number},
+		{"70-bit binary", canary + ": 0b" + strings.Repeat("1", 70) + "\n", number},
+		{"90-bit octal", canary + ": 0o" + strings.Repeat("7", 30) + "\n", number},
+		{"bare tag on a huge exponent", canary + ": ! 1e400\n", number},
+		{"huge number in a sequence", canary + ": [1e400]\n", number},
 		{"plus sign", canary + ": +1\n", number},
 		{"leading zero", canary + ": 007\n", number},
 		{"hexadecimal", canary + ": 0x10\n", number},

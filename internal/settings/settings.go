@@ -10,6 +10,7 @@ import (
 	"io"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/michielvha/vh-adlc/internal/report"
 	"go.yaml.in/yaml/v3"
@@ -38,6 +39,10 @@ const (
 
 // decimal is the one integer spelling the reader accepts.
 var decimal = regexp.MustCompile(`^-?(0|[1-9][0-9]*)$`)
+
+// numberSpelling is what the library's resolver reads as a number, once
+// numberShaped has removed any underscores.
+var numberSpelling = regexp.MustCompile(`^[-+]?(0[xX][0-9a-fA-F]+|0[oO][0-7]+|0[bB][01]+|(\.[0-9]+|[0-9]+(\.[0-9]*)?)([eE][-+]?[0-9]+)?)$`)
 
 // A library error names its line only as `yaml: line N: ...`.
 var libraryLine = regexp.MustCompile(`^yaml: line ([0-9]+):`)
@@ -167,7 +172,7 @@ func key(n *yaml.Node) *refusal {
 	switch {
 	case n.Tag == "!!merge":
 		return &refusal{reasonMerge, n.Line}
-	case n.Kind != yaml.ScalarNode || n.Tag != "!!str":
+	case n.Kind != yaml.ScalarNode || n.Tag != "!!str" || overflowed(n):
 		return &refusal{reasonKey, n.Line}
 	}
 	return nil
@@ -175,7 +180,12 @@ func key(n *yaml.Node) *refusal {
 
 func scalar(n *yaml.Node) (any, *refusal) {
 	switch n.Tag {
-	case "!!str", "!!timestamp":
+	case "!!str":
+		if overflowed(n) {
+			return nil, &refusal{reasonNumber, n.Line}
+		}
+		return n.Value, nil
+	case "!!timestamp":
 		return n.Value, nil
 	case "!!bool":
 		if n.Value == "true" || n.Value == "false" {
@@ -197,4 +207,22 @@ func scalar(n *yaml.Node) (any, *refusal) {
 	default: // !!float, the only tag left for an untagged scalar
 		return nil, &refusal{reasonNumber, n.Line}
 	}
+}
+
+// overflowed reports a plain !!str that is spelled as a number. The library
+// tags a number it cannot hold as a string, so the tag alone would accept it.
+func overflowed(n *yaml.Node) bool {
+	return n.Style == 0 && numberShaped(n.Value)
+}
+
+// numberShaped follows the resolver, which never reads a value starting with an
+// underscore as a number and keeps the underscores of one starting with a dot.
+func numberShaped(s string) bool {
+	if strings.HasPrefix(s, "_") {
+		return false
+	}
+	if !strings.HasPrefix(s, ".") {
+		s = strings.ReplaceAll(s, "_", "")
+	}
+	return numberSpelling.MatchString(s)
 }
