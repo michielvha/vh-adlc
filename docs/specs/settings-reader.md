@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-02 at R-3. R-3's non-blocking findings carry into the task list, outside the normative baseline."
+status: in-progress
+status_description: "Implementing on feat/settings-reader, with the claim local to that branch at the owner's direction. Accepted at R-3; its findings are covered in the task list."
 issue: null
+branch: feat/settings-reader
 goal: "`vh-adlc settings read` turns a YAML settings file into a checked value, or refuses it, for the TypeScript operations."
 covers:
   - cmd/vh-adlc/
