@@ -26,6 +26,20 @@ The runtime has no GUI dependency. Other GUI surfaces have no triage support cla
 Copilot's migration runner is test-only and grants no managed execution support.
 The historical results below retain their original scope.
 
+## Persistent codebase audit
+
+The audit operation is a harness-agnostic skill and Bun/Git helper package in the 0.7.0 candidate.
+Its local structural tests cover historical inventory, current-source bindings, conservative verdicts,
+owned ledger updates, selected repair batches, scoped policy, interruption recovery and cutover denials.
+These tests do not establish that a model actually followed the procedure.
+
+Actual Copilot Opus 5.5 behavior trials, independent implementation/parity review and isolated native
+Codex/Claude install/discovery/helper trials remain pending in the
+[audit feature evidence](../specs/shared-audit.md). Actual Claude model invocation and GUI behavior
+remain deferred. No live Stackweaver audit, production token/database operation or bug repair has run.
+Published marketplace and post-merge adopted-policy checks follow source completion in that order;
+a local catalog is development evidence only. A valid receipt grants no publication or merge authority.
+
 ## Dependency and security maintenance
 
 Maintenance requires plugin 0.6.0 or later. Isolated native installs of the exact

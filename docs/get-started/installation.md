@@ -89,7 +89,7 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains eleven skills: the generic `vh-adlc` entry, nine engineering
+The package contains twelve skills: the generic `vh-adlc` entry, ten engineering
 operations and `vh-adlc-blog` for article and promotion drafts. It includes
 separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
@@ -117,6 +117,12 @@ installation blocker; do not reconstruct it from a legacy local agent.
 Maintenance uses an agent procedure with observed evidence, rather than triage's
 managed publication controller. The other feature operations continue to use the
 verified binary without requiring Bun.
+
+Persistent codebase audit requires plugin 0.7.0+, Bun and Git. Create the
+[audit settings and project procedure](../../plugins/vh-adlc/references/audit-settings.md) in the
+consumer repository before running its helpers. The example supplies new files; no existing personal
+configuration is assumed. The operation uses artifact-backed agent verification. It does not inherit
+triage's controller, provision credentials or grant remote effects merely by being installed.
 
 The other marketplace plugins install separately. Bun is required for the
 GitHub App registration scripts; installing vh-adlc does not install those scripts

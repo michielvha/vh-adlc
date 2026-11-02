@@ -10,7 +10,7 @@ want separately.
 
 | Plugin | Purpose | Availability |
 | --- | --- | --- |
-| `vh-adlc` | Lifecycle intake, dependency/security maintenance, article/promotion drafts and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
+| `vh-adlc` | Lifecycle intake, persistent codebase audit, dependency/security maintenance, article/promotion drafts and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes, with Claude Remote Control phone notifications. | Codex and Claude catalogs; source lives in [auth-refresh](https://github.com/michielvha/auth-refresh). |
 | `github-app-registration` | Register a GitHub App through its manifest flow, save credentials locally with mode 0600, and export them to project files. | Claude catalog. The scripts require [Bun](https://bun.sh). |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. | Codex and Claude catalogs. Requires a signed-in Codex host with Remote Control running and `qrencode`. |
@@ -18,6 +18,14 @@ want separately.
 The [Codex catalog](../../.agents/plugins/marketplace.json) and
 [Claude catalog](../../.claude-plugin/marketplace.json) define package sources.
 Both pin auth-refresh to the same component commit.
+
+## Persistent audit
+
+`vh-adlc-audit` is packaged in the 0.7.0 candidate. It keeps persistent findings, re-verification and
+selected repairs portable while consumers retain their ledgers and operating rules. Candidate source
+checks do not establish marketplace availability. Publish and test actual fresh/upgrade/reinstall
+behavior before adopting a consumer migration. See the [audit workflow](../user-guides/workflows.md#persistent-codebase-audit)
+and [acceptance limits](compatibility.md#persistent-codebase-audit).
 
 ## Shared maintenance
 
