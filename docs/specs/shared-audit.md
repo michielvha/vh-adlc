@@ -76,6 +76,12 @@ publication to wait until spec acceptance. These decisions are folded into Desig
 they are not acceptance of the not-yet-refreshed reviewed spec.
 
 
+Implementation sequencing correction: the first settings commit `90b2416` was created after its
+focused settings pass but despite the existing package checker rejecting the missing candidate
+version bump. A shell sequence did not stop after a failed metadata assertion. T3 remained unchecked;
+no feature code was pushed. T26 moves the already-required coherent version bump forward, keeps the
+failed checker log, and requires the passing package/settings rerun before T3 completion.
+
 ### Latest spec review and implementation obligation
 
 Actual Copilot `claude-opus-5.5` R-12 reviewed `67a91a17944bb219ce956364963531532577c396`
@@ -705,6 +711,8 @@ live operations remain separate owner-selected tasks.
       Evidence: Consumer commit `04696fb7e50168fd9e742a9f1d57a457e6dde388` records 39 rows and five bound legacy files at `0ae15a9d`; all excerpt hashes/required dimensions validated. Normal host commit hooks passed four checks with no skips after a retained sandbox Git-spawn EPERM. Future homes/contracts and independent semantic completeness remain for T24; AC-05 is not ticked.
 - [x] T2 `tests/vh-adlc/audit/settings.test.ts` and `fixtures.ts` - write meaningful origin/config/profile/path and complete-example checks first; observe failure because the audit settings operation is absent (AC-02).
       Evidence: `bun test tests/vh-adlc/audit/settings.test.ts` failed with exit 1 because the audit settings module does not exist, before implementation. The retained red log is `T2-settings-red.log`; cases cover identity, missing setup, malformed/escaping inputs, redaction and the full standalone example.
+- [x] T26 `plugins/vh-adlc/plugin.json` and `.claude-plugin/plugin.json` - move the coherent 0.7.0 candidate version prerequisite before further package work; the observed existing package-version red becomes green alongside settings tests (AC-01, AC-06).
+      Evidence: Existing package-version check failed before the bump in `T3-package-check.log`; both manifest versions are now 0.7.0. `bun test tests/vh-adlc/check.test.ts tests/vh-adlc/audit/settings.test.ts` passes 75 tests/213 assertions with zero failures in `T26-version-settings-green.log`.
 - [ ] T3 `plugins/vh-adlc/scripts/audit/settings.ts`, `types.ts` and `examples/audit/basic/` - implement strict origin-bound settings and complete standalone files; T2 passes without host/private configuration (AC-02).
 - [ ] T4 `tests/vh-adlc/audit/inventory.test.ts` - write legacy-index/heading/reference/high-water/ambiguity tests first; observe the missing inventory behavior fail (AC-02).
 - [ ] T5 `plugins/vh-adlc/scripts/audit/inventory.ts` - implement supported Markdown inventory and conservative ID allocation; T4 passes including alternate prefix and incomplete inventories (AC-02).
@@ -722,7 +730,7 @@ live operations remain separate owner-selected tasks.
 - [ ] T17 `Stackweaver:AGENTS.md`, `agents/codebase-audit.md`, `agents/audit-project.md`, `.claude/commands/audit.md` and `.vh-adlc/audit.json` - implement the thin adapter and retained local policy; T16 passes using the actual shared helper in non-granting candidate mode (AC-05).
 - [ ] T18 `tests/vh-adlc/audit/adoption.test.ts` and `Stackweaver:tests/agent-audit/preflight.test.ts`, `rehearsal.test.ts` - write wrong-operation/artifact/target/model/version and unadopted-policy cutover denials plus rollback/reapply first; observe the absent audit verifier fail (AC-05, AC-07).
 - [ ] T19 `plugins/vh-adlc/scripts/audit/adoption.ts` and `Stackweaver:tests/agent-audit/preflight.ts`, `rehearse.ts`, `manifest.json`, `README.md` - implement audit-specific artifact-bound preflight and actual scoped rollback rehearsal; T18 passes and real publication remains required before cutover (AC-05, AC-07).
-- [ ] T20 `plugins/vh-adlc/plugin.json`, `.claude-plugin/plugin.json`, `README.md`, user/install/compatibility guides and `.github/workflows/ci.yml` - publish coherent candidate packaging/docs and add audit to the portable test selection; package contracts and actionlint pass without trigger/permission changes or untested compatibility claims (AC-01, AC-06).
+- [ ] T20 `README.md`, user/install/compatibility guides and `.github/workflows/ci.yml` - finish coherent candidate documentation and add audit to the portable test selection; package contracts and actionlint pass without trigger/permission changes or untested compatibility claims (AC-01, AC-06).
 - [ ] T21 `tests/vh-adlc/audit/trial-proof.test.ts` - write positive/negative semantic-evidence and transcript/provenance controls for actual model trials; observe the missing grader/runner contract fail (AC-03, AC-04, AC-06).
 - [ ] T22 `tests/vh-adlc/audit/trial-proof.ts` and bounded synthetic trial runners - execute actual Copilot Opus 5.5 audit/repair/recovery trials at a committed payload, including independent repair review and adverse controls; raw transcripts, native exits and manual inspections establish the declared scenarios (AC-01, AC-03, AC-04, AC-06).
 - [ ] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
