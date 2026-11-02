@@ -199,3 +199,15 @@ test("an established dated-ledger layout keeps banners, summary tables, visible 
   expect(candidate.bytes).toContain("Older summary stays intact."); expect(candidate.bytes).toContain("Historical pass (2026-10-01): prior evidence only.");
   expect(candidate.bytes).toContain("Unselected findings retain their recorded history");
 });
+
+test("new full-audit entries stay with findings before existing summaries instead of becoming summary children", () => {
+  const c = context("full"); c.f.write(c.config.ledger_path, ledger + "\n## Re-verification summary (2026-10-01)\nHistorical summary remains.\n"); c.f.commit();
+  const snap = captureSnapshot(c.config, { mode: "full", artifact_root: c.f.artifacts }), result = appendFindings(c.config, snap, [{ id: "AUD-003", severity: "High", title: "New cause", body: "Original new scenario." }]);
+  expect(result.bytes.indexOf("### AUD-003")).toBeLessThan(result.bytes.indexOf("## Re-verification summary")); expect(result.bytes).toContain("Historical summary remains.");
+});
+test("a new finding body cannot introduce a sibling/parent heading, while fenced reproduction headings remain content", () => {
+  const c = context("full"), snap = captureSnapshot(c.config, { mode: "full", artifact_root: c.f.artifacts });
+  const finding = { id: "AUD-003", severity: "High", title: "New cause", body: "## Escapes finding scope\nUnexpected document structure." };
+  expect(() => appendFindings(c.config, snap, [finding])).toThrow();
+  expect(appendFindings(c.config, snap, [{ ...finding, body: "```sh\n# Reproduction comment\n```\n#### Evidence\nObserved scenario." }]).bytes).toContain("# Reproduction comment");
+});

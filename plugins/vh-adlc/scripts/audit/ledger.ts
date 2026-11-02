@@ -152,6 +152,9 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
     const expected = config.id_prefix + "-" + String(next++).padStart(snap.inventory.next_id!.slice(config.id_prefix.length + 1).length, "0");
     if (finding.id !== expected || !finding.severity?.trim() || !finding.title?.trim() || !finding.body?.trim() ||
         /[\x00-\x1f\x7f|]/.test(finding.title + finding.severity) || finding.body.includes("\0") || new RegExp("^#{1,6}\\s+" + config.id_prefix + "-", "m").test(finding.body)) fail("new IDs must follow the reserved high-water mark with a single supported finding identity");
+    if (visibleLines(finding.body).some(line => {
+      const heading = line.match(/^ {0,3}(#{1,6})[ \t]+/); return heading && heading[1].length <= config.profile.finding_level;
+    })) fail("new finding body cannot escape its configured section level");
     if (snap.mode === "reverify" && (!delta || !Array.isArray(finding.delta_paths) || !finding.delta_paths.length ||
         finding.delta_paths.some(path => repositoryPath(path) !== path || !delta.has(path) || [config.ledger_path, config.settings_path, config.project_procedure].includes(path) ||
           !/^100(?:644|755) blob /.test(git(config.root, "ls-tree", snap.source.commit, "--", path))))) fail("reverify new findings must cite actual related changed source paths; missing history never triggers full audit");
@@ -172,7 +175,15 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
     return "";
   }).join(" | ") + " |");
   lines.splice(end, 0, ...rows);
-  for (const finding of findings) lines.push("", "#".repeat(config.profile.finding_level) + " " + finding.id + " - " + finding.title, finding.body, "");
+  const visible = visibleLines(lines.join("\n")), findingHeading = new RegExp("^ {0,3}#{" + config.profile.finding_level + "}[ \t]+" + config.id_prefix + "-[0-9]+(?=\\s|$|:)");
+  let last = -1;
+  for (const [at, line] of visible.entries()) if (findingHeading.test(line)) last = at;
+  let insertion = lines.length;
+  for (let at = last + 1; last >= 0 && at < visible.length; at++) {
+    const heading = visible[at].match(/^ {0,3}(#{1,6})[ \t]+/);
+    if (heading && heading[1].length <= config.profile.finding_level) { insertion = at; break; }
+  }
+  lines.splice(insertion, 0, ...findings.flatMap(finding => ["", "#".repeat(config.profile.finding_level) + " " + finding.id + " - " + finding.title, finding.body, ""]));
   return lines.join("\n");
 }
 export function appendFindings(config: Settings, snap: Snapshot, findings: NewFinding[]) {
