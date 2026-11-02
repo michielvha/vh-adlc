@@ -1,0 +1,54 @@
+import { afterEach, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { createRun, readRun, intent } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { cleanupPending, liveReady } from "../../../plugins/vh-adlc/scripts/audit/recovery";
+import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
+import { fixture } from "./fixtures";
+
+const projects: ReturnType<typeof fixture>[] = [];
+function context() {
+  const f = fixture(); projects.push(f); const config = loadSettings(f.root);
+  const run = createRun(config, { artifact_root: f.artifacts, run_id: "live-test", batch_digest: "d".repeat(64) });
+  const scope = { target: "development:owned-slot", actor: "fixture-actor", organization: "fixture-org", cleanup_method: "#verification-owned-cleanup" };
+  const pending = (id: string, kind: "key" | "row") => intent(readRun(config, run.directory, "d".repeat(64)), { id, kind, correlation: "run-live-test-" + id, ...scope });
+  return { f, config, run, scope, pending, reload: () => readRun(config, run.directory, "d".repeat(64)) };
+}
+afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
+
+test.each(["before-create", "after-create", "after-cleanup"])("fresh-context %s recovery reconciles exact owned resources and never creates another key", async phase => {
+  const c = context(); c.pending("temporary-key", "key"); c.pending("test-row", "row");
+  const resources = new Map<string, string>(); let deletes = 0, created = 0;
+  if (phase !== "before-create") { resources.set("run-live-test-temporary-key", "key-id"); resources.set("run-live-test-test-row", "row-id"); created = 2; }
+  if (phase === "after-cleanup") resources.clear();
+  expect(liveReady(c.reload())).toBe(false);
+  const result = await cleanupPending(c.reload(), c.scope, {
+    authorized: true,
+    lookup: async action => { const id = resources.get(action.correlation); return id ? [{ id, ...c.scope }] : []; },
+    cleanup: async (action, resource) => { deletes++; expect(resource.id).toBe(resources.get(action.correlation)!); resources.delete(action.correlation); },
+  });
+  expect(result.ready).toBe(true); expect(resources.size).toBe(0); expect(deletes).toBe(phase === "after-create" ? 2 : 0);
+  expect(created).toBe(phase === "before-create" ? 0 : 2); expect(liveReady(c.reload())).toBe(true);
+  expect(readFileSync(join(c.run.directory, "header.json"), "utf8")).not.toContain("secret");
+});
+
+test("accepted cleanup with lost response is reconciled by observing absence before retry", async () => {
+  const c = context(); c.pending("temporary-key", "key"); let present = true, deletes = 0;
+  const transport = { authorized: true,
+    lookup: async () => present ? [{ id: "key-id", ...c.scope }] : [],
+    cleanup: async () => { present = false; deletes++; throw Error("cleanup response lost"); },
+  };
+  await expect(cleanupPending(c.run, c.scope, transport)).rejects.toThrow("response lost");
+  expect(liveReady(c.reload())).toBe(false);
+  expect((await cleanupPending(c.reload(), c.scope, transport)).ready).toBe(true); expect(deletes).toBe(1);
+});
+
+test.each(["denied", "ambiguous", "target", "owner", "method"])("a %s cleanup boundary leaves a durable specific handoff and blocks another live attempt", async kind => {
+  const c = context(); c.pending("temporary-key", "key"); let deleted = false;
+  const resource = { id: "key-id", ...c.scope, ...(kind === "owner" ? { actor: "another-actor" } : {}) };
+  const result = await cleanupPending(c.reload(), { ...c.scope, ...(kind === "target" ? { target: "another-target" } : kind === "method" ? { cleanup_method: "#other" } : {}) }, {
+    authorized: kind !== "denied", lookup: async () => kind === "ambiguous" ? [resource, resource] : [resource], cleanup: async () => { deleted = true; },
+  });
+  expect(result.ready).toBe(false); expect(result.handoffs.length).toBeGreaterThan(0); expect(deleted).toBe(false);
+  expect(liveReady(c.reload())).toBe(false); expect(c.reload().events.some(e => e.kind === "handoff")).toBe(true);
+});
