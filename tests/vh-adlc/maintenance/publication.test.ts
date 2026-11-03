@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { resolveStanding, reportPermission, type Standing } from "../../../plugins/vh-adlc/scripts/maintenance/authority";
 import { beginCandidate, candidateSnapshot, commitCandidate, publicationReadiness, promoteOriginal } from "../../../plugins/vh-adlc/scripts/maintenance/report-candidate";
 import { appendRun, createRun, readRun } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
@@ -16,10 +16,10 @@ function project() { const f = fixture(); projects.push(f); return f; }
 const fields = { repository: "example/project", hostname: "github.com", branch: "main", publication_route: "default-branch-checkout-ff-only", report_dir: "reports", index_paths: "[]", initial_publication: "commit-and-push-before-selection", same_run_updates: "commit-and-push" };
 function declaration(overrides: Record<string, string> = {}) { return "## Standing maintenance report publication\n\n| Field | Value |\n| --- | --- |\n" + Object.entries({ ...fields, ...overrides }).map(([key, value]) => `| ${key} | ${value} |`).join("\n") + "\n"; }
 function adopted(f: ReturnType<typeof fixture>, overrides: Record<string, string> = {}) {
-  f.write("AGENTS.md", "Use [maintenance settings](.vh-adlc/maintenance.json).\n");
+  f.write("AGENTS.md", "Use [maintenance settings](.vh-adlc/maintenance.yaml).\n");
   f.settings({ schema_version: 1, report_dir: "reports", project_procedure: "maintenance-project.md" });
   f.write("maintenance-project.md", declaration(overrides));
-  git(f.root, "add", "AGENTS.md", ".vh-adlc/maintenance.json", "maintenance-project.md"); git(f.root, "commit", "-qm", "docs: adopt report publication");
+  git(f.root, "add", "AGENTS.md", ".vh-adlc/maintenance.yaml", "maintenance-project.md"); git(f.root, "commit", "-qm", "docs: adopt report publication");
   const commit = git(f.root, "rev-parse", "HEAD"), branch = git(f.root, "branch", "--show-current");
   git(f.root, "update-ref", `refs/remotes/origin/${branch}`, commit);
   const config = loadSettings(f.root), standing = resolveStanding(config, { default_branch: branch, default_commit: commit });
@@ -40,7 +40,7 @@ function saved(f: ReturnType<typeof fixture>, c: ReturnType<typeof loadSettings>
 test("only the committed default-branch instruction chain supplies an adopted grant", () => {
   const f = project(), { config, standing, commit } = adopted(f);
   expect(standing.status).toBe("adopted"); expect(standing.default_commit).toBe(commit);
-  expect(standing.sources.map(source => source.path)).toEqual(["AGENTS.md", ".vh-adlc/maintenance.json", "maintenance-project.md"]);
+  expect(standing.sources.map(source => source.path)).toEqual(["AGENTS.md", ".vh-adlc/maintenance.yaml", "maintenance-project.md"]);
   expect(standing.sources.every(source => /^[a-f0-9]{40,64}$/.test(source.blob))).toBe(true);
   f.write("maintenance-project.md", declaration({ repository: "other/project" }));
   expect(resolveStanding(config, { default_branch: "main", default_commit: commit })).toEqual(standing);
@@ -68,12 +68,36 @@ test("declaration validation rejects missing, unknown, duplicate, unsafe and mis
 });
 
 test("missing and example-only adoption links do not authorize publication", () => {
-  for (const contents of ["No adopted maintenance route.\n", "```md\n[settings](.vh-adlc/maintenance.json)\n```\n", "<!-- [settings](.vh-adlc/maintenance.json) -->\n"]) {
+  for (const contents of ["No adopted maintenance route.\n", "```md\n[settings](.vh-adlc/maintenance.yaml)\n```\n", "<!-- [settings](.vh-adlc/maintenance.yaml) -->\n"]) {
     const f = project(); adopted(f); f.write("AGENTS.md", contents); git(f.root, "add", "AGENTS.md"); git(f.root, "commit", "-qm", "docs: no live adoption link");
     const commit = git(f.root, "rev-parse", "HEAD"); git(f.root, "update-ref", "refs/remotes/origin/main", commit);
     expect(resolveStanding(loadSettings(f.root), { default_branch: "main", default_commit: commit }).status).toBe("unadopted");
   }
 });
+
+test("a default branch that still links the JSON settings file reports unadopted", () => {
+  const f = project(), { config } = adopted(f);
+  f.write("AGENTS.md", "Use [maintenance settings](.vh-adlc/maintenance.json).\n");
+  f.write(".vh-adlc/maintenance.json", JSON.stringify({ schema_version: 1, report_dir: "reports", project_procedure: "maintenance-project.md" }));
+  git(f.root, "add", "AGENTS.md", ".vh-adlc/maintenance.json"); git(f.root, "commit", "-qm", "docs: stale JSON adoption link");
+  const commit = git(f.root, "rev-parse", "HEAD"); git(f.root, "update-ref", "refs/remotes/origin/main", commit);
+  expect(resolveStanding(config, { default_branch: "main", default_commit: commit })).toMatchObject({ status: "unadopted", grant: null });
+});
+
+test("a YAML adoption chain grants nothing when the binary cannot be obtained", () => {
+  const f = project(), { config, commit } = adopted(f), home = join(f.root, ".empty-home");
+  mkdirSync(home);
+  const authority = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/maintenance/authority.ts");
+  const script = `import { resolveStanding } from ${JSON.stringify(authority)};
+    const standing = resolveStanding(${JSON.stringify(config)}, { default_branch: "main", default_commit: ${JSON.stringify(commit)} });
+    console.log(JSON.stringify({ status: standing.status, grant: standing.grant }));`;
+  const run = Bun.spawnSync([process.execPath, "-e", script], { cwd: f.root, stdout: "pipe", stderr: "pipe", timeout: 60_000,
+    env: { HOME: home, XDG_CACHE_HOME: join(home, "cache"), PATH: "/usr/bin:/bin", LC_ALL: "C", https_proxy: "http://127.0.0.1:9", HTTPS_PROXY: "http://127.0.0.1:9",
+      GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" } });
+  expect({ exit: run.exitCode, error: run.stderr.toString() }).toEqual({ exit: 0, error: "" });
+  const result = JSON.parse(run.stdout.toString());
+  expect(result.status).not.toBe("adopted"); expect(result.grant).toBeNull();
+}, 60_000);
 
 test("the same opt-in works on another default branch and every current restriction wins", () => {
   const f = project(); git(f.root, "branch", "-m", "trunk");

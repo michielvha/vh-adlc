@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-02 at R-5. R-5's non-blocking findings carry into the task list, outside the normative baseline."
+status: complete
+status_description: "Complete on feat/yaml-settings: R-7 at 5767579, after the macOS test fix, found all eight criteria met. Plugin publication and Stackweaver's order step 4 follow the merge."
 issue: null
+branch: feat/yaml-settings
 goal: "Triage and maintenance settings are YAML, Stackweaver's move is reviewed, and the pinned conventions forbid choosing JSON over YAML. Audit is a known exception until its revision lands."
 covers:
   - plugins/vh-adlc/scripts/settings-file.ts
@@ -125,18 +126,26 @@ changes it. There, after `git fetch origin main`: run
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Triage and maintenance read `.vh-adlc/<name>.yaml` and produce the same validated settings as before,
+- [x] AC-01: Triage and maintenance read `.vh-adlc/<name>.yaml` and produce the same validated settings as before,
       apart from `settings_path`.
-- [ ] AC-02: A `.vh-adlc/<name>.json` or `.yml` file in the working tree fails naming the expected path, and YAML the
+      Evidence: `bun test tests/vh-adlc/triage/settings.test.ts tests/vh-adlc/maintenance/settings.test.ts`, `39a3bf8`, pass; a rich block YAML file per operation gives the validated settings recorded from the JSON loader at `a1f10de`, apart from `root` and `settings_path`, and every fixture file is checked as commented block YAML. Full `bun test tests/vh-adlc` at `39a3bf8`: 626 pass, 5 fail, all 5 s timeouts under load average 12 to 20, and those files pass with `--timeout 120000`. Limitation: the frozen Stackweaver values are compared through test setup, not through Stackweaver's own files, which AC-06 covers.
+- [x] AC-02: A `.vh-adlc/<name>.json` or `.yml` file in the working tree fails naming the expected path, and YAML the
       reader refuses fails visibly.
-- [ ] AC-05: The maintenance standing grant holds from a merged `AGENTS.md` link to the YAML file.
-- [ ] AC-06: A reviewed Stackweaver branch runs triage and maintenance from YAML against the candidate plugin, with
+      Evidence: `bun test tests/vh-adlc/settings-file.test.ts` and both settings suites, `39a3bf8`, pass: a working-tree `.json` or `.yml` fails naming `.vh-adlc/<name>.yaml`, with or without `--settings`, and refused YAML fails with the reader's fixed reason and no file text.
+- [x] AC-05: The maintenance standing grant holds from a merged `AGENTS.md` link to the YAML file.
+      Evidence: `bun test --timeout 120000 tests/vh-adlc/maintenance/publication.test.ts`, `39a3bf8`, 25 pass, 0 fail: the grant holds from a committed `AGENTS.md` link to `.vh-adlc/maintenance.yaml`, a stale `.json` link reports `unadopted`, and a YAML chain without the binary grants nothing. Limitation: the default 5 s timeout failed three cases under load in the full run.
+- [x] AC-06: A reviewed Stackweaver branch runs triage and maintenance from YAML against the candidate plugin, with
       settings output unchanged apart from `settings_path`, and its adapter states the plugin version it needs.
-- [ ] AC-07: `conventions/coding.md` at the pinned revision carries the rule.
-- [ ] AC-09: The plugin lock names a stable release with `settings read`, and a `.yaml` read with no binary fails.
-- [ ] AC-10: On a YAML checkout, the confined triage controller's export equals `json(loadSettings(checkout))`, and its
+      Evidence: implementation review R-6 at `fe877e481cf49ba03e688cb3441143052c195fea`, claude-opus-5-5 reviewer subagent, procedural, kept in this document's Review Log: Stackweaver `1e0b55b28f8e0ff621c66ecb65d06e90c59130ea` on `chore/vh-adlc-yaml-settings` against candidate vh-adlc `fc74cf3` (plugin 0.7.0). In a clean clone, triage and maintenance `settings` at `5a46c0d7` on plugin 0.6.0 and at `1e0b55b2` on the candidate were deeply equal apart from `settings_path`; `VH_ADLC_PLUGIN_DIR=<candidate> bun test --timeout 120000 tests/agent-triage tests/agent-maintenance` gave 16 pass, none skipped; `VH_ADLC_TRIAGE_PLUGIN=<candidate> bun tests/agent-triage/rehearse.ts` exited 0; `tests/agent-maintenance/manifest.json` states `minimum_plugin_version` 0.7.0. Limitation: candidate plugin only; publication and the manifest's `published_*` fields are Order step 4.
+- [x] AC-07: `conventions/coding.md` at the pinned revision carries the rule.
+      Evidence: `vh-adlc knowledge --repo . --plugin-pin 0e52f51f01b84eda75a976763c42d8ec0a07b544 --page conventions/coding.md` on `feat/yaml-settings` after the pin move, answered at revision `0e52f51` from the repository pin in `AGENTS.md`; the served page's Configuration format section, before "Inputs and safety", is the Design's text word for word.
+- [x] AC-09: The plugin lock names a stable release with `settings read`, and a `.yaml` read with no binary fails.
+      Evidence: `bun test tests/vh-adlc/ensure.test.ts` and `bun test tests/vh-adlc/settings-file.test.ts`, `39a3bf8`, pass: the lock names stable v0.9.0, its binary answers `settings read`, and a `.yaml` read with an empty HOME and a refusing proxy fails as binary unavailable, while a no-file load needs no binary.
+- [x] AC-10: On a YAML checkout, the confined triage controller's export equals `json(loadSettings(checkout))`, and its
       session starts with no binary inside the boundary.
-- [ ] AC-13: The settings references name only `.yaml` paths, and their examples load.
+      Evidence: `bun test tests/vh-adlc/triage/acceptance.test.ts`, `39a3bf8`, pass in the full run: on a YAML checkout `settings.json` equals `JSON.stringify(loadSettings(checkout))`, `verifyInputs` passes, and the real `boundaryCommand` under bwrap, with PATH `/usr/bin` and HOME `/nonexistent`, serves the same bytes through its `read` tool.
+- [x] AC-13: The settings references name only `.yaml` paths, and their examples load.
+      Evidence: `bun test tests/vh-adlc/settings-references.test.ts tests/vh-adlc/maintenance/discovery.test.ts`, `39a3bf8`, pass: both references name only `.vh-adlc/<name>.yaml`, state the binary requirement, and their commented block YAML examples load through each loader.
 
 ## Test Plan
 
@@ -152,7 +161,41 @@ changes it. There, after `git fetch origin main`: run
 
 ## Tasks
 
-None yet; written once the document is planned.
+T1 to T11 are this repository's PR. T12 is the `vhco-pro/docs` change, prepared on a local branch for the
+owner to publish, and T13 waits for its merge. T14 and T15 are Stackweaver's branch, reviewed against this
+candidate before the PR merges. Order step 4 and shared audit's revision are not tasks here.
+
+- [x] T1 `tests/vh-adlc/ensure.test.ts` - the real-lock install test also pipes a block YAML mapping with a comment to `settings read --stdin` and expects `answered` with its value; fails on the 0.1.0 lock, whose binary has no such command (AC-09)
+      Evidence: `bun test tests/vh-adlc/ensure.test.ts -t "real lock"` on the 0.1.0 lock: 1 fail, the command answered exit 2 and result `usage` where exit 0 and `answered` were expected.
+- [x] T2 `plugins/vh-adlc/vh-adlc.lock.json`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - the lock names stable v0.9.0 with asset and binary digests taken from its signature-checked `checksums.txt`, and the plugin moves to 0.7.0; T1 and the lock-shape and version-change checks in `tests/vh-adlc/check.test.ts` pass (AC-09)
+      Evidence: `gpg --verify checksums.txt.sig checksums.txt` reported a good signature from subkey 929B7A7AF19CB3E67EEEEC0272E691932274AE79 of primary 9A5CD8F7CF9617B1C57F359ED61B8A7F2C06BAB6, `sha256sum --check checksums.txt` passed for all four assets, and binary digests came from the extracted archives; v0.9.0 is a stable release at `a1f10de`. `bun test tests/vh-adlc/ensure.test.ts`: 16 pass, 0 fail. `bun test tests/vh-adlc/check.test.ts -t "lock|version change"`: 3 pass, 0 fail.
+- [x] T3 `tests/vh-adlc/settings-file.test.ts` - a loader table: a block `.vh-adlc/<name>.yaml` with a comment reads through the binary; a working-tree `.vh-adlc/<name>.json` or `.yml` fails naming `.vh-adlc/<name>.yaml`, also when `--settings` selects another `.yaml` file; an explicit path that does not end in `.yaml` fails; YAML the reader refuses fails with the reader's fixed reason and no text from the file; with no file and the installer failing, defaults apply and `settings_path` is `.vh-adlc/<name>.yaml`; a `.yaml` read with the installer failing fails as binary unavailable; fails because `settings-file.ts` does not exist (AC-02, AC-09)
+      Evidence: `bun test tests/vh-adlc/settings-file.test.ts`: 0 pass, 1 fail, with `Cannot find module '../../plugins/vh-adlc/scripts/settings-file'`.
+- [x] T4 `plugins/vh-adlc/scripts/settings-file.ts` - the Design's loader, which gets the binary from `ensure-vh-adlc.sh` only when a file exists; T3 passes (AC-02, AC-09)
+      Evidence: `bun test tests/vh-adlc/settings-file.test.ts`: 18 pass, 0 fail, including the no-file load and the refused `.yaml` read with an empty HOME and a refusing proxy. `bun test tests/vh-adlc/check.test.ts`: 53 pass, 0 fail.
+- [x] T5 `tests/vh-adlc/triage/fixtures.ts`, `tests/vh-adlc/maintenance/fixtures.ts`, `tests/vh-adlc/triage/settings.test.ts`, `tests/vh-adlc/maintenance/settings.test.ts`, `tests/vh-adlc/triage/acceptance.test.ts` - the fixture writers emit block YAML under a comment line to `.vh-adlc/<name>.yaml`; the settings suites assert that each written file fails `JSON.parse` and holds a comment, that a rich YAML file gives the validated settings the JSON loader gave at `a1f10de` apart from `root` and `settings_path`, and that refused files fail as T3 lists; an AC-10 case runs `exportInputs` on a YAML checkout, compares `settings.json` with `json(loadSettings(checkout))`, passes `verifyInputs`, starts the real `boundaryCommand` and reads `settings.json` through the session's `read` tool; these fail because both loaders read `.json` (AC-01, AC-02, AC-10)
+      Evidence: `bun test tests/vh-adlc/triage/settings.test.ts tests/vh-adlc/maintenance/settings.test.ts`: 4 pass, 59 fail; the JSON loaders report `settings_path` `.vh-adlc/triage.json` and treat the YAML files as absent. `bun test tests/vh-adlc/triage/acceptance.test.ts -t "YAML checkout"`: 1 fail, `configured` false where true was expected. The block-style check lives in `tests/vh-adlc/settings-yaml.ts`, which both fixture writers call.
+- [x] T6 `plugins/vh-adlc/scripts/triage/settings.ts`, `plugins/vh-adlc/scripts/maintenance/settings.ts` - both loaders read through `settings-file.ts` and keep their validators; T5 passes (AC-01, AC-02, AC-10)
+      Evidence: `bun test tests/vh-adlc/triage/settings.test.ts tests/vh-adlc/maintenance/settings.test.ts tests/vh-adlc/settings-file.test.ts`: 81 pass, 0 fail. `bun test tests/vh-adlc/triage/acceptance.test.ts -t "YAML checkout"`: 1 pass, 0 fail, 10 expect() calls, with the real `boundaryCommand` under bwrap.
+- [x] T7 `tests/vh-adlc/maintenance/publication.test.ts` - the adoption chain links and commits `.vh-adlc/maintenance.yaml` and holds; a default branch still linking `.vh-adlc/maintenance.json` reports `unadopted`; a YAML chain read with the installer failing grants nothing; fails because `authority.ts` follows the JSON link (AC-05)
+      Evidence: `bun test tests/vh-adlc/maintenance/publication.test.ts`: 4 pass, 21 fail; every case built on the YAML adoption chain reports `unadopted`. The binary case passes before the change too, because it only requires that nothing is granted.
+- [x] T8 `plugins/vh-adlc/scripts/maintenance/authority.ts` - the committed chain follows `.vh-adlc/maintenance.yaml` and reads its blob through `settings-file.ts`, keeping the top-level key check; T7 passes (AC-05)
+      Evidence: `bun test --timeout 120000 tests/vh-adlc/maintenance/publication.test.ts`: 25 pass, 0 fail in 263 s. A first run at the default 5 s timeout, on a host with load average 16, timed out two cases; one of them also timed out at `a1f10de` in the baseline run, and both pass alone.
+- [x] T9 the remaining tests that write or name a settings file, under `tests/vh-adlc/triage/` and `tests/vh-adlc/maintenance/` - they use `.vh-adlc/<name>.yaml`; the frozen Stackweaver data in `tests/vh-adlc/triage/fixtures/migration/` and the consumer commit `policy-corpus.ts` reads stay JSON as recorded, and test setup writes their values as YAML into the fixture checkout; `bun test tests/vh-adlc` passes apart from failures also seen at `a1f10de` (AC-01)
+      Evidence: `bun test tests/vh-adlc` (load average 13 to 20): 613 pass, 14 fail, 627 tests in 667 s; the baseline run at `a1f10de` gave 593 pass, 6 fail, 1 error. The 14 were timeouts, lock-keeper and worktree errors under load, and one run without Go on PATH. Rerun with `--timeout 120000`, `VH_ADLC_TRIAGE_TEST_TIMEOUT_MS=60000` and Go on PATH, each file passed: `maintenance-variants.test.ts` 2/2, `maintenance/bot-only-trial.test.ts` 1/1, `maintenance/delivery-cases.test.ts` 4/4, `maintenance/journal.test.ts` 8/8, `maintenance/publication.test.ts` 25/25, `triage/execution.test.ts` 55/55. The synthetic shared adapter fixture moved to `.vh-adlc/maintenance.yaml`; `trial-proof.test.ts` keeps its consumer stand-in as recorded JSON.
+- [x] T10 `tests/vh-adlc/settings-references.test.ts` - both settings references name `.vh-adlc/<name>.yaml` and no `.json` or `.yml` settings path, say that reading a settings file needs the verified binary, and hold block YAML examples with a comment that fail `JSON.parse` and load through their loader in a fixture checkout; fails because both references show JSON (AC-13)
+      Evidence: `bun test tests/vh-adlc/settings-references.test.ts tests/vh-adlc/maintenance/discovery.test.ts` before the reference edits: 3 pass, 5 fail; both references named the `.json` files and showed JSON examples. `discovery.test.ts` now expects `.vh-adlc/maintenance.yaml` in the maintenance contract.
+- [x] T11 `plugins/vh-adlc/references/triage-settings.md`, `plugins/vh-adlc/references/maintenance-settings.md` - YAML examples, the `.yaml` grant chain, the binary requirement in place of the Bun-only runtime line, and no claim that loading creates no files; T10 passes (AC-13)
+      Evidence: `bun test tests/vh-adlc/settings-references.test.ts tests/vh-adlc/maintenance/discovery.test.ts tests/vh-adlc/check.test.ts`: 61 pass, 0 fail. The maintenance reference keeps `index_paths` as a JSON array, the exception Scope names.
+- [x] T12 `vhco-pro/docs` `conventions/coding.md` - the Design's Configuration format section, before "Inputs and safety", committed on a local branch in a fresh clone; `git diff origin/main` shows that section and nothing else. Pushing it and its PR are the owner's (AC-07)
+      Evidence: commit `4e408fa` on local branch `docs/yaml-configuration-format` in a fresh clone at `/home/m/code/vhco-pro-docs-yaml-config`, on `origin/main` `5f7c39a`. `git diff --stat origin/main` shows `conventions/coding.md` with 6 insertions, the section alone, and `npm run check` passed for 27 Markdown files and the rules block. Not pushed; the push, PR and merge are the owner's.
+- [x] T13 `AGENTS.md`, `plugins/vh-adlc/knowledge.md` - the pin moves to the `vhco-pro/docs` merge that carries T12; `vh-adlc knowledge --page conventions/coding.md` at the new pin serves the section, and what applies from the conventions diff since `e4d58d2` is recorded under this task; waits for T12 to merge (AC-07)
+      Evidence: `vh-adlc knowledge --repo . --plugin-pin 0e52f51f01b84eda75a976763c42d8ec0a07b544 --page conventions/coding.md --page conventions/typescript.md ...` answered with revision `0e52f51`, source `repository`, and the cached `conventions/coding.md` holds the Configuration format section at line 68. The pin is vhco-pro/docs PR #19's merge, which contains T12's `4e408fa`. `conventions/feature-documents.md` and `guides/humanize-prose.md` are unchanged between `e4d58d2` and `0e52f51`, so the rules block and gates are the same. After the move, `bun test tests/vh-adlc` gave 631 pass, 0 fail in 211 s, and `go test ./...`, `go vet`, `golangci-lint run` (local v2.14.0) and `go mod tidy -diff` passed.
+      Conventions diff `e4d58d2..0e52f51`, what applies to this feature and what changed for it: the Configuration format rule is this feature. The AGENTS.md route to `conventions/typescript.md` applies because the plugin is TypeScript, so `AGENTS.md` now routes TypeScript work there, as the onboarding guide's template does. From that page, external input is now narrowed from `unknown` in `readYAML` in `plugins/vh-adlc/scripts/settings-file.ts`, which had cast the reader's report, and in the fixture parse in `tests/vh-adlc/maintenance/related-cases.ts`; a strict `tsc` 5.9.3 run with Bun types over `settings-file.ts`, `settings-yaml.ts`, both loaders and `authority.ts` reported no errors. The example knowledge line in `plugins/vh-adlc/references/loop.md` names the new pin. Not applied here, and reported to the owner as findings: the repository has no strict type-check or type-aware lint for its TypeScript; the delivery rule that every pinned dependency is discoverable by the updater does not hold for `vh-adlc.lock.json`; the documentation rule that a component's examples live under `examples/` is read as covering actions and workflows, not these plugin references, whose YAML examples the Design keeps and a test loads; trunk-based branch cleanup, `v` tags, managed Renovate, the `run` block length limit, the Shared components naming table, README banners and the new release workflows concern repository settings, CI and other components, not this change. Test fixture pins such as `DOCS_PIN` in `tests/vh-adlc/lifecycle/fixtures.ts` are recorded revisions and stay.
+- [x] T14 Stackweaver branch `feat/yaml-settings-migration`: `.vh-adlc/triage.yaml`, `.vh-adlc/maintenance.yaml`, `AGENTS.md`, `.claude/commands/`, `agents/`, `tests/agent-triage/`, `tests/agent-maintenance/` - both files converted by hand to block YAML with comments, references updated, `tests/agent-maintenance/contract.test.ts` re-baselined with the reason recorded, `minimum_plugin_version` in `tests/agent-maintenance/manifest.json` set to 0.7.0, and contract assertions that both settings files fail `JSON.parse`, hold a comment, and that the manifest states that version; done when `VH_ADLC_PLUGIN_DIR=<candidate> bun test tests/agent-triage tests/agent-maintenance` and `VH_ADLC_TRIAGE_PLUGIN=<candidate> bun tests/agent-triage/rehearse.ts` pass, and both operations' `settings` output at the last JSON commit on 0.6.0 and at the YAML commit on the candidate, run from one checkout path, are deeply equal apart from key order and `settings_path` (AC-06)
+      Evidence: Stackweaver commit `1e0b55b28f8e0ff621c66ecb65d06e90c59130ea` on local branch `chore/vh-adlc-yaml-settings` (the coordinator's name for the branch this task called `feat/yaml-settings-migration`), from origin/main `5a46c0d7`, in `/home/m/code/stackweaver/.claude/worktrees/yaml-settings`; candidate plugin `plugins/vh-adlc` at vh-adlc `fc74cf3`, version 0.7.0. Both files are hand-written commented block YAML; their raw reader values equal the JSON files' at `5a46c0d7`. The new contract assertions failed 6 of 12 on the JSON-era tree and pass on the YAML commit. In one clean clone with origin `https://github.com/michielvha/stackweaver.git`, `settings` for triage and maintenance at `5a46c0d7` on installed plugin 0.6.0 and at `1e0b55b2` on the candidate are deeply equal apart from `settings_path`, with the same `root`; triage's JSON text differs only in `label_map` key order. `VH_ADLC_PLUGIN_DIR=<candidate> bun test --timeout 120000 tests/agent-triage tests/agent-maintenance` in that clone: 16 pass, 0 fail, none skipped. Run from the worktree, whose origin URL carries a credential, the installed-plugin case fails `origin identity`, as the loaders refuse such an origin on any plugin version. `VH_ADLC_TRIAGE_PLUGIN=<candidate> bun tests/agent-triage/rehearse.ts` exited 0 with rollback, reapply and index preservation true over `AGENTS.md`, `agents/issue-triage.md`, `.claude/commands/triage.md` and `.vh-adlc/triage.yaml`. The pre-commit `make verify` ran documentation authoring, changelog and gitleaks checks: 4 passed. Not pushed; the commit carries no `[skip ci]`, because `.vh-adlc/` and `tests/agent-*/` are not on CLAUDE.md's skip-eligible list.
+- [x] T15 this document - an independent review of T14's branch at an exact Stackweaver commit against an exact candidate plugin commit, with the Stackweaver commit, plugin commit, reviewer and where the review is kept named in AC-06's evidence line (AC-06)
+      Evidence: implementation review R-6, by an independent reviewer subagent on claude-opus-5-5 dispatched by the coordinator (isolation procedural), reviewed Stackweaver `1e0b55b28f8e0ff621c66ecb65d06e90c59130ea` against candidate vh-adlc `fc74cf3` within its review of `fe877e481cf49ba03e688cb3441143052c195fea` and returned AC-06 met. It is kept in this document's Review Log under R-6; `vh-adlc review check --review R-6` reported equal.
 
 ## Open Questions
 
@@ -168,6 +211,8 @@ None.
 | 2026-11-02 | R-4 | spec | `22769c05e7ba2e6f30b43b91a3f60ad9413c62f8` | claude-opus-5-5 | procedural | 10 findings, 0 blocking |
 | 2026-11-02 | R-5 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 8 findings, 0 blocking |
 | 2026-11-02 | R-5 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | n/a | n/a | accepted by owner |
+| 2026-11-03 | R-6 | implementation | `fe877e481cf49ba03e688cb3441143052c195fea` | claude-opus-5-5 | procedural | All eight criteria met, one nit |
+| 2026-11-03 | R-7 | implementation | `57675797b2be0aac9ad2df24c3febd796aa1daab` | claude-opus-5-5 | procedural | All eight criteria met after the macOS test fix, two nits |
 
 ### R-1
 
@@ -612,6 +657,114 @@ SEVERITY: nit
 WHERE: Document location
 EVIDENCE: conventions/delivery.md:36-37 says that until a document has a `branch` field it "is committed and pushed to the default branch". `git branch -a --contains d225d01` lists only local `spec/host-cleanup`, and `vh-adlc fresh` reports remote_sha c8343c5, which does not contain it. Local main (930541c) is not an ancestor of d225d01 either. Reviews R-1 to R-4 and this pass are all bound to unpushed commits, and a rebase onto main would make them stale with `commit-unreachable`. settings-reader.md R-1 F-11 raised this for that document on the same branch.
 PROPOSAL: Land the branch by merge or fast-forward before an acceptance row relies on this review.
+
+### R-6
+
+CRITERION: AC-01 Triage and maintenance read `.vh-adlc/<name>.yaml` and produce the same validated settings as before, apart from `settings_path`.
+VERDICT: met
+EVIDENCE: `bun test --timeout 120000 tests/vh-adlc/triage/settings.test.ts` (31 pass, 0 fail) and `tests/vh-adlc/maintenance/settings.test.ts` (32 pass, 0 fail) at `fe877e481cf49ba03e688cb3441143052c195fea`. I also ran my own comparison in a scratch Git repository holding each suite's rich values. JSON settings on the `a1f10de` plugin and block YAML on the candidate (`fc74cf3`, whose plugin tree is byte-identical to `fe877e4`) gave deeply equal `settings` output apart from `settings_path`, with the same `root`. For maintenance the JSON text was identical. For triage the only difference was `label_map` key order, because the reader returns mapping keys sorted. Full `VH_ADLC_TRIAGE_TEST_TIMEOUT_MS=60000 bun test --timeout 120000 tests/vh-adlc` with Go on PATH: 631 pass, 0 fail, no skips, 106 s, load average about 9. Limitation: mapping key order is not preserved, which does not change any value and does not affect `label_map`'s only use, the validator copy in `triage/settings.ts`.
+
+CRITERION: AC-02 A `.vh-adlc/<name>.json` or `.yml` file in the working tree fails naming the expected path, and YAML the reader refuses fails visibly.
+VERDICT: met
+EVIDENCE: `bun test --timeout 120000 tests/vh-adlc/settings-file.test.ts`, `fe877e4`, 18 pass, 0 fail. A working-tree `.vh-adlc/triage.json` or `.yml` fails naming both the leftover file and `.vh-adlc/triage.yaml`, with or without `--settings`. Duplicate keys, anchors, two documents, a top-level list and a syntax error fail with the reader's fixed reason and no file text. The two settings suites repeat the leftover and refused-YAML cases for each loader and pass, as above. I also read the code: `settingsFile` in `plugins/vh-adlc/scripts/settings-file.ts` checks for leftover files before anything else and fails through the caller's `fail`. Limitation: none.
+
+CRITERION: AC-05 The maintenance standing grant holds from a merged `AGENTS.md` link to the YAML file.
+VERDICT: met
+EVIDENCE: `bun test --timeout 120000 tests/vh-adlc/maintenance/publication.test.ts`, `fe877e4`, 25 pass, 0 fail. A committed `AGENTS.md` link to `.vh-adlc/maintenance.yaml` gives `adopted`, with sources `AGENTS.md`, `.vh-adlc/maintenance.yaml` and `maintenance-project.md`. A default branch still linking `.vh-adlc/maintenance.json` reports `unadopted` with a null grant. A YAML chain read with an empty HOME and a refusing proxy grants nothing. Code inspected: `resolveStanding` in `authority.ts` follows the `.yaml` link and reads the blob through `readYAML`, keeping the top-level key check. Limitation: run with the 120 s timeout only; I did not repeat it at the default 5 s.
+
+CRITERION: AC-06 A reviewed Stackweaver branch runs triage and maintenance from YAML against the candidate plugin, with settings output unchanged apart from `settings_path`, and its adapter states the plugin version it needs.
+VERDICT: met
+EVIDENCE: I reviewed Stackweaver commit `1e0b55b28f8e0ff621c66ecb65d06e90c59130ea` on branch `chore/vh-adlc-yaml-settings`, based on origin/main `5a46c0d748aa77c0f4e84e2ce50d35e6f7848ff3`, against candidate `plugins/vh-adlc` exported from vh-adlc `fc74cf3` (plugin version 0.7.0).
+
+- **Clean clone:** a fresh shared, sparse clone under /tmp, images excluded, with origin `https://github.com/michielvha/stackweaver.git` and hooks disabled.
+- **Settings comparison:** `bun <plugin>/scripts/<op>/cli.ts settings --repo <clone>` for triage and maintenance. At `5a46c0d7` I used the installed plugin 0.6.0, whose payload matches `git archive b5b94495` apart from `.in_use`. At `1e0b55b2` I used the candidate. Both exited 0 with `configured` true and the same `root`. Outputs are deeply equal apart from `settings_path` (`.json` to `.yaml`). Maintenance JSON text is identical; triage differs only in `label_map` key order.
+- **Hand conversion:** I read both raw files with `vh-adlc settings read`. They equal the JSON files at `5a46c0d7` value for value, and both are commented block YAML. Their comments are consistent with `references/triage-settings.md` and with the ranking in `triage/report.ts`.
+- **Adapter tests:** `VH_ADLC_PLUGIN_DIR=<candidate> bun test --timeout 120000 tests/agent-triage tests/agent-maintenance` gave 16 pass, 0 fail. A JUnit listing showed all 16 cases ran with none skipped, including the installed-component `loadSettings` case and the new YAML and version contract case.
+- **Rehearsal:** `VH_ADLC_TRIAGE_PLUGIN=<candidate> bun tests/agent-triage/rehearse.ts` exited 0 with rollback, reapply, index_preserved and rollback_index_bytes_preserved all true.
+- **Version statements:** `minimum_plugin_version` is "0.7.0" in `tests/agent-maintenance/manifest.json`. `installed.ts` refuses minor versions below 7. `agents/issue-triage.md`, `agents/maintenance.md` and `tests/agent-maintenance/README.md` require 0.7.0 or later.
+- **Contract re-baseline:** the reason is recorded in a test comment and in the commit body. `git diff --name-only 72186d3 5a46c0d7` over the checked paths lists `agents/seo.md` and `.claude/commands/seo.md`, so the old frozen-scope check would already fail on main. Excluding the triage entry points is covered by `tests/agent-triage/contract.test.ts`.
+- **Leftover references:** no `.json` settings path remains except the two assertions that the JSON files are absent.
+
+The worktree's origin URL contains a credential marker, so the clean clone was needed; I did not print the URL. Limitations: run against the candidate only, not a published plugin. The manifest's `published_*` fields still describe 0.6.0, which Design step 4 updates after publication.
+
+CRITERION: AC-07 `conventions/coding.md` at the pinned revision carries the rule.
+VERDICT: met
+EVIDENCE: `vh-adlc knowledge --repo . --plugin-pin 0e52f51f01b84eda75a976763c42d8ec0a07b544 --page conventions/coding.md` on `feat/yaml-settings` at `fe877e4` answered at revision `0e52f51f01b84eda75a976763c42d8ec0a07b544`, source `repository`, pin file `AGENTS.md`. The served page has `## Configuration format` at line 68, directly before `## Inputs and safety` at line 74. Its paragraph is the Design's text word for word. Limitation: none.
+
+CRITERION: AC-09 The plugin lock names a stable release with `settings read`, and a `.yaml` read with no binary fails.
+VERDICT: met
+EVIDENCE: `plugins/vh-adlc/vh-adlc.lock.json` at `fe877e4` names 0.9.0. `gh release view v0.9.0 --repo michielvha/vh-adlc` reports isPrerelease false and isDraft false, and the tag resolves to `a1f10de`. The cached binary's sha256 `ea918c2c...` equals the lock's linux_amd64 `binary_sha256`, and it answered `settings read --stdin` with `answered`. `bun test --timeout 120000 tests/vh-adlc/ensure.test.ts`: 16 pass, 0 fail. That includes the real-lock install into an empty HOME, which pipes commented YAML to `settings read` and gets `answered`. `tests/vh-adlc/settings-file.test.ts`: 18 pass. A `.yaml` read with an empty HOME, PATH `/usr/bin:/bin` and a refusing proxy exits 1 with `binary unavailable`, and a no-file load exits 0 with defaults. Limitation: the platform digests other than linux_amd64 were not checked against the release's checksums in this review.
+
+CRITERION: AC-10 On a YAML checkout, the confined triage controller's export equals `json(loadSettings(checkout))`, and its session starts with no binary inside the boundary.
+VERDICT: met
+EVIDENCE: `bun test --timeout 120000 tests/vh-adlc/triage/acceptance.test.ts`, `fe877e4`, 24 pass, 0 fail, and it also passed in the full run. The YAML-checkout case:
+
+- asserts the settings file is not JSON;
+- exports and checks that `settings.json` equals `JSON.stringify(loadSettings(root))` with `configured` true and `settings_path` `.vh-adlc/triage.yaml`;
+- checks that `verifyInputs` passes;
+- starts the real `boundaryCommand` under bwrap with `--setenv PATH /usr/bin --setenv HOME /nonexistent`, where `/usr/bin/vh-adlc` does not exist;
+- reads `settings.json` through the session's `read` tool with the same bytes.
+
+Limitation: "no binary inside" is shown through PATH, HOME and the absence of `/usr/bin/vh-adlc`, not by listing every bound path.
+
+CRITERION: AC-13 The settings references name only `.yaml` paths, and their examples load.
+VERDICT: met
+EVIDENCE: `bun test --timeout 120000 tests/vh-adlc/settings-references.test.ts` (4 pass, 0 fail) and `tests/vh-adlc/maintenance/discovery.test.ts` (4 pass, 0 fail), `fe877e4`. Both references name `.vh-adlc/<name>.yaml` and no `.vh-adlc/<name>.json` or `.yml` path, and state the verified-binary requirement. Each holds exactly one commented block YAML example, which fails `JSON.parse` and loads through its loader with `configured` true. `grep` confirms that `.json` and `.yml` appear only in the sentence saying such files fail. Limitation: none.
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Frontmatter covers; docs/get-started/installation.md
+EVIDENCE: `git diff 111af6c fc74cf3 -- docs/` adds the feature's plugin version statements to `docs/get-started/installation.md` and `docs/reference/compatibility.md`, and neither path is in `covers`. In installation.md the new line "Triage and maintenance settings are YAML files ... and need plugin 0.7.0 or later." is followed directly by the existing "Invoke `vh-adlc-maintenance` on plugin 0.6.0 or later.", which reads as a contradiction to someone setting up maintenance settings.
+PROPOSAL: Next time the normative baseline is revised, add both pages to `covers`. Reword the 0.6.0 sentence so it is clear that a repository with a maintenance settings file needs 0.7.0.
+
+### R-7
+
+CRITERION: AC-01 Triage and maintenance read `.vh-adlc/<name>.yaml` and produce the same validated settings as before, apart from `settings_path`.
+VERDICT: met
+EVIDENCE: At `57675797b2be0aac9ad2df24c3febd796aa1daab`, `bun test --timeout 120000 tests/vh-adlc/triage/settings.test.ts` gave 31 pass, 0 fail, and `tests/vh-adlc/maintenance/settings.test.ts` gave 32 pass, 0 fail, once with the default TMPDIR and once with TMPDIR set to a symlink pointing at another directory. I ran my own check in a scratch test. For each loader, I loaded the suite's rich values from `.vh-adlc/<name>.json` with the plugin exported from `a1f10de`, then from block YAML with the plugin at HEAD. The two results were deeply equal apart from `settings_path`, with the same `root`. For maintenance the JSON text was identical too. A probe under the symlinked TMPDIR showed the triage loader returns the canonical path, so the fixture path and `root` differ. The old `toBe(f.root)` assertion would therefore fail there, and the new `realpathSync(f.root)` assertion passes. I ran the full suite with `VH_ADLC_TRIAGE_TEST_TIMEOUT_MS=60000 bun test --timeout 120000 tests/vh-adlc` with Go on PATH: 631 pass, 0 fail, 90.7 s, load average 5 to 7. Limitations: I ran the full suite with the default TMPDIR only. Under the symlinked TMPDIR I ran only the eight criterion test files. I did not run on macOS.
+
+CRITERION: AC-02 A `.vh-adlc/<name>.json` or `.yml` file in the working tree fails naming the expected path, and YAML the reader refuses fails visibly.
+VERDICT: met
+EVIDENCE: At `5767579`, `bun test --timeout 120000 tests/vh-adlc/settings-file.test.ts` gave 18 pass, 0 fail, under both the default and the symlinked TMPDIR. The table covers a working-tree `.json` or `.yml` file, with and without `--settings`, failing and naming `.vh-adlc/<name>.yaml`, and refused YAML failing with the reader's fixed reason. Both settings suites repeat these cases for each loader and passed, as under AC-01. All of these also passed in the full run. Limitation: none.
+
+CRITERION: AC-05 The maintenance standing grant holds from a merged `AGENTS.md` link to the YAML file.
+VERDICT: met
+EVIDENCE: At `5767579`, `bun test --timeout 120000 tests/vh-adlc/maintenance/publication.test.ts` gave 25 pass, 0 fail under the symlinked TMPDIR, and the file passed again in the full run. Those cases cover the grant holding from a committed `AGENTS.md` link to `.vh-adlc/maintenance.yaml`, a stale `.json` link reporting `unadopted`, and a YAML chain with no binary granting nothing. `plugins/vh-adlc` at `5767579` is the same tree object, `c7abf2e3`, as at `fc74cf3`, and `git diff --stat fe877e4 5767579` shows no plugin change since R-6. Limitation: I ran this only with the 120 s per-test timeout. No timeouts occurred.
+
+CRITERION: AC-06 A reviewed Stackweaver branch runs triage and maintenance from YAML against the candidate plugin, with settings output unchanged apart from `settings_path`, and its adapter states the plugin version it needs.
+VERDICT: met
+EVIDENCE: I reviewed Stackweaver `1e0b55b28f8e0ff621c66ecb65d06e90c59130ea` on `chore/vh-adlc-yaml-settings`, whose parent is `5a46c0d748aa77c0f4e84e2ce50d35e6f7848ff3`. The candidate was `plugins/vh-adlc` exported with `git archive` from vh-adlc `fc74cf3`, version 0.7.0 in both manifests. I made a fresh clone under /tmp: shared, sparse with media excluded, hooks disabled, and origin set to `https://github.com/michielvha/stackweaver.git`. I did not print the worktree's URL. The installed plugin 0.6.0 matches `git archive b5b94495` apart from `.in_use`. I ran `bun <plugin>/scripts/<op>/cli.ts settings --repo <clone>` for both operations, at `5a46c0d7` on 0.6.0 and at `1e0b55b2` on the candidate. All four runs exited 0 with `configured` true and the same `root`. Under node `deepStrictEqual`, both operations were equal apart from `settings_path` (`.json` to `.yaml`). Maintenance JSON text was identical. Triage text differed only in `label_map` key order, and `protected_ids` stayed [332,334]. `VH_ADLC_PLUGIN_DIR=<candidate> bun test --timeout 120000 tests/agent-triage tests/agent-maintenance` in the clone gave 16 pass, 0 fail. The JUnit report showed 16 tests and 0 skipped, including "settings are commented block YAML and the adapter states the plugin version that reads them". `VH_ADLC_TRIAGE_PLUGIN=<candidate> bun tests/agent-triage/rehearse.ts` exited 0, and rollback, reapply, index_preserved and rollback_index_bytes_preserved were all true. `tests/agent-maintenance/manifest.json` states `minimum_plugin_version` "0.7.0", `installed.ts` refuses minor versions below 7, and `agents/issue-triage.md` and `agents/maintenance.md` require 0.7.0. Outside two absence assertions, `git grep` at `1e0b55b2` finds no `.vh-adlc/(triage|maintenance).(json|yml)` path in the tree outside `docs/internal`. Limitations: candidate plugin only, not a published one. The manifest's `published_*` fields still name 0.6.0 and `b5b94495`, which Design step 4 updates.
+
+CRITERION: AC-07 `conventions/coding.md` at the pinned revision carries the rule.
+VERDICT: met
+EVIDENCE: `vh-adlc knowledge --repo /home/m/code/vh-adlc-yaml-settings --plugin-pin 0e52f51f01b84eda75a976763c42d8ec0a07b544 --page conventions/coding.md` at `5767579` answered at revision `0e52f51f01b84eda75a976763c42d8ec0a07b544`, source `repository`, pin file `AGENTS.md`. The cached page is byte-identical to `gh api repos/vhco-pro/docs/contents/conventions/coding.md?ref=0e52f51...`. It has `## Configuration format` at line 68, directly before `## Inputs and safety` at line 74, and its paragraph is word for word the Design's text. `AGENTS.md` and `plugins/vh-adlc/knowledge.md` both name that pin. Limitation: none.
+
+CRITERION: AC-09 The plugin lock names a stable release with `settings read`, and a `.yaml` read with no binary fails.
+VERDICT: met
+EVIDENCE: At `5767579`, `plugins/vh-adlc/vh-adlc.lock.json` names 0.9.0. `gh release view v0.9.0 --repo michielvha/vh-adlc` reports isPrerelease false and isDraft false, and the tag resolves to `a1f10de`. I downloaded `checksums.txt` and `checksums.txt.sig` from the release. In a temporary GNUPGHOME holding the release public key, the signature checked Good, primary fingerprint 9A5C D8F7 CF96 17B1 C57F 359E D61B 8A7F 2C06 BAB6. All four lock `asset_sha256` values equal the checksums. The cached linux_amd64 binary's sha256 `ea918c2c...` equals the lock's `binary_sha256`, and `settings read --stdin` on a YAML line answered `answered`. Under the symlinked TMPDIR, `bun test --timeout 120000 tests/vh-adlc/ensure.test.ts` gave 16 pass, 0 fail, and `tests/vh-adlc/settings-file.test.ts` gave 18 pass, including "a .yaml read fails visibly when the installer cannot supply the binary". Both also passed in the full run. Limitation: I did not extract the archives for platforms other than linux_amd64, so their `binary_sha256` values were not checked.
+
+CRITERION: AC-10 On a YAML checkout, the confined triage controller's export equals `json(loadSettings(checkout))`, and its session starts with no binary inside the boundary.
+VERDICT: met
+EVIDENCE: At `5767579`, `bun test --timeout 120000 tests/vh-adlc/triage/acceptance.test.ts` gave 24 pass, 0 fail under the symlinked TMPDIR, and the file passed in the full run. The YAML-checkout case asserts the settings file is not JSON, that exported `settings.json` equals `JSON.stringify(loadSettings(root))` with `settings_path` `.vh-adlc/triage.yaml`, and that `verifyInputs` passes. It then starts the real `boundaryCommand` under bwrap and reads the same bytes through the session's `read` tool. In `boundaryCommand` in `plugins/vh-adlc/scripts/triage/controller.ts`, the only binds are `/usr` read-only, the Bun executable, the driver, the input directory and its plugin copy, with `--clearenv`, PATH `/usr/bin` and HOME `/nonexistent`. `find /usr -maxdepth 4 -name 'vh-adlc*'` found nothing. Limitation: I did not list the exported input directory's contents to prove it holds no binary.
+
+CRITERION: AC-13 The settings references name only `.yaml` paths, and their examples load.
+VERDICT: met
+EVIDENCE: At `5767579`, `bun test --timeout 120000 tests/vh-adlc/settings-references.test.ts` gave 4 pass, 0 fail, and `tests/vh-adlc/maintenance/discovery.test.ts` gave 4 pass, 0 fail, under the symlinked TMPDIR. Both also passed in the full run. For each reference, the tests check that it names only `.vh-adlc/<name>.yaml`, and that its block YAML example fails `JSON.parse` and loads through its loader. Neither reference changed since R-6. Limitation: none.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter status; Review Log
+EVIDENCE: `vh-adlc gate complete docs/specs/yaml-settings.md --repo . --plugin-pin 0e52f51f01b84eda75a976763c42d8ec0a07b544` at `5767579` returned `fail (impl_review_fresh; rules 1, docs 0e52f51)`. `vh-adlc fresh` gave R-6 stale with `covered-changed` on `tests/vh-adlc/triage/settings.test.ts`. The document has been `complete` since `a612688`, and the test change landed after it. `vh-adlc lint` passed, and the spec review R-5 is fresh.
+PROPOSAL: Record this pass as the latest implementation review, re-run `gate complete`, and update `status_description`, which still cites R-6 as the deciding review.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Frontmatter covers; docs/get-started/installation.md
+EVIDENCE: `d65c4b5` rewrote the plugin version lines in `docs/get-started/installation.md`, and `vh-adlc fresh` did not report it, because neither that page nor `docs/reference/compatibility.md` is in `covers`. R-6 F-01 raised the same point. The new text also leaves "Missing that operation is an installation blocker" after a sentence about settings files, so "that operation" no longer sits next to `vh-adlc-maintenance`, its referent.
+PROPOSAL: At the next normative revision, add both pages to `covers`. Change "Missing that operation" to "Missing `vh-adlc-maintenance`".
 
 ## Sources
 

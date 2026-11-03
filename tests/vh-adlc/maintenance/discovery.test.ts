@@ -28,7 +28,7 @@ test("the maintenance contract covers actual analysis, private outcomes and boun
   for (const term of ["scripts/maintenance/cli.ts", "report-stage", "source_commit", "release notes", "call-site", "pre-1.0", "superset", "inventory gap", "complete-unavailable", "unverified legacy comparison", "pending-outcome", "Maintenance-Step", "no-commit", "no-push", "ff-only", "before selection", "after transfer", "default-branch checkout", "unpublished", "read-only", "independent", "source_target", "record_target"]) expect(procedure).toContain(term);
   expect(procedure).not.toContain("michielvha/stackweaver"); expect(procedure).not.toContain("satellite-merge.sh");
   const schema = read("references/maintenance-settings.md");
-  for (const term of ["schema_version", "bot_inventory_terms", "surface_expectations", "index_paths", "publication_route", "same_run_updates", "AGENTS.md", ".vh-adlc/maintenance.json", "project_procedure"]) expect(schema).toContain(term);
+  for (const term of ["schema_version", "bot_inventory_terms", "surface_expectations", "index_paths", "publication_route", "same_run_updates", "AGENTS.md", ".vh-adlc/maintenance.yaml", "project_procedure"]) expect(schema).toContain(term);
 });
 
 test("authored repair review binds both source and Definition while bot-only batching retains its flow", () => {

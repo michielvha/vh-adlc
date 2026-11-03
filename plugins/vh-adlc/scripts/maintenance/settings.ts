@@ -1,7 +1,8 @@
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { relative, sep } from "node:path";
 import { origin, resolveInside } from "../triage/settings";
 import type { Dashboard, RelatedRepository, Settings, SurfaceExpectation } from "./types";
+import { settingsFile } from "../settings-file";
 
 function fail(field: string): never { throw Error(`invalid maintenance settings: ${field}`); }
 function object(value: unknown, field: string): Record<string, unknown> {
@@ -62,14 +63,9 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   let identity: { repository: string; hostname: string };
   try { identity = origin(root); } catch { fail("origin identity"); }
   identity = { repository: repository(identity.repository, "origin repository"), hostname: hostname(identity.hostname) };
-  let settingsFile: string;
-  try { settingsFile = resolveInside(root, options.settingsPath ?? ".vh-adlc/maintenance.json"); } catch { fail("settings path"); }
-  const configured = existsSync(settingsFile);
-  let input: Record<string, unknown> = {};
-  if (configured) {
-    try { input = object(JSON.parse(readFileSync(settingsFile, "utf8")), "settings object"); }
-    catch { fail("readable JSON object required"); }
-  } else if (options.settingsPath !== undefined) fail("requested settings file missing");
+  const inside = (path: string) => { try { return resolveInside(root, path); } catch { fail("settings path"); } };
+  const file = settingsFile({ root, name: "maintenance", settingsPath: options.settingsPath, inside, fail });
+  const configured = file.configured, input = object(file.value, "settings object");
   keys(input, ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories",
     "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references",
     "report_dir", "history_dir", "project_procedure", "surface_expectations"], "settings");
@@ -118,7 +114,7 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   unique(organizations, "discovery_organizations");
   const report_dir = path(root, input.report_dir ?? ".vh-adlc/reports/maintenance", "report_dir", "optional-directory");
   const history_dir = path(root, input.history_dir ?? report_dir, "history_dir", "optional-directory");
-  return { schema_version: 1, root, configured, settings_path: relative(root, settingsFile).split(sep).join("/"), ...identity,
+  return { schema_version: 1, root, configured, settings_path: file.path, ...identity,
     repositories, discovery_organizations: organizations, excluded_repositories: excluded, bot_authors: authors,
     bot_inventory_terms: strings(input.bot_inventory_terms, "bot_inventory_terms").map(value => value.toLowerCase()), dashboards,
     generated_mirrors: strings(input.generated_mirrors, "generated_mirrors").map(value => path(root, value, "generated mirror", "optional-directory")),

@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync,readdirSync,existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { settingsYAML } from "../settings-yaml";
 process.env.VH_ADLC_TRIAGE_LOCK_ROOT??=join(tmpdir(),`vh-triage-locks-${process.pid}`);
 process.env.VH_ADLC_TRIAGE_VERIFICATION_CACHE??=join(tmpdir(),`vh-triage-verification-${process.pid}`);
 
@@ -30,7 +31,7 @@ export function fixture() {
   write("src/app.ts", "export const answer = 42;\n");
   git(root, "add", "src/app.ts");
   git(root, "commit", "-qm", "test: seed project");
-  return { root, write, settings: (value: unknown) => write(".vh-adlc/triage.json", JSON.stringify(value)), dispose: () => {
+  return { root, write, settings: (value: unknown) => write(".vh-adlc/triage.yaml", settingsYAML(value)), dispose: () => {
     activeFixtures.delete(root);
     // Reset only this process's quiescent test namespace. Child fixtures inherit
     // the parent's lock root and cannot remove its controller history.
