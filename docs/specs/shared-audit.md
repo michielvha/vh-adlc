@@ -344,6 +344,8 @@ adopted Stackweaver passed for the complete declared Go/TypeScript/React page se
 Claude profiles and notification settings were not changed. The shared Stackweaver main working tree
 has unrelated local work and was preserved; reconcile that checkout separately before using its files.
 
+R-26 is a permitted canonical spec-review continuation. Its original triage-trial grader rejects `--resume` and remains unchanged; `spec-r26/canonical-read-only-validation.json` separately verifies the actual model, same context, six read-only calls confined to the public packet and all required reads. No resumed triage-trial success is claimed. A recording edit briefly changed a quoted task sentence; the final stored R-26 bytes were restored from the original return and rechecked before publication.
+
 Local operator artifacts remain under `.audit-review-archive/`: `runtime-release-v0.11.0-r1`,
 `published-{codex,claude}-{fresh-r1,upgrade-r2}`, `private-parity-published-r1`, `published-adoption-r1`,
 `postmerge-adoption-r1`, and `consumer-verify-published-r2.log`. Failed attempts remain separate.
@@ -2372,7 +2374,7 @@ FINDING: F-01
 KIND: factual
 SEVERITY: nit
 WHERE: Tasks, T25 evidence (revision-r26/shared-audit.md:1368) and T99 evidence (revision-r26/shared-audit.md:1371)
-EVIDENCE: T25's evidence still says in the present tense: "The complete gate was then still required before the status change. Publication, actual marketplace checks and post-merge obligations subsequently completed in the documented order; see the delivery evidence above." T99's evidence ends: "Final implementation re-review followed in R-23 and R-24; R-24 executed all current checks and returned all seven criteria met with no findings." Neither is true at 71fdf981. Frontmatter status is `complete`. revision-r26/actual-complete-gate.json reports `vh-adlc gate complete: pass` with `"failing":[]`. The Review Log records R-24 (all seven criteria met, no findings) and R-25. Context line 339 records publication, adoption and the R-24 current-default proof. This revision put the matching R-19 and R-20 criterion evidence lines into the historical tense ("were still open in that pass"), so these two task lines are the only remaining present-tense pending statements outside the verbatim review records.
+EVIDENCE: T25's evidence still says in the present tense: "Source completion still needs the complete gate before status changes; actual publication, marketplace and post-merge obligations follow in order." T99's evidence ends: "Final re-review follows at this committed revision." Neither is true at 71fdf981. Frontmatter status is `complete`. revision-r26/actual-complete-gate.json reports `vh-adlc gate complete: pass` with `"failing":[]`. The Review Log records R-24 (all seven criteria met, no findings) and R-25. Context line 339 records publication, adoption and the R-24 current-default proof. This revision put the matching R-19 and R-20 criterion evidence lines into the historical tense ("were still open in that pass"), so these two task lines are the only remaining present-tense pending statements outside the verbatim review records.
 PROPOSAL: Put both lines in the historical tense, for example "the complete gate was then still required" and "final re-review followed in R-23 and R-24". Leave the normative sections and the stored review records unchanged.
 
 ## Sources
