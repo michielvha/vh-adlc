@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing on feat/yaml-settings, claimed locally and unpushed by the owner's instruction. The vhco-pro/docs rule, the pin move and Stackweaver's branch come after this repository's tasks."
+status: complete
+status_description: "Complete on feat/yaml-settings: R-6 found all eight criteria met. Unpushed; shipping, plugin publication and Stackweaver's order step 4 remain."
 issue: null
 branch: feat/yaml-settings
 goal: "Triage and maintenance settings are YAML, Stackweaver's move is reviewed, and the pinned conventions forbid choosing JSON over YAML. Audit is a known exception until its revision lands."
