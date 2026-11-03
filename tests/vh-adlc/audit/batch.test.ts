@@ -4,14 +4,22 @@ import { join } from "node:path";
 import { checkBatch, batchJournalDigest, renderRecord, type Definition } from "../../../plugins/vh-adlc/scripts/audit/batch";
 import { captureSnapshot, digest } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
-import { createRun, intent, handoff } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { createRun, intent, handoff, reconcilePolicy } from "../../../plugins/vh-adlc/scripts/audit/journal";
 import { cleanupPending } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { fixture, git } from "./fixtures";
 import { terminal } from "./evidence";
 import { createLedgerCandidate } from "../../../plugins/vh-adlc/scripts/audit/ledger";
 const projects: ReturnType<typeof fixture>[] = [];
-function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"], defaultBranch = "main", indexBeforeFreeze=false) {
-  const f = fixture(); projects.push(f); const config = loadSettings(f.root), base = git(f.root, "rev-parse", "HEAD");
+function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"], defaultBranch = "main", indexBeforeFreeze=false, oldPolicyRun=false) {
+  const f = fixture(); projects.push(f);
+  let pendingPolicyRun:ReturnType<typeof createRun>|undefined;
+  if(oldPolicyRun){
+    const policy=readFileSync(join(f.root,"audit-project.md"),"utf8");f.write("audit-project.md","# Earlier cleanup policy\n");f.commit();
+    pendingPolicyRun=createRun(loadSettings(f.root),{artifact_root:f.artifacts,run_id:"earlier-policy",batch_digest:"c".repeat(64)});
+    intent(pendingPolicyRun,{id:"key",kind:"key",correlation:"owned-key",target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"});
+    f.write("audit-project.md",policy);f.commit();
+  }
+  const config = loadSettings(f.root), base = git(f.root, "rev-parse", "HEAD");
   git(f.root, "update-ref", "refs/remotes/origin/main", base); git(f.root, "switch", "-qc", "fix/audit-batch");
   let taskBase = base, carried: Definition["carried"] = null;
   if (carry) {
@@ -54,7 +62,7 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
     workstream: definition.workstream, default_branch: definition.default_branch, scope_baseline: definition.scope_baseline, task_base: definition.task_base,
     ids: definition.members.map(member => member.id).sort(), carried: definition.carried ? { commit: definition.carried.commit, ids: definition.carried.ids.slice().sort() } : null }) });
   Object.assign(input, { journal: { directory: run.directory, batch_digest: run.header.batch_digest } });
-  return { f, config, definition, input, base, target, path, run, observe: () => ({ default_branch: "main", default_commit: git(f.root, "rev-parse", "refs/remotes/origin/main") }) };
+  return { f, config, definition, input, base, target, path, run, pendingPolicyRun, observe: () => ({ default_branch: "main", default_commit: git(f.root, "rev-parse", "refs/remotes/origin/main") }) };
 }
 function retarget(c: ReturnType<typeof context>) {
   const target = git(c.f.root, "rev-parse", "HEAD"), previous = c.input.document.assessments;
@@ -230,4 +238,13 @@ test("a generated index frozen with source is allowed but later index changes re
  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(true);
  c.f.write("docs/internal/README.md","Changed after source freeze\n");c.f.commit();retarget(c);
  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
+});
+
+
+test("a later batch completes after explicit old-policy cleanup reconciliation",async()=>{
+ const c=context(false,false,false,["unit"],"main",false,true),old=c.pendingPolicyRun!;
+ expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
+ const cleanup=reconcilePolicy(c.config,old.directory,old.header.batch_digest,{owner_approved:true,owner_handoff:"owner:old-policy-cleanup",expected_digest:old.digest,policy_commit:c.base});
+ await cleanupPending(cleanup,{target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"},{authorized:true,lookup:async()=>[],cleanup:async()=>{throw Error("already absent resource must not be deleted");}});
+ expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(true);
 });

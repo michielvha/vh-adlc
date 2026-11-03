@@ -2,15 +2,16 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSy
 import { join } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
 import { loadSettings } from "./settings";
-import { digest, git, hash, privateDirectory } from "./snapshot";
+import { digest, git, gitBytes, hash, privateDirectory } from "./snapshot";
 import type { Settings } from "./types";
 
 export type Intent = { id: string; kind: "report" | "local-commit" | "issue" | "push" | "pull" | "merge" | "key" | "row";
   correlation: string; target: string; actor?: string; organization?: string; cleanup_method?: string; expected_head?: string };
 export type Receipt = { state: "observed"; resource_id?: string; commit?: string; pull_number?: number; artifact_path?: string; artifact_digest?: string };
-type Event = { revision: number; previous: string; kind: "intent" | "resource" | "outcome" | "handoff"; action_id: string; payload: Intent | Receipt | { reason_code: string } | { resource_id: string } };
+type PolicyTransition = {from_settings_digest:string;from_policy_digest:string;settings_digest:string;policy_digest:string;policy_commit:string;owner_handoff:string;cleanup_only:true};
+type Event = { revision: number; previous: string; kind: "intent" | "resource" | "outcome" | "handoff" | "policy-transition"; action_id: string; payload: PolicyTransition | Intent | Receipt | { reason_code: string } | { resource_id: string } };
 type Header = { schema_version: 1; run_id: string; repository: string; hostname: string; common_dir: string; batch_digest: string; settings_digest: string; policy_digest: string };
-export type Run = { policy_current: boolean; directory: string; config: Settings; header: Header; events: Event[]; revision: number; digest: string };
+export type Run = { policy_current: boolean; cleanup_only:boolean; directory: string; config: Settings; header: Header; events: Event[]; revision: number; digest: string };
 function fail(): never { throw Error("audit journal conflict, unsafe input or changed scope; reconcile owned state"); }
 function identifier(value: unknown): value is string { return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:#/@-]{0,159}$/.test(value); }
 function exact(value: object, allowed: string[], required = allowed) {
@@ -30,7 +31,7 @@ function privateJSON(path: string): unknown {
 }
 function validateIntent(value: Intent) {
   exact(value, ["id", "kind", "correlation", "target", "actor", "organization", "cleanup_method", "expected_head"], ["id", "kind", "correlation", "target"]);
-  if (!identifier(value.id) || !identifier(value.correlation) || !identifier(value.target) ||
+  if (value.id === "policy-transition" || !identifier(value.id) || !identifier(value.correlation) || !identifier(value.target) ||
       !["report", "local-commit", "issue", "push", "pull", "merge", "key", "row"].includes(value.kind)) fail();
   for (const item of [value.actor, value.organization]) if (item !== undefined && !identifier(item)) fail();
   if (value.cleanup_method !== undefined && !/^#[a-z0-9][a-z0-9-]*$/.test(value.cleanup_method)) fail();
@@ -61,9 +62,10 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
   privateDirectory(directory, config.root); privateDirectory(join(directory, "events"), config.root);
   const header = privateJSON(join(directory, "header.json")) as Header;
   exact(header, ["schema_version", "run_id", "repository", "hostname", "common_dir", "batch_digest", "settings_digest", "policy_digest"]);
-  const bindings = inputBindings(config), policy_current = header.settings_digest === bindings.settings_digest && header.policy_digest === bindings.policy_digest;
+  const bindings = inputBindings(config);
+  let effective={settings_digest:header.settings_digest,policy_digest:header.policy_digest},cleanup_only=false;
   if (header.schema_version !== 1 || header.repository !== config.repository || header.hostname !== config.hostname || header.batch_digest !== batch_digest ||
-      header.common_dir !== bindings.common_dir || !policy_current && !options.inspect) fail();
+      header.common_dir !== bindings.common_dir) fail();
   const events: Event[] = [];
   let previous = digest(header);
   const files = readdirSync(join(directory, "events")).filter(name => !name.startsWith(".tmp-")).sort();
@@ -73,11 +75,21 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
     const event = privateJSON(join(directory, "events", file)) as Event;
     exact(event, ["revision", "previous", "kind", "action_id", "payload"]);
     if (event.revision !== revision || event.previous !== previous || !identifier(event.action_id)) fail();
-    if (event.kind === "intent") {
+    if(event.kind==="policy-transition"){
+      const transition=event.payload as PolicyTransition;
+      exact(transition,["from_settings_digest","from_policy_digest","settings_digest","policy_digest","policy_commit","owner_handoff","cleanup_only"]);
+      if(event.action_id!=="policy-transition"||transition.cleanup_only!==true||!identifier(transition.owner_handoff)||!(/^[a-f0-9]{40,64}$/).test(transition.policy_commit)||
+        [transition.from_settings_digest,transition.from_policy_digest,transition.settings_digest,transition.policy_digest].some(value=>!(/^[a-f0-9]{64}$/).test(value))||
+        transition.from_settings_digest!==effective.settings_digest||transition.from_policy_digest!==effective.policy_digest)fail();
+      effective={settings_digest:transition.settings_digest,policy_digest:transition.policy_digest};cleanup_only=true;
+    }else if (event.kind === "intent") {
+      if(cleanup_only)fail();
       validateIntent(event.payload as Intent);
       if ((event.payload as Intent).id !== event.action_id || events.some(e => e.kind === "intent" && e.action_id === event.action_id)) fail();
     } else {
       if (!events.some(e => e.kind === "intent" && e.action_id === event.action_id)) fail();
+      const resource=["key","row"].includes((events.find(e=>e.kind==="intent"&&e.action_id===event.action_id)!.payload as Intent).kind);
+      if(cleanup_only&&event.kind!=="handoff"&&!resource)fail();
       if (event.kind === "resource") {
         exact(event.payload, ["resource_id"]);
         if (!identifier((event.payload as { resource_id: string }).resource_id) || events.some(e => e.kind === "resource" && e.action_id === event.action_id) ||
@@ -91,7 +103,9 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
     }
     events.push(event); previous = digest(event);
   }
-  return { policy_current, directory, config, header, events, revision: events.length, digest: previous };
+  const policy_current=effective.settings_digest===bindings.settings_digest&&effective.policy_digest===bindings.policy_digest;
+  if(!policy_current&&!options.inspect)fail();
+  return { policy_current, cleanup_only, directory, config, header, events, revision: events.length, digest: previous };
 }
 type Registration = { run_id: string; directory: string; batch_digest: string; header_digest: string };
 function registryDirectory(config: Settings, create = false): string | null {
@@ -144,13 +158,14 @@ export function inspectPending(config: Settings, directory: string, batch_digest
     const resource = run.events.find(value => value.kind === "resource" && value.action_id === action.id)?.payload as { resource_id: string } | undefined;
     return { ...action, ...(resource ?? {}) };
   });
-  return { policy_current: run.policy_current, live_ready: run.policy_current && !pending.some(action => ["key", "row"].includes(action.kind)), pending,
+  return { policy_current: run.policy_current, cleanup_only:run.cleanup_only, journal_digest:run.digest, live_ready: run.policy_current && !run.cleanup_only && !pending.some(action => ["key", "row"].includes(action.kind)), pending,
     handoff: run.policy_current ? null : "policy-changed", limit: "Read-only pending-state inspection. Changed policy requires explicit reconciliation; no retry, cleanup or journal mutation is authorized." };
 }
 function append(run: Run, kind: Event["kind"], action_id: string, payload: Event["payload"]) {
   const actual = readRun(run.config, run.directory, run.header.batch_digest);
   requireRegistered(actual);
   if (actual.digest !== run.digest) fail();
+  if(actual.cleanup_only&&(kind==="intent"||kind==="outcome"&&!actual.events.some(e=>e.kind==="intent"&&e.action_id===action_id&&["key","row"].includes((e.payload as Intent).kind))))fail();
   const event: Event = { revision: actual.revision + 1, previous: actual.digest, kind, action_id, payload };
   publishJSON(join(run.directory, "events", String(event.revision).padStart(8, "0") + ".json"), event);
   Object.assign(run, readRun(run.config, run.directory, run.header.batch_digest));
@@ -162,7 +177,7 @@ export function pendingResources(run: Run) {
 /** Register the whole first-attempt resource plan before creating any resource. */
 export function resourceIntents(run: Run, actions: Intent[]) {
   requireRegistered(run);
-  if (!Array.isArray(actions) || !actions.length || registeredPending(run.config).length) fail();
+  if (run.cleanup_only || !Array.isArray(actions) || !actions.length || registeredPending(run.config).length) fail();
   const ids = new Set(run.events.filter(e => e.kind === "intent").map(e => e.action_id));
   const scopes = new Set(run.events.filter(e => e.kind === "intent").map(e => resourceScope(e.payload as Intent)));
   for (const action of actions) {
@@ -196,4 +211,25 @@ export function noteResource(run: Run, action_id: string, resource_id: string) {
   if (!identifier(resource_id) || !run.events.some(e => e.kind === "intent" && e.action_id === action_id && ["key", "row"].includes((e.payload as Intent).kind)) ||
       run.events.some(e => ["resource", "outcome"].includes(e.kind) && e.action_id === action_id)) fail();
   append(run, "resource", action_id, { resource_id });
+}
+
+/** Owner-attested handoff to current committed policy for cleanup only; no execution grant. */
+export function reconcilePolicy(config:Settings,directory:string,batch_digest:string,request:{owner_approved:boolean;owner_handoff:string;expected_digest:string;policy_commit:string}) {
+ exact(request,["owner_approved","owner_handoff","expected_digest","policy_commit"]);
+ if(request.owner_approved!==true||!identifier(request.owner_handoff)||!(/^[a-f0-9]{64}$/).test(request.expected_digest)||!(/^[a-f0-9]{40,64}$/).test(request.policy_commit))fail();
+ const run=readRun(config,directory,batch_digest,{inspect:true});requireRegistered(run);
+ const bindings=inputBindings(config);
+ git(config.root,"merge-base","--is-ancestor",request.policy_commit,"HEAD");
+ if(git(config.root,"status","--porcelain","--",config.settings_path,config.project_procedure))fail();
+ for(const [path,bound]of [[config.settings_path,bindings.settings_digest],[config.project_procedure,bindings.policy_digest]])
+  if(hash(gitBytes(config.root,"show",request.policy_commit+":"+path))!==bound)fail();
+ const previous=run.events.filter(event=>event.kind==="policy-transition").at(-1);
+ if(previous&&previous.previous===request.expected_digest&&run.policy_current&&(previous.payload as PolicyTransition).owner_handoff===request.owner_handoff&&(previous.payload as PolicyTransition).policy_commit===request.policy_commit)return readRun(config,directory,batch_digest);
+ if(run.digest!==request.expected_digest||run.policy_current||!pendingResources(run).length)fail();
+ const old=previous?.payload as PolicyTransition|undefined;
+ const payload:PolicyTransition={from_settings_digest:old?.settings_digest??run.header.settings_digest,from_policy_digest:old?.policy_digest??run.header.policy_digest,
+  settings_digest:bindings.settings_digest,policy_digest:bindings.policy_digest,policy_commit:request.policy_commit,owner_handoff:request.owner_handoff,cleanup_only:true};
+ const event:Event={revision:run.revision+1,previous:run.digest,kind:"policy-transition",action_id:"policy-transition",payload};
+ publishJSON(join(directory,"events",String(event.revision).padStart(8,"0")+".json"),event);
+ return readRun(config,directory,batch_digest);
 }

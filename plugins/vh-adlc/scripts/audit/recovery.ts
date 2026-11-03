@@ -7,6 +7,7 @@ export async function recoverEffect(run: Run, id: string, transport: {
 }) {
   run = reload(run);
   requireRegistered(run);
+  if(run.cleanup_only)throw Error("audit cleanup-only handoff cannot recover forward effects");
   const action = run.events.find(e => e.kind === "intent" && e.action_id === id)?.payload as Intent | undefined;
   if (!action) throw Error("audit effect has no durable intent; inspect actual state before a new action");
   if (["key", "row"].includes(action.kind)) throw Error("audit resource intents require scoped cleanup reconciliation, never generic effect completion");
@@ -27,7 +28,7 @@ type Resource = Scope & { id: string };
 export function liveReady(run: Run): boolean {
   run = reload(run);
   requireRegistered(run);
-  return registeredPending(run.config).length === 0;
+  return !run.cleanup_only && registeredPending(run.config).length === 0;
 }
 export async function cleanupPending(run: Run, scope: Scope | ((action: Intent) => Scope), transport: {
   authorized: boolean; lookup: (action: Intent, recordedID?: string) => Promise<Resource[]>; cleanup: (action: Intent, resource: Resource) => Promise<void>;
@@ -52,18 +53,19 @@ export async function cleanupPending(run: Run, scope: Scope | ((action: Intent) 
       try { resources = await transport.lookup(action, recordedID); } catch { resources = []; reason = "cleanup-lookup-unavailable"; }
       if (!reason && (resources.length > 1 || resources.some(resource => !resource.id || recordedID && resource.id !== recordedID || Object.entries(current).some(([k, v]) => resource[k as keyof Resource] !== v)))) reason = "cleanup-ownership-ambiguous";
       if (!reason) {
-        if (resources.length) {
+        const selected=resources[0], observedID=selected?.id;
+        if (selected) {
           // The caller resolves this method from current authorized policy, never executes journal strings.
-          if (!recordedID) noteResource(run, action.id, resources[0].id);
-          try { await transport.cleanup(action, resources[0]); } catch { reason = "cleanup-execution-failed"; }
+          if (!recordedID) noteResource(run, action.id, observedID!);
+          try { await transport.cleanup(action, selected); } catch { reason = "cleanup-execution-failed"; }
           if (!reason) {
             try {
-              const after = await transport.lookup(action, recordedID ?? resources[0].id);
+              const after = await transport.lookup(action, recordedID ?? observedID);
               if (after.length) reason = "cleanup-absence-not-observed";
             } catch { reason = "cleanup-absence-unavailable"; }
           }
         }
-        if (!reason) outcome(run, action.id, { state: "observed", ...(resources.length ? { resource_id: resources[0].id } : {}) });
+        if (!reason) outcome(run, action.id, { state: "observed", ...(observedID ? { resource_id: observedID } : {}) });
       }
     }
     if (reason) { handoff(run, action.id, reason); handoffs.push({ action: action.id, reason }); }

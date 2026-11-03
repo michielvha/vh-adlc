@@ -240,3 +240,24 @@ method, match that intent, and be verified against lookup results. Missing/chang
 a handoff; a function or incomplete object is never treated as an empty scope check. This API adds
 no live authority. An owned verification-runtime rebuild needs the exact adopted/current target
 permission; unrelated/shared or production restarts still require their own approval.
+
+### Cleanup after a committed policy change
+
+A policy change never reactivates an old run. First inspect `journal-pending` and retain its
+`journal_digest`. An explicit owner handoff may call `journal-reconcile-policy --directory <run>
+--batch-digest <digest> --input <request.json>`. Its exact request is
+`{owner_approved:true,owner_handoff:"<identifier>",expected_digest:"<observed journal digest>",policy_commit:"<real committed ancestor>"}`.
+The selected commit's settings/procedure bytes must equal the current clean committed policy.
+This is an operator attestation of the actual handoff, not permission inferred from a file.
+
+The helper appends one hash-bound transition, retaining the original header, intents, IDs and
+history. Exact retries reconcile that transition. Only resource-ID observations, scoped cleanup
+absence outcomes and handoffs may follow; no new intent, forward-effect recovery or old-batch
+completion is allowed. Current cleanup methods and transport permission still govern every
+lookup/delete. Preserve an old cleanup fragment as a current explicit alias if its implementation
+moves; the transition never broadens target/actor/organization or substitutes arbitrary methods.
+Dirty/uncommitted policy, stale digest, unknown fields or absent handoff fails without mutation.
+
+After absence is observed for all old resources, the global pending inventory clears and a new
+current-policy run can proceed. The old run remains cleanup-only, including `live_ready:false`;
+never reuse it as a new live attempt or repair batch. Keep transition records through handoff.

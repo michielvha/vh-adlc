@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, readFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
-import { createRun, readRun, intent, outcome, inspectPending } from "../../../plugins/vh-adlc/scripts/audit/journal";
-import { recoverEffect } from "../../../plugins/vh-adlc/scripts/audit/recovery";
+import { createRun, readRun, intent, outcome, inspectPending, reconcilePolicy, registeredPending } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { recoverEffect, cleanupPending, liveReady } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git } from "./fixtures";
 
@@ -77,4 +77,26 @@ test("changed policy leaves resource intents inspectable without conferring jour
   expect(result.policy_current).toBe(false); expect(result.handoff).toBe("policy-changed"); expect(result.live_ready).toBe(false);
   expect(result.pending.map(row => row.id)).toEqual(["owned-key"]);
   expect(() => outcome(c.run, "owned-key", { state: "observed" })).toThrow();
+});
+
+
+test("explicit committed policy handoff permits only old-resource reconciliation and unblocks a later run",async()=>{
+ const c=context(),scope={target:"dev:slot",actor:"fixture",organization:"org",cleanup_method:"#cleanup"};
+ intent(c.run,{id:"key",kind:"key",correlation:"owned-key",...scope});const before=c.reload(),header=readFileSync(join(before.directory,"header.json"));
+ c.f.write("audit-project.md","# Current policy\n\n## Cleanup\nOnly the recorded owned key may be removed.\n");const policyCommit=c.f.commit();const config=loadSettings(c.f.root);
+ const request={owner_approved:true,owner_handoff:"owner-session:cleanup-1",expected_digest:before.digest,policy_commit:policyCommit};
+ expect(()=>reconcilePolicy(config,before.directory,before.header.batch_digest,{...request,owner_approved:false})).toThrow();
+ expect(()=>reconcilePolicy(config,before.directory,before.header.batch_digest,{...request,expected_digest:"0".repeat(64)})).toThrow();
+ c.f.write("audit-project.md","# Uncommitted policy\n");
+ expect(()=>reconcilePolicy(loadSettings(c.f.root),before.directory,before.header.batch_digest,request)).toThrow();
+ c.f.write("audit-project.md","# Current policy\n\n## Cleanup\nOnly the recorded owned key may be removed.\n");
+ const current=reconcilePolicy(config,before.directory,before.header.batch_digest,request);
+ expect(current.cleanup_only).toBe(true);expect(current.policy_current).toBe(true);
+ expect(reconcilePolicy(config,before.directory,before.header.batch_digest,request).revision).toBe(current.revision);
+ expect(()=>intent(current,{id:"retry",kind:"merge",correlation:"pull-42",target:"pull:42"})).toThrow();
+ let deleted=0;const resources=[{...scope,id:"key-id"}];
+ await cleanupPending(current,scope,{authorized:true,lookup:async()=>resources,cleanup:async()=>{resources.length=0;deleted++;}});
+ expect(deleted).toBe(1);expect(registeredPending(config)).toEqual([]);expect(liveReady(current)).toBe(false);
+ const later=createRun(config,{artifact_root:c.f.artifacts,run_id:"later-run",batch_digest:"b".repeat(64)});expect(liveReady(later)).toBe(true);
+ expect(readFileSync(join(before.directory,"header.json")).equals(header)).toBe(true);
 });

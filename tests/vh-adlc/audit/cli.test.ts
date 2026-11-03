@@ -84,3 +84,20 @@ test("native candidates include checked section updates without changing source"
   expect(result.exitCode).toBe(0);const savedCandidate=JSON.parse(result.stdout.toString()),value=JSON.parse(readFileSync(savedCandidate.path,"utf8"));expect(value.bytes).toContain("Current evidence supersedes");expect(value.bytes).toContain("Earlier observation.");
   expect(git(f.root,"status","--porcelain")).toBe(before);expect(git(f.root,"rev-parse","HEAD")).toBe(head);
 });
+
+
+test("native owner-handoff reconciliation retires old cleanup without reactivating its run",()=>{
+ const f=fixture();projects.push(f);const batch="f".repeat(64);
+ const created=invoke(f,"journal-new","--artifact-root",f.artifacts,"--run-id","old-policy","--batch-digest",batch);const directory=JSON.parse(created.stdout.toString()).directory,args=["--directory",directory,"--batch-digest",batch];
+ const key=f.artifact("transition-key.json",JSON.stringify({id:"key",kind:"key",correlation:"owned-key",target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"}));
+ expect(invoke(f,"journal-intent",...args,"--input",join(f.artifacts,key.path)).exitCode).toBe(0);
+ const header=readFileSync(join(directory,"header.json")),digest=JSON.parse(invoke(f,"journal-read",...args).stdout.toString()).digest;
+ f.write("audit-project.md","# Committed cleanup policy\n");const policy_commit=f.commit();
+ const request=f.artifact("policy-handoff.json",JSON.stringify({owner_approved:true,owner_handoff:"owner-session:cleanup",expected_digest:digest,policy_commit}));
+ expect(invoke(f,"journal-reconcile-policy",...args,"--input",join(f.artifacts,request.path)).exitCode).toBe(0);
+ expect(invoke(f,"journal-intent",...args,"--input",join(f.artifacts,key.path)).exitCode).toBe(1);
+ const receipt=f.artifact("policy-cleanup.json",JSON.stringify({state:"observed"}));
+ expect(invoke(f,"journal-cleanup-outcome",...args,"--action-id","key","--input",join(f.artifacts,receipt.path),"--absence-confirmed","true").exitCode).toBe(0);
+ const pending=JSON.parse(invoke(f,"journal-pending",...args).stdout.toString());expect(pending.pending).toEqual([]);expect(pending.cleanup_only).toBe(true);expect(pending.live_ready).toBe(false);
+ expect(JSON.parse(invoke(f,"journal-registered-pending").stdout.toString()).pending).toEqual([]);expect(readFileSync(join(directory,"header.json")).equals(header)).toBe(true);
+});
