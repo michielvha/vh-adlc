@@ -92,6 +92,7 @@ func Parse(args []string) (Config, error) {
 	if !filepath.IsAbs(c.Home) {
 		return c, errors.New("state directory must be absolute")
 	}
+	c.Home = filepath.Clean(c.Home)
 	switch c.Command {
 	case "share":
 		if len(positionals) != 1 {

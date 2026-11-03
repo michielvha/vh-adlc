@@ -2,6 +2,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,8 +10,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"syscall"
+	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/tailnet"
 )
 
 type Result struct {
@@ -91,9 +97,27 @@ func Doctor(c config.Config) Result {
 			r.Missing = append(r.Missing, name)
 		}
 	}
+	sort.Strings(r.Missing)
 	if len(r.Missing) > 0 {
 		r.Result = "missing-dependencies"
 		r.Diagnostic = "provide existing host tools or configure REMOTE_GUI tool paths; no packages were installed"
+	}
+	if r.Result == "ready" {
+		identity, err := state.Inspect(os.Getpid())
+		if err != nil || state.Signal(identity, syscall.Signal(0)) != nil {
+			r.Result = "capability-unavailable"
+			r.Diagnostic = "Linux process identity and pidfd signalling are required"
+			return r
+		}
+		if c.Transport == "tailscale" {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			_, err := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET")).Plan(ctx, "http://127.0.0.1:1")
+			if err != nil {
+				r.Result = "capability-unavailable"
+				r.Diagnostic = err.Error() + "; conditional LocalAPI reads and ETag/If-Match updates are required; no configuration was changed"
+			}
+		}
 	}
 	return r
 }

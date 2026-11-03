@@ -3,6 +3,8 @@ package app
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -30,5 +32,21 @@ func TestServiceDoctorDoesNotNeedGUI(t *testing.T) {
 	out.Reset()
 	if code := Run([]string{"doctor", "--kind", "browser", "--transport", "loopback"}, &out); code == 0 {
 		t.Fatal("browser doctor accepted missing GUI tools")
+	}
+}
+
+func TestTailnetDoctorRequiresConditionalAPI(t *testing.T) {
+	tools := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tools, "tailscale"), []byte("#!/bin/sh\nexit 0\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tools)
+	t.Setenv("REMOTE_GUI_TAILSCALE_SOCKET", filepath.Join(tools, "absent.sock"))
+	var out bytes.Buffer
+	if code := Run([]string{"doctor", "--kind", "share", "--transport", "tailscale"}, &out); code == 0 {
+		t.Fatal("doctor accepted unreachable LocalAPI")
+	}
+	if !bytes.Contains(out.Bytes(), []byte("capability-unavailable")) {
+		t.Fatal("missing capability diagnostic", out.String())
 	}
 }
