@@ -1,7 +1,7 @@
 {
   "pass_all": true,
-  "observed_at": "2026-11-03T17:51:40.827324+00:00",
-  "binary": "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin/vh-adlc",
+  "observed_at": "2026-11-03T18:02:19.050779+00:00",
+  "binary": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/bin/vh-adlc",
   "binary_version": "vh-adlc 0.9.0",
   "binary_sha256": "ea918c2ce0c99c9312913ab09857f17f29287fcd263c84ace69a51aa264a7cfa",
   "binary_source": "/home/m/.cache/vh-adlc/bin/0.9.0/linux_amd64/vh-adlc",
@@ -15,10 +15,19 @@
     "exit_code": 0
   },
   "binary_copied_to_isolated_PATH": true,
+  "binary_lock_verification": {
+    "path": "/home/m/code/vh-adlc-migration-roadmap/plugins/vh-adlc/vh-adlc.lock.json",
+    "lock_sha256": "b7ba6ac6c1d8ee65b6ca7835015835dbcb9aae1012f2acf823abe5337cd9202f",
+    "platform": "linux_amd64",
+    "expected_binary_sha256": "ea918c2ce0c99c9312913ab09857f17f29287fcd263c84ace69a51aa264a7cfa",
+    "actual_binary_sha256": "ea918c2ce0c99c9312913ab09857f17f29287fcd263c84ace69a51aa264a7cfa",
+    "match": true,
+    "setup_scope": "Host cached installer verification followed by an exact binary copy; not an isolated native installation"
+  },
   "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
   "sentinel": {
     "type": "local-rejecting-HTTP-proxy",
-    "url": "http://127.0.0.1:33205",
+    "url": "http://127.0.0.1:41043",
     "outside_forwarding": false,
     "requests": []
   },
@@ -26,7 +35,7 @@
     {
       "case": "cold",
       "argv": [
-        "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin/vh-adlc",
+        "/tmp/audit-offline-knowledge-r5-b7vnh6fx/bin/vh-adlc",
         "knowledge",
         "--offline",
         "--repo",
@@ -47,14 +56,14 @@
         "conventions/typescript.md"
       ],
       "environment": {
-        "HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/cold",
-        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/cold/cache",
-        "PATH": "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin",
+        "HOME": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/cold",
+        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/cold/cache",
+        "PATH": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/bin",
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_OPTIONAL_LOCKS": "0",
-        "HTTPS_PROXY": "http://127.0.0.1:33205",
-        "HTTP_PROXY": "http://127.0.0.1:33205",
+        "HTTPS_PROXY": "http://127.0.0.1:41043",
+        "HTTP_PROXY": "http://127.0.0.1:41043",
         "NO_PROXY": "",
         "LANG": "C.UTF-8"
       },
@@ -93,7 +102,7 @@
     {
       "case": "partial",
       "argv": [
-        "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin/vh-adlc",
+        "/tmp/audit-offline-knowledge-r5-b7vnh6fx/bin/vh-adlc",
         "knowledge",
         "--offline",
         "--repo",
@@ -114,14 +123,14 @@
         "conventions/typescript.md"
       ],
       "environment": {
-        "HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial",
-        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache",
-        "PATH": "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin",
+        "HOME": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/partial",
+        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/partial/cache",
+        "PATH": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/bin",
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_OPTIONAL_LOCKS": "0",
-        "HTTPS_PROXY": "http://127.0.0.1:33205",
-        "HTTP_PROXY": "http://127.0.0.1:33205",
+        "HTTPS_PROXY": "http://127.0.0.1:41043",
+        "HTTP_PROXY": "http://127.0.0.1:41043",
         "NO_PROXY": "",
         "LANG": "C.UTF-8"
       },
@@ -141,7 +150,7 @@
           "page": "conventions/feature-documents.md",
           "git_blob": "958f628d3b64c89583a0492cdac1013230006828",
           "sha256": "079ee4d4c8c62b11e6db21c267f0f2eaaa127bb6f71e5f48c467fd18ab14e0ce",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -156,7 +165,7 @@
           "page": "conventions/coding.md",
           "git_blob": "65c15ff058bc9e187601e993f9760dd281029e7a",
           "sha256": "d96094ed8a738b455e8cf5989393650e1a8a5ef863cfb2bdfab22de463f84ac7",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -171,7 +180,7 @@
           "page": "conventions/documentation.md",
           "git_blob": "f0c40be51e67d5e6a67533484b09f2408712c38a",
           "sha256": "4f01a75d76a16d8db72f8ad7f93cc51f0cbc7c653d2e7bae5a5245d7264b08f2",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -186,7 +195,7 @@
           "page": "conventions/delivery.md",
           "git_blob": "150c899a79311bf5093e237c80b38cc8c5fc687c",
           "sha256": "92f067227ce08bb4dc906b0de62e2f6819f336763a8b1ba80d10a6b650c816d8",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -201,7 +210,7 @@
           "page": "conventions/typescript.md",
           "git_blob": "cebd3d4ebbd45e001d5da9b67ef94f7d908a5b19",
           "sha256": "36dc17f140096809a019fe54fcf533dac0fe3d42cd0b054b67ccec84a5a87eed",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md"
         }
       ],
       "requested_pages": [
@@ -326,7 +335,7 @@
     {
       "case": "warm",
       "argv": [
-        "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin/vh-adlc",
+        "/tmp/audit-offline-knowledge-r5-b7vnh6fx/bin/vh-adlc",
         "knowledge",
         "--offline",
         "--repo",
@@ -347,14 +356,14 @@
         "conventions/typescript.md"
       ],
       "environment": {
-        "HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm",
-        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache",
-        "PATH": "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin",
+        "HOME": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/warm",
+        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/warm/cache",
+        "PATH": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/bin",
         "GIT_CONFIG_GLOBAL": "/dev/null",
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_OPTIONAL_LOCKS": "0",
-        "HTTPS_PROXY": "http://127.0.0.1:33205",
-        "HTTP_PROXY": "http://127.0.0.1:33205",
+        "HTTPS_PROXY": "http://127.0.0.1:41043",
+        "HTTP_PROXY": "http://127.0.0.1:41043",
         "NO_PROXY": "",
         "LANG": "C.UTF-8"
       },
@@ -374,7 +383,7 @@
           "page": "conventions/feature-documents.md",
           "git_blob": "958f628d3b64c89583a0492cdac1013230006828",
           "sha256": "079ee4d4c8c62b11e6db21c267f0f2eaaa127bb6f71e5f48c467fd18ab14e0ce",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -389,7 +398,7 @@
           "page": "conventions/coding.md",
           "git_blob": "65c15ff058bc9e187601e993f9760dd281029e7a",
           "sha256": "d96094ed8a738b455e8cf5989393650e1a8a5ef863cfb2bdfab22de463f84ac7",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -404,7 +413,7 @@
           "page": "conventions/documentation.md",
           "git_blob": "f0c40be51e67d5e6a67533484b09f2408712c38a",
           "sha256": "4f01a75d76a16d8db72f8ad7f93cc51f0cbc7c653d2e7bae5a5245d7264b08f2",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -419,7 +428,7 @@
           "page": "conventions/delivery.md",
           "git_blob": "150c899a79311bf5093e237c80b38cc8c5fc687c",
           "sha256": "92f067227ce08bb4dc906b0de62e2f6819f336763a8b1ba80d10a6b650c816d8",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -434,7 +443,7 @@
           "page": "guides/humanize-prose.md",
           "git_blob": "2d7e4bca59ced5a522f63cfecd06acc403c2357a",
           "sha256": "7a6e4b3124c309b4f4e51ef4c4cdab84e72c3be3a7023448766556a3fb40ee66",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md"
         },
         {
           "method": "exact-Git-blob-to-isolated-docs-cache",
@@ -449,7 +458,7 @@
           "page": "conventions/typescript.md",
           "git_blob": "cebd3d4ebbd45e001d5da9b67ef94f7d908a5b19",
           "sha256": "36dc17f140096809a019fe54fcf533dac0fe3d42cd0b054b67ccec84a5a87eed",
-          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md"
+          "cache_path": "/tmp/audit-offline-knowledge-r5-b7vnh6fx/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md"
         }
       ],
       "requested_pages": [
