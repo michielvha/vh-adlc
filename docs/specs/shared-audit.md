@@ -144,7 +144,12 @@ the colliding audit candidate. The distinct audit version/minimum checks are ret
 the proposed YAML loader is still unimplemented pending revised acceptance. The real ledger retains
 SHA-256 `c0eb6250334fbb592ed955c595b24aea2d796f5c1c7b5279672e26065807d769`.
 Actual Copilot spec R-13 and bounded private parity R6 target this exact draft/current consumer
-`4772ade58091e342b7c3666a197fa318195260eb`; their results remain pending until returned and inspected.
+`4772ade58091e342b7c3666a197fa318195260eb`. Both returned the requested actual model with complete
+required reads and exclusive read-only tools. R-13's nine records are preserved verbatim below;
+its technical design clarifications preserve the already-required full validation, read-only/cache
+and scoped recovery rules. No new execution/network grant is introduced. Private R6 found remaining
+provenance wording, transient summary text and rebased-run identity gaps, tracked under T91. Q1
+remains the owner product-policy decision; the revised spec is not accepted.
 
 ### Latest spec review and implementation obligation
 
@@ -707,6 +712,13 @@ new-finding audit mode. After this honest reassessment, a new update uses the cu
 default ancestor as its next Scope baseline. A dirty/non-default-source assessment still cannot
 write the default ledger under the earlier application rule.
 
+If a published batch's default baseline advances, its previous scope-bound journal cannot certify a
+rebased batch. A separately owner-approved rewrite starts a new run on the same PR branch, with a
+fresh Scope baseline, run ID/journal/record and Task-base ledger from the new default (or a freshly
+checked explicitly selected carried report). Rebuild/freeze source, regenerate candidate/record and
+rerun all checks and independent review. Retain old outcomes/pending-resource records and reconcile
+resources before new work. This specifies identity, not permission to rewrite or merge default.
+
 Stackweaver keeps its existing one-branch/one-PR-per-workstream batching, one finding or coupled bundle
 per commit, local full verification before one batch push, one tracking issue per workstream and
 conditional squash merge after live gates plus green CI. Its detailed step-7 merge rule explicitly
@@ -1027,6 +1039,8 @@ live operations remain separate owner-selected tasks.
       Evidence: Chose public R9's documentation option: persist a non-resource intent only after its last gate, and retain a later declined/absent effect as an unretired handoff. All 15 recovery checks pass (`T82-retained-handoff-green.log`), including no execution, retirement refusal, later scoped-resource cleanup while the root is retained, and unknown-state refusal if it is removed. No failing code test was applicable: existing behavior already enforces this retained state. No withdrawal grant or event schema was added.
 - [x] T83 `references/audit-record.md`, consumer follow-up policy and batch controls - make non-forced post-CI source refreezing executable and name the owner handoff when default advances after publication (private R5 F-01; AC-04, AC-05).
       Evidence: The real disposable Git rehearsal has 43 passing batch tests (`T83-rehearsal-first.log`): the naive follow-up fails the exact Task-base ledger condition, restored-ledger/new-source/candidate/record refreezing passes without rewriting its published ancestor, and advanced default refuses the old batch. The consumer contract is red on missing instructions (`T83-consumer-red.log`), then the focused guidance test passes. Consumer `4772ade5` retains normal hooks. The intermediate whole-candidate attempt correctly refuses uncommitted procedure bytes; a committed rerun is retained separately. This clarifies the accepted route without adding rewrite/publication authority.
+- [x] T91 shared/consumer provenance guidance, summary renderer and follow-up record policy - align every selected fix's note, keep permanent summaries free of pending workflow state and require a fresh run for an explicitly approved rebase (R-13 F-06; private R6; AC-03, AC-04, AC-05).
+      Evidence: A permanent-authority reminder and missing consumer instruction controls fail first (`T91-summary-red.log`, `T91-consumer-red.log`). All 125 ledger/batch controls pass after the output/guidance correction (`T91-shared-green.log`); the focused consumer contract also passes. Normal consumer hooks and committed-candidate checks remain required. No YAML loader or live effect was implemented.
 - [ ] T89 plugin manifests and package-version contract - reserve coherent audit plugin 0.8.0 before any further package implementation; the already observed collision red becomes a passing package check (AC-01, AC-07).
 - [ ] T84 `tests/vh-adlc/audit/settings.test.ts`, authority and example contracts - observe strict YAML, working/committed alternate-suffix, stale-link, full committed-schema/same-commit path, exact byte/value match, offline cached/uncached and distinct reader-failure controls fail before converting the audit loader (AC-02, AC-04).
 - [ ] T85 `scripts/audit/settings.ts`, `authority.ts` and shared settings integration - reuse the strict shared reader with optional offline mode for working and fully validated committed YAML, preserve other callers and prove no grant on failure; T84 passes (AC-02, AC-04).

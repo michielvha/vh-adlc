@@ -121,8 +121,14 @@ check and duplicate run-note guard reject it. Declared generated indexes change 
 If default advances after publication, stop for the owner's choice of a separately approved
 rebase/force-push or a new batch from current default. Do not silently merge default into the
 published repair branch or borrow the earlier review. A new batch resolves scope and pending
-resources again, retains the old outcomes/history and needs fresh proof. This procedure grants
-neither a rewrite nor publication; the consumer and current owner request govern both.
+resources again, retains the old outcomes/history and needs fresh proof. An explicitly approved
+rebase/force-push also becomes a new run on the same PR branch: a fresh actual-default Scope baseline,
+new run ID/journal/record path and Task-base ledger from that new default (or a newly checked and
+explicitly selected carried report). Restore that Task-base ledger in the rebuilt source commit,
+freeze it, regenerate candidate/record and rerun every required check and independent review. Recheck
+any carried report against the new default; old carried proof never transfers automatically. Keep
+old run/resource/outcome records; their scope digest cannot serve the rebased run. This procedure
+grants neither a rewrite nor publication; the consumer and current owner request govern both.
 
 ## Bound resource journal
 

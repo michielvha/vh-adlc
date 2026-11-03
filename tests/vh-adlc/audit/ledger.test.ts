@@ -195,6 +195,7 @@ test("an established dated-ledger layout keeps banners, summary tables, visible 
   expect(candidate.bytes).toContain("> Audit pass (2026-11-02)");
   expect(candidate.bytes.indexOf("> Audit pass (2026-11-02)")).toBeLessThan(candidate.bytes.indexOf("> Historical pass"));
   expect(candidate.bytes).toContain("## Re-verification summary (2026-11-02)");
+  expect(candidate.bytes).not.toContain("still require current ledger/delivery authority");
   for (const category of ["Fully fixed", "Partially fixed", "Regressed", "Moot", "Unknown"]) expect(candidate.bytes).toContain("### " + category);
   expect(candidate.bytes).toContain("### AUD-001 - Incorrect result\n\n✅ **FIXED (2026-11-02)**");
   expect(candidate.bytes).toContain("Older summary stays intact."); expect(candidate.bytes).toContain("Historical pass (2026-10-01): prior evidence only.");

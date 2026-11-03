@@ -116,9 +116,9 @@ its actual gap, preserving the original ambiguous/range index. It cannot acquire
 terminal verdict or an invented finding section. Supported title annotations and inline
 `**Re-verify (date):**` markers preserve the original heading text/anchors and earlier history.
 For reverify/full, an existing `How this audit was performed` layout retains its dated banner and
-categorized `Re-verification summary (date)` tables. Selected fix candidates add only their changed
-finding markers/index cells/inline notes and record bindings; they add no pass overview or permanent
-claim that final review is still pending. Changed statuses get a dated marker immediately below the
+categorized `Re-verification summary (date)` tables. Every selected fix member gets a dated
+per-finding verification note, including unchanged statuses; markers and index cells stay changed-only.
+Fix candidates retain their record bindings and add no pass overview or permanent pending-review claim. Changed statuses get a dated marker immediately below the
 unchanged finding heading, preserving its anchor. Older banners, summaries and finding prose remain;
 unselected history is never described as freshly verified. Minimal ledgers keep their inline-note layout.
 
