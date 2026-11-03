@@ -1,10 +1,27 @@
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { relative, sep } from "node:path";
+import { existsSync, realpathSync, statSync } from "node:fs";
+import { isAbsolute, relative, sep } from "node:path";
 import { git, origin, resolveInside } from "../triage/settings";
+import { settingsFile, readYAML } from "../settings-file";
 import type { Profile, Settings } from "./types";
 
+export class AuditSettingsError extends Error {
+  constructor(readonly code: string, message: string) { super(`${code}: ${message}`); }
+}
 export function invalid(field: string): never {
-  throw Error("invalid audit settings: " + field);
+  throw new AuditSettingsError("settings-invalid", "invalid audit settings: " + field);
+}
+export function settingsFailure(error: unknown, fallback: string): string {
+  return error instanceof AuditSettingsError ? error.code : fallback;
+}
+function readerFailure(reason: string): never {
+  const code = reason.startsWith("binary unavailable:") ? "settings-reader-unavailable"
+    : reason.startsWith("settings file refused:") ? "settings-reader-refused"
+    : reason.startsWith(".vh-adlc/audit.") && reason.includes("is not read") ? "settings-suffix-conflict" : "settings-invalid";
+  throw new AuditSettingsError(code, "invalid audit settings: " + reason);
+}
+/** Parse bytes without installing or refreshing anything; callers validate their own source tree. */
+export function readAuditYAML(bytes: Uint8Array): unknown {
+  return readYAML(bytes, readerFailure, { offline: true });
 }
 export function object(value: unknown, field: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) invalid(field);
@@ -30,11 +47,13 @@ export function auditOrigin(root: string): { repository: string; hostname: strin
 }
 function file(root: string, value: unknown, field: string): string {
   const path = text(value, field);
-  if (path.split("/").includes(".git")) invalid(field);
+  if (isAbsolute(path) || path.split(/[\\/]/).some(part => part.toLowerCase() === ".git")) invalid(field);
   let absolute: string;
   try { absolute = resolveInside(root, path); } catch { invalid(field); }
   if (!existsSync(absolute) || !statSync(absolute).isFile()) invalid(field + " must reference an existing file");
-  return relative(root, absolute).split(sep).join("/");
+  const normalized = relative(root, absolute).split(sep).join("/");
+  if (normalized.split("/").some(part => part.toLowerCase() === ".git")) invalid(field);
+  return normalized;
 }
 
 /** Reading settings performs no setup, permission refresh, or filesystem mutation. */
@@ -43,13 +62,16 @@ export function loadSettings(directory: string, options: { settingsPath?: string
   let identity: { repository: string; hostname: string };
   try { identity = auditOrigin(root); } catch { invalid("origin"); }
   const repository = identity.repository.toLowerCase(), hostname = identity.hostname.toLowerCase();
-  const requested = options.settingsPath ?? ".vh-adlc/audit.json";
-  let settingsFile: string;
-  try { settingsFile = resolveInside(root, requested); } catch { invalid("settings path"); }
-  if (!existsSync(settingsFile)) throw Error("audit setup required: create the documented audit settings and ledger");
-  let input: Record<string, unknown>;
-  try { input = object(JSON.parse(readFileSync(settingsFile, "utf8")), "settings object"); }
-  catch { invalid("readable JSON object required"); }
+  const loaded = settingsFile({ root, name: "audit", settingsPath: options.settingsPath, offline: true,
+    inside: path => { try { return resolveInside(root, path); } catch { invalid("settings path"); } }, fail: readerFailure });
+  if (!loaded.configured) throw Error("audit setup required: create the documented audit YAML settings and ledger");
+  return settingsFromValue(loaded.value, { root, repository, hostname }, loaded.path, (value, field) => file(root, value, field));
+}
+
+/** The same schema applies to working files and exact committed blobs. */
+export function settingsFromValue(value: unknown, identity: { root: string; repository: string; hostname: string },
+  requested: string, resolveFile: (value: unknown, field: string) => string): Settings {
+  const { root, repository, hostname } = identity, input = object(value, "settings object");
   keys(input, ["schema_version", "repository", "hostname", "ledger_path", "project_procedure", "id_prefix", "profile"], "settings");
   if (input.schema_version !== 1) invalid("schema_version must be 1");
   if (input.repository !== undefined && text(input.repository, "repository").toLowerCase() !== repository) invalid("repository conflicts with origin");
@@ -74,9 +96,9 @@ export function loadSettings(directory: string, options: { settingsPath?: string
   if(profile.workstream_heading!==undefined)layout.workstream_heading=text(profile.workstream_heading,"workstream_heading");
   return {
     schema_version: 1, root, repository, hostname,
-    settings_path: file(root, requested, "settings path"),
-    ledger_path: file(root, input.ledger_path, "ledger_path"),
-    project_procedure: file(root, input.project_procedure, "project_procedure"),
+    settings_path: resolveFile(requested, "settings path"),
+    ledger_path: resolveFile(input.ledger_path, "ledger_path"),
+    project_procedure: resolveFile(input.project_procedure, "project_procedure"),
     id_prefix,
     profile: {
       name: "markdown-audit-v1",

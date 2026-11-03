@@ -19,7 +19,7 @@ export function policy(values: Record<string, string> = fields) {
 const projects: ReturnType<typeof fixture>[] = [];
 function adopted(values = fields) {
   const f = fixture(); projects.push(f);
-  f.write("AGENTS.md", "# Local rules\n\nAudit: [settings](.vh-adlc/audit.json), [policy](audit-project.md).\n");
+  f.write("AGENTS.md", "# Local rules\n\nAudit: [settings](.vh-adlc/audit.yaml), [policy](audit-project.md).\n");
   f.write("audit-project.md", policy(values)); const commit = f.commit("test: adopted audit policy");
   git(f.root, "update-ref", "refs/remotes/origin/main", commit);
   let fetches = 0;
@@ -33,7 +33,7 @@ test("an adopted exact committed declaration permits only the current selected m
   const c = adopted();
   const result = inspectAuthority(c.config, { mode: "fix", ids: ["AUD-001"], workstream: "A", effect: "branch-push", request: c.request, refresh: c.refresh });
   expect(result.allowed).toBe(true); expect(result.basis).toBe("adopted"); expect(c.fetches()).toBe(1);
-  expect(result.sources.map(s => s.path)).toEqual(["AGENTS.md", ".vh-adlc/audit.json", "audit-project.md"]);
+  expect(result.sources.map(s => s.path)).toEqual(["AGENTS.md", ".vh-adlc/audit.yaml", "audit-project.md"]);
   expect(result.default_commit).toBe(git(c.f.root, "rev-parse", "HEAD"));
   expect(result.pending_conditions).toBe(true); // Policy semantics/gates remain a separate obligation.
 });

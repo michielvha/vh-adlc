@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, posix } from "node:path";
 import { inventory, tableCells } from "./inventory";
-import { auditOrigin, loadSettings } from "./settings";
+import { AuditSettingsError, auditOrigin, loadSettings, readAuditYAML, settingsFailure, settingsFromValue, text } from "./settings";
 import { digest, git, gitBytes, hash } from "./snapshot";
 import type { AuditMode, Settings } from "./types";
 
@@ -78,6 +78,7 @@ export function parseDeclaration(markdown: string, config: Settings, default_bra
 }
 export function inspectCandidatePolicy(config: Settings, options: { default_branch: string; commit: string; parity_path?: string; observe?: () => Observed }) {
   try {
+    if (digest(loadSettings(config.root, { settingsPath: config.settings_path })) !== digest(config)) fail();
     const commit = options.commit;
     if (!/^[a-f0-9]{40,64}$/.test(commit) || git(config.root, "rev-parse", commit + "^{commit}") !== commit) fail();
     const identity = auditOrigin(config.root);
@@ -91,8 +92,8 @@ export function inspectCandidatePolicy(config: Settings, options: { default_bran
       return text;
     };
     const links = [...visible(read("AGENTS.md")).matchAll(/\[[^\]\n]+\]\(([^\s)]+)\)/g)].map(m => m[1].replace(/^\.\//, ""));
-    if (!links.includes(config.settings_path)) fail();
-    if (JSON.parse(read(config.settings_path)).project_procedure !== config.project_procedure) fail();
+    if (!links.includes(config.settings_path)) throw new AuditSettingsError("settings-link-stale", "Committed instructions do not link the reviewed YAML settings.");
+    if (digest(committedSettings(config, commit, read(config.settings_path))) !== digest(config)) fail();
     const parsed = parseDeclaration(read(config.project_procedure), config, observed.default_branch); if (!parsed) fail();
     const blob = (path: string) => git(config.root, "rev-parse", `${commit}:${path}`);
     if (options.parity_path) read(options.parity_path);
@@ -101,7 +102,7 @@ export function inspectCandidatePolicy(config: Settings, options: { default_bran
       effects_digest: digest(Object.fromEntries(Object.entries(parsed.effects).map(([mode, effects]) => [mode, [...effects].sort()]))) };
     return { valid: true, allowed: false as const, adopted: false as const, consumer_commit: commit, default_branch: observed.default_branch, default_commit: observed.default_commit,
       reason: "Exact committed candidate inspection confers no adopted effect.", declaration: parsed, bindings };
-  } catch { return { valid: false, allowed: false as const, adopted: false as const, consumer_commit: null, reason: "Invalid or uncommitted candidate declaration/default identity.", declaration: null, bindings: null }; }
+  } catch (error) { return { valid: false, allowed: false as const, adopted: false as const, consumer_commit: null, reason: settingsFailure(error, "Invalid or uncommitted candidate declaration/default identity."), declaration: null, bindings: null }; }
 }
 export function observeDefault(config: Settings): Observed {
   const head = git(config.root, "ls-remote", "--symref", "origin", "HEAD"), branch = [...head.matchAll(/^ref: refs\/heads\/([^\s]+)\s+HEAD$/gm)], commit = [...head.matchAll(/^([a-f0-9]{40,64})\s+HEAD$/gm)];
@@ -127,6 +128,23 @@ function committedFile(config: Settings, commit: string, path: string): string {
   }
   return gitBytes(config.root, "show", `${commit}:${path}`).toString();
 }
+/** Resolve every configured file in this Git tree, never through the current filesystem. */
+function committedSettings(config: Settings, commit: string, bytes: string): Settings {
+  for (const suffix of ["json", "yml"]) {
+    if (git(config.root, "ls-tree", commit, "--", `.vh-adlc/audit.${suffix}`)) {
+      throw new AuditSettingsError("settings-suffix-conflict", "Committed alternate settings suffix conflicts with audit YAML.");
+    }
+  }
+  if (!config.settings_path.endsWith(".yaml")) throw new AuditSettingsError("settings-link-stale", "Audit settings must use the YAML path.");
+  return settingsFromValue(readAuditYAML(new TextEncoder().encode(bytes)), config, config.settings_path, (value, field) => {
+    const path = text(value, field), normalized = posix.normalize(path);
+    if (isAbsolute(path) || path.includes("\\") || normalized === "." || normalized.startsWith("../") || normalized.split("/").some(part => part.toLowerCase() === ".git")) {
+      throw new AuditSettingsError("settings-invalid", "Invalid committed audit file path.");
+    }
+    committedFile(config, commit, normalized);
+    return normalized;
+  });
+}
 /** Read-only policy discovery, not an execution authorization or synthetic fix request. */
 export function inspectAdoptedPolicy(config: Settings, options: { refresh?: () => Observed } = {}) {
   const sources: { path: string; digest: string }[] = [];
@@ -140,17 +158,17 @@ export function inspectAdoptedPolicy(config: Settings, options: { refresh?: () =
     if (!/^[a-f0-9]{40,64}$/.test(observed.default_commit) || git(config.root, "rev-parse", "refs/remotes/origin/" + observed.default_branch) !== observed.default_commit) fail();
     const read = (path: string) => { const text = committedFile(config, observed!.default_commit, path); sources.push({ path, digest: hash(text) }); return text; };
     const links = [...visible(read("AGENTS.md")).matchAll(/\[[^\]\n]+\]\(([^\s)]+)\)/g)].map(m => m[1].replace(/^\.\//, ""));
-    if (!links.includes(config.settings_path)) fail();
+    if (!links.includes(config.settings_path)) throw new AuditSettingsError("settings-link-stale", "Committed instructions do not link the reviewed YAML settings.");
     const settings = read(config.settings_path);
-    if (settings.trimEnd() !== readFileSync(join(config.root, config.settings_path), "utf8").trimEnd() || JSON.parse(settings).project_procedure !== config.project_procedure) fail();
+    if (settings !== readFileSync(join(config.root, config.settings_path), "utf8") || digest(committedSettings(config, observed.default_commit, settings)) !== digest(config)) fail();
     const procedure = read(config.project_procedure);
-    if (procedure.trimEnd() !== readFileSync(join(config.root, config.project_procedure), "utf8").trimEnd()) fail();
+    if (procedure !== readFileSync(join(config.root, config.project_procedure), "utf8")) fail();
     const declaration = parseDeclaration(procedure, config, observed.default_branch); if (!declaration) fail();
-    return { valid: true, allowed: false as const, adopted: true, ...observed, sources, declaration,
+    return { valid: true, allowed: false as const, adopted: true, ...observed, sources, declaration, reason: "Validated exact committed YAML policy.",
       limit: "Read-only adopted policy inspection; current selection, restrictions and semantic gates must still authorize each effect." };
-  } catch {
+  } catch (error) {
     return { valid: false, allowed: false as const, adopted: false, default_branch: observed?.default_branch ?? null, default_commit: observed?.default_commit ?? null,
-      sources, declaration: null, limit: "Fresh adopted policy unavailable; this inspection grants no effect." };
+      sources, declaration: null, reason: settingsFailure(error, "Fresh adopted policy unavailable."), limit: "Fresh adopted policy unavailable; this inspection grants no effect." };
   }
 }
 export function inspectAuthority(config: Settings, options: AuthorityOptions) {
@@ -188,6 +206,6 @@ export function inspectAuthority(config: Settings, options: AuthorityOptions) {
     sources.push(...policy.sources); default_commit = policy.default_commit; default_branch = policy.default_branch;
     return policy.valid && policy.declaration?.effects[options.mode].includes(effect)
       ? response(true, "adopted", "Fresh committed scoped grant; semantic gates remain pending.")
-      : response(false, "none", "No fresh adopted grant for this effect.");
-  } catch { return response(false, "none", "Fresh adopted policy could not be established."); }
+      : response(false, "none", policy.valid ? "No fresh adopted grant for this effect." : policy.reason);
+  } catch (error) { return response(false, "none", settingsFailure(error, "Fresh adopted policy could not be established.")); }
 }

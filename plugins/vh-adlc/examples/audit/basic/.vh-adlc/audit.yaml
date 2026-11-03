@@ -1,0 +1,11 @@
+# Fixture settings, written the way a person edits them.
+schema_version: 1
+repository: example/project
+hostname: github.com
+ledger_path: docs/audit.md
+project_procedure: audit-project.md
+id_prefix: AUD
+profile:
+  name: markdown-audit-v1
+  index_heading: Severity index
+  finding_level: 3

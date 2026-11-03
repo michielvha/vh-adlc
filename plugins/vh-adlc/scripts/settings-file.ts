@@ -13,7 +13,7 @@ export type SettingsFile = { path: string; configured: boolean; value: unknown }
  * Reads the settings file for `name`. `inside` resolves a repository path and
  * refuses one that escapes the checkout; `fail` throws the caller's error.
  */
-export function settingsFile(options: { root: string; name: string; settingsPath?: string; inside: (path: string) => string; fail: Fail }): SettingsFile {
+export function settingsFile(options: { root: string; name: string; settingsPath?: string; offline?: boolean; inside: (path: string) => string; fail: Fail }): SettingsFile {
   const { root, name, settingsPath, inside, fail } = options, expected = `.vh-adlc/${name}.yaml`;
   // A file under another suffix would otherwise leave the repository silently on defaults.
   for (const suffix of ["json", "yml"]) {
@@ -26,12 +26,12 @@ export function settingsFile(options: { root: string; name: string; settingsPath
     if (settingsPath !== undefined) fail("requested settings file is missing");
     return { path, configured: false, value: {} };
   }
-  return { path, configured: true, value: readYAML(readFileSync(file), fail) };
+  return { path, configured: true, value: readYAML(readFileSync(file), fail, { offline: options.offline }) };
 }
 
 /** Returns the value `vh-adlc settings read` gives for `bytes`, or fails with its fixed reason. */
-export function readYAML(bytes: Uint8Array, fail: Fail): unknown {
-  const installer = Bun.spawnSync(["bash", join(import.meta.dir, "ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
+export function readYAML(bytes: Uint8Array, fail: Fail, options: { offline?: boolean } = {}): unknown {
+  const installer = Bun.spawnSync(["bash", join(import.meta.dir, "ensure-vh-adlc.sh"), ...(options.offline ? ["--offline"] : [])], { stdout: "pipe", stderr: "pipe" });
   if (installer.exitCode !== 0) fail("binary unavailable: the verified vh-adlc binary could not be obtained");
   const run = Bun.spawnSync([installer.stdout.toString().trim(), "settings", "read", "--stdin"], { stdin: bytes, stdout: "pipe", stderr: "pipe" });
   let parsed: unknown;

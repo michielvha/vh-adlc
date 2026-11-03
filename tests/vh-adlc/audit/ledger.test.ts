@@ -1,3 +1,4 @@
+import { settingsYAML } from "../settings-yaml";
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -216,7 +217,7 @@ test("a new finding body cannot introduce a sibling/parent heading, while fenced
 
 test.each(["no-commit", "read-only", "option-no-write", "prohibited-update", "unknown-request-field"])("apply honors %s before any refresh, worktree, commit or ref change", kind => {
   const c = context();
-  c.f.write("AGENTS.md", "Audit: [settings](.vh-adlc/audit.json).\n");
+  c.f.write("AGENTS.md", "Audit: [settings](.vh-adlc/audit.yaml).\n");
   const fields = { repository: "example/project", hostname: "github.com", default_branch: "main", ledger_path: "docs/audit.md", status_effects: "none", reverify_effects: "ledger-update,ledger-commit", full_effects: "none", fix_effects: "none", selection_policy: "#selection", verification_policy: "#verification", merge_policy: "#merge" };
   c.f.write("audit-project.md", ["# Policy", "", "## Standing audit workflow authorization", "", "| Field | Value |", "| --- | --- |", ...Object.entries(fields).map(([key,value]) => `| ${key} | ${value} |`), "", "## Selection", "Selected IDs only.", "## Verification", "Required checks.", "## Merge", "No merge grant.", ""].join("\n"));
   const base = c.f.commit(); git(c.f.root, "update-ref", "refs/remotes/origin/main", base);
@@ -431,7 +432,7 @@ test("a dated current marker explicitly supersedes historical heading annotation
 
 test("a declared How-this-audit section retains a checked scoped delta summary",()=>{
  const f=fixture();projects.push(f);const settings=baseSettings();settings.profile={...settings.profile,section_note_headings:["How this audit was performed"]} as any;
- f.write(".vh-adlc/audit.json",JSON.stringify(settings));f.write("docs/audit.md","## How this audit was performed\nHistorical method.\n\n"+ledger);const base=f.commit(),config=loadSettings(f.root);
+ f.write(".vh-adlc/audit.yaml",settingsYAML(settings));f.write("docs/audit.md","## How this audit was performed\nHistorical method.\n\n"+ledger);const base=f.commit(),config=loadSettings(f.root);
  const snap=captureSnapshot(config,{mode:"reverify",ids:["AUD-001"],baseline:base,artifact_root:f.artifacts,required_checks:{"AUD-001":["unit"]}}),document={schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(f,snap)]};
  const candidate=createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"delta-summary",section_notes:[{heading:"How this audit was performed",ids:["AUD-001"],text:"Scoped comparison: no new source changes in this fixture.",evidence:[f.artifact("scoped-comparison.txt","Fixture comparison at "+base)]}]});
  expect(candidate.bytes).toContain("Scoped comparison: no new source changes in this fixture.");expect(candidate.bytes).toContain("Historical method.");expect(validateLedgerCandidate(config,snap,candidate,document).valid).toBe(true);

@@ -130,7 +130,7 @@ function coldReader(c: ReturnType<typeof project>, unverified = false) {
   const script = `import { loadSettings } from ${JSON.stringify(loader)}; try { console.log(JSON.stringify(loadSettings(${JSON.stringify(c.f.root)}))); } catch (error) { console.error(String(error)); process.exit(1); }`;
   const before = git(c.f.root, "status", "--porcelain"), refs = git(c.f.root, "for-each-ref", "--format=%(refname) %(objectname)");
   const run = Bun.spawnSync([process.execPath, "-e", script], {
-    env: { HOME: home, XDG_CACHE_HOME: join(home, "cache"), PATH: bin, TMPDIR: c.f.outer, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_OPTIONAL_LOCKS: "0", LANG: "C" },
+    env: { BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", HOME: home, XDG_CACHE_HOME: join(home, "cache"), PATH: bin, TMPDIR: c.f.outer, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_OPTIONAL_LOCKS: "0", LANG: "C" },
     stdout: "pipe", stderr: "pipe", timeout: 20_000,
   });
   expect(run.exitCode).toBe(1); expect(run.stderr.toString()).toContain("settings-reader-unavailable");

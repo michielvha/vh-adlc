@@ -1,3 +1,4 @@
+import { settingsYAML } from "../settings-yaml";
 import { chmodSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -50,7 +51,7 @@ export function fixture(options: { configured?: boolean } = {}) {
   write("src/app.ts", "export const answer = 42;\n");
   write("docs/audit.md", ledger);
   write("audit-project.md", "# Audit project policy\n\nNo standing publication grant.\n");
-  const settings = (value: unknown) => write(".vh-adlc/audit.json", JSON.stringify(value, null, 2) + "\n");
+  const settings = (value: unknown) => write(".vh-adlc/audit.yaml", settingsYAML(value));
   if (options.configured !== false) settings(baseSettings());
   const commit = (message = "test: seed fixture") => {
     git(root, "add", ".");

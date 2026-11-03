@@ -1,3 +1,4 @@
+import { settingsYAML } from "../settings-yaml";
 import { afterEach, expect, test } from "bun:test";
 import { cpSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -49,9 +50,9 @@ test.each([
 test("symlink escapes are refused for configuration, ledger and project procedure", () => {
   for (const kind of ["settings", "ledger_path", "project_procedure"]) {
     const f = project(false), outside = join(f.outer, "outside.md");
-    writeFileSync(outside, kind === "settings" ? JSON.stringify(baseSettings()) : "# Outside\n");
+    writeFileSync(outside, kind === "settings" ? settingsYAML(baseSettings()) : "# Outside\n");
     mkdirSync(join(f.root, ".vh-adlc"), { recursive: true });
-    if (kind === "settings") symlinkSync(outside, join(f.root, ".vh-adlc/audit.json"));
+    if (kind === "settings") symlinkSync(outside, join(f.root, ".vh-adlc/audit.yaml"));
     else {
       symlinkSync(outside, join(f.root, "escape.md"));
       f.settings(baseSettings({ [kind]: "escape.md" }));
@@ -62,7 +63,7 @@ test("symlink escapes are refused for configuration, ledger and project procedur
 
 test("invalid input and credential-bearing origins never echo their values", () => {
   const f = project();
-  f.write(".vh-adlc/audit.json", "do-not-echo-this-secret");
+  f.write(".vh-adlc/audit.yaml", "do-not-echo-this-secret");
   let failure: unknown;
   try { loadSettings(f.root); } catch (error) { failure = error; }
   expect(failure).toBeInstanceOf(Error);
