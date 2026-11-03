@@ -133,7 +133,10 @@ a standing grant, not a separate explicit current request; actual local prohibit
 restrictions win. Status has no effects. Generic selected eligible fixes authorize local scoped
 edits/checks/record/commits only. Conditional merge/live/issue/push/PR grants remain consumer-specific
 and pending until the actual retained gates and current selected PR/head/evidence are observed.
-They grant no production deployment, protection bypass, real-data migration or secret rotation.
+An adopted/current merge policy may explicitly disclose automatic tag/build pipeline consequences
+of its permitted merge. Those disclosed CI consequences belong to that merge scope; they grant no
+separate manual tag/release action, workflow dispatch, production deployment, protection bypass,
+real-data migration or secret rotation.
 
 Retain private/pending ledger work, evidence refs and resource intents. Ordinary non-forced cleanup
 may remove only clean owned audit roles after their outcomes/evidence are retained, published or
