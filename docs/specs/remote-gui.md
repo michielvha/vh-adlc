@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Owner accepted the scope on 2026-11-03; refreshing review against the current default branch before implementation."
+status: planned
+status_description: "Accepted by the owner and independently reviewed against current main; preparing implementation tasks."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
@@ -159,6 +159,7 @@ None.
 | 2026-10-28 | R-3 | spec | `fe77f964ab05744740fa41f89d15d9e5ea27046b` | unknown | procedural | Blocking app-cookie isolation gap; clarify functional-readiness failures. |
 | 2026-10-28 | R-4 | spec | `a90306d12a82d8cfc68ef833480be9f9a5c426cd` | unknown | procedural | NO FINDINGS |
 | 2026-11-03 | R-4 | spec | `a90306d12a82d8cfc68ef833480be9f9a5c426cd` | n/a | n/a | accepted by owner |
+| 2026-11-03 | R-5 | spec | `eafc992633c5ab0f0fd673c79263ad84c0e1c778` | unknown | procedural | NO FINDINGS |
 
 ### R-1
 
@@ -205,6 +206,10 @@ EVIDENCE: docs/specs/remote-gui.md:71 requires a browser check of the intended p
 PROPOSAL: Specify that failed required app-functionality checks produce an explicit compatibility blocker and prohibit advertising the URL as a usable app, even when transport probes passed; preserve the upstream app and report any remaining diagnostic share separately. Add a fixture where HTTP succeeds but a required asset, redirect or WebSocket fails, and require the agent to report that blocker without substituting a localhost link.
 
 ### R-4
+
+NO FINDINGS
+
+### R-5
 
 NO FINDINGS
 
