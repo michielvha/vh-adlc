@@ -10,6 +10,7 @@ covers:
   - .agents/plugins/marketplace.json
   - .claude-plugin/marketplace.json
   - .github/workflows/ci.yml
+  - cmd/vh-adlc/workflow_test.go
   - README.md
   - CONTRIBUTING.md
   - docs/reference/marketplace.md
@@ -21,7 +22,7 @@ Install `remote-gui` independently from vhco-tools. In a configured remote sessi
 
 ## Context
 
-The owner accepted the reviewed scope and requested implementation on 2026-11-03. This worktree restores the unchanged normative baseline from local commit `3f76178b21dcb9ead926e71369c544dead0e8653` onto the current default branch. The older local main and unrelated blog edits remain preserved in their original worktree.
+The owner accepted the reviewed scope and requested implementation on 2026-11-03. In this session the owner also explicitly approved adding `cmd/vh-adlc/workflow_test.go` to the covered paths and updating its expected CI prerequisites to include remote-gui. This worktree restores the unchanged normative baseline from local commit `3f76178b21dcb9ead926e71369c544dead0e8653` onto the current default branch. The older local main and unrelated blog edits remain preserved in their original worktree.
 
 The owner requested a reusable browser handoff in the session handoff read on 2026-10-25 at `/home/m/code/.build-cache/remote-gui-handoff.txt`. It calls for Tailscale access, an SSH-tunnel-compatible loopback option, and preservation of the live prototype. Its browser profile and access files are excluded from inspection and testing.
 
@@ -160,7 +161,8 @@ Add a Linux CI job for plugin build/test/vet/lint and package checks. The existi
       Evidence: the real headed-browser test initially failed during marker initialization and cleanup. After correcting child I/O, Chromium startup switches and display ownership cleanup, `REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser -run TestRealHeadedBrowser -count=1` passed using existing host dependencies and fresh profiles. Dependency/rollback tests, all plugin race tests, vet, v2.15.0 config verification/lint and tidy passed. Actual noVNC input and reattachment remain T9 checks.
 - [x] T7 `plugins/remote-gui/internal/app/`, `cmd/remote-gui/main.go` - add command-level lifecycle and redaction tests first, then pass the public CLI contract, scoped diagnostics and private reveal flow (AC-01, AC-03, AC-05, AC-07, AC-11).
       Evidence: the public CLI test first failed for missing dispatch; the capability test then caught doctor accepting an unreachable LocalAPI. Public share/status/access/stop/cleanup, missing and repeated-stop results, query/code redaction, and read-only capability diagnostics now pass. All plugin race tests, vet, v2.15.0 lint, tidy and CLI build passed. The final browser rerun after dump cleanup also passed; a resource-pressure timeout and transient lint conflict were retained as failed attempts, not acceptance evidence.
-- [ ] T8 `plugins/remote-gui/scripts/`, `skills/remote-gui/`, plugin manifests, `tests/remote-gui/`, both marketplace catalogs, `.github/workflows/ci.yml`, `README.md`, `CONTRIBUTING.md`, `docs/reference/marketplace.md` - add installed-package and CI dependency checks first, then pass independent source-install builds and package checks with documented remote activation and auth-refresh boundaries (AC-01, AC-08, AC-09, AC-10, AC-12).
+- [x] T8 `plugins/remote-gui/scripts/`, `skills/remote-gui/`, plugin manifests, `tests/remote-gui/`, both marketplace catalogs, `.github/workflows/ci.yml`, `cmd/vh-adlc/workflow_test.go`, `README.md`, `CONTRIBUTING.md`, `docs/reference/marketplace.md` - add installed-package and CI dependency checks first, then pass independent source-install builds and package checks with documented remote activation and auth-refresh boundaries (AC-01, AC-08, AC-09, AC-10, AC-12).
+      Evidence: four package checks first failed for missing manifests, helper, skill and CI dependency. All now pass, including a complete source copy built outside the repository with an existing matching Go toolchain and downloads disabled. The existing CI prerequisite test initially failed; the owner approved its exact path/expectation update, after which root tests, vet, v2.15.0 config verification/lint and tidy passed. Existing Bun suites passed (599 vh-adlc, 34 GitHub App tests). The release workflow is unchanged. Native-host automatic behavior and remote-device access are not established by these package checks.
 - [ ] T9 `tests/remote-gui/`, `plugins/remote-gui/internal/` tests - run disposable real-browser and native-agent scenarios, address observed defects within scope, and record actual evidence for first-link forwarding, same-browser handoff, app compatibility and auth-refresh isolation (AC-02, AC-03, AC-05, AC-06, AC-07, AC-08, AC-10, AC-11, AC-12).
 - [ ] T10 `docs/specs/remote-gui.md`, plugin verification scripts - run all required Go/Bun/lint/tidy checks, obtain owner-authorized second-device Tailscale and SSH acceptance evidence, and record exact results without claiming host-only checks establish remote reachability (AC-04, AC-09, AC-10, AC-11).
 

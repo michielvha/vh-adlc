@@ -80,6 +80,7 @@ This repository hosts the **vhco-tools** marketplace. Each plugin installs separ
 | Plugin | Purpose |
 | --- | --- |
 | `vh-adlc` | Development workflows, feature gates, and independent reviews. |
+| `remote-gui` | Share local apps through private tailnet links and hand a fresh browser to the human. |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes. |
 | `github-app-registration` | Register GitHub Apps and save their credentials locally. |
 | `codex-qr-pairing` | Generate a fresh QR code for pairing with this Codex host. |
