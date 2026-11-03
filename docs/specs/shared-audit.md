@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 branch: feat/shared-audit
-status_description: "R-21 returns all seven source criteria met at shared 60460709 and consumer 4a469873. The complete source gate is next. PR #44, actual marketplace acceptance and consumer adoption remain in delivery."
+status_description: "The complete source gate passed after R-21 returned all source criteria met. PR #44 publication, actual marketplace fresh/upgrade checks and Stackweaver adoption remain mandatory delivery work; no real product audit or GUI/Claude model result is claimed."
 issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -39,6 +39,8 @@ covers:
 # Shared persistent codebase audit
 
 ## Context
+
+Source status, 2026-11-03: the reviewed implementation and complete source gate pass. The shared plugin is ready for publication through PR #44. Actual marketplace acceptance, the final published/current-consumer paired review, preflight and adoption follow next; this source-complete status does not claim those delivery events.
 
 Revision summary: audit still checks software for bugs, security and reliability problems, retains
 findings, re-verifies them and handles selected repairs. This revision changes its human-written
