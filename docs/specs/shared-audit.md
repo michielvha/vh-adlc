@@ -134,6 +134,16 @@ new conventions pin and unrelated feature documents. Its accepted YAML feature e
 an audit-spec revision before audit's settings move; no settings conversion or feature publication
 is inferred from this merge. Earlier test/review targets remain exact historical evidence.
 
+Post-integration validation at `dd878483`: all 371 focused audit tests/987 assertions pass, all
+79 committed consumer and retained-route checks pass, and the eight required Go/module/lint/workflow
+and secondary-plugin gates pass. The complete shared suite has 1004 passes and one failure
+(`full-bun-r12.log`): main now also uses plugin 0.7.0, so its package-version-change control refuses
+the colliding audit candidate. The distinct audit version/minimum checks are retained under T88;
+the proposed YAML loader is still unimplemented pending revised acceptance. The real ledger retains
+SHA-256 `c0eb6250334fbb592ed955c595b24aea2d796f5c1c7b5279672e26065807d769`.
+Actual Copilot spec R-13 and bounded private parity R6 target this exact draft/current consumer
+`4772ade58091e342b7c3666a197fa318195260eb`; their results remain pending until returned and inspected.
+
 ### Latest spec review and implementation obligation
 
 Actual Copilot `claude-opus-5.5` R-12 reviewed `67a91a17944bb219ce956364963531532577c396`
