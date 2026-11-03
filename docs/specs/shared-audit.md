@@ -300,8 +300,8 @@ extractions remain in the parent roadmap for a separate owner selection.
 
 | Delivery input | Observed identity or result |
 | --- | --- |
-| Shared publication | [PR #44](https://github.com/michielvha/vh-adlc/pull/44), merge `afb0c4b84ad0c013614f404bcfea7d12ee9eca78`; tree equals reviewed final source `c955644f61cd921a8a58e52d2d22095d16c90d22`. |
-| Normal shared CI | [Run 41727358677](https://github.com/michielvha/vh-adlc/actions/runs/41727358677), Linux, macOS, Go and version jobs succeeded. Source verification includes 1,092 package tests and 935 portable macOS tests. |
+| Shared publication | [PR #44](https://github.com/michielvha/vh-adlc/pull/44), merge `afb0c4b84ad0c013614f404bcfea7d12ee9eca78`; tree equals source-complete commit `c955644f61cd921a8a58e52d2d22095d16c90d22`, whose code/test/plugin/workflow objects equal reviewed `60460709` and executed `0743ef07`. |
+| Normal shared CI | [Run 41727358677](https://github.com/michielvha/vh-adlc/actions/runs/41727358677), Linux, macOS, Go and version jobs succeeded. Counts of 1,092 package tests and 935 portable macOS tests were independently observed in [run 41717534624](https://github.com/michielvha/vh-adlc/actions/runs/41717534624) at object-equivalent source `0743ef07`. |
 | Runtime release | [v0.11.0](https://github.com/michielvha/vh-adlc/releases/tag/v0.11.0), tag resolved to the shared merge; public-key signature and all four Darwin/Linux amd64/arm64 archive checksums verified. Linux amd64 version and strict YAML reader executed. Other archives were not executed here. The plugin retains its reviewed 0.9.0 runtime lock. |
 | Published marketplace | Plugin 0.8.0, complete byte/mode digest `5084c65324769b125916ac0a48bce0e8c1f04376702a21e441706ddd451d28f1`. Both Codex CLI and Claude CLI fetched the actual published shared commit. |
 | Consumer reviewed before merge | `5784c6db87ff5a9636c779e97f54684db775e03d`, including actual default `575f1cc36afb2e94561cbd1076c559195b42352a`. |
@@ -1356,6 +1356,9 @@ live operations remain separate owner-selected tasks.
 - [x] T25 `docs/specs/shared-audit.md` and exact committed feature/consumer snapshots - run the complete required local gates and independent implementation review, resolve all criterion gaps and preserve R-12 recovery evidence; source completion requires every current criterion met/residualised by the approved process, while actual marketplace/post-merge checks remain the ordered delivery obligations (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
 
       Evidence: R-21 completes the current independent source review with all seven criteria met, after the R-20 failed consumer result was retained and corrected through ordinary current-main reconciliation. The binary review check confirms exact returned records. Source completion still needs the complete gate before status changes; actual publication, marketplace and post-merge obligations follow in order.
+
+- [x] T99 `tests/vh-adlc/audit/setup-docs.test.ts` and the delivery guides - cover compatibility/marketplace YAML settings and audit minimum; execute the changed documentation contracts and fix R-22's attribution/stale-roadmap findings (AC-02, AC-06).
+      Evidence: Both new guide cases were observed failing on the missing YAML path (`delivery-doc-contract-red-r1.log`: 3 pass, 2 fail). After naming the YAML settings in both guides, the package and documentation run passed 61 tests with zero failures (`delivery-doc-contract-green-r1.log`). The publication row now distinguishes source-complete commit c955644f from reviewed 60460709/executed 0743ef07; counts cite their observed CI run. The parent Context records adoption rather than leaving it pending. Final re-review follows at this committed revision.
 
 ## Open Questions
 

@@ -20,7 +20,7 @@ completed triage feature.
 The owner selected dependency/security maintenance next on 2026-10-27. Its accepted child is
 [shared-maintenance.md](shared-maintenance.md). Its published delivery and marketplace-verified
 Stackweaver adoption completed on 2026-10-30; exact revisions and remaining test limits are recorded there. Stackweaver retains its specific operating procedures, including its existing
-approved satellite-merge helper. Audit was selected on 2026-11-01; its [child spec](shared-audit.md) has passed the shared source review; publication and Stackweaver adoption remain pending. Documentation and domain extraction remain unselected.
+approved satellite-merge helper. Audit was selected on 2026-11-01 and is published and adopted. Its [child delivery evidence](shared-audit.md#published-audit-and-stackweaver-adoption-2026-11-03) records the exact publication, marketplace and Stackweaver checks. Documentation and domain extraction remain unselected.
 
 Triage is the first extraction. Its accepted behavior and local verification remain in
 [shared-triage.md](shared-triage.md), initially completed at `0e033f8` and refreshed by Copilot Opus 5.5 R-34 before publication.

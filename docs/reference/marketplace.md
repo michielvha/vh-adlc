@@ -25,7 +25,8 @@ Both pin auth-refresh to the same component commit.
 selected repairs portable while consumers retain their ledgers and operating rules. Actual Codex
 and Claude CLI marketplace fresh installs, upgrades from 0.7.0 and reinstalls passed at published
 source `afb0c4b84ad0c013614f404bcfea7d12ee9eca78` before Stackweaver adoption. A new adopter must
-verify its own installed version, project policy and migration preflight. See the [audit workflow](../user-guides/workflows.md#persistent-codebase-audit)
+verify its own installed version, project policy and migration preflight. Configure `.vh-adlc/audit.yaml`
+using the [audit settings reference](../../plugins/vh-adlc/references/audit-settings.md). See the [audit workflow](../user-guides/workflows.md#persistent-codebase-audit)
 and [acceptance limits](compatibility.md#persistent-codebase-audit).
 
 ## Shared maintenance

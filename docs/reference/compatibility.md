@@ -29,6 +29,7 @@ The historical results below retain their original scope.
 ## Persistent codebase audit
 
 The audit operation is a harness-agnostic skill and Bun/Git helper package, included from plugin 0.8.0.
+Configure `.vh-adlc/audit.yaml` using the [audit settings reference](../../plugins/vh-adlc/references/audit-settings.md).
 Actual Codex CLI and Claude CLI marketplace fresh installs, upgrades from 0.7.0, discovery of twelve
 operations, installed offline entry/helpers and reinstall passed at published source
 `afb0c4b84ad0c013614f404bcfea7d12ee9eca78`, with identical complete payload bytes/modes.
