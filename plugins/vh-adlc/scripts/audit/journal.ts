@@ -159,7 +159,7 @@ export function inspectPending(config: Settings, directory: string, batch_digest
     return { ...action, ...(resource ?? {}) };
   });
   return { policy_current: run.policy_current, cleanup_only:run.cleanup_only, journal_digest:run.digest, live_ready: run.policy_current && !run.cleanup_only && !pending.some(action => ["key", "row"].includes(action.kind)), pending,
-    handoff: run.policy_current ? null : "policy-changed", limit: "Read-only pending-state inspection. Changed policy requires explicit reconciliation; no retry, cleanup or journal mutation is authorized." };
+    handoff: run.policy_current ? null : "policy-changed", limit: "Read-only pending-state inspection; this result grants no retry, cleanup or journal mutation. Current owner and transport authority are checked separately. Changed policy requires explicit cleanup reconciliation." };
 }
 function append(run: Run, kind: Event["kind"], action_id: string, payload: Event["payload"]) {
   const actual = readRun(run.config, run.directory, run.header.batch_digest);
