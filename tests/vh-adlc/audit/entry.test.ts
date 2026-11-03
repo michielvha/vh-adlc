@@ -58,7 +58,8 @@ for (const state of ["binary-missing", "docs-empty", "docs-partial", "ready"] as
   }
   if (["ready", "docs-partial"].includes(state)) for (const page of pages.filter(p => state === "ready" || p !== "guides/humanize-prose.md")) {
     const source = pinnedPages.get(page)!;
-    const target = join(home, "cache/vh-adlc/docs", pin, page); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, source.bytes);
+    const cacheBase = process.platform === "darwin" ? join(home, "Library/Caches") : join(home, "cache");
+    const target = join(cacheBase, "vh-adlc/docs", pin, page); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, source.bytes);
     (setup.pages as unknown[]).push({ page, sha256: hash(source.bytes), blob: source.blob });
   }
   writeFileSync(join(f.outer, "explicit-setup.json"), JSON.stringify(setup));
