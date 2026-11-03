@@ -1,0 +1,51 @@
+# What vh-adlc's own tests leave in /tmp when a run is killed. `vh-adlc clean`
+# reads this file from the default branch only. Each glob names a prefix the
+# tests pass to mkdtemp, and none matches the temp base, vh-adlc-<uid>.
+schema_version: 1
+project: vh-adlc
+tmp:
+  - {glob: "vh-triage-*", max_age: 6h}
+  - {glob: "vh-maintenance-*", max_age: 6h}
+  - {glob: "vh-lifecycle-*", max_age: 6h}
+  - {glob: "vh-feature-*", max_age: 6h}
+  - {glob: "vh-domain-lifecycle-*", max_age: 6h}
+  - {glob: "vh-delivery-lifecycle-*", max_age: 6h}
+  - {glob: "vh-issue-*", max_age: 6h}
+  - {glob: "vh-native-review-*", max_age: 6h}
+  - {glob: "vh-settings-file-*", max_age: 6h}
+  - {glob: "vh-worktree-handoff-*", max_age: 6h}
+  - {glob: "vh-adlc-golden-*", max_age: 6h}
+  - {glob: "vh-adlc-fixtures-*", max_age: 6h}
+  - {glob: "vh-adlc-claude-*", max_age: 6h}
+  - {glob: "vh-adlc-real-*", max_age: 6h}
+  - {glob: "vh-adlc-ensure-*", max_age: 6h}
+  - {glob: "vh-adlc-at-*", max_age: 6h}
+  - {glob: "vh-adlc-s1*", max_age: 6h}
+  - {glob: "vh-adlc-S*", max_age: 6h}
+  - {glob: "triage-controller-*", max_age: 6h}
+  - {glob: "triage-verification-denial-*", max_age: 6h}
+  - {glob: "triage-strip-hash-*", max_age: 6h}
+  - {glob: "triage-replace-hash-*", max_age: 6h}
+  - {glob: "triage-managed-recovery-*", max_age: 6h}
+  - {glob: "triage-fake-proof-*", max_age: 6h}
+  - {glob: "triage-bound-selection-*", max_age: 6h}
+  - {glob: "stack-triage-rehearsal-*", max_age: 6h}
+  - {glob: "maintenance-report-*", max_age: 6h}
+  - {glob: "maintenance-render-*", max_age: 6h}
+  - {glob: "maintenance-related-*", max_age: 6h}
+  - {glob: "maintenance-publication-*", max_age: 6h}
+  - {glob: "maintenance-paired-*", max_age: 6h}
+  - {glob: "maintenance-install-*", max_age: 6h}
+  - {glob: "maintenance-go-bot-*", max_age: 6h}
+  - {glob: "maintenance-delivery-*", max_age: 6h}
+  - {glob: "maintenance-client-*", max_age: 6h}
+  - {glob: "maintenance-builder-*", max_age: 6h}
+  - {glob: "maintenance-authored-*", max_age: 6h}
+  - {glob: "maintenance-action-*", max_age: 6h}
+  - {glob: "quiet-tag-*", max_age: 6h}
+  - {glob: "quiet-shout-*", max_age: 6h}
+  - {glob: "copilot-real-reads-*", max_age: 6h}
+  - {glob: "copilot-page-reads-*", max_age: 6h}
+  - {glob: "auth-refresh-*", max_age: 6h}
+  - {glob: "gh-app-repo-*", max_age: 6h}
+  - {glob: "gh-app-export-*", max_age: 6h}

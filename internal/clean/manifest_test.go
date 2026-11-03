@@ -1,6 +1,9 @@
 package clean
 
 import (
+	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -111,4 +114,74 @@ func TestManifestRefusals(t *testing.T) {
 			}
 		})
 	}
+}
+
+// testPrefixes are the mkdtemp prefixes this repository's tests use, found
+// with a search of tests/, plugins/, cmd/ and internal/ for tmpdir() and
+// os.MkdirTemp calls. A scenario directory is vh-adlc-<scenario id>-.
+var testPrefixes = []string{
+	"vh-triage-", "vh-triage-locks-", "vh-triage-verify-", "vh-triage-verification-", "vh-triage-controller-",
+	"vh-maintenance-", "vh-maintenance-outside-", "vh-maintenance-variant-", "vh-maintenance-resume-",
+	"vh-maintenance-packet-", "vh-maintenance-linked-",
+	"vh-lifecycle-test-", "vh-lifecycle-context-", "vh-lifecycle-boundary-", "vh-lifecycle-final-",
+	"vh-feature-review-", "vh-feature-lifecycle-", "vh-domain-lifecycle-", "vh-delivery-lifecycle-",
+	"vh-issue-batch-", "vh-issue-authority-", "vh-native-review-", "vh-settings-file-", "vh-worktree-handoff-",
+	"vh-adlc-golden-", "vh-adlc-fixtures-", "vh-adlc-claude-", "vh-adlc-real-", "vh-adlc-ensure-", "vh-adlc-at-",
+	"vh-adlc-s1-home-", "vh-adlc-s14-home-", "vh-adlc-S1-", "vh-adlc-S12.10-",
+	"triage-controller-e2e-", "triage-controller-hostile-", "triage-controller-negative-",
+	"triage-verification-denial-", "triage-strip-hash-", "triage-replace-hash-", "triage-managed-recovery-",
+	"triage-fake-proof-", "triage-bound-selection-", "stack-triage-rehearsal-",
+	"maintenance-report-ref-grade-", "maintenance-render-receipt-", "maintenance-related-",
+	"maintenance-publication-test-", "maintenance-publication-grade-", "maintenance-paired-worker-",
+	"maintenance-install-test-", "maintenance-go-bot-", "maintenance-delivery-transport-",
+	"maintenance-client-start-", "maintenance-builder-", "maintenance-authored-case-", "maintenance-action-",
+	"quiet-tag-", "quiet-shout-", "copilot-real-reads-", "copilot-page-reads-",
+	"auth-refresh-integrity-", "auth-refresh-contract-", "auth-refresh-claude-",
+	"gh-app-repo-", "gh-app-export-",
+}
+
+// TestOwnManifest decodes this repository's manifest: every glob matches a
+// prefix the tests use, every prefix is matched, and no glob matches the temp
+// base of any uid.
+func TestOwnManifest(t *testing.T) {
+	b, err := os.ReadFile(filepath.Join("..", "..", ManifestPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := ParseManifest(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Project != "vh-adlc" || m.TempRoot != nil || len(m.Compose) != 0 || len(m.Kind) != 0 {
+		t.Fatalf("manifest %+v: want only tmp rules", m)
+	}
+	for _, r := range m.Tmp {
+		used := false
+		for _, p := range testPrefixes {
+			if ok, _ := path.Match(r.Glob, p+"Ab12Cd"); ok {
+				used = true
+			}
+		}
+		if !used {
+			t.Errorf("%s matches no prefix the tests use", r.Glob)
+		}
+		for _, base := range []string{"vh-adlc-0", "vh-adlc-1000", "vh-adlc-65534"} {
+			if ok, _ := path.Match(r.Glob, base); ok {
+				t.Errorf("%s matches the temp base %s", r.Glob, base)
+			}
+		}
+	}
+	for _, p := range testPrefixes {
+		if _, ok := matchRule(fileRulesOf(m), p+"Ab12Cd"); !ok {
+			t.Errorf("no glob matches the test prefix %s", p)
+		}
+	}
+}
+
+func fileRulesOf(m *Manifest) []fileRule {
+	var out []fileRule
+	for _, r := range m.Tmp {
+		out = append(out, fileRule(r))
+	}
+	return out
 }
