@@ -112,10 +112,11 @@ must enforce the same boundary and pass their own tests. Missing confinement lea
 unavailable; local reports remain available. Another read adapter must preserve the pagination and error contract. Shared dependency and security maintenance also requires Bun, Git and an authenticated `gh`.
 Its [settings](../../plugins/vh-adlc/references/maintenance-settings.md) are optional;
 project topology, verification commands and delivery policies stay in the consumer.
-Triage and maintenance settings are YAML files, `.vh-adlc/triage.yaml` and `.vh-adlc/maintenance.yaml`,
-and need plugin 0.7.0 or later.
-Invoke `vh-adlc-maintenance` on plugin 0.6.0 or later. Missing that operation is an
-installation blocker; do not reconstruct it from a legacy local agent.
+Triage and maintenance settings are YAML files, `.vh-adlc/triage.yaml` and `.vh-adlc/maintenance.yaml`.
+`vh-adlc-maintenance` is available from plugin 0.6.0. A repository with a triage or maintenance
+settings file needs plugin 0.7.0 or later, because earlier releases do not read these files and run on
+their defaults. Missing that operation is an installation blocker; do not reconstruct it from a legacy
+local agent.
 Maintenance uses an agent procedure with observed evidence, rather than triage's
 managed publication controller. The other feature operations continue to use the
 verified binary without requiring Bun.
