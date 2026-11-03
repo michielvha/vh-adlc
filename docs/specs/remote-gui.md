@@ -22,7 +22,7 @@ Install `remote-gui` independently from vhco-tools. In a configured remote sessi
 
 ## Context
 
-The owner accepted the reviewed scope and requested implementation on 2026-11-03. In this session the owner also explicitly approved adding `cmd/vh-adlc/workflow_test.go` to the covered paths and updating its expected CI prerequisites to include remote-gui. This worktree restores the unchanged normative baseline from local commit `3f76178b21dcb9ead926e71369c544dead0e8653` onto the current default branch. The older local main and unrelated blog edits remain preserved in their original worktree.
+The owner accepted the reviewed scope and requested implementation on 2026-11-03. In this session the owner also explicitly approved adding `cmd/vh-adlc/workflow_test.go` to the covered paths and updating its expected CI prerequisites to include remote-gui. This worktree originally restored the reviewed baseline from local commit `3f76178b21dcb9ead926e71369c544dead0e8653` onto the current default branch. The older local main and unrelated blog edits remain preserved in their original worktree.
 
 The owner requested a reusable browser handoff in the session handoff read on 2026-10-25 at `/home/m/code/.build-cache/remote-gui-handoff.txt`. It calls for Tailscale access, an SSH-tunnel-compatible loopback option, and preservation of the live prototype. Its browser profile and access files are excluded from inspection and testing.
 
@@ -180,6 +180,7 @@ None.
 | 2026-10-28 | R-4 | spec | `a90306d12a82d8cfc68ef833480be9f9a5c426cd` | unknown | procedural | NO FINDINGS |
 | 2026-11-03 | R-4 | spec | `a90306d12a82d8cfc68ef833480be9f9a5c426cd` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-5 | spec | `eafc992633c5ab0f0fd673c79263ad84c0e1c778` | unknown | procedural | NO FINDINGS |
+| 2026-11-03 | R-6 | spec | `443b0b0c2423017dd6968c9a85929bb0270c5947` | unknown | procedural | Blocking revision-state finding; draft correction preserved for a fresh pass. |
 
 ### R-1
 
@@ -232,6 +233,15 @@ NO FINDINGS
 ### R-5
 
 NO FINDINGS
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Frontmatter, Context and Review Log
+EVIDENCE: At 443b0b0c2423017dd6968c9a85929bb0270c5947, docs/specs/remote-gui.md:2 retains status in-progress while :13 adds cmd/vh-adlc/workflow_test.go to covers. The parent commit lacks this covered path. The pinned conventions/feature-documents.md:70-73 defines a covers change as a normative revision requiring draft, fresh review and renewed acceptance before implementation resumes. The current acceptance at docs/specs/remote-gui.md:181 predates that revision, and :25 incorrectly describes the normative baseline as unchanged.
+PROPOSAL: Move the document to draft, correct the unchanged-baseline claim and obtain a fresh clean review and owner acceptance for the revised baseline before resuming implementation. Preserve the existing commits and review history.
 
 ## Sources
 
