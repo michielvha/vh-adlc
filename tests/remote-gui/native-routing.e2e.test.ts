@@ -30,7 +30,7 @@ for(const scenario of cases)test.skipIf(!enabled)(`native real-runtime routing: 
   check(generated.exitCode===0,'private TLS fixture could not be created');chmodSync(key,0o600);
   const trust=join(root,'trust.pem');
   const inheritedTrust=[...new Set([process.env.SSL_CERT_FILE,process.env.NODE_EXTRA_CA_CERTS,'/etc/ssl/certs/ca-certificates.crt','/etc/pki/tls/certs/ca-bundle.crt','/etc/ssl/cert.pem'].filter((path):path is string=>Boolean(path)&&existsSync(path!)))].map(path=>readFileSync(path,'utf8')).join('\n');
-  writeFileSync(trust,inheritedTrust+'\n'+readFileSync(cert,'utf8')); 
+  writeFileSync(trust,inheritedTrust+'\n'+readFileSync(cert,'utf8'));
   writeFileSync(join(root,'hosts'),readFileSync('/etc/hosts','utf8')+'\n127.0.0.1 remote-gui.test\n');
   const activation=readFileSync(join(plugin,'README.md'),'utf8').match(/```text\n([\s\S]*?)\n```/)?.[1];
   check(activation,'persistent activation instructions missing');
