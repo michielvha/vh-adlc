@@ -1,7 +1,7 @@
 ---
-status: draft
+status: planned
 branch: feat/remote-gui
-status_description: "Owner delegated the authentication decision; port-scoped browser HTTP authentication is specified for fresh review."
+status_description: "Revised native authentication passed R-8 and is accepted under the owner-delegated decision."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
@@ -195,6 +195,8 @@ None.
 | 2026-11-03 | R-5 | spec | `eafc992633c5ab0f0fd673c79263ad84c0e1c778` | unknown | procedural | NO FINDINGS |
 | 2026-11-03 | R-6 | spec | `443b0b0c2423017dd6968c9a85929bb0270c5947` | unknown | procedural | Blocking revision-state finding; draft correction preserved for a fresh pass. |
 | 2026-11-03 | R-7 | spec | `9edfd1c82a1e4d2aa85a6a2780fbf6dad1de41b4` | unknown | procedural | Blocking cookie exposure to unmanaged same-host handlers; owner trust-boundary decision required. |
+| 2026-11-03 | R-8 | spec | `d3b54f67cb8522a063096c1c1421921a8c032a83` | unknown | procedural | NO FINDINGS; static review of the revised native-authentication requirements. |
+| 2026-11-03 | R-8 | spec | `d3b54f67cb8522a063096c1c1421921a8c032a83` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -265,6 +267,10 @@ SEVERITY: blocking
 WHERE: Design, Automatic remote links and Viewer and transport; Test Plan AC-03 and AC-11
 EVIDENCE: At 9edfd1c82a1e4d2aa85a6a2780fbf6dad1de41b4, docs/specs/remote-gui.md:77-79 isolates cookies between managed shares, :91 authenticates with browser cookies, and :93 preserves unrelated Serve handlers on the same hostname. No trust boundary covers those unmanaged handlers. The committed plugins/remote-gui/internal/proxy/proxy.go:288 sets the bearer cookie with Path=/. A fresh sandboxed Chromium experiment set a synthetic HttpOnly, SameSite=Strict cookie on one disposable loopback port, then navigated to another; the second handler received it, producing foreignHandlerReceivedSyntheticProxyCookie=true. RFC 6265 section 8.5, https://www.rfc-editor.org/rfc/rfc6265#section-8.5, confirms that cookies ignore ports. An unrelated handler can therefore receive the credential and replay it to the original session; checking its expected Host or Origin does not prevent server-side replay.
 PROPOSAL: Define an owner-approved hostname trust boundary or authentication that prevents reusable credentials from reaching unrelated handlers, and block unsupported mixed-trust hosting. Add a fresh-browser test with an unmanaged handler on another port that records received cookies and attempts replay against the original session.
+
+### R-8
+
+NO FINDINGS
 
 ## Sources
 
