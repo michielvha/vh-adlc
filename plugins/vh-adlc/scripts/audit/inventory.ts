@@ -34,33 +34,55 @@ export function tableCells(line: string): string[] {
   return cells;
 }
 
-export function visibleLines(text: string): string[] {
+function codeSpans(text: string): { start: number; end: number }[] {
+  const spans: { start: number; end: number }[] = [];
+  for (let at = 0; at < text.length;) {
+    if (text[at] === "\\") { at += 2; continue; }
+    if (text[at] !== "`") { at++; continue; }
+    const start = at; while (text[at] === "`") at++; const size = at - start;
+    let search = at, end = -1;
+    while (search < text.length) { if (text[search] !== "`") { search++; continue; } const first = search; while (text[search] === "`") search++; if (search - first === size) { end = search; break; } }
+    if (end >= 0) { spans.push({ start, end }); at = end; }
+  }
+  return spans;
+}
+export function maskInlineCode(text: string) {
+  const spans = codeSpans(text); let result = "", at = 0;
+  for (const span of spans) { result += text.slice(at, span.start) + " ".repeat(span.end - span.start); at = span.end; }
+  return result + text.slice(at);
+}
+export function escapeInlineHtml(text: string) {
+  const escape = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  let result = "", at = 0;
+  for (const span of codeSpans(text)) { result += escape(text.slice(at, span.start)) + text.slice(span.start, span.end); at = span.end; }
+  return result + escape(text.slice(at));
+}
+function commentStart(text: string) {
+  const masked = maskInlineCode(text); let at = masked.indexOf("<!--");
+  while (at >= 0) { let escapes = 0; for (let i = at - 1; i >= 0 && masked[i] === "\\"; i--) escapes++; if (!(escapes % 2)) return at; at = masked.indexOf("<!--", at + 4); }
+  return -1;
+}
+export function markdownVisibility(text: string) {
   let fence: { char: string; size: number } | undefined, comment = false;
-  return text.split(/\r?\n/).map(raw => {
+  const lines = text.split(/\r?\n/).map(raw => {
     const marker = raw.match(/^ {0,3}([~\x60])\1{2,}/);
     if (fence) {
-      if (marker && marker[1] === fence.char && marker[0].trim().length >= fence.size &&
-          !raw.slice(marker[0].length).trim()) fence = undefined;
+      if (marker && marker[1] === fence.char && marker[0].trim().length >= fence.size && !raw.slice(marker[0].length).trim()) fence = undefined;
       return "";
     }
-    if (!comment && marker) {
-      fence = { char: marker[1], size: marker[0].trim().length }; return "";
-    }
+    if (!comment && /^(?: {4}|\t)/.test(raw)) return "";
+    if (!comment && marker) { fence = { char: marker[1], size: marker[0].trim().length }; return ""; }
     let rest = raw, value = "";
     while (rest) {
-      if (comment) {
-        const end = rest.indexOf("-->");
-        if (end < 0) return value;
-        rest = rest.slice(end + 3); comment = false;
-      } else {
-        const start = rest.indexOf("<!--");
-        if (start < 0) { value += rest; break; }
-        value += rest.slice(0, start); rest = rest.slice(start + 4); comment = true;
-      }
+      if (comment) { const end = rest.indexOf("-->"); if (end < 0) return value; rest = rest.slice(end + 3); comment = false; }
+      else { const start = commentStart(rest); if (start < 0) { value += rest; break; } value += rest.slice(0, start); rest = rest.slice(start + 4); comment = true; }
     }
-    return /^ {4}/.test(value) ? "" : value;
+    return /^(?: {4}|\t)/.test(value) ? "" : value;
   });
+  return { lines, balanced: !fence && !comment };
 }
+export function visibleLines(text: string): string[] { return markdownVisibility(text).lines; }
+
 function status(value: string): RecordedStatus {
   // A historical cell is never current proof; ambiguous prose is not a positive status.
   if (/\b(?:not|never|unverified|pending|was|previously)\b/i.test(value)) return "UNKNOWN";
@@ -76,9 +98,11 @@ function titleStatus(value: string): { raw: string; state: RecordedStatus } {
   return { raw, state: status(raw) };
 }
 
-export function inventory(config: Settings): Inventory {
-  const bytes = readFileSync(join(config.root, config.ledger_path)), text = bytes.toString("utf8");
-  const lines = visibleLines(text), diagnostics: Diagnostic[] = [], entries = new Map<string, number[]>();
+export function inventory(config: Settings): Inventory { return inventoryMarkdown(config, readFileSync(join(config.root, config.ledger_path))); }
+export function inventoryMarkdown(config: Settings, input: string | Uint8Array): Inventory {
+  const bytes = Buffer.from(input), text = bytes.toString("utf8"), visibility = markdownVisibility(text);
+  const lines = visibility.lines, diagnostics: Diagnostic[] = [], entries = new Map<string, number[]>();
+  if (!visibility.balanced) diagnostics.push({ code: "unterminated-markdown-block" });
   const indices = new Map<string, { line: number; state: RecordedStatus; raw: string; severity: string; aggregate: boolean }[]>();
   const range_summaries: Inventory["range_summaries"] = [];
   const idText = config.id_prefix + "-[0-9]+", primary = new RegExp("^(" + idText + ")(?=\\s|$|:)");

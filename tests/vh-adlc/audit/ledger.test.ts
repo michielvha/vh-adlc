@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createLedgerCandidate, validateLedgerCandidate, applyLedgerCandidate, cleanupOwnedLedger, appendFindings } from "../../../plugins/vh-adlc/scripts/audit/ledger";
 import { captureSnapshot, hash } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
+import { inventory, visibleLines } from "../../../plugins/vh-adlc/scripts/audit/inventory";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git, ledger } from "./fixtures";
 import { terminal } from "./evidence";
@@ -227,4 +228,42 @@ test.each(["no-commit", "read-only", "option-no-write", "prohibited-update", "un
   let refreshes=0; const before = git(c.f.root,"show-ref"), index=hash(readFileSync(join(c.f.root,".git/index")));
   expect(() => applyLedgerCandidate(config,snap,candidate,document,{...c.options,request, ...(kind === "option-no-write" ? { restrictions: ["no-write"] } : {}), refresh:()=>{refreshes++;return {default_branch:"main",default_commit:base};}})).toThrow();
   expect(refreshes).toBe(0); expect(git(c.f.root,"show-ref")).toBe(before); expect(hash(readFileSync(join(c.f.root,".git/index")))).toBe(index); expect(git(c.f.root,"status","--porcelain")).toBe("");
+});
+
+test("new title/comment text cannot hide original or newly declared ledger identities", () => {
+  const c = context("full"), candidate = createLedgerCandidate(c.config,c.snap,{ document:c.document,at:"2026-11-02",run_id:"literal-title",new_findings:[{id:"AUD-003",severity:"High",title:"Stored XSS via <!-- injection",body:"Observed new scenario."}] });
+  c.f.write(c.config.ledger_path,candidate.bytes);
+  const observed = inventory(c.config);
+  expect(observed.complete).toBe(true); expect(observed.findings.map((row:any)=>row.id).sort()).toEqual(["AUD-001","AUD-002","AUD-003"]);
+});
+test.each(["<!-- unclosed comment", "```sh\n# unclosed code", "~~~\nUnclosed alternative fence"])("unbalanced new body cannot swallow following ledger content: %s", body => {
+  const c=context("full"); expect(()=>appendFindings(c.config,c.snap,[{id:"AUD-003",severity:"High",title:"New cause",body}])).toThrow();
+});
+test.each(["## Severity index ##", " ## Severity index"])("the supported visible index heading %s can receive a new finding", heading => {
+  const c=context("full"); c.f.write(c.config.ledger_path,ledger.replace("## Severity index",heading)); c.f.commit();
+  const snap=captureSnapshot(c.config,{mode:"full",artifact_root:c.f.artifacts}),result=appendFindings(c.config,snap,[{id:"AUD-003",severity:"High",title:"New cause",body:"Observed scenario."}]);
+  c.f.write(c.config.ledger_path,result.bytes); const observed=inventory(c.config); expect(observed.complete).toBe(true);
+});
+test("a fenced example index before the real table cannot capture new index rows",()=>{
+  const c=context("full"),example="```md\n## Severity index\n| ID | Sev | Finding | Status |\n| --- | --- | --- | --- |\n```\n";
+  c.f.write(c.config.ledger_path,"# Layout example\n\n"+example+"\n"+ledger);c.f.commit(); const snap=captureSnapshot(c.config,{mode:"full",artifact_root:c.f.artifacts});
+  const result=appendFindings(c.config,snap,[{id:"AUD-003",severity:"High",title:"New cause",body:"Observed scenario."}]); expect(result.bytes).toContain(example);
+  c.f.write(c.config.ledger_path,result.bytes);const observed=inventory(c.config);expect(observed.complete).toBe(true);
+});
+test("gap prose cannot comment out the new dated overview",()=>{
+  const c=context("full"),original=ledger.replace("## Severity index","## How this audit was performed\n\nPrior pass.\n\n## Severity index").replace("| AUD-002 | Low | Historical observation | FIXED |","| AUD-002..AUD-003 | Low | Historical group | FIXED |");
+  c.f.write(c.config.ledger_path,original);const base=c.f.commit(),snap=captureSnapshot(c.config,{mode:"full",ids:["AUD-003"],baseline:base,artifact_root:c.f.artifacts});
+  const row=terminal(c.f,snap,"AUD-003");row.verdict="UNKNOWN";row.reason="Missing identity <!-- sample";row.residuals=["Missing scenario <!-- another sample"];row.checks=[];row.challenge=null;
+  const candidate=createLedgerCandidate(c.config,snap,{document:{schema_version:1,snapshot_digest:snap.digest,assessments:[row]},at:"2026-11-02",run_id:"literal-gap"});
+  const visible=visibleLines(candidate.bytes);expect(visible).toContain("## Re-verification summary (2026-11-02)");
+});
+test("inline-code HTML examples remain literal and do not hide a later new finding",()=>{
+  const c=context("full"),result=appendFindings(c.config,c.snap,[{id:"AUD-003",severity:"High",title:"First cause",body:"The literal `<!--` opener and `<script>` are code examples."},{id:"AUD-004",severity:"Low",title:"Second cause",body:"Another scenario."}]);
+  c.f.write(c.config.ledger_path,result.bytes);const observed=inventory(c.config);expect(observed.complete).toBe(true);expect(observed.findings).toHaveLength(4);
+});
+
+test("rendered inventory refuses an unchecked terminal annotation smuggled through a new legacy title",()=>{
+  const c=context("full"), original=ledger.replace("| ID | Sev | Finding | Status |","| ID | Sev | Area | Title |").replace("| AUD-001 | High | Incorrect result | OPEN |","| AUD-001 | High | Example | Incorrect result |").replace("| AUD-002 | Low | Historical observation | FIXED |","| AUD-002 | Low | Example | Historical observation |");
+  c.f.write(c.config.ledger_path,original);c.f.commit(); const snap=captureSnapshot(c.config,{mode:"full",artifact_root:c.f.artifacts});
+  expect(()=>appendFindings(c.config,snap,[{id:"AUD-003",severity:"High",title:"New cause - **FIXED**",body:"No terminal evidence was collected."}])).toThrow();
 });

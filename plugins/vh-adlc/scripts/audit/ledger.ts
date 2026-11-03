@@ -3,7 +3,7 @@ import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
 import { inspectAuthority, refreshDefault, validRequest, validConstraints, type AuthorityOptions } from "./authority";
 import { evaluateAssessments, evaluateCandidateAssessments, evaluateCommittedAssessments, evaluateFrozenCandidateAssessments, type Assessment } from "./assessment";
-import { tableCells, visibleLines } from "./inventory";
+import { tableCells, visibleLines, markdownVisibility, maskInlineCode, escapeInlineHtml, inventoryMarkdown } from "./inventory";
 import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
 import { loadSettings } from "./settings";
@@ -79,7 +79,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     }
     const marker = `<!-- audit-run:${options.run_id}:${row.id} -->`;
     if (lines.includes(marker)) fail("run note already exists; reconcile the actual ledger");
-    const safe = (value: string) => value.replace(/[\r\n]/g, " ").replaceAll("<!--", "&lt;!--");
+    const safe = (value: string) => escapeInlineHtml(value.replace(/[\r\n]/g, " "));
     const stateMarker = row.verdict === "FIXED" ? "✅" : row.verdict === "MOOT" ? "🗑️" : "⚠️";
     lines.splice(end, 0, "", marker, `**Re-verify (${options.at}):** ${stateMarker} **${row.verdict}** (previous recorded state: ${finding.recorded_status}).`,
       `Scope baseline: ${snap.scope_baseline}`, `Verified source: ${snap.source.commit}`, `Comparison: ${snap.history.status}; baseline: ${snap.history.baseline ?? "unavailable"}. ${snap.history.reason}`, `Run: ${options.run_id}; snapshot: ${snap.digest}`,
@@ -92,7 +92,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
   if (gaps.length) {
     lines.push("", `## Audit coverage ${options.at} (${options.run_id})`, "", `Scope baseline: ${snap.scope_baseline}`, `Verified source: ${snap.source.commit}`,
       "Incomplete identities below were not converted into individual terminal verdicts; original index/history remains unchanged.");
-    for (const row of gaps) lines.push(`- ${row.id}: ${row.verdict}. ${row.reason.replace(/[\r\n]/g, " ")} Gap: ${row.residuals.join("; ").replace(/[\r\n]/g, " ")}`);
+    for (const row of gaps) lines.push(`- ${row.id}: ${row.verdict}. ${escapeInlineHtml(row.reason.replace(/[\r\n]/g, " "))} Gap: ${escapeInlineHtml(row.residuals.join("; ").replace(/[\r\n]/g, " "))}`);
     lines.push("");
   }
   if (datedLayout) {
@@ -110,12 +110,26 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     const present = options.document.assessments.filter(row => row.verdict === "STILL_PRESENT").map(row => row.id);
     lines.push("", "Assessed still present: " + (present.join(", ") || "none in the selected scope") + ".", "Unselected findings retain their recorded history; this pass does not freshly verify them.", "");
   }
+  const bytes = options.new_findings?.length ? appendBytes(config, snap, lines.join("\n"), options.new_findings) : lines.join("\n");
+  verifyRenderedInventory(config, snap, original, bytes, (options.new_findings ?? []).map(f => f.id), options.document.assessments.map(row => row.id));
   const body = { schema_version: 1 as const, run_id: options.run_id, at: options.at, snapshot_digest: snap.digest,
     assessments_digest: digest(options.document), source_target: snap.source.commit, scope_baseline: snap.scope_baseline,
     ids: [...snap.selected_ids, ...(options.new_findings ?? []).map(f => f.id)], new_findings: options.new_findings ?? [],
     verdict_eligibility: options.provisional ? "provisional" as const : "checked-proposal" as const,
-    bytes: options.new_findings?.length ? appendBytes(config, snap, lines.join("\n"), options.new_findings) : lines.join("\n") };
+    bytes };
   return { ...body, digest: digest(body) };
+}
+function verifyRenderedInventory(config: Settings, snap: Snapshot, original: string, bytes: string, newIDs: string[], changed: string[]) {
+  const before = inventoryMarkdown(config, original), after = inventoryMarkdown(config, bytes);
+  if (digest(before) !== digest(snap.inventory) || !markdownVisibility(bytes).balanced || digest(after.findings.map(f => f.id).sort()) !== digest([...before.findings.map(f => f.id), ...newIDs].sort())) fail("rendered ledger changes finding visibility or declared identity scope");
+  const oldLines = original.split("\n"), newLines = bytes.split("\n");
+  for (const finding of before.findings) {
+    const next = after.findings.find(f => f.id === finding.id);
+    if (!next || next.identity_valid !== finding.identity_valid || next.aggregate !== finding.aggregate || next.index_lines.length !== finding.index_lines.length ||
+        digest(next.entry_lines.map(line => newLines[line - 1])) !== digest(finding.entry_lines.map(line => oldLines[line - 1])) || next.severity !== finding.severity ||
+        (!changed.includes(finding.id) || !finding.identity_valid) && digest(next.index_lines.map(line => newLines[line - 1])) !== digest(finding.index_lines.map(line => oldLines[line - 1]))) fail("rendered ledger hides or rewrites an original finding/index class");
+  }
+  for (const id of newIDs) { const next = after.findings.find(f => f.id === id); if (!next?.identity_valid || next.index_lines.length !== 1 || next.entry_lines.length !== 1 || next.recorded_status !== "OPEN") fail("new finding must have one visible OPEN index/entry identity"); }
 }
 export function validateLedgerCandidate(config: Settings, snap: Snapshot, candidate: Candidate, document: Document) {
   try {
@@ -152,6 +166,8 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
     const expected = config.id_prefix + "-" + String(next++).padStart(snap.inventory.next_id!.slice(config.id_prefix.length + 1).length, "0");
     if (finding.id !== expected || !finding.severity?.trim() || !finding.title?.trim() || !finding.body?.trim() ||
         /[\x00-\x1f\x7f|]/.test(finding.title + finding.severity) || finding.body.includes("\0") || new RegExp("^#{1,6}\\s+" + config.id_prefix + "-", "m").test(finding.body)) fail("new IDs must follow the reserved high-water mark with a single supported finding identity");
+    const visibility = markdownVisibility(finding.body);
+    if (!visibility.balanced || visibility.lines.some(line => /<[A-Za-z][^>]*|<\//.test(maskInlineCode(line).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g, "")))) fail("new finding body requires balanced Markdown and HTML examples in code");
     if (visibleLines(finding.body).some(line => {
       const heading = line.match(/^ {0,3}(#{1,6})[ \t]+/); return heading && heading[1].length <= config.profile.finding_level;
     })) fail("new finding body cannot escape its configured section level");
@@ -160,18 +176,24 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
           !/^100(?:644|755) blob /.test(git(config.root, "ls-tree", snap.source.commit, "--", path))))) fail("reverify new findings must cite actual related changed source paths; missing history never triggers full audit");
   }
   const lines = original.split("\n");
-  const section = lines.findIndex(line => line.replace(/^#{1,6}\s+/, "").trim() === config.profile.index_heading);
-  if (section < 0) fail("index heading is missing");
-  let header = section + 1;
-  while (header < lines.length && tableCells(lines[header])[0]?.toUpperCase() !== "ID") { if (/^#/.test(lines[header])) fail("index table missing"); header++; }
+  const visibleIndex = visibleLines(lines.join("\n")), sections = visibleIndex.flatMap((line, at) => {
+    const heading = line.match(/^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/);
+    return heading && heading[2].trim() === config.profile.index_heading ? [{ at, level: heading[1].length }] : [];
+  });
+  if (sections.length !== 1) fail("one visible index heading is required");
+  const section = sections[0]; let header = section.at + 1;
+  while (header < lines.length && tableCells(visibleIndex[header])[0]?.toUpperCase() !== "ID") {
+    const heading = visibleIndex[header].match(/^ {0,3}(#{1,6})[ \t]+/);
+    if (heading && heading[1].length <= section.level) fail("index table missing"); header++;
+  }
   if (header >= lines.length) fail("index table missing");
   const cells = tableCells(lines[header]); let end = header + 2;
   while (end < lines.length && lines[end].trim().startsWith("|")) end++;
   const rows = findings.map(finding => "| " + cells.map(cell => {
     if (/^ID$/i.test(cell)) return finding.id;
-    if (/^(Sev|Severity)$/i.test(cell)) return finding.severity;
+    if (/^(Sev|Severity)$/i.test(cell)) return escapeInlineHtml(finding.severity);
     if (/^(Status|State)$/i.test(cell)) return "OPEN";
-    if (/^(Title|Finding|Description)$/i.test(cell)) return finding.title;
+    if (/^(Title|Finding|Description)$/i.test(cell)) return escapeInlineHtml(finding.title);
     return "";
   }).join(" | ") + " |");
   lines.splice(end, 0, ...rows);
@@ -183,12 +205,13 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
     const heading = visible[at].match(/^ {0,3}(#{1,6})[ \t]+/);
     if (heading && heading[1].length <= config.profile.finding_level) { insertion = at; break; }
   }
-  lines.splice(insertion, 0, ...findings.flatMap(finding => ["", "#".repeat(config.profile.finding_level) + " " + finding.id + " - " + finding.title, finding.body, ""]));
+  lines.splice(insertion, 0, ...findings.flatMap(finding => ["", "#".repeat(config.profile.finding_level) + " " + finding.id + " - " + escapeInlineHtml(finding.title), finding.body, ""]));
   return lines.join("\n");
 }
 export function appendFindings(config: Settings, snap: Snapshot, findings: NewFinding[]) {
   if (!checkSnapshot(config, snap).current) fail("new-finding source changed");
   const bytes = appendBytes(config, snap, readFileSync(join(config.root, config.ledger_path), "utf8"), findings);
+  verifyRenderedInventory(config, snap, readFileSync(join(config.root, config.ledger_path), "utf8"), bytes, findings.map(f => f.id), []);
   return { bytes, digest: hash(bytes), eligible: false, reason: "Private proposal only; checked candidate and separate ledger authority are required for application." };
 }
 export function applyLedgerCandidate(config: Settings, snap: Snapshot, candidate: Candidate, document: Document, options: {

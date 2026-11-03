@@ -120,3 +120,12 @@ Restriction tokens are `read-only`, `no-write`, `no-commit`, `no-push`, `no-merg
 Prohibited effects use the declared effect vocabulary. Constraints from the current request and helper
 options accumulate; neither a standing declaration nor explicit effects override them. Ledger apply
 rejects a prohibited write/commit before refreshing refs or creating an owned branch/worktree.
+
+## New-entry Markdown safety
+
+New title/severity text is rendered as literal HTML text outside code spans. New bodies must keep
+fences and comments balanced; put HTML examples in code spans or fenced code rather than raw tags.
+The renderer locates the visible index with the inventory grammar, then re-inventories its complete
+output. Original identities, heading/index classes and unselected rows must remain visible; each
+new ID needs one visible OPEN index row and finding entry. An unbalanced existing ledger remains
+inspectable as a gap, but canonical updates wait for explicit reconciliation rather than rewriting it.
