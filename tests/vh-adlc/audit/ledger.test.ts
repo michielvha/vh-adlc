@@ -435,3 +435,10 @@ test("a declared How-this-audit section retains a checked scoped delta summary",
  const candidate=createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"delta-summary",section_notes:[{heading:"How this audit was performed",ids:["AUD-001"],text:"Scoped comparison: no new source changes in this fixture.",evidence:[f.artifact("scoped-comparison.txt","Fixture comparison at "+base)]}]});
  expect(candidate.bytes).toContain("Scoped comparison: no new source changes in this fixture.");expect(candidate.bytes).toContain("Historical method.");expect(validateLedgerCandidate(config,snap,candidate,document).valid).toBe(true);
 });
+
+test("dated-layout fix proposals retain per-finding history without a permanent pending-review pass summary",()=>{
+ const f=fixture();projects.push(f);f.write("docs/audit.md","## How this audit was performed\nHistorical pass.\n\n"+ledger);const base=f.commit(),config=loadSettings(f.root);
+ const snap=captureSnapshot(config,{mode:"fix",ids:["AUD-001"],baseline:base,scope_baseline:base,artifact_root:f.artifacts,required_checks:{"AUD-001":["unit"]}}),document={schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(f,snap)]};
+ const candidate=createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"fix-dated",provisional:true});
+ expect(candidate.bytes).toContain("Re-verify (2026-11-03)");expect(candidate.bytes).not.toContain("Provisional verdicts require");expect(candidate.bytes).not.toContain("Re-verification summary (2026-11-03)");expect(candidate.bytes).not.toContain("Audit pass (2026-11-03)");
+});

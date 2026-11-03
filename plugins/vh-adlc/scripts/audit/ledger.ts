@@ -100,11 +100,11 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     for (const row of gaps) lines.push(`- ${row.id}: ${row.verdict}. ${escapeInlineHtml(row.reason.replace(/[\r\n]/g, " "))} Gap: ${escapeInlineHtml(row.residuals.join("; ").replace(/[\r\n]/g, " "))}`);
     lines.push("");
   }
-  if (datedLayout) {
+  if (datedLayout && snap.mode!=="fix") {
     const heading = visibleLines(lines.join("\n")).findIndex(line => /^ {0,3}#{1,6}[ \t]+How this audit was performed(?:[ \t]+#+)?[ \t]*$/i.test(line));
     if (heading < 0) fail("dated layout heading changed");
     lines.splice(heading + 1, 0, "", `> Audit pass (${options.at}): ${snap.selected_ids.length} selected assessments; run ${options.run_id}. Scope baseline: ${snap.scope_baseline}; Verified source: ${snap.source.commit}. Comparison: ${snap.history.status}. Prior passes remain historical.`, "");
-    lines.push("", `## Re-verification summary (${options.at})`, "", `Run: ${options.run_id}; selected scope only. ${options.provisional ? "Provisional verdicts require the final independent batch review before completion or publication." : "Checked proposals still require current ledger/delivery authority."}`);
+    lines.push("", `## Re-verification summary (${options.at})`, "", `Run: ${options.run_id}; selected scope only. Checked proposals still require current ledger/delivery authority.`);
     const cell = (text: string) => text.replace(/[\r\n]/g, " ").replaceAll("\\", "\\\\").replaceAll("|", "\\|").replaceAll("<", "&lt;");
     for (const [title, verdict] of [["Fully fixed", "FIXED"], ["Partially fixed", "PARTIAL"], ["Regressed", "REGRESSED"], ["Moot", "MOOT"], ["Unknown", "UNKNOWN"]]) {
       const rows = options.document.assessments.filter(row => row.verdict === verdict);
