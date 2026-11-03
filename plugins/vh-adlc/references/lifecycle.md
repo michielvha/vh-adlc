@@ -15,11 +15,14 @@ invoking investigation never becomes permission to implement a repair.
 1. Identify the requested result and inspect the current repository or artifact.
    Separate the outcome, the actions authorized in the owner's request, and the
    existing task's actual state. A question may need only an answer.
-2. Inspect local instructions and Git state where relevant. Resolve engineering
-   knowledge through the existing installer and `vh-adlc knowledge` procedure.
-   Request the applicable prose/documentation, coding, language or delivery
-   pages, read the returned pages, and report the revision. Local repository
-   instructions still apply. A cached page is not a framework task record.
+2. Identify persistent audit intent before its installer or knowledge call. Inspect only the request,
+   local instructions and read-only repository evidence needed to choose the route. For audit, use
+   `scripts/audit/bootstrap.ts --offline` from the audit skill: verified cached binary, validated settings
+   metadata, then offline knowledge for the exact normalized `knowledge_pages`. Missing prerequisites
+   get the setup/onboarding handoff; never fall back online. If audit intent is ambiguous, defer bootstrap
+   and resolve that scope first. Configuration alone does not choose audit. Clear non-audit requests
+   use the ordinary installer and knowledge procedure. Read all resolved pinned pages and report the
+   revision; local instructions still apply. A cached page is not a framework task record.
 3. Select the procedure below. State it briefly, then do the authorized work.
    Do not ask the owner to choose a skill name. Ask only a missing scope or
    authority question that changes the result, continuing independent reads.

@@ -41,6 +41,11 @@ Resolve the entire normalized list with an explicit online `vh-adlc knowledge --
 list; every page must be available in the caller's docs cache at that revision. A copied binary
 alone does not prepare the docs cache. Stop setup if any required page is missing.
 
+The portable setup executor is `bun <plugin>/scripts/audit/bootstrap.ts --setup --repo <checkout>
+--plugin-pin <knowledge.md pin> --required-page conventions/typescript.md`. Supply one `--required-page`
+for each applicable obligation read from local instructions. It rejects a page absent from the YAML
+before resolving the declared set. Use `--offline` instead of `--setup` for ordinary entry.
+
 Every later audit entry, including status and lifecycle intake, uses `ensure-vh-adlc.sh --offline`,
 reads only this validated metadata, then runs `vh-adlc knowledge --offline` for that exact page set.
 A missing binary or incomplete docs cache gives a prerequisite handoff before any audit work;
