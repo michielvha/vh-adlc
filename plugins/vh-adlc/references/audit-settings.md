@@ -139,3 +139,27 @@ new IDs and canonical ledger updates wait for reconciliation. No format rewrite 
 ATX finding headings for this profile; supported single-line setext section boundaries retain their
 original lines. Fence info-string and inline-comment handling follow the renderer, rather than
 hiding a heading merely because it looks like code or a comment to a line scanner.
+
+
+## Optional existing-ledger layout
+
+The same `markdown-audit-v1` profile can declare `severity_sections` as an object mapping each
+severity label to an existing section heading, `required_index_columns` as extra index headers
+that every new entry must fill, `workstream_heading` as the existing membership section, and
+`section_note_headings` as the exact existing sections allowed to receive checked dated updates.
+These are literal layout names, never commands or a new storage format. All declared sections
+must resolve uniquely at proposal time; severity sections must contain the configured finding level.
+
+A new-finding object may include `index_cells` for extra non-reserved index headers and `workstream`
+for its explicit membership key. Required cells and configured workstream assignment cannot be
+omitted. Core ID/severity/status/title cells cannot be overridden. Without these optional layout
+settings, the minimal standalone profile keeps its existing behavior.
+
+Candidate input can provide `--section-notes <json>`: an array of `{heading, ids, text, evidence}`.
+Each evidence item is a real private `{path,sha256}` artifact; IDs must belong to the selected/new
+scope. An empty ID list is allowed only for assessment-mode coverage observations. Updates go
+inside declared existing sections, retaining prior prose as history with the current source/run
+binding. They cannot introduce an equal/ancestor heading, raw HTML or an unclosed block. Rebuilding
+a candidate revalidates the same section updates and evidence; editing only its bytes cannot pass.
+A source evidence item may supply `line`; it must name a nonempty line in the same hash-bound
+current file. The dated note records that location without rewriting old historical references.

@@ -4,6 +4,10 @@ export type Profile = {
   name: "markdown-audit-v1";
   index_heading: string;
   finding_level: number;
+  severity_sections?: Record<string,string>;
+  required_index_columns?: string[];
+  workstream_heading?: string;
+  section_note_headings?: string[];
 };
 export type Settings = {
   schema_version: 1;

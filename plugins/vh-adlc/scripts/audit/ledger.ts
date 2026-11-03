@@ -3,16 +3,16 @@ import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
 import { inspectAuthority, refreshDefault, validRequest, validConstraints, type AuthorityOptions } from "./authority";
 import { evaluateAssessments, evaluateCandidateAssessments, evaluateCommittedAssessments, evaluateFrozenCandidateAssessments, type Assessment } from "./assessment";
-import { tableCells, visibleLines, markdownVisibility, maskInlineCode, escapeInlineHtml, inventoryMarkdown, markdownSections } from "./inventory";
+import { tableCells, visibleLines, markdownVisibility, escapeInlineHtml, inventoryMarkdown, markdownSections } from "./inventory";
 import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
 import { loadSettings } from "./settings";
 import { repositoryPath } from "../maintenance/authority";
 
 type Document = { schema_version: number; snapshot_digest: string; assessments: Assessment[] };
-type NewFinding = { id: string; severity: string; title: string; body: string; delta_paths?: string[] };
+import { boundedBody, indexMetadata, insertEntries, addSectionNotes, type NewFinding, type SectionNote } from "./layout";
 export type Candidate = { schema_version: 1; run_id: string; at: string; snapshot_digest: string; assessments_digest: string;
-  source_target: string; scope_baseline: string; ids: string[]; new_findings: NewFinding[]; verdict_eligibility: "provisional" | "checked-proposal"; bytes: string; digest: string };
+  source_target: string; scope_baseline: string; ids: string[]; new_findings: NewFinding[]; section_notes?: SectionNote[]; verdict_eligibility: "provisional" | "checked-proposal"; bytes: string; digest: string };
 type OwnedLedger = { path: string; branch: string; base: string; commit: string | null; candidate_digest: string; owner_file: string };
 function fail(message: string): never { throw Error("audit ledger: " + message); }
 function marker(verdict: string) { return verdict === "FIXED" ? "✅" : verdict === "MOOT" ? "🗑️" : "⚠️"; }
@@ -30,8 +30,9 @@ function replaceCell(line: string, index: number, value: string | ((raw: string)
   const rendered = typeof value === "function" ? value(old.slice(spaces[1].length, old.length - spaces[2].length)) : value;
   return line.slice(0, start) + spaces[1] + rendered + spaces[2] + line.slice(end);
 }
-type CandidateOptions = { document: Document; at: string; run_id: string; new_findings?: NewFinding[]; provisional?: boolean };
+type CandidateOptions = { document: Document; at: string; run_id: string; new_findings?: NewFinding[]; section_notes?: SectionNote[]; provisional?: boolean };
 export function createLedgerCandidate(config: Settings, snap: Snapshot, options: CandidateOptions): Candidate {
+  if (options.new_findings !== undefined && !Array.isArray(options.new_findings) || options.section_notes !== undefined && !Array.isArray(options.section_notes)) fail("proposal additions must be arrays");
   if (!(["reverify", "full"].includes(snap.mode) && !options.provisional || snap.mode === "fix" && options.provisional) ||
       !/^\d{4}-\d{2}-\d{2}$/.test(options.at) || !/^[a-z0-9][a-z0-9_-]{0,79}$/.test(options.run_id)) fail("invalid proposal mode/date/run");
   if (!checkSnapshot(config, snap).current) fail("assessment bindings changed");
@@ -84,7 +85,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     const stateMarker = row.verdict === "FIXED" ? "✅" : row.verdict === "MOOT" ? "🗑️" : "⚠️";
     lines.splice(end, 0, "", marker, `**Re-verify (${options.at}):** ${stateMarker} **${row.verdict}** (previous recorded state: ${finding.recorded_status}).`,
       `Scope baseline: ${snap.scope_baseline}`, `Verified source: ${snap.source.commit}`, `Comparison: ${snap.history.status}; baseline: ${snap.history.baseline ?? "unavailable"}. ${snap.history.reason}`, `Run: ${options.run_id}; snapshot: ${snap.digest}`,
-      "Scenario: " + safe(row.reason), "Evidence: " + row.evidence.map(e => safe(e.path + "#" + e.symbol)).join(", "),
+      "Scenario: " + safe(row.reason), "Evidence: " + row.evidence.map(e => safe(e.path + (e.line === undefined ? "" : ":" + e.line) + "#" + e.symbol)).join(", "),
       "Checks: " + row.checks.map(c => safe(c.name + " exit " + c.exit_code)).join(", "),
       "Residuals: " + (row.residuals.map(safe).join("; ") || "none recorded"), "");
     if (datedLayout && finding.recorded_status !== row.verdict) lines.splice(finding.entry_lines[0], 0, "", `${stateMarker} **${row.verdict} (${options.at})** <!-- audit-status:${options.run_id}:${row.id} -->`, "");
@@ -111,11 +112,13 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     const present = options.document.assessments.filter(row => row.verdict === "STILL_PRESENT").map(row => row.id);
     lines.push("", "Assessed still present: " + (present.join(", ") || "none in the selected scope") + ".", "Unselected findings retain their recorded history; this pass does not freshly verify them.", "");
   }
-  const bytes = options.new_findings?.length ? appendBytes(config, snap, lines.join("\n"), options.new_findings) : lines.join("\n");
+  let bytes = options.new_findings?.length ? appendBytes(config, snap, lines.join("\n"), options.new_findings) : lines.join("\n");
+  if (options.section_notes?.length) bytes = addSectionNotes(config,snap,bytes,options.section_notes,{at:options.at,run_id:options.run_id,ids:[...snap.selected_ids,...(options.new_findings??[]).map(row=>row.id)]});
   verifyRenderedInventory(config, snap, original, bytes, (options.new_findings ?? []).map(f => f.id), options.document.assessments.map(row => row.id));
   const body = { schema_version: 1 as const, run_id: options.run_id, at: options.at, snapshot_digest: snap.digest,
     assessments_digest: digest(options.document), source_target: snap.source.commit, scope_baseline: snap.scope_baseline,
     ids: [...snap.selected_ids, ...(options.new_findings ?? []).map(f => f.id)], new_findings: options.new_findings ?? [],
+    ...(options.section_notes?.length ? {section_notes:options.section_notes} : {}),
     verdict_eligibility: options.provisional ? "provisional" as const : "checked-proposal" as const,
     bytes };
   return { ...body, digest: digest(body) };
@@ -134,14 +137,14 @@ function verifyRenderedInventory(config: Settings, snap: Snapshot, original: str
 }
 export function validateLedgerCandidate(config: Settings, snap: Snapshot, candidate: Candidate, document: Document) {
   try {
-    const expected = createLedgerCandidate(config, snap, { document, at: candidate.at, run_id: candidate.run_id, new_findings: candidate.new_findings, provisional: candidate.verdict_eligibility === "provisional" });
+    const expected = createLedgerCandidate(config, snap, { document, at: candidate.at, run_id: candidate.run_id, new_findings: candidate.new_findings, section_notes: candidate.section_notes, provisional: candidate.verdict_eligibility === "provisional" });
     return { valid: canonicalJSON(candidate) === canonicalJSON(expected), reason: "Candidate must exactly match the checked deterministic proposal." };
   } catch { return { valid: false, reason: "Candidate evidence or source changed." }; }
 }
 export function validateHistoricalCandidate(config: Settings, snap: Snapshot, candidate: Candidate, document: Document) {
   try {
     if (!["reverify", "full"].includes(snap.mode) || !evaluateCommittedAssessments(config, snap, document).pass) return false;
-    const expected = renderCandidate(config, snap, { document, at: candidate.at, run_id: candidate.run_id, new_findings: candidate.new_findings },
+    const expected = renderCandidate(config, snap, { document, at: candidate.at, run_id: candidate.run_id, new_findings: candidate.new_findings, section_notes: candidate.section_notes },
       gitBytes(config.root, "show", `${snap.source.commit}:${config.ledger_path}`).toString());
     return canonicalJSON(candidate) === canonicalJSON(expected);
   } catch { return false; }
@@ -152,7 +155,7 @@ export function validateFrozenFixCandidate(config: Settings, snap: Snapshot, can
     if (snap.mode !== "fix" || !snap.source.clean || candidate.verdict_eligibility !== "provisional" ||
         !/^\d{4}-\d{2}-\d{2}$/.test(candidate.at) || !/^[a-z0-9][a-z0-9_-]{0,79}$/.test(candidate.run_id) ||
         !evaluateFrozenCandidateAssessments(config, snap, document).pass) return false;
-    const expected = renderCandidate(config, snap, { document, at: candidate.at, run_id: candidate.run_id, new_findings: candidate.new_findings, provisional: true },
+    const expected = renderCandidate(config, snap, { document, at: candidate.at, run_id: candidate.run_id, new_findings: candidate.new_findings, section_notes: candidate.section_notes, provisional: true },
       gitBytes(config.root, "show", `${snap.source.commit}:${config.ledger_path}`).toString());
     return canonicalJSON(expected) === canonicalJSON(candidate);
   } catch { return false; }
@@ -164,15 +167,11 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
     new Set(git(config.root, "diff", "--name-only", "-z", snap.history.baseline, snap.source.commit, "--").split("\0").filter(Boolean)) : null;
   let next = snap.inventory.highest_id + 1;
   for (const finding of findings) {
-    if (!Number.isSafeInteger(next) || !finding || Object.keys(finding).some(key => !["id", "severity", "title", "body", "delta_paths"].includes(key))) fail("unsafe new-finding fields or ID allocation");
+    if (!Number.isSafeInteger(next) || !finding || Object.keys(finding).some(key => !["id", "severity", "title", "body", "delta_paths", "index_cells", "workstream"].includes(key))) fail("unsafe new-finding fields or ID allocation");
     const expected = config.id_prefix + "-" + String(next++).padStart(snap.inventory.next_id!.slice(config.id_prefix.length + 1).length, "0");
     if (finding.id !== expected || !finding.severity?.trim() || !finding.title?.trim() || !finding.body?.trim() ||
         /[\x00-\x1f\x7f|]/.test(finding.title + finding.severity) || finding.body.includes("\0") || new RegExp("^#{1,6}\\s+" + config.id_prefix + "-", "m").test(finding.body)) fail("new IDs must follow the reserved high-water mark with a single supported finding identity");
-    const visibility = markdownVisibility(finding.body);
-    if (!visibility.balanced || visibility.comments || visibility.lines.some(line => /<[A-Za-z][^>]*|<\//.test(maskInlineCode(line).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g, "")))) fail("new finding body requires balanced Markdown and HTML examples in code");
-    let escapingHeading = false;
-    Bun.markdown.render(finding.body, { heading(children, { level }) { if (level <= config.profile.finding_level) escapingHeading = true; return children; } });
-    if (escapingHeading) fail("new finding body cannot escape its configured section level");
+    boundedBody(finding.body,config.profile.finding_level);
     if (snap.mode === "reverify" && (!delta || !Array.isArray(finding.delta_paths) || !finding.delta_paths.length ||
         finding.delta_paths.some(path => repositoryPath(path) !== path || !delta.has(path) || [config.ledger_path, config.settings_path, config.project_procedure].includes(path) ||
           !/^100(?:644|755) blob /.test(git(config.root, "ls-tree", snap.source.commit, "--", path))))) fail("reverify new findings must cite actual related changed source paths; missing history never triggers full audit");
@@ -189,22 +188,15 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
   if (header >= lines.length) fail("index table missing");
   const cells = tableCells(lines[header]); let end = header + 2;
   while (end < lines.length && lines[end].trim().startsWith("|")) end++;
-  const rows = findings.map(finding => "| " + cells.map(cell => {
+  const rows = findings.map(finding => { const extra=indexMetadata(config,finding,cells); return "| " + cells.map(cell => {
     if (/^ID$/i.test(cell)) return finding.id;
     if (/^(Sev|Severity)$/i.test(cell)) return escapeInlineHtml(finding.severity);
     if (/^(Status|State)$/i.test(cell)) return "OPEN";
     if (/^(Title|Finding|Description)$/i.test(cell)) return escapeInlineHtml(finding.title);
-    return "";
-  }).join(" | ") + " |");
+    return extra.get(cell.toLowerCase())??"";
+  }).join(" | ") + " |"; });
   lines.splice(end, 0, ...rows);
-  const sectionHeads = markdownSections(lines.join("\n")).headings;
-  const findingTitle = new RegExp("^" + config.id_prefix + "-[0-9]+(?=\\s|$|:)");
-  let last = -1;
-  for (const heading of sectionHeads.values()) if (heading.level === config.profile.finding_level && findingTitle.test(heading.title)) last = heading.at;
-  let insertion = lines.length;
-  for (const heading of sectionHeads.values()) if (last >= 0 && heading.at > last && heading.level <= config.profile.finding_level) { insertion = heading.at; break; }
-  lines.splice(insertion, 0, ...findings.flatMap(finding => ["", "#".repeat(config.profile.finding_level) + " " + finding.id + " - " + escapeInlineHtml(finding.title), finding.body, ""]));
-  return lines.join("\n");
+  return insertEntries(config,lines,findings);
 }
 export function appendFindings(config: Settings, snap: Snapshot, findings: NewFinding[]) {
   if (!checkSnapshot(config, snap).current) fail("new-finding source changed");

@@ -5,7 +5,7 @@ import { createLedgerCandidate, validateLedgerCandidate, applyLedgerCandidate, c
 import { captureSnapshot, hash, digest } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
 import { inventory, visibleLines } from "../../../plugins/vh-adlc/scripts/audit/inventory";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
-import { fixture, git, ledger } from "./fixtures";
+import { fixture, git, ledger, baseSettings } from "./fixtures";
 import { terminal } from "./evidence";
 const projects: ReturnType<typeof fixture>[] = [];
 function context(mode: "reverify" | "full" = "reverify") {
@@ -324,4 +324,59 @@ test.each(["historical", "provisional"])("%s reconstruction re-derives history a
     const altered={...candidateBody,snapshot_digest:forged.digest,assessments_digest:digest(doc),scope_baseline:forged.scope_baseline!,bytes};
     expect(check(c.config,forged,{...altered,digest:digest(altered)},doc)).toBe(false);
   }
+});
+
+
+function structuredLedger() {
+  const f=fixture();projects.push(f);
+  f.write("docs/audit.md",ledger.replace("| ID | Sev | Finding | Status |","| ID | Sev | Area | Finding | Status |").replace("| --- | --- | --- | --- |","| --- | --- | --- | --- | --- |").replace("| AUD-001 | High |","| AUD-001 | High | runtime |").replace("| AUD-002 | Low |","| AUD-002 | Low | history |").replace("### AUD-001","## High findings\n\n### AUD-001").replace("### AUD-002","## Low findings\n\n### AUD-002")+"\n## Workstreams\n\n**A. Runtime:** AUD-001.\n\n## Positive\n\nEarlier positive claim.\n\n## Coverage\n\nEarlier coverage limitation.\n");
+  f.settings(baseSettings({profile:{name:"markdown-audit-v1",index_heading:"Severity index",finding_level:3,severity_sections:{High:"High findings",Low:"Low findings"},required_index_columns:["Area"],workstream_heading:"Workstreams",section_note_headings:["Positive","Coverage"]}}));
+  f.commit();const config=loadSettings(f.root),snap=captureSnapshot(config,{mode:"full",ids:["AUD-001"],artifact_root:f.artifacts,required_checks:{"AUD-001":["unit"]}});
+  const finding={id:"AUD-003",severity:"High",title:"New current cause",body:"Observed source scenario.",index_cells:{Area:"runtime"},workstream:"A"};
+  return {f,config,snap,finding};
+}
+test("full additions retain adopter index cells, severity placement and workstream membership", () => {
+  const c=structuredLedger(),before=readFileSync(join(c.f.root,c.config.ledger_path),"utf8"),result=appendFindings(c.config,c.snap,[c.finding]);
+  expect(result.bytes).toContain("| AUD-003 | High | runtime | New current cause | OPEN |");
+  expect(result.bytes.indexOf("### AUD-003")).toBeGreaterThan(result.bytes.indexOf("## High findings"));expect(result.bytes.indexOf("### AUD-003")).toBeLessThan(result.bytes.indexOf("## Low findings"));
+  const membership=result.bytes.slice(result.bytes.indexOf("## Workstreams"),result.bytes.indexOf("## Positive"));expect(membership).toContain("AUD-003");expect(membership).toContain("A");
+  expect(result.bytes).toContain("**A. Runtime:** AUD-001.");expect(readFileSync(join(c.f.root,c.config.ledger_path),"utf8")).toBe(before);
+});
+test("checked section updates preserve prior positive and coverage history with current bound evidence", () => {
+  const c=structuredLedger(),artifact=c.f.artifact("section-observation.txt","Observed current synthetic source and coverage.");
+  const document={schema_version:1,snapshot_digest:c.snap.digest,assessments:[terminal(c.f,c.snap)]};
+  const section_notes=[{heading:"Positive",ids:["AUD-001"],text:"The earlier positive claim no longer holds for this observed path.",evidence:[artifact]},{heading:"Coverage",ids:[],text:"Current coverage still lacks the external integration path.",evidence:[artifact]}];
+  const candidate=createLedgerCandidate(c.config,c.snap,{document,at:"2026-11-02",run_id:"section-update",new_findings:[c.finding],section_notes});
+  expect(candidate.bytes).toContain(section_notes[0].text);expect(candidate.bytes).toContain(section_notes[1].text);
+  expect(candidate.bytes).toContain("Earlier positive claim.");expect(candidate.bytes).toContain("Earlier coverage limitation.");
+  expect(validateLedgerCandidate(c.config,c.snap,candidate,document).valid).toBe(true);
+  const tampered=structuredClone(candidate);tampered.bytes=tampered.bytes.replace(section_notes[0].text,"An unsupported changed claim.");expect(validateLedgerCandidate(c.config,c.snap,tampered,document).valid).toBe(false);
+});
+test.each(["missing-area","reserved-cell","missing-workstream","wrong-severity"])("new-entry metadata cannot omit or escape declared adopter structure: %s", kind => {
+  const c=structuredLedger(),finding:any=structuredClone(c.finding);
+  if(kind==="missing-area")delete finding.index_cells;if(kind==="reserved-cell")finding.index_cells.ID="AUD-001";
+  if(kind==="missing-workstream")delete finding.workstream;if(kind==="wrong-severity")finding.severity="Unknown class";
+  expect(()=>appendFindings(c.config,c.snap,[finding])).toThrow();
+});
+
+
+test("dated evidence publishes only a checked current source line", () => {
+  const c=context();(c.document.assessments[0].evidence[0] as any).line=1;
+  expect(c.candidate().bytes).toContain("src/app.ts:1#");
+  (c.document.assessments[0].evidence[0] as any).line=999;
+  expect(()=>c.candidate()).toThrow();
+});
+test.each(["unconfigured","wrong-id","missing-proof","escaping"])("section notes reject unbound or escaping changes: %s",kind=>{
+  const c=structuredLedger(),artifact=c.f.artifact("bound-note.txt"),note:any={heading:"Positive",ids:["AUD-001"],text:"Checked update.",evidence:[artifact]};
+  if(kind==="unconfigured")note.heading="Workstreams";if(kind==="wrong-id")note.ids=["AUD-999"];
+  if(kind==="missing-proof")note.evidence=[];if(kind==="escaping")note.text="Unrelated root section\n===";
+  const document={schema_version:1,snapshot_digest:c.snap.digest,assessments:[terminal(c.f,c.snap)]};
+  expect(()=>createLedgerCandidate(c.config,c.snap,{document,at:"2026-11-02",run_id:"bad-section",section_notes:[note]})).toThrow();
+});
+
+
+test("section-note date metadata cannot turn a fenced reproduction into a real section", () => {
+  const c=structuredLedger(),proof=c.f.artifact("fenced-note-proof.txt"),document={schema_version:1,snapshot_digest:c.snap.digest,assessments:[terminal(c.f,c.snap)]};
+  const candidate=createLedgerCandidate(c.config,c.snap,{document,at:"2026-11-02",run_id:"fenced-note",section_notes:[{heading:"Positive",ids:["AUD-001"],text:"```text\n## Reproduction output\n```",evidence:[proof]}]});
+  expect(Bun.markdown.html(candidate.bytes)).not.toContain("<h2>Reproduction output</h2>");expect(candidate.bytes).toContain("Earlier positive claim.");
 });

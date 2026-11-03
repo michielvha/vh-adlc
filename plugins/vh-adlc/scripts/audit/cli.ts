@@ -15,7 +15,7 @@ import type { AuditMode } from "./types";
 
 const argumentsByOperation: Record<string, string[]> = {
   settings: [], status: [], inventory: [], snapshot: ["mode", "ids", "artifact-root", "baseline", "scope-baseline", "requirements", "name"],
-  check: ["snapshot", "input"], report: ["snapshot", "input", "name"], candidate: ["snapshot", "input", "run-id", "date", "name", "new-findings", "provisional"],
+  check: ["snapshot", "input"], report: ["snapshot", "input", "name"], candidate: ["snapshot", "input", "run-id", "date", "name", "new-findings", "section-notes", "provisional"],
   "new-findings": ["snapshot", "input", "name"], apply: ["snapshot", "input", "candidate", "request", "path", "commit"],
   "policy-candidate": ["default-branch", "commit", "parity"], "policy-adopted": [], authority: ["input"], "batch-check": ["input"],
   "journal-new": ["artifact-root", "run-id", "batch-digest"], "journal-read": ["directory", "batch-digest"],
@@ -59,6 +59,7 @@ export function runCLI(argv: string[]) {
     if (options.provisional !== undefined && options.provisional !== "true") throw Error("audit provisional candidate flag must be true when supplied");
     const snap = snapshot(), value = createLedgerCandidate(config, snap, { document: json(requireOption("input")),
       at: requireOption("date"), run_id: requireOption("run-id"), new_findings: options["new-findings"] ? json(options["new-findings"]) : undefined,
+      section_notes: options["section-notes"] ? json(options["section-notes"]) : undefined,
       provisional: options.provisional === "true" });
     return save(snap.artifact_root, value);
   }

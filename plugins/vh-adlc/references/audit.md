@@ -87,7 +87,11 @@ do not change source, index, refs or ledger. Report before remediation selection
 
 Retain every ID, existing finding, anchor, table shape, historical note and unrelated prose.
 Update only authorized status/index cells and append dated evidence. Full mode may append genuinely
-new root causes beyond every reserved reference; never renumber/delete/reuse IDs. Use the checked
+new root causes beyond every reserved reference; never renumber/delete/reuse IDs.
+Honor declared severity sections and required index cells, and assign each new entry to its declared
+workstream. During full assessment, check older positive observations and coverage gaps too. Retain
+truthful current updates as evidence-bound notes in their configured sections, preserving prior
+observations as history. Refresh source locations only where actually reverified. Use the checked
 candidate's exact bytes. Re-read bindings immediately before application; drift or conflicting new
 IDs stops for reconciliation. Required semantic judgments still belong to the actual assessor/reviewer.
 

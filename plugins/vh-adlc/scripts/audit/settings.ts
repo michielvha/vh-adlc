@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { relative, sep } from "node:path";
 import { git, origin, resolveInside } from "../triage/settings";
-import type { Settings } from "./types";
+import type { Profile, Settings } from "./types";
 
 export function invalid(field: string): never {
   throw Error("invalid audit settings: " + field);
@@ -58,9 +58,20 @@ export function loadSettings(directory: string, options: { settingsPath?: string
   const id_prefix = text(input.id_prefix, "id_prefix");
   if (!/^[A-Z][A-Z0-9]{0,15}$/.test(id_prefix)) invalid("id_prefix must be uppercase letters/digits");
   const profile = object(input.profile, "profile");
-  keys(profile, ["name", "index_heading", "finding_level"], "profile");
+  keys(profile, ["name", "index_heading", "finding_level", "severity_sections", "required_index_columns", "workstream_heading", "section_note_headings"], "profile");
   if (profile.name !== "markdown-audit-v1") invalid("unsupported profile");
   if (!Number.isInteger(profile.finding_level) || Number(profile.finding_level) < 2 || Number(profile.finding_level) > 6) invalid("finding_level");
+  const layout:Partial<Profile>={};
+  if(profile.severity_sections!==undefined){
+    const values=object(profile.severity_sections,"severity_sections");if(!Object.keys(values).length)invalid("severity_sections");
+    layout.severity_sections=Object.fromEntries(Object.entries(values).map(([key,value])=>{text(key,"severity name");if(["__proto__","constructor","prototype"].includes(key))invalid("severity name");return [key,text(value,"severity section")];}));
+  }
+  for(const key of ["required_index_columns","section_note_headings"] as const)if(profile[key]!==undefined){
+    const values=profile[key];if(!Array.isArray(values)||!values.length||new Set(values.map(value=>text(value,key).toLowerCase())).size!==values.length)invalid(key);
+    if(key==="required_index_columns"&&values.some(value=>/^(ID|Sev|Severity|Status|State|Title|Finding|Description)$/i.test(value)))invalid(key);
+    layout[key]=values.map(value=>text(value,key));
+  }
+  if(profile.workstream_heading!==undefined)layout.workstream_heading=text(profile.workstream_heading,"workstream_heading");
   return {
     schema_version: 1, root, repository, hostname,
     settings_path: file(root, requested, "settings path"),
@@ -71,6 +82,7 @@ export function loadSettings(directory: string, options: { settingsPath?: string
       name: "markdown-audit-v1",
       index_heading: text(profile.index_heading, "index_heading"),
       finding_level: Number(profile.finding_level),
+      ...layout,
     },
   };
 }

@@ -8,7 +8,7 @@ type Artifact = { path: string; sha256: string };
 type Check = { name: string; argv: string[]; exit_code: number; commit: string; artifact: Artifact };
 export type Assessment = {
   id: string; disposition: "assessment-only" | "authored-repair"; verdict: string; reason: string;
-  evidence: { path: string; sha256: string; symbol: string; scenario: string; commit: string }[];
+  evidence: { path: string; sha256: string; symbol: string; scenario: string; commit: string; line?: number }[];
   checks: Check[]; residuals: string[];
   challenge?: { producer: string; reviewer: string; result: string; id: string; source_commit: string; artifact: Artifact } | null;
   red?: Check;
@@ -75,6 +75,7 @@ function evaluate(config: Settings, snap: Snapshot, document: unknown, committed
           const path = resolveInside(config.root, e.path);
           const bytes = committed ? gitBytes(config.root, "show", `${snap.source.commit}:${e.path}`) : readFileSync(path);
           return !e.symbol?.trim() || !e.scenario?.trim() || e.commit !== snap.source.commit ||
+            e.line !== undefined && (!Number.isSafeInteger(e.line) || e.line < 1 || !bytes.toString("utf8").split(/\r?\n/)[e.line-1]?.trim()) ||
             (committed ? !/^100(?:644|755) blob /.test(git(config.root, "ls-tree", snap.source.commit, "--", e.path)) : !lstatSync(path).isFile()) || hash(bytes) !== e.sha256;
         } catch { return true; }
       })) errors.push("Original scenario needs current source evidence: " + row.id);

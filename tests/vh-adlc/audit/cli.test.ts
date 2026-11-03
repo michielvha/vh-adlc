@@ -1,7 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fixture, git } from "./fixtures";
+import { fixture, git, baseSettings, ledger } from "./fixtures";
+import { terminal } from "./evidence";
 const projects: ReturnType<typeof fixture>[] = [];
 const cli = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/audit/cli.ts");
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
@@ -67,4 +68,19 @@ test("native live plan registers key and row together and refuses another attemp
   const second=f.artifact("second-plan.json",JSON.stringify([{...actions[0],id:"second-key",correlation:"second-key"}]));
   expect(invoke(f,"journal-live-intents",...args,"--input",join(f.artifacts,second.path)).exitCode).toBe(1);
   expect(JSON.parse(invoke(f,"journal-pending",...args).stdout.toString()).pending).toHaveLength(2);
+});
+
+
+test("native candidates include checked section updates without changing source", () => {
+  const f=fixture();projects.push(f);f.write("docs/audit.md",ledger+"\n## Positive\n\nEarlier observation.\n");
+  f.settings(baseSettings({profile:{name:"markdown-audit-v1",index_heading:"Severity index",finding_level:3,section_note_headings:["Positive"]}}));f.commit();
+  const before=git(f.root,"status","--porcelain"),head=git(f.root,"rev-parse","HEAD");
+  const required=f.artifact("required.json",JSON.stringify({"AUD-001":["unit"]}));
+  const snapshot=invoke(f,"snapshot","--mode","full","--ids","AUD-001","--artifact-root",f.artifacts,"--requirements",join(f.artifacts,required.path),"--name","native-note-snapshot");expect(snapshot.exitCode).toBe(0);
+  const saved=JSON.parse(snapshot.stdout.toString()),snap=JSON.parse(readFileSync(saved.path,"utf8"));
+  const document=f.artifact("native-note-document.json",JSON.stringify({schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(f,snap)]})),proof=f.artifact("native-note-proof.txt");
+  const notes=f.artifact("native-notes.json",JSON.stringify([{heading:"Positive",ids:["AUD-001"],text:"Current evidence supersedes the earlier claim.",evidence:[proof]}]));
+  const result=invoke(f,"candidate","--snapshot",saved.path,"--input",join(f.artifacts,document.path),"--date","2026-11-02","--run-id","native-notes","--name","native-note-candidate","--section-notes",join(f.artifacts,notes.path));
+  expect(result.exitCode).toBe(0);const savedCandidate=JSON.parse(result.stdout.toString()),value=JSON.parse(readFileSync(savedCandidate.path,"utf8"));expect(value.bytes).toContain("Current evidence supersedes");expect(value.bytes).toContain("Earlier observation.");
+  expect(git(f.root,"status","--porcelain")).toBe(before);expect(git(f.root,"rev-parse","HEAD")).toBe(head);
 });
