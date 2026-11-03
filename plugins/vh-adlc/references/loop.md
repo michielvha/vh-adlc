@@ -6,6 +6,13 @@ rule from.
 
 ## 1. Get the binary
 
+Audit entry overrides this section's online bootstrap, including when selected through lifecycle
+intake. Use `scripts/audit/bootstrap.ts --offline` as the audit skill specifies: cached verified binary,
+validated settings metadata, then cache-only knowledge for its normalized `knowledge_pages`. Missing
+prerequisites stop audit work with an explicit setup handoff. Never invoke the online installer first.
+The metadata read is the narrow exception to knowledge-first order. Explicit setup may obtain the
+binary and complete pinned pages separately; other operations keep the ordinary procedure below.
+
 The plugin directory is the one that holds `skills/`: two levels above the skill's own directory, which
 the host names when it loads the skill. Resolve a symlinked skill directory to its real location first.
 Run the installer through Bash from there and use the path it prints for every later call:

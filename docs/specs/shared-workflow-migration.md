@@ -20,7 +20,7 @@ completed triage feature.
 The owner selected dependency/security maintenance next on 2026-10-27. Its accepted child is
 [shared-maintenance.md](shared-maintenance.md). Its published delivery and marketplace-verified
 Stackweaver adoption completed on 2026-10-30; exact revisions and remaining test limits are recorded there. Stackweaver retains its specific operating procedures, including its existing
-approved satellite-merge helper. Audit was selected on 2026-11-01; its [child spec](shared-audit.md) is being reviewed before implementation. Documentation and domain extraction remain unselected.
+approved satellite-merge helper. Audit was selected on 2026-11-01; its [child spec](shared-audit.md) has passed the shared source review; publication and Stackweaver adoption remain pending. Documentation and domain extraction remain unselected.
 
 Triage is the first extraction. Its accepted behavior and local verification remain in
 [shared-triage.md](shared-triage.md), initially completed at `0e033f8` and refreshed by Copilot Opus 5.5 R-34 before publication.
@@ -40,8 +40,8 @@ adapters, and migrate each selected consumer after its shared dependency is publ
 The unit of extraction is a useful capability. A local agent name does not require a one-to-one
 shared agent or skill.
 
-The current delivery authorization covers triage publication, the actual marketplace installation
-test and the Stackweaver triage merge. Other rows below require their own scope selection and
+The owner-authorized audit delivery follows its reviewed source gate, actual marketplace acceptance
+and Stackweaver preflight. Other unselected rows below require their own scope selection and
 accepted child spec before implementation. Existing development rules, product-specific workflows,
 credentials, services and notification behavior remain outside this migration unless separately selected.
 
@@ -72,7 +72,7 @@ updated rollback baseline. GUI discovery remains unverified under #33.
 | --- | --- | --- |
 | TRIAGE | Backlog triage, `agents/issue-triage.md` | [Child spec](shared-triage.md) adopted through vh-adlc #34 and Stackweaver #976 after actual marketplace tests. The delivery evidence is above. GUI discovery remains under [#33](https://github.com/michielvha/vh-adlc/issues/33). |
 | D-01 | Dependency/security maintenance, `agents/maintenance.md` | Published in [vh-adlc #37](https://github.com/michielvha/vh-adlc/pull/37) and adopted in [Stackweaver #997](https://github.com/michielvha/stackweaver/pull/997), after real Codex/Claude marketplace fresh installs/upgrades, final paired review and adoption preflight. The [child spec](shared-maintenance.md#published-maintenance-and-consumer-adoption-2026-10-30) records exact revisions, retained local policy and deferred live-Claude/GUI/production tests. The host main checkout still needs reconciliation of unrelated local planning work. |
-| D-02 | Persistent codebase audit, `agents/codebase-audit.md` | Selected on 2026-11-01; [shared-audit.md](shared-audit.md) specifies the extraction and Stackweaver migration. Reviewed through Copilot Opus 5.5 R-12 and accepted on 2026-11-02. Documentation/claim publication and implementation are authorized; preserve finding identities, adversarial re-verification, residuals and local delivery policy. |
+| D-02 | Persistent codebase audit, `agents/codebase-audit.md` | Selected on 2026-11-01; [shared-audit.md](shared-audit.md) specifies the extraction and Stackweaver migration. The owner accepted the revised R-18 spec on 2026-11-03. R-21 returns all source criteria met at shared `60460709` and current consumer `4a469873`: 1,092 package tests, 935 hosted Mac tests, both native candidates, actual Copilot trials and 100 current consumer checks. [PR #44](https://github.com/michielvha/vh-adlc/pull/44) remains in delivery; actual published-marketplace and consumer cutover checks are mandatory next. |
 | D-03 | Documentation impact, drift audit/resolution and truth checks | Deferred. Compare `agents/docs-impact.md`, `docs-drift-audit.md`, `docs-drift-resolver.md` and `docs-truth.md` with vh-adlc's existing documentation workflow first. Any selected extraction gets a separate spec. Existing scanners, ledgers, hooks and schedules stay unchanged. |
 | D-04 | TFE compatibility and provider-fork workflows | Keep `agents/tfe-compat.md` and `agents/provider-fork.md` as domain extensions in Stackweaver. Extract only a separately selected reusable part, preserving product contracts and licensing boundaries. |
 | D-05 | Broader Stackweaver development-loop onboarding | Separate future scope. Keep plan formats, slot isolation, integration/browser requirements and shipping rules local until their compatibility and migration are specified. No wholesale conversion follows from triage adoption. |
@@ -129,6 +129,8 @@ its own equivalent handoff. A parent status never replaces a child's acceptance 
 - [x] T4 `docs/specs/` - when the owner selects audit, draft and independently review its own child spec before implementation (AC-01, AC-04).
       Evidence: `shared-audit.md` reviewed by actual Copilot Opus 5.5 through R-12 at `67a91a17944bb219ce956364963531532577c396`, with no blockers and the merge-outcome recovery obligation retained for implementation. The owner accepted the summary and authorized documentation/issue/claim publication plus implementation on 2026-11-02.
 - [ ] T5 `docs/specs/` and this document - revisit documentation overlap, domain extensions and broader onboarding only when selected; retain explicit dispositions meanwhile (AC-01, AC-04).
+
+- [ ] T6 `docs/specs/shared-audit.md` and this document - record the authorized audit publication, actual marketplace fresh/upgrade acceptance, final paired preflight and consumer adoption with exact revisions; keep real Claude, GUI/phone and product operations visibly unclaimed until tested (AC-02, AC-03).
 
 ## Open Questions
 
