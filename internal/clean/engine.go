@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"syscall"
 	"time"
@@ -136,4 +138,65 @@ func (e *Engine) request(ctx context.Context, method, path string) (*http.Respon
 		return nil, err
 	}
 	return e.client.Do(req)
+}
+
+// errInUse is an engine refusal because something still uses the object.
+var errInUse = errors.New("in use")
+
+func labelFilter(label string) string {
+	b, _ := json.Marshal(map[string][]string{"label": {label}})
+	return url.QueryEscape(string(b))
+}
+
+func (e *Engine) networks(ctx context.Context, label string) ([]network, error) {
+	var ns []network
+	if err := e.get(ctx, "/networks?filters="+labelFilter(label), &ns); err != nil {
+		return nil, err
+	}
+	return ns, nil
+}
+
+func (e *Engine) volumes(ctx context.Context, label string) ([]volume, error) {
+	var out struct {
+		Volumes []volume `json:"Volumes"`
+	}
+	if err := e.get(ctx, "/volumes?filters="+labelFilter(label), &out); err != nil {
+		return nil, err
+	}
+	return out.Volumes, nil
+}
+
+func (e *Engine) stopContainer(ctx context.Context, id string) error {
+	return e.do(ctx, http.MethodPost, "/containers/"+url.PathEscape(id)+"/stop")
+}
+
+func (e *Engine) removeContainer(ctx context.Context, id string) error {
+	return e.do(ctx, http.MethodDelete, "/containers/"+url.PathEscape(id))
+}
+
+func (e *Engine) removeNetwork(ctx context.Context, id string) error {
+	return e.do(ctx, http.MethodDelete, "/networks/"+url.PathEscape(id))
+}
+
+func (e *Engine) removeVolume(ctx context.Context, name string) error {
+	return e.do(ctx, http.MethodDelete, "/volumes/"+url.PathEscape(name))
+}
+
+// do sends a change. 304 (already stopped) and 404 (already gone) succeed;
+// 409 is errInUse.
+func (e *Engine) do(ctx context.Context, method, path string) error {
+	resp, err := e.request(ctx, method, path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	switch {
+	case resp.StatusCode < 300, resp.StatusCode == http.StatusNotModified, resp.StatusCode == http.StatusNotFound:
+		return nil
+	case resp.StatusCode == http.StatusConflict:
+		return errInUse
+	default:
+		return fmt.Errorf("%s %s: %s", method, path, resp.Status)
+	}
 }
