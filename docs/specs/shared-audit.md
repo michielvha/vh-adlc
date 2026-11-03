@@ -209,8 +209,8 @@ session identity and combined full-line coverage are retained (`spec-r16-complet
 trial grader's unconditional resume rejection remains recorded and unchanged; this was a canonical
 procedural spec-review continuation, not a resumed triage acceptance trial. All R-16 records below
 are the actual reissued records. Its remaining cache/absence clarifications are now normative tasks.
-The richer native cold/partial/warm r4 evidence (including exact installer argv and a verified binary
-copied into the isolated PATH) is committed under tests/vh-adlc/evidence/shared-audit;
+The r4 native cold/partial/warm proof was recorded first and is superseded by the committed r5
+proof under tests/vh-adlc/evidence/shared-audit (expected/actual lock digest and isolated PATH copy);
 the earlier incomplete evidence attempts remain archived, including null-report handling in r2.
 
 R-17's four actual records are preserved below. The draft now specifies the recorder's exact
@@ -219,6 +219,14 @@ and declares the setup/entry page set through normalized knowledge_pages. The ri
 proof records expected/actual lock digests and their comparison, exact cache setup and full isolated
 environment; all cold/partial/warm cases pass. Earlier attempts remain archived. No YAML runtime
 implementation, field adoption or clean R-18 review is claimed by these spec corrections.
+
+R-18 at `e471cf650f687c677b0e6fcd5d4e8709b0623d15` has no blocking or should-fix findings.
+Its two actual nits remain verbatim below. F-01 is resolved by T96's setup/conversion-time check
+against declared local obligations: entry uses only the normalized list and performs no language
+inference. This satisfies the existing requirement that obligations be declared before entry.
+F-02's historical r4 label is corrected here; the committed native proof is r5. These Context/Tasks
+changes do not alter the reviewed normative baseline. Revised owner acceptance is still pending;
+no YAML implementation, source-completion, marketplace or migration acceptance is claimed.
 
 ### Earlier accepted R-12 review and implementation obligation
 
@@ -1231,7 +1239,7 @@ live operations remain separate owner-selected tasks.
 - [ ] T89 plugin manifests and package-version contract - reserve coherent audit plugin 0.8.0 before any further package implementation; the already observed collision red becomes a passing package check covering the entire current package diff, including T91 (AC-01, AC-07).
 - [ ] T84 `tests/vh-adlc/audit/settings.test.ts`, authority and example contracts - observe strict YAML, working/committed alternate-suffix, stale-link, full committed-schema/same-commit path, exact byte/value match, offline cached/uncached and distinct reader-failure controls fail before converting the audit loader; positive fixture writers use actual commented block YAML rejected by JSON.parse (AC-02, AC-04).
 - [ ] T85 `scripts/audit/settings.ts`, `authority.ts` and shared settings integration - reuse the strict shared reader with optional offline mode for working and fully validated committed YAML, preserve other callers and prove no grant on failure; T84 passes (AC-02, AC-04).
-- [ ] T96 `scripts/audit/settings.ts`, `types.ts`, settings output and config/entry contracts - implement optional declared knowledge_pages and the deterministic normalized mandatory-plus-declared set; setup/direct/intake request exactly that set, unsafe/duplicate pages fail and an unseeded request cannot proceed (AC-01, AC-02, AC-06).
+- [ ] T96 `scripts/audit/settings.ts`, `types.ts`, settings output and config/entry contracts - implement optional declared knowledge_pages and the deterministic normalized mandatory-plus-declared set; explicit setup/conversion checks that set against declared local obligations; entry never infers languages and only requests/verifies the normalized set; unsafe/duplicate pages and unseeded requests fail (R-18 F-01) (AC-01, AC-02, AC-06).
 - [ ] T86 `references/audit-settings.md`, examples, `docs/user-guides/workflows.md`, installation, compatibility and marketplace guides - replace active audit JSON setup and 0.7.0 audit claims with readable YAML/0.8.0 guidance and exact reader prerequisites; package checks require the inline and standalone examples to be commented block YAML rejected by JSON.parse and load, with invalid inputs refused (AC-01, AC-02).
 - [ ] T92 `skills/vh-adlc-audit/SKILL.md`, `references/loop.md`, `references/lifecycle.md` and entry trials - force direct and intake-routed audit bootstrap/knowledge offline before any installer, preserve other routes and pass complete/empty/partial-cache isolated PATH/HOME/XDG sentinel cases after recording both setup steps (AC-01, AC-06).
 - [ ] T94 `references/audit.md`, `audit-record.md`, `audit-review.md`, `lifecycle.md`, audit authority messages, consumer policy/parity and generic/consumer selection contracts - state the separate feature/PR route, owner merge, retained member visibility and explicit reselection in all generic/reviewer/local instructions; refuse a planning exception as in-batch eligibility and retain visible-restoration judgment stops; package and actual model cases pass (AC-04, AC-05).
