@@ -10,7 +10,7 @@ import { fixture, git } from "./fixtures";
 import { terminal } from "./evidence";
 import { createLedgerCandidate } from "../../../plugins/vh-adlc/scripts/audit/ledger";
 const projects: ReturnType<typeof fixture>[] = [];
-function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"], defaultBranch = "main") {
+function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"], defaultBranch = "main", indexBeforeFreeze=false) {
   const f = fixture(); projects.push(f); const config = loadSettings(f.root), base = git(f.root, "rev-parse", "HEAD");
   git(f.root, "update-ref", "refs/remotes/origin/main", base); git(f.root, "switch", "-qc", "fix/audit-batch");
   let taskBase = base, carried: Definition["carried"] = null;
@@ -25,11 +25,12 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
   }
   if (priorLedger) f.write(config.ledger_path, readFileSync(join(f.root, config.ledger_path), "utf8") + "\n### AUD-099 - Unapproved before freeze\nUnchecked source metadata.\n");
   // Actual disposable regression execution is retained separately by the model trial; these unit records are structural attestations.
+  if(indexBeforeFreeze)f.write("docs/internal/README.md","# Internal docs\n\n| Audit record | Bounded audit repair evidence |\n");
   if (!allAssessment) f.write("src/app.ts", "export const answer = 43;\n"); const repaired = allAssessment ? taskBase : f.commit("test: authored fixture repair");
   const path = "docs/internal/maintenance/audit-A-test.md";
   const definition: Definition = { schema_version: 1, repository: config.repository, hostname: config.hostname, default_branch: defaultBranch, run_id: "batch-test", workstream: "A",
     scope_baseline: base, task_base: taskBase, source_target: repaired, ledger_path: config.ledger_path, record_path: path,
-    affected_paths: ["src/app.ts", config.ledger_path, path], verification_inputs: ["src/app.ts"],
+    affected_paths: ["src/app.ts", config.ledger_path, path,...(indexBeforeFreeze?["docs/internal/README.md"]:[])], verification_inputs: ["src/app.ts",...(indexBeforeFreeze?["docs/internal/README.md"]:[])],
     members: ["AUD-001", "AUD-002"].map((id, i) => ({ id, disposition: i === 0 && !allAssessment ? "authored-repair" : "assessment-only", contract: "Existing documented return-value contract.", eligibility: "restoration", required_checks: checkNames, ...(i === 0 && !allAssessment ? { pre_fix: taskBase, repair_commit: repaired } : {}) })),
     carried };
   const sourceSnapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, scope_baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
@@ -209,4 +210,24 @@ test("completion sees a pre-freeze pending resource from another registered run/
   const earlier=createRun(c.config,{artifact_root:root,run_id:"earlier-live",batch_digest:"e".repeat(64)});
   intent(earlier,{id:"key",kind:"key",correlation:"earlier-key",target:"synthetic:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"});
   expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
+});
+
+test("consumer frontmatter survives the final record and append-only freshness checks",()=>{
+ const c=context();const metadata={description:"Bounded audit repair evidence",covers:["src/**"]};
+ const text=renderRecord(c.definition,metadata);
+ expect(Bun.YAML.parse(text.match(/^---\n([\s\S]*?)\n---/)?.[1]??'')).toEqual(metadata);
+ c.f.write(c.path,text);c.f.commit();retarget(c);
+ expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(true);
+ c.f.write(c.path,text+"\nObserved completion after review.\n");c.f.commit();
+ expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(true);
+ c.f.write(c.path,readFileSync(join(c.f.root,c.path),'utf8').replace(metadata.description,'Changed contract'));c.f.commit();
+ expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
+});
+
+
+test("a generated index frozen with source is allowed but later index changes require a new freeze",()=>{
+ const c=context(false,false,false,["unit"],"main",true);
+ expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(true);
+ c.f.write("docs/internal/README.md","Changed after source freeze\n");c.f.commit();retarget(c);
+ expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
 });

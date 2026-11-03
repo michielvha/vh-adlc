@@ -6,6 +6,13 @@ Evidence, Reviews and State sections. Use the consumer's maintenance/task locati
 source branch; it does not inherit the external paired dependency-record variant.
 
 Use `scripts/audit/batch.ts`'s `renderRecord` to write the checked JSON Definition inside Markdown.
+Consumers with internal-document conventions may pass `{description,covers}` as the second
+argument. The renderer emits that metadata as YAML frontmatter before the record. Use actual
+consumer code/config coverage globs. Create its stable title/frontmatter scaffold and regenerate
+required tracked documentation indexes before freezing `source_target`; declare those index paths
+in affected paths and verification inputs. The final record/ledger phase cannot change an index.
+If a generator requires a new tracked delta after freezing, re-freeze and rerun checks/review;
+never relax the source-equivalence allowlist or hand-edit generated indexes.
 Replace every field with observed values. Its schema is:
 
 ```json

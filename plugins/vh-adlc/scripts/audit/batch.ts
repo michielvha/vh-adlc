@@ -25,8 +25,13 @@ export function batchJournalDigest(def: Definition) {
     default_branch: def.default_branch, scope_baseline: def.scope_baseline, task_base: def.task_base,
     ids: def.members.map(m => m.id).sort(), carried: def.carried ? { commit: def.carried.commit, ids: [...def.carried.ids].sort() } : null });
 }
-export function renderRecord(definition: Definition) {
-  return "# Audit repair batch\n\n## Definition\n\n```json\n" + JSON.stringify(definition, null, 2) +
+export function renderRecord(definition: Definition, metadata?: {description:string;covers:string[]}) {
+  let frontmatter="";
+  if(metadata){
+    if(Object.keys(metadata).some(key=>!["description","covers"].includes(key))||typeof metadata.description!=="string"||!metadata.description.trim()||!Array.isArray(metadata.covers)||metadata.covers.some(path=>typeof path!=="string"||!path.trim()))throw Error("audit record requires valid consumer metadata");
+    frontmatter="---\ndescription: "+JSON.stringify(metadata.description)+"\ncovers: "+JSON.stringify(metadata.covers)+"\n---\n\n";
+  }
+  return frontmatter+"# Audit repair batch\n\n## Definition\n\n```json\n" + JSON.stringify(definition, null, 2) +
     "\n```\n\n## Evidence\n\nAppend actual per-member red/green/scenario/challenge and final-target checks.\n\n## Reviews\n\nRetain returned records verbatim with exact targets, model and isolation.\n\n## State\n\nreview pending\n";
 }
 function definition(text: string): Definition {
