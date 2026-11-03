@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, readFileSync, symlinkSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, symlinkSync, renameSync, rmSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import { createRun, readRun, intent, outcome, inspectPending, reconcilePolicy, registeredPending } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { createRun, readRun, intent, outcome, inspectPending, reconcilePolicy, registeredPending, retireRun } from "../../../plugins/vh-adlc/scripts/audit/journal";
 import { recoverEffect, cleanupPending, liveReady } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git } from "./fixtures";
@@ -90,13 +90,49 @@ test("explicit committed policy handoff permits only old-resource reconciliation
  c.f.write("audit-project.md","# Uncommitted policy\n");
  expect(()=>reconcilePolicy(loadSettings(c.f.root),before.directory,before.header.batch_digest,request)).toThrow();
  c.f.write("audit-project.md","# Current policy\n\n## Cleanup\nOnly the recorded owned key may be removed.\n");
- const current=reconcilePolicy(config,before.directory,before.header.batch_digest,request);
+ const observer={observe:()=>({default_branch:"main",default_commit:policyCommit})};
+ const current=reconcilePolicy(config,before.directory,before.header.batch_digest,request,observer);
  expect(current.cleanup_only).toBe(true);expect(current.policy_current).toBe(true);
- expect(reconcilePolicy(config,before.directory,before.header.batch_digest,request).revision).toBe(current.revision);
+ expect(reconcilePolicy(config,before.directory,before.header.batch_digest,request,observer).revision).toBe(current.revision);
  expect(()=>intent(current,{id:"retry",kind:"merge",correlation:"pull-42",target:"pull:42"})).toThrow();
  let deleted=0;const resources=[{...scope,id:"key-id"}];
  await cleanupPending(current,scope,{authorized:true,lookup:async()=>resources,cleanup:async()=>{resources.length=0;deleted++;}});
  expect(deleted).toBe(1);expect(registeredPending(config)).toEqual([]);expect(liveReady(current)).toBe(false);
  const later=createRun(config,{artifact_root:c.f.artifacts,run_id:"later-run",batch_digest:"b".repeat(64)});expect(liveReady(later)).toBe(true);
  expect(readFileSync(join(before.directory,"header.json")).equals(header)).toBe(true);
+});
+
+
+test("cleanup transition refuses an unpublished policy and failed default observation",()=>{
+ const c=context();intent(c.run,{id:"key",kind:"key",correlation:"owned-key",target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"});
+ const before=c.reload(),defaultCommit=git(c.f.root,"rev-parse","HEAD");
+ git(c.f.root,"switch","-qc","feat/unpublished-policy");c.f.write("audit-project.md","# Unpublished policy\n");const policyCommit=c.f.commit();
+ const request={owner_approved:true,owner_handoff:"owner:cleanup",expected_digest:before.digest,policy_commit:policyCommit};
+ expect(()=>reconcilePolicy(loadSettings(c.f.root),before.directory,before.header.batch_digest,request,{observe:()=>({default_branch:"main",default_commit:defaultCommit})})).toThrow();
+ expect(()=>reconcilePolicy(loadSettings(c.f.root),before.directory,before.header.batch_digest,request,{observe:()=>{throw Error("offline");}})).toThrow();
+ expect(readRun(loadSettings(c.f.root),before.directory,before.header.batch_digest,{inspect:true}).events.length).toBe(before.events.length);
+});
+
+
+test("moving a repository preserves pending cleanup registration",async()=>{
+ const c=context(),scope={target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"};intent(c.run,{id:"key",kind:"key",correlation:"owned-key",...scope});
+ const moved=join(c.f.outer,"moved-repository");renameSync(c.f.root,moved);const config=loadSettings(moved);
+ expect(registeredPending(config).map(row=>row.action.id)).toEqual(["key"]);
+ const run=readRun(config,c.run.directory,c.run.header.batch_digest);await cleanupPending(run,scope,{authorized:true,lookup:async()=>[],cleanup:async()=>{throw Error("absent");}});
+ expect(registeredPending(config)).toEqual([]);
+});
+test("explicit retirement preserves a zero-pending digest after the completed artifact root is removed",()=>{
+ const c=context(),before=c.reload(),request={owner_approved:true,owner_handoff:"owner:retained-outcomes",expected_digest:before.digest};
+ const retired=retireRun(c.config,before.directory,before.header.batch_digest,request);expect(retired.zero_pending).toBe(true);
+ const retirementPath=join(git(c.f.root,"rev-parse","--path-format=absolute","--git-common-dir"),"vh-adlc-audit-runs",before.header.run_id+".retired.json");
+ unlinkSync(retirementPath); // Simulate interruption after the serialized event but before its registry receipt.
+ expect(retireRun(c.config,before.directory,before.header.batch_digest,request)).toEqual(retired);
+ expect(()=>intent(c.reload(),{id:"new",kind:"report",correlation:"new-report",target:"private"})).toThrow();
+ rmSync(before.directory,{recursive:true});expect(registeredPending(c.config)).toEqual([]);
+ expect(retireRun(c.config,before.directory,before.header.batch_digest,request)).toEqual(retired);
+ const later=createRun(c.config,{artifact_root:c.f.artifacts,run_id:"after-retirement",batch_digest:"d".repeat(64)});expect(liveReady(later)).toBe(true);
+});
+test.each(["merge","key"] as const)("retirement refuses pending %s effects",kind=>{
+ const c=context();intent(c.run,{id:kind,kind,correlation:"owned-pending",target:"dev:slot",...(kind==="key"?{actor:"actor",organization:"org",cleanup_method:"#cleanup"}:{})});
+ expect(()=>retireRun(c.config,c.run.directory,c.run.header.batch_digest,{owner_approved:true,owner_handoff:"owner:retain",expected_digest:c.reload().digest})).toThrow();
 });

@@ -11,7 +11,7 @@ import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "
 import { createLedgerCandidate, applyLedgerCandidate, appendFindings } from "./ledger";
 import { requireAuditRuntime } from "./runtime";
 import { checkBatch } from "./batch";
-import { createRun, reconcilePolicy, registerRun, registeredPending, intent, resourceIntents, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
+import { createRun, retireRun, reconcilePolicy, registerRun, registeredPending, intent, resourceIntents, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
 import type { AuditMode } from "./types";
 
 const argumentsByOperation: Record<string, string[]> = {
@@ -21,6 +21,7 @@ const argumentsByOperation: Record<string, string[]> = {
   "policy-candidate": ["default-branch", "commit", "parity"], "policy-adopted": [], authority: ["input"], "batch-check": ["input"],
   "journal-new": ["artifact-root", "run-id", "batch-digest"], "journal-read": ["directory", "batch-digest"],
   "journal-register": ["directory", "batch-digest"], "journal-registered-pending": [],
+  "journal-retire": ["directory","batch-digest","input"],
   "journal-reconcile-policy": ["directory", "batch-digest", "input"],
   "journal-pending": ["directory", "batch-digest"],
   "journal-cleanup-outcome": ["directory", "batch-digest", "action-id", "input", "absence-confirmed"],
@@ -81,6 +82,7 @@ export function runCLI(argv: string[]) {
   if (operation === "journal-registered-pending") return { pending: registeredPending(config), limit: "Read-only registered cleanup inventory; no execution authority." };
   if (operation === "journal-register") { const run = registerRun(config, requireOption("directory"), requireOption("batch-digest")); return { directory: run.directory, registered: true }; }
   if (operation === "journal-pending") return inspectPending(config, requireOption("directory"), requireOption("batch-digest"));
+  if(operation==="journal-retire")return retireRun(config,requireOption("directory"),requireOption("batch-digest"),json(requireOption("input")));
   if(operation==="journal-reconcile-policy"){const run=reconcilePolicy(config,requireOption("directory"),requireOption("batch-digest"),json(requireOption("input")));return {directory:run.directory,revision:run.revision,cleanup_only:run.cleanup_only,policy_current:run.policy_current};}
   const run = readRun(config, requireOption("directory"), requireOption("batch-digest"));
   if (["journal-outcome", "journal-cleanup-outcome"].includes(operation)) {

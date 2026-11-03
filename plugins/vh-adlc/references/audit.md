@@ -247,7 +247,11 @@ A policy change never reactivates an old run. First inspect `journal-pending` an
 `journal_digest`. An explicit owner handoff may call `journal-reconcile-policy --directory <run>
 --batch-digest <digest> --input <request.json>`. Its exact request is
 `{owner_approved:true,owner_handoff:"<identifier>",expected_digest:"<observed journal digest>",policy_commit:"<real committed ancestor>"}`.
-The selected commit's settings/procedure bytes must equal the current clean committed policy.
+The selected commit must be an ancestor of the freshly observed actual remote default, and its
+settings/procedure bytes must equal both that default and the current clean committed policy.
+The transition retains that observed default branch/commit. An unpublished policy, unavailable
+remote observation or unavailable required Git object fails closed; refresh the actual default and
+reconcile rather than substituting a cached local declaration.
 This is an operator attestation of the actual handoff, not permission inferred from a file.
 
 The helper appends one hash-bound transition, retaining the original header, intents, IDs and
@@ -261,3 +265,25 @@ Dirty/uncommitted policy, stale digest, unknown fields or absent handoff fails w
 After absence is observed for all old resources, the global pending inventory clears and a new
 current-policy run can proceed. The old run remains cleanup-only, including `live_ready:false`;
 never reuse it as a new live attempt or repair batch. Keep transition records through handoff.
+
+### Completed-run retirement and repository moves
+
+A run may be retired only after every intent has an observed outcome and its reports, proof and
+outcomes are retained, published or safely superseded under the existing retention policy.
+`journal-retire --directory <run> --batch-digest <digest> --input <request.json>` takes
+`{owner_approved:true,owner_handoff:"<identifier>",expected_digest:"<observed journal digest>"}`.
+It serializes a final zero-pending event against competing intents, then retains an immutable
+registry receipt with the final digest. A lost acknowledgement resumes that event/receipt once.
+Pending keys, rows or other effects cannot be retired; retirement grants no effect or deletion.
+
+After successful retirement, ordinary authorized cleanup may remove the old run directory while
+the receipt remains. Future checks validate the receipt without needing that directory. The old
+run ID cannot be reactivated. Retirement does not archive proof for you or authorize deleting
+artifacts still needed by active batch reviews, receipts or pending evidence refs.
+
+Registration in the repository's private common Git metadata binds the header digest; the
+header's original absolute common-directory path is historical. Moving that repository alone
+preserves its registrations and pending checks. Independent clones still require explicit journal
+handoff. Keep unretired artifact roots at their registered absolute paths; a missing/moved root is
+unknown, never absence. Restore the exact retained root before resuming rather than deleting a
+registration or guessing that no resources remain.

@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
@@ -67,4 +67,14 @@ export function fixture(options: { configured?: boolean } = {}) {
     // This entire directory and its optional sibling worktrees belong to this fixture.
     dispose: () => rmSync(outer, { recursive: true, force: true }),
   };
+}
+
+
+/** Native CLI test transport: observe one real disposable bare default, with no URL/global rewrite. */
+export function wireDefault(f:ReturnType<typeof fixture>,commit:string){
+ const bare=join(f.outer,"observed-default.git");git(f.root,"init","--bare",bare);
+ git(f.root,"--git-dir",bare,"fetch",f.root,commit+":refs/heads/main");git(f.root,"--git-dir",bare,"symbolic-ref","HEAD","refs/heads/main");
+ const directory=join(f.outer,"wire-bin");mkdirSync(directory);
+ const content="#!/usr/bin/env bun\nconst args=process.argv.slice(2);const forwarded=JSON.stringify(args)===JSON.stringify(['-C',"+JSON.stringify(f.root)+",'ls-remote','--symref','origin','HEAD'])?['ls-remote','--symref',"+JSON.stringify(bare)+",'HEAD']:args;const result=Bun.spawnSync(['/usr/bin/git',...forwarded],{stdout:'inherit',stderr:'inherit'});process.exit(result.exitCode);\n";
+ writeFileSync(join(directory,"git"),content);chmodSync(join(directory,"git"),0o700);return directory;
 }

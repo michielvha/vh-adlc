@@ -244,7 +244,7 @@ test("a generated index frozen with source is allowed but later index changes re
 test("a later batch completes after explicit old-policy cleanup reconciliation",async()=>{
  const c=context(false,false,false,["unit"],"main",false,true),old=c.pendingPolicyRun!;
  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
- const cleanup=reconcilePolicy(c.config,old.directory,old.header.batch_digest,{owner_approved:true,owner_handoff:"owner:old-policy-cleanup",expected_digest:old.digest,policy_commit:c.base});
+ const cleanup=reconcilePolicy(c.config,old.directory,old.header.batch_digest,{owner_approved:true,owner_handoff:"owner:old-policy-cleanup",expected_digest:old.digest,policy_commit:c.base},{observe:c.observe});
  await cleanupPending(cleanup,{target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"},{authorized:true,lookup:async()=>[],cleanup:async()=>{throw Error("already absent resource must not be deleted");}});
  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(true);
 });

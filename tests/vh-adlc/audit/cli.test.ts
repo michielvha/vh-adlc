@@ -1,13 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { fixture, git, baseSettings, ledger } from "./fixtures";
+import { fixture, git, baseSettings, ledger, wireDefault } from "./fixtures";
 import { terminal } from "./evidence";
 const projects: ReturnType<typeof fixture>[] = [];
 const cli = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/audit/cli.ts");
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
 function invoke(f: ReturnType<typeof fixture>, ...args: string[]) {
-  return Bun.spawnSync([process.execPath, cli, ...args, "--repo", f.root], { stdout: "pipe", stderr: "pipe" });
+  return Bun.spawnSync([process.execPath, cli, ...args, "--repo", f.root], { env:{...process.env,PATH:(existsSync(join(f.outer,"wire-bin"))?join(f.outer,"wire-bin")+":":"")+process.env.PATH},stdout: "pipe", stderr: "pipe" });
 }
 test("native status and snapshot helpers preserve source, index and refs", () => {
   const f = fixture(); projects.push(f); const head = git(f.root, "rev-parse", "HEAD"), status = git(f.root, "status", "--porcelain");
@@ -92,7 +92,7 @@ test("native owner-handoff reconciliation retires old cleanup without reactivati
  const key=f.artifact("transition-key.json",JSON.stringify({id:"key",kind:"key",correlation:"owned-key",target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"}));
  expect(invoke(f,"journal-intent",...args,"--input",join(f.artifacts,key.path)).exitCode).toBe(0);
  const header=readFileSync(join(directory,"header.json")),digest=JSON.parse(invoke(f,"journal-read",...args).stdout.toString()).digest;
- f.write("audit-project.md","# Committed cleanup policy\n");const policy_commit=f.commit();
+ f.write("audit-project.md","# Committed cleanup policy\n");const policy_commit=f.commit();wireDefault(f,policy_commit);
  const request=f.artifact("policy-handoff.json",JSON.stringify({owner_approved:true,owner_handoff:"owner-session:cleanup",expected_digest:digest,policy_commit}));
  expect(invoke(f,"journal-reconcile-policy",...args,"--input",join(f.artifacts,request.path)).exitCode).toBe(0);
  expect(invoke(f,"journal-intent",...args,"--input",join(f.artifacts,key.path)).exitCode).toBe(1);
@@ -100,4 +100,15 @@ test("native owner-handoff reconciliation retires old cleanup without reactivati
  expect(invoke(f,"journal-cleanup-outcome",...args,"--action-id","key","--input",join(f.artifacts,receipt.path),"--absence-confirmed","true").exitCode).toBe(0);
  const pending=JSON.parse(invoke(f,"journal-pending",...args).stdout.toString());expect(pending.pending).toEqual([]);expect(pending.cleanup_only).toBe(true);expect(pending.live_ready).toBe(false);
  expect(JSON.parse(invoke(f,"journal-registered-pending").stdout.toString()).pending).toEqual([]);expect(readFileSync(join(directory,"header.json")).equals(header)).toBe(true);
+});
+
+
+test("native retirement retains its receipt after completed run artifacts are removed",()=>{
+ const f=fixture();projects.push(f);const batch="a".repeat(64);
+ const created=invoke(f,"journal-new","--artifact-root",f.artifacts,"--run-id","native-retirement","--batch-digest",batch),directory=JSON.parse(created.stdout.toString()).directory,args=["--directory",directory,"--batch-digest",batch];
+ const before=JSON.parse(invoke(f,"journal-read",...args).stdout.toString());
+ const request=f.artifact("retirement-request.json",JSON.stringify({owner_approved:true,owner_handoff:"owner:retained-evidence",expected_digest:before.digest}));
+ const retired=invoke(f,"journal-retire",...args,"--input",join(f.artifacts,request.path));expect(retired.exitCode).toBe(0);expect(JSON.parse(retired.stdout.toString()).zero_pending).toBe(true);
+ rmSync(directory,{recursive:true});expect(JSON.parse(invoke(f,"journal-registered-pending").stdout.toString()).pending).toEqual([]);
+ expect(invoke(f,"journal-retire",...args,"--input",join(f.artifacts,request.path)).exitCode).toBe(0);
 });
