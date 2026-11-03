@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { cpSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -43,4 +43,15 @@ describe('independent remote-gui package', () => {
   expect(skill).toContain('human-facing local');
   expect(skill).toContain('connectOverCDP');
  });
+});
+
+test('unsupported source-build hosts get a platform diagnostic before compiling',()=>{
+ const root=mkdtempSync(join(tmpdir(),'rg-platform-'));
+ try{
+  writeFileSync(join(root,'go'),'#!/bin/sh\nexit 99\n',{mode:0o700});
+  writeFileSync(join(root,'uname'),'#!/bin/sh\necho Darwin\n',{mode:0o700});
+  const result=Bun.spawnSync(['/usr/bin/bash',join(plugin,'scripts/remote-gui.sh'),'doctor'],{env:{PATH:root,HOME:root}});
+  expect(result.exitCode).toBe(1);
+  expect(result.stdout.toString()).toContain('unsupported-platform');
+ }finally{rmSync(root,{recursive:true,force:true})}
 });

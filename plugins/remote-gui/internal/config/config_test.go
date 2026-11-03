@@ -26,3 +26,9 @@ func TestRejectUnsafeTargets(t *testing.T) {
 		}
 	}
 }
+
+func TestReservedEnrollmentQueryCannotBeAnAppTarget(t *testing.T) {
+	if _, err := Parse([]string{"share", "http://127.0.0.1:3000/?__remote_gui_enroll=1"}); err == nil {
+		t.Fatal("app target collides with native enrollment route")
+	}
+}

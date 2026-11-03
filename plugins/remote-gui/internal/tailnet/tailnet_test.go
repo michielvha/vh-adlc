@@ -151,7 +151,7 @@ func TestHostReadAndReadinessDoesNotSkipTLSOrWS(t *testing.T) {
 			http.Error(w, "no upgrade", 400)
 			return
 		}
-		if _, err := r.Cookie("auth"); err != nil {
+		if _, err := r.Cookie("auth"); err != nil || r.Header.Get("Authorization") != "Basic c3ludGhldGlj" {
 			w.WriteHeader(401)
 			return
 		}
@@ -160,15 +160,15 @@ func TestHostReadAndReadinessDoesNotSkipTLSOrWS(t *testing.T) {
 	plain := httptest.NewServer(handler)
 	defer plain.Close()
 	cookie := &http.Cookie{Name: "auth", Value: "fixture"}
-	if err = Probe(context.Background(), plain.URL, cookie, "/", ""); err != nil {
+	if err = Probe(context.Background(), plain.URL, cookie, "Basic c3ludGhldGlj", "/", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err = Probe(context.Background(), plain.URL, cookie, "/", "/ws"); err == nil {
+	if err = Probe(context.Background(), plain.URL, cookie, "Basic c3ludGhldGlj", "/", "/ws"); err == nil {
 		t.Fatal("HTTP success hid failed WebSocket readiness")
 	}
 	secure := httptest.NewTLSServer(handler)
 	defer secure.Close()
-	if err = Probe(context.Background(), secure.URL, cookie, "/", ""); err == nil {
+	if err = Probe(context.Background(), secure.URL, cookie, "Basic c3ludGhldGlj", "/", ""); err == nil {
 		t.Fatal("untrusted TLS certificate accepted")
 	}
 }

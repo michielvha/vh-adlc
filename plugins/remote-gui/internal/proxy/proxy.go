@@ -5,15 +5,12 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"crypto/subtle"
 	"encoding/base64"
 	"errors"
-	"html/template"
 	"io"
 	"log"
 	"net"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httputil"
 	"net/url"
 	"os"
@@ -41,6 +38,7 @@ type Options struct {
 	OnCompatibility func(string)
 }
 type client struct {
+	proof   [32]byte
 	jar     http.CookieJar
 	expires time.Time
 }
@@ -61,7 +59,7 @@ type (
 		revoked         bool
 		attempts        int
 		attemptsUntil   time.Time
-		clients         map[string]*client
+		clients         map[[32]byte]*client
 		connections     map[net.Conn]bool
 		reverse         *httputil.ReverseProxy
 		upstreamAlive   func() bool
@@ -102,7 +100,7 @@ func New(o Options) (*Proxy, error) {
 			return nil, errors.New("viewer assets unavailable")
 		}
 	}
-	p := &Proxy{assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[string]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, onCompatibility: o.OnCompatibility}
+	p := &Proxy{assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[[32]byte]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, onCompatibility: o.OnCompatibility}
 	p.reverse = &httputil.ReverseProxy{Rewrite: p.rewrite, ModifyResponse: p.response, ErrorLog: log.New(io.Discard, "", 0), ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
 		p.fail("upstream-or-compatibility-failure")
 		http.Error(w, "application proxy unavailable", http.StatusBadGateway)
@@ -168,7 +166,7 @@ func (p *Proxy) Revoke() {
 	p.mu.Lock()
 	p.revoked = true
 	p.hasCode = false
-	p.clients = make(map[string]*client)
+	p.clients = make(map[[32]byte]*client)
 	connections := make([]net.Conn, 0, len(p.connections))
 	for c := range p.connections {
 		connections = append(connections, c)
@@ -202,104 +200,11 @@ func (p *Proxy) validOrigin(r *http.Request) bool {
 	return true
 }
 
-func (p *Proxy) authorized(r *http.Request) *client {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.revoked || !time.Now().Before(p.deadline) {
-		return nil
-	}
-	var token string
-	count := 0
-	for _, c := range r.Cookies() {
-		if c.Name == CookiePrefix+p.id {
-			token = c.Value
-			count++
-		}
-	}
-	if count != 1 {
-		return nil
-	}
-	c := p.clients[token]
-	if c == nil || !time.Now().Before(c.expires) {
-		delete(p.clients, token)
-		return nil
-	}
-	return c
-}
-
-var loginPage = template.Must(template.New("login").Parse(`<!doctype html><html><head><meta name="viewport" content="width=device-width"><title>Remote session access</title></head><body><h1>Open remote session</h1><form method="post" action="/__remote_gui/login"><label>One-time access code <input name="code" type="password" autocomplete="off" required></label><input type="hidden" name="return" value="{{.Return}}"><button>Open session</button></form></body></html>`))
-
-func (p *Proxy) login(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodGet {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_ = loginPage.Execute(w, map[string]string{"Return": p.landing})
-		return
-	}
-	if r.Method != http.MethodPost || r.Header.Get("Origin") != p.origin.String() {
-		http.Error(w, "same-origin POST required", http.StatusForbidden)
-		return
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "invalid enrollment", http.StatusBadRequest)
-		return
-	}
-	code := r.PostForm.Get("code")
-	hash := sha256.Sum256([]byte(code))
-	p.mu.Lock()
-	now := time.Now()
-	if now.After(p.attemptsUntil) {
-		p.attempts = 0
-		p.attemptsUntil = now.Add(time.Minute)
-	}
-	if p.attempts >= 8 {
-		p.mu.Unlock()
-		http.Error(w, "enrollment rate limited", http.StatusTooManyRequests)
-		return
-	}
-	p.attempts++
-	if p.revoked || !now.Before(p.deadline) || !p.hasCode || !now.Before(p.codeExpiry) || subtle.ConstantTimeCompare(hash[:], p.code[:]) != 1 {
-		p.mu.Unlock()
-		http.Error(w, "invalid or expired access code", http.StatusUnauthorized)
-		return
-	}
-	if len(p.clients) >= 64 {
-		p.mu.Unlock()
-		http.Error(w, "session client limit reached", http.StatusTooManyRequests)
-		return
-	}
-	token, err := random()
-	if err != nil {
-		p.mu.Unlock()
-		http.Error(w, "enrollment unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		p.mu.Unlock()
-		http.Error(w, "enrollment unavailable", http.StatusServiceUnavailable)
-		return
-	}
-	p.hasCode = false
-	p.code = [32]byte{}
-	p.clients[token] = &client{jar: jar, expires: p.deadline}
-	expires := p.deadline
-	p.mu.Unlock()
-	http.SetCookie(w, &http.Cookie{Name: CookiePrefix + p.id, Value: token, Path: "/", HttpOnly: true, Secure: p.origin.Scheme == "https", SameSite: http.SameSiteStrictMode, Expires: expires})
-	destination := p.landing
-	if candidate := r.PostForm.Get("return"); candidate != "" {
-		u, e := url.Parse(candidate)
-		if e == nil && !u.IsAbs() && u.Host == "" && strings.HasPrefix(u.Path, "/") && !strings.HasPrefix(u.Path, "//") && !strings.HasPrefix(u.Path, "/__remote_gui") && path.Clean(u.Path) == u.Path {
-			destination = u.RequestURI()
-		}
-	}
-	http.Redirect(w, r, destination, http.StatusSeeOther)
-}
-
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Add("Content-Security-Policy", "worker-src 'none'")
 	if !p.validOrigin(r) {
 		http.Error(w, "request origin rejected", http.StatusForbidden)
 		return
@@ -312,7 +217,15 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.URL.Path == loginPath {
-		p.login(w, r)
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		http.Redirect(w, r, "/?__remote_gui_enroll=1", http.StatusSeeOther)
+		return
+	}
+	if r.URL.Path == "/" && r.URL.Query().Has("__remote_gui_enroll") {
+		p.enroll(w, r)
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/__remote_gui") && (p.assets == nil || r.URL.Path != "/__remote_gui/viewer-access") {
@@ -323,11 +236,15 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid application path", http.StatusBadRequest)
 		return
 	}
+	if len(r.Header.Values("Authorization")) == 1 && r.Header.Get("Authorization") != "" && !strings.HasPrefix(strings.ToLower(r.Header.Get("Authorization")), "basic ") {
+		http.Error(w, "compatibility-blocked: application Authorization headers are unsupported", http.StatusConflict)
+		return
+	}
 	c := p.authorized(r)
 	if c == nil {
+		w.Header().Set("Referrer-Policy", "same-origin")
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusUnauthorized)
-		_ = loginPage.Execute(w, map[string]string{"Return": r.URL.RequestURI()})
+		showLogin(w)
 		return
 	}
 	if p.upstreamAlive != nil && !p.upstreamAlive() {
@@ -346,6 +263,8 @@ func (p *Proxy) rewrite(r *httputil.ProxyRequest) {
 	r.Out.URL.Host = p.target.Host
 	r.Out.Host = p.target.Host
 	r.Out.Header.Del("Cookie")
+	r.Out.Header.Del("Authorization")
+	r.Out.Header.Del("Proxy-Authorization")
 	r.Out.Header.Del("Forwarded")
 	for k := range r.Out.Header {
 		lower := strings.ToLower(k)
@@ -367,6 +286,12 @@ func (p *Proxy) response(r *http.Response) error {
 	if !ok {
 		return errors.New("application context missing")
 	}
+	if r.Header.Get("WWW-Authenticate") != "" || r.Header.Get("Proxy-Authenticate") != "" || r.Header.Get("Authentication-Info") != "" {
+		r.Header.Del("WWW-Authenticate")
+		r.Header.Del("Proxy-Authenticate")
+		r.Header.Del("Authentication-Info")
+		return errors.New("application-http-authentication-unsupported")
+	}
 	cookies := r.Cookies()
 	r.Header.Del("Set-Cookie")
 	for _, cookie := range cookies {
@@ -383,6 +308,9 @@ func (p *Proxy) response(r *http.Response) error {
 		if err != nil {
 			return errors.New("invalid application redirect")
 		}
+		if strings.HasPrefix(strings.ToLower(u.Path), "/__remote_gui") || u.Query().Has("__remote_gui_enroll") {
+			return errors.New("application-reserved-route-collision")
+		}
 		if u.Scheme != "" && u.Scheme != "http" && u.Scheme != "https" {
 			return errors.New("unsupported application redirect scheme")
 		}
@@ -398,30 +326,10 @@ func (p *Proxy) response(r *http.Response) error {
 				u.Scheme = p.origin.Scheme
 				u.Host = p.origin.Host
 				r.Header.Set("Location", u.String())
-			} else if ip := net.ParseIP(u.Hostname()); ip != nil && ip.IsLoopback() {
+			} else if ip := net.ParseIP(u.Hostname()); (ip != nil && ip.IsLoopback()) || strings.EqualFold(u.Hostname(), "localhost") || strings.HasSuffix(strings.ToLower(u.Hostname()), ".localhost") {
 				return errors.New("unshared local redirect rejected")
 			}
 		}
 	}
 	return nil
-}
-
-// ProbeCookie issues an internal transport-probe credential. It is never exported
-// through status, logs or the public CLI; browser verification remains separate.
-func (p *Proxy) ProbeCookie() (*http.Cookie, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.revoked || !time.Now().Before(p.deadline) {
-		return nil, errors.New("session expired or stopped")
-	}
-	token, err := random()
-	if err != nil {
-		return nil, err
-	}
-	jar, err := cookiejar.New(nil)
-	if err != nil {
-		return nil, err
-	}
-	p.clients[token] = &client{jar: jar, expires: p.deadline}
-	return &http.Cookie{Name: CookiePrefix + p.id, Value: token, Path: "/", HttpOnly: true, Secure: p.origin.Scheme == "https", SameSite: http.SameSiteStrictMode}, nil
 }

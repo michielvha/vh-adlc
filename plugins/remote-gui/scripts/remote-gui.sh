@@ -2,12 +2,16 @@
 set -euo pipefail
 umask 077
 plugin_root=$(cd -- "${BASH_SOURCE[0]%/*}/.." && pwd -P)
+if command -v uname >/dev/null 2>&1 && [[ $(uname -s) != Linux || $(uname -m) != x86_64 ]]; then
+  printf '%s\n' '{"schema_version":1,"result":"unsupported-platform","diagnostic":"remote-gui sessions require Linux amd64"}'
+  exit 1
+fi
 go_cmd=${REMOTE_GUI_GO:-go}
 if ! command -v "$go_cmd" >/dev/null 2>&1; then
   printf '%s\n' 'remote-gui needs the Go toolchain declared in go.mod. Install Go, then retry; nothing was downloaded.' >&2
   exit 1
 fi
-for tool in sha256sum find sort xargs flock stat mktemp; do
+for tool in uname sha256sum find sort xargs flock stat mktemp; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     printf 'remote-gui build needs the existing host tool: %s\n' "$tool" >&2
     exit 1

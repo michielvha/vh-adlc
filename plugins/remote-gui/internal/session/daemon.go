@@ -450,6 +450,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 			w.WriteHeader(409)
 			return
 		}
+		issuedAt := time.Now().UTC()
 		code, e := p.Issue()
 		if e != nil {
 			w.WriteHeader(409)
@@ -457,6 +458,8 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		}
 		v := view(current, true)
 		v.AccessCode = code
+		deadline := minTime(issuedAt.Add(10*time.Minute), current.Expires)
+		v.EnrollmentExpires = &deadline
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(v)
 	})
@@ -503,7 +506,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 			return err
 		}
 	}
-	cookie, err := p.ProbeCookie()
+	grant, err := p.ProbeGrant()
 	if err != nil {
 		return err
 	}
@@ -520,7 +523,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	defer cancelProbe()
 	var last error
 	for {
-		last = tailnet.Probe(probeCtx, origin, cookie, appPath, wsPath)
+		last = tailnet.Probe(probeCtx, origin, grant.Cookie, grant.Authorization, appPath, wsPath)
 		if last == nil {
 			break
 		}

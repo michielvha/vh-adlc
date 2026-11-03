@@ -21,20 +21,21 @@ import (
 )
 
 type View struct {
-	SchemaVersion   int       `json:"schema_version"`
-	Result          string    `json:"result"`
-	LocalTarget     string    `json:"local_target,omitempty"`
-	ID              string    `json:"id"`
-	Kind            string    `json:"kind"`
-	State           string    `json:"state"`
-	URL             string    `json:"url,omitempty"`
-	Expires         time.Time `json:"expires_at"`
-	Diagnostic      string    `json:"diagnostic,omitempty"`
-	ReadinessScope  string    `json:"readiness_scope,omitempty"`
-	AppVerification string    `json:"app_verification,omitempty"`
-	CDPAddress      string    `json:"local_cdp,omitempty"`
-	Marker          string    `json:"marker,omitempty"`
-	AccessCode      string    `json:"access_code,omitempty"`
+	SchemaVersion     int        `json:"schema_version"`
+	Result            string     `json:"result"`
+	LocalTarget       string     `json:"local_target,omitempty"`
+	ID                string     `json:"id"`
+	Kind              string     `json:"kind"`
+	State             string     `json:"state"`
+	URL               string     `json:"url,omitempty"`
+	Expires           time.Time  `json:"expires_at"`
+	Diagnostic        string     `json:"diagnostic,omitempty"`
+	ReadinessScope    string     `json:"readiness_scope,omitempty"`
+	AppVerification   string     `json:"app_verification,omitempty"`
+	CDPAddress        string     `json:"local_cdp,omitempty"`
+	Marker            string     `json:"marker,omitempty"`
+	AccessCode        string     `json:"access_code,omitempty"`
+	EnrollmentExpires *time.Time `json:"enrollment_expires_at,omitempty"`
 }
 type BrowserHandle struct {
 	Assets     string

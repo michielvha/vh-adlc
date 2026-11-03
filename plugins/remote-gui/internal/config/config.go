@@ -165,6 +165,11 @@ func Target(raw string) (*url.URL, error) {
 	if err != nil || port < 1 || port > 65535 {
 		return nil, errors.New("target needs a valid explicit port")
 	}
+	for key := range u.Query() {
+		if strings.HasPrefix(strings.ToLower(key), "__remote_gui") {
+			return nil, errors.New("reserved proxy query cannot be shared")
+		}
+	}
 	lower := strings.ToLower(u.Path)
 	if strings.HasPrefix(lower, "/devtools") || strings.HasPrefix(lower, "/json") || strings.HasPrefix(lower, "/__remote_gui") {
 		return nil, errors.New("browser-control and reserved paths cannot be shared")

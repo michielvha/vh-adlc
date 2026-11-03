@@ -10,10 +10,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -34,7 +32,19 @@ func fixture(t *testing.T, upstream string) (*Proxy, *httptest.Server) {
 	return p, s
 }
 
-func enroll(t *testing.T, p *Proxy, s *httptest.Server) *http.Cookie {
+type testCredential struct {
+	*http.Cookie
+	Code string
+}
+
+func (c *testCredential) apply(r *http.Request) {
+	r.AddCookie(c.Cookie)
+	if c.Code != "" {
+		r.SetBasicAuth("viewer", c.Code)
+	}
+}
+
+func enroll(t *testing.T, p *Proxy, s *httptest.Server) *testCredential {
 	t.Helper()
 	code, err := p.Issue()
 	if err != nil {
@@ -49,16 +59,16 @@ func enroll(t *testing.T, p *Proxy, s *httptest.Server) *http.Cookie {
 	if len(cs) != 1 {
 		t.Fatalf("auth cookie count %d", len(cs))
 	}
-	return cs[0]
+	return &testCredential{Cookie: cs[0], Code: code}
 }
 
 func redeem(t *testing.T, s *httptest.Server, code string) *http.Response {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodPost, s.URL+"/__remote_gui/login", strings.NewReader(url.Values{"code": {code}}.Encode()))
+	req, err := http.NewRequest(http.MethodGet, s.URL+"/?__remote_gui_enroll=1", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth("viewer", code)
 	req.Header.Set("Origin", s.URL)
 	c := &http.Client{Timeout: 2 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	r, err := c.Do(req)
@@ -68,14 +78,14 @@ func redeem(t *testing.T, s *httptest.Server, code string) *http.Response {
 	return r
 }
 
-func get(t *testing.T, s *httptest.Server, path string, cookies ...*http.Cookie) *http.Response {
+func get(t *testing.T, s *httptest.Server, path string, cookies ...*testCredential) *http.Response {
 	t.Helper()
 	req, err := http.NewRequest(http.MethodGet, s.URL+path, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, c := range cookies {
-		req.AddCookie(c)
+		c.apply(req)
 	}
 	resp, err := s.Client().Do(req)
 	if err != nil {
@@ -108,7 +118,7 @@ func TestAuthAndUpstreamCookieBoundary(t *testing.T) {
 	if !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
 		t.Fatal("weak authentication cookie")
 	}
-	r = get(t, s, "/set", cookie, &http.Cookie{Name: "foreign", Value: "not-for-upstream"})
+	r = get(t, s, "/set", cookie, &testCredential{Cookie: &http.Cookie{Name: "foreign", Value: "not-for-upstream"}})
 	_ = r.Body.Close()
 	if len(r.Header.Values("Set-Cookie")) != 0 || seen.Load().(string) != "" {
 		t.Fatal("browser cookie or upstream Set-Cookie crossed proxy boundary")
@@ -191,7 +201,7 @@ func TestCrossOriginAndHostRejected(t *testing.T) {
 	for _, origin := range []string{"http://foreign.invalid", "null"} {
 		req, _ := http.NewRequest(http.MethodGet, s.URL+"/", nil)
 		req.Header.Set("Origin", origin)
-		req.AddCookie(cookie)
+		cookie.apply(req)
 		r, err := s.Client().Do(req)
 		if err != nil {
 			t.Fatal(err)
@@ -203,7 +213,7 @@ func TestCrossOriginAndHostRejected(t *testing.T) {
 	}
 	req, _ := http.NewRequest(http.MethodGet, s.URL+"/", nil)
 	req.Host = "foreign.invalid"
-	req.AddCookie(cookie)
+	cookie.apply(req)
 	r, err := s.Client().Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -243,7 +253,7 @@ func TestAuthenticatedWebSocketAndRevocation(t *testing.T) {
 	}
 	defer func() { _ = c.Close() }()
 	_ = c.SetDeadline(time.Now().Add(2 * time.Second))
-	_, _ = fmt.Fprintf(c, "GET /socket HTTP/1.1\r\nHost: %s\r\nOrigin: %s\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nCookie: %s=%s; foreign=sentinel\r\n\r\n", s.Listener.Addr(), s.URL, cookie.Name, cookie.Value)
+	_, _ = fmt.Fprintf(c, "GET /socket HTTP/1.1\r\nHost: %s\r\nOrigin: %s\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nAuthorization: Basic %s\r\nCookie: %s=%s; foreign=sentinel\r\n\r\n", s.Listener.Addr(), s.URL, base64.StdEncoding.EncodeToString([]byte("viewer:"+cookie.Code)), cookie.Name, cookie.Value)
 	reader := bufio.NewReader(c)
 	resp, err := http.ReadResponse(reader, nil)
 	if err != nil || resp.StatusCode != 101 {
@@ -297,7 +307,7 @@ func TestLandingPathAndCookieScope(t *testing.T) {
 	p, s := fixture(t, upstream.URL+"/nested?filter=selected")
 	code, _ := p.Issue()
 	r := redeem(t, s, code)
-	cookie := r.Cookies()[0]
+	cookie := &testCredential{Cookie: r.Cookies()[0], Code: code}
 	_ = r.Body.Close()
 	if r.Header.Get("Location") != "/nested?filter=selected" {
 		t.Fatalf("landing path lost: %s", r.Header.Get("Location"))
@@ -308,7 +318,7 @@ func TestLandingPathAndCookieScope(t *testing.T) {
 		t.Fatal("foreign cookie scope crossed boundary")
 	}
 	req, _ := http.NewRequest(http.MethodGet, s.URL+"/socket", nil)
-	req.AddCookie(cookie)
+	cookie.apply(req)
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Connection", "Upgrade")
 	r, err := s.Client().Do(req)
@@ -330,7 +340,7 @@ func TestUnsafeLocalRedirectDoesNotEscapeShare(t *testing.T) {
 	p, s := fixture(t, upstream.URL)
 	cookie := enroll(t, p, s)
 	req, _ := http.NewRequest(http.MethodGet, s.URL+"/", nil)
-	req.AddCookie(cookie)
+	cookie.apply(req)
 	c := &http.Client{Timeout: time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	r, err := c.Do(req)
 	if err != nil {
@@ -396,6 +406,65 @@ func TestViewerCredentialsAndAssetsStayBehindAuthentication(t *testing.T) {
 		_ = r.Body.Close()
 		if r.StatusCode != want || bytes.Contains(body, []byte("private-sentinel")) {
 			t.Fatalf("viewer asset boundary %s: %d", route, r.StatusCode)
+		}
+	}
+}
+
+func TestEnrollmentPagePreservesSameOriginFormOrigin(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(200) }))
+	defer upstream.Close()
+	_, server := fixture(t, upstream.URL)
+	for _, route := range []string{"/", "/__remote_gui/login"} {
+		response := get(t, server, route)
+		_ = response.Body.Close()
+		if response.Header.Get("Referrer-Policy") != "same-origin" {
+			t.Fatal("enrollment form policy causes browser Origin:null")
+		}
+	}
+}
+
+func TestSecureAppCookiesWorkThroughHTTPSOrigin(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/set" {
+			http.SetCookie(w, &http.Cookie{Name: "app-session", Value: "synthetic-app", Path: "/", HttpOnly: true, Secure: true})
+			return
+		}
+		cookie, err := r.Cookie("app-session")
+		if err != nil || cookie.Value != "synthetic-app" {
+			w.WriteHeader(401)
+			return
+		}
+		w.WriteHeader(200)
+	}))
+	defer upstream.Close()
+	server := httptest.NewUnstartedServer(nil)
+	p, err := New(Options{ID: "0123456789abcdef0123456789abcdef", Origin: "https://" + server.Listener.Addr().String(), Target: upstream.URL, Deadline: time.Now().Add(time.Minute)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server.Config.Handler = p
+	server.Config.ConnState = p.ConnState
+	server.StartTLS()
+	defer server.Close()
+	defer p.Revoke()
+	grant, err := p.ProbeGrant()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, route := range []string{"/set", "/read"} {
+		request, _ := http.NewRequest(http.MethodGet, server.URL+route, nil)
+		request.AddCookie(grant.Cookie)
+		request.Header.Set("Authorization", grant.Authorization)
+		response, err := server.Client().Do(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = response.Body.Close()
+		if response.StatusCode != 200 {
+			t.Fatal("Secure app cookie was dropped behind the HTTPS share")
+		}
+		if len(response.Cookies()) != 0 {
+			t.Fatal("app cookie reached the browser")
 		}
 	}
 }

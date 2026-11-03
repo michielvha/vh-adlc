@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/app"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/session"
@@ -61,6 +62,15 @@ func TestPublicLifecycle(t *testing.T) {
 	code, raw = invoke("access", started.ID, "--reveal")
 	if code != 0 || !strings.Contains(raw, "access_code") || !strings.Contains(raw, "cli-query-sentinel") {
 		t.Fatal("explicit reveal failed")
+	}
+	var revealed map[string]any
+	if json.Unmarshal([]byte(raw), &revealed) != nil {
+		t.Fatal("invalid reveal metadata")
+	}
+	expiry, _ := revealed["enrollment_expires_at"].(string)
+	deadline, err := time.Parse(time.RFC3339, expiry)
+	if err != nil || time.Until(deadline) <= 0 || time.Until(deadline) > 10*time.Minute {
+		t.Fatal("missing or incorrect enrollment deadline")
 	}
 	code, raw = invoke("stop", started.ID)
 	if code != 0 || !strings.Contains(raw, `"state":"stopped"`) {

@@ -60,16 +60,21 @@ func waitEnd(t *testing.T, home, id string) View {
 	return View{}
 }
 
-func auth(t *testing.T, v View, code string) *http.Cookie {
+type accessGrant struct {
+	Cookie *http.Cookie
+	Code   string
+}
+
+func auth(t *testing.T, v View, code string) *accessGrant {
 	t.Helper()
 	u, err := url.Parse(v.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
 	origin := u.Scheme + "://" + u.Host
-	req, _ := http.NewRequest(http.MethodPost, origin+"/__remote_gui/login", strings.NewReader(url.Values{"code": {code}}.Encode()))
+	req, _ := http.NewRequest(http.MethodGet, origin+"/?__remote_gui_enroll=1", nil)
 	req.Header.Set("Origin", origin)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth("viewer", code)
 	c := &http.Client{Timeout: time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	r, err := c.Do(req)
 	if err != nil {
@@ -79,7 +84,7 @@ func auth(t *testing.T, v View, code string) *http.Cookie {
 	if r.StatusCode != 303 || len(r.Cookies()) != 1 {
 		t.Fatal("session enrollment failed")
 	}
-	return r.Cookies()[0]
+	return &accessGrant{Cookie: r.Cookies()[0], Code: code}
 }
 
 func TestServiceLifecycleAndRedaction(t *testing.T) {
@@ -105,7 +110,8 @@ func TestServiceLifecycleAndRedaction(t *testing.T) {
 	}
 	cookie := auth(t, a, a.AccessCode)
 	req, _ := http.NewRequest(http.MethodGet, a.URL, nil)
-	req.AddCookie(cookie)
+	req.AddCookie(cookie.Cookie)
+	req.SetBasicAuth("viewer", cookie.Code)
 	r, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)

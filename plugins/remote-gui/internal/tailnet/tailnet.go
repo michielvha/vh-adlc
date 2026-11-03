@@ -337,7 +337,7 @@ func (c *Client) Remove(ctx context.Context, f *state.Forward) error {
 }
 
 // Probe checks transport from this host; it never attests another device's reachability.
-func Probe(ctx context.Context, origin string, cookie *http.Cookie, appPath, wsPath string) error {
+func Probe(ctx context.Context, origin string, cookie *http.Cookie, authorization, appPath, wsPath string) error {
 	u, err := url.Parse(origin)
 	if err != nil || u.Host == "" || u.User != nil || (u.Scheme != "https" && u.Scheme != "http") {
 		return errors.New("invalid-probe-origin")
@@ -366,6 +366,9 @@ func Probe(ctx context.Context, origin string, cookie *http.Cookie, appPath, wsP
 	if cookie != nil {
 		req.AddCookie(cookie)
 	}
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return probeError(err)
@@ -375,7 +378,7 @@ func Probe(ctx context.Context, origin string, cookie *http.Cookie, appPath, wsP
 		return errors.New("authenticated-http-readiness-failed")
 	}
 	if wsPath != "" {
-		return websocket(ctx, u, cookie, wsPath)
+		return websocket(ctx, u, cookie, authorization, wsPath)
 	}
 	return nil
 }
@@ -394,7 +397,7 @@ func probeError(err error) error {
 	}
 }
 
-func websocket(ctx context.Context, u *url.URL, cookie *http.Cookie, route string) error {
+func websocket(ctx context.Context, u *url.URL, cookie *http.Cookie, authorization, route string) error {
 	path, err := url.Parse(route)
 	if err != nil || path.IsAbs() || path.Host != "" {
 		return errors.New("invalid-websocket-path")
@@ -441,6 +444,9 @@ func websocket(ctx context.Context, u *url.URL, cookie *http.Cookie, route strin
 	req.Header.Set("Sec-WebSocket-Key", key)
 	if cookie != nil {
 		req.AddCookie(cookie)
+	}
+	if authorization != "" {
+		req.Header.Set("Authorization", authorization)
 	}
 	if err = req.Write(conn); err != nil {
 		return errors.New("websocket-readiness-failed")
