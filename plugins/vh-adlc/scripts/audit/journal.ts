@@ -11,7 +11,8 @@ export type Intent = { id: string; kind: "report" | "local-commit" | "issue" | "
 export type Receipt = { state: "observed"; resource_id?: string; commit?: string; pull_number?: number; artifact_path?: string; artifact_digest?: string };
 type PolicyTransition = {from_settings_digest:string;from_policy_digest:string;settings_digest:string;policy_digest:string;policy_commit:string;observed_default_branch:string;observed_default_commit:string;owner_handoff:string;cleanup_only:true};
 type RetireEvent = {owner_handoff:string;zero_pending:true};
-type Event = { revision: number; previous: string; kind: "intent" | "resource" | "outcome" | "handoff" | "policy-transition" | "retirement"; action_id: string; payload: RetireEvent | PolicyTransition | Intent | Receipt | { reason_code: string } | { resource_id: string } };
+type Event = { revision: number; previous: string; kind: "intent" | "resource" | "outcome" | "handoff" | "policy-transition" | "retirement" | "observed-outcome"; action_id: string; payload: RetireEvent | PolicyTransition | Intent | Receipt | { reason_code: string } | { resource_id: string } };
+function isOutcome(event:Event){return event.kind==="outcome"||event.kind==="observed-outcome";}
 type Header = { schema_version: 1; run_id: string; repository: string; hostname: string; common_dir: string; batch_digest: string; settings_digest: string; policy_digest: string };
 export type Run = { policy_current: boolean; cleanup_only:boolean; retired:boolean; directory: string; config: Settings; header: Header; events: Event[]; revision: number; digest: string };
 function fail(): never { throw Error("audit journal conflict, unsafe input or changed scope; reconcile owned state"); }
@@ -80,7 +81,7 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
     if(event.kind==="retirement"){
       exact(event.payload,["owner_handoff","zero_pending"]);
       const retirement=event.payload as RetireEvent;
-      if(event.action_id!=="run-retirement"||!identifier(retirement.owner_handoff)||retirement.zero_pending!==true||events.some(e=>e.kind==="intent"&&!events.some(done=>done.kind==="outcome"&&done.action_id===e.action_id)))fail();
+      if(event.action_id!=="run-retirement"||!identifier(retirement.owner_handoff)||retirement.zero_pending!==true||events.some(e=>e.kind==="intent"&&!events.some(done=>isOutcome(done)&&done.action_id===e.action_id)))fail();
       retired=true;
     }else if(event.kind==="policy-transition"){
       const transition=event.payload as PolicyTransition;
@@ -97,14 +98,15 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
     } else {
       if (!events.some(e => e.kind === "intent" && e.action_id === event.action_id)) fail();
       const resource=["key","row"].includes((events.find(e=>e.kind==="intent"&&e.action_id===event.action_id)!.payload as Intent).kind);
-      if(cleanup_only&&event.kind!=="handoff"&&!resource)fail();
+      if(cleanup_only&&event.kind!=="handoff"&&event.kind!=="observed-outcome"&&!resource)fail();
+      if(event.kind==="observed-outcome"&&(!cleanup_only||resource))fail();
       if (event.kind === "resource") {
         exact(event.payload, ["resource_id"]);
         if (!identifier((event.payload as { resource_id: string }).resource_id) || events.some(e => e.kind === "resource" && e.action_id === event.action_id) ||
             !["key", "row"].includes((events.find(e => e.kind === "intent" && e.action_id === event.action_id)!.payload as Intent).kind)) fail();
-      } else if (event.kind === "outcome") {
+      } else if (event.kind === "outcome" || event.kind==="observed-outcome") {
         validateReceipt(event.payload as Receipt);
-        if (events.some(e => e.kind === "outcome" && e.action_id === event.action_id)) fail();
+        if (events.some(e => isOutcome(e) && e.action_id === event.action_id)) fail();
       } else if (event.kind === "handoff") {
         exact(event.payload, ["reason_code"]); if (!identifier((event.payload as { reason_code: string }).reason_code)) fail();
       } else fail();
@@ -179,12 +181,17 @@ export function registeredPending(config: Settings) {
 /** Read-only recovery inventory remains available after valid policy edits. Never grants retry/cleanup authority. */
 export function inspectPending(config: Settings, directory: string, batch_digest: string) {
   const run = readRun(config, directory, batch_digest, { inspect: true });
-  const pending = run.events.filter(event => event.kind === "intent" && !run.events.some(done => done.kind === "outcome" && done.action_id === event.action_id)).map(event => {
+  const pending = run.events.filter(event => event.kind === "intent" && !run.events.some(done => isOutcome(done) && done.action_id === event.action_id)).map(event => {
     const action = event.payload as Intent;
     const resource = run.events.find(value => value.kind === "resource" && value.action_id === action.id)?.payload as { resource_id: string } | undefined;
     return { ...action, ...(resource ?? {}) };
   });
-  return { policy_current: run.policy_current, cleanup_only:run.cleanup_only, retired:run.retired, journal_digest:run.digest, live_ready: run.policy_current && !run.cleanup_only && !run.retired && !pending.some(action => ["key", "row"].includes(action.kind)), pending,
+  let live_ready=false,readiness_handoff:string|null=run.policy_current?run.retired?"run-retired":run.cleanup_only?"reconciliation-only":null:"policy-changed";
+  if(!readiness_handoff){
+    try{requireRegistered(run);if(registeredPending(config).length)readiness_handoff="registered-cleanup-pending";else live_ready=true;}
+    catch{readiness_handoff="registered-state-unknown-or-unregistered";}
+  }
+  return { policy_current: run.policy_current, cleanup_only:run.cleanup_only, retired:run.retired, journal_digest:run.digest, live_ready, readiness_handoff, pending,
     handoff: run.policy_current ? null : "policy-changed", limit: "Read-only pending-state inspection; this result grants no retry, cleanup or journal mutation. Current owner and transport authority are checked separately. Changed policy requires explicit cleanup reconciliation." };
 }
 function append(run: Run, kind: Event["kind"], action_id: string, payload: Event["payload"]) {
@@ -199,7 +206,7 @@ function append(run: Run, kind: Event["kind"], action_id: string, payload: Event
 }
 export function pendingResources(run: Run) {
   return run.events.filter(e => e.kind === "intent" && ["key", "row"].includes((e.payload as Intent).kind) &&
-    !run.events.some(done => done.kind === "outcome" && done.action_id === e.action_id));
+    !run.events.some(done => isOutcome(done) && done.action_id === e.action_id));
 }
 /** Register the whole first-attempt resource plan before creating any resource. */
 export function resourceIntents(run: Run, actions: Intent[]) {
@@ -226,8 +233,14 @@ export function intent(run: Run, action: Intent) {
 }
 export function outcome(run: Run, action_id: string, receipt: Receipt) {
   validateReceipt(receipt);
-  if (!run.events.some(e => e.kind === "intent" && e.action_id === action_id) || run.events.some(e => e.kind === "outcome" && e.action_id === action_id)) fail();
+  if (!run.events.some(e => e.kind === "intent" && e.action_id === action_id) || run.events.some(e => isOutcome(e) && e.action_id === action_id)) fail();
   append(run, "outcome", action_id, receipt);
+}
+export function observedOutcome(run:Run,action_id:string,receipt:Receipt){
+ validateReceipt(receipt);
+ const action=run.events.find(e=>e.kind==="intent"&&e.action_id===action_id)?.payload as Intent|undefined;
+ if(!run.cleanup_only||!action||["key","row"].includes(action.kind)||run.events.some(e=>isOutcome(e)&&e.action_id===action_id))fail();
+ append(run,"observed-outcome",action_id,receipt);
 }
 export function handoff(run: Run, action_id: string, reason_code: string) {
   if (!identifier(reason_code)) fail();
@@ -257,7 +270,7 @@ export function reconcilePolicy(config:Settings,directory:string,batch_digest:st
  for(const [path,bound]of [[config.settings_path,bindings.settings_digest],[config.project_procedure,bindings.policy_digest]])
   if(hash(gitBytes(config.root,"show",request.policy_commit+":"+path))!==bound||hash(gitBytes(config.root,"show",observed.default_commit+":"+path))!==bound)fail();
  if(previous&&previous.previous===request.expected_digest&&run.policy_current&&(previous.payload as PolicyTransition).owner_handoff===request.owner_handoff&&(previous.payload as PolicyTransition).policy_commit===request.policy_commit)return readRun(config,directory,batch_digest);
- if(run.digest!==request.expected_digest||run.policy_current||!pendingResources(run).length)fail();
+ if(run.digest!==request.expected_digest||run.policy_current||!run.events.some(e=>e.kind==="intent"&&!run.events.some(done=>isOutcome(done)&&done.action_id===e.action_id)))fail();
  const old=previous?.payload as PolicyTransition|undefined;
  const payload:PolicyTransition={from_settings_digest:old?.settings_digest??run.header.settings_digest,from_policy_digest:old?.policy_digest??run.header.policy_digest,
   settings_digest:bindings.settings_digest,policy_digest:bindings.policy_digest,policy_commit:request.policy_commit,observed_default_branch:observed.default_branch,observed_default_commit:observed.default_commit,owner_handoff:request.owner_handoff,cleanup_only:true};
@@ -280,7 +293,7 @@ export function retireRun(config:Settings,directory:string,batch_digest:string,r
  let run=readRun(config,directory,batch_digest,{inspect:true});registrationFor(run);
  let final=run.events.at(-1);
  if(!run.retired){
-  if(run.digest!==request.expected_digest||run.events.some(e=>e.kind==="intent"&&!run.events.some(done=>done.kind==="outcome"&&done.action_id===e.action_id)))fail();
+  if(run.digest!==request.expected_digest||run.events.some(e=>e.kind==="intent"&&!run.events.some(done=>isOutcome(done)&&done.action_id===e.action_id)))fail();
   const event:Event={revision:run.revision+1,previous:run.digest,kind:"retirement",action_id:"run-retirement",payload:{owner_handoff:request.owner_handoff,zero_pending:true}};
   publishJSON(join(directory,"events",String(event.revision).padStart(8,"0")+".json"),event);
   run=readRun(config,directory,batch_digest,{inspect:true});final=run.events.at(-1);

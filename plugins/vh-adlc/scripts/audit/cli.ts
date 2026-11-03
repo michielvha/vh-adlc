@@ -11,7 +11,7 @@ import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "
 import { createLedgerCandidate, applyLedgerCandidate, appendFindings } from "./ledger";
 import { requireAuditRuntime } from "./runtime";
 import { checkBatch } from "./batch";
-import { createRun, retireRun, reconcilePolicy, registerRun, registeredPending, intent, resourceIntents, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
+import { createRun, retireRun, reconcilePolicy, registerRun, registeredPending, intent, resourceIntents, noteResource, readRun, outcome, observedOutcome, handoff, inspectPending } from "./journal";
 import type { AuditMode } from "./types";
 
 const argumentsByOperation: Record<string, string[]> = {
@@ -25,6 +25,7 @@ const argumentsByOperation: Record<string, string[]> = {
   "journal-reconcile-policy": ["directory", "batch-digest", "input"],
   "journal-pending": ["directory", "batch-digest"],
   "journal-cleanup-outcome": ["directory", "batch-digest", "action-id", "input", "absence-confirmed"],
+  "journal-observed-outcome": ["directory","batch-digest","action-id","input","observation-confirmed"],
   "journal-outcome": ["directory", "batch-digest", "action-id", "input"],
   "journal-handoff": ["directory", "batch-digest", "action-id", "reason"],
   "journal-live-intents": ["directory", "batch-digest", "input"],
@@ -85,6 +86,10 @@ export function runCLI(argv: string[]) {
   if(operation==="journal-retire")return retireRun(config,requireOption("directory"),requireOption("batch-digest"),json(requireOption("input")));
   if(operation==="journal-reconcile-policy"){const run=reconcilePolicy(config,requireOption("directory"),requireOption("batch-digest"),json(requireOption("input")));return {directory:run.directory,revision:run.revision,cleanup_only:run.cleanup_only,policy_current:run.policy_current};}
   const run = readRun(config, requireOption("directory"), requireOption("batch-digest"));
+  if(operation==="journal-observed-outcome"){
+    if(requireOption("observation-confirmed")!=="true")throw Error("audit observed outcome requires an explicit current observation, never execution permission");
+    observedOutcome(run,requireOption("action-id"),json(requireOption("input")));
+  }
   if (["journal-outcome", "journal-cleanup-outcome"].includes(operation)) {
     const id = requireOption("action-id"), action = run.events.find(event => event.kind === "intent" && event.action_id === id);
     const resource = action && ["key", "row"].includes((action.payload as { kind: string }).kind);

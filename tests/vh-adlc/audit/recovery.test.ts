@@ -136,3 +136,27 @@ test.each(["merge","key"] as const)("retirement refuses pending %s effects",kind
  const c=context();intent(c.run,{id:kind,kind,correlation:"owned-pending",target:"dev:slot",...(kind==="key"?{actor:"actor",organization:"org",cleanup_method:"#cleanup"}:{})});
  expect(()=>retireRun(c.config,c.run.directory,c.run.header.batch_digest,{owner_approved:true,owner_handoff:"owner:retain",expected_digest:c.reload().digest})).toThrow();
 });
+
+test("an observed merge after policy drift is recorded once without replay and permits retirement",async()=>{
+ const c=context();intent(c.run,{id:"merge",kind:"merge",correlation:"pull-42",target:"pull:42"});const before=c.reload();
+ c.f.write("audit-project.md","# Adopted changed policy\n");const policyCommit=c.f.commit(),config=loadSettings(c.f.root);
+ const run=reconcilePolicy(config,before.directory,before.header.batch_digest,{owner_approved:true,owner_handoff:"owner:observe-merge",expected_digest:before.digest,policy_commit:policyCommit},{observe:()=>({default_branch:"main",default_commit:policyCommit})});
+ let executed=0;const transport={authorized:true,observe:async()=>({state:"done" as const,receipt:{state:"observed" as const,commit:policyCommit,pull_number:42}}),execute:async()=>{executed++;throw Error("never replay");}};
+ expect((await recoverEffect(run,"merge",transport)).state).toBe("observed");expect((await recoverEffect(run,"merge",transport)).state).toBe("observed");expect(executed).toBe(0);
+ const current=readRun(config,run.directory,run.header.batch_digest);expect(current.events.filter(e=>e.kind==="observed-outcome")).toHaveLength(1);
+ expect(retireRun(config,current.directory,current.header.batch_digest,{owner_approved:true,owner_handoff:"owner:retained-merge",expected_digest:current.digest}).zero_pending).toBe(true);
+});
+test("a reconciliation-only absent merge stays pending even when an execute callback is supplied",async()=>{
+ const c=context();intent(c.run,{id:"merge",kind:"merge",correlation:"pull-42",target:"pull:42"});const before=c.reload();c.f.write("audit-project.md","# New policy\n");const policyCommit=c.f.commit(),config=loadSettings(c.f.root);
+ const run=reconcilePolicy(config,before.directory,before.header.batch_digest,{owner_approved:true,owner_handoff:"owner:no-replay",expected_digest:before.digest,policy_commit:policyCommit},{observe:()=>({default_branch:"main",default_commit:policyCommit})});
+ let executed=0;expect((await recoverEffect(run,"merge",{authorized:true,observe:async()=>({state:"absent"}),execute:async()=>{executed++;return{state:"observed"};}})).state).toBe("blocked");expect(executed).toBe(0);
+ expect(inspectPending(config,run.directory,run.header.batch_digest).pending.map(row=>row.id)).toEqual(["merge"]);
+});
+
+test("pending inspection reports repository-wide readiness without mutating either registered run",()=>{
+ const c=context(),other=createRun(c.config,{artifact_root:c.f.artifacts,run_id:"other-pending",batch_digest:"e".repeat(64)});
+ intent(other,{id:"key",kind:"key",correlation:"other-key",target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"});
+ const before=readFileSync(join(c.run.directory,"header.json"));
+ expect(inspectPending(c.config,c.run.directory,c.run.header.batch_digest).live_ready).toBe(false);
+ expect(readFileSync(join(c.run.directory,"header.json")).equals(before)).toBe(true);
+});

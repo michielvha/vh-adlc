@@ -112,3 +112,15 @@ test("native retirement retains its receipt after completed run artifacts are re
  rmSync(directory,{recursive:true});expect(JSON.parse(invoke(f,"journal-registered-pending").stdout.toString()).pending).toEqual([]);
  expect(invoke(f,"journal-retire",...args,"--input",join(f.artifacts,request.path)).exitCode).toBe(0);
 });
+
+test("native observation-only merge reconciliation after policy drift can retire without execution",()=>{
+ const f=fixture();projects.push(f);const batch="b".repeat(64),created=invoke(f,"journal-new","--artifact-root",f.artifacts,"--run-id","observed-merge","--batch-digest",batch),directory=JSON.parse(created.stdout.toString()).directory,args=["--directory",directory,"--batch-digest",batch];
+ const action=f.artifact("observed-merge-intent.json",JSON.stringify({id:"merge",kind:"merge",correlation:"pull-42",target:"pull:42"}));expect(invoke(f,"journal-intent",...args,"--input",join(f.artifacts,action.path)).exitCode).toBe(0);
+ const before=JSON.parse(invoke(f,"journal-read",...args).stdout.toString());f.write("audit-project.md","# Adopted policy for observing prior outcomes\n");const policy_commit=f.commit();wireDefault(f,policy_commit);
+ const request=f.artifact("observed-merge-policy.json",JSON.stringify({owner_approved:true,owner_handoff:"owner:observed-merge",expected_digest:before.digest,policy_commit}));expect(invoke(f,"journal-reconcile-policy",...args,"--input",join(f.artifacts,request.path)).exitCode).toBe(0);
+ const receipt=f.artifact("observed-merge-receipt.json",JSON.stringify({state:"observed",commit:policy_commit,pull_number:42}));
+ expect(invoke(f,"journal-outcome",...args,"--action-id","merge","--input",join(f.artifacts,receipt.path)).exitCode).toBe(1);
+ expect(invoke(f,"journal-observed-outcome",...args,"--action-id","merge","--input",join(f.artifacts,receipt.path),"--observation-confirmed","true").exitCode).toBe(0);
+ const current=JSON.parse(invoke(f,"journal-read",...args).stdout.toString());expect(current.events.filter((e:any)=>e.kind==="observed-outcome")).toHaveLength(1);
+ const retirement=f.artifact("observed-merge-retire.json",JSON.stringify({owner_approved:true,owner_handoff:"owner:retained",expected_digest:current.digest}));expect(invoke(f,"journal-retire",...args,"--input",join(f.artifacts,retirement.path)).exitCode).toBe(0);
+});

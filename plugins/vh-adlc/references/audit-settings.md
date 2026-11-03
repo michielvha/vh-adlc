@@ -174,7 +174,7 @@ in the pass summary with its source/Scope baseline; partial/unknown summary obse
 residuals. The minimal standalone layout keeps per-finding notes. No unchanged old heading or title
 annotation is rewritten merely to add another date.
 
-Canonical updates reject HTML comments within the declared index section, including multiline
-inline comments: the supported pipe-row scanner cannot establish their rendered row visibility.
-Inspection reports an unsupported-structure gap; reconcile that source explicitly before updating.
+Comments or raw HTML within the declared index section remain unsupported, including multiline
+inline forms. Although rows come from rendered tables, this profile conservatively invalidates
+terminal eligibility and next-ID allocation for that index until explicit reconciliation.
 Literal examples inside code fences/spans do not trigger this restriction.

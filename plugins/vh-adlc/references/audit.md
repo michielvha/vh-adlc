@@ -115,8 +115,10 @@ An incomplete aggregate/index-only identity can receive a dated UNKNOWN/PARTIAL 
 its actual gap, preserving the original ambiguous/range index. It cannot acquire an individual
 terminal verdict or an invented finding section. Supported title annotations and inline
 `**Re-verify (date):**` markers preserve the original heading text/anchors and earlier history.
-An existing `How this audit was performed` layout also retains its dated banner and categorized
-`Re-verification summary (date)` tables. Changed statuses get a dated marker immediately below the
+For reverify/full, an existing `How this audit was performed` layout retains its dated banner and
+categorized `Re-verification summary (date)` tables. Selected fix candidates add only their changed
+finding markers/index cells/inline notes and record bindings; they add no pass overview or permanent
+claim that final review is still pending. Changed statuses get a dated marker immediately below the
 unchanged finding heading, preserving its anchor. Older banners, summaries and finding prose remain;
 unselected history is never described as freshly verified. Minimal ledgers keep their inline-note layout.
 
@@ -255,9 +257,9 @@ reconcile rather than substituting a cached local declaration.
 This is an operator attestation of the actual handoff, not permission inferred from a file.
 
 The helper appends one hash-bound transition, retaining the original header, intents, IDs and
-history. Exact retries reconcile that transition. Only resource-ID observations, scoped cleanup
-absence outcomes and handoffs may follow; no new intent, forward-effect recovery or old-batch
-completion is allowed. Current cleanup methods and transport permission still govern every
+history. Exact retries reconcile that transition. Only resource-ID observations, scoped cleanup absence outcomes, read-only observations of existing
+non-resource effects and handoffs may follow. No new intent, execution/replay or old-batch completion
+is allowed. Current cleanup methods and transport permission still govern every
 lookup/delete. Preserve an old cleanup fragment as a current explicit alias if its implementation
 moves; the transition never broadens target/actor/organization or substitutes arbitrary methods.
 Dirty/uncommitted policy, stale digest, unknown fields or absent handoff fails without mutation.
@@ -287,3 +289,17 @@ preserves its registrations and pending checks. Independent clones still require
 handoff. Keep unretired artifact roots at their registered absolute paths; a missing/moved root is
 unknown, never absence. Restore the exact retained root before resuming rather than deleting a
 registration or guessing that no resources remain.
+
+After a policy transition, an existing merge/push/issue/PR/report/commit intent can be reconciled
+through a read-only actual-state lookup. `recoverEffect` records `observed-outcome` only for an
+already observed completion and never invokes its execute callback in this mode. Absent or unknown
+state remains pending with a handoff, even if an execute callback is supplied. Native callers may
+use `journal-observed-outcome --action-id <id> --input <observed-receipt.json>
+--observation-confirmed true` after the same actual lookup; this is an operator attestation and
+accepts no key/row creation outcome. Inspect completed receipts before retrying a native write.
+A fully observed old run can then retire normally. The transition is available for any pending
+intent, not only live resources, and still requires current adopted policy and owner handoff.
+
+`journal-pending` reports repository-wide cleanup readiness, including other registered runs.
+Its `readiness_handoff` distinguishes another pending cleanup, unknown registration, retirement or
+policy reconciliation. Readiness grants no live permission; actual current scope still governs.

@@ -1,4 +1,4 @@
-import { handoff, outcome, noteResource, pendingResources, registeredPending, requireRegistered, readRun, type Intent, type Receipt, type Run } from "./journal";
+import { handoff, outcome, observedOutcome, noteResource, pendingResources, registeredPending, requireRegistered, readRun, type Intent, type Receipt, type Run } from "./journal";
 
 type Observation = { state: "done"; receipt: Receipt } | { state: "absent" | "unknown" };
 function reload(run: Run) { return readRun(run.config, run.directory, run.header.batch_digest); }
@@ -7,14 +7,14 @@ export async function recoverEffect(run: Run, id: string, transport: {
 }) {
   run = reload(run);
   requireRegistered(run);
-  if(run.cleanup_only)throw Error("audit cleanup-only handoff cannot recover forward effects");
   const action = run.events.find(e => e.kind === "intent" && e.action_id === id)?.payload as Intent | undefined;
   if (!action) throw Error("audit effect has no durable intent; inspect actual state before a new action");
   if (["key", "row"].includes(action.kind)) throw Error("audit resource intents require scoped cleanup reconciliation, never generic effect completion");
-  const completed = run.events.find(e => e.kind === "outcome" && e.action_id === id);
+  const completed = run.events.find(e => ["outcome","observed-outcome"].includes(e.kind) && e.action_id === id);
   if (completed) return completed.payload as Receipt;
   const observed = await transport.observe(action);
-  if (observed.state === "done") { outcome(run, id, observed.receipt); return observed.receipt; }
+  if (observed.state === "done") { if(run.cleanup_only)observedOutcome(run,id,observed.receipt);else outcome(run, id, observed.receipt); return observed.receipt; }
+  if(run.cleanup_only){handoff(run,id,"reconciliation-only-no-replay");return {state:"blocked" as const};}
   if (observed.state === "unknown" || !transport.authorized || !transport.execute) {
     handoff(run, id, observed.state === "unknown" ? "actual-state-unknown" : "execution-not-authorized-or-recovery-only");
     return { state: "blocked" as const };
