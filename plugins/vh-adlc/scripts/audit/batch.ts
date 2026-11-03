@@ -1,4 +1,5 @@
 import { loadSettings } from "./settings";
+import { readRun, pendingResources } from "./journal";
 import { observeDefault } from "./authority";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -18,6 +19,12 @@ export type Definition = {
     pre_fix?: string; repair_commit?: string; coupled_bundle?: string }[];
   carried: null | { commit: string; ids: string[]; paths: string[]; report_snapshot_digest: string; evidence_artifact: { path: string; sha256: string } };
 };
+/** Stable selected scope: source and review freshness are checked separately. */
+export function batchJournalDigest(def: Definition) {
+  return digest({ repository: def.repository, hostname: def.hostname, run_id: def.run_id, workstream: def.workstream,
+    default_branch: def.default_branch, scope_baseline: def.scope_baseline, task_base: def.task_base,
+    ids: def.members.map(m => m.id).sort(), carried: def.carried ? { commit: def.carried.commit, ids: [...def.carried.ids].sort() } : null });
+}
 export function renderRecord(definition: Definition) {
   return "# Audit repair batch\n\n## Definition\n\n```json\n" + JSON.stringify(definition, null, 2) +
     "\n```\n\n## Evidence\n\nAppend actual per-member red/green/scenario/challenge and final-target checks.\n\n## Reviews\n\nRetain returned records verbatim with exact targets, model and isolation.\n\n## State\n\nreview pending\n";
@@ -62,6 +69,7 @@ function preservedLedger(before: string, after: string, selected: string[]) {
 }
 export function checkBatch(config: Settings, input: {
   record_path: string; review_target: string; snapshot: Snapshot; document: unknown;
+  journal: { directory: string; batch_digest: string };
   provisional: { snapshot: Snapshot; document: { schema_version: number; snapshot_digest: string; assessments: any[] }; candidate: Candidate };
   selection: { ids: string[]; workstream: string; carried: Definition["carried"] };
   review: { target: string; producer: string; reviewer: string; artifact: { path: string; sha256: string }; model: string };
@@ -72,6 +80,11 @@ export function checkBatch(config: Settings, input: {
     const recordPath = repositoryPath(input.record_path), target = input.review_target;
     const record = gitBytes(config.root, "show", `${target}:${recordPath}`).toString(), def = definition(record);
     publication_base = def.scope_baseline;
+    if (!/^[a-z0-9][a-z0-9_-]{0,79}$/.test(def.run_id) || !input.journal ||
+        input.journal.directory !== join(input.snapshot.artifact_root, "audit-run-" + def.run_id) ||
+        input.journal.batch_digest !== batchJournalDigest(def)) throw Error("Batch requires its scope-bound resource journal.");
+    const run = readRun(config, input.journal.directory, input.journal.batch_digest);
+    if (run.header.run_id !== def.run_id || pendingResources(run).length) throw Error("Pending resource cleanup blocks batch completion.");
     if (def.schema_version !== 1 || def.repository !== config.repository || def.hostname !== config.hostname || def.record_path !== recordPath ||
         def.ledger_path !== config.ledger_path || !def.run_id?.trim() || def.workstream !== input.selection.workstream ||
         !Array.isArray(def.members) || !def.members.length || new Set(def.members.map(m => m.id)).size !== def.members.length ||

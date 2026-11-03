@@ -1,4 +1,4 @@
-import { handoff, outcome, readRun, type Intent, type Receipt, type Run } from "./journal";
+import { handoff, outcome, noteResource, pendingResources, readRun, type Intent, type Receipt, type Run } from "./journal";
 
 type Observation = { state: "done"; receipt: Receipt } | { state: "absent" | "unknown" };
 function reload(run: Run) { return readRun(run.config, run.directory, run.header.batch_digest); }
@@ -25,16 +25,14 @@ type Scope = { target: string; actor: string; organization: string; cleanup_meth
 type Resource = Scope & { id: string };
 export function liveReady(run: Run): boolean {
   run = reload(run);
-  return !run.events.some(e => e.kind === "intent" && ["key", "row"].includes((e.payload as Intent).kind) &&
-    !run.events.some(done => done.kind === "outcome" && done.action_id === e.action_id));
+  return pendingResources(run).length === 0;
 }
 export async function cleanupPending(run: Run, scope: Scope, transport: {
   authorized: boolean; lookup: (action: Intent, recordedID?: string) => Promise<Resource[]>; cleanup: (action: Intent, resource: Resource) => Promise<void>;
 }) {
   run = reload(run);
   const handoffs: { action: string; reason: string }[] = [];
-  const pending = run.events.filter(e => e.kind === "intent" && ["key", "row"].includes((e.payload as Intent).kind) &&
-    !run.events.some(done => done.kind === "outcome" && done.action_id === e.action_id));
+  const pending = pendingResources(run);
   for (const event of pending) {
     const action = event.payload as Intent;
     const recordedID = (run.events.find(e => e.kind === "resource" && e.action_id === action.id)?.payload as { resource_id: string } | undefined)?.resource_id;
@@ -48,9 +46,14 @@ export async function cleanupPending(run: Run, scope: Scope, transport: {
       if (!reason) {
         if (resources.length) {
           // The caller resolves this method from current authorized policy, never executes journal strings.
-          await transport.cleanup(action, resources[0]);
-          const after = await transport.lookup(action, recordedID);
-          if (after.length) reason = "cleanup-absence-not-observed";
+          if (!recordedID) noteResource(run, action.id, resources[0].id);
+          try { await transport.cleanup(action, resources[0]); } catch { reason = "cleanup-execution-failed"; }
+          if (!reason) {
+            try {
+              const after = await transport.lookup(action, recordedID ?? resources[0].id);
+              if (after.length) reason = "cleanup-absence-not-observed";
+            } catch { reason = "cleanup-absence-unavailable"; }
+          }
         }
         if (!reason) outcome(run, action.id, { state: "observed", ...(resources.length ? { resource_id: resources[0].id } : {}) });
       }

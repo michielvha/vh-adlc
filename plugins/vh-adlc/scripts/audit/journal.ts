@@ -110,8 +110,29 @@ function append(run: Run, kind: Event["kind"], action_id: string, payload: Event
   publishJSON(join(run.directory, "events", String(event.revision).padStart(8, "0") + ".json"), event);
   Object.assign(run, readRun(run.config, run.directory, run.header.batch_digest));
 }
+export function pendingResources(run: Run) {
+  return run.events.filter(e => e.kind === "intent" && ["key", "row"].includes((e.payload as Intent).kind) &&
+    !run.events.some(done => done.kind === "outcome" && done.action_id === e.action_id));
+}
+/** Register the whole first-attempt resource plan before creating any resource. */
+export function resourceIntents(run: Run, actions: Intent[]) {
+  if (!Array.isArray(actions) || !actions.length || pendingResources(run).length) fail();
+  const ids = new Set(run.events.filter(e => e.kind === "intent").map(e => e.action_id));
+  const scopes = new Set(run.events.filter(e => e.kind === "intent").map(e => resourceScope(e.payload as Intent)));
+  for (const action of actions) {
+    validateIntent(action);
+    const scope = resourceScope(action);
+    if (!["key", "row"].includes(action.kind) || ids.has(action.id) || scopes.has(scope)) fail();
+    ids.add(action.id); scopes.add(scope);
+  }
+  for (const action of actions) append(run, "intent", action.id, action);
+}
+function resourceScope(action: Intent) {
+  return digest([action.kind, action.target, action.actor ?? null, action.organization ?? null, action.correlation]);
+}
 export function intent(run: Run, action: Intent) {
   validateIntent(action);
+  if (["key", "row"].includes(action.kind)) { resourceIntents(run, [action]); return; }
   if (run.events.some(e => e.kind === "intent" && e.action_id === action.id)) fail();
   append(run, "intent", action.id, action);
 }

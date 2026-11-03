@@ -94,3 +94,16 @@ a later ledger. The frozen ledger must still equal the selected Task-base ledger
 an explicitly included checked carried report. The final committed ledger must equal that candidate's
 bytes. Final verdicts, dispositions, reasons, residuals and scenario/source evidence must match;
 final checks and independent challenge/review artifacts bind the later actual review target.
+
+
+## Bound resource journal
+
+Every `batch-check` bundle also requires `journal: {directory, batch_digest}`, including batches
+that never create live resources. Create the run under the snapshot's private artifact root as
+`audit-run-<run_id>`. Compute its digest using `batchJournalDigest(definition)`: it binds repository,
+hostname, run ID, workstream, actual default branch, Scope baseline, Task base, sorted member IDs
+and the included carried report's commit/sorted IDs (or null). A different selected scope needs a
+new run. Source and review updates keep this scope digest; their freshness checks still apply.
+The helper reads the current policy-bound journal and refuses completion while any key/row cleanup
+is pending, including a denied or ambiguous handoff. An empty journal records that no resources
+were registered; it supplies no authority or independent execution proof.

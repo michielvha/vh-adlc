@@ -1,14 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { checkBatch, renderRecord, type Definition } from "../../../plugins/vh-adlc/scripts/audit/batch";
-import { captureSnapshot } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
+import { checkBatch, batchJournalDigest, renderRecord, type Definition } from "../../../plugins/vh-adlc/scripts/audit/batch";
+import { captureSnapshot, digest } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
+import { createRun, intent, handoff } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { cleanupPending } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { fixture, git } from "./fixtures";
 import { terminal } from "./evidence";
 import { createLedgerCandidate } from "../../../plugins/vh-adlc/scripts/audit/ledger";
 const projects: ReturnType<typeof fixture>[] = [];
-function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"]) {
+function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"], defaultBranch = "main") {
   const f = fixture(); projects.push(f); const config = loadSettings(f.root), base = git(f.root, "rev-parse", "HEAD");
   git(f.root, "update-ref", "refs/remotes/origin/main", base); git(f.root, "switch", "-qc", "fix/audit-batch");
   let taskBase = base, carried: Definition["carried"] = null;
@@ -25,7 +27,7 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
   // Actual disposable regression execution is retained separately by the model trial; these unit records are structural attestations.
   if (!allAssessment) f.write("src/app.ts", "export const answer = 43;\n"); const repaired = allAssessment ? taskBase : f.commit("test: authored fixture repair");
   const path = "docs/internal/maintenance/audit-A-test.md";
-  const definition: Definition = { schema_version: 1, repository: config.repository, hostname: config.hostname, default_branch: "main", run_id: "batch-test", workstream: "A",
+  const definition: Definition = { schema_version: 1, repository: config.repository, hostname: config.hostname, default_branch: defaultBranch, run_id: "batch-test", workstream: "A",
     scope_baseline: base, task_base: taskBase, source_target: repaired, ledger_path: config.ledger_path, record_path: path,
     affected_paths: ["src/app.ts", config.ledger_path, path], verification_inputs: ["src/app.ts"],
     members: ["AUD-001", "AUD-002"].map((id, i) => ({ id, disposition: i === 0 && !allAssessment ? "authored-repair" : "assessment-only", contract: "Existing documented return-value contract.", eligibility: "restoration", required_checks: checkNames, ...(i === 0 && !allAssessment ? { pre_fix: taskBase, repair_commit: repaired } : {}) })),
@@ -44,9 +46,14 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
   if (!allAssessment) rows[0].red = { ...rows[0].checks[0], commit: taskBase, exit_code: 1, artifact: f.artifact("red.txt") };
   rows[0].batch_review = { producer: "author", reviewer: "independent", result: "NO FINDINGS", source_commit: target, artifact: f.artifact("review.txt", "MODEL: claude-opus-5.5\nNO FINDINGS\n") };
   const input = { record_path: path, review_target: target, snapshot, provisional, document: { schema_version: 1, snapshot_digest: snapshot.digest, assessments: rows },
+    journal: { directory: "", batch_digest: "" },
     selection: { ids: ["AUD-001", "AUD-002"], workstream: "A", carried },
     review: { target, producer: "author", reviewer: "independent", artifact: rows[0].batch_review.artifact, model: "claude-opus-5.5" } };
-  return { f, config, definition, input, base, target, path, observe: () => ({ default_branch: "main", default_commit: git(f.root, "rev-parse", "refs/remotes/origin/main") }) };
+  const run = createRun(config, { artifact_root: f.artifacts, run_id: definition.run_id, batch_digest: digest({ repository: definition.repository, hostname: definition.hostname, run_id: definition.run_id,
+    workstream: definition.workstream, default_branch: definition.default_branch, scope_baseline: definition.scope_baseline, task_base: definition.task_base,
+    ids: definition.members.map(member => member.id).sort(), carried: definition.carried ? { commit: definition.carried.commit, ids: definition.carried.ids.slice().sort() } : null }) });
+  Object.assign(input, { journal: { directory: run.directory, batch_digest: run.header.batch_digest } });
+  return { f, config, definition, input, base, target, path, run, observe: () => ({ default_branch: "main", default_commit: git(f.root, "rev-parse", "refs/remotes/origin/main") }) };
 }
 function retarget(c: ReturnType<typeof context>) {
   const target = git(c.f.root, "rev-parse", "HEAD"), previous = c.input.document.assessments;
@@ -153,11 +160,34 @@ test("even an all-assessment terminal batch must declare nonempty per-member fin
 });
 
 test("an author-named other branch cannot masquerade as the actual default even at an equal cached tip",()=>{
-  const c=context();git(c.f.root,"update-ref","refs/remotes/origin/old-feature",c.base);c.definition.default_branch="old-feature";
-  c.f.write(c.path,renderRecord(c.definition));c.f.commit();retarget(c);
+  const c=context(false,false,false,["unit"],"old-feature");git(c.f.root,"update-ref","refs/remotes/origin/old-feature",c.base);
   expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
 });
 test.each(["offline","advanced"])("%s actual remote observation cannot be replaced by a cached default ref",kind=>{
   const c=context(); const observe=()=>{if(kind==="offline")throw Error("synthetic remote unavailable");return {default_branch:"main",default_commit:c.target};};
   expect(checkBatch(c.config,c.input,{observe}).pass).toBe(false);
+});
+
+test("pending resource cleanup and a denied handoff block batch completion until absence is reconciled",async()=>{
+  const c=context(),scope={target:"synthetic:owned",actor:"actor",organization:"org",cleanup_method:"#cleanup"};
+  intent(c.run,{id:"key",kind:"key",correlation:"owned-key",...scope});handoff(c.run,"key","cleanup-permission-denied");
+  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
+  await cleanupPending(c.run,scope,{authorized:true,lookup:async()=>[],cleanup:async()=>{throw Error("nothing exists");}});
+  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(true);
+});
+
+
+test.each(["missing", "wrong-directory", "wrong-digest"])("a %s resource journal cannot establish batch completion", kind => {
+  const c = context();
+  if (kind === "missing") delete (c.input as any).journal;
+  if (kind === "wrong-directory") c.input.journal.directory += "-another";
+  if (kind === "wrong-digest") c.input.journal.batch_digest = "0".repeat(64);
+  expect(checkBatch(c.config, c.input, {observe:c.observe}).pass).toBe(false);
+});
+test("resource journal scope stays stable across source updates but changes with selected scope", () => {
+  const c = context(), original = batchJournalDigest(c.definition);
+  expect(batchJournalDigest({...c.definition, source_target:"a".repeat(40)})).toBe(original);
+  for (const changed of [{run_id:"another"},{workstream:"B"},{default_branch:"another"},{scope_baseline:"a".repeat(40)},
+    {task_base:"a".repeat(40)},{members:c.definition.members.slice(1)},{carried:{commit:c.base,ids:["AUD-099"]} as any}])
+    expect(batchJournalDigest({...c.definition,...changed})).not.toBe(original);
 });

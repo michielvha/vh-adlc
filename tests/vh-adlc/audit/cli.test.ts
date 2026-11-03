@@ -49,3 +49,21 @@ test("native generic outcomes cannot confuse a created key with confirmed cleanu
   const pending = invoke(f, "journal-pending", "--directory", directory, "--batch-digest", batch); expect(JSON.parse(pending.stdout.toString()).live_ready).toBe(false);
   expect(invoke(f, "journal-cleanup-outcome", "--directory", directory, "--batch-digest", batch, "--action-id", "key", "--input", join(f.artifacts, receipt.path), "--absence-confirmed", "true").exitCode).toBe(0);
 });
+
+
+test("native live plan registers key and row together and refuses another attempt before cleanup", () => {
+  const f=fixture();projects.push(f);const batch="e".repeat(64);
+  const created=invoke(f,"journal-new","--artifact-root",f.artifacts,"--run-id","live-plan","--batch-digest",batch);
+  expect(created.exitCode).toBe(0);const directory=JSON.parse(created.stdout.toString()).directory;
+  const actions=["key","row"].map(kind=>({id:kind,kind,correlation:"owned-"+kind,target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"}));
+  const malformed=f.artifact("malformed-plan.json",JSON.stringify([actions[0],{...actions[1],actor:undefined}]));
+  const args=["--directory",directory,"--batch-digest",batch];
+  expect(invoke(f,"journal-live-intents",...args,"--input",join(f.artifacts,malformed.path)).exitCode).toBe(1);
+  expect(JSON.parse(invoke(f,"journal-pending",...args).stdout.toString()).pending).toEqual([]);
+  const input=f.artifact("live-plan.json",JSON.stringify(actions));
+  expect(invoke(f,"journal-live-intents",...args,"--input",join(f.artifacts,input.path)).exitCode).toBe(0);
+  expect(JSON.parse(invoke(f,"journal-pending",...args).stdout.toString()).pending).toHaveLength(2);
+  const second=f.artifact("second-plan.json",JSON.stringify([{...actions[0],id:"second-key",correlation:"second-key"}]));
+  expect(invoke(f,"journal-live-intents",...args,"--input",join(f.artifacts,second.path)).exitCode).toBe(1);
+  expect(JSON.parse(invoke(f,"journal-pending",...args).stdout.toString()).pending).toHaveLength(2);
+});

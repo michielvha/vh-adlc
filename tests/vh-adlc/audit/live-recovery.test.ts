@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createRun, readRun, intent, noteResource } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { createRun, readRun, intent, resourceIntents, noteResource } from "../../../plugins/vh-adlc/scripts/audit/journal";
 import { cleanupPending, liveReady, recoverEffect } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture } from "./fixtures";
@@ -17,7 +17,7 @@ function context() {
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
 
 test.each(["before-create", "after-create", "after-cleanup"])("fresh-context %s recovery reconciles exact owned resources and never creates another key", async phase => {
-  const c = context(); c.pending("temporary-key", "key"); c.pending("test-row", "row");
+  const c = context(); resourceIntents(c.reload(), [{id:"temporary-key",kind:"key",correlation:"run-live-test-temporary-key",...c.scope},{id:"test-row",kind:"row",correlation:"run-live-test-test-row",...c.scope}]);
   const resources = new Map<string, string>(); let deletes = 0, created = 0;
   if (phase !== "before-create") { resources.set("run-live-test-temporary-key", "key-id"); resources.set("run-live-test-test-row", "row-id"); created = 2; }
   if (phase === "after-cleanup") resources.clear();
@@ -38,7 +38,7 @@ test("accepted cleanup with lost response is reconciled by observing absence bef
     lookup: async () => present ? [{ id: "key-id", ...c.scope }] : [],
     cleanup: async () => { present = false; deletes++; throw Error("cleanup response lost"); },
   };
-  await expect(cleanupPending(c.run, c.scope, transport)).rejects.toThrow("response lost");
+  expect((await cleanupPending(c.run, c.scope, transport)).handoffs).toEqual([{action:"temporary-key",reason:"cleanup-execution-failed"}]);
   expect(liveReady(c.reload())).toBe(false);
   expect((await cleanupPending(c.reload(), c.scope, transport)).ready).toBe(true); expect(deletes).toBe(1);
 });
@@ -71,4 +71,21 @@ test.each(["key", "row"] as const)("generic effect recovery cannot mark %s creat
   })).rejects.toThrow("cleanup");
   expect(observed).toBe(false); expect(liveReady(c.reload())).toBe(false);
   expect(c.reload().events.some(event => event.kind === "outcome")).toBe(false);
+});
+
+test("a second live resource intent is refused while the first is pending or handed off",()=>{
+  const c=context();c.pending("key","key");
+  expect(()=>c.pending("another-key","key")).toThrow();
+});
+test.each(["cleanup","absence-lookup"])("a %s failure leaves a specific durable handoff",async kind=>{
+  const c=context();c.pending("key","key");let lookups=0;
+  try { await cleanupPending(c.reload(),c.scope,{authorized:true,lookup:async()=>{lookups++;if(kind==="absence-lookup"&&lookups>1)throw Error("synthetic denied observation");return [{id:"key-id",...c.scope}];},cleanup:async()=>{if(kind==="cleanup")throw Error("synthetic revoke denied");}}); } catch { /* Old implementation threw without preserving the handoff. */ }
+  expect(c.reload().events.some(event=>event.kind==="handoff"&&event.action_id==="key")).toBe(true);expect(liveReady(c.reload())).toBe(false);
+});
+test("a resource ID discovered during lost-response reconciliation is retained before cleanup, protecting replacements",async()=>{
+  const c=context();c.pending("key","key");let current="original-id",deletes=0;
+  const transport={authorized:true,lookup:async()=>[{id:current,...c.scope}],cleanup:async()=>{deletes++;current="replacement-id";throw Error("synthetic cleanup acknowledgement lost");}};
+  try {await cleanupPending(c.reload(),c.scope,transport);}catch{}
+  try {await cleanupPending(c.reload(),c.scope,transport);}catch{}
+  expect(deletes).toBe(1);expect(current).toBe("replacement-id");expect(c.reload().events.some(event=>event.kind==="resource"&&(event.payload as any).resource_id==="original-id")).toBe(true);
 });

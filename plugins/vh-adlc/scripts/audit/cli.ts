@@ -10,7 +10,7 @@ import { saveReport } from "./report";
 import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "./authority";
 import { createLedgerCandidate, applyLedgerCandidate, appendFindings } from "./ledger";
 import { checkBatch } from "./batch";
-import { createRun, intent, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
+import { createRun, intent, resourceIntents, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
 import type { AuditMode } from "./types";
 
 const argumentsByOperation: Record<string, string[]> = {
@@ -23,6 +23,7 @@ const argumentsByOperation: Record<string, string[]> = {
   "journal-cleanup-outcome": ["directory", "batch-digest", "action-id", "input", "absence-confirmed"],
   "journal-outcome": ["directory", "batch-digest", "action-id", "input"],
   "journal-handoff": ["directory", "batch-digest", "action-id", "reason"],
+  "journal-live-intents": ["directory", "batch-digest", "input"],
   "journal-intent": ["directory", "batch-digest", "input"], "journal-resource": ["directory", "batch-digest", "action-id", "resource-id"],
 };
 export function runCLI(argv: string[]) {
@@ -81,6 +82,7 @@ export function runCLI(argv: string[]) {
     outcome(run, id, json(requireOption("input")));
   }
   if (operation === "journal-handoff") handoff(run, requireOption("action-id"), requireOption("reason"));
+  if (operation === "journal-live-intents") resourceIntents(run, json(requireOption("input")));
   if (operation === "journal-intent") intent(run, json(requireOption("input")));
   if (operation === "journal-resource") noteResource(run, requireOption("action-id"), requireOption("resource-id"));
   return { header: run.header, events: run.events, revision: run.revision, directory: run.directory };

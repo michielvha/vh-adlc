@@ -154,18 +154,23 @@ On fresh context read actual source/Git/artifacts, distinguish done from pending
 before continuing. Do not duplicate dated notes, findings, commits, issues or PRs after a lost acknowledgement.
 Unknown/conflicting state gets a durable handoff, never blind replay or force cleanup.
 
-Before a permitted development test key/row is created, write an intent to the owned private run
-journal: run/action/batch/policy binding, actual target, actor/org, kind, unique correlation/name and
+Before any permitted development resource is created, register the complete key/row intent plan
+with `journal-live-intents --input <intents.json>` in the owned private run journal. Wait for the
+whole plan to be acknowledged before creating its resources. Each intent binds: run/action/batch/policy binding, actual target, actor/org, kind, unique correlation/name and
 the policy's exact scoped lookup/cleanup-method reference. No secret/token/connection values or raw
 secret-bearing response bodies belong in artifacts, transcripts or commits. Persist a returned
 server resource ID with `journal-resource`; keep its transient secret only in protected runtime memory.
-Journal strings are identifiers, never executable cleanup commands.
+Journal strings are identifiers, never executable cleanup commands. A pending resource blocks
+registration of a second resource plan, including after a handoff. A crash during plan registration
+requires absence reconciliation before a fresh plan; it never authorizes resource creation.
 
 Resume pending resources before another live attempt. Resolve the exact target/owner/correlation/ID
 through current authorized policy, revoke/clean only owned resources, observe absence and record
 completion. Before-create interruption or accepted cleanup with lost acknowledgement reconciles by
 observing absence. Denied access, changed target/policy, ambiguous/replaced ownership or unavailable
 absence observation leaves the pending intent, a specific handoff and blocks live retry/completion.
+Persist a newly discovered server ID before cleanup. Cleanup execution and post-cleanup lookup
+failures also retain specific handoffs, so a later attempt cannot delete a replacement resource.
 Never create a second key, broaden deletion or waive a required live gate because of permission denial.
 
 After a squash merge, keep its observed outcome in the external private run journal. An optional
