@@ -54,3 +54,8 @@ test("an exact detached review target can be assessed without creating a branch"
   expect(snap.source.branch).toBe(null);
   expect(checkSnapshot(loadSettings(f.root), snap).current).toBe(true);
 });
+
+
+test.each(["<details>","not-a-sha\n## hidden"])("malformed comparison baseline %s is rejected before notes can render it", baseline => {
+  const f=project();expect(()=>captureSnapshot(loadSettings(f.root),{mode:"reverify",artifact_root:f.artifacts,baseline})).toThrow();
+});

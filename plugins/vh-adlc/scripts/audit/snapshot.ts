@@ -59,6 +59,7 @@ export function captureSnapshot(config: Settings, options: {
   const required_checks = options.required_checks ?? {};
   if (Object.entries(required_checks).some(([id, checks]) => !selected_ids.includes(id) || !Array.isArray(checks) ||
       new Set(checks).size !== checks.length || checks.some(check => typeof check !== "string" || !check.trim()))) throw Error("invalid required audit checks");
+  if (options.baseline !== undefined && (typeof options.baseline !== "string" || !/^[a-f0-9]{40,64}$/.test(options.baseline))) throw Error("invalid audit comparison baseline");
   const target = source(config.root);
   let history: { status: "scoped" | "unscoped"; baseline: string | null; reason: string } = {
     status: "unscoped", baseline: options.baseline ?? null, reason: "No reachable comparison baseline was supplied; directly reassess selected findings.",
