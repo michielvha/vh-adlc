@@ -15,6 +15,7 @@ export type Candidate = { schema_version: 1; run_id: string; at: string; snapsho
   source_target: string; scope_baseline: string; ids: string[]; new_findings: NewFinding[]; section_notes?: SectionNote[]; verdict_eligibility: "provisional" | "checked-proposal"; bytes: string; digest: string };
 type OwnedLedger = { path: string; branch: string; base: string; commit: string | null; candidate_digest: string; owner_file: string };
 function fail(message: string): never { throw Error("audit ledger: " + message); }
+function unchangedState(recorded: string, current: string) { return recorded === current || recorded === "OPEN" && current === "STILL_PRESENT"; }
 function marker(verdict: string) { return verdict === "FIXED" ? "✅" : verdict === "MOOT" ? "🗑️" : "⚠️"; }
 function replaceCell(line: string, index: number, value: string | ((raw: string) => string)) {
   const delimiters: number[] = []; let escaped = false;
@@ -53,6 +54,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
       if (!["UNKNOWN", "PARTIAL"].includes(row.verdict)) fail("individual finding identity is incomplete");
       continue; // Preserve the ambiguous/range index; record its gap separately below.
     }
+    if (datedLayout && unchangedState(finding.recorded_status,row.verdict)) continue;
     const index = finding.index_lines[0] - 1;
     let header: string[] | undefined;
     for (let i = index - 1; i >= 0; i--) {
@@ -72,6 +74,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     snap.inventory.findings.find(f => f.id === b.id)!.entry_lines[0] - snap.inventory.findings.find(f => f.id === a.id)!.entry_lines[0]);
   for (const row of rows) {
     const finding = snap.inventory.findings.find(f => f.id === row.id)!;
+    if (datedLayout && unchangedState(finding.recorded_status,row.verdict)) continue;
     let end = finding.entry_lines[0];
     const sections = markdownSections(lines.join("\n")).headings;
     while (end < lines.length) {
@@ -106,7 +109,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     for (const [title, verdict] of [["Fully fixed", "FIXED"], ["Partially fixed", "PARTIAL"], ["Regressed", "REGRESSED"], ["Moot", "MOOT"], ["Unknown", "UNKNOWN"]]) {
       const rows = options.document.assessments.filter(row => row.verdict === verdict);
       lines.push("", "### " + title, "", "| ID | Previously recorded | Current observation |", "| --- | --- | --- |");
-      for (const row of rows) lines.push(`| ${row.id} | ${snap.inventory.findings.find(f => f.id === row.id)?.recorded_status ?? "UNKNOWN"} | ${cell(row.reason)} |`);
+      for (const row of rows) lines.push(`| ${row.id} | ${snap.inventory.findings.find(f => f.id === row.id)?.recorded_status ?? "UNKNOWN"} | ${cell(row.reason + (row.residuals.length ? " Residuals: " + row.residuals.join("; ") : ""))} |`);
       if (!rows.length) lines.push("", "No selected findings in this category.");
     }
     const present = options.document.assessments.filter(row => row.verdict === "STILL_PRESENT").map(row => row.id);

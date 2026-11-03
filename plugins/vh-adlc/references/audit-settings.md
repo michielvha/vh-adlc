@@ -163,3 +163,10 @@ binding. They cannot introduce an equal/ancestor heading, raw HTML or an unclose
 a candidate revalidates the same section updates and evidence; editing only its bytes cannot pass.
 A source evidence item may supply `line`; it must name a nonempty line in the same hash-bound
 current file. The dated note records that location without rewriting old historical references.
+
+
+Ledgers with the established "How this audit was performed" dated layout keep inline history only
+for changed statuses. OPEN observed as STILL_PRESENT is unchanged. Current unchanged findings stay
+in the pass summary with its source/Scope baseline; partial/unknown summary observations include
+residuals. The minimal standalone layout keeps per-finding notes. No unchanged old heading or title
+annotation is rewritten merely to add another date.

@@ -380,3 +380,25 @@ test("section-note date metadata cannot turn a fenced reproduction into a real s
   const candidate=createLedgerCandidate(c.config,c.snap,{document,at:"2026-11-02",run_id:"fenced-note",section_notes:[{heading:"Positive",ids:["AUD-001"],text:"```text\n## Reproduction output\n```",evidence:[proof]}]});
   expect(Bun.markdown.html(candidate.bytes)).not.toContain("<h2>Reproduction output</h2>");expect(candidate.bytes).toContain("Earlier positive claim.");
 });
+
+
+test.each([false,true])("legacy dated history adds inline notes only for changed statuses: changed=%s",changed=>{
+  const c=context("full");c.f.write(c.config.ledger_path,ledger.replace("# Example audit","# Example audit\n\n## How this audit was performed\n\nPrior methodology and dated history."));c.f.commit();
+  const snap=captureSnapshot(c.config,{mode:"full",ids:["AUD-001","AUD-002"],artifact_root:c.f.artifacts,required_checks:{"AUD-001":["unit"],"AUD-002":["unit"]}}),rows=[terminal(c.f,snap,"AUD-001"),terminal(c.f,snap,"AUD-002")];
+  if(!changed){rows[0].verdict="STILL_PRESENT";rows[0].reason="Original scenario still reproduces.";rows[0].checks[0].exit_code=1;}
+  const candidate=createLedgerCandidate(c.config,snap,{document:{schema_version:1,snapshot_digest:snap.digest,assessments:rows},at:"2026-11-02",run_id:"changed-only"});
+  expect(candidate.bytes).toContain("## Re-verification summary (2026-11-02)");expect(candidate.bytes).toContain("Scope baseline: "+snap.scope_baseline);
+  expect(candidate.bytes.includes("<!-- audit-run:changed-only:AUD-001 -->")).toBe(changed);
+  expect(candidate.bytes).not.toContain("<!-- audit-run:changed-only:AUD-002 -->");
+  if(!changed)expect(candidate.bytes).toContain("| AUD-001 | High | Incorrect result | OPEN |");
+  expect(candidate.bytes).toContain("### AUD-002 - Historical observation\nRecorded FIXED on an older commit.");
+});
+
+
+test("unchanged legacy title-column annotations keep their original dates and raw rows", () => {
+  const c=context("full"),first="| AUD-001 | High | runtime | Incorrect result - ⚠️ **STILL_PRESENT (2026-07-01)** |",second="| AUD-002 | Low | history | Historical observation - ✅ **FIXED (2026-07-01)** |";
+  const original=ledger.replace("# Example audit","# Example audit\n\n## How this audit was performed\n\nOriginal methodology.").replace("| ID | Sev | Finding | Status |","| ID | Sev | Area | Title |").replace("| AUD-001 | High | Incorrect result | OPEN |",first).replace("| AUD-002 | Low | Historical observation | FIXED |",second);
+  c.f.write(c.config.ledger_path,original);c.f.commit();const snap=captureSnapshot(c.config,{mode:"full",ids:["AUD-001","AUD-002"],artifact_root:c.f.artifacts,required_checks:{"AUD-001":["unit"],"AUD-002":["unit"]}}),rows=[terminal(c.f,snap,"AUD-001"),terminal(c.f,snap,"AUD-002")];rows[0].verdict="STILL_PRESENT";rows[0].checks[0].exit_code=1;
+  const candidate=createLedgerCandidate(c.config,snap,{document:{schema_version:1,snapshot_digest:snap.digest,assessments:rows},at:"2026-11-02",run_id:"unchanged-title"});
+  expect(candidate.bytes).toContain(first);expect(candidate.bytes).toContain(second);expect(candidate.bytes).not.toContain("audit-run:unchanged-title:");expect(candidate.bytes).not.toContain("audit-status:unchanged-title:");
+});
