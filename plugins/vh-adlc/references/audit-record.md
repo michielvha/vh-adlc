@@ -106,6 +106,24 @@ bytes. Final verdicts, dispositions, reasons, residuals and scenario/source evid
 final checks and independent challenge/review artifacts bind the later actual review target.
 
 
+## Follow-up after published CI fails
+
+A consumer-authorized non-forced follow-up keeps the same selected batch only while its Scope
+baseline is still the freshly observed default. Preserve prior evidence and review artifacts. On
+the owned repair branch, make a follow-up source/test commit that also restores the ledger to the
+exact Task-base blob. Freeze that commit as the new `source_target`, then regenerate the provisional
+candidate from that frozen checkout. Commit the new candidate ledger and updated record, run the
+required final-target checks and obtain a fresh independent review before another push. Update
+member repair commits and actual evidence bindings; retain the original failing regression evidence.
+Do not freeze a source commit that still carries the previous provisional ledger: the Task-base
+check and duplicate run-note guard reject it. Declared generated indexes change before freezing.
+
+If default advances after publication, stop for the owner's choice of a separately approved
+rebase/force-push or a new batch from current default. Do not silently merge default into the
+published repair branch or borrow the earlier review. A new batch resolves scope and pending
+resources again, retains the old outcomes/history and needs fresh proof. This procedure grants
+neither a rewrite nor publication; the consumer and current owner request govern both.
+
 ## Bound resource journal
 
 Every `batch-check` bundle also requires `journal: {directory, batch_digest}`, including batches

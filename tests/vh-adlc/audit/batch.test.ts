@@ -248,3 +248,32 @@ test("a later batch completes after explicit old-policy cleanup reconciliation",
  await cleanupPending(cleanup,{target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"},{authorized:true,lookup:async()=>[],cleanup:async()=>{throw Error("already absent resource must not be deleted");}});
  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(true);
 });
+
+
+test.each([false,true])("non-forced CI follow-up restores Task-base ledger before refreezing: %s",restore=>{
+ const c=context(),previousSource=c.definition.source_target;
+ const taskLedger=git(c.f.root,"show",c.definition.task_base+":"+c.config.ledger_path)+"\n";
+ c.f.write("src/app.ts","export const answer = 44;\n");
+ if(restore)c.f.write(c.config.ledger_path,taskLedger);
+ const source=c.f.commit("test: non-forced CI follow-up");
+ c.definition.source_target=source;c.definition.members[0].repair_commit=source;
+ if(restore){
+  const snapshot=captureSnapshot(c.config,{mode:"fix",ids:c.input.selection.ids,baseline:c.base,scope_baseline:c.base,artifact_root:c.f.artifacts,required_checks:c.input.snapshot.required_checks});
+  const assessments=snapshot.selected_ids.map(id=>terminal(c.f,snapshot,id));assessments[0].disposition="authored-repair";assessments[0].red=c.input.document.assessments[0].red;
+  const document={schema_version:1,snapshot_digest:snapshot.digest,assessments};
+  const candidate=createLedgerCandidate(c.config,snapshot,{document,at:"2026-11-03",run_id:c.definition.run_id,provisional:true});
+  c.input.provisional={snapshot,document,candidate};c.f.write(c.config.ledger_path,candidate.bytes);
+ }
+ c.f.write(c.path,renderRecord(c.definition));c.f.commit("test: new ledger and record after follow-up freeze");retarget(c);
+ const result=checkBatch(c.config,c.input,{observe:c.observe});
+ expect(git(c.f.root,"merge-base","--is-ancestor",c.target,"HEAD")).toBe("");
+ expect(source).not.toBe(previousSource);expect(result.pass).toBe(restore);
+ if(!restore)expect(result.errors).toContain("Frozen source must retain the selected Task-base ledger before provisional updates.");
+});
+test("default advancement after publication blocks the old batch without a history rewrite",()=>{
+ const c=context();git(c.f.root,"switch","-q","main");c.f.write("unrelated-current-main.txt","New default work.\n");const next=c.f.commit("test: actual advanced default");
+ git(c.f.root,"update-ref","refs/remotes/origin/main",next);git(c.f.root,"switch","-q","fix/audit-batch");
+ const result=checkBatch(c.config,c.input,{observe:c.observe});expect(result.pass).toBe(false);
+ expect(result.errors).toContain("Scope baseline is not the fresh observed actual remote default/tracking tip.");
+ expect(git(c.f.root,"rev-parse","HEAD")).toBe(c.target);
+});
