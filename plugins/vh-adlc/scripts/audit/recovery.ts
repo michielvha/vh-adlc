@@ -1,4 +1,4 @@
-import { handoff, outcome, noteResource, pendingResources, readRun, type Intent, type Receipt, type Run } from "./journal";
+import { handoff, outcome, noteResource, pendingResources, registeredPending, requireRegistered, readRun, type Intent, type Receipt, type Run } from "./journal";
 
 type Observation = { state: "done"; receipt: Receipt } | { state: "absent" | "unknown" };
 function reload(run: Run) { return readRun(run.config, run.directory, run.header.batch_digest); }
@@ -6,6 +6,7 @@ export async function recoverEffect(run: Run, id: string, transport: {
   authorized: boolean; observe: (action: Intent) => Promise<Observation>; execute?: (action: Intent) => Promise<Receipt>;
 }) {
   run = reload(run);
+  requireRegistered(run);
   const action = run.events.find(e => e.kind === "intent" && e.action_id === id)?.payload as Intent | undefined;
   if (!action) throw Error("audit effect has no durable intent; inspect actual state before a new action");
   if (["key", "row"].includes(action.kind)) throw Error("audit resource intents require scoped cleanup reconciliation, never generic effect completion");
@@ -25,12 +26,14 @@ type Scope = { target: string; actor: string; organization: string; cleanup_meth
 type Resource = Scope & { id: string };
 export function liveReady(run: Run): boolean {
   run = reload(run);
-  return pendingResources(run).length === 0;
+  requireRegistered(run);
+  return registeredPending(run.config).length === 0;
 }
 export async function cleanupPending(run: Run, scope: Scope, transport: {
   authorized: boolean; lookup: (action: Intent, recordedID?: string) => Promise<Resource[]>; cleanup: (action: Intent, resource: Resource) => Promise<void>;
 }) {
   run = reload(run);
+  requireRegistered(run);
   const handoffs: { action: string; reason: string }[] = [];
   const pending = pendingResources(run);
   for (const event of pending) {

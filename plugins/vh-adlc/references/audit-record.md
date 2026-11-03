@@ -105,6 +105,8 @@ must retain the same original private artifact root. Create the run under that r
 hostname, run ID, workstream, actual default branch, Scope baseline, Task base, sorted member IDs
 and the included carried report's commit/sorted IDs (or null). A different selected scope needs a
 new run. Source and review updates keep this scope digest; their freshness checks still apply.
-The helper reads the current policy-bound journal and refuses completion while any key/row cleanup
-is pending, including a denied or ambiguous handoff. An empty journal records that no resources
+The run header is durably registered before live work in private common-Git-directory metadata;
+a duplicate run ID in another root is refused. The helper reads the current policy-bound journal
+and all registered runs, refusing completion while any key/row cleanup is pending, including a
+denied or ambiguous handoff from an earlier selected scope. Missing registered state is unknown. An empty journal records that no resources
 were registered; it supplies no authority or independent execution proof.

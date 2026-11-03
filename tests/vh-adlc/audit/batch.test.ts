@@ -199,7 +199,14 @@ test("a fresh final snapshot root and empty journal cannot hide the original bat
   for(const name of readdirSync(c.f.artifacts))if(lstatSync(join(c.f.artifacts,name)).isFile())copyFileSync(join(c.f.artifacts,name),join(root,name));
   const {digest:_,...body}=c.input.snapshot;const changed={...body,artifact_root:root};c.input.snapshot={...changed,digest:digest(changed)};
   c.input.document.snapshot_digest=c.input.snapshot.digest;
-  const fresh=createRun(c.config,{artifact_root:root,run_id:c.definition.run_id,batch_digest:batchJournalDigest(c.definition)});
-  c.input.journal={directory:fresh.directory,batch_digest:fresh.header.batch_digest};
+  expect(()=>createRun(c.config,{artifact_root:root,run_id:c.definition.run_id,batch_digest:batchJournalDigest(c.definition)})).toThrow();
+  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
+});
+
+
+test("completion sees a pre-freeze pending resource from another registered run/root", () => {
+  const c=context(),root=join(c.f.outer,"earlier-live-artifacts");mkdirSync(root,{mode:0o700});
+  const earlier=createRun(c.config,{artifact_root:root,run_id:"earlier-live",batch_digest:"e".repeat(64)});
+  intent(earlier,{id:"key",kind:"key",correlation:"earlier-key",target:"synthetic:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"});
   expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
 });

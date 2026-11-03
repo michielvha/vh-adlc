@@ -37,7 +37,8 @@ bun <plugin>/scripts/audit/cli.ts snapshot --repo <consumer> --mode reverify --i
 ```
 
 Choose one new owned directory per audit batch outside the checkout, canonical path, mode 0700.
-Keep that same artifact root for its live intents, provisional snapshot and final-head snapshots;
+The run is registered before any live intent in private metadata under the repository's common Git
+directory. Keep that same artifact root for its live intents, provisional snapshot and final-head snapshots;
 use unique artifact names within it. A later snapshot never starts an empty replacement journal. Private artifacts use
 0600 and exclusive creation. Use IDs/prefix and concrete per-member required checks from the actual
 consumer. Snapshot binds repository identity, clean commit/diff, ledger/settings/procedure hashes,
@@ -163,7 +164,8 @@ the policy's exact scoped lookup/cleanup-method reference. No secret/token/conne
 secret-bearing response bodies belong in artifacts, transcripts or commits. Persist a returned
 server resource ID with `journal-resource`; keep its transient secret only in protected runtime memory.
 Journal strings are identifiers, never executable cleanup commands. A pending resource blocks
-registration of a second resource plan, including after a handoff. A crash during plan registration
+registration of a second resource plan in any registered run, including after a handoff or scope
+reselection. A run ID cannot be restarted under another artifact root. A crash during plan registration
 requires absence reconciliation before a fresh plan; it never authorizes resource creation.
 
 Resume pending resources before another live attempt. Resolve the exact target/owner/correlation/ID
@@ -203,3 +205,17 @@ absence through the currently authorized consumer method, the native `journal-cl
 operation can retain its receipt with explicit `--absence-confirmed true`. This flag is an operator
 attestation, not execution or proof of cleanup. Generic `journal-outcome` and `recoverEffect` reject
 resource completion so a creation reply cannot accidentally retire a pending cleanup intent.
+
+
+### Registered-run recovery
+
+`journal-registered-pending --repo <consumer>` inspects every registered run in this repository's
+common Git directory. It grants no effect. A pre-freeze restart or new selected scope must reconcile
+those pending resources before another live plan or batch completion. Missing/corrupt registered
+journals are unknown and block progression; never remove their registrations to hide cleanup.
+Preserve registered journals and their immutable headers even when another artifact root is used.
+`journal-register --directory <existing-run> --batch-digest <digest>` can register an existing owned,
+current-policy journal during an explicit handoff; it does not recreate outcomes, move a run ID,
+authorize cleanup or reactivate resources. Registration is local private recovery metadata, not a
+tracked file, ref, index update or shell-resistant proof boundary. Another independent Git clone
+needs an explicit journal handoff; do not infer absence from a clone that lacks the prior run state.

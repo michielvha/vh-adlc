@@ -1,4 +1,4 @@
-import { lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
 import { loadSettings } from "./settings";
@@ -54,6 +54,7 @@ export function createRun(config: Settings, options: { artifact_root: string; ru
   const header: Header = { schema_version: 1, run_id: options.run_id, repository: config.repository, hostname: config.hostname,
     batch_digest: options.batch_digest, ...inputBindings(config) };
   publishJSON(join(directory, "header.json"), header);
+  registerRun(config, directory, options.batch_digest);
   return readRun(config, directory, options.batch_digest);
 }
 export function readRun(config: Settings, directory: string, batch_digest: string, options: { inspect?: boolean } = {}): Run {
@@ -92,6 +93,49 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
   }
   return { policy_current, directory, config, header, events, revision: events.length, digest: previous };
 }
+type Registration = { run_id: string; directory: string; batch_digest: string; header_digest: string };
+function registryDirectory(config: Settings, create = false): string | null {
+  const path = join(inputBindings(config).common_dir, "vh-adlc-audit-runs");
+  if (create) { try { mkdirSync(path, { mode: 0o700 }); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; } }
+  let stat;
+  try { stat = lstatSync(path); } catch (error) { if (!create && (error as NodeJS.ErrnoException).code === "ENOENT") return null; throw error; }
+  if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(path) !== path || (stat.mode & 0o077) || process.getuid && stat.uid !== process.getuid()) fail();
+  return path;
+}
+/** Bind the durable header before any effects. A run ID cannot move to a new root. */
+export function registerRun(config: Settings, directory: string, batch_digest: string) {
+  const run = readRun(config, directory, batch_digest);
+  if (!/^[a-z0-9][a-z0-9_-]{0,79}$/.test(run.header.run_id)) fail();
+  const registry = registryDirectory(config, true)!;
+  const registration: Registration = { run_id: run.header.run_id, directory, batch_digest, header_digest: digest(run.header) };
+  const path = join(registry, registration.run_id + ".json");
+  if (existsSync(path)) { if (canonicalJSON(privateJSON(path)) !== canonicalJSON(registration)) fail(); }
+  else publishJSON(path, registration);
+  return run;
+}
+export function requireRegistered(run: Run) {
+  const directory = registryDirectory(run.config);
+  if (!directory || !/^[a-z0-9][a-z0-9_-]{0,79}$/.test(run.header.run_id)) fail();
+  const registration = privateJSON(join(directory, run.header.run_id + ".json")) as Registration;
+  if (canonicalJSON(registration) !== canonicalJSON({ run_id: run.header.run_id, directory: run.directory,
+      batch_digest: run.header.batch_digest, header_digest: digest(run.header) })) fail();
+}
+/** Scope changes never retire cleanup from an earlier registered run in this Git repository. */
+export function registeredPending(config: Settings) {
+  const directory = registryDirectory(config), pending: { run_id: string; directory: string; batch_digest: string; policy_current: boolean; action: Intent }[] = [];
+  if (!directory) return pending;
+  for (const name of readdirSync(directory).filter(name => !name.startsWith(".tmp-")).sort()) {
+    if (!/^[a-z0-9][a-z0-9_-]{0,79}\.json$/.test(name)) fail();
+    const registration = privateJSON(join(directory, name)) as Registration;
+    exact(registration, ["run_id", "directory", "batch_digest", "header_digest"]);
+    if (registration.run_id + ".json" !== name) fail();
+    const run = readRun(config, registration.directory, registration.batch_digest, { inspect: true });
+    requireRegistered(run);
+    for (const event of pendingResources(run)) pending.push({ run_id: run.header.run_id, directory: run.directory,
+      batch_digest: run.header.batch_digest, policy_current: run.policy_current, action: event.payload as Intent });
+  }
+  return pending;
+}
 /** Read-only recovery inventory remains available after valid policy edits. Never grants retry/cleanup authority. */
 export function inspectPending(config: Settings, directory: string, batch_digest: string) {
   const run = readRun(config, directory, batch_digest, { inspect: true });
@@ -105,6 +149,7 @@ export function inspectPending(config: Settings, directory: string, batch_digest
 }
 function append(run: Run, kind: Event["kind"], action_id: string, payload: Event["payload"]) {
   const actual = readRun(run.config, run.directory, run.header.batch_digest);
+  requireRegistered(actual);
   if (actual.digest !== run.digest) fail();
   const event: Event = { revision: actual.revision + 1, previous: actual.digest, kind, action_id, payload };
   publishJSON(join(run.directory, "events", String(event.revision).padStart(8, "0") + ".json"), event);
@@ -116,7 +161,8 @@ export function pendingResources(run: Run) {
 }
 /** Register the whole first-attempt resource plan before creating any resource. */
 export function resourceIntents(run: Run, actions: Intent[]) {
-  if (!Array.isArray(actions) || !actions.length || pendingResources(run).length) fail();
+  requireRegistered(run);
+  if (!Array.isArray(actions) || !actions.length || registeredPending(run.config).length) fail();
   const ids = new Set(run.events.filter(e => e.kind === "intent").map(e => e.action_id));
   const scopes = new Set(run.events.filter(e => e.kind === "intent").map(e => resourceScope(e.payload as Intent)));
   for (const action of actions) {

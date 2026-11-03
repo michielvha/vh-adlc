@@ -1,5 +1,5 @@
 import { loadSettings } from "./settings";
-import { readRun, pendingResources } from "./journal";
+import { readRun, registeredPending, requireRegistered } from "./journal";
 import { observeDefault } from "./authority";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -85,7 +85,8 @@ export function checkBatch(config: Settings, input: {
         input.journal.directory !== join(input.snapshot.artifact_root, "audit-run-" + def.run_id) ||
         input.journal.batch_digest !== batchJournalDigest(def)) throw Error("Batch requires its scope-bound resource journal.");
     const run = readRun(config, input.journal.directory, input.journal.batch_digest);
-    if (run.header.run_id !== def.run_id || pendingResources(run).length) throw Error("Pending resource cleanup blocks batch completion.");
+    requireRegistered(run);
+    if (run.header.run_id !== def.run_id || registeredPending(config).length) throw Error("Pending resource cleanup blocks batch completion.");
     if (def.schema_version !== 1 || def.repository !== config.repository || def.hostname !== config.hostname || def.record_path !== recordPath ||
         def.ledger_path !== config.ledger_path || !def.run_id?.trim() || def.workstream !== input.selection.workstream ||
         !Array.isArray(def.members) || !def.members.length || new Set(def.members.map(m => m.id)).size !== def.members.length ||

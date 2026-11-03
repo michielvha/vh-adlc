@@ -63,6 +63,7 @@ test("native live plan registers key and row together and refuses another attemp
   const input=f.artifact("live-plan.json",JSON.stringify(actions));
   expect(invoke(f,"journal-live-intents",...args,"--input",join(f.artifacts,input.path)).exitCode).toBe(0);
   expect(JSON.parse(invoke(f,"journal-pending",...args).stdout.toString()).pending).toHaveLength(2);
+  const registered=invoke(f,"journal-registered-pending");expect(registered.exitCode).toBe(0);expect(JSON.parse(registered.stdout.toString()).pending).toHaveLength(2);
   const second=f.artifact("second-plan.json",JSON.stringify([{...actions[0],id:"second-key",correlation:"second-key"}]));
   expect(invoke(f,"journal-live-intents",...args,"--input",join(f.artifacts,second.path)).exitCode).toBe(1);
   expect(JSON.parse(invoke(f,"journal-pending",...args).stdout.toString()).pending).toHaveLength(2);

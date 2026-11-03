@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { createRun, readRun, intent, resourceIntents, noteResource } from "../../../plugins/vh-adlc/scripts/audit/journal";
 import { cleanupPending, liveReady, recoverEffect } from "../../../plugins/vh-adlc/scripts/audit/recovery";
@@ -88,4 +88,31 @@ test("a resource ID discovered during lost-response reconciliation is retained b
   try {await cleanupPending(c.reload(),c.scope,transport);}catch{}
   try {await cleanupPending(c.reload(),c.scope,transport);}catch{}
   expect(deletes).toBe(1);expect(current).toBe("replacement-id");expect(c.reload().events.some(event=>event.kind==="resource"&&(event.payload as any).resource_id==="original-id")).toBe(true);
+});
+
+
+test("a pre-freeze run cannot be restarted in another artifact root while its key is pending", () => {
+  const c=context();c.pending("key","key");const root=join(c.f.outer,"another-artifacts");mkdirSync(root,{mode:0o700});
+  expect(()=>createRun(c.config,{artifact_root:root,run_id:c.run.header.run_id,batch_digest:c.run.header.batch_digest})).toThrow();
+});
+test("scope reselection cannot admit a live plan while another run's resource is pending", () => {
+  const c=context();c.pending("key","key");
+  const next=createRun(c.config,{artifact_root:c.f.artifacts,run_id:"reselected",batch_digest:"f".repeat(64)});
+  expect(()=>intent(next,{id:"another-key",kind:"key",correlation:"new-scope-key",...c.scope})).toThrow();
+});
+
+
+test("reselection becomes live-ready only after the earlier run's actual cleanup absence", async () => {
+  const c=context();c.pending("key","key");
+  const next=createRun(c.config,{artifact_root:c.f.artifacts,run_id:"later-selected-scope",batch_digest:"a".repeat(64)});
+  const action={id:"later-key",kind:"key" as const,correlation:"later-key",...c.scope};
+  expect(liveReady(next)).toBe(false);expect(()=>intent(next,action)).toThrow();
+  expect((await cleanupPending(c.reload(),c.scope,{authorized:true,lookup:async()=>[],cleanup:async()=>{throw Error("no resource should be deleted");}})).ready).toBe(true);
+  intent(next,action);expect(liveReady(c.reload())).toBe(false);
+});
+test("a missing registered header blocks another live attempt rather than forgetting cleanup", () => {
+  const c=context();c.pending("key","key");unlinkSync(join(c.run.directory,"header.json"));
+  const next=createRun(c.config,{artifact_root:c.f.artifacts,run_id:"missing-prior-header",batch_digest:"a".repeat(64)});
+  expect(()=>intent(next,{id:"key",kind:"key",correlation:"new-key",...c.scope})).toThrow();
+  expect(()=>liveReady(next)).toThrow();
 });

@@ -10,7 +10,7 @@ import { saveReport } from "./report";
 import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "./authority";
 import { createLedgerCandidate, applyLedgerCandidate, appendFindings } from "./ledger";
 import { checkBatch } from "./batch";
-import { createRun, intent, resourceIntents, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
+import { createRun, registerRun, registeredPending, intent, resourceIntents, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
 import type { AuditMode } from "./types";
 
 const argumentsByOperation: Record<string, string[]> = {
@@ -19,6 +19,7 @@ const argumentsByOperation: Record<string, string[]> = {
   "new-findings": ["snapshot", "input", "name"], apply: ["snapshot", "input", "candidate", "request", "path", "commit"],
   "policy-candidate": ["default-branch", "commit", "parity"], "policy-adopted": [], authority: ["input"], "batch-check": ["input"],
   "journal-new": ["artifact-root", "run-id", "batch-digest"], "journal-read": ["directory", "batch-digest"],
+  "journal-register": ["directory", "batch-digest"], "journal-registered-pending": [],
   "journal-pending": ["directory", "batch-digest"],
   "journal-cleanup-outcome": ["directory", "batch-digest", "action-id", "input", "absence-confirmed"],
   "journal-outcome": ["directory", "batch-digest", "action-id", "input"],
@@ -73,6 +74,8 @@ export function runCLI(argv: string[]) {
   if (operation === "authority") return inspectAuthority(config, json(requireOption("input")));
   if (operation === "batch-check") return checkBatch(config, json(requireOption("input")));
   if (operation === "journal-new") { const run = createRun(config, { artifact_root: requireOption("artifact-root"), run_id: requireOption("run-id"), batch_digest: requireOption("batch-digest") }); return { directory: run.directory, revision: run.revision }; }
+  if (operation === "journal-registered-pending") return { pending: registeredPending(config), limit: "Read-only registered cleanup inventory; no execution authority." };
+  if (operation === "journal-register") { const run = registerRun(config, requireOption("directory"), requireOption("batch-digest")); return { directory: run.directory, registered: true }; }
   if (operation === "journal-pending") return inspectPending(config, requireOption("directory"), requireOption("batch-digest"));
   const run = readRun(config, requireOption("directory"), requireOption("batch-digest"));
   if (["journal-outcome", "journal-cleanup-outcome"].includes(operation)) {
