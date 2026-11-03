@@ -3,6 +3,7 @@ import { git, origin } from "../triage/settings";
 import { canonicalJSON, digest, runID } from "./journal";
 import { commitID, gitBytes } from "./history";
 import type { Settings } from "./types";
+import { readYAML } from "../settings-file";
 
 export type Grant = { repository: string; hostname: string; branch: string; publication_route: "default-branch-checkout-ff-only";
   report_dir: string; index_paths: string[]; initial_publication: "commit-and-push-before-selection"; same_run_updates: "commit-and-push" | "explicit-request" };
@@ -92,10 +93,10 @@ export function resolveStanding(config: Settings, observed: { default_branch: st
   const result: Standing = { status: "unadopted", reason: "committed adoption chain absent", default_branch: observed.default_branch, default_commit: commit, sources: [], grant: null };
   const source = (path: string) => { const data = blob(config.root, commit, path); if (data) result.sources.push({ path, blob: data.blob }); return data?.text ?? null; };
   const agents = source("AGENTS.md");
-  if (agents === null || !links(agents).includes(".vh-adlc/maintenance.json")) return result;
+  if (agents === null || !links(agents).includes(".vh-adlc/maintenance.yaml")) return result;
   try {
-    const raw = source(".vh-adlc/maintenance.json"); if (raw === null) return result;
-    const settings = object(JSON.parse(raw));
+    const raw = source(".vh-adlc/maintenance.yaml"); if (raw === null) return result;
+    const settings = object(readYAML(Buffer.from(raw), fail));
     const known = ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories", "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references", "report_dir", "history_dir", "project_procedure", "surface_expectations"];
     if (settings.schema_version !== 1 || Object.keys(settings).some(key => !known.includes(key))) fail("invalid committed settings");
     if (settings.repository !== undefined && settings.repository !== config.repository || settings.hostname !== undefined && settings.hostname !== config.hostname) fail("committed settings identity mismatch");
