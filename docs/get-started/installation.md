@@ -115,7 +115,7 @@ project topology, verification commands and delivery policies stay in the consum
 Triage and maintenance settings are YAML files, `.vh-adlc/triage.yaml` and `.vh-adlc/maintenance.yaml`.
 `vh-adlc-maintenance` is available from plugin 0.6.0. A repository with a triage or maintenance
 settings file needs plugin 0.7.0 or later, because earlier releases do not read these files and run on
-their defaults. Missing that operation is an installation blocker; do not reconstruct it from a legacy
+their defaults. Missing `vh-adlc-maintenance` is an installation blocker; do not reconstruct it from a legacy
 local agent.
 Maintenance uses an agent procedure with observed evidence, rather than triage's
 managed publication controller. The other feature operations continue to use the
