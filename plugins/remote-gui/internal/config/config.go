@@ -28,9 +28,13 @@ type Config struct {
 func Parse(args []string) (Config, error) {
 	c := Config{Kind: "share", Transport: "tailscale", TTL: 2 * time.Hour, Home: os.Getenv("REMOTE_GUI_HOME")}
 	if c.Home == "" {
-		base, err := os.UserCacheDir()
-		if err != nil {
-			return c, errors.New("private state directory unavailable")
+		base := os.Getenv("XDG_STATE_HOME")
+		if base == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return c, errors.New("private state directory unavailable")
+			}
+			base = filepath.Join(home, ".local", "state")
 		}
 		c.Home = filepath.Join(base, "remote-gui", "sessions")
 	}

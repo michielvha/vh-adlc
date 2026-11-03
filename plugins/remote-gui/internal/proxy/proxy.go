@@ -137,6 +137,9 @@ func (p *Proxy) fail(code string) {
 }
 func (p *Proxy) Problem() string { p.mu.Lock(); defer p.mu.Unlock(); return p.problem }
 func (p *Proxy) ConnState(c net.Conn, s http.ConnState) {
+	if s == http.StateHijacked {
+		_ = c.SetDeadline(time.Time{})
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if s == http.StateClosed {
@@ -380,4 +383,24 @@ func (p *Proxy) response(r *http.Response) error {
 		}
 	}
 	return nil
+}
+
+// ProbeCookie issues an internal transport-probe credential. It is never exported
+// through status, logs or the public CLI; browser verification remains separate.
+func (p *Proxy) ProbeCookie() (*http.Cookie, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.revoked || !time.Now().Before(p.deadline) {
+		return nil, errors.New("session expired or stopped")
+	}
+	token, err := random()
+	if err != nil {
+		return nil, err
+	}
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		return nil, err
+	}
+	p.clients[token] = &client{jar: jar, expires: p.deadline}
+	return &http.Cookie{Name: CookiePrefix + p.id, Value: token, Path: "/", HttpOnly: true, Secure: p.origin.Scheme == "https", SameSite: http.SameSiteStrictMode}, nil
 }

@@ -456,3 +456,31 @@ func websocket(ctx context.Context, u *url.URL, cookie *http.Cookie, route strin
 	}
 	return nil
 }
+
+// Plan selects an unused dedicated scope without changing the daemon. Install
+// repeats the ownership check against the ETag used for the actual mutation.
+func (c *Client) Plan(ctx context.Context, target string) (*state.Forward, error) {
+	host, err := c.Host(ctx)
+	if err != nil {
+		return nil, err
+	}
+	d, _, err := c.read(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for range 32 {
+		var b [2]byte
+		if _, err = rand.Read(b[:]); err != nil {
+			return nil, errors.New("port-randomness-unavailable")
+		}
+		port := 10000 + (int(b[0])*256+int(b[1]))%50000
+		used, err := occupied(d, port, 0)
+		if err != nil {
+			return nil, err
+		}
+		if !used {
+			return &state.Forward{Host: host, Port: port, Target: target}, nil
+		}
+	}
+	return nil, errors.New("tailscale-no-free-scope")
+}

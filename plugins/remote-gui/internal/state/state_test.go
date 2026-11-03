@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,5 +117,23 @@ func TestSignalUsesVerifiedProcessBirth(t *testing.T) {
 	}
 	if err = Signal(id, syscall.SIGTERM); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRejectForeignStateRecord(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "sessions")
+	id, err := New(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(Record{Version: 1, ID: id, Kind: "share", State: "starting"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, id, "state.json"), data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = Load(root, id); err == nil {
+		t.Fatal("foreign JSON was accepted as a tool-owned record")
 	}
 }
