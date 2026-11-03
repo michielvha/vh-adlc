@@ -171,9 +171,16 @@ export async function nativeInstallTrial(repo: string, commit: string, output: s
       const snapshot = await helper("snapshot", "snapshot", ["--mode", "reverify", "--ids", "AUD-001", "--artifact-root", project.artifacts, "--name", "installed-snapshot"]);
       const report = await helper("report", "report", ["--snapshot", snapshot.path, "--name", "installed-report"]);
       if (!report.path || !existsSync(report.path) || !readFileSync(report.path, "utf8").includes("Recorded")) throw Error("installed audit report missing");
+      // Preserve the files before fixture disposal so an independent review can inspect them.
+      const saved_artifacts: Record<string, { path: string; sha256: string }> = {};
+      for (const [kind, original] of [["snapshot", snapshot.path], ["report", report.path]]) {
+        const bytes = readFileSync(original), path = join(profile, `saved-${kind}.${kind === "report" ? "md" : "json"}`);
+        writeFileSync(path, bytes, { mode: 0o600 }); saved_artifacts[kind] = { path, sha256: hash(bytes) };
+      }
       const requiredHelpers = helpers.filter(row => ["settings", "inventory", "report"].includes(row.stage));
       const receipt = { kind: "local-catalog", host, native_version: version, source_commit: commit, version: installed.version, payload_digest: installed.digest, installed_path: installedPath,
         setup: { ...setup, platform, binary_sha256: binarySHA, expected_binary_sha256: lock.assets[platform].binary_sha256, binary_version: lock.version, environment_isolated: true, credentials_inherited: false },
+        saved_artifacts,
         offline_entry: { argv: entryArgv, ...entry, observations: entryOutput },
         discovery: host === "codex-cli" ? discoveredCodexOperations(discovered, `vh-adlc@${catalogName}`) : discoveredClaudeOperations(discovered, componentOperations(source)), commands, helpers: requiredHelpers, authentication_copied: false, model_invocations: 0 };
       // Some Codex plugin/list versions expose only the component. app-server skills/list provides operation discovery separately.
