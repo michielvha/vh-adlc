@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: draft
 branch: feat/remote-gui
-status_description: "Local implementation and isolated checks pass; live second-device and human handoff acceptance remain."
+status_description: "Revising Tailscale access to authorize the owner identity without a viewer password."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
