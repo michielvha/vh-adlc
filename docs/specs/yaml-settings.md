@@ -126,18 +126,24 @@ changes it. There, after `git fetch origin main`: run
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Triage and maintenance read `.vh-adlc/<name>.yaml` and produce the same validated settings as before,
+- [x] AC-01: Triage and maintenance read `.vh-adlc/<name>.yaml` and produce the same validated settings as before,
       apart from `settings_path`.
-- [ ] AC-02: A `.vh-adlc/<name>.json` or `.yml` file in the working tree fails naming the expected path, and YAML the
+      Evidence: `bun test tests/vh-adlc/triage/settings.test.ts tests/vh-adlc/maintenance/settings.test.ts`, `39a3bf8`, pass; a rich block YAML file per operation gives the validated settings recorded from the JSON loader at `a1f10de`, apart from `root` and `settings_path`, and every fixture file is checked as commented block YAML. Full `bun test tests/vh-adlc` at `39a3bf8`: 626 pass, 5 fail, all 5 s timeouts under load average 12 to 20, and those files pass with `--timeout 120000`. Limitation: the frozen Stackweaver values are compared through test setup, not through Stackweaver's own files, which AC-06 covers.
+- [x] AC-02: A `.vh-adlc/<name>.json` or `.yml` file in the working tree fails naming the expected path, and YAML the
       reader refuses fails visibly.
-- [ ] AC-05: The maintenance standing grant holds from a merged `AGENTS.md` link to the YAML file.
+      Evidence: `bun test tests/vh-adlc/settings-file.test.ts` and both settings suites, `39a3bf8`, pass: a working-tree `.json` or `.yml` fails naming `.vh-adlc/<name>.yaml`, with or without `--settings`, and refused YAML fails with the reader's fixed reason and no file text.
+- [x] AC-05: The maintenance standing grant holds from a merged `AGENTS.md` link to the YAML file.
+      Evidence: `bun test --timeout 120000 tests/vh-adlc/maintenance/publication.test.ts`, `39a3bf8`, 25 pass, 0 fail: the grant holds from a committed `AGENTS.md` link to `.vh-adlc/maintenance.yaml`, a stale `.json` link reports `unadopted`, and a YAML chain without the binary grants nothing. Limitation: the default 5 s timeout failed three cases under load in the full run.
 - [ ] AC-06: A reviewed Stackweaver branch runs triage and maintenance from YAML against the candidate plugin, with
       settings output unchanged apart from `settings_path`, and its adapter states the plugin version it needs.
 - [ ] AC-07: `conventions/coding.md` at the pinned revision carries the rule.
-- [ ] AC-09: The plugin lock names a stable release with `settings read`, and a `.yaml` read with no binary fails.
-- [ ] AC-10: On a YAML checkout, the confined triage controller's export equals `json(loadSettings(checkout))`, and its
+- [x] AC-09: The plugin lock names a stable release with `settings read`, and a `.yaml` read with no binary fails.
+      Evidence: `bun test tests/vh-adlc/ensure.test.ts` and `bun test tests/vh-adlc/settings-file.test.ts`, `39a3bf8`, pass: the lock names stable v0.9.0, its binary answers `settings read`, and a `.yaml` read with an empty HOME and a refusing proxy fails as binary unavailable, while a no-file load needs no binary.
+- [x] AC-10: On a YAML checkout, the confined triage controller's export equals `json(loadSettings(checkout))`, and its
       session starts with no binary inside the boundary.
-- [ ] AC-13: The settings references name only `.yaml` paths, and their examples load.
+      Evidence: `bun test tests/vh-adlc/triage/acceptance.test.ts`, `39a3bf8`, pass in the full run: on a YAML checkout `settings.json` equals `JSON.stringify(loadSettings(checkout))`, `verifyInputs` passes, and the real `boundaryCommand` under bwrap, with PATH `/usr/bin` and HOME `/nonexistent`, serves the same bytes through its `read` tool.
+- [x] AC-13: The settings references name only `.yaml` paths, and their examples load.
+      Evidence: `bun test tests/vh-adlc/settings-references.test.ts tests/vh-adlc/maintenance/discovery.test.ts`, `39a3bf8`, pass: both references name only `.vh-adlc/<name>.yaml`, state the binary requirement, and their commented block YAML examples load through each loader.
 
 ## Test Plan
 
