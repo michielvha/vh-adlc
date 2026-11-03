@@ -165,6 +165,13 @@ configuration and passed its secret scan. The first pass missed two required com
 reads, so it is not a clean acceptance review. All findings still require correction and a complete
 fresh paired review. The accepted normative spec and every criterion remain unchanged/unchecked.
 
+The refreshed bounded private parity review R2 read every required legacy/current workflow file
+at shared `54970ea` and consumer `1eee1199`. It returned retained-policy and migration issues, not
+a clean acceptance. T62-T66 track scope recovery, explicit consumer verification/merge conditions,
+record metadata, fixture prerequisites, pending-report policy and rollback-test state. The raw
+private findings stay local. Accepted below-heading markers remain the reviewed Design choice;
+the local wording must consistently describe that choice rather than repeat conflicting legacy text.
+
 ## Scope
 
 Deliver one discoverable `vh-adlc-audit` skill and canonical audit procedure for status,
@@ -883,6 +890,11 @@ live operations remain separate owner-selected tasks.
       Evidence: The new shared-route preservation case fails first (`T60-red.log`). Rollback now patches only declared audit fragments in shared AGENTS and preserves newer unrelated committed, staged and working routes plus raw index bytes. Eight owned synthetic cases pass, including working/staged/symlink conflicts on both exclusive files and shared audit fragments (`T60-green.log`). The real caller and ledger remain unchanged.
 - [x] T61 adoption-safe consumer contracts - distinguish candidate ledger/baseline guards from post-adoption checks and use a squash-stable internal changelog disposition (private parity feedback; AC-05, AC-07).
       Evidence: Missing adoption-safe guard fails first (`T61-red.log`). Candidate guards retain the unchanged reviewed ledger and unrelated-path restriction; post-adoption guards accept legitimate later committed history while rejecting dirty ledger bytes or changed disposition history. A synthetic squash-message check resolves the named internal disposition rather than an obsolete feature SHA. All 71 consumer audit/retained-route checks pass (`T61-integration.log`); real ledger bytes remain unchanged.
+- [ ] T62 blocked carry recovery - require owner reselection and renewed source freeze/checks/review before changing an approved carried-report scope (manual delivery trial inspection; AC-04, AC-05).
+- [ ] T63 retained consumer gates - restore explicit pre-merge integration/kind/engine checks, all legacy owner-judgment stops, top-claim challenge/full entries and disclosed automatic merge consequences, with parity controls (private R2; AC-04, AC-05).
+- [ ] T64 internal record conventions - support consumer frontmatter and freeze generated documentation index changes before the final ledger/record metadata phase (private R2; AC-04, AC-05).
+- [ ] T65 complete consumer continuation policy - define actor/organization/browser prerequisites, report defaults/pending reconciliation and red-CI continuation while keeping selected scope and current permissions (private R2; AC-04, AC-05).
+- [ ] T66 rollback test state - remove only the adapter-specific executable contracts during rollback, preserve handoff/history and reapply their exact candidate bytes in the owned rehearsal (private R2; AC-05, AC-07).
 - [ ] T22 `tests/vh-adlc/audit/trial-proof.ts` and bounded synthetic trial runners - execute actual Copilot Opus 5.5 audit/repair/recovery trials at a committed payload, including independent repair review and adverse controls; raw transcripts, native exits and manual inspections establish the declared scenarios (AC-01, AC-03, AC-04, AC-06).
 - [x] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
       Evidence: Actual isolated Codex CLI and Claude CLI native installers at `deb1d7fcb60b416a7980fdf0825acd2d3a94e77d` both pass (`native-install-r2/result.json`): twelve native skills, installed settings/inventory/report helpers, unchanged source/index and identical byte/mode payload after uninstall/reinstall. No authentication/configuration is copied or model invoked by installers. The short-SHA launch failure remains `native-install-r1-launch.log`; four verifier negative-control tests pass. This is local-catalog candidate evidence, not published-marketplace, real Claude model or GUI acceptance.
