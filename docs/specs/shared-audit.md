@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-audit
-status_description: "Owner accepted fresh R-18 on 2026-11-03; the revision re-entered implementation through its existing published claim. YAML/offline/recovery work and fresh verification are in progress. Marketplace publication and consumer cutover remain pending."
+status_description: "R-20 verifies the complete shared code and both hosted platforms. The consumer must refresh its advanced default branch, expose candidate-denial diagnostics and prove policy-object equivalence before the final review. PR #44 remains in progress; publication and adoption are pending."
 issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -1053,19 +1053,26 @@ live operations remain separate owner-selected tasks.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Native skill discovery and ordinary lifecycle intake select the shared audit procedure for its declared modes, preserve other routes, and reject invalid scope without writes or an invented harness/model dependency.
+- [x] AC-01: Native skill discovery and ordinary lifecycle intake select the shared audit procedure for its declared modes, preserve other routes, and reject invalid scope without writes or an invented harness/model dependency.
+      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
-- [ ] AC-02: Adopters using strict YAML settings through the shared verified reader can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
+- [x] AC-02: Adopters using strict YAML settings through the shared verified reader can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
+      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
-- [ ] AC-03: Current assessments and update proposals preserve stable IDs/history and admit FIXED/MOOT only with complete target-bound evidence and the required adversarial check, while stale, missing or contradictory evidence remains visibly incomplete and cannot yield an eligible terminal update.
+- [x] AC-03: Current assessments and update proposals preserve stable IDs/history and admit FIXED/MOOT only with complete target-bound evidence and the required adversarial check, while stale, missing or contradictory evidence remains visibly incomplete and cannot yield an eligible terminal update.
+      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
-- [ ] AC-04: Selected audit repairs use the existing reviewed repair/feature lifecycle and the consumer's required verification and authority, preserve workstream boundaries and recover from interruption without silently replaying stale or duplicating completed effects.
+- [x] AC-04: Selected audit repairs use the existing reviewed repair/feature lifecycle and the consumer's required verification and authority, preserve workstream boundaries and recover from interruption without silently replaying stale or duplicating completed effects.
+      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
 - [ ] AC-05: Stackweaver's adapter preserves every parity-mapped audit behavior with the owner-approved separate-feature routing change, command/model/arguments, real ledger bytes and unrelated workflows, and can roll back/reapply only its migration paths against current main.
+      Evidence: R-20 returned not met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
 - [ ] AC-06: The committed source passes its required automated suites, independent exact-commit review, isolated native Codex/Claude installation and helper checks, and bounded actual Copilot Opus 5.5 generic/consumer behavior trials with adversarial negative controls and explicit test limits.
+      Evidence: R-20 returned not met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
 - [ ] AC-07: Consumer cutover is blocked without matching published-marketplace and paired-review artifacts, and the documented delivery procedure verifies the published shared component and installed operation before adopting Stackweaver, retaining exact revisions, rollback and deferred capability limits.
+      Evidence: R-20 returned not verified; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
 
 ## Test Plan
@@ -1278,7 +1285,7 @@ live operations remain separate owner-selected tasks.
       Evidence: Actual isolated Codex CLI and Claude CLI native installers at `deb1d7fcb60b416a7980fdf0825acd2d3a94e77d` both pass (`native-install-r2/result.json`): twelve native skills, installed settings/inventory/report helpers, unchanged source/index and identical byte/mode payload after uninstall/reinstall. No authentication/configuration is copied or model invoked by installers. The short-SHA launch failure remains `native-install-r1-launch.log`; four verifier negative-control tests pass. This is local-catalog candidate evidence, not published-marketplace, real Claude model or GUI acceptance.
 - [ ] T24 `Stackweaver:tests/agent-audit/parity.json`, migration fixtures and paired review artifacts - independently verify full legacy-to-map/adapter coverage and bounded consumer policy behavior at exact commits, correcting omissions and rerunning affected checks; no private packet is transferred without applicable approval (AC-05, AC-06).
 - [ ] T98 review evidence - retain installed synthetic report/snapshot files; independently bind older model-trial helpers to current Git objects, provide raw bounded native/model and approved consumer evidence, run every required suite through review launchers, and observe hosted Linux/macOS CI at the actual PR commit (R-19; AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
-      Progress: Hosted run 41715388667 passes Linux and Go, but the portable macOS job exposes the ready-entry fixture seeding Linux’s cache path. The test now seeds the actual Darwin Library/Caches path; local entry checks pass, with a real hosted rerun still required. The independently executable model-proof checker passes nine actual native contexts, verifies 90 unchanged plugin Git objects, both installed payloads and retained report/snapshot bytes, and replays actual toy red/green plus an adversarial check (`T98-model-proof-dry-r1.log`). `T98-native-retention-red.log` proves the prior candidate receipts lack retained report/snapshot files. The native runner now saves their exact bytes before fixture disposal; its four existing structural checks pass. A fresh committed native run will verify the actual retained files. R-19's own launcher passes 117 tests with checkout/index/refs preservation, but its limited packet cannot establish the composite criteria. The actual full primary suite passes 1,092 tests at the same source. Both results are retained honestly. Native report retention and a complete independently executable proof bundle are the next implementation work. Publication for CI may use an explicitly in-progress PR; completion and consumer cutover remain blocked.
+      Progress: R-20 executes all 1,092 package tests, every required check, both new native installs and model-proof regrading successfully; replacement hosted CI 41717534624 passes Linux (1,092) and macOS (935). Its consumer run has 99 passes and one correct live-default refusal: read-only observation confirms remote main advanced to 2c98be05 while the reviewed branch includes f14becc1. The earlier failed run and R-20 remain unchanged. Consumer refresh, diagnostic output and three cited consumer-policy Git-object checks remain open. Hosted run 41715388667 passes Linux and Go, but the portable macOS job exposes the ready-entry fixture seeding Linux’s cache path. The test now seeds the actual Darwin Library/Caches path; local entry checks pass, with a real hosted rerun still required. The independently executable model-proof checker passes nine actual native contexts, verifies 90 unchanged plugin Git objects, both installed payloads and retained report/snapshot bytes, and replays actual toy red/green plus an adversarial check (`T98-model-proof-dry-r1.log`). `T98-native-retention-red.log` proves the prior candidate receipts lack retained report/snapshot files. The native runner now saves their exact bytes before fixture disposal; its four existing structural checks pass. A fresh committed native run will verify the actual retained files. R-19's own launcher passes 117 tests with checkout/index/refs preservation, but its limited packet cannot establish the composite criteria. The actual full primary suite passes 1,092 tests at the same source. Both results are retained honestly. Native report retention and a complete independently executable proof bundle are the next implementation work. Publication for CI may use an explicitly in-progress PR; completion and consumer cutover remain blocked.
 - [ ] T25 `docs/specs/shared-audit.md` and exact committed feature/consumer snapshots - run the complete required local gates and independent implementation review, resolve all criterion gaps and preserve R-12 recovery evidence; source completion requires every current criterion met/residualised by the approved process, while actual marketplace/post-merge checks remain the ordered delivery obligations (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
 
 ## Open Questions
@@ -1310,6 +1317,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-03 | R-18 | spec | `e471cf650f687c677b0e6fcd5d4e8709b0623d15` | claude-opus-5.5 | procedural | No blocking/should-fix findings; two nits: setup-time page checking and historical proof label. |
 | 2026-11-03 | R-18 | spec | `e471cf650f687c677b0e6fcd5d4e8709b0623d15` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-19 | implementation | `4a31ee68bb9007648aabf928edb65d3cad28ee74` | claude-opus-5.5 | procedural | All seven criteria not verified: executable review coverage and retained evidence are incomplete. No new code finding. |
+| 2026-11-03 | R-20 | implementation | `0743ef0758d40c18c040f336a28dc88659466666` | claude-opus-5.5 | procedural | AC-01 to AC-04 met; consumer candidate denied after upstream advance, consumer trial equivalence incomplete; strict extra-read deviation disclosed. |
 
 ### R-1
 
@@ -1806,6 +1814,114 @@ Several gaps remain. No portable macOS CI result is present in this input, altho
 CRITERION: AC-07 Consumer cutover is blocked without matching published-marketplace and paired-review artifacts, and the documented delivery procedure verifies the published shared component and installed operation before adopting Stackweaver, retaining exact revisions, rollback and deferred capability limits.
 VERDICT: not verified
 EVIDENCE: I inspected adoption.ts. It requires a published-marketplace receipt for the vh-adlc-audit operation, exact NO FINDINGS paired-review bytes, a non-granting installed candidate-policy receipt, and fresh install, upgrade, reinstall, discovery and helper evidence for both hosts. I also inspected the audit.md cutover section and the inspectCandidatePolicy and inspectAdoptedPolicy functions in authority.ts. I did not execute adoption.test.ts, which contains the unit preflight denials. It appears only in the archived full-suite log. As the accepted Design and observed/limitations.json state, publication, real marketplace install and upgrade, a fresh published paired review, the installed artifact-bound preflight, consumer merge and post-merge adopted-policy inspection are ordered delivery obligations after source completion. None of them has happened, and I do not claim them as passed.
+### R-20
+
+CRITERION: AC-01 Native skill discovery and ordinary lifecycle intake select the shared audit procedure for its declared modes, preserve other routes, and reject invalid scope without writes or an invented harness/model dependency.
+VERDICT: met
+EVIDENCE: I ran each fixed launcher once against an exported tree at shared 0743ef0758d40c18c040f336a28dc88659466666.
+- The five package groups ran `bun test --timeout 120000` and passed 172, 263, 251, 193 and 213 tests. That is 1092 pass and 0 fail across all 93 entrypoints, each run exactly once.
+- Each launcher verified the exported bytes and left the checkout, index and refs unchanged.
+- The native launcher did fresh isolated installs at the same commit on Codex CLI 0.163.0 and Claude Code 2.1.316: plugin 0.8.0, 12 skills discovered including vh-adlc-audit, the binary digest verified, six pages answered at pin 0e52f51f01b84eda75a976763c42d8ec0a07b544, and 0 model invocations.
+- The proof launcher regraded the behavior-r14 Copilot claude-opus-5.5 transcript. It covers 9 routes: four audit modes, maintenance, investigation, triage and two clarify cases. Its model, full-read and transcript hashes match.
+- 90 plugin objects are byte-identical between baseline 0bdcacee and this commit. The only excluded change, to `ensure-vh-adlc.sh`, is covered by the current native and offline controls.
+- Hosted CI run 41717534624 at this exact head concluded success, with 1092 pass on Linux and 935 pass on macOS.
+
+CRITERION: AC-02 Adopters using strict YAML settings through the shared verified reader can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
+VERDICT: met
+EVIDENCE: The complete package run (1092 pass, 0 fail across 93 files at 0743ef07) includes the settings, YAML settings, knowledge settings, setup docs, inventory and ledger allocation suites. The required-checks launcher passed:
+- Go test and vet, `mod tidy -diff`, golangci-lint config verify and run with 0 issues;
+- actionlint;
+- the companion plugin suite with 34 pass;
+- `git diff --check`.
+
+Native helpers on both hosts preserved input and index digests, and both hosts retained the report and snapshot artifacts. Hosted CI passed at the same head on Linux and macOS. I read `settings.ts`, `settings-file.ts`, `inventory.ts`, `ledger.ts` and the settings reference in full. Identity comes only from headings and index tables, references are scanned for allocation, and unsafe structure sets no next ID.
+
+CRITERION: AC-03 Current assessments and update proposals preserve stable IDs/history and admit FIXED/MOOT only with complete target-bound evidence and the required adversarial check, while stale, missing or contradictory evidence remains visibly incomplete and cannot yield an eligible terminal update.
+VERDICT: met
+EVIDENCE: The full package run at 0743ef07 passed the assessment, snapshot, report, ledger and batch suites (1092 pass, 0 fail). Hosted CI passed at the same head.
+
+The proof launcher regraded the original behavior-r14 transcript and confirmed its model and hashes. Its 22 cases cover valid and false FIXED, genuine MOOT versus a renamed symbol, missing checks or challenge, source and settings drift, class growth, an unscoped legacy baseline, and duplicate handling with fresh ID allocation. Every negative case stayed ineligible.
+
+The helpers are unchanged object for object since 0bdcacee. I independently read the returned case fixture alongside `assessment.ts`, `snapshot.ts` and `audit-review.md`.
+
+CRITERION: AC-04 Selected audit repairs use the existing reviewed repair/feature lifecycle and the consumer's required verification and authority, preserve workstream boundaries and recover from interruption without silently replaying stale or duplicating completed effects.
+VERDICT: met
+EVIDENCE: The full package run at 0743ef07 passed the batch, authority, journal, recovery, live-recovery, retained-absence, repair-route, rebuild and format-recovery suites (1092 pass, 0 fail). Hosted CI passed on Linux and macOS.
+
+The proof launcher regraded these actual claude-opus-5.5 trials, all with matching hashes:
+- recovery-model-r9 (2 rounds)
+- retained-recovery-model-r2 (2 rounds)
+- reviewer-controls-r3
+- authored-r3 with authored-review-r10
+- delivery-model-r3
+
+It also reran the read-only whole-batch check for the authored two-member record, which passed. The real toy regressions failed (exit 1) at pre-fix commit 165d6689 and passed (exit 0), together with a fresh adversarial check, at reviewed commit e5ffc72c. No effects were recorded.
+
+The regraded delivery decisions keep the owner decisions intact:
+- A migration-bearing or intentional behavior change needs a separate accepted feature and PR, with an owner merge.
+- Explicit reselection is required before the batch is reduced.
+- A visible restoration stops for the owner merge.
+
+The consumer candidate-declaration gap is assessed under AC-05.
+
+CRITERION: AC-05 Stackweaver's adapter preserves every parity-mapped audit behavior with the owner-approved separate-feature routing change, command/model/arguments, real ledger bytes and unrelated workflows, and can roll back/reapply only its migration paths against current main.
+VERDICT: not met
+EVIDENCE: The consumer launcher ran the agent-audit, agent-maintenance and agent-triage contract suites once at consumer b844cdd39b30a9e1fa9a38c5e5029b07ede681bf with shared 0743ef07. It exited 1 with 99 pass and 1 fail. The failing test is `the actual shared helper validates the real candidate declaration without granting an effect` in `tests/agent-audit/contract.test.ts`, where the `policy-candidate` child exited 1 instead of 0. The launcher therefore wrote no result.json and did not run its state-preservation postcheck.
+
+The Test Plan requires that the real authority helper validate the exact committed candidate settings and procedure, so this requirement is unproven at these commits. The remaining 99 tests passed, including the parity, preflight, rehearsal and adoption-contract checks.
+
+I read the full legacy and consumer policy independently. Its retained rules and the owner-approved tightenings match the parity map, but that reading cannot substitute for the failed executed check.
+
+CRITERION: AC-06 The committed source passes its required automated suites, independent exact-commit review, isolated native Codex/Claude installation and helper checks, and bounded actual Copilot Opus 5.5 generic/consumer behavior trials with adversarial negative controls and explicit test limits.
+VERDICT: not met
+EVIDENCE: The following passed:
+- All 93 package entrypoints (1092 pass) and all required Go, lint, workflow, whitespace and companion plugin checks, in my launcher runs at 0743ef07.
+- Hosted CI run 41717534624 at the exact head: verify, checker (1092 pass, 0 fail) and checker-macos (935 pass, 0 fail, 76 files).
+- Fresh isolated native installs on both hosts with helper digest preservation, reinstall to the same payload digest and retained report and snapshot files.
+- Nine regraded Copilot claude-opus-5.5 trials with object equivalence for 90 plugin files.
+
+Two gaps keep this composite from being met:
+- This independent exact-commit review of the paired targets has an open blocking finding (F-01).
+- The consumer delivery trial bound consumer 4a41311f. The proof launcher showed no equivalence between that consumer revision and b844cdd.
+
+The actual Claude model and GUI or phone trials are deferred by the owner and are not claimed.
+
+CRITERION: AC-07 Consumer cutover is blocked without matching published-marketplace and paired-review artifacts, and the documented delivery procedure verifies the published shared component and installed operation before adopting Stackweaver, retaining exact revisions, rollback and deferred capability limits.
+VERDICT: not verified
+EVIDENCE: The adoption suite in the full package run passed at 0743ef07, including the unit preflight denials. The consumer preflight tests confirmed that cutover is refused while published-marketplace evidence is missing. Adoption receipts are operator attestations and make no OS-level proof claim.
+
+The ordered delivery obligations have not happened, and I claim none of them:
+- publication;
+- actual marketplace install and upgrade;
+- a fresh paired review of the published component;
+- passing installed preflight with a non-granting candidate-policy receipt;
+- consumer merge;
+- the post-merge adopted-policy inspection.
+
+The installed candidate-policy receipt also depends on the helper path that failed in AC-05.
+
+FINDING: F-01
+SEVERITY: blocking
+CRITERION: AC-05, AC-06
+LOCATION: consumer b844cdd39b30a9e1fa9a38c5e5029b07ede681bf `tests/agent-audit/contract.test.ts` (real candidate declaration test); shared 0743ef0758d40c18c040f336a28dc88659466666 `plugins/vh-adlc/scripts/audit/authority.ts` candidate inspection
+EVIDENCE: In the single consumer launcher run, the shared `policy-candidate` helper returned exit 1 for the exact committed consumer candidate: 99 pass, 1 fail, no result.json and no postcheck. The test asserts the exit code before it parses the helper output, so the denial reason was never shown.
+
+The candidate inspection includes a live observation of the remote default branch and an ancestry requirement. A default branch that has moved past b844cdd, or a failed remote observation, would both produce this result. Neither cause is proven.
+CORRECTION: Make the test surface the helper's returned reason when it fails. Determine whether the cause is consumer staleness or a helper defect. Refresh the consumer onto the current default if needed. Then, under a new launcher, rerun the consumer contract, parity, preflight and rollback/reapply rehearsal at the exact new revisions. Do not relabel this failed run.
+
+FINDING: F-02
+SEVERITY: non-blocking
+CRITERION: AC-06
+LOCATION: proofs/delivery-model-r3
+EVIDENCE: The regraded consumer delivery trial is bound to consumer 4a41311fe2a565982a2b001787bb9fe76675c373. The proof launcher verified object equivalence only for shared plugin files, not for the consumer policy files that trial cited, at b844cdd.
+CORRECTION: Add a Git object equivalence check for the cited consumer policy paths between 4a41311f and the reviewed consumer revision, or rerun the bounded consumer trial at that revision.
+
+FINDING: F-03
+SEVERITY: non-blocking
+CRITERION: none
+LOCATION: review procedure
+EVIDENCE: Before execution, this reviewer used one extra read-only shell command to print the eight argument-free launcher scripts. Each script contains only a fixed invocation of `check.py` with its step number. The command wrote nothing, and every launcher still ran exactly once in order.
+CORRECTION: None required for source. Disclosed for procedural isolation.
 ## Sources
 
 - [Current configuration rule](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md#configuration-format) and [TypeScript conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md): YAML for human-written settings, typed boundaries and repository-specific verification after the pin adopted on main.
