@@ -91,7 +91,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
       "Scenario: " + safe(row.reason), "Evidence: " + row.evidence.map(e => safe(e.path + (e.line === undefined ? "" : ":" + e.line) + "#" + e.symbol)).join(", "),
       "Checks: " + row.checks.map(c => safe(c.name + " exit " + c.exit_code)).join(", "),
       "Residuals: " + (row.residuals.map(safe).join("; ") || "none recorded"), "");
-    if (datedLayout && finding.recorded_status !== row.verdict) lines.splice(finding.entry_lines[0], 0, "", `${stateMarker} **${row.verdict} (${options.at})** <!-- audit-status:${options.run_id}:${row.id} -->`, "");
+    if (datedLayout && finding.recorded_status !== row.verdict) lines.splice(finding.entry_lines[0], 0, "", `${stateMarker} **${row.verdict} (${options.at})** <!-- audit-status:${options.run_id}:${row.id} --> Current status; supersedes any historical heading annotation.`, "");
   }
   const gaps = options.document.assessments.filter(row => !snap.inventory.findings.find(f => f.id === row.id)?.identity_valid);
   if (gaps.length) {

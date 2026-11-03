@@ -417,3 +417,21 @@ test.each(["<?unclosed","<!LEGACY","<![CDATA[","Note <span title=\""])("new raw 
  const c=context("full");
  expect(()=>appendFindings(c.config,c.snap,[{id:"AUD-003",severity:"High",title:"New cause",body}])).toThrow();
 });
+
+test("a dated current marker explicitly supersedes historical heading annotations without rewriting anchors",()=>{
+ const f=fixture();projects.push(f);
+ const heading="### AUD-001 - Incorrect result ✅ **FIXED (2025-01-01)**";
+ f.write("docs/audit.md","## How this audit was performed\nHistorical pass.\n\n"+ledger.replace("### AUD-001 - Incorrect result",heading));const base=f.commit(),config=loadSettings(f.root);
+ const snap=captureSnapshot(config,{mode:"reverify",ids:["AUD-001"],baseline:base,artifact_root:f.artifacts,required_checks:{"AUD-001":["unit"]}}),document={schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(f,snap)]};
+ const candidate=createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"historical-heading"});
+ expect(candidate.bytes).toContain(heading+"\n");expect(candidate.bytes).toContain("supersedes any historical heading annotation");
+});
+
+
+test("a declared How-this-audit section retains a checked scoped delta summary",()=>{
+ const f=fixture();projects.push(f);const settings=baseSettings();settings.profile={...settings.profile,section_note_headings:["How this audit was performed"]} as any;
+ f.write(".vh-adlc/audit.json",JSON.stringify(settings));f.write("docs/audit.md","## How this audit was performed\nHistorical method.\n\n"+ledger);const base=f.commit(),config=loadSettings(f.root);
+ const snap=captureSnapshot(config,{mode:"reverify",ids:["AUD-001"],baseline:base,artifact_root:f.artifacts,required_checks:{"AUD-001":["unit"]}}),document={schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(f,snap)]};
+ const candidate=createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"delta-summary",section_notes:[{heading:"How this audit was performed",ids:["AUD-001"],text:"Scoped comparison: no new source changes in this fixture.",evidence:[f.artifact("scoped-comparison.txt","Fixture comparison at "+base)]}]});
+ expect(candidate.bytes).toContain("Scoped comparison: no new source changes in this fixture.");expect(candidate.bytes).toContain("Historical method.");expect(validateLedgerCandidate(config,snap,candidate,document).valid).toBe(true);
+});

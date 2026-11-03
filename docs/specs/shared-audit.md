@@ -918,6 +918,7 @@ live operations remain separate owner-selected tasks.
 - [x] T74 documentation alignment - place runtime prerequisites under audit and align reviewer/index instructions with the actual source-freeze boundary (public R7 F-05/F-06; AC-01, AC-04).
       Evidence: Reader-facing runtime requirements now appear inside each audit section, and the bare Bun wording is replaced. Reviewer and record instructions agree with the existing tested ledger/record-only post-freeze boundary and explicitly exclude separate ledger-content-derived tracked indexes. Static section/link/whitespace inspection verifies this prose-only alignment; runtime source-freeze tests remain unchanged.
 - [ ] T75 consumer review tail - reconcile report-only publication with local CI rules, ordinary owned-slot setup, touched workers, checked delta summaries, historical heading annotations and exact parity homes/excerpts; retain the pending owner route decision (private R3; AC-04, AC-05).
+      Progress: The prior blanket provisioning stop conflicted with the existing committed project constitution. Local policy now retains its ordinary newly owned nonzero-slot create/default-seed/destroy lifecycle, all touched workers, and no shared/IdP or unrelated-slot grant. Skip-marked reports are again the constitution-bound default; separate publication uses a newly rechecked skip-marked commit, and non-skip carry needs an explicit current CI-rule exception. Parity excerpts/homes are corrected. A new marker-clarity control fails first (`T75-heading-red.log`); all 79 ledger checks then pass with current-status supersession and an actual checked How-section delta summary (`T75-ledger-green.log`). The owner route choice remains Q1, so this task and final completion stay open.
 - [ ] T22 `tests/vh-adlc/audit/trial-proof.ts` and bounded synthetic trial runners - execute actual Copilot Opus 5.5 audit/repair/recovery trials at a committed payload, including independent repair review and adverse controls; raw transcripts, native exits and manual inspections establish the declared scenarios (AC-01, AC-03, AC-04, AC-06).
 - [x] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
       Evidence: Actual isolated Codex CLI and Claude CLI native installers at `deb1d7fcb60b416a7980fdf0825acd2d3a94e77d` both pass (`native-install-r2/result.json`): twelve native skills, installed settings/inventory/report helpers, unchanged source/index and identical byte/mode payload after uninstall/reinstall. No authentication/configuration is copied or model invoked by installers. The short-SHA launch failure remains `native-install-r1-launch.log`; four verifier negative-control tests pass. This is local-catalog candidate evidence, not published-marketplace, real Claude model or GUI acceptance.
@@ -926,10 +927,18 @@ live operations remain separate owner-selected tasks.
 
 ## Open Questions
 
-None. On 2026-11-01 the owner accepted the three recommendations summarized in the conversation:
+Earlier decisions: on 2026-11-01 the owner accepted the three recommendations summarized in the conversation:
 retain adopted local authority and per-mode ledger writes; allow bounded repairs restoring documented
 behavior; use one repair record with final-head review per compatible selected workstream batch.
 The reviewed spec was accepted on 2026-11-02. Any new policy judgment returns to the owner.
+
+### Q1: Route for migration-bearing or intentional behavior-changing findings
+
+Copilot private parity R3 found tension between legacy retention in the audit PR and the accepted
+shared feature-eligibility route. The owner is being asked whether these members leave through
+explicit reselection into a separate accepted feature/PR, or stay as an expressly approved audit
+exception that only the owner merges. Dependent route changes and final completion wait for that
+decision; unrelated correctness fixes and tests continue. No choice is inferred from elapsed time.
 
 ## Review Log
 
