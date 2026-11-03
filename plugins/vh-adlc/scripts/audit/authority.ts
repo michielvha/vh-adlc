@@ -103,7 +103,7 @@ export function inspectCandidatePolicy(config: Settings, options: { default_bran
       reason: "Exact committed candidate inspection confers no adopted effect.", declaration: parsed, bindings };
   } catch { return { valid: false, allowed: false as const, adopted: false as const, consumer_commit: null, reason: "Invalid or uncommitted candidate declaration/default identity.", declaration: null, bindings: null }; }
 }
-function observeDefault(config: Settings): Observed {
+export function observeDefault(config: Settings): Observed {
   const head = git(config.root, "ls-remote", "--symref", "origin", "HEAD"), branch = [...head.matchAll(/^ref: refs\/heads\/([^\s]+)\s+HEAD$/gm)], commit = [...head.matchAll(/^([a-f0-9]{40,64})\s+HEAD$/gm)];
   if (branch.length !== 1 || commit.length !== 1) fail();
   git(config.root, "check-ref-format", "refs/heads/" + branch[0][1]);

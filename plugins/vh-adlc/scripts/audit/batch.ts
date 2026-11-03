@@ -1,3 +1,5 @@
+import { loadSettings } from "./settings";
+import { observeDefault } from "./authority";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { canonicalJSON } from "../maintenance/journal";
@@ -63,9 +65,10 @@ export function checkBatch(config: Settings, input: {
   provisional: { snapshot: Snapshot; document: { schema_version: number; snapshot_digest: string; assessments: any[] }; candidate: Candidate };
   selection: { ids: string[]; workstream: string; carried: Definition["carried"] };
   review: { target: string; producer: string; reviewer: string; artifact: { path: string; sha256: string }; model: string };
-}) {
+}, options: { observe?: () => { default_branch: string; default_commit: string } } = {}) {
   const errors: string[] = []; let publication_base: string | null = null, repair_batch = false;
   try {
+    if (digest(loadSettings(config.root, { settingsPath: config.settings_path })) !== digest(config)) throw Error("current audit identity changed");
     const recordPath = repositoryPath(input.record_path), target = input.review_target;
     const record = gitBytes(config.root, "show", `${target}:${recordPath}`).toString(), def = definition(record);
     publication_base = def.scope_baseline;
@@ -77,7 +80,9 @@ export function checkBatch(config: Settings, input: {
     if (!ancestor(config, def.scope_baseline, def.task_base) || !ancestor(config, def.task_base, def.source_target) ||
         !ancestor(config, def.source_target, target)) errors.push("Scope, Task base and frozen source must be real ordered ancestors.");
     git(config.root, "check-ref-format", "refs/heads/" + def.default_branch);
-    if (git(config.root, "rev-parse", "refs/remotes/origin/" + def.default_branch) !== def.scope_baseline) errors.push("Fetched default scope baseline is no longer current.");
+    const observed = (options.observe ?? (() => observeDefault(config)))();
+    if (observed.default_branch !== def.default_branch || observed.default_commit !== def.scope_baseline ||
+        git(config.root, "rev-parse", "refs/remotes/origin/" + observed.default_branch) !== observed.default_commit) errors.push("Scope baseline is not the fresh observed actual remote default/tracking tip.");
     if (!Array.isArray(def.affected_paths) || !Array.isArray(def.verification_inputs) ||
         [...def.affected_paths, ...def.verification_inputs].some(path => repositoryPath(path) !== path) ||
         !def.affected_paths.includes(config.ledger_path) || !def.affected_paths.includes(recordPath)) errors.push("Definition lacks its actual affected paths and verification inputs.");

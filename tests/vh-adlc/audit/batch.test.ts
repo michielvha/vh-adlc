@@ -46,7 +46,7 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
   const input = { record_path: path, review_target: target, snapshot, provisional, document: { schema_version: 1, snapshot_digest: snapshot.digest, assessments: rows },
     selection: { ids: ["AUD-001", "AUD-002"], workstream: "A", carried },
     review: { target, producer: "author", reviewer: "independent", artifact: rows[0].batch_review.artifact, model: "claude-opus-5.5" } };
-  return { f, config, definition, input, base, target, path };
+  return { f, config, definition, input, base, target, path, observe: () => ({ default_branch: "main", default_commit: git(f.root, "rev-parse", "refs/remotes/origin/main") }) };
 }
 function retarget(c: ReturnType<typeof context>) {
   const target = git(c.f.root, "rev-parse", "HEAD"), previous = c.input.document.assessments;
@@ -60,7 +60,7 @@ function retarget(c: ReturnType<typeof context>) {
 }
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
 test("a fully covered mixed batch checks the full scope and frozen source without SHA self-reference", () => {
-  const c = context(), result = checkBatch(c.config, c.input);
+  const c = context(), result = checkBatch(c.config, c.input, { observe: c.observe });
   expect(result.pass).toBe(true); expect(result.publication_base).toBe(c.base); expect(result.repair_batch).toBe(true);
 });
 test.each(["missing-member", "missing-contract", "missing-challenge", "one-check-only", "unresolved", "new-contract", "wrong-review", "changed-ledger", "changed-definition", "source-after-freeze", "pre-fix-source"])("%s blocks whole batch completion", kind => {
@@ -79,14 +79,14 @@ test.each(["missing-member", "missing-contract", "missing-challenge", "one-check
     c.f.write(c.path, renderRecord(c.definition)); c.f.commit();
   }
   if (kind === "source-after-freeze") { c.f.write("src/app.ts", "export const answer = 44;\n"); c.f.commit(); }
-  expect(checkBatch(c.config, c.input).pass).toBe(false);
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });
 test("append-only record evidence/review/state bookkeeping preserves freshness but rewriting evidence does not", () => {
   const c = context(), record = readFileSync(join(c.f.root, c.path), "utf8");
   c.f.write(c.path, record + "\nObserved final review outcome.\n"); c.f.commit("test: append state evidence");
-  expect(checkBatch(c.config, c.input).pass).toBe(true);
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(true);
   c.f.write(c.path, record.replace("review pending", "rewritten history")); c.f.commit();
-  expect(checkBatch(c.config, c.input).pass).toBe(false);
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });
 test("scope baseline survives a squash while the discarded pre-squash source target is not used as the delta baseline", () => {
   const c = context(); git(c.f.root, "switch", "-q", "main"); git(c.f.root, "merge", "--squash", "fix/audit-batch"); const squash = c.f.commit("test: squash batch");
@@ -96,25 +96,25 @@ test("scope baseline survives a squash while the discarded pre-squash source tar
   expect(captureSnapshot(loadSettings(c.f.root), { mode: "reverify", artifact_root: c.f.artifacts, baseline: c.target }).history.status).toBe("unscoped");
 });
 
-test("a caller cannot use another remote branch as default scope, or hide deleted finding content in metadata", () => {
+test("a stale default tracking tip cannot supply the recorded scope baseline", () => {
   const c = context();
   git(c.f.root, "update-ref", "refs/remotes/origin/main", c.target);
   git(c.f.root, "update-ref", "refs/remotes/origin/old-feature", c.base);
-  expect(checkBatch(c.config, c.input).pass).toBe(false);
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });
 test("re-reviewed ledger metadata still cannot delete pre-existing finding prose or IDs", () => {
   const c = context(), text = readFileSync(join(c.f.root, "docs/audit.md"), "utf8");
   c.f.write("docs/audit.md", text.replace("The return value needs a current check.\n", "")); c.f.commit(); retarget(c);
-  expect(checkBatch(c.config, c.input).pass).toBe(false);
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });
 test("all-assessment work produces no empty repair publication", () => {
   const c = context(false, true);
-  const result = checkBatch(c.config, c.input); expect(result.pass).toBe(true); expect(result.publish_repair).toBe(false);
+  const result = checkBatch(c.config, c.input, { observe: c.observe }); expect(result.pass).toBe(true); expect(result.publish_repair).toBe(false);
 });
 
 test("a carried report is reviewed from its default ancestor and requires exact owner inclusion and all original evidence", () => {
-  const c = context(true); expect(checkBatch(c.config, c.input).pass).toBe(true);
-  c.input.selection.carried = null; expect(checkBatch(c.config, c.input).pass).toBe(false);
+  const c = context(true); expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(true);
+  c.input.selection.carried = null; expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });
 test("an omitted carried ID or missing member challenge cannot hide behind a structurally valid artifact digest", () => {
   for (const kind of ["id", "challenge"]) {
@@ -123,7 +123,7 @@ test("an omitted carried ID or missing member challenge cannot hide behind a str
     if (kind === "id") proof.document.assessments.pop(); else proof.document.assessments[0].challenge = null;
     carried.evidence_artifact = c.f.artifact("carried-bad.json", JSON.stringify(proof));
     c.input.selection.carried = structuredClone(carried); c.f.write(c.path, renderRecord(c.definition)); c.f.commit(); retarget(c);
-    expect(checkBatch(c.config, c.input).pass).toBe(false);
+    expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
   }
 });
 
@@ -135,19 +135,29 @@ test.each(["pre-fix-ledger-source", "missing-ledger-source", "placeholder-ledger
   if (kind === "contradictory-verdict") bytes = bytes.replace(/(\| AUD-001 \| High \| Incorrect result \| )[^|]+/, "$1MOOT ");
   if (kind === "unchecked-new-id") bytes += "\n### AUD-099 - Unchecked finding\nAn unassessed new root cause.\n";
   c.f.write(c.config.ledger_path, bytes); c.f.commit(); retarget(c);
-  expect(checkBatch(c.config, c.input).pass).toBe(false);
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });
 
 test("an unchecked ledger edit hidden before frozen source cannot become a checked candidate baseline", () => {
-  const c = context(false, false, true); expect(checkBatch(c.config, c.input).pass).toBe(false);
+  const c = context(false, false, true); expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });
 
 test("a verbatim clean review may separate its model header and records with a blank line, without admitting other content", () => {
   const c = context(); c.input.review.artifact = c.f.artifact("blank-separated-review.txt", "MODEL: claude-opus-5.5\n\nNO FINDINGS\n");
-  expect(checkBatch(c.config, c.input).pass).toBe(true);
-  c.input.review.artifact = c.f.artifact("review-footer.txt", "MODEL: claude-opus-5.5\nNO FINDINGS\nAn extra claim.\n"); expect(checkBatch(c.config, c.input).pass).toBe(false);
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(true);
+  c.input.review.artifact = c.f.artifact("review-footer.txt", "MODEL: claude-opus-5.5\nNO FINDINGS\nAn extra claim.\n"); expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });
 
 test("even an all-assessment terminal batch must declare nonempty per-member final checks", () => {
-  const c = context(false, true, false, []); expect(checkBatch(c.config, c.input).pass).toBe(false);
+  const c = context(false, true, false, []); expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
+});
+
+test("an author-named other branch cannot masquerade as the actual default even at an equal cached tip",()=>{
+  const c=context();git(c.f.root,"update-ref","refs/remotes/origin/old-feature",c.base);c.definition.default_branch="old-feature";
+  c.f.write(c.path,renderRecord(c.definition));c.f.commit();retarget(c);
+  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
+});
+test.each(["offline","advanced"])("%s actual remote observation cannot be replaced by a cached default ref",kind=>{
+  const c=context(); const observe=()=>{if(kind==="offline")throw Error("synthetic remote unavailable");return {default_branch:"main",default_commit:c.target};};
+  expect(checkBatch(c.config,c.input,{observe}).pass).toBe(false);
 });

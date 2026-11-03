@@ -9,7 +9,7 @@ Missing inputs or an unavailable independent route leave `review pending` with a
 
 Read only. Leave source, index and every ref unchanged; put scratch outside the repository. Read the
 committed Definition, every original finding and actual source evidence. Review the full publication diff
-from the fetched default-ancestor Scope baseline, including any carried ledger commit. Task base is
+from the fetched default-ancestor Scope baseline, including any carried ledger commit. The helper observes the actual remote default read-only and requires its tip to match both that baseline and the existing tracking ref; an author-selected branch or stale/offline observation cannot substitute for it. It never fetches or moves a ref during review. Task base is
 the post-ledger point for attributing repair/red evidence, not a way to hide earlier published changes.
 
 Verify each member's cited pre-existing contract and restoration eligibility. New semantics, an
