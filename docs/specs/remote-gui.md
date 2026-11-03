@@ -144,7 +144,16 @@ Add a Linux CI job for plugin build/test/vet/lint and package checks. The existi
 
 ## Tasks
 
-None yet; write test-first tasks after scope acceptance.
+- [ ] T1 `plugins/remote-gui/go.mod`, `cmd/remote-gui/main.go`, `internal/app/` - add CLI/configuration and session-kind doctor tests first, observe failure, then make build/help/doctor checks pass without changing host configuration (AC-01, AC-05).
+- [ ] T2 `plugins/remote-gui/internal/state/` - add private-state, lifetime, lock and process-identity tests first, then pass tests for concurrent allocation, restrictive modes and reused identities (AC-05, AC-06, AC-07).
+- [ ] T3 `plugins/remote-gui/internal/proxy/` - add HTTP/WebSocket enrollment, origin, expiry, cookie isolation and upstream-boundary tests first, then pass them with authenticated proxying and connection revocation (AC-03, AC-11).
+- [ ] T4 `plugins/remote-gui/internal/tailnet/` - add conditional Serve acquisition/removal and trusted transport-probe tests first, then pass conflict, foreign-config, privilege, certificate and failure cases (AC-04, AC-06, AC-07).
+- [ ] T5 `plugins/remote-gui/internal/session/` - add disposable service-session, control-socket and supervisor/guard process tests first, then pass start/access/status/stop/expiry/crash/recovery and upstream-identity checks (AC-04, AC-05, AC-06, AC-07, AC-11).
+- [ ] T6 `plugins/remote-gui/internal/browser/` - add headed-browser dependency, allocation and rollback tests first, then pass isolated X/VNC/Chromium startup, marker and exact-session attachment checks without accessing live profiles (AC-02, AC-05, AC-06, AC-07).
+- [ ] T7 `plugins/remote-gui/internal/app/`, `cmd/remote-gui/main.go` - add command-level lifecycle and redaction tests first, then pass the public CLI contract, scoped diagnostics and private reveal flow (AC-01, AC-03, AC-05, AC-07, AC-11).
+- [ ] T8 `plugins/remote-gui/scripts/`, `skills/remote-gui/`, plugin manifests, `tests/remote-gui/`, both marketplace catalogs, `.github/workflows/ci.yml`, `README.md`, `CONTRIBUTING.md`, `docs/reference/marketplace.md` - add installed-package and CI dependency checks first, then pass independent source-install builds and package checks with documented remote activation and auth-refresh boundaries (AC-01, AC-08, AC-09, AC-10, AC-12).
+- [ ] T9 `tests/remote-gui/`, `plugins/remote-gui/internal/` tests - run disposable real-browser and native-agent scenarios, address observed defects within scope, and record actual evidence for first-link forwarding, same-browser handoff, app compatibility and auth-refresh isolation (AC-02, AC-03, AC-05, AC-06, AC-07, AC-08, AC-10, AC-11, AC-12).
+- [ ] T10 `docs/specs/remote-gui.md`, plugin verification scripts - run all required Go/Bun/lint/tidy checks, obtain owner-authorized second-device Tailscale and SSH acceptance evidence, and record exact results without claiming host-only checks establish remote reachability (AC-04, AC-09, AC-10, AC-11).
 
 ## Open Questions
 
