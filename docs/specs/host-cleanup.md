@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-02 at R-7. The non-blocking findings of R-6 and R-7 carry into tasks, and any of them needing a baseline change goes through the normal revision path at implementation."
+status: in-progress
+status_description: "Being implemented on feat/host-cleanup, local only at the owner's direction: the R-8 record, the tasks and this claim are commits on that branch, not on main, and reach main with the feature's PR. R-8 found no blocking issue, so the R-7 acceptance holds."
 issue: null
+branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
 covers:
   - cmd/vh-adlc/
