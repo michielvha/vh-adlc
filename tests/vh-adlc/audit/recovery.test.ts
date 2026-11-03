@@ -160,3 +160,18 @@ test("pending inspection reports repository-wide readiness without mutating eith
  expect(inspectPending(c.config,c.run.directory,c.run.header.batch_digest).live_ready).toBe(false);
  expect(readFileSync(join(c.run.directory,"header.json")).equals(before)).toBe(true);
 });
+
+
+test("a declined non-resource effect stays in a retained handoff without blocking another owned run",async()=>{
+ const c=context();intent(c.run,{id:"declined-merge",kind:"merge",correlation:"pull-42",target:"pull:42"});let executions=0;
+ const result=await recoverEffect(c.reload(),"declined-merge",{authorized:false,observe:async()=>({state:"absent"}),execute:async()=>{executions++;return {state:"observed"};}});
+ expect(result.state).toBe("blocked");expect(executions).toBe(0);
+ const retained=c.reload();expect(retained.events.some(row=>row.kind==="handoff"&&row.action_id==="declined-merge")).toBe(true);
+ expect(inspectPending(c.config,retained.directory,retained.header.batch_digest).pending.map(row=>row.id)).toEqual(["declined-merge"]);
+ expect(()=>retireRun(c.config,retained.directory,retained.header.batch_digest,{owner_approved:true,owner_handoff:"owner:retained",expected_digest:retained.digest})).toThrow();
+ const later=createRun(c.config,{artifact_root:c.f.artifacts,run_id:"after-declined-merge",batch_digest:"f".repeat(64)});
+ intent(later,{id:"owned-key",kind:"key",correlation:"later-key",target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"});
+ await cleanupPending(readRun(c.config,later.directory,later.header.batch_digest),{target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"},{authorized:true,lookup:async()=>[],cleanup:async()=>{throw Error("absent");}});
+ expect(liveReady(readRun(c.config,later.directory,later.header.batch_digest))).toBe(true);
+ rmSync(retained.directory,{recursive:true});expect(()=>registeredPending(c.config)).toThrow();
+});

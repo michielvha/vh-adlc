@@ -187,6 +187,14 @@ Persist a newly discovered server ID before cleanup. Cleanup execution and post-
 failures also retain specific handoffs, so a later attempt cannot delete a replacement resource.
 Never create a second key, broaden deletion or waive a required live gate because of permission denial.
 
+Persist a non-resource intent immediately before execution, after the effect's final current gates
+and authorization pass. If the effect is then declined or becomes forbidden, observe its actual
+state and keep an absent/unknown result as a pending handoff. It is not an executed outcome and
+cannot retire. Keep that run directory at its registered absolute path; do not delete its registration.
+A retained non-resource-only handoff does not prevent a later run's resource plan. Removing its root
+would make registered state unknown and block later admission. This is the documented retained state
+for a deliberately unperformed effect; there is no withdrawal receipt or implied execution grant.
+
 After a squash merge, keep its observed outcome in the external private run journal. An optional
 deduplicated issue update needs existing issue-write authority. No new default-branch push is needed.
 After a lost merge acknowledgement, read actual selected PR/head/merge state and record the observed
