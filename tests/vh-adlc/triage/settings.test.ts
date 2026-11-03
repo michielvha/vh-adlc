@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readFileSync, symlinkSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { loadSettings, ownership, sourcePath } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import { fixture, git } from "./fixtures";
@@ -95,7 +95,7 @@ test("a block YAML settings file gives the settings the JSON file gave", () => {
   const text = readFileSync(join(f.root, ".vh-adlc/triage.yaml"), "utf8");
   expect(() => JSON.parse(text)).toThrow(); expect(blockYAML(text)).toContain("\nsource_roots:\n  - src\n");
   const { root, settings_path, ...config } = loadSettings(f.root);
-  expect(root).toBe(f.root); expect(settings_path).toBe(".vh-adlc/triage.yaml");
+  expect(root).toBe(realpathSync(f.root)); expect(settings_path).toBe(".vh-adlc/triage.yaml");
   expect(config).toEqual(beforeYAML as typeof config);
 });
 
