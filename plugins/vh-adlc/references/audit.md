@@ -36,7 +36,9 @@ bun <plugin>/scripts/audit/cli.ts settings --repo <consumer>
 bun <plugin>/scripts/audit/cli.ts snapshot --repo <consumer> --mode reverify --ids AUD-001,AUD-002 --artifact-root <owned-private-directory> --baseline <resolved-ancestor> --requirements <required-checks.json> --name snapshot
 ```
 
-Choose a new owned directory outside the checkout, canonical path, mode 0700. Private artifacts use
+Choose one new owned directory per audit batch outside the checkout, canonical path, mode 0700.
+Keep that same artifact root for its live intents, provisional snapshot and final-head snapshots;
+use unique artifact names within it. A later snapshot never starts an empty replacement journal. Private artifacts use
 0600 and exclusive creation. Use IDs/prefix and concrete per-member required checks from the actual
 consumer. Snapshot binds repository identity, clean commit/diff, ledger/settings/procedure hashes,
 mode/IDs, inventory and requirements. Recorded historical counts are not fresh verification.

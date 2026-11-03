@@ -99,7 +99,8 @@ final checks and independent challenge/review artifacts bind the later actual re
 ## Bound resource journal
 
 Every `batch-check` bundle also requires `journal: {directory, batch_digest}`, including batches
-that never create live resources. Create the run under the snapshot's private artifact root as
+that never create live resources. All snapshots in the batch, including provisional and final-head,
+must retain the same original private artifact root. Create the run under that root as
 `audit-run-<run_id>`. Compute its digest using `batchJournalDigest(definition)`: it binds repository,
 hostname, run ID, workstream, actual default branch, Scope baseline, Task base, sorted member IDs
 and the included carried report's commit/sorted IDs (or null). A different selected scope needs a

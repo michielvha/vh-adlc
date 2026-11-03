@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, lstatSync, mkdirSync, copyFileSync } from "node:fs";
 import { join } from "node:path";
 import { checkBatch, batchJournalDigest, renderRecord, type Definition } from "../../../plugins/vh-adlc/scripts/audit/batch";
 import { captureSnapshot, digest } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
@@ -190,4 +190,16 @@ test("resource journal scope stays stable across source updates but changes with
   for (const changed of [{run_id:"another"},{workstream:"B"},{default_branch:"another"},{scope_baseline:"a".repeat(40)},
     {task_base:"a".repeat(40)},{members:c.definition.members.slice(1)},{carried:{commit:c.base,ids:["AUD-099"]} as any}])
     expect(batchJournalDigest({...c.definition,...changed})).not.toBe(original);
+});
+
+
+test("a fresh final snapshot root and empty journal cannot hide the original batch's pending key", () => {
+  const c=context();intent(c.run,{id:"key",kind:"key",correlation:"owned-key",target:"synthetic:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"});
+  const root=join(c.f.outer,"fresh-final-artifacts");mkdirSync(root,{mode:0o700});
+  for(const name of readdirSync(c.f.artifacts))if(lstatSync(join(c.f.artifacts,name)).isFile())copyFileSync(join(c.f.artifacts,name),join(root,name));
+  const {digest:_,...body}=c.input.snapshot;const changed={...body,artifact_root:root};c.input.snapshot={...changed,digest:digest(changed)};
+  c.input.document.snapshot_digest=c.input.snapshot.digest;
+  const fresh=createRun(c.config,{artifact_root:root,run_id:c.definition.run_id,batch_digest:batchJournalDigest(c.definition)});
+  c.input.journal={directory:fresh.directory,batch_digest:fresh.header.batch_digest};
+  expect(checkBatch(c.config,c.input,{observe:c.observe}).pass).toBe(false);
 });

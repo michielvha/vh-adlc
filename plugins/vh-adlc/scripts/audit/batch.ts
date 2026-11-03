@@ -80,6 +80,7 @@ export function checkBatch(config: Settings, input: {
     const recordPath = repositoryPath(input.record_path), target = input.review_target;
     const record = gitBytes(config.root, "show", `${target}:${recordPath}`).toString(), def = definition(record);
     publication_base = def.scope_baseline;
+    if (!input.provisional || input.provisional.snapshot.artifact_root !== input.snapshot.artifact_root) throw Error("Batch snapshots must retain the original resource-journal artifact root.");
     if (!/^[a-z0-9][a-z0-9_-]{0,79}$/.test(def.run_id) || !input.journal ||
         input.journal.directory !== join(input.snapshot.artifact_root, "audit-run-" + def.run_id) ||
         input.journal.batch_digest !== batchJournalDigest(def)) throw Error("Batch requires its scope-bound resource journal.");
