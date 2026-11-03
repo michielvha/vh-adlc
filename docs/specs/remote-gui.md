@@ -145,7 +145,8 @@ Add a Linux CI job for plugin build/test/vet/lint and package checks. The existi
 
 ## Tasks
 
-- [ ] T1 `plugins/remote-gui/go.mod`, `cmd/remote-gui/main.go`, `internal/app/` - add CLI/configuration and session-kind doctor tests first, observe failure, then make build/help/doctor checks pass without changing host configuration (AC-01, AC-05).
+- [x] T1 `plugins/remote-gui/go.mod`, `cmd/remote-gui/main.go`, `internal/app/` - add CLI/configuration and session-kind doctor tests first, observe failure, then make build/help/doctor checks pass without changing host configuration (AC-01, AC-05).
+      Evidence: `go test ./internal/app ./internal/config` first failed with missing Run/Parse; after implementation `go test ./...`, `go vet ./...`, build, v2.15.0 lint and `go mod tidy -diff` passed.
 - [ ] T2 `plugins/remote-gui/internal/state/` - add private-state, lifetime, lock and process-identity tests first, then pass tests for concurrent allocation, restrictive modes and reused identities (AC-05, AC-06, AC-07).
 - [ ] T3 `plugins/remote-gui/internal/proxy/` - add HTTP/WebSocket enrollment, origin, expiry, cookie isolation and upstream-boundary tests first, then pass them with authenticated proxying and connection revocation (AC-03, AC-11).
 - [ ] T4 `plugins/remote-gui/internal/tailnet/` - add conditional Serve acquisition/removal and trusted transport-probe tests first, then pass conflict, foreign-config, privilege, certificate and failure cases (AC-04, AC-06, AC-07).
