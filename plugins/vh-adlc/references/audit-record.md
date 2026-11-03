@@ -49,7 +49,10 @@ Replace every field with observed values. Its schema is:
 The Definition also records the requested outcome, scope/coupling, proposed repair, concrete pass
 conditions and owner-decision boundaries in prose. Cite the actual existing contract for each
 member. New public behavior, intentional permission/data boundary changes, format/migration or
-delivery policy need the feature/owner route. A documented restoration can use bounded repair.
+delivery policy need a separate feature and separate PR; the owner merges that feature. Record the
+handoff and retain those original members visibly until explicit reselection creates the replacement
+batch. A planning answer is no in-batch eligibility exception. A documented restoration can use
+bounded repair, retaining local visible-restoration judgment and owner-merge stops.
 Do not omit unresolved original members, silently replace IDs or select another workstream.
 
 An `assessment-only` member has no invented pre_fix/repair_commit or failing regression. It needs

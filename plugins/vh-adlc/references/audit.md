@@ -137,7 +137,12 @@ ledger commit alone never authorizes that publication.
 Classify each member against its cited pre-existing contract. Restoration of documented intended
 behavior, including permission/data invariants, may use the existing bounded-maintenance loop when
 no new promised semantics, boundary, stored format/migration or delivery rule is introduced.
-Wider/ambiguous decisions require the accepted feature/owner route before dependent changes.
+A migration-bearing or intentional behavior-changing finding needs a separate feature with its own
+accepted spec and separate PR; the owner merges that feature. Answering a planning question never
+makes it eligible for the audit repair PR. Keep that finding visible in the requested selection and
+report, and obtain explicit reselection before completing a reduced repair batch. A visible repair
+that restores an existing contract keeps any local ask-before-fix or owner-only merge stop. Resolve
+ambiguous eligibility before dependent changes.
 
 Use one compatible workstream branch and `audit-record.md`. For actual authored repairs observe the
 failing regression first, repair the root cause, commit one finding/coupled bundle at a time, then

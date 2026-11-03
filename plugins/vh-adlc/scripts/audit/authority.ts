@@ -189,7 +189,7 @@ export function inspectAuthority(config: Settings, options: AuthorityOptions) {
     const identity = auditOrigin(config.root);
     if (identity.repository.toLowerCase() !== config.repository || identity.hostname !== config.hostname) return response(false, "none", "Origin changed.");
     if (!validRequest(request) || !validConstraints(options.restrictions, options.prohibited_effects)) return response(false, "none", "Invalid request, restriction or effect fails closed.");
-    if (options.mode === "fix" && request?.eligible_repair !== true) return response(false, "none", "Ineligible fix needs the feature/owner route before any fix effect.");
+    if (options.mode === "fix" && request?.eligible_repair !== true) return response(false, "none", "Ineligible fix needs a separate feature/spec and separate PR with owner merge; preserve members until explicit reselection.");
     const known = new Set(inventory(config).findings.map(f => f.id));
     if (options.ids.some(id => !known.has(id)) || options.mode === "fix" && !options.ids.length) return response(false, "none", "Unknown or empty selected finding scope.");
     if (!modes[options.mode]?.includes(effect) || !request?.authorized || request.mode !== options.mode ||

@@ -109,7 +109,10 @@ precedence; report that concrete requirement rather than overriding it.
 For selected audit work, [audit.md](audit.md) makes the restoration distinction explicit: repairing
 an already documented intended behavior, permission or data invariant may use bounded maintenance
 without introducing a new boundary or promise. New semantics/boundary/format/migration/delivery policy
-still needs the feature/owner route. The audit record/reviewer checks every selected disposition and
+needs a separate feature, accepted spec and separate PR; the owner merges that feature. Keep the
+routed members visible and require explicit reselection before reducing an audit batch; a planning
+answer grants no in-batch exception. Local visible-restoration judgment/owner-merge stops remain.
+The audit record/reviewer checks every selected disposition and
 the full carried publication scope; ordinary maintenance review alone does not establish those facts.
 
 A clearly requested eligible maintenance task authorizes its scoped local

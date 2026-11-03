@@ -14,7 +14,10 @@ the post-ledger point for attributing repair/red evidence, not a way to hide ear
 
 Verify each member's cited pre-existing contract and restoration eligibility. New semantics, an
 intentional boundary/format/migration/delivery change or unresolved product judgment needs the
-feature/owner route. Verify complete selection, coupled bundles and every disposition. For authored
+separate feature route with a separate PR; the owner merges that feature. Reject a planning answer
+as an exception permitting it in the audit PR. Require visible handoff of excluded original members
+and explicit reselection before approving a reduced batch. Retain local visible-restoration judgment
+and owner-merge stops. Verify complete selection, coupled bundles and every disposition. For authored
 repairs inspect real pre-fix regression failure, repair commit and actual final-head required checks.
 For assessment-only members require honest current scenario/challenge/check evidence and no fake
 red. UNKNOWN/PARTIAL or missing required evidence blocks the requested whole batch. An all-assessment
