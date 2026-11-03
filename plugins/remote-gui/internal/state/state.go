@@ -30,11 +30,13 @@ type Process struct {
 	Identity Identity `json:"identity"`
 }
 type Forward struct {
-	Port   int             `json:"port"`
-	Host   string          `json:"host"`
-	Target string          `json:"target"`
-	TCP    json.RawMessage `json:"tcp"`
-	Web    json.RawMessage `json:"web"`
+	ParentTCP bool            `json:"parent_tcp"`
+	ParentWeb bool            `json:"parent_web"`
+	Port      int             `json:"port"`
+	Host      string          `json:"host"`
+	Target    string          `json:"target"`
+	TCP       json.RawMessage `json:"tcp"`
+	Web       json.RawMessage `json:"web"`
 }
 type Record struct {
 	Version      int           `json:"version"`

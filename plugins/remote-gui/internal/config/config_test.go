@@ -18,6 +18,7 @@ func TestParseLifetimeAndArgumentOrder(t *testing.T) {
 		}
 	}
 }
+
 func TestRejectUnsafeTargets(t *testing.T) {
 	for _, target := range []string{"http://example.com:3000", "https://127.0.0.1:3000", "http://user:password@127.0.0.1:3000", "http://127.0.0.1:0", "http://127.0.0.1:3000/json/version", "http://127.0.0.1:3000/devtools/browser/test"} {
 		if _, err := Parse([]string{"share", target}); err == nil {
