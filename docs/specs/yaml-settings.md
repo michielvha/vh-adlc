@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Complete on feat/yaml-settings: R-6 found all eight criteria met. Unpushed; shipping, plugin publication and Stackweaver's order step 4 remain."
+status_description: "Complete on feat/yaml-settings: R-7 at 5767579, after the macOS test fix, found all eight criteria met. Plugin publication and Stackweaver's order step 4 follow the merge."
 issue: null
 branch: feat/yaml-settings
 goal: "Triage and maintenance settings are YAML, Stackweaver's move is reviewed, and the pinned conventions forbid choosing JSON over YAML. Audit is a known exception until its revision lands."
