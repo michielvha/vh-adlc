@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Implemented on feat/settings-reader, local only at the owner's direction; the claim is on that branch, not on main. R-4 returned AC-02 as not met with one blocking finding, fixed at T7. The next step is a new implementation review."
+status_description: "Implemented on feat/settings-reader, local only at the owner's direction; the claim is on that branch, not on main. R-5 returned all four criteria as met, with no findings."
 issue: null
 branch: feat/settings-reader
 goal: "`vh-adlc settings read` turns a YAML settings file into a checked value, or refuses it, for the TypeScript operations."
@@ -68,16 +68,20 @@ part of the report holds text from the file or from the library's error.
 - [x] AC-01: For input in the accepted forms, with no `--plugin-pin`, `vh-adlc settings read --stdin` reports
       `answered`, and `data.value` equals the expected value, with keys sorted and timestamps as written.
       Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, `TestAccepted`, `TestSortedKeys`, the `settings-read` golden and `TestSchema` passed with no `--plugin-pin`; `TestSchema` checks keys and enums, not a full JSON Schema validation.
+      Evidence: R-5 at `8068a3e`, verdict met.
 - [x] AC-02: Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from
       the file.
       Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, 68 `TestRefused` rows and both refusal goldens passed, each asserting the result, code and reason, and that the canary is absent from the whole report; limited to the listed forms.
       Evidence: R-4 at `800fc8e`, verdict not met: plain numbers past the library's range came back as strings, so these spellings were answered and not refused.
       Evidence: `go test -count=1 ./...` and the binary built from `a78a82e`: all 88 `TestRefused` rows and both refusal goldens passed, the plain spellings R-4 F-01 named are refused with exit 3, and quoted `"1e400"`, `1.2.3` and `2026-13-45` still answer as strings; limited to the listed forms, and not yet re-reviewed.
+      Evidence: R-5 at `8068a3e`, verdict met.
 - [x] AC-03: Without `--stdin` the command reports `usage`, a failed read reports `error`, and a refusal has `data: null`,
       one finding and the stated line.
       Evidence: `go test ./internal/settings ./cmd/vh-adlc`, `3d13710`, `TestUsage`, `TestSettingsReadFailedRead`, `TestSettingsReadRefusal` and 19 `TestRefusalLine` cases covering each branch of the line rule passed.
+      Evidence: R-5 at `8068a3e`, verdict met.
 - [x] AC-04: `docs/reference/cli.md` names the command and its pin exemption.
       Evidence: Read `docs/reference/cli.md` against the binary built from `3d13710`: the page names `settings read --stdin` and its pin exemption, and the binary answered with no pin and with a bad pin.
+      Evidence: R-5 at `8068a3e`, verdict met.
 
 ## Test Plan
 
@@ -118,6 +122,7 @@ None.
 | 2026-11-02 | R-3 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 | 2026-11-02 | R-3 | spec | `d225d01622be32d9ec446a21bd15e910fea72585` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-4 | implementation | `800fc8e6cc705b475676342fbdd9fb2e9f6b4918` | claude-opus-5-5 | procedural | AC-01, AC-03 and AC-04 met, AC-02 not met, 1 blocking finding |
+| 2026-11-03 | R-5 | implementation | `8068a3e10a291bb98493f4a85303b4282c872398` | claude-opus-5-5 | procedural | All four criteria met, no findings |
 
 ### R-1
 
@@ -282,3 +287,21 @@ SEVERITY: blocking
 WHERE: internal/settings/settings.go `scalar` and `key`; AC-02; Design, refusals
 EVIDENCE: `scalar` and `key` trust the library's tag. In go.yaml.in/yaml/v3 v3.0.5 resolve.go, a number the library cannot parse falls through to `return strTag, in` at line 264: `strconv.ParseFloat` fails on overflow at lines 204-205, and the integer and base-prefix parsers fail past 64 bits at lines 192-251. So a plain out-of-range number comes back as `!!str` and the reader answers it as a string. Observed: `a: 1` plus 309 zeros, `a: 1e400`, `a: 0x` plus 24 `F`, and the same spellings as keys, all report `answered`, exit 0. `a: 1` plus 308 zeros is refused, so the outcome flips at the float64 limit. The Test Plan names "an out-of-range integer" as a refused row, and Design refuses "floats, and other number, boolean or null spellings". T3 and the table stop at 20 digits (`past 64 bits`), so the case is untested. Design's "Refusal covers what the node tree shows" does not cover this: its examples leave no mark in the tree, while here the tree holds a plain scalar (Style 0) whose Value is a number spelling. The reader exists to stop a parser silently changing what a file means, and this result becomes a locked contract once released.
 PROPOSAL: Refuse a plain `!!str` scalar or key that matches the library's number syntax (decimal, float, `0x`, `0o`, `0b`, leading zero, with underscores), and add rows for a 400-digit integer, `1e400`, a 96-bit hex value and a number-shaped key. If the owner wants these accepted as strings, that is a Design revision and needs a new acceptance.
+
+### R-5
+
+CRITERION: AC-01 For input in the accepted forms, with no `--plugin-pin`, `vh-adlc settings read --stdin` reports `answered`, and `data.value` equals the expected value, with keys sorted and timestamps as written.
+VERDICT: met
+EVIDENCE: `go test -count=1 ./...` and a black-box run of a binary built from the tree, target 8068a3e (code identical to a78a82e, only the document differs). All packages passed, including the 52 `TestAccepted` rows, `TestSortedKeys`, the `settings-read` golden and `TestSchema`. With no pin, 25 multi-form inputs each gave exit 0, `answered`, `knowledge: null`, empty findings, no stderr and the expected value. They covered strings with `yes`, `no`, `on`, `off`, `y`, `n`, `true`, `false`, `null`, `a:`, both safe-range limits, `-0` as 0, empty sequence and mapping, `{}`, JSON text, nested collections, six timestamp spellings returned as written, quoted `"1e400"`, block scalars, `1.2.3`, `2026-13-45`, a bare `!`, `%YAML 1.1` and a byte order mark. `z: 1\na: {y: 2, b: 3}\nm: [{q: 1, c: 2}]` printed with keys sorted at every level. In a scratch copy of the package, 405865 generated number-like plain scalars were answered, and each `!!str` one kept its exact text as a value and was also accepted as a key. 58483 mutated files that were answered matched the library's own decode to `any` (seeds holding dates, whose library decode differs, were excluded from that comparison). A Python jsonschema Draft 2020-12 validation gave no errors for all three settings goldens. It also answered under `env -i` with a nonexistent `--repo`. Limitation: `TestSchema` itself checks only keys and enums. No timeouts were seen.
+
+CRITERION: AC-02 Each refused form reports `malformed` and `settings-invalid`, and no part of the report holds text from the file.
+VERDICT: met
+EVIDENCE: `go test -count=1 ./...` and the binary built from the tree, target 8068a3e. All 88 `TestRefused` rows and both refusal goldens passed. Black-box, 778 inputs each gave exit 3, `malformed`, `data: null`, `knowledge: null`, one `settings-invalid` finding, an empty `path`, no stderr and no canary anywhere in the report. They covered every form in Design: empty input, second documents, a trailing `---`, non-mapping tops, non-string keys, duplicates in several styles including an escaped spelling, aliases, anchors, merge keys, `<<` values, explicit tags on keys, values and collections, `%TAG` tags, floats, `.inf` and `.nan` spellings, boolean and null spellings, and syntax errors. The R-4 F-01 spellings were probed as value, flow item, nested value, value under a bare `!`, key, flow key and nested key: 309 and 400 digits, signs, leading zero, underscores, `1e400` variants, `0x`, `0X`, `0b`, `0B`, `0o`, `0O` past 64 bits with each sign, all refused. A math/big oracle independent of the reader's regexp, over 594749 generated scalars, found no number spelling the reader answered other than a safe decimal integer. 600000 mutated files carrying the canary gave no panic: 541517 refused, none with the canary, more than one finding or another code, and no result other than `answered` or `malformed`. Nesting past the library's limit and 5 MB of digits were refused. Limitation: this covers the listed forms and generated inputs; the fuzzing ran in a scratch copy of `internal/settings` and `internal/report`, not through the binary. No timeouts were seen.
+
+CRITERION: AC-03 Without `--stdin` the command reports `usage`, a failed read reports `error`, and a refusal has `data: null`, one finding and the stated line.
+VERDICT: met
+EVIDENCE: `go test -count=1 ./...` and the binary built from the tree, target 8068a3e. All 19 `TestRefusalLine` cases, `TestSettingsReadRefusal`, `TestSettingsReadFailedRead` and the three `TestUsage` settings rows passed. Observed directly: no `--stdin`, `--stdin=false`, a positional argument and an unknown flag each gave `usage`, exit 2. A directory as stdin gave `error`, exit 4, `data: null`, one finding with code `error`. 27 line cases each gave exit 3, `data: null`, one finding and the expected line: duplicate key on the second occurrence, offending key or value, document node for a whole document (`a: 1\n---\n` gives 2, `\n\n---\n[1]\n` gives 3), library number (`x: 1\nb: *.md\n` gives 2), 0 for an unknown anchor, `%YAML 1.2` and empty input, and the T7 refusals on their own key or value line. Limitation: a closed stdin reads as empty, because the Go runtime reopens it, so it reports `empty input`; the real read failure exercised is a directory. No timeouts were seen.
+
+CRITERION: AC-04 `docs/reference/cli.md` names the command and its pin exemption.
+VERDICT: met
+EVIDENCE: Read `docs/reference/cli.md` at 8068a3e against the binary built from the tree. The commands table lists `settings read --stdin`, and the page says every command above except `settings read` requires `--plugin-pin`, and that `settings read` needs no pin and ignores one if given. The binary gave exit 0 with no pin, exit 0 with `--plugin-pin bad`, and refused `a: [` with exit 3 while given `--plugin-pin bad`, as the page states. `TestSettingsReadIgnoresPin` passed. No timeouts were seen.
