@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: draft
 branch: feat/shared-audit
 status_description: "Shared audit and the Stackweaver adapter are implemented locally. Review corrections and final evidence refresh are in progress; local-catalog native trials passed at their recorded target. Marketplace publication and consumer cutover remain pending."
 issue: https://github.com/michielvha/vh-adlc/issues/40
