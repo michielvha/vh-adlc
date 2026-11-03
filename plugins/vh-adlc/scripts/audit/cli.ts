@@ -11,7 +11,7 @@ import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "
 import { createLedgerCandidate, applyLedgerCandidate, appendFindings } from "./ledger";
 import { requireAuditRuntime } from "./runtime";
 import { checkBatch } from "./batch";
-import { createRun, retireRun, reconcilePolicy, registerRun, registeredPending, intent, resourceIntents, noteResource, readRun, outcome, observedOutcome, handoff, inspectPending } from "./journal";
+import { retainAbsence, registeredOutstanding, createRun, retireRun, reconcilePolicy, registerRun, registeredPending, intent, resourceIntents, noteResource, readRun, outcome, observedOutcome, handoff, inspectPending } from "./journal";
 import type { AuditMode } from "./types";
 
 const argumentsByOperation: Record<string, string[]> = {
@@ -23,6 +23,8 @@ const argumentsByOperation: Record<string, string[]> = {
   "journal-register": ["directory", "batch-digest"], "journal-registered-pending": [],
   "journal-retire": ["directory","batch-digest","input"],
   "journal-reconcile-policy": ["directory", "batch-digest", "input"],
+  "journal-retained-absence": ["directory", "batch-digest", "action-id", "input", "absence-confirmed", "no-write"],
+  "journal-registered-outstanding": [],
   "journal-pending": ["directory", "batch-digest"],
   "journal-cleanup-outcome": ["directory", "batch-digest", "action-id", "input", "absence-confirmed"],
   "journal-observed-outcome": ["directory","batch-digest","action-id","input","observation-confirmed"],
@@ -80,6 +82,12 @@ export function runCLI(argv: string[]) {
   if (operation === "authority") return inspectAuthority(config, json(requireOption("input")));
   if (operation === "batch-check") return checkBatch(config, json(requireOption("input")));
   if (operation === "journal-new") { const run = createRun(config, { artifact_root: requireOption("artifact-root"), run_id: requireOption("run-id"), batch_digest: requireOption("batch-digest") }); return { directory: run.directory, revision: run.revision }; }
+  if (operation === "journal-registered-outstanding") return { outstanding: registeredOutstanding(config), limit: "All-intent read-only cutover inventory; no retry, completion or merge grant." };
+  if (operation === "journal-retained-absence") {
+    if (options["no-write"] !== undefined && options["no-write"] !== "true") throw Error("no-write cannot be overridden");
+    return retainAbsence(config, requireOption("directory"), requireOption("batch-digest"), requireOption("action-id"), json(requireOption("input")),
+      { absence_confirmed: requireOption("absence-confirmed") === "true", restrictions: options["no-write"] ? ["no-write"] : [] });
+  }
   if (operation === "journal-registered-pending") return { pending: registeredPending(config), limit: "Read-only registered cleanup inventory; no execution authority." };
   if (operation === "journal-register") { const run = registerRun(config, requireOption("directory"), requireOption("batch-digest")); return { directory: run.directory, registered: true }; }
   if (operation === "journal-pending") return inspectPending(config, requireOption("directory"), requireOption("batch-digest"));

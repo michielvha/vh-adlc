@@ -1,4 +1,4 @@
-import { handoff, outcome, observedOutcome, noteResource, pendingResources, registeredPending, requireRegistered, readRun, type Intent, type Receipt, type Run } from "./journal";
+import { hasRetainedAbsence, handoff, outcome, observedOutcome, noteResource, pendingResources, registeredPending, requireRegistered, readRun, type Intent, type Receipt, type Run } from "./journal";
 
 type Observation = { state: "done"; receipt: Receipt } | { state: "absent" | "unknown" };
 function reload(run: Run) { return readRun(run.config, run.directory, run.header.batch_digest); }
@@ -12,9 +12,10 @@ export async function recoverEffect(run: Run, id: string, transport: {
   if (["key", "row"].includes(action.kind)) throw Error("audit resource intents require scoped cleanup reconciliation, never generic effect completion");
   const completed = run.events.find(e => ["outcome","observed-outcome"].includes(e.kind) && e.action_id === id);
   if (completed) return completed.payload as Receipt;
+  if (run.events.some(event => event.kind === "retained-absence" && event.action_id === id)) return { state: "blocked" as const };
   const observed = await transport.observe(action);
   if (observed.state === "done") { if(run.cleanup_only)observedOutcome(run,id,observed.receipt);else outcome(run, id, observed.receipt); return observed.receipt; }
-  if(run.cleanup_only){handoff(run,id,"reconciliation-only-no-replay");return {state:"blocked" as const};}
+  if(run.cleanup_only || hasRetainedAbsence(run)){handoff(run,id,"reconciliation-only-no-replay");return {state:"blocked" as const};}
   if (observed.state === "unknown" || !transport.authorized || !transport.execute) {
     handoff(run, id, observed.state === "unknown" ? "actual-state-unknown" : "execution-not-authorized-or-recovery-only");
     return { state: "blocked" as const };
@@ -28,7 +29,7 @@ type Resource = Scope & { id: string };
 export function liveReady(run: Run): boolean {
   run = reload(run);
   requireRegistered(run);
-  return !run.cleanup_only && registeredPending(run.config).length === 0;
+  return !run.cleanup_only && !hasRetainedAbsence(run) && registeredPending(run.config).length === 0;
 }
 export async function cleanupPending(run: Run, scope: Scope | ((action: Intent) => Scope), transport: {
   authorized: boolean; lookup: (action: Intent, recordedID?: string) => Promise<Resource[]>; cleanup: (action: Intent, resource: Resource) => Promise<void>;

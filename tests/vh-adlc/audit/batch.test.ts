@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { checkBatch, batchJournalDigest, renderRecord, type Definition } from "../../../plugins/vh-adlc/scripts/audit/batch";
 import { captureSnapshot, digest } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
-import { createRun, intent, handoff, reconcilePolicy } from "../../../plugins/vh-adlc/scripts/audit/journal";
+import { createRun, intent, handoff, reconcilePolicy, retainAbsence } from "../../../plugins/vh-adlc/scripts/audit/journal";
 import { cleanupPending } from "../../../plugins/vh-adlc/scripts/audit/recovery";
 import { fixture, git } from "./fixtures";
 import { terminal } from "./evidence";
@@ -310,4 +310,16 @@ test("an unchanged historical record already in Task base remains valid history"
 test("a new run cannot overwrite a historical record at its own record path", () => {
   const c = context(false, false, false, ["unit"], "main", false, false, false, "docs/internal/maintenance/audit-A-test.md");
   expect(checkBatch(c.config, c.input, { observe: c.observe }).errors).toContain("A new audit run requires a record path absent from Task base.");
+});
+
+
+test("a retained absent non-resource effect cannot complete its old repair batch", () => {
+  const c = context(); expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(true);
+  const action = { id: "declined-push", kind: "push" as const, correlation: "selected-push", target: "owned-head" };
+  intent(c.run, action);
+  const lookup = c.f.artifact("declined-batch-push.json", JSON.stringify({ schema_version: 1, repository: c.config.repository, hostname: c.config.hostname,
+    run_id: c.run.header.run_id, batch_digest: c.run.header.batch_digest, action_id: action.id, intent: action, intent_digest: digest(action), state: "absent", observed_at: new Date().toISOString(), method: "read-only:owned-head" }));
+  retainAbsence(c.config, c.run.directory, c.run.header.batch_digest, action.id,
+    { owner_approved: true, journal_only: true, owner_handoff: "owner:retain-absence", expected_digest: c.run.digest, intent_digest: digest(action), lookup }, { absence_confirmed: true });
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(false);
 });

@@ -1,7 +1,8 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, dirname } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
-import { observeDefault } from "./authority";
+import { validArtifact } from "./assessment";
+import { observeDefault, validConstraints } from "./authority";
 import { loadSettings } from "./settings";
 import { digest, git, gitBytes, hash, privateDirectory } from "./snapshot";
 import type { Settings } from "./types";
@@ -11,7 +12,9 @@ export type Intent = { id: string; kind: "report" | "local-commit" | "issue" | "
 export type Receipt = { state: "observed"; resource_id?: string; commit?: string; pull_number?: number; artifact_path?: string; artifact_digest?: string };
 type PolicyTransition = {from_settings_digest:string;from_policy_digest:string;settings_digest:string;policy_digest:string;policy_commit:string;observed_default_branch:string;observed_default_commit:string;owner_handoff:string;cleanup_only:true};
 type RetireEvent = {owner_handoff:string;zero_pending:true};
-type Event = { revision: number; previous: string; kind: "intent" | "resource" | "outcome" | "handoff" | "policy-transition" | "retirement" | "observed-outcome"; action_id: string; payload: RetireEvent | PolicyTransition | Intent | Receipt | { reason_code: string } | { resource_id: string } };
+type RetainedAbsence = { state: "absent"; journal_only: true; owner_handoff: string; header_digest: string; intent_digest: string;
+  observed_at: string; method: string; lookup: { path: string; sha256: string } };
+type Event = { revision: number; previous: string; kind: "intent" | "resource" | "outcome" | "handoff" | "policy-transition" | "retirement" | "observed-outcome" | "retained-absence"; action_id: string; payload: RetainedAbsence | RetireEvent | PolicyTransition | Intent | Receipt | { reason_code: string } | { resource_id: string } };
 function isOutcome(event:Event){return event.kind==="outcome"||event.kind==="observed-outcome";}
 type Header = { schema_version: 1; run_id: string; repository: string; hostname: string; common_dir: string; batch_digest: string; settings_digest: string; policy_digest: string };
 export type Run = { policy_current: boolean; cleanup_only:boolean; retired:boolean; directory: string; config: Settings; header: Header; events: Event[]; revision: number; digest: string };
@@ -50,6 +53,50 @@ function validateReceipt(value: Receipt) {
   if (value.artifact_path !== undefined && (!identifier(value.artifact_path) || value.artifact_path.split("/").includes(".."))) fail();
   if (value.artifact_digest !== undefined && !/^[a-f0-9]{64}$/.test(value.artifact_digest)) fail();
 }
+function retainedLookup(config: Settings, header: Header, directory: string, action: Intent, payload: RetainedAbsence) {
+  exact(payload, ["state", "journal_only", "owner_handoff", "header_digest", "intent_digest", "observed_at", "method", "lookup"]);
+  if (payload.state !== "absent" || payload.journal_only !== true || !identifier(payload.owner_handoff) ||
+      payload.header_digest !== digest(header) || payload.intent_digest !== digest(action) || ["key", "row"].includes(action.kind) ||
+      !identifier(payload.method) || typeof payload.observed_at !== "string" || !Number.isFinite(Date.parse(payload.observed_at)) ||
+      new Date(payload.observed_at).toISOString() !== payload.observed_at) fail();
+  exact(payload.lookup, ["path", "sha256"]);
+  if (!/^[a-f0-9]{64}$/.test(payload.lookup.sha256) || !validArtifact(dirname(directory), payload.lookup)) fail();
+  const observed = JSON.parse(readFileSync(join(dirname(directory), payload.lookup.path), "utf8")) as Record<string, unknown>;
+  exact(observed, ["schema_version", "repository", "hostname", "run_id", "batch_digest", "action_id", "intent", "intent_digest", "state", "observed_at", "method"]);
+  if (observed.schema_version !== 1 || observed.repository !== config.repository || observed.hostname !== config.hostname ||
+      observed.run_id !== header.run_id || observed.batch_digest !== header.batch_digest || observed.action_id !== action.id ||
+      observed.intent_digest !== payload.intent_digest || canonicalJSON(observed.intent) !== canonicalJSON(action) ||
+      observed.state !== "absent" || observed.observed_at !== payload.observed_at || observed.method !== payload.method) fail();
+}
+export function hasRetainedAbsence(run: Run) { return run.events.some(event => event.kind === "retained-absence"); }
+/** Explicit journal-only observation. Candidate settings establish identity, never policy authority. */
+export function retainAbsence(config: Settings, directory: string, batch_digest: string, action_id: string, input: unknown,
+  options: { absence_confirmed: boolean; restrictions?: string[] }): Run {
+  if (!input || typeof input !== "object" || Array.isArray(input)) fail();
+  exact(input, ["owner_approved", "journal_only", "owner_handoff", "expected_digest", "intent_digest", "lookup", "restrictions"],
+    ["owner_approved", "journal_only", "owner_handoff", "expected_digest", "intent_digest", "lookup"]);
+  const request = input as { owner_approved: boolean; journal_only: boolean; owner_handoff: string; expected_digest: string;
+    intent_digest: string; lookup: { path: string; sha256: string }; restrictions?: string[] };
+  if (request.owner_approved !== true || request.journal_only !== true || options.absence_confirmed !== true || !identifier(request.owner_handoff) ||
+      !validConstraints(request.restrictions, undefined) || !validConstraints(options.restrictions, undefined) ||
+      [...request.restrictions ?? [], ...options.restrictions ?? []].some(value => ["read-only", "no-write"].includes(value))) fail();
+  const run = readRun(config, directory, batch_digest, { inspect: true }); requireRegistered(run);
+  const event = run.events.find(event => event.kind === "intent" && event.action_id === action_id), action = event?.payload as Intent | undefined;
+  if (!action || !/^[a-f0-9]{64}$/.test(request.expected_digest) || run.digest !== request.expected_digest ||
+      request.intent_digest !== digest(action) || run.events.some(event => (isOutcome(event) || event.kind === "retained-absence") && event.action_id === action_id)) fail();
+  const lookup = request.lookup;
+  if (!lookup || !validArtifact(dirname(directory), lookup)) fail();
+  const observed = JSON.parse(readFileSync(join(dirname(directory), lookup.path), "utf8")) as { observed_at: string; method: string };
+  const payload: RetainedAbsence = { state: "absent", journal_only: true, owner_handoff: request.owner_handoff, header_digest: digest(run.header),
+    intent_digest: request.intent_digest, observed_at: observed.observed_at, method: observed.method, lookup };
+  retainedLookup(config, run.header, directory, action, payload);
+  const actual = readRun(config, directory, batch_digest, { inspect: true }); requireRegistered(actual);
+  if (actual.digest !== request.expected_digest) fail();
+  const next: Event = { revision: actual.revision + 1, previous: actual.digest, kind: "retained-absence", action_id, payload };
+  publishJSON(join(directory, "events", String(next.revision).padStart(8, "0") + ".json"), next);
+  return readRun(config, directory, batch_digest, { inspect: true });
+}
+
 export function createRun(config: Settings, options: { artifact_root: string; run_id: string; batch_digest: string }): Run {
   const root = privateDirectory(options.artifact_root, config.root);
   if (!/^[a-z0-9][a-z0-9_-]{0,79}$/.test(options.run_id) || !/^[a-f0-9]{64}$/.test(options.batch_digest)) fail();
@@ -67,7 +114,7 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
   exact(header, ["schema_version", "run_id", "repository", "hostname", "common_dir", "batch_digest", "settings_digest", "policy_digest"]);
   const bindings = inputBindings(config);
   let effective={settings_digest:header.settings_digest,policy_digest:header.policy_digest},cleanup_only=false,retired=false;
-  if (header.schema_version !== 1 || header.repository !== config.repository || header.hostname !== config.hostname || header.batch_digest !== batch_digest ||
+  if (header.schema_version !== 1 || !/^[a-z0-9][a-z0-9_-]{0,79}$/.test(header.run_id) || [header.batch_digest, header.settings_digest, header.policy_digest].some(value => !/^[a-f0-9]{64}$/.test(value)) || header.repository !== config.repository || header.hostname !== config.hostname || header.batch_digest !== batch_digest ||
       typeof header.common_dir!=="string"||!header.common_dir.startsWith("/")||header.common_dir.includes("\0")) fail();
   const events: Event[] = [];
   let previous = digest(header);
@@ -92,21 +139,24 @@ export function readRun(config: Settings, directory: string, batch_digest: strin
         transition.from_settings_digest!==effective.settings_digest||transition.from_policy_digest!==effective.policy_digest)fail();
       effective={settings_digest:transition.settings_digest,policy_digest:transition.policy_digest};cleanup_only=true;
     }else if (event.kind === "intent") {
-      if(cleanup_only)fail();
+      if(cleanup_only || events.some(event => event.kind === "retained-absence"))fail();
       validateIntent(event.payload as Intent);
       if ((event.payload as Intent).id !== event.action_id || events.some(e => e.kind === "intent" && e.action_id === event.action_id)) fail();
     } else {
       if (!events.some(e => e.kind === "intent" && e.action_id === event.action_id)) fail();
       const resource=["key","row"].includes((events.find(e=>e.kind==="intent"&&e.action_id===event.action_id)!.payload as Intent).kind);
-      if(cleanup_only&&event.kind!=="handoff"&&event.kind!=="observed-outcome"&&!resource)fail();
+      if(cleanup_only&&event.kind!=="handoff"&&event.kind!=="observed-outcome"&&event.kind!=="retained-absence"&&!resource)fail();
       if(event.kind==="observed-outcome"&&(!cleanup_only||resource))fail();
-      if (event.kind === "resource") {
+      if (event.kind === "retained-absence") {
+        if (events.some(previous => previous.action_id === event.action_id && (isOutcome(previous) || previous.kind === "retained-absence"))) fail();
+        retainedLookup(config, header, directory, events.find(previous => previous.kind === "intent" && previous.action_id === event.action_id)!.payload as Intent, event.payload as RetainedAbsence);
+      } else if (event.kind === "resource") {
         exact(event.payload, ["resource_id"]);
         if (!identifier((event.payload as { resource_id: string }).resource_id) || events.some(e => e.kind === "resource" && e.action_id === event.action_id) ||
             !["key", "row"].includes((events.find(e => e.kind === "intent" && e.action_id === event.action_id)!.payload as Intent).kind)) fail();
       } else if (event.kind === "outcome" || event.kind==="observed-outcome") {
         validateReceipt(event.payload as Receipt);
-        if (events.some(e => isOutcome(e) && e.action_id === event.action_id)) fail();
+        if (events.some(e => (isOutcome(e) || e.kind === "retained-absence") && e.action_id === event.action_id)) fail();
       } else if (event.kind === "handoff") {
         exact(event.payload, ["reason_code"]); if (!identifier((event.payload as { reason_code: string }).reason_code)) fail();
       } else fail();
@@ -161,22 +211,31 @@ function readRetirement(config:Settings,registry:string,registration:Registratio
 }
 /** Scope changes never retire cleanup from an earlier registered run in this Git repository. */
 export function registeredPending(config: Settings) {
-  const directory = registryDirectory(config), pending: { run_id: string; directory: string; batch_digest: string; policy_current: boolean; action: Intent }[] = [];
-  if (!directory) return pending;
-  const files=readdirSync(directory).filter(name=>!name.startsWith(".tmp-"));
-  for(const name of files.filter(name=>name.endsWith(".retired.json")))if(!(/^[a-z0-9][a-z0-9_-]{0,79}\.retired\.json$/).test(name)||!files.includes(name.replace(/\.retired\.json$/,".json")))fail();
-  for (const name of files.filter(name=>!name.endsWith(".retired.json")).sort()) {
+  return registeredOutstanding(config).filter(row => ["key", "row"].includes(row.action.kind))
+    .map(({ run_id, directory, batch_digest, policy_current, action }) => ({ run_id, directory, batch_digest, policy_current, action }));
+}
+/** Every unresolved effect matters at cutover, including deliberately retained non-resource absence. */
+export function registeredOutstanding(config: Settings) {
+  const registry = registryDirectory(config), rows: { run_id: string; directory: string; batch_digest: string; policy_current: boolean; action: Intent; disposition: "pending" | "retained-absence" }[] = [];
+  if (!registry) return rows;
+  const files = readdirSync(registry).filter(name => !name.startsWith(".tmp-"));
+  for (const name of files.filter(name => name.endsWith(".retired.json"))) {
+    if (!/^[a-z0-9][a-z0-9_-]{0,79}\.retired\.json$/.test(name) || !files.includes(name.replace(/\.retired\.json$/, ".json"))) fail();
+  }
+  for (const name of files.filter(name => !name.endsWith(".retired.json")).sort()) {
     if (!/^[a-z0-9][a-z0-9_-]{0,79}\.json$/.test(name)) fail();
-    const registration = privateJSON(join(directory, name)) as Registration;
+    const registration = privateJSON(join(registry, name)) as Registration;
     exact(registration, ["run_id", "directory", "batch_digest", "header_digest"]);
     if (registration.run_id + ".json" !== name) fail();
-    if(readRetirement(config,directory,registration))continue;
-    const run = readRun(config, registration.directory, registration.batch_digest, { inspect: true });
-    registrationFor(run);if(run.retired)continue;
-    for (const event of pendingResources(run)) pending.push({ run_id: run.header.run_id, directory: run.directory,
-      batch_digest: run.header.batch_digest, policy_current: run.policy_current, action: event.payload as Intent });
+    if (readRetirement(config, registry, registration)) continue;
+    const run = readRun(config, registration.directory, registration.batch_digest, { inspect: true }); registrationFor(run);
+    if (run.retired) continue;
+    for (const event of run.events.filter(event => event.kind === "intent" && !run.events.some(done => isOutcome(done) && done.action_id === event.action_id))) {
+      rows.push({ run_id: run.header.run_id, directory: run.directory, batch_digest: run.header.batch_digest, policy_current: run.policy_current, action: event.payload as Intent,
+        disposition: run.events.some(observation => observation.kind === "retained-absence" && observation.action_id === event.action_id) ? "retained-absence" : "pending" });
+    }
   }
-  return pending;
+  return rows;
 }
 /** Read-only recovery inventory remains available after valid policy edits. Never grants retry/cleanup authority. */
 export function inspectPending(config: Settings, directory: string, batch_digest: string) {
@@ -186,7 +245,7 @@ export function inspectPending(config: Settings, directory: string, batch_digest
     const resource = run.events.find(value => value.kind === "resource" && value.action_id === action.id)?.payload as { resource_id: string } | undefined;
     return { ...action, ...(resource ?? {}) };
   });
-  let live_ready=false,readiness_handoff:string|null=run.policy_current?run.retired?"run-retired":run.cleanup_only?"reconciliation-only":null:"policy-changed";
+  let live_ready=false,readiness_handoff:string|null=hasRetainedAbsence(run)?"retained-absence-no-replay":run.policy_current?run.retired?"run-retired":run.cleanup_only?"reconciliation-only":null:"policy-changed";
   if(!readiness_handoff){
     try{requireRegistered(run);if(registeredPending(config).length)readiness_handoff="registered-cleanup-pending";else live_ready=true;}
     catch{readiness_handoff="registered-state-unknown-or-unregistered";}
@@ -198,6 +257,7 @@ function append(run: Run, kind: Event["kind"], action_id: string, payload: Event
   const actual = readRun(run.config, run.directory, run.header.batch_digest);
   requireRegistered(actual);
   if (actual.digest !== run.digest) fail();
+  if (hasRetainedAbsence(actual) && kind === "intent" || ["outcome", "observed-outcome"].includes(kind) && actual.events.some(event => event.kind === "retained-absence" && event.action_id === action_id)) fail();
   if(actual.cleanup_only&&(kind==="intent"||kind==="outcome"&&!actual.events.some(e=>e.kind==="intent"&&e.action_id===action_id&&["key","row"].includes((e.payload as Intent).kind))))fail();
   const event: Event = { revision: actual.revision + 1, previous: actual.digest, kind, action_id, payload };
   publishJSON(join(run.directory, "events", String(event.revision).padStart(8, "0") + ".json"), event);
@@ -211,7 +271,7 @@ export function pendingResources(run: Run) {
 /** Register the whole first-attempt resource plan before creating any resource. */
 export function resourceIntents(run: Run, actions: Intent[]) {
   requireRegistered(run);
-  if (run.cleanup_only || !Array.isArray(actions) || !actions.length || registeredPending(run.config).length) fail();
+  if (run.cleanup_only || hasRetainedAbsence(run) || !Array.isArray(actions) || !actions.length || registeredPending(run.config).length) fail();
   const ids = new Set(run.events.filter(e => e.kind === "intent").map(e => e.action_id));
   const scopes = new Set(run.events.filter(e => e.kind === "intent").map(e => resourceScope(e.payload as Intent)));
   for (const action of actions) {

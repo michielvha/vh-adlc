@@ -234,6 +234,43 @@ attestation, not execution or proof of cleanup. Generic `journal-outcome` and `r
 resource completion so a creation reply cannot accidentally retire a pending cleanup intent.
 
 
+### Retained absence before a format cutover
+
+A deliberately unperformed report/commit/issue/push/PR/merge effect may retain a typed
+`retained-absence` event. First perform a read-only lookup of that exact intent; unknown is not
+absence. Keep a private hash-checked JSON lookup artifact with exactly schema_version (1),
+repository, hostname, run_id, batch_digest, action_id, the full intent, intent_digest, state (absent),
+observed_at (ISO UTC) and an identifier-only method. It contains no credentials or executable commands.
+
+Only a current explicit journal-only owner handoff permits
+`journal-retained-absence --repo <owning-checkout> --directory <run> --batch-digest <digest>
+--action-id <id> --input <request.json> --absence-confirmed true`.
+The request has exactly owner_approved (true), journal_only (true), owner_handoff,
+expected_digest (the observed current journal digest), intent_digest and lookup `{path,sha256}`;
+optional restrictions use the current request vocabulary. Read-only/no-write restrictions win,
+including the helper's `--no-write true`. `journal-handoff --reason` cannot create this observation.
+Lookup path/hash, full intent, origin/repository/host, immutable header/private registration and
+run/batch must agree before the next journal revision is written. Stale/conflicting requests fail.
+
+Before adoption use strict candidate YAML from the owning migration worktree; afterward use current
+YAML from its owning checkout. These settings establish actual Git/origin/common-directory identity
+only. The explicit handoff permits this metadata observation even when policy digests changed or
+a cleanup-only policy transition already occurred. It never changes those digests or activates
+candidate policy. Ordinary appends keep their existing restrictions. The returned policy-current
+and cleanup-only values remain unchanged. Native confirmation is an operator attestation, not OS proof.
+
+A retained absence is no outcome, cleanup, retirement, verification gate or permission to retry.
+It cannot clear key/row intents. Keep the registered root and lookup evidence. The retained intent
+never replays, even with later authority or an execute callback; that old batch is never execution-ready.
+A new intended attempt needs a new run and current selection/authority. Other pending effects still
+need their own exact reconciliation. Read-only `journal-pending` never records absence on its own.
+
+`journal-registered-outstanding --repo <consumer>` inspects every unresolved intent kind, including
+retained absence. Migration preflight must block pending resources, active/unknown non-resource
+effects, unreadable/missing roots and untyped/free-reason/reconciliation-only handoffs. Only typed
+retained absence for non-resource effects may remain, with roots and proof preserved. Admission
+checks do not establish marketplace adoption, batch completion or merge authority.
+
 ### Registered-run recovery
 
 `journal-registered-pending --repo <consumer>` inspects every registered run in this repository's
