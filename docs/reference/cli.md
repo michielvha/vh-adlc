@@ -34,8 +34,11 @@ VH_ADLC=$(bash plugins/vh-adlc/scripts/ensure-vh-adlc.sh)
 | `gate <target-status> <doc>` | May the document change to this status? |
 | `next <doc>` | What is the next step? |
 | `review check <doc> --review <id> --returned <file>` | Were the reviewer's records stored as returned? |
+| `settings read --stdin` | What value does the YAML settings file on stdin hold? |
 
-Every command above requires `--plugin-pin`, a full 40-character lowercase SHA.
+Every command above except `settings read` requires `--plugin-pin`, a full
+40-character lowercase SHA. `settings read` reads no conventions, so it needs no
+pin and ignores one if given.
 Read the current value from [knowledge.md](../../plugins/vh-adlc/knowledge.md).
 `--repo <dir>` selects the repository and defaults to the current directory.
 `--offline` reads documentation from the cache only.
@@ -53,6 +56,12 @@ Before `fresh` or `gate`, fetch the repository's default branch yourself. The
 binary never fetches. A gate checks the current document; it does not change its
 status. Apply a status change only after a passing result and follow the
 [feature loop](../../plugins/vh-adlc/references/loop.md).
+
+`settings read` takes one file's bytes, puts its value in `data.value` with
+mapping keys sorted, and reports `knowledge: null`. It refuses anything outside
+its strict subset of YAML with `malformed`, `data: null` and one
+`settings-invalid` finding. The finding gives a fixed reason and, when known, a
+line number. It never holds text from the file.
 
 ## Output and exit codes
 

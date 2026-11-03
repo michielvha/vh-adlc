@@ -142,6 +142,7 @@
               "transition-not-allowed",
               "review-not-found",
               "records-differ",
+              "settings-invalid",
               "error",
               "no_open_questions",
               "test_plan_complete",
