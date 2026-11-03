@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: draft
 branch: feat/remote-gui
-status_description: "Implementation claimed in an isolated worktree; test-first tasks are in progress."
+status_description: "Owner-approved CI test path added; fresh spec review is in progress before implementation resumes."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
