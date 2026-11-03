@@ -21,10 +21,12 @@ Both pin auth-refresh to the same component commit.
 
 ## Persistent audit
 
-`vh-adlc-audit` is packaged in the 0.8.0 candidate. It keeps persistent findings, re-verification and
-selected repairs portable while consumers retain their ledgers and operating rules. Candidate source
-checks do not establish marketplace availability. Publish and test actual fresh/upgrade/reinstall
-behavior before adopting a consumer migration. See the [audit workflow](../user-guides/workflows.md#persistent-codebase-audit)
+`vh-adlc-audit` is included from plugin 0.8.0. It keeps persistent findings, re-verification and
+selected repairs portable while consumers retain their ledgers and operating rules. Actual Codex
+and Claude CLI marketplace fresh installs, upgrades from 0.7.0 and reinstalls passed at published
+source `afb0c4b84ad0c013614f404bcfea7d12ee9eca78` before Stackweaver adoption. A new adopter must
+verify its own installed version, project policy and migration preflight. Configure `.vh-adlc/audit.yaml`
+using the [audit settings reference](../../plugins/vh-adlc/references/audit-settings.md). See the [audit workflow](../user-guides/workflows.md#persistent-codebase-audit)
 and [acceptance limits](compatibility.md#persistent-codebase-audit).
 
 ## Shared maintenance

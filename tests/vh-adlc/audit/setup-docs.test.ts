@@ -28,3 +28,14 @@ test("the public workflow uses YAML and the new audit plugin release", () => {
   expect(text).toBeDefined(); expect(text).toContain(".vh-adlc/audit.yaml"); expect(text).not.toContain(".vh-adlc/audit.json");
   expect(text).toContain("0.8.0+"); expect(text).toContain("offline");
 });
+
+test.each(["compatibility", "marketplace"])("the %s audit guidance names the YAML settings and audit minimum", name => {
+  const document = readFileSync(resolve(root, "docs/reference/" + name + ".md"), "utf8");
+  const heading = name === "compatibility" ? "## Persistent codebase audit" : "## Persistent audit";
+  const section = document.split(heading)[1]?.split(/^## /m)[0];
+  expect(section).toBeDefined();
+  expect(section).toContain(".vh-adlc/audit.yaml");
+  expect(section).toContain("0.8.0");
+  expect(section).not.toContain(".vh-adlc/audit.json");
+  expect(section).not.toMatch(/(?:requires|minimum|included from|packaged in)\s+(?:plugin\s+)?0\.7\.0/i);
+});
