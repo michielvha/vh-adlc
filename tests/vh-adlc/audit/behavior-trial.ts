@@ -43,7 +43,7 @@ export async function runBehaviorTrial(repo: string, output: string) {
   mkdirSync(join(input, "cases"));
   for (const [id, verdict, eligible, next, facts] of observations) {
     const path = `cases/${id}.md`; sources[path] = `# Synthetic ${id}\n${facts}\n`; writeFileSync(join(input, path), sources[path]);
-    expected.cases.push({ id, verdict: id === "A-013" ? ["UNKNOWN", "PARTIAL"] : verdict, eligible, next, evidence: [{ path, line: 2 }] });
+    expected.cases.push({ id, verdict: id === "A-013" ? ["UNKNOWN", "PARTIAL"] : id === "A-015" ? ["UNKNOWN", "STILL_PRESENT"] : verdict, eligible, next, evidence: [{ path, line: 2 }] });
   }
   writeFileSync(join(input, "intake.json"), JSON.stringify(intakeCases.map(({ id, prompt, configured }) => ({ id, prompt, configured })), null, 2));
   const required = ["skills/vh-adlc-audit/SKILL.md", "references/audit.md", "references/audit-review.md", "references/audit-record.md", "references/lifecycle.md"].map(path => join(plugin, path));
