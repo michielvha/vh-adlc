@@ -32,7 +32,16 @@ export function baseSettings(overrides: Record<string, unknown> = {}) {
   };
 }
 
+let readerPrepared = false;
+/** Explicit fixture setup, outside the consumer and every isolated entry subprocess. */
+function prepareReader() {
+  if (readerPrepared) return;
+  const run = Bun.spawnSync(["bash", join(import.meta.dir, "../../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh")], { stdout: "pipe", stderr: "pipe" });
+  if (run.exitCode !== 0) throw Error("audit fixture setup requires the locked verified settings reader");
+  readerPrepared = true;
+}
 export function fixture(options: { configured?: boolean } = {}) {
+  prepareReader();
   const outer = realpathSync(mkdtempSync(join(tmpdir(), "vh-audit-")));
   const root = join(outer, "repo");
   mkdirSync(root);
