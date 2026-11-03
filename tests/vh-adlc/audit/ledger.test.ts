@@ -281,3 +281,10 @@ test("an inline comment before another finding cannot move the earlier finding's
   const candidate=createLedgerCandidate(c.config,snap,{document:{schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(c.f,snap)]},at:"2026-11-02",run_id:"inline-boundary"});
   expect(candidate.bytes.indexOf("<!-- audit-run:inline-boundary:AUD-001 -->")).toBeLessThan(candidate.bytes.indexOf("### AUD-002"));
 });
+
+
+test("an invalid backtick fence info string cannot hide a rendered section escape", () => {
+  const c=context("full"),body="```example`invalid\n## Escaped section\n```";
+  expect(Bun.markdown.html(body)).toContain("<h2>Escaped section</h2>");
+  expect(()=>appendFindings(c.config,c.snap,[{id:"AUD-003",severity:"High",title:"Observed cause",body}])).toThrow();
+});

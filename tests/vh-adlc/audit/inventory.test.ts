@@ -134,3 +134,10 @@ test("an inline comment opener cannot hide a subsequent rendered finding heading
   const result=inventory(loadSettings(project(text).root));
   expect(result.findings.find(row=>row.id==="AUD-002")?.identity_valid).toBe(true);
 });
+
+
+test("an invalid backtick fence does not hide an actual rendered finding", () => {
+  const text=ledger.replace("### AUD-002","```example`invalid\n### AUD-002")+"\n```\n";
+  expect(Bun.markdown.html(text)).toContain("<h3>AUD-002");
+  expect(inventory(loadSettings(project(text).root)).findings.find(row=>row.id==="AUD-002")?.identity_valid).toBe(true);
+});

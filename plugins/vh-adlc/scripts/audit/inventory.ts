@@ -72,7 +72,7 @@ export function markdownVisibility(text: string) {
     }
     if (comment) { if (raw.includes("-->")) comment = false; return ""; }
     if (/^(?: {4}|\t)/.test(raw)) return "";
-    if (marker) { fence = { char: marker[1], size: marker[0].trim().length }; return ""; }
+    if (marker && (marker[1] !== "`" || !raw.slice(marker[0].length).includes("`"))) { fence = { char: marker[1], size: marker[0].trim().length }; return ""; }
     const first = commentStart(raw);
     if (first >= 0) comments = true;
     // Only a line-start HTML comment opens a block across later headings.
