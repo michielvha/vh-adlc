@@ -1,6 +1,7 @@
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
+import { settingsYAML } from "../settings-yaml";
 
 export function git(root: string, ...args: string[]): string {
   const result = Bun.spawnSync(["git", "-C", root, ...args], {
@@ -28,7 +29,7 @@ export function fixture(parent = tmpdir()) {
   git(root, "commit", "-qm", "test: seed project");
   return {
     root, write,
-    settings: (data: unknown) => write(".vh-adlc/maintenance.json", JSON.stringify(data)),
+    settings: (data: unknown) => write(".vh-adlc/maintenance.yaml", settingsYAML(data)),
     dispose: () => {
       // These checkouts belong to this disposable fixture, including deliberate dirty negatives.
       const registered = git(root, "worktree", "list", "--porcelain", "-z").split("\0");

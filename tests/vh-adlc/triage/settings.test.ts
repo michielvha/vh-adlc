@@ -1,8 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, symlinkSync } from "node:fs";
+import { existsSync, readFileSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { loadSettings, ownership, sourcePath } from "../../../plugins/vh-adlc/scripts/triage/settings";
 import { fixture, git } from "./fixtures";
+import { blockYAML } from "../settings-yaml";
 
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const project of projects.splice(0)) project.dispose(); });
@@ -13,6 +14,7 @@ test("no settings has conservative defaults and creates no config or report dire
   expect(config.repository).toBe("example/project");
   expect(config.hostname).toBe("github.com");
   expect(config.configured).toBe(false);
+  expect(config.settings_path).toBe(".vh-adlc/triage.yaml");
   expect(config.report_dir).toBe(".vh-adlc/reports/triage");
   expect(config.plan_roots).toEqual([]);
   expect(config.priority_order).toEqual([]);
@@ -76,11 +78,44 @@ test.each([
   expect(() => loadSettings(f.root)).toThrow();
 });
 
-test("invalid JSON and an explicitly missing settings file fail without exposing values", () => {
-  const f = project(); f.write(".vh-adlc/triage.json", "private-value: not json");
+// The JSON loader at a1f10de gave this for the same values, apart from root and settings_path.
+const beforeYAML = {"schema_version":1,"configured":true,"repository":"example/project","hostname":"github.com","source_roots":["src","src"],"generated_mirrors":["generated"],"plan_roots":["plans"],"plan_fields":{"issue":"tracker","status":"state","status_description":"detail","priority":"rank"},"report_dir":".vh-adlc/reports/triage","report_dir_configured":false,"protected_ids":[8,3],"index_ids":[9],"index_rules":{"labels":["tracking"],"title_prefixes":["Milestone:"]},"bot_authors":["update-bot"],"owned_labels":["another-workstream"],"label_map":{"zeta":"z-label","alpha":"a-label"},"workstreams":[{"owner":"specialist","plan_roots":[],"reference_files":["docs/ledger.md"]}],"workstream_ownership":{"12":{"owners":["specialist"],"sources":["docs/ledger.md"]}},"workstream_sources":{"docs/ledger.md":"7fab47612a9c426725beb2f40408def77b8b742e733a10459462636068de4522"},"priority_order":["urgent","later"],"milestone_order":["Launch"],"stale_days":30,"page_budget":12};
+
+test("a block YAML settings file gives the settings the JSON file gave", () => {
+  const f = project();
+  f.write("plans/a.md", "---\ntracker: 8\n---\n"); f.write("docs/ledger.md", "Owned #12.\n");
+  git(f.root, "add", "plans", "docs"); git(f.root, "commit", "-qm", "test: seed workstream sources");
+  f.settings({ schema_version: 1, repository: "example/project", source_roots: ["src", "./src"],
+    generated_mirrors: ["generated"], plan_roots: ["plans"], protected_ids: [8, 8, 3], index_ids: [9],
+    index_rules: { labels: ["tracking"], title_prefixes: ["Milestone:"] }, bot_authors: ["update-bot"],
+    owned_labels: ["another-workstream"], priority_order: ["urgent", "later"], milestone_order: ["Launch"],
+    plan_fields: { issue: "tracker", status: "state", status_description: "detail", priority: "rank" },
+    label_map: { zeta: "z-label", alpha: "a-label" }, stale_days: 30, page_budget: 12,
+    workstreams: [{ owner: "specialist", reference_files: ["docs/ledger.md"] }] });
+  const text = readFileSync(join(f.root, ".vh-adlc/triage.yaml"), "utf8");
+  expect(() => JSON.parse(text)).toThrow(); expect(blockYAML(text)).toContain("\nsource_roots:\n  - src\n");
+  const { root, settings_path, ...config } = loadSettings(f.root);
+  expect(root).toBe(f.root); expect(settings_path).toBe(".vh-adlc/triage.yaml");
+  expect(config).toEqual(beforeYAML as typeof config);
+});
+
+test("refused YAML and an explicitly missing settings file fail without exposing values", () => {
+  const f = project(); f.write(".vh-adlc/triage.yaml", "# Broken on purpose.\nprivate-value: [unclosed\n");
   try { loadSettings(f.root); throw new Error("accepted invalid config"); }
-  catch (error) { expect(String(error)).not.toContain("private-value"); }
-  expect(() => loadSettings(f.root, { settingsPath: "absent.json" })).toThrow("settings");
+  catch (error) { expect(String(error)).toContain("invalid triage settings"); expect(String(error)).not.toContain("private-value"); }
+  expect(() => loadSettings(f.root, { settingsPath: "absent.yaml" })).toThrow("settings");
+});
+
+test.each(["json", "yml"])("a leftover .vh-adlc/triage.%s fails naming the YAML path, with or without --settings", suffix => {
+  const f = project(); f.write(`.vh-adlc/triage.${suffix}`, "{\"schema_version\":1}\n");
+  expect(() => loadSettings(f.root)).toThrow(".vh-adlc/triage.yaml");
+  f.settings({ schema_version: 1 });
+  expect(() => loadSettings(f.root, { settingsPath: ".vh-adlc/triage.yaml" })).toThrow(".vh-adlc/triage.yaml");
+});
+
+test("an explicit settings path must end in .yaml", () => {
+  const f = project(); f.write("config/triage.json", "{\"schema_version\":1}\n");
+  expect(() => loadSettings(f.root, { settingsPath: "config/triage.json" })).toThrow(".yaml");
 });
 
 test("configured repository conflicts never switch target or account", () => {

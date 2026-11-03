@@ -1,11 +1,12 @@
 import{test as trustedTest}from"./boundary-test";
 import { afterEach, expect, test } from "bun:test";
-import { readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import * as native from "./native";
 import { boundaryCommand, commandWorkspace, committedComponent, engineeringInputs, exportInputs, gradeTrial, verifyInputs, prepareVerification } from "./native";
 import { fixture, git } from "./fixtures";
 import{verificationRecord}from"../../../plugins/vh-adlc/scripts/triage/verification";
+import { loadSettings } from "../../../plugins/vh-adlc/scripts/triage/settings";
 const projects: ReturnType<typeof fixture>[]=[];
 afterEach(()=>{for(const f of projects.splice(0)) f.dispose();});
 const plugin=resolve(import.meta.dir,"../../../plugins/vh-adlc");
@@ -74,6 +75,21 @@ test("boundary launch exposes only declared read-only input and runtime with no 
   expect(args).not.toContain("--share-net");expect(args.join(" ")).not.toMatch(/GH_TOKEN|GITHUB_TOKEN|SSH_AUTH_SOCK|credential.helper/);
   expect(args).not.toContain("--bind");
   for (let i=0;i<args.length;i++) if(args[i]==="--ro-bind") expect(["/","/home","/run"]).not.toContain(args[i+1]);
+});
+
+test("a YAML checkout exports the loader's settings, and the confined session reads them with no binary inside",()=>{
+  const f=setup();expect(()=>JSON.parse(readFileSync(join(f.root,".vh-adlc/triage.yaml"),"utf8"))).toThrow();f.export();
+  const config=loadSettings(f.root);expect(config.configured).toBe(true);expect(config.settings_path).toBe(".vh-adlc/triage.yaml");
+  const exported=readFileSync(join(f.output,"settings.json"),"utf8");expect(exported).toBe(JSON.stringify(config));
+  expect(verifyInputs(f.output,{checkout:f.root,plugin})).toEqual({pass:true,failures:[]});
+  const args=boundaryCommand({input:f.output,driver:resolve(import.meta.dir,"native.ts"),bun:process.execPath});
+  // The session's PATH is /usr/bin and its HOME does not exist, so no vh-adlc binary is reachable inside.
+  expect(args.join(" ")).toContain("--setenv PATH /usr/bin --setenv HOME /nonexistent");expect(existsSync("/usr/bin/vh-adlc")).toBe(false);
+  const request={jsonrpc:"2.0",id:1,method:"tools/call",params:{name:"read",arguments:{path:"settings.json"}}};
+  const child=Bun.spawnSync(args,{stdin:Buffer.from(JSON.stringify(request)+"\n"),stdout:"pipe",stderr:"pipe",timeout:15_000});
+  expect(child.exitCode).toBe(0);
+  const reply=JSON.parse(child.stdout.toString().trim().split("\n")[0]),value=JSON.parse(reply.result.content[0].text);
+  expect(value.path).toBe("settings.json");expect(value.lines.map((line:{text:string})=>line.text).join("\n")).toBe(exported);
 });
 
 test("a prose-only discovery claim and unit-only adapter trace cannot pass a native trial",()=>{
