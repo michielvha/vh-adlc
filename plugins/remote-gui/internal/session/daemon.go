@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -185,6 +184,9 @@ func finish(home, id string, controller bool) error {
 	if err = removeForward(home, id); err != nil {
 		return err
 	}
+	if err = state.ReleaseDisplay(r.Display); err != nil {
+		return err
+	}
 	if err = privateCleanup(home, id); err != nil {
 		return err
 	}
@@ -198,6 +200,7 @@ func finish(home, id string, controller bool) error {
 		r.ProxyAddress = ""
 		r.CDPAddress = ""
 		r.Marker = ""
+		r.Display = nil
 		r.Config.Target = redactedTarget(r.Config.Target)
 	})
 }
@@ -242,8 +245,8 @@ func guard(home, id string) int {
 	}
 	cmd := exec.Command(executable, "_supervise", home, id)
 	cmd.ExtraFiles = []*os.File{file}
-	cmd.Stdout = io.Discard
-	cmd.Stderr = io.Discard
+	cmd.Stdout = nil
+	cmd.Stderr = nil
 	if err = cmd.Start(); err != nil {
 		_ = file.Close()
 		_ = update(home, id, func(r *state.Record) { r.State = "failed"; r.Diagnostic = "supervisor-start-failed" })
@@ -359,6 +362,14 @@ func supervise(home, id string) int {
 
 func serve(ctx context.Context, r state.Record) (result error) {
 	home, id := r.Config.Home, r.ID
+	file := os.NewFile(3, "proxy-listener")
+	listener, err := net.FileListener(file)
+	_ = file.Close()
+	if err != nil {
+		return errors.New("inherited-proxy-listener-unavailable")
+	}
+	defer func() { _ = listener.Close() }()
+
 	var bundle BrowserHandle
 	target := r.Config.Target
 	if r.Kind == "share" {
@@ -369,7 +380,6 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		if BrowserLauncher == nil {
 			return errors.New("browser-runtime-unavailable")
 		}
-		var err error
 		bundle, err = BrowserLauncher(ctx, r.Config, id)
 		if err != nil {
 			return err
@@ -386,13 +396,6 @@ func serve(ctx context.Context, r state.Record) (result error) {
 			return err
 		}
 	}
-	file := os.NewFile(3, "proxy-listener")
-	listener, err := net.FileListener(file)
-	_ = file.Close()
-	if err != nil {
-		return errors.New("inherited-proxy-listener-unavailable")
-	}
-	defer func() { _ = listener.Close() }()
 	origin := "http://" + r.ProxyAddress
 	client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
 	var forward *state.Forward
@@ -414,7 +417,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		}
 		return true
 	}
-	p, err := proxy.New(proxy.Options{ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive})
+	p, err := proxy.New(proxy.Options{ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password})
 	if err != nil {
 		return err
 	}

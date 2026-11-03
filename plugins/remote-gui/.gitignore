@@ -1,1 +1,5 @@
 /remote-gui
+
+# Browser crashes must never enter source artifacts.
+core
+core.[0-9]*

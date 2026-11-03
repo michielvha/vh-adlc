@@ -134,3 +134,33 @@ func bindingAlive(r state.Record) bool {
 	inodes, err := listenerInodes(r.Config.Target)
 	return err == nil && inodes[r.UpstreamSocket] && ownsSocket(r.Upstream, r.UpstreamSocket)
 }
+
+func OwnsListener(address string, id state.Identity) bool {
+	inodes, err := listenerInodes(address)
+	if err != nil || len(inodes) == 0 {
+		return false
+	}
+	for inode := range inodes {
+		if !ownsSocket(id, inode) {
+			return false
+		}
+	}
+	return true
+}
+
+func OwnsUnixListener(name string, id state.Identity) bool {
+	if !state.Alive(id) {
+		return false
+	}
+	data, err := os.ReadFile("/proc/net/unix")
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 8 && (fields[7] == name || fields[7] == "@"+name) && ownsSocket(id, fields[6]) {
+			return true
+		}
+	}
+	return false
+}

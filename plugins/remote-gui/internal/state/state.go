@@ -39,6 +39,7 @@ type Forward struct {
 	Web       json.RawMessage `json:"web"`
 }
 type Record struct {
+	Display        *Display      `json:"display,omitempty"`
 	Owner          string        `json:"owner"`
 	UpstreamSocket string        `json:"upstream_socket,omitempty"`
 	Version        int           `json:"version"`

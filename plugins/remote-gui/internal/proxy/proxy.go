@@ -16,6 +16,7 @@ import (
 	"net/http/cookiejar"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"path"
 	"strings"
 	"sync"
@@ -30,6 +31,8 @@ const (
 )
 
 type Options struct {
+	ViewerAssets    string
+	ViewerPassword  string
 	ID              string
 	Origin          string
 	Target          string
@@ -44,6 +47,8 @@ type client struct {
 type (
 	clientKey struct{}
 	Proxy     struct {
+		assets          *os.Root
+		viewerPassword  string
 		landing         string
 		mu              sync.Mutex
 		id              string
@@ -87,7 +92,17 @@ func New(o Options) (*Proxy, error) {
 	target.Path = ""
 	target.RawPath = ""
 	target.RawQuery = ""
-	p := &Proxy{landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[string]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, onCompatibility: o.OnCompatibility}
+	var assets *os.Root
+	if o.ViewerAssets != "" {
+		if o.ViewerPassword == "" {
+			return nil, errors.New("viewer credentials unavailable")
+		}
+		assets, err = os.OpenRoot(o.ViewerAssets)
+		if err != nil {
+			return nil, errors.New("viewer assets unavailable")
+		}
+	}
+	p := &Proxy{assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[string]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, onCompatibility: o.OnCompatibility}
 	p.reverse = &httputil.ReverseProxy{Rewrite: p.rewrite, ModifyResponse: p.response, ErrorLog: log.New(io.Discard, "", 0), ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
 		p.fail("upstream-or-compatibility-failure")
 		http.Error(w, "application proxy unavailable", http.StatusBadGateway)
@@ -163,6 +178,9 @@ func (p *Proxy) Revoke() {
 		_ = c.Close()
 	}
 	p.reverse.Transport.(*http.Transport).CloseIdleConnections()
+	if p.assets != nil {
+		_ = p.assets.Close()
+	}
 }
 
 func (p *Proxy) validOrigin(r *http.Request) bool {
@@ -297,11 +315,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		p.login(w, r)
 		return
 	}
-	if strings.HasPrefix(r.URL.Path, "/__remote_gui") {
+	if strings.HasPrefix(r.URL.Path, "/__remote_gui") && (p.assets == nil || r.URL.Path != "/__remote_gui/viewer-access") {
 		http.NotFound(w, r)
 		return
 	}
-	if path.Clean(r.URL.Path) != r.URL.Path || strings.Contains(r.URL.Path, "\\") {
+	if (path.Clean(r.URL.Path) != r.URL.Path && path.Clean(r.URL.Path) != strings.TrimSuffix(r.URL.Path, "/")) || strings.HasPrefix(r.URL.Path, "//") || strings.Contains(r.URL.Path, "\\") {
 		http.Error(w, "invalid application path", http.StatusBadRequest)
 		return
 	}
@@ -315,6 +333,9 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if p.upstreamAlive != nil && !p.upstreamAlive() {
 		p.Revoke()
 		http.Error(w, "application ownership changed", http.StatusGone)
+		return
+	}
+	if p.viewer(w, r) {
 		return
 	}
 	p.reverse.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), clientKey{}, c)))

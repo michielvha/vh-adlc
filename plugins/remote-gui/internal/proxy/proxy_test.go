@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
@@ -10,6 +11,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -336,5 +339,63 @@ func TestUnsafeLocalRedirectDoesNotEscapeShare(t *testing.T) {
 	defer func() { _ = r.Body.Close() }()
 	if r.StatusCode != 502 || r.Header.Get("Location") != "" {
 		t.Fatal("unshared loopback redirect escaped proxy")
+	}
+}
+
+func TestViewerCredentialsAndAssetsStayBehindAuthentication(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		t.Error("viewer assets or credentials reached bridge upstream")
+		w.WriteHeader(500)
+	}))
+	defer upstream.Close()
+	assets := t.TempDir()
+	if err := os.Mkdir(filepath.Join(assets, "core"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(assets, "core", "rfb.js"), []byte("export default class RFB {}"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	foreign := filepath.Join(t.TempDir(), "secret")
+	if err := os.WriteFile(foreign, []byte("private-sentinel"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(foreign, filepath.Join(assets, "core", "escape")); err != nil {
+		t.Fatal(err)
+	}
+	s := httptest.NewUnstartedServer(nil)
+	p, err := New(Options{ID: "0123456789abcdef0123456789abcdef", Origin: "http://" + s.Listener.Addr().String(), Target: upstream.URL, Deadline: time.Now().Add(time.Hour), ViewerAssets: assets, ViewerPassword: "synthetic-vnc-password"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s.Config.Handler = p
+	s.Config.ConnState = p.ConnState
+	s.Start()
+	defer s.Close()
+	defer p.Revoke()
+	r := get(t, s, "/__remote_gui/viewer-access")
+	_ = r.Body.Close()
+	if r.StatusCode == 200 {
+		t.Fatal("unauthenticated VNC credential retrieval")
+	}
+	cookie := enroll(t, p, s)
+	r = get(t, s, "/vnc.html", cookie)
+	page, _ := io.ReadAll(r.Body)
+	_ = r.Body.Close()
+	if r.StatusCode != 200 || bytes.Contains(page, []byte("synthetic-vnc-password")) {
+		t.Fatal("viewer embedded a credential or failed to render")
+	}
+	r = get(t, s, "/__remote_gui/viewer-access", cookie)
+	data, _ := io.ReadAll(r.Body)
+	_ = r.Body.Close()
+	if r.StatusCode != 200 || !bytes.Contains(data, []byte("synthetic-vnc-password")) {
+		t.Fatal("authenticated viewer credential flow failed")
+	}
+	for route, want := range map[string]int{"/core/rfb.js": 200, "/core/": 404, "/core/escape": 404, "/utils/novnc_proxy": 404} {
+		r = get(t, s, route, cookie)
+		body, _ := io.ReadAll(r.Body)
+		_ = r.Body.Close()
+		if r.StatusCode != want || bytes.Contains(body, []byte("private-sentinel")) {
+			t.Fatalf("viewer asset boundary %s: %d", route, r.StatusCode)
+		}
 	}
 }
