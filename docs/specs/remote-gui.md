@@ -1,7 +1,7 @@
 ---
-status: planned
+status: in-progress
 branch: feat/remote-gui
-status_description: "Revised native authentication passed R-8 and is accepted under the owner-delegated decision."
+status_description: "Implementing the accepted native-authentication revision and remaining acceptance scenarios."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
