@@ -47,7 +47,7 @@ findings, re-verifies them and handles selected repairs. This revision changes i
 settings to YAML through the strict reader already on shared main. Stackweaver keeps its ledger,
 local operating rules and `/audit` command. Audit's candidate becomes plugin 0.8.0 because 0.7.0
 already belongs to the YAML triage/maintenance release. The owner accepted the reviewed revision
-on 2026-11-03; implementation has resumed on the existing branch. The owner has now selected separate feature/PR routing for migration-bearing
+on 2026-11-03; the operation is now published and adopted in Stackweaver. The owner has now selected separate feature/PR routing for migration-bearing
 or intentionally behavior-changing findings; the feature merge stays with the owner.
 
 The owner selected audit after maintenance on 2026-11-01 and requested the extraction end to end.
@@ -227,8 +227,8 @@ Its two actual nits remain verbatim below. F-01 is resolved by T96's setup/conve
 against declared local obligations: entry uses only the normalized list and performs no language
 inference. This satisfies the existing requirement that obligations be declared before entry.
 F-02's historical r4 label is corrected here; the committed native proof is r5. These Context/Tasks
-changes do not alter the reviewed normative baseline. Revised owner acceptance is still pending;
-no YAML implementation, source-completion, marketplace or migration acceptance is claimed.
+changes did not alter the reviewed normative baseline. Revised owner acceptance was then pending;
+the owner accepted R-18 on 2026-11-03. The later implementation and delivery results are recorded above.
 
 ### Earlier accepted R-12 review and implementation obligation
 
@@ -1114,33 +1114,41 @@ live operations remain separate owner-selected tasks.
 ## Acceptance Criteria
 
 - [x] AC-01: Native skill discovery and ordinary lifecycle intake select the shared audit procedure for its declared modes, preserve other routes, and reject invalid scope without writes or an invented harness/model dependency.
+      Evidence: R-24 returns met at shared 88992f2c and observed consumer default b88aa6d5; its exact source equivalence, current checks and actual delivery observations are recorded below.
       Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
-      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
-      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
+      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence were still open in that pass.
+      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage was still pending under T98 in that pass.
 - [x] AC-02: Adopters using strict YAML settings through the shared verified reader can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
+      Evidence: R-24 returns met at shared 88992f2c and observed consumer default b88aa6d5; its exact source equivalence, current checks and actual delivery observations are recorded below.
       Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
-      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
-      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
+      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence were still open in that pass.
+      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage was still pending under T98 in that pass.
 - [x] AC-03: Current assessments and update proposals preserve stable IDs/history and admit FIXED/MOOT only with complete target-bound evidence and the required adversarial check, while stale, missing or contradictory evidence remains visibly incomplete and cannot yield an eligible terminal update.
+      Evidence: R-24 returns met at shared 88992f2c and observed consumer default b88aa6d5; its exact source equivalence, current checks and actual delivery observations are recorded below.
       Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
-      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
-      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
+      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence were still open in that pass.
+      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage was still pending under T98 in that pass.
 - [x] AC-04: Selected audit repairs use the existing reviewed repair/feature lifecycle and the consumer's required verification and authority, preserve workstream boundaries and recover from interruption without silently replaying stale or duplicating completed effects.
+      Evidence: R-24 returns met at shared 88992f2c and observed consumer default b88aa6d5; its exact source equivalence, current checks and actual delivery observations are recorded below.
       Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
-      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
-      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
+      Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence were still open in that pass.
+      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage was still pending under T98 in that pass.
 - [x] AC-05: Stackweaver's adapter preserves every parity-mapped audit behavior with the owner-approved separate-feature routing change, command/model/arguments, real ledger bytes and unrelated workflows, and can roll back/reapply only its migration paths against current main.
+      Evidence: R-23 returned not verified when default advanced to b88aa6d5 and its wrapper stopped before comparing command, forwarder and adapter-test objects there. R-24 executed every missing comparison against its actually observed default and returned met; no residual was invented.
+      Evidence: R-24 returns met at shared 88992f2c and observed consumer default b88aa6d5; its exact source equivalence, current checks and actual delivery observations are recorded below.
       Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
-      Evidence: R-20 returned not met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
-      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
+      Evidence: R-20 returned not met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence were still open in that pass.
+      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage was still pending under T98 in that pass.
 - [x] AC-06: The committed source passes its required automated suites, independent exact-commit review, isolated native Codex/Claude installation and helper checks, and bounded actual Copilot Opus 5.5 generic/consumer behavior trials with adversarial negative controls and explicit test limits.
+      Evidence: R-24 returns met at shared 88992f2c and observed consumer default b88aa6d5; its exact source equivalence, current checks and actual delivery observations are recorded below.
       Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
-      Evidence: R-20 returned not met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
-      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
+      Evidence: R-20 returned not met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence were still open in that pass.
+      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage was still pending under T98 in that pass.
 - [x] AC-07: Consumer cutover is blocked without matching published-marketplace and paired-review artifacts, and the documented delivery procedure verifies the published shared component and installed operation before adopting Stackweaver, retaining exact revisions, rollback and deferred capability limits.
+      Evidence: R-24 returns met at shared 88992f2c and observed consumer default b88aa6d5; its exact source equivalence, current checks and actual delivery observations are recorded below.
       Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
-      Evidence: R-20 returned not verified; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
-      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
+      Evidence: R-20 returned not verified; complete shared execution is observed. Consumer refresh and exact policy-object equivalence were still open in that pass.
+      Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage was still pending under T98 in that pass.
 
 ## Test Plan
 
