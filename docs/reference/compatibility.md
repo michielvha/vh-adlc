@@ -28,20 +28,22 @@ The historical results below retain their original scope.
 
 ## Persistent codebase audit
 
-The audit operation is a harness-agnostic skill and Bun/Git helper package in the 0.8.0 candidate.
-Its local structural tests cover historical inventory, current-source bindings, conservative verdicts,
-owned ledger updates, selected repair batches, scoped policy, interruption recovery and cutover denials.
-These tests do not establish that a model actually followed the procedure.
+The audit operation is a harness-agnostic skill and Bun/Git helper package, included from plugin 0.8.0.
+Actual Codex CLI and Claude CLI marketplace fresh installs, upgrades from 0.7.0, discovery of twelve
+operations, installed offline entry/helpers and reinstall passed at published source
+`afb0c4b84ad0c013614f404bcfea7d12ee9eca78`, with identical complete payload bytes/modes.
 
-Local-catalog Codex/Claude install/discovery/helper and reinstall trials passed at committed source
-`a6c4f282e056c9e8d96cddc8632ccddab891a46f`, with all twelve skills and matching payload bytes/modes.
-The bounded Copilot Opus 5.5 read-only behavior and two-context recovery trials passed at their recorded
-targets. Later independent review fixes require a final evidence refresh and exact-commit review;
-Stackweaver semantic parity and actual marketplace adoption remain pending in the
-[audit feature evidence](../specs/shared-audit.md). Actual Claude model invocation and GUI behavior
-remain deferred. No live Stackweaver audit, production token/database operation or bug repair has run.
-Published marketplace and post-merge adopted-policy checks follow source completion in that order;
-a local catalog is development evidence only. A valid receipt grants no publication or merge authority.
+The shared source gate includes 1,092 Linux package tests, 935 portable macOS tests and actual bounded
+Copilot Opus 5.5 behavior, repair and interruption-recovery trials. Stackweaver passed 100 consumer
+checks, all 18 applicable pre-push checks with no skips, a clean paired review at published/current
+commits and artifact-bound installed preflight before [adoption #1020](https://github.com/michielvha/stackweaver/pull/1020).
+Post-merge installed policy inspection matched every mode and binding, left the ledger unchanged and
+passed synthetic mismatch/rollback/reapply checks. Exact targets and retained attempts live in the
+[audit delivery evidence](../specs/shared-audit.md#published-audit-and-stackweaver-adoption-2026-11-03).
+
+These checks use operator attestations and provide no OS-level enforcement claim. Real Claude model
+invocation, GUI/phone entry and actual product audit repairs or live token/database/resource operations
+remain unclaimed. Other adopters must verify their own policy and installation.
 
 Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
 runtime reports that prerequisite before the operation starts. Use the same verified Bun version

@@ -1,7 +1,7 @@
 ---
 status: complete
 branch: feat/shared-audit
-status_description: "The complete source gate passed after R-21 returned all source criteria met. PR #44 publication, actual marketplace fresh/upgrade checks and Stackweaver adoption remain mandatory delivery work; no real product audit or GUI/Claude model result is claimed."
+status_description: "Published through PR #44 and adopted by Stackweaver #1020 after real marketplace fresh/upgrade checks, paired review and installed preflight. Post-merge policy and rollback checks pass. Real Claude, GUI/phone and product operations remain unclaimed."
 issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -40,7 +40,7 @@ covers:
 
 ## Context
 
-Source status, 2026-11-03: the reviewed implementation and complete source gate pass. The shared plugin is ready for publication through PR #44. Actual marketplace acceptance, the final published/current-consumer paired review, preflight and adoption follow next; this source-complete status does not claim those delivery events.
+Delivery status, 2026-11-03: shared PR #44 and Stackweaver PR #1020 are merged. Real marketplace fresh installs and upgrades, exact-commit paired review, installed preflight and read-only post-merge adoption checks pass. The delivery evidence below records the exact revisions and limits.
 
 Revision summary: audit still checks software for bugs, security and reliability problems, retains
 findings, re-verifies them and handles selected repairs. This revision changes its human-written
@@ -291,6 +291,62 @@ record metadata, fixture prerequisites, pending-report policy and rollback-test 
 private findings stay local. The accepted Design requires preserving existing finding content and anchors while adding dated
 evidence. The implementation places new markers below unchanged headings to satisfy that constraint;
 local wording must consistently distinguish current evidence from historical heading annotations.
+
+### Published audit and Stackweaver adoption, 2026-11-03
+
+The shared operation is published and Stackweaver routes `/audit` through it. The local ledger,
+project checks and delivery policy remain in Stackweaver. Documentation workflows and other agent
+extractions remain in the parent roadmap for a separate owner selection.
+
+| Delivery input | Observed identity or result |
+| --- | --- |
+| Shared publication | [PR #44](https://github.com/michielvha/vh-adlc/pull/44), merge `afb0c4b84ad0c013614f404bcfea7d12ee9eca78`; tree equals reviewed final source `c955644f61cd921a8a58e52d2d22095d16c90d22`. |
+| Normal shared CI | [Run 41727358677](https://github.com/michielvha/vh-adlc/actions/runs/41727358677), Linux, macOS, Go and version jobs succeeded. Source verification includes 1,092 package tests and 935 portable macOS tests. |
+| Runtime release | [v0.11.0](https://github.com/michielvha/vh-adlc/releases/tag/v0.11.0), tag resolved to the shared merge; public-key signature and all four Darwin/Linux amd64/arm64 archive checksums verified. Linux amd64 version and strict YAML reader executed. Other archives were not executed here. The plugin retains its reviewed 0.9.0 runtime lock. |
+| Published marketplace | Plugin 0.8.0, complete byte/mode digest `5084c65324769b125916ac0a48bce0e8c1f04376702a21e441706ddd451d28f1`. Both Codex CLI and Claude CLI fetched the actual published shared commit. |
+| Consumer reviewed before merge | `5784c6db87ff5a9636c779e97f54684db775e03d`, including actual default `575f1cc36afb2e94561cbd1076c559195b42352a`. |
+| Consumer adoption | [Stackweaver #1020](https://github.com/michielvha/stackweaver/pull/1020), squash `14a2779c46ceb5be52e0898e8fffe2b5c0e5ec64`; complete tree equals the reviewed consumer. Its normal PR and merged-main CI succeeded. |
+
+All four real marketplace cases passed: fresh Codex, fresh Claude, and independent upgrades from
+native-observed 0.7.0 to 0.8.0 on each host. Each used a credential-free isolated profile and checked
+all twelve discovered operations, exact installed bytes/modes, explicit pinned setup, offline entry,
+settings/inventory/snapshot/report execution, unchanged inputs/index, retained report artifacts and
+uninstall/reinstall. The first upgrade runner refused its old 0.7 payload with an audit-only 0.8
+inspector before changing either profile. The corrected operator check measured both old manifests
+and the active native version; the failed logs remain retained. No old agent was reconstructed.
+
+The final published/current-consumer paired review ran actual Copilot Opus 5.5 at the two exact
+revisions above. It returned `MODEL: claude-opus-5.5` and `NO FINDINGS`, with all 70 required files
+read completely, no tool violations and no real ledger/application/tracker/credential export.
+All 100 consumer/adjacent checks passed. The required `make verify SUITES=--changed` rerun passed
+18 checks with zero failures/skips after exact locked frontend dependencies were installed in the
+owned worktree. Its first run honestly reported missing frontend dependencies as a skip.
+
+The artifact-bound installed preflight passed with these real native receipts, actual paired-review
+bytes and a valid, non-granting, unadopted candidate policy at the exact consumer commit. The all-kind
+registered audit inventory was empty. Receipt validity remains an operator attestation, not an OS
+proof boundary or permission to act.
+
+After merge, the installed helper read freshly fetched Stackweaver main from an owned detached
+verification checkout. `policy-adopted` reported valid/adopted with `allowed: false`; all four modes'
+effects, committed policy blobs and fragment bindings matched the preflight/parity map. No unresolved
+registered effect remained. The real ledger SHA-256 stayed
+`c0eb6250334fbb592ed955c595b24aea2d796f5c1c7b5279672e26065807d769`.
+A deliberately corrupted synthetic expected effect matrix stopped acceptance and produced the scoped
+rollback/repair handoff. The actual synthetic rollback/reapply rehearsal preserved source/index,
+restored adapter tests and the retained maintenance contract, and performed no real rollback.
+
+This host's Codex marketplace installation now reports plugin 0.8.0; its actual offline entry against
+adopted Stackweaver passed for the complete declared Go/TypeScript/React page set at docs pin
+`0e52f51f01b84eda75a976763c42d8ec0a07b544`. A new chat discovers the updated installed skill. Existing
+Claude profiles and notification settings were not changed. The shared Stackweaver main working tree
+has unrelated local work and was preserved; reconcile that checkout separately before using its files.
+
+Local operator artifacts remain under `.audit-review-archive/`: `runtime-release-v0.11.0-r1`,
+`published-{codex,claude}-{fresh-r1,upgrade-r2}`, `private-parity-published-r1`, `published-adoption-r1`,
+`postmerge-adoption-r1`, and `consumer-verify-published-r2.log`. Failed attempts remain separate.
+Real Claude model execution, GUI/phone entry and real Stackweaver repair/live token/database/resource
+operations remain unclaimed. The migration evidence does not establish those results.
 
 ## Scope
 
