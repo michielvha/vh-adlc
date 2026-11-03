@@ -1,6 +1,7 @@
 package clean
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"path/filepath"
@@ -14,6 +15,10 @@ func snapshot(t *testing.T, dir string) string {
 	t.Helper()
 	var b strings.Builder
 	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		if errors.Is(err, fs.ErrPermission) {
+			fmt.Fprintf(&b, "%s unreadable\n", path)
+			return nil
+		}
 		if err != nil {
 			return err
 		}
