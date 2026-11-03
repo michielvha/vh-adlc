@@ -73,7 +73,7 @@ challenge. Missing or stale evidence remains unknown or partial.
 Create `.vh-adlc/audit.json` and a project procedure using the
 [audit settings and complete example](../../plugins/vh-adlc/references/audit-settings.md).
 Keep domain knowledge, finding format, verification commands and operating policy in your repository.
-The shared operation requires plugin 0.7.0+, Bun and Git. A missing operation is an installation blocker.
+The shared operation requires plugin 0.7.0+, Bun 1.4+ with its Markdown renderer and Git. A missing operation is an installation blocker.
 A dependency/security sweep still uses maintenance; diagnosis without a persistent ledger still uses
 investigation. Ambiguous audit requests need a scope question.
 
@@ -84,6 +84,11 @@ repair authority covers local work only. Live tests, tracker writes, push/PR and
 an explicit current grant or a valid committed consumer policy, plus their actual verification gates.
 Receipts are operator attestations; audit does not use triage's enforced publication controller.
 See [audit compatibility and outstanding acceptance](../reference/compatibility.md#persistent-codebase-audit).
+
+Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
+runtime reports that prerequisite before the operation starts. Use the same verified Bun version
+when generating and reconstructing a candidate; renderer differences are not proof of equivalent
+ledger bytes. A changed rendering result requires reconciliation and renewed verification.
 
 ## Dependency and security maintenance
 
@@ -193,8 +198,3 @@ usable independently of vh-adlc.
 The [lifecycle procedure](../../plugins/vh-adlc/references/lifecycle.md) and
 [feature loop](../../plugins/vh-adlc/references/loop.md) contain the agent-facing
 execution rules.
-
-Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
-runtime reports that prerequisite before the operation starts. Use the same verified Bun version
-when generating and reconstructing a candidate; renderer differences are not proof of equivalent
-ledger bytes. A changed rendering result requires reconciliation and renewed verification.

@@ -43,6 +43,11 @@ remain deferred. No live Stackweaver audit, production token/database operation 
 Published marketplace and post-merge adopted-policy checks follow source completion in that order;
 a local catalog is development evidence only. A valid receipt grants no publication or merge authority.
 
+Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
+runtime reports that prerequisite before the operation starts. Use the same verified Bun version
+when generating and reconstructing a candidate; renderer differences are not proof of equivalent
+ledger bytes. A changed rendering result requires reconciliation and renewed verification.
+
 ## Dependency and security maintenance
 
 Maintenance requires plugin 0.6.0 or later. Isolated native installs of the exact
@@ -117,8 +122,3 @@ prose guide when the humanizer skill is unavailable.
 
 Continue with [your first feature](../get-started/first-feature.md) or
 [review requirements](../user-guides/workflows.md#reviews).
-
-Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
-runtime reports that prerequisite before the operation starts. Use the same verified Bun version
-when generating and reconstructing a candidate; renderer differences are not proof of equivalent
-ledger bytes. A changed rendering result requires reconciliation and renewed verification.

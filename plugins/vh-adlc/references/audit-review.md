@@ -33,7 +33,8 @@ Reject omitted scope, missing member challenge, checks only for a sibling, or re
 Task-base-to-head. Preserve ledger IDs, anchors, finding content, table shape and historical notes.
 
 Verify `source_target` is a real post-repair commit and the ledger's Verified source. Compare its Git
-objects to the final review commit: only the Definition-declared ledger/index/record paths may differ;
+objects to the final review commit: only the Definition-declared ledger and record paths may differ; generated indexes must already
+be frozen with source, and ledger-content-derived external indexes are unsupported in this profile;
 source, tests, config and verification inputs must match. Final checks still target the actual final
 head. A placeholder, pre-fix target, changed input or post-review ledger edit is a finding. A provisional
 local candidate is reviewable but not a published completion verdict before this review and all gates.

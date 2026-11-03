@@ -12,7 +12,10 @@ consumer code/config coverage globs. Create its stable title/frontmatter scaffol
 required tracked documentation indexes before freezing `source_target`; declare those index paths
 in affected paths and verification inputs. The final record/ledger phase cannot change an index.
 If a generator requires a new tracked delta after freezing, re-freeze and rerun checks/review;
-never relax the source-equivalence allowlist or hand-edit generated indexes.
+never relax the source-equivalence allowlist or hand-edit generated indexes. This profile does not
+support a separate tracked index whose bytes depend on the final ledger's status/content; it cannot
+be changed in the post-freeze metadata phase. Keep that proposal private until an accepted design
+supports its independently verified generation.
 Replace every field with observed values. Its schema is:
 
 ```json
