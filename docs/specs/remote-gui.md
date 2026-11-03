@@ -1,7 +1,7 @@
 ---
-status: draft
+status: planned
 branch: feat/remote-gui
-status_description: "Revising Tailscale access to authorize the owner identity without a viewer password."
+status_description: "Reviewed passwordless identity revision accepted for the requested local reimplementation."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
@@ -22,7 +22,7 @@ Install `remote-gui` independently from vhco-tools. In a configured remote sessi
 
 ## Context
 
-The owner requested passwordless, identity-restricted Tailscale access in this session with "please reimplement with this new context". The intended flow is a direct link opened by the authorized Tailscale user, with no viewer username, password or enrollment step. Earlier native-authentication reviews and implementation evidence remain history, not acceptance of this revision. The owner explicitly approved one-time host setup of local operator `m`; the command succeeded and the existing Serve configuration hash stayed unchanged. The runtime must still never change the operator automatically. Code pushes, PRs, merges and releases remain separately authorized. Existing unrelated worktrees and blog edits remain preserved.
+The owner requested passwordless, identity-restricted Tailscale access in this session with "please reimplement with this new context". That explicit implementation request accepts the identity-restricted behavior described immediately before it; the reviewed Unix-peer wiring is a security-preserving implementation detail. The intended flow is a direct link opened by the authorized Tailscale user, with no viewer username, password or enrollment step. Earlier native-authentication reviews and implementation evidence remain history, not acceptance of this revision. The owner explicitly approved one-time host setup of local operator `m`; the command succeeded and the existing Serve configuration hash stayed unchanged. The runtime must still never change the operator automatically. Code pushes, PRs, merges and releases remain separately authorized. Existing unrelated worktrees and blog edits remain preserved.
 
 The current runtime uses native HTTP authentication and a client-binding cookie (`plugins/remote-gui/internal/proxy/auth.go:23`, `:87`). Serve currently proxies to a loopback TCP listener (`plugins/remote-gui/internal/session/daemon.go:228`, `:403`). Tailscale Serve supplies authenticated user-login headers and removes caller-supplied identity headers [S11]. A plain loopback backend cannot distinguish those headers from a local process's forgery. This revision changes both authorization and the trusted local transport.
 
@@ -207,6 +207,8 @@ None.
 | 2026-11-03 | R-7 | spec | `9edfd1c82a1e4d2aa85a6a2780fbf6dad1de41b4` | unknown | procedural | Blocking cookie exposure to unmanaged same-host handlers; owner trust-boundary decision required. |
 | 2026-11-03 | R-8 | spec | `d3b54f67cb8522a063096c1c1421921a8c032a83` | unknown | procedural | NO FINDINGS; static review of the revised native-authentication requirements. |
 | 2026-11-03 | R-8 | spec | `d3b54f67cb8522a063096c1c1421921a8c032a83` | n/a | n/a | accepted by owner |
+| 2026-11-03 | R-9 | spec | `2c6aeb22fb8846e3a897d866693fa28378f52b6c` | unknown | procedural | NO FINDINGS; model identity not attested. Passwordless owner identity and trusted Unix ingress reviewed. |
+| 2026-11-03 | R-9 | spec | `2c6aeb22fb8846e3a897d866693fa28378f52b6c` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -279,6 +281,10 @@ EVIDENCE: At 9edfd1c82a1e4d2aa85a6a2780fbf6dad1de41b4, docs/specs/remote-gui.md:
 PROPOSAL: Define an owner-approved hostname trust boundary or authentication that prevents reusable credentials from reaching unrelated handlers, and block unsupported mixed-trust hosting. Add a fresh-browser test with an unmanaged handler on another port that records received cookies and attempts replay against the original session.
 
 ### R-8
+
+NO FINDINGS
+
+### R-9
 
 NO FINDINGS
 
