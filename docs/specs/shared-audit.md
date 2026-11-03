@@ -1182,6 +1182,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-03 | R-13 | spec | `dd878483b9eb6908b56c9c401db766cae2f46c3a` | claude-opus-5.5 | procedural | YAML validation/offline/cutover/ordering clarifications required; factual coverage and wording corrections. |
 | 2026-11-03 | R-14 | spec | `adb0c49988fc9fee05329fd21494e2f94729fe15` | claude-opus-5.5 | procedural | Skill-level offline, cutover enforcement, superseded record and fixture proof corrections required. |
 | 2026-11-03 | R-15 | spec | `24831961330d64f9e7f12649a95bee7129638bff` | claude-opus-5.5 | procedural | Intake/offline evidence, active-effect cutover checks, shared routing and guide proof corrections required. |
+| 2026-11-03 | R-16 | spec | `0f2e6f71fbb30b2fd40a5403e2f6e1cbf21f72d3` | claude-opus-5.5 | procedural | Pinned-doc cache setup and distinguishable retained-absence observation still need specification. |
 
 ### R-1
 
@@ -1542,6 +1543,29 @@ SEVERITY: nit
 WHERE: Tasks T75
 EVIDENCE: T75 is still unchecked and its title says "retain the pending owner route decision". Its progress line says "The owner route choice remains Q1, so this task and final completion stay open." Open Questions now reports Q1 answered and folded into T94 (shared-audit.md:1140-1142, 191-197). T75 therefore has no remaining done condition distinct from T94, and the standard requires each task to name a check that completes it.
 PROPOSAL: Restate T75's remaining done condition without the pending-Q1 dependency, or mark the route part as moved to T94 and tick T75 when its other listed work has evidence.
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: shared/docs/specs/shared-audit.md:400-418 and 433-436 (Design, offline bootstrap and isolated trials); AC-06 cached skill-entry/helper pass condition.
+EVIDENCE: Every audit invocation must now pass `vh-adlc knowledge --offline` before reading settings (401-403). Per knowledge.go:214-224, offline mode answers only from `<cacheDir>/vh-adlc/docs/<rev>/<page>` and returns unreachable on a miss. native-evidence cold.stdout shows that the always-read conventions/feature-documents.md page also fails when uncached. Yet the only named setup step installs "the exact locked binary" (415-418), and isolated trials "provision only the exact locked verified binary into their own cache or PATH" (433-434). Neither the installer nor that setup step fills the docs cache. That page cache is keyed by the consumer-resolved revision and must hold every page the audit skill reads. As written, the isolated "cached success" trial cannot pass, and a fresh adopter can never reach audit. result.json also does not record how its warm case was warmed.
+PROPOSAL: Add the docs-cache setup to the explicit setup step: an observed online `vh-adlc knowledge` call, or an equivalent, for the exact page set and the consumer's resolved docs revision. Keep it a separate setup step, not something borrowed from status. Change "provision only the binary" so trial setup also seeds those pages. Have AC-06 record both setup observations, and require a partial page set to fail visibly.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: shared/docs/specs/shared-audit.md:842-848 (cutover preflight), T87 at 1152, T90; source journal.ts:14,245-248, recovery.ts:17-19, references/audit.md:190-196,220.
+EVIDENCE: The mandatory cutover gate must admit a "recorded declined/absence handoff", refuse an "unknown-state handoff", and require "a distinguishable absence observation". The current journal has no absence-observation record. A handoff payload is only a free identifier `{reason_code}`, and the CLI `journal handoff --reason` accepts any identifier. recovery.ts records "reconciliation-only-no-replay" for every policy-changed (cleanup_only) run before it checks the observed state. Every retained run becomes policy-changed under YAML (835), so absent and unknown collapse into one code there. audit.md:190-196 still keeps "absent/unknown" alike as pending handoffs. An ambiguous legacy handoff must stay blocked "until read-only reconciliation establishes that disposition" (845-846). A read-only step cannot persist that disposition, so the next preflight would see the same ambiguity. No open task names the shared journal/recovery/CLI/reference change, or the discriminating vocabulary, that the consumer preflight (T87) and the recovery test (T90) would rely on. The pass condition is therefore not observable, and admission could rest on an operator-chosen reason string.
+PROPOSAL: Define how a deliberate absence is represented. This could be a fixed reason code emitted only after an observed `absent` state, or a distinct journal event that the CLI cannot forge through `--reason`. Specify how a legacy or cleanup_only handoff gets that disposition recorded, and through which existing explicit authority. Name the shared journal.ts/recovery.ts/cli.ts/audit.md change in an open task (T90 or new), with AC-04/AC-05 cases. Those cases must show that an absent-observed handoff passes, while unknown, reconciliation-only and free-text handoffs block.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: shared/docs/specs/shared-audit.md:412-414.
+EVIDENCE: The spec says the v0.9.0 runs used "isolated HOME/XDG/PATH and a local proxy sentinel" and cites `knowledge-offline-release-r1/result.json`. The observed artifact is native-evidence/knowledge-offline/result.json. It records the argv against the real repository and binary path, exit codes, `network_requests: 0`, `cache_and_home_unchanged: true` and `docs_source_override: false`. It records no HOME/XDG/PATH values and no proxy configuration, and both stderr files are empty. The isolation and sentinel claims cannot be checked from the cited artifact.
+PROPOSAL: Cite the actual artifact path. Either add the recorded environment and proxy-sentinel details, plus the warm-cache setup, to the evidence, or limit the sentence to what result.json shows.
 
 ## Sources
 
