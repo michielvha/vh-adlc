@@ -1,7 +1,7 @@
 ---
-status: planned
+status: in-progress
 branch: feat/shared-audit
-status_description: "Owner accepted fresh R-18 on 2026-11-03. The YAML/offline/recovery revision is planned on the existing audit branch; re-enter implementation through the gate. Marketplace publication and consumer cutover remain pending."
+status_description: "Owner accepted fresh R-18 on 2026-11-03; the revision re-entered implementation through its existing published claim. YAML/offline/recovery work and fresh verification are in progress. Marketplace publication and consumer cutover remain pending."
 issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
