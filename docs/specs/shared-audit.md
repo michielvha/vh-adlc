@@ -1272,6 +1272,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-03 | R-15 | spec | `24831961330d64f9e7f12649a95bee7129638bff` | claude-opus-5.5 | procedural | Intake/offline evidence, active-effect cutover checks, shared routing and guide proof corrections required. |
 | 2026-11-03 | R-16 | spec | `0f2e6f71fbb30b2fd40a5403e2f6e1cbf21f72d3` | claude-opus-5.5 | procedural | Pinned-doc cache setup and distinguishable retained-absence observation still need specification. |
 | 2026-11-03 | R-17 | spec | `daeee127e424ee60e74f4b51dd787e461f1b11a1` | claude-opus-5.5 | procedural | Recorder identity, typed-event wording, deterministic page set and evidence details need correction. |
+| 2026-11-03 | R-18 | spec | `e471cf650f687c677b0e6fcd5d4e8709b0623d15` | claude-opus-5.5 | procedural | No blocking/should-fix findings; two nits: setup-time page checking and historical proof label. |
 
 ### R-1
 
@@ -1685,6 +1686,22 @@ SEVERITY: nit
 WHERE: Design, offline bootstrap evidence description (lines 423-427, 451)
 EVIDENCE: Line 425 says "The six-page setup records each exact pinned Git blob/hash", but the partial-cache case seeds only five pages and omits `guides/humanize-prose.md` (result.json partial setup). Line 451 requires verifying "the binary against its independent pin". Instead, the evidence ran `ensure-vh-adlc.sh --offline` against the host cache from cwd `/home/m/code` with no recorded isolated environment (result.json:8-16). It then copied the binary (result.json:7, 17), and it records `binary_sha256` with no lock digest or comparison result. The isolated root is named `audit-offline-knowledge-r2-...` (result.json:4), while the Context cites the r4 run.
 PROPOSAL: Describe the evidence as six pages for the warm case and five for the partial case. Record the lock entry's expected digest and the comparison result next to `binary_sha256`, or say that verification used the host's installer cache rather than an isolated install. Note the r2/r4 naming relationship.
+
+### R-18
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, offline bootstrap and knowledge_pages (shared-audit.md:473-480)
+EVIDENCE: shared-audit.md:477-479 says "language pages are never guessed per invocation. Any independently required local language page must be declared before entry, otherwise report a setup/config mismatch." The only normalized input at entry is the declared list (473-476). To detect an undeclared "independently required" page at entry, the model would have to work out which language pages apply, and that is the per-invocation guessing the same sentence forbids. Only the conversion-time check has an observable pass condition: Design 911-914 "verify the new effective page list against existing local language obligations", and AC-05 "checking the new knowledge_pages field against the declared local obligations". T96 and AC-06 test exact page-set equality and unseeded failure, but they have no entry-time mismatch case.
+PROPOSAL: Say the mismatch check is made at setup or conversion against declared local obligations, and that entry only requests and verifies the normalized list. Alternatively, name the deterministic local source that entry compares against and add that case to T96.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, R-16 paragraph (shared-audit.md:212-214)
+EVIDENCE: shared-audit.md:212-213 says "The richer native cold/partial/warm r4 evidence ... is committed under tests/vh-adlc/evidence/shared-audit". The committed result.json is the r5 run: result.json:4 "/tmp/audit-offline-knowledge-r5-b7vnh6fx/bin/vh-adlc", and lines 59-61 use the same r5 HOME, XDG_CACHE_HOME and PATH. shared-audit.md:441 itself says "The current r5 fixture prefix matches that run; the earlier r4 proof used an r2-named scratch prefix", and line 218 calls r5 the richer proof.
+PROPOSAL: Reword lines 212-214 in the past tense so r4 is the superseded archived attempt, and point to the r5 run as the committed evidence.
 
 ## Sources
 
