@@ -1227,6 +1227,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-03 | R-14 | spec | `adb0c49988fc9fee05329fd21494e2f94729fe15` | claude-opus-5.5 | procedural | Skill-level offline, cutover enforcement, superseded record and fixture proof corrections required. |
 | 2026-11-03 | R-15 | spec | `24831961330d64f9e7f12649a95bee7129638bff` | claude-opus-5.5 | procedural | Intake/offline evidence, active-effect cutover checks, shared routing and guide proof corrections required. |
 | 2026-11-03 | R-16 | spec | `0f2e6f71fbb30b2fd40a5403e2f6e1cbf21f72d3` | claude-opus-5.5 | procedural | Pinned-doc cache setup and distinguishable retained-absence observation still need specification. |
+| 2026-11-03 | R-17 | spec | `daeee127e424ee60e74f4b51dd787e461f1b11a1` | claude-opus-5.5 | procedural | Recorder identity, typed-event wording, deterministic page set and evidence details need correction. |
 
 ### R-1
 
@@ -1610,6 +1611,36 @@ SEVERITY: nit
 WHERE: shared/docs/specs/shared-audit.md:412-414.
 EVIDENCE: The spec says the v0.9.0 runs used "isolated HOME/XDG/PATH and a local proxy sentinel" and cites `knowledge-offline-release-r1/result.json`. The observed artifact is native-evidence/knowledge-offline/result.json. It records the argv against the real repository and binary path, exit codes, `network_requests: 0`, `cache_and_home_unchanged: true` and `docs_source_override: false`. It records no HOME/XDG/PATH values and no proxy configuration, and both stderr files are empty. The isolation and sentinel claims cannot be checked from the cited artifact.
 PROPOSAL: Cite the actual artifact path. Either add the recorded environment and proxy-sentinel details, plus the warm-cache setup, to the evidence, or limit the sentence to what result.json shows.
+
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Stackweaver adapter, parity and rollback (lines 885-889); Tasks T87 (line 1196)
+EVIDENCE: Lines 859-860 and AC-05 (line 1021) admit only runs with typed `retained-absence` events. They also say "Arbitrary --reason, legacy/unknown/reconciliation-only handoffs cannot pass." Lines 885-886 still let "an explicit recorded declined/absence handoff" satisfy the cutover check. T87, which owns the actual cutover preflight, says "admitting recorded declined/absence handoffs". The current `handoff` event is a free `reason_code` handoff (journal.ts:110-111, 245-248), so an implementer following T87 could admit a `journal-handoff --reason declined` record. Line 889 also points to "the explicit observation-recording operation below", but that section is above it (lines 837-861).
+PROPOSAL: In lines 885-886 and T87, replace "recorded declined/absence handoff(s)" with "typed `retained-absence` observation(s) per the Retained absence observations section", and change "below" to "above". T87 should also name the free-reason handoff negative that AC-05 already requires.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Retained absence observations (lines 853-857) and cutover (lines 875-879); T95 (line 1195)
+EVIDENCE: Lines 853-855 let the dedicated recorder append to a "legacy or policy-changed run ... including before the new YAML policy is adopted". In current source, every append rereads the run without `inspect` (journal.ts:198), and that read fails whenever `policy_current` is false (journal.ts:116-117). The run identity, registry location and policy bindings all come from `loadSettings` over the working-tree settings (journal.ts:23-26, 121-122). Before adoption, the default checkout holds JSON, which the 0.8.0 strict reader refuses (line 405). The only loadable settings is the unadopted candidate YAML, yet the design says recording "does not activate candidate policy". The spec never says which settings or identity source the recorder binds, or how it bypasses the `policy_current` requirement only for this event. Lines 878-879 also require "the existing explicit current-policy handoff" to mutate a policy-changed retained run later, while line 853 lets the recorder append to any policy-changed run without one. If that transition is used, the run becomes cleanup-only, and cleanup-only appends admit only `handoff`/`observed-outcome` for non-resource intents (journal.ts:101, 201).
+PROPOSAL: State the exact config and identity source the recorder uses before and after adoption. For example, candidate YAML read only for repository, host and common-dir identity, checked against the run header, with no policy binding. State that only this event kind skips the `policy_current` and cleanup-only append restrictions. Reconcile line 878 with line 853, and add the post-adoption and post-transition recording cases to T95 and AC-04/AC-05.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, offline bootstrap (lines 428-433, 448-452); AC-06 proof (line 1022); T92 and T88 (lines 1192, 1198)
+EVIDENCE: Setup must seed "every audit-required and applicable language page" (line 429), and AC-06 requires the "complete consumer-resolved pinned docs page set". The audit skill fixes five pages and adds "relevant language pages" chosen at invocation (SKILL.md:12-14). Each `knowledge` call requests "every docs page the operation will read" (loop.md:29, 59). In offline mode, any page missing from the cache returns `unreachable` (knowledge.go:214-224). No page list is declared per consumer or in settings. The native evidence uses one generic six-page set with `conventions/typescript.md` against the shared repository. Nothing ties that set to Stackweaver or to what an entry run will actually request. So whether complete-cache entry passes depends on which language pages the model chooses, and the "complete" pass condition cannot be checked.
+PROPOSAL: Make the audit page set deterministic, for example a declared language-page list in the consumer procedure or settings, used by both explicit setup and offline entry. Require T92/T88 trials to show that the requested set equals the seeded set, and that an entry requesting an unseeded page fails visibly.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, offline bootstrap evidence description (lines 423-427, 451)
+EVIDENCE: Line 425 says "The six-page setup records each exact pinned Git blob/hash", but the partial-cache case seeds only five pages and omits `guides/humanize-prose.md` (result.json partial setup). Line 451 requires verifying "the binary against its independent pin". Instead, the evidence ran `ensure-vh-adlc.sh --offline` against the host cache from cwd `/home/m/code` with no recorded isolated environment (result.json:8-16). It then copied the binary (result.json:7, 17), and it records `binary_sha256` with no lock digest or comparison result. The isolated root is named `audit-offline-knowledge-r2-...` (result.json:4), while the Context cites the r4 run.
+PROPOSAL: Describe the evidence as six pages for the warm case and five for the partial case. Record the lock entry's expected digest and the comparison result next to `binary_sha256`, or say that verification used the host's installer cache rather than an isolated install. Note the r2/r4 naming relationship.
 
 ## Sources
 
