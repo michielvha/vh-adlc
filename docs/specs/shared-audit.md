@@ -1100,6 +1100,7 @@ inferred from elapsed time or a request to continue unrelated fixes.
 | 2026-11-02 | R-12 | spec | `67a91a17944bb219ce956364963531532577c396` | claude-opus-5.5 | procedural | No blocking findings; post-merge outcome placement/recovery remains an implementation proof obligation. |
 | 2026-11-02 | R-12 | spec | `67a91a17944bb219ce956364963531532577c396` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-13 | spec | `dd878483b9eb6908b56c9c401db766cae2f46c3a` | claude-opus-5.5 | procedural | YAML validation/offline/cutover/ordering clarifications required; factual coverage and wording corrections. |
+| 2026-11-03 | R-14 | spec | `adb0c49988fc9fee05329fd21494e2f94729fe15` | claude-opus-5.5 | procedural | Skill-level offline, cutover enforcement, superseded record and fixture proof corrections required. |
 
 ### R-1
 
@@ -1357,6 +1358,65 @@ SEVERITY: nit
 WHERE: Test Plan AC-02, AC-04
 EVIDENCE: The AC-02 proof (line 826) now includes "committed-policy YAML parsing against clean/dirty, stale-link, unmerged and alternate-origin inputs; no reader failure may yield a grant". The AC-02 criterion text (line 814) covers settings and ledger inventory, not grants. Grants belong to AC-04's "consumer's required verification and authority" (line 816), whose proof (line 828) has no YAML or reader-failure case. T84 and T85 map to AC-04, but an implementation reviewer judging AC-04 against its proof row would not find these checks.
 PROPOSAL: Move or copy the committed-YAML no-grant cases into the AC-04 proof row and keep the parsing and leftover cases under AC-02.
+
+### R-14
+
+FINDING: F-01 Status and no-fetch audit requests still download through the skill's mandatory first step
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Consumer settings (offline reads, explicit setup); Tasks T84 to T88; Test Plan AC-01 and AC-06; frontmatter covers
+EVIDENCE: shared-audit.md:346-353 says every audit settings read uses an offline verified binary, including status and read-only or no-fetch requests. It says reads "never bootstrap a download or create its cache", and that installation is "a separate setup step, not permission borrowed from status". This only covers the settings helper. Step 1 of skills/vh-adlc-audit/SKILL.md:12 follows references/loop.md for every invocation. loop.md:14 runs `bash .../ensure-vh-adlc.sh` without `--offline` and then `vh-adlc knowledge`. ensure-vh-adlc.sh:105-126 downloads with curl and writes the cache when no matching binary is found. So a `status` request with an empty cache still performs exactly the network fetch and cache write the correction forbids. It happens before the helper's offline read runs. No task among T84 to T88 changes SKILL.md step 1 or loop.md, and loop.md is not in covers. The AC-01 and AC-06 proofs only check an empty-cache read at the helper level, so they pass while the original R-13 problem survives. The proof also does not require isolating PATH. ensure-vh-adlc.sh:84-94 accepts a matching vh-adlc on PATH first, so an "uncached" sentinel run on a developer host can pass without testing the empty state.
+PROPOSAL: State how the skill entry behaves for status and for read-only or no-fetch requests: it runs the loop installer with `--offline`, or it skips the online install and knowledge step. State which explicit operator step performs setup. Add a task covering SKILL.md and loop.md, and add loop.md to covers. Extend the AC-01 and AC-06 proof with a skill-level run that uses an isolated PATH, HOME and XDG cache, with network and cache-write sentinels for both the cached and the uncached state.
+
+FINDING: F-02 "Pending resources or unknown registration block cutover" has no check that enforces it
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stackweaver adapter (format cutover); Tasks T87 and T90; Test Plan AC-05 and AC-07
+EVIDENCE: shared-audit.md:748-749 says retained declined non-resource handoffs do not block cutover, but "Pending resources or unknown registration do block cutover". Today the only enforcement is run admission in scripts/audit/journal.ts:163-180, where registeredPending throws for pending key or row resources or a missing root. That only fires when a new run starts. scripts/audit/adoption.ts imports only fs, path and ./snapshot (lines 1-3) and makes no journal or registration check. The AC-05 proof lists stale links, suffix conflicts, a missing reader, value comparison, rollback and reapply, and a malformed real candidate, but no refusal for a registered pending resource or an unregistered root. T90 and the AC-04 proof test only admission of a later run. A cutover can therefore merge the YAML conversion while a key or row resource is still pending, and every criterion still passes. That leaves recovery to a later run under a changed settings digest instead of blocking it as the Design promises.
+PROPOSAL: Add an inspection of registered pending resources and unknown roots to the actual cutover preflight in T87, with an AC-05 case that must refuse when a key or row is pending or a registration is unreadable. Otherwise, narrow the Design text to "blocks new live work after cutover" and remove the cutover claim.
+
+FINDING: F-03 The previous record file after an owner-approved rebase has no defined disposition
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Evidence and delivery (approved rebase); references/audit-record.md:125-131; Test Plan AC-04
+EVIDENCE: shared-audit.md:715-720 and audit-record.md:125-131 say an explicitly approved rebase becomes a new scope-bound run on the same PR branch, with a new run ID, journal and record path. The rebuilt branch still carries the earlier run's record file at its old path, and that file holds the earlier Definition, Evidence and Reviews for a base that no longer applies. Neither text says whether the rebuilt source deletes it, marks it superseded or keeps it as history. It lies outside the new Definition's declared paths but stays in the publication diff that the conditional squash merge publishes. The batch freeze and review rules check the new record only. No AC-04 case covers a rebase, so an implementation can merge a stale second record that claims passing reviews for code it no longer describes.
+PROPOSAL: State what happens to the prior record on an approved rebase: removed, or retained with an explicit superseded marker that cites the new run. Require the batch check and review to include that path. Add an AC-04 case where the stale record left without that disposition is refused.
+
+FINDING: F-04 Nothing requires the shipped example, the converted consumer file or the fixtures to be real commented block YAML
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Consumer settings (line 344); Test Plan AC-02 and AC-05; tests/vh-adlc/audit/fixtures.ts
+EVIDENCE: shared-audit.md:344 says "examples use commented block YAML". The AC-05 proof says to "Convert the exact consumer audit configuration to commented YAML" and pass when validated values match. JSON is valid YAML, so renaming audit.json to audit.yaml, or emitting JSON text under the new name, passes the reader, the value comparison and every listed proof. This is the gap the yaml-settings precedent closed in R-5 F-01. Today tests/vh-adlc/audit/fixtures.ts:53 writes settings with `JSON.stringify(value, null, 2)`, and ledger.test.ts:434 does the same. The T84 to T88 conversion can rename these paths and every test stays green without exercising comments or block syntax. No pass condition in AC-02 or AC-05 asserts that the standalone example, the Stackweaver file and the fixture writers emit block YAML containing a comment that `JSON.parse` rejects.
+PROPOSAL: Add pass conditions to AC-02 and AC-05: the standalone example, the converted Stackweaver settings and the shared fixture writers produce block YAML with at least one comment, and each file fails `JSON.parse`. Name the fixture writer conversion in the T84 or T85 done condition.
+
+FINDING: F-05 Covers omits runtime modules that the audit helpers import
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter covers
+EVIDENCE: Audit scripts import shared code from paths that covers does not list:
+- scripts/triage/settings.ts: scripts/audit/settings.ts:3 imports git, origin and resolveInside, and assessment.ts:3 imports from it.
+- scripts/maintenance/journal.ts: imported by report.ts:2, cli.ts:4, ledger.ts:3, batch.ts:6 and journal.ts:3.
+- scripts/maintenance/authority.ts: ledger.ts:10 and batch.ts:7 import repositoryPath.
+Origin binding (AC-02) and journal publication and recovery (AC-04) depend on these modules. yaml-settings.md covers scripts/triage/settings.ts, but this spec does not. A later change to those files would not route to the audit feature's review.
+PROPOSAL: Add scripts/triage/settings.ts, scripts/maintenance/journal.ts and scripts/maintenance/authority.ts to covers.
+
+FINDING: F-06 T91 package changes under the colliding 0.7.0 version are not recorded
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T89 and T91; Context (package-version ordering)
+EVIDENCE: T91 is checked. It changes shipped plugin package content (the scripts/audit summary renderer and the references) to address R-13 F-06 and private R6. Both were raised against dd878483, after main published its own 0.7.0. plugin.json:4 still says 0.7.0. Context lines 139-143 say version reservation precedes further package implementation, and they record the earlier 90b2416 ordering failure. T91's evidence cites only focused ledger and batch controls. The Context does not record that T91 also landed before reservation, and T89's done condition does not require its package check to cover T91's changed files.
+PROPOSAL: Record T91 next to the 90b2416 note as package work done before reservation. Require T89's package-version check and its evidence to cover the T91 changes.
+
+FINDING: F-07 Several Context pointers are stale
+KIND: factual
+SEVERITY: nit
+WHERE: Context, lines 124, 143, 146 and 154
+EVIDENCE:
+- Line 143 says version handling is "retained under T88", but reservation is now T89.
+- Line 146 says R-13 reviewed "this exact draft", but R-13 targeted dd878483 and the current draft is adb0c49.
+- Line 154 is headed "Latest spec review" but discusses R-12, while R-13 is the latest returned review.
+- Line 124 presents "Current local validation at c98a6e42" as current, although the draft has since moved.
+PROPOSAL: Change line 143 to T89, give R-13's exact target, retitle line 154 as an earlier review, and mark the c98a6e42 validation as historical.
 
 ## Sources
 
