@@ -166,3 +166,12 @@ test("a multiline inline comment in the index is an explicit unsupported visibil
  expect(result.diagnostics.some(row=>row.code==="unsupported-markdown-structure")).toBe(true);
  expect(result.complete).toBe(false);
 });
+
+
+test.each([["<?legacy","?>"],["<!LEGACY",">"],["<![CDATA[","]]>"],["Note <span title=\"","\">tail</span>"]])("raw HTML index block %s cannot establish identities or allocation",(open,close)=>{
+ const without=ledger.replace("| AUD-002 | Low | Historical observation | FIXED |\n","");
+ const f=project(without.replace("## Findings",open+"\n| AUD-002 | Low | Hidden | FIXED |\n"+close+"\n\n## Findings"));
+ const result=inventory(loadSettings(f.root));
+ expect(result.diagnostics.some(row=>row.code==="unsupported-markdown-structure")).toBe(true);
+ expect(result.findings.every(row=>!row.identity_valid)).toBe(true);expect(result.next_id).toBeNull();
+});

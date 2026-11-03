@@ -63,6 +63,14 @@ function commentStart(text: string) {
   while (at >= 0) { let escapes = 0; for (let i = at - 1; i >= 0 && masked[i] === "\\"; i--) escapes++; if (!(escapes % 2)) return at; at = masked.indexOf("<!--", at + 4); }
   return -1;
 }
+function rawHtml(text:string){
+  const masked=maskInlineCode(text).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g,"");
+  for(const match of masked.matchAll(/</g)){
+    const at=match.index!;let escapes=0;for(let before=at-1;before>=0&&masked[before]==="\\";before--)escapes++;
+    if(!(escapes%2)&&/^<(?:\/?[A-Za-z](?=[A-Za-z0-9:\- \t\r\n/>]|$)|\?|![A-Za-z]|!\[CDATA\[)/.test(masked.slice(at)))return true;
+  }
+  return false;
+}
 export function markdownVisibility(text: string) {
   let fence: { char: string; size: number } | undefined, comment = false, comments = false, unsupported = false, list = false;
   const lines = text.split(/\r?\n/).map(raw => {
@@ -78,7 +86,7 @@ export function markdownVisibility(text: string) {
     if (listMarker) list = true; else if (raw.trim() && !indent) list = false;
     const first = commentStart(raw);
     if ((list && (indent > 0 || listMarker) || /^ {0,3}>/.test(raw)) && first >= 0) unsupported = true;
-    if (/^ {0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?=[ \t/>]|$)/.test(maskInlineCode(raw))) unsupported = true;
+    if (rawHtml(raw)) unsupported = true;
     if (first >= 0) comments = true;
     // Only a line-start HTML comment opens a block across later headings.
     if (first >= 0 && /^ {0,3}<!--/.test(raw)) { comment = !raw.includes("-->", first + 4); return ""; }
@@ -144,7 +152,8 @@ function titleStatus(value: string): { raw: string; state: RecordedStatus } {
 export function inventory(config: Settings): Inventory { return inventoryMarkdown(config, readFileSync(join(config.root, config.ledger_path))); }
 export function inventoryMarkdown(config: Settings, input: string | Uint8Array): Inventory {
   const bytes = Buffer.from(input), text = bytes.toString("utf8"), visibility = markdownVisibility(text);
-  const sections = markdownSections(text), unsupported = visibility.unsupported || sections.unsupported;
+  const sections = markdownSections(text);
+  let unsupported = visibility.unsupported || sections.unsupported;
   const lines = visibility.lines, diagnostics: Diagnostic[] = [], entries = new Map<string, number[]>();
   const headings=[...sections.headings.entries()];
   const ambiguousIndexComments=headings.some(([start,heading])=>{
@@ -152,7 +161,8 @@ export function inventoryMarkdown(config: Settings, input: string | Uint8Array):
     const end=headings.find(([at,next])=>at>start&&next.level<=heading.level)?.[0]??text.split(/\r?\n/).length;
     return markdownVisibility(text.split(/\r?\n/).slice(start+1,end).join("\n")).comments;
   });
-  if (unsupported || ambiguousIndexComments) diagnostics.push({ code: "unsupported-markdown-structure" });
+  unsupported ||= ambiguousIndexComments;
+  if (unsupported) diagnostics.push({ code: "unsupported-markdown-structure" });
   if (!visibility.balanced) diagnostics.push({ code: "unterminated-markdown-block" });
   const indices = new Map<string, { line: number; state: RecordedStatus; raw: string; severity: string; aggregate: boolean }[]>();
   const range_summaries: Inventory["range_summaries"] = [];

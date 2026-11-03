@@ -4,7 +4,8 @@ import { join } from "node:path";
 import { saveReport } from "../../../plugins/vh-adlc/scripts/audit/report";
 import { captureSnapshot } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
-import { fixture, git } from "./fixtures";
+import { fixture, git, ledger } from "./fixtures";
+import { evaluateAssessments } from "../../../plugins/vh-adlc/scripts/audit/assessment";
 import { terminal } from "./evidence";
 
 const projects: ReturnType<typeof fixture>[] = [];
@@ -30,4 +31,14 @@ test("a human report contains every current finding's verdict, observed checks a
   const file = saveReport(config, snap, "incomplete-report", { schema_version: 1, snapshot_digest: snap.digest, assessments: [row] });
   const text = readFileSync(file, "utf8");
   for (const expected of ["AUD-001", "UNKNOWN", "The live scenario could not be exercised.", "Live target unavailable.", "unit"]) expect(text).toContain(expected);
+});
+
+
+test("a comment-hidden identity is neither terminal-eligible nor allocated in the private report",()=>{
+ const f=fixture();projects.push(f);
+ const bytes=ledger.replace("| AUD-002 | Low | Historical observation | FIXED |\n","").replace("## Findings","Note <!-- archived\n| AUD-002 | Low | Hidden | FIXED |\n-->\n\n## Findings");f.write("docs/audit.md",bytes);const base=f.commit();
+ const config=loadSettings(f.root),snap=captureSnapshot(config,{mode:"reverify",ids:["AUD-002"],artifact_root:f.artifacts,baseline:base,required_checks:{"AUD-002":["unit"]}});
+ const document={schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(f,snap,"AUD-002")]};
+ expect(evaluateAssessments(config,snap,document).eligible_ids).toEqual([]);expect(snap.inventory.next_id).toBeNull();
+ const text=readFileSync(saveReport(config,snap,"hidden-index",document),"utf8");expect(text).toContain("Terminal eligibility: not established");expect(text).not.toContain("structurally eligible");
 });

@@ -127,8 +127,9 @@ New title/severity text is rendered as literal HTML text outside code spans. New
 fences and comments balanced; put HTML examples in code spans or fenced code rather than raw tags.
 The audit helper requires Bun 1.4+ and uses its Markdown renderer to establish which section
 headings actually render, including single-line setext sections. New bodies cannot introduce a
-rendered heading at or above the finding level. The renderer locates the actual index and then
-re-inventories its complete output. Original identities, heading/index classes and unselected rows must remain visible; each
+rendered heading at or above the finding level. The renderer locates section boundaries. Index rows use the supported pipe-table grammar;
+raw HTML and comments in that section make identities and allocation unavailable. The helper
+re-inventories the complete output under those same supported-profile checks. Original identities, heading/index classes and unselected rows must remain visible; each
 new ID needs one visible OPEN index row and finding entry. An unbalanced existing ledger remains
 inspectable as a gap, but canonical updates wait for explicit reconciliation rather than rewriting it.
 

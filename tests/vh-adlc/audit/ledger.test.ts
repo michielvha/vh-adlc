@@ -408,6 +408,12 @@ test("a comment-hidden index row blocks terminal updates and new finding inserti
  f.write("docs/audit.md",ledger.replace("## Findings","Legacy note <!-- archived\n| AUD-099 | High | Hidden | FIXED |\n-->\n\n## Findings"));const base=f.commit();
  const config=loadSettings(f.root),snap=captureSnapshot(config,{mode:"full",ids:["AUD-001"],baseline:base,artifact_root:f.artifacts,required_checks:{"AUD-001":["unit"]}});
  const document={schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(f,snap)]};
- expect(()=>createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"hidden-index"})).toThrow("unsupported Markdown");
+ expect(()=>createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"hidden-index"})).toThrow("assessment evidence is incomplete");
  expect(()=>appendFindings(config,snap,[{id:"AUD-100",severity:"High",title:"New root cause",body:"Observed with evidence.",root_cause:"distinct"}])).toThrow("unsupported Markdown");
+});
+
+
+test.each(["<?unclosed","<!LEGACY","<![CDATA[","Note <span title=\""])("new raw HTML body %s cannot conceal following sections",body=>{
+ const c=context("full");
+ expect(()=>appendFindings(c.config,c.snap,[{id:"AUD-003",severity:"High",title:"New cause",body}])).toThrow();
 });
