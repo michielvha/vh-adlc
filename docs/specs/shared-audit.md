@@ -135,6 +135,18 @@ The owner accepted the summarized reviewed spec on 2026-11-02 and explicitly aut
 of its documentation, tracking issue and implementation claim, followed by implementation. The R-12
 recovery obligation remains required; no implementation or runtime verification is claimed by acceptance.
 
+Independent public-only implementation review R4 at `2368bea6b28679f7ec3de51ed4077e360fe8d3dd`
+returned two should-fix findings and two nits. Its actual Opus identity, exclusive read-only tools,
+complete required-page reads and native exit passed. The raw return remains in the local review
+archive. T45-T48 track inline-comment rendering, original resource-journal root binding, malformed
+comparison values and explicit fix Scope baseline. No accepted criterion or normative requirement
+was weakened. The full plugin attempt at that target was interrupted after unrelated triage timeouts
+under severe disk load; required Go/module/lint/workflow and secondary-plugin checks passed.
+Native candidate installations and actual model behavior/recovery trials passed at that recorded target.
+The consumer reconciled current default `7428e487` into local migration commit `9c773752`; all 58
+audit and preserved-route tests passed and the real ledger checksum stayed unchanged. Private
+semantic parity review still requires its separate payload approval. Feature publication stays pending.
+
 ## Scope
 
 Deliver one discoverable `vh-adlc-audit` skill and canonical audit procedure for status,
@@ -819,6 +831,11 @@ live operations remain separate owner-selected tasks.
       Evidence: An author-named alternate branch, failed remote observation and advanced actual default each falsely pass before correction (`T42-real-default-red.log`). The focused batch/authority rerun passes (`T42-real-default-green.log`). Batch review now revalidates origin/settings identity and read-only actual default metadata against both the declared Scope baseline and cached tracking tip; it cannot fetch/move refs during review. Fixtures inject a declared synthetic observer rather than contacting real example remotes.
 - [x] T43 batch/journal/recovery helpers, native operations and controls - bind batch completion to its live-resource journal, distinguish a complete first-attempt resource plan from a prohibited retry, and retain specific cleanup/lookup failure handoffs (R3 F-04; AC-04).
       Evidence: Five observed recovery false-pass/failure controls in `T43-pending-resource-red.log` became 61 passing tests/182 assertions across batch, recovery, live recovery and native CLI (`T43-final-green.log`). Batch completion now requires its current policy-bound selected-scope journal and no pending key/row. The complete first-attempt key/row plan is registered before creation; another plan is refused until cleanup is reconciled. Cleanup execution/absence-lookup failures retain specific handoffs and a newly discovered resource ID is persisted before deletion, protecting replacements after a lost acknowledgement. Actual fresh-context recovery and final helper repair validation still require the T22 refresh; no live production effect is claimed.
+- [x] T45 inventory/ledger Markdown visibility and controls - preserve rendered headings after inline comment openers and reject new-body comments that could conceal another index or finding boundary (R4 F-01; AC-02, AC-03).
+      Evidence: Bun Markdown renders the concealed heading, and four inventory/ledger controls fail first (`T45-T48-red.log`). The focused inventory/ledger rerun passes (`T45-green.log`). Only a line-start comment can hide later blocks; new finding bodies reject comments outside code. Existing inline openers no longer hide another finding or move its predecessor's dated note under it. The setup-only missing temporary-directory failure is retained separately.
+- [ ] T46 batch journal binding and controls - require the original batch artifact root across provisional and final snapshots, so a fresh empty journal cannot conceal pending cleanup (R4 F-02; AC-04).
+- [ ] T47 snapshot comparison baseline validation - reject malformed baseline values before they can enter a rendered ledger note, preserving honest missing-hex-commit history (R4 F-03; AC-02, AC-03).
+- [ ] T48 explicit fix publication scope - leave fix Scope baseline unset until the fetched default ancestor is explicitly supplied, keeping historical comparison separate (R4 F-04; AC-03, AC-04).
 - [ ] T22 `tests/vh-adlc/audit/trial-proof.ts` and bounded synthetic trial runners - execute actual Copilot Opus 5.5 audit/repair/recovery trials at a committed payload, including independent repair review and adverse controls; raw transcripts, native exits and manual inspections establish the declared scenarios (AC-01, AC-03, AC-04, AC-06).
 - [x] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
       Evidence: Actual isolated Codex CLI and Claude CLI native installers at `deb1d7fcb60b416a7980fdf0825acd2d3a94e77d` both pass (`native-install-r2/result.json`): twelve native skills, installed settings/inventory/report helpers, unchanged source/index and identical byte/mode payload after uninstall/reinstall. No authentication/configuration is copied or model invoked by installers. The short-SHA launch failure remains `native-install-r1-launch.log`; four verifier negative-control tests pass. This is local-catalog candidate evidence, not published-marketplace, real Claude model or GUI acceptance.

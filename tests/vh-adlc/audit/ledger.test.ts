@@ -267,3 +267,17 @@ test("rendered inventory refuses an unchecked terminal annotation smuggled throu
   c.f.write(c.config.ledger_path,original);c.f.commit(); const snap=captureSnapshot(c.config,{mode:"full",artifact_root:c.f.artifacts});
   expect(()=>appendFindings(c.config,snap,[{id:"AUD-003",severity:"High",title:"New cause - **FIXED**",body:"No terminal evidence was collected."}])).toThrow();
 });
+
+
+test.each(["## Severity index\n| ID | Status |\n| --- | --- |\n| AUD-001 | FIXED |", "## Escaped finding section"])("inline comments cannot conceal rendered section escape: %s", hidden => {
+  const c=context("full"), body="Context <!-- note\n"+hidden+"\n-->";
+  expect(Bun.markdown.html(body)).toContain("<h2>");
+  expect(()=>appendFindings(c.config,c.snap,[{id:"AUD-003",severity:"High",title:"Observed cause",body}])).toThrow();
+});
+test("an inline comment before another finding cannot move the earlier finding's note under it", () => {
+  const c=context(),text=ledger.replace("### AUD-002","Context <!-- note\n### AUD-002")+"\n-->\n";
+  c.f.write(c.config.ledger_path,text);c.f.commit();
+  const snap=captureSnapshot(c.config,{mode:"reverify",ids:["AUD-001"],artifact_root:c.f.artifacts});
+  const candidate=createLedgerCandidate(c.config,snap,{document:{schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(c.f,snap)]},at:"2026-11-02",run_id:"inline-boundary"});
+  expect(candidate.bytes.indexOf("<!-- audit-run:inline-boundary:AUD-001 -->")).toBeLessThan(candidate.bytes.indexOf("### AUD-002"));
+});

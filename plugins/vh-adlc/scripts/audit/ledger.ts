@@ -167,7 +167,7 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
     if (finding.id !== expected || !finding.severity?.trim() || !finding.title?.trim() || !finding.body?.trim() ||
         /[\x00-\x1f\x7f|]/.test(finding.title + finding.severity) || finding.body.includes("\0") || new RegExp("^#{1,6}\\s+" + config.id_prefix + "-", "m").test(finding.body)) fail("new IDs must follow the reserved high-water mark with a single supported finding identity");
     const visibility = markdownVisibility(finding.body);
-    if (!visibility.balanced || visibility.lines.some(line => /<[A-Za-z][^>]*|<\//.test(maskInlineCode(line).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g, "")))) fail("new finding body requires balanced Markdown and HTML examples in code");
+    if (!visibility.balanced || visibility.comments || visibility.lines.some(line => /<[A-Za-z][^>]*|<\//.test(maskInlineCode(line).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g, "")))) fail("new finding body requires balanced Markdown and HTML examples in code");
     if (visibleLines(finding.body).some(line => {
       const heading = line.match(/^ {0,3}(#{1,6})[ \t]+/); return heading && heading[1].length <= config.profile.finding_level;
     })) fail("new finding body cannot escape its configured section level");

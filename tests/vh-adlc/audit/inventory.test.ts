@@ -126,3 +126,11 @@ test("compressed ranges expose every reserved ID without inventing per-member ve
   expect(result.complete).toBe(false);
   expect(result.range_summaries).toHaveLength(1);
 });
+
+
+test("an inline comment opener cannot hide a subsequent rendered finding heading", () => {
+  const text=ledger.replace("### AUD-002", "Context <!-- note\n### AUD-002")+"\n-->\n";
+  expect(Bun.markdown.html(text)).toContain("<h3>AUD-002");
+  const result=inventory(loadSettings(project(text).root));
+  expect(result.findings.find(row=>row.id==="AUD-002")?.identity_valid).toBe(true);
+});

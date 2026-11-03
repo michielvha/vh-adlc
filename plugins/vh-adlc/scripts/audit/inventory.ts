@@ -63,23 +63,29 @@ function commentStart(text: string) {
   return -1;
 }
 export function markdownVisibility(text: string) {
-  let fence: { char: string; size: number } | undefined, comment = false;
+  let fence: { char: string; size: number } | undefined, comment = false, comments = false;
   const lines = text.split(/\r?\n/).map(raw => {
     const marker = raw.match(/^ {0,3}([~\x60])\1{2,}/);
     if (fence) {
       if (marker && marker[1] === fence.char && marker[0].trim().length >= fence.size && !raw.slice(marker[0].length).trim()) fence = undefined;
       return "";
     }
-    if (!comment && /^(?: {4}|\t)/.test(raw)) return "";
-    if (!comment && marker) { fence = { char: marker[1], size: marker[0].trim().length }; return ""; }
+    if (comment) { if (raw.includes("-->")) comment = false; return ""; }
+    if (/^(?: {4}|\t)/.test(raw)) return "";
+    if (marker) { fence = { char: marker[1], size: marker[0].trim().length }; return ""; }
+    const first = commentStart(raw);
+    if (first >= 0) comments = true;
+    // Only a line-start HTML comment opens a block across later headings.
+    if (first >= 0 && /^ {0,3}<!--/.test(raw)) { comment = !raw.includes("-->", first + 4); return ""; }
     let rest = raw, value = "";
     while (rest) {
-      if (comment) { const end = rest.indexOf("-->"); if (end < 0) return value; rest = rest.slice(end + 3); comment = false; }
-      else { const start = commentStart(rest); if (start < 0) { value += rest; break; } value += rest.slice(0, start); rest = rest.slice(start + 4); comment = true; }
+      const start = commentStart(rest), end = start < 0 ? -1 : rest.indexOf("-->", start + 4);
+      if (end < 0) { value += rest; break; }
+      value += rest.slice(0, start); rest = rest.slice(end + 3);
     }
-    return /^(?: {4}|\t)/.test(value) ? "" : value;
+    return value;
   });
-  return { lines, balanced: !fence && !comment };
+  return { lines, balanced: !fence && !comment, comments };
 }
 export function visibleLines(text: string): string[] { return markdownVisibility(text).lines; }
 
