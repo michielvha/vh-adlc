@@ -75,6 +75,14 @@ an installer result does not establish agent behavior. The live Claude command
 trial and GUI maintenance checks remain deferred. Copilot report/reviewer tests
 do not establish general Copilot lifecycle or delivery support.
 
+## Repository settings
+
+Triage reads `.vh-adlc/triage.yaml` and maintenance reads `.vh-adlc/maintenance.yaml`. YAML settings need
+plugin 0.7.0 or later. An earlier plugin does not read these files and runs on its defaults, so upgrade
+the plugin on every host before a repository moves its settings. Plugin 0.7.0 refuses a `.json` or `.yml`
+settings file and names the expected path. Reading a settings file uses the verified `vh-adlc` binary that
+the plugin installs; a repository without settings files needs no binary for settings.
+
 ## Support matrix
 
 Supported means the scenario run in `tests/vh-adlc/evidence/` passed on that host. Everything else is

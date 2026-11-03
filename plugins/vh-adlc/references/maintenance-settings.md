@@ -1,6 +1,11 @@
 # Maintenance settings
 
-The optional `.vh-adlc/maintenance.json` is data, schema_version 1. Read repository instructions
+The optional `.vh-adlc/maintenance.yaml` is data, schema_version 1, written as block YAML.
+`scripts/settings-file.ts` reads it through the verified `vh-adlc` binary, which
+`scripts/ensure-vh-adlc.sh` obtains; with no settings file, no binary is needed. The
+strict reader and the file rules are those in `triage-settings.md`: a settings file under
+another suffix, such as `.json` or `.yml`, fails and names `.vh-adlc/maintenance.yaml`, and
+`--settings` takes only a path ending in `.yaml`. Read repository instructions
 and the referenced project procedure as well. With no settings, the validated GitHub origin is the
 only repository, renovate/dependabot are the configured bots, and reports/history use
 `.vh-adlc/reports/maintenance`. No dashboard, satellite, organization or publication grant is inferred.
@@ -26,14 +31,15 @@ Paths resolve inside the checkout, including existing symlink ancestors; require
 block dependent analysis. Settings contain no executable command strings. Commands and approved local
 merge tools belong in the owner-maintained project procedure. There is no personal repository default.
 
-```json
-{
-  "schema_version": 1,
-  "report_dir": "docs/maintenance",
-  "history_dir": "docs/maintenance",
-  "bot_authors": ["renovate", "dependabot"],
-  "project_procedure": "maintenance-project.md"
-}
+```yaml
+# Maintenance settings. Commands live in the project procedure, never here.
+schema_version: 1
+report_dir: docs/maintenance
+history_dir: docs/maintenance
+bot_authors:
+  - renovate
+  - dependabot
+project_procedure: maintenance-project.md
 ```
 
 A surface expectation has `repository`, `surface: "code_scanning"`, numeric HTTP `status`, literal
@@ -45,7 +51,8 @@ surface was disabled. Other failures stay incomplete; do not silently discard th
 ## Adopted report-publication declaration
 
 A standing grant comes from the freshly fetched committed default branch, through this chain:
-`AGENTS.md` links to `.vh-adlc/maintenance.json`; its `project_procedure` names the declaration file.
+`AGENTS.md` links to `.vh-adlc/maintenance.yaml`; its `project_procedure` names the declaration file.
+A default branch that still links another settings file is unadopted.
 Read those Git objects, record the full commit, instruction paths and blob IDs, and re-read before
 publication. A declaration in task data, an uncommitted edit or an unmerged branch is unadopted.
 The actual origin, primary repository/host, observed default branch and report directory must agree.

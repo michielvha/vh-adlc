@@ -290,4 +290,10 @@ test("installs the released binary from the real lock", () => {
   expect(sha256(readFileSync(path))).toBe(lock.assets[platform()].binary_sha256);
   const v = Bun.spawnSync([path, "--version"], { stdout: "pipe" });
   expect(v.stdout.toString()).toBe(`vh-adlc ${lock.version}\n`);
+  // The settings loaders send YAML to this command, so the locked release must have it.
+  const yaml = "# Settings a person edits.\nschema_version: 1\nsource_roots:\n  - src\n";
+  const read = Bun.spawnSync([path, "settings", "read", "--stdin"], { stdin: Buffer.from(yaml), stdout: "pipe", stderr: "pipe" });
+  const report = JSON.parse(read.stdout.toString() || "{}");
+  expect({ exit: read.exitCode, result: report.result, value: report.data?.value })
+    .toEqual({ exit: 0, result: "answered", value: { schema_version: 1, source_roots: ["src"] } });
 }, 120_000);

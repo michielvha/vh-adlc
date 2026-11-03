@@ -1,13 +1,14 @@
 # Repository instructions
 
 Read the personal conventions at
-https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/AGENTS.md
+https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/AGENTS.md
 and follow the task routes there before implementation.
 
 For all code, read conventions/coding.md at that revision.
 To specify, plan or implement a feature, read conventions/feature-documents.md.
 For Go, also read conventions/go.md; for CI and releases, conventions/delivery.md and
-knowledge/shared-delivery.md. Edit all prose a reader will see with guides/humanize-prose.md.
+knowledge/shared-delivery.md. For TypeScript, read conventions/typescript.md.
+Edit all prose a reader will see with guides/humanize-prose.md.
 When onboarding or bootstrapping, read the matching guides/ page.
 
 Load only the relevant documents. If they are inaccessible, report it and stop.

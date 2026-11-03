@@ -44,7 +44,7 @@ export async function runPairedReview(trial: string, output: string) {
   writeFileSync(join(packet, "owner-request.json"), ownerBytes);
   json(join(packet, "owner-request-provenance.json"), { kind: "Trusted synthetic test owner's pre-authored user task input, not a repository declaration", sha256: digest(ownerBytes), matches_original_operator_scenario: true, scope: "Only the express selected source/conditional delivery and any expressly selected local primary preparation; no real GitHub operation." });
   const primaryInputs: string[] = [];
-  for (const path of ["AGENTS.md", ".vh-adlc/maintenance.json", "maintenance-project.md", "maintenance-related.md", ".github/workflows/sync-builder.yml", "deps/builder.version.json"]) {
+  for (const path of ["AGENTS.md", ".vh-adlc/maintenance.yaml", "maintenance-project.md", "maintenance-related.md", ".github/workflows/sync-builder.yml", "deps/builder.version.json"]) {
     const raw = Bun.spawnSync(["git", "-C", fixture.primary.main, "show", `${fixture.primary.base}:${path}`], { stdout: "pipe", stderr: "pipe" });
     if (raw.exitCode) continue;
     const target = join(packet, "primary-inputs", path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, raw.stdout); primaryInputs.push(path);

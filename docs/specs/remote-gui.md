@@ -1,0 +1,240 @@
+---
+status: in-progress
+branch: feat/remote-gui
+status_description: "Implementation claimed in an isolated worktree; test-first tasks are in progress."
+issue: null
+goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
+covers:
+  - plugins/remote-gui/
+  - tests/remote-gui/
+  - .agents/plugins/marketplace.json
+  - .claude-plugin/marketplace.json
+  - .github/workflows/ci.yml
+  - README.md
+  - CONTRIBUTING.md
+  - docs/reference/marketplace.md
+---
+
+# Plan: Remote web access and browser handoff
+
+Install `remote-gui` independently from vhco-tools. In a configured remote session, the agent shares local apps and previews through verified tailnet URLs automatically. When the human needs to use the agent's browser, it also provides a temporary authenticated noVNC viewer and resumes automation in that same browser afterward.
+
+## Context
+
+The owner accepted the reviewed scope and requested implementation on 2026-11-03. This worktree restores the unchanged normative baseline from local commit `3f76178b21dcb9ead926e71369c544dead0e8653` onto the current default branch. The older local main and unrelated blog edits remain preserved in their original worktree.
+
+The owner requested a reusable browser handoff in the session handoff read on 2026-10-25 at `/home/m/code/.build-cache/remote-gui-handoff.txt`. It calls for Tailscale access, an SSH-tunnel-compatible loopback option, and preservation of the live prototype. Its browser profile and access files are excluded from inspection and testing.
+
+The inspected prototype runs Xvfb, x11vnc and websockify, then launches headed Chromium with a separate persistent profile and a debugging port. Its ports, display and executable locations are fixed for that experiment (`/home/m/code/.build-cache/linkedin-browser-handoff/supervisor.py:45`, `:63`, `:73`, `:77`; `browser.cjs:1`, `:5`, `:11`). These files establish the approach, not a distributable implementation or evidence that this plugin works.
+
+Both marketplace catalogs are named `vhco-tools` and contain independent plugins (`.agents/plugins/marketplace.json:2`, `.claude-plugin/marketplace.json:2`). The root Go module and release configuration belong to `vh-adlc` (`go.mod:1`, `.goreleaser.yml:5`, `:8`). The existing CI runs its Go checks and package checker (`.github/workflows/ci.yml:16`, `:24`). `vh-adlc find --slug remote-gui` returned `result: answered` and `documents: []` in this run.
+
+The owner selected existing host dependencies with diagnostic setup guidance in this session. No dependency downloader or system package installation is required for this version. The owner also authorized a one-time viewer access code in the task chat, a self-contained Go plugin module, a two-hour default with an eight-hour maximum, and deletion of the temporary browser profile on stop.
+
+In the 2026-10-28 scope discussion, the owner described repeated unusable localhost links in remote chats. The owner approved automatic tailnet sharing for local apps/previews, browser handoff for human interaction beyond login, and a complementary boundary with auth-refresh. The previous browser-only design did not cover that link behavior. The marketplace pins auth-refresh to `3695e2c73df68d1b3bad8e21dbb204e431adcd3d` in both catalogs; its canonical skill owns configured CLI/SSO refreshes and its workflow protects account-specific browser lanes [S7].
+
+## Scope
+
+Deliver an independent plugin, a shared agent skill, a small Go lifecycle CLI, and installation instructions for remote-session activation. It supports two session kinds: forwarding an existing task-owned local HTTP service, and sharing a fresh Chromium browser under Xvfb. Tailscale Serve is the primary transport; loopback serves users who establish their own SSH tunnel. Service forwarding needs the compiled CLI and selected transport, with no browser or display tools; the agent uses its own available browser capability for app verification. Browser handoff also uses existing Xvfb, xauth, x11vnc, noVNC, websockify and Chromium installations. Paths may point into an existing user cache.
+
+Include automatic handling of human-facing local web links in configured remote sessions, authenticated access to shared services and viewers, shared-browser identity verification, bounded readiness checks, concurrent sessions, expiry, stop and recovery cleanup. Browser handoff covers login, form completion, page inspection and other authorized human interaction. Validate the first version on Linux amd64. Other host platforms return an unsupported-platform diagnostic; a human viewer may use another operating system.
+
+Exclude native application sharing, Kubernetes desktop management, existing desktop export, attaching a viewer to an arbitrary existing browser, automatic SSH setup, global MCP configuration changes, automatic dependency downloads, browser profile import/export, credential management and release publication. Do not automatically forward every host listener, arbitrary private-network targets, browser debugging ports or authentication callbacks. Login, MFA and provider challenges remain with the human when using a shared browser. A completed login grants no authority for subsequent provider actions.
+
+## Design
+
+### Package and build
+
+Put `go.mod`, `cmd/remote-gui/main.go`, `internal/`, a v2 lint configuration and a Bash build helper inside `plugins/remote-gui/`. Both catalogs point to that directory. The plugin contains the complete source needed to build its CLI after installation; the helper works outside this checkout and stores compiled output in a user cache keyed by source identity. A missing Go toolchain produces setup guidance. It never downloads or executes an unverified binary.
+
+Adapt the inspected Go template's relevant lint/build conventions. Source: `michielvha/template-go-app@b8f86cd8a50e45c2aa4c95f7f2fa992c8e0ec3cd`; its `.golangci.yml`, `.goreleaser.yml`, `Dockerfile` and `.github/workflows/build-and-release.yaml` were read in this run. The template contains delivery configuration and its workflow leaves tests as a TODO. This plugin adds real checks and needs neither a container nor a second release publisher. Its source build does not change the existing `vh-adlc` release artifacts.
+
+### CLI and session identity
+
+The executable is `remote-gui`. Commands are `doctor`, `share`, `start`, `status`, `access`, `stop` and `cleanup`. `share <local-http-url>` starts a service-sharing session; `start` starts a browser-handoff session. Both accept `--transport tailscale|loopback` and `--ttl <duration>` and return a session ID. Runtime commands support machine-readable, secret-free JSON with a schema version, result, session kind, state, local target and human-facing URL where ready. Syntax errors and failed operations exit nonzero; missing sessions and repeated successful stops have documented, stable results.
+
+`doctor` checks the operating system, configured dependency paths and capabilities for the selected session kind. Browser checks include noVNC assets and the executables needed to launch a sandboxed browser. Tailscale is required only for that transport. A service-sharing check does not require or start Chromium, Xvfb or VNC. It neither installs packages nor changes Serve, operator permissions or host configuration. Its guidance distinguishes missing tools from unsupported capabilities.
+
+`start --transport tailscale|loopback --ttl <duration>` allocates a random session ID, private state and profile directories, an authenticated X display, and separate local listeners. It starts the dependencies with argument arrays, keeps Chromium's sandbox enabled, and never accepts arbitrary extra shell commands or a caller's existing profile. Sessions last two hours by default, with a positive configurable duration up to eight hours. A detached supervisor remains responsible after the launching agent command exits.
+
+`share` creates only its private session state, authenticated proxy and scoped forward. It uses the same lifetime limits, supervision and cleanup ownership rules as browser handoff. Record and verify the selected upstream's process identity or a task-established service identity; refuse reuse and revoke access when that identity changes, even if another service takes the same port. If identity cannot be verified, return an explicit blocker. The application remains owned by its original task; stopping or failing the share must not kill or reconfigure it.
+
+State is stored under a user-owned runtime directory with mode 0700; files containing secrets have mode 0600. A per-user lock serializes resource allocation and managed Serve changes. Display acquisition must respect existing X locks. Listener allocation handles competing binds with bounded retries and rolls back partial startup. Session records track process identity using boot identity and process start time, resource locations, expiry, and the exact scoped forward. A PID or a free port alone is never proof of ownership.
+
+Chromium's CDP endpoint is local and belongs to the same headed browser shown by noVNC. The CLI creates a harmless session marker page. The skill attaches with Playwright `connectOverCDP`, finds that marker in the default browser context, and proves control before offering a handoff. CDP supports Chromium and has less functionality than Playwright's own protocol [S3]. If the host cannot attach locally, the skill explains the missing capability before promising that automation can resume. It never substitutes a different browser or copies login state.
+
+### Automatic remote links
+
+Use trusted session context, explicit owner instructions or an owner-configured remote mode to establish that the human is on another device. A Tailscale installation or localhost URL alone does not establish that context. Installation documentation supplies a short persistent instruction snippet for the owner's normal agent startup instructions. It tells the agent to load the canonical remote-gui skill whenever a remote task produces a human-facing local web link. The skill's description also covers that trigger. Installation and host activation are separate checks; catalog availability alone cannot establish automatic behavior. Do not edit unrelated repository instructions or global MCP configuration while installing or running the plugin.
+
+Once remote context is established, before sending a local app or preview link to the human, the agent invokes `share` or reuses the matching live share owned by that task. It sends the verified tailnet URL and access instructions without waiting for a forwarding reminder. Reuse must match the target and current session ownership, not merely a reused port. Known external web URLs stay unchanged. Internal tool endpoints remain local. An explicit established SSH tunnel may supply the owner's chosen route; a bare host-local URL is never presented as reachable from another device. When sharing fails, explain the observed blocker instead of silently falling back to an unusable localhost link.
+
+Only share a concrete HTTP service started or selected for the current task. Validate loopback target addresses, ports and URL syntax; reject credentials in URLs, non-HTTP schemes, arbitrary network destinations and browser-control endpoints. Pin the validated upstream so redirects, caller-supplied Host headers or paths cannot turn the proxy into an open forwarder. Preserve the intended app path and query in the human link, excluding sensitive URL contents from logs and ordinary status exports. External navigation and provider authentication/callback URLs are not generic forwarding targets.
+
+The authenticated proxy handles the selected app's HTTP routes and WebSocket upgrades, including development hot reload when the app supports its remote origin. Authentication uses the one-time-code flow below. Proxy authentication endpoints use a documented reserved path; conflicting app routes produce an explicit compatibility error. Preserve app behavior across path routing, same-app redirects, assets and WebSockets. Configure only the task's app through its documented public-origin options when needed and authorized. Do not broadly rewrite response bodies, disable origin protections or rewrite OAuth callbacks. A browser check must exercise the intended page and any required WebSocket behavior; HTTP 200 alone does not prove that an app is usable remotely.
+
+Keep proxy authentication separate from upstream application state for HTTP and WebSockets. Bind every enrollment code and proxy cookie to one session, its purpose and expected viewer/application origin; another session cannot redeem or reuse them. Consume codes only at proxy-owned enrollment endpoints. Never forward raw browser Cookie headers, proxy authentication headers or enrollment bodies to an app. Proxy cookie names use a reserved namespace. Refuse ambiguous proxy cookies and upstream attempts to set reserved names. Cookies do not provide port isolation on a shared hostname [S8].
+
+Store supported upstream Set-Cookie values in an in-memory cookie jar isolated by share and authenticated client. Send only that jar's matching app cookies upstream, including on WebSocket handshakes; remove all upstream Set-Cookie headers from browser responses. Normal server-managed application cookies must continue to work. The jar is temporary transport state, is never imported from auth-refresh, and is discarded when its authenticated session ends or the share stops. Apps that require browser-script access to their cookies, unsupported cookie scopes or other incompatible behavior receive a compatibility blocker. Do not claim general app compatibility by silently weakening this boundary. A separate shared-browser handoff remains available for human interaction when the task calls for it.
+
+### Relationship with auth-refresh
+
+For configured CLI/SSO identities, use auth-refresh's canonical workflow and account rules [S7]. Remote-gui does not read its credential files, copy cookies, reuse its profiles, operate its browser lanes, change account selection or replace its refresh logic. It must not turn a missing credential into a request to disclose a password in chat. Do not interpret remote-gui session cleanup as permission to stop auth-refresh processes or delete their state.
+
+Use remote-gui when human browser interaction is needed, including unfamiliar logins that the agent cannot complete, or for non-login tasks. Before switching a configured authentication task to human browser control, establish that the prior flow is finished or safely yielded through its owning workflow. Never start a second competing login or MFA challenge, park someone else's lane, or suggest that shared-browser login has refreshed a CLI identity without that identity's own verification. This version creates a fresh browser and does not convert an auth-refresh headless lane into a shared browser. A blocked transfer remains explicit; there is no automatic credential or session migration.
+
+### Viewer and transport
+
+For browser handoff, reuse noVNC and websockify. noVNC's launcher demonstrates a configurable listening address and web asset directory [S4]; websockify provides the WebSocket-to-TCP bridge [S5]. Run websockify directly with explicit local addresses so its launcher cannot clone dependencies. Go provides a small authenticated reverse proxy in front of the viewer and its WebSocket endpoint. In browser mode it serves only the configured noVNC assets and bridge route, with directory listing disabled. In service-sharing mode it forwards only the selected validated application. The display has X authentication and no TCP listener; VNC, websockify, the viewer backend and CDP bind only to loopback.
+
+The proxy creates at least 256 bits of random access material per session. `access <session> --reveal` deliberately returns a one-time enrollment code for the owner; ordinary start, access and status output contain no secret. The agent may share this code in the task chat, as the owner authorized in this session. Each code expires after ten minutes or at session expiry, whichever comes first. Issuing a new code invalidates the previous unredeemed code. Redemption is atomic: a second attempt with the same code fails. The ordinary viewer URL carries no secret. A human submits the code to a login form; an HttpOnly, SameSite session cookie authorizes viewer requests and WebSocket upgrades until session expiry or revocation. HTTPS cookies are Secure. HTTP is allowed only through the explicit loopback transport, whose confidentiality outside the host comes from the user's SSH tunnel. Authentication applies to the bridge as well as viewer assets. Reject wrong, expired and revoked credentials, cross-origin WebSocket requests and repeated login guesses; never record request bodies, cookies or access material in runtime logs. Disable protocol recordings, browser traces and automatic page/input logging. The dedicated reveal output and the owner's task chat are the permitted delivery surfaces; never copy codes into repository artifacts, ordinary diagnostics or third-party messages.
+
+Tailscale Serve routes private tailnet traffic to local services and requires tailnet HTTPS setup; tailnet access rules still apply [S1]. The runtime uses an unused dedicated HTTPS port, persists its intended mapping before mutation, and verifies the resulting configuration. The CLI supports JSON status and scoped shutdown; reset removes all Serve configuration and is forbidden [S2]. Acquisition and removal use a conditional LocalAPI mutation rather than separate CLI read/write calls: read the configuration and ETag, check the selected scope against that snapshot, change only that scope, preserve all unrelated and unknown JSON fields, and submit with `If-Match` for that ETag. The inspected Tailscale client uses this API contract [S6]. A conflict requires a fresh read and ownership check before a bounded retry. Missing conditional-write support fails closed before a mutation; doctor reports that compatibility requirement. Never enable Funnel or change the global operator. If a matching scope already exists, allocate another or fail without replacement. When privileges or HTTPS approval are missing, return the precise next action and roll back; never invoke interactive sudo automatically.
+
+Browser-handoff readiness requires live child processes, the marker through CDP, authenticated viewer HTTP and a working viewer WebSocket. For Tailscale, repeat HTTP and WebSocket checks through the real HTTPS hostname with certificate validation enabled and bounded retries. Classify approval, privilege, certificate, DNS and connection failures from observed evidence; ambiguous failures remain ambiguous. Host probes cannot prove another device's ACL or network access. Only a browser on that device can confirm it. Loopback readiness reports its local scope and gives an SSH forwarding example.
+
+For service shares, readiness checks the selected upstream, authenticated application HTTP through the real transport URL and any WebSocket capability required by that app, with the same TLS validation, timeouts and reachability limits. It has no CDP, display, browser-marker or VNC requirement. Report host-verified transport readiness separately from observed app/browser functionality and second-device confirmation. Never imply an unperformed check passed. Transport readiness cannot override a pending or failed required app check. Before presenting a URL as a usable app, the skill must observe the intended page, its required assets, redirects and WebSocket behavior in a browser. Missing verification capability is an explicit blocker.
+
+If a required app check fails, the skill stops that share, preserves the upstream app, and reports `compatibility-blocked` with the observed failure. Its final result must not describe the app as ready or contain an advertised usable app link, even if HTTP transport probes passed. Pending diagnostic URLs are labeled as unverified and are never substituted for the final usable URL. Do not leave a failed share exposed for diagnosis by default, and do not fall back to sending a bare localhost URL.
+
+### Stop, expiry and recovery
+
+Use explicit states: starting, ready, stopping, stopped, failed and cleanup-pending. `status` reports observed health and deadline without reading page contents or exporting profile data. Stop and expiry immediately reject new viewer/application access, close active proxied connections, then stop only verified owned process groups. Delete session access material on normal stop and expiry. For browser handoff, also delete the task-created browser profile, downloads and X authentication. For service sharing, preserve the upstream app process, files and settings.
+
+Supervision must detect a child crash and clean up the rest. Add a separate lifetime guard so an unexpectedly killed supervisor cannot leave an authenticated viewer operating past its deadline. Record cleanup intentions before acquisitions so interrupted startup can be recovered. `cleanup` reconciles only this tool's private session records, including those from a previous boot. Unverifiable or reused process identities must remain untouched. It never discovers cleanup candidates by executable name or broad process matching.
+
+Before removing a scoped Serve entry, read its configuration under the management lock and compare its port, handler and target with the stored ownership record. Submit removal conditionally against that same snapshot's ETag. A concurrent replacement invalidates the write and must survive reconciliation. Preserve foreign or changed entries and report cleanup-pending when ownership or removal cannot be established. Never reset or restore a saved complete configuration. After crashes that stop both supervisor and guard, recovery runs on the next lifecycle invocation; no cleanup during a host shutdown is promised. Retain a secret-free tombstone for cleanup failures and clear it only after reconciliation. A stale forward must never be reported as cleaned up merely because local children exited.
+
+### Agent procedure and validation
+
+The shared skill first determines whether the human needs a local web service or control of the agent's browser. For apps/previews, it follows the automatic-link procedure and does not launch GUI dependencies. For browser handoff, it diagnoses capabilities, starts an isolated session, verifies the marker, and gives the human the viewer URL, a one-time access code and its expiry in the task chat. Tailscale viewers need no host terminal access. While the human uses the browser, the agent stops page navigation and input. After the human confirms completion, the agent reattaches to the same session and checks a harmless marker before continuing the authorized task. Session teardown follows the selected lifetime policy and reports cleanup failures. `vh-adlc` governs development only; users do not need it to run the plugin.
+
+Add a Linux CI job for plugin build/test/vet/lint and package checks. The existing `version` job in `.github/workflows/ci.yml` must depend on this job. This feature does not change the separately triggered release workflow. Reuse the workflow's existing pinned checkout/tool setup where suitable. Existing Go and plugin checks remain required. Runtime integration tests use disposable profiles and resources. Tests never use the live prototype's session directory, display or ports, or mutate its Serve entry. Live Tailscale mutation is an explicit acceptance exercise on a disposable, unused scope; unit tests inject its LocalAPI client and probe failures.
+
+## Acceptance Criteria
+
+- [ ] AC-01: A user can install remote-gui independently from either vhco-tools catalog and build and run its CLI from the installed plugin without the repository checkout or vh-adlc runtime.
+- [ ] AC-02: A Linux user with the documented host tools can start a sandboxed headed Chromium session, and a human's harmless viewer input is visible to agent automation attached to that exact session before and after reattachment.
+- [ ] AC-03: The viewer requires valid temporary session authentication for HTTP and WebSocket access; display, VNC and CDP interfaces remain local, and secrets and browser contents do not appear in status, diagnostic output or retained logs.
+- [ ] AC-04: A Tailscale session becomes ready only after trusted HTTPS and authenticated viewer WebSocket probes pass through its real hostname; a loopback session works through a user-established SSH tunnel and reports readiness with its actual scope.
+- [ ] AC-05: Missing dependencies, unsupported hosts, unavailable attachment capabilities and failed startup checks leave no usable partial session and give an actionable result without installing packages or changing global host configuration.
+- [ ] AC-06: Concurrent sessions use separate profiles, displays and ports; stopping, expiring or failing one preserves the other session and all pre-existing browser and Serve resources.
+- [ ] AC-07: Normal stop, expiry and a child or supervisor crash revoke viewer access and clean up verified owned resources; recovery after interrupted startup or restart preserves changed resources and reports any unresolved cleanup explicitly.
+- [ ] AC-08: An agent can follow the installed skill to hand control to the human and resume the authorized task in the verified original browser, with clear expiry and cleanup results and no global MCP reconfiguration.
+- [ ] AC-09: Required plugin and repository checks pass in their documented local commands, and the CI version/tagging job waits for the plugin checks to pass.
+- [ ] AC-10: In a configured remote session, the agent gives the human a verified tailnet URL for a task-local app or preview on the first attempt without a forwarding reminder; unrelated external links and internal control endpoints keep their intended routing.
+- [ ] AC-11: A human can use a shared local app's intended pages, assets, same-app redirects and required WebSocket features through authenticated tailnet access without starting a shared browser; ending the share preserves the original app and unrelated resources.
+- [ ] AC-12: Configured authentication work retains auth-refresh's account, credential and lane ownership, while remote-gui supports authorized human browser interaction without competing login flows, reading its credentials or changing its state.
+
+## Test Plan
+
+| Criterion | Proof |
+| --- | --- |
+| AC-01 | `bun test tests/remote-gui` checks both manifests resolve the same plugin. Copy only the plugin to a temporary installed directory, run its build helper, then CLI help and doctor from an unrelated working directory; no root module or vh-adlc is available. |
+| AC-02 | A disposable Linux integration scenario launches the session, attaches Playwright over CDP, opens noVNC in a separate viewer browser, types a random harmless marker through the rendered canvas, and reads that value from the original page. Disconnect and reattach; require the same browser endpoint, marker and value. Verify sandbox launch settings and observed browser health. |
+| AC-03 | HTTP and WebSocket tests reject missing, wrong, expired and revoked codes/cookies, cross-origin upgrades, path escapes and login bursts. Redeem one code concurrently; require exactly one success. Check the ten-minute/session deadline and replacement of an unredeemed code. Inspect actual sockets and X startup to verify local-only access. Seed access material and harmless synthetic page/input sentinels, exercise success and failures, then scan ordinary captured output and retained logs for leaks. Only explicit reveal output may contain the enrollment code. Inspect cookie flags over HTTPS and loopback. A recording upstream must receive no proxy code, cookie or auth header in either HTTP or WebSocket requests; exercise concurrent shares and cross-session code/cookie reuse. |
+| AC-04 | Inject delayed certificates, DNS failures, approval requirements, permission failures and rejected WebSocket upgrades; readiness must stay false. On a disposable unused Tailscale scope, require trusted HTTPS and a noVNC canvas over WSS from a second tailnet device. Run loopback mode through a manually established SSH tunnel and perform the marker input procedure. Host-only evidence cannot substitute for the second-device check. |
+| AC-05 | Run CLI tests with missing executables/assets, unsupported capability/version responses, failed launches, occupied resources and unavailable CDP attachment. Require nonzero actionable failures and rollback; assert no package manager, downloader, interactive sudo or operator mutation was invoked. Run doctor against a missing-dependency fixture and a real configured host. |
+| AC-06 | Start two disposable sessions concurrently, with a pre-existing foreign display/listener and Serve fixture. Stop one and expire another in separate runs; assert the surviving session accepts marker input and foreign resource/configuration values remain unchanged. Deterministically occupy or replace the selected Serve scope between reading its snapshot and submitting acquisition/removal. Require conditional failure, a fresh ownership check and preserved foreign configuration, including unknown fields. Include competing binds and missing conditional-write support. |
+| AC-07 | Process integration tests send stop, expire a short test TTL, kill each child and kill the supervisor while retaining the lifetime guard. Require denied new access, closed existing viewer sockets, dead owned children, deleted private material and scoped removal. Inject cleanup failure, reused PIDs/ports, changed mappings, interrupted acquisitions and boot changes; run cleanup and require preserved foreign resources plus accurate cleanup-pending state until resolved. |
+| AC-08 | Record one disposable end-to-end skill run with a local browser automation client and human confirmation. Verify marker before handoff and after resume, deliberate pause of agent input, delivery of URL and one-time code without requiring a host terminal, same-session continuation, expiry and stop reporting. Check skill text and ordinary outputs for forbidden global MCP edits and secret disclosure outside the authorized reveal/task-chat surfaces; keep the live code out of retained test evidence. |
+| AC-09 | In the plugin module run `go build ./cmd/remote-gui`, `go test -race ./...`, `go vet ./...`, `golangci-lint config verify`, `golangci-lint run` with v2.15.0, and `go mod tidy -diff`. In the root run all Go commands from AGENTS.md, `bun test tests/vh-adlc`, `bun test tests/remote-gui`, and the github-app-registration command from AGENTS.md. Inspect the `version` job's `needs` in CI and require the plugin check job; verify the release workflow is unchanged. |
+| AC-10 | Run real-agent scenarios with the plugin installed and its persistent remote-session instruction loaded. Ask only to build/show a local app; give no case-specific forwarding hint. The first human-facing link must use the verified tailnet origin, and a second-device browser must open the intended app after authentication. Repeat for a reused share, external URL, internal CDP URL, a failing transport and an explicit existing SSH tunnel. When HTTP succeeds but a required asset, same-app redirect, origin check or WebSocket fails, require `compatibility-blocked`, stopped forwarding and a final reply with neither a usable-app claim nor localhost fallback. Require the same result when browser verification is unavailable. Inspect installation instructions for the one-time activation step and require scenario evidence before claiming host coverage. |
+| AC-11 | A disposable app fixture supplies nested routes, assets, same-app redirects, a server-managed cookie and a WebSocket echo/hot-reload endpoint. Exercise them through the authenticated share from a second device, including reconnects. With two concurrent shares on the same hostname, require app cookies to work through isolated per-client jars while recording upstreams receive no raw browser/proxy cookies. Malicious upstream Set-Cookie values must neither reach the browser nor overwrite proxy or other-share cookies; verify jar deletion on stop and client expiry. Browser-script-cookie fixtures must produce an explicit blocker. Deny unauthenticated HTTP/upgrades, unsafe targets, proxy escapes, reserved-route collisions and incompatible origin configuration. Replace the upstream with another process on the same port and require revoked access and refused reuse. Seed sensitive query values and scan ordinary outputs/logs for leaks. Run forwarding without GUI tools and assert none is launched; stop/expire/crash the share and require the app, its files and foreign forwards to survive. Apply AC-03/AC-06/AC-07 credential, concurrency and conditional-cleanup failure checks to both session kinds. |
+| AC-12 | Real-agent routing scenarios cover a configured SSO refresh, unknown credentials, an auth-refresh flow already on a challenge, and a non-login form/inspection handoff. Provide sentinel auth-refresh files and a recording fake owning interface. Require delegation to the canonical auth-refresh workflow for configured identities, no direct credential/profile/state access, no unauthorized lane actions or second challenge, and explicit blocking when prior ownership cannot be yielded. Complete the non-login handoff in the same shared browser and verify the form result after agent reattachment. Claim no CLI authentication success without its provider verification. |
+
+## Tasks
+
+- [ ] T1 `plugins/remote-gui/go.mod`, `cmd/remote-gui/main.go`, `internal/app/` - add CLI/configuration and session-kind doctor tests first, observe failure, then make build/help/doctor checks pass without changing host configuration (AC-01, AC-05).
+- [ ] T2 `plugins/remote-gui/internal/state/` - add private-state, lifetime, lock and process-identity tests first, then pass tests for concurrent allocation, restrictive modes and reused identities (AC-05, AC-06, AC-07).
+- [ ] T3 `plugins/remote-gui/internal/proxy/` - add HTTP/WebSocket enrollment, origin, expiry, cookie isolation and upstream-boundary tests first, then pass them with authenticated proxying and connection revocation (AC-03, AC-11).
+- [ ] T4 `plugins/remote-gui/internal/tailnet/` - add conditional Serve acquisition/removal and trusted transport-probe tests first, then pass conflict, foreign-config, privilege, certificate and failure cases (AC-04, AC-06, AC-07).
+- [ ] T5 `plugins/remote-gui/internal/session/` - add disposable service-session, control-socket and supervisor/guard process tests first, then pass start/access/status/stop/expiry/crash/recovery and upstream-identity checks (AC-04, AC-05, AC-06, AC-07, AC-11).
+- [ ] T6 `plugins/remote-gui/internal/browser/` - add headed-browser dependency, allocation and rollback tests first, then pass isolated X/VNC/Chromium startup, marker and exact-session attachment checks without accessing live profiles (AC-02, AC-05, AC-06, AC-07).
+- [ ] T7 `plugins/remote-gui/internal/app/`, `cmd/remote-gui/main.go` - add command-level lifecycle and redaction tests first, then pass the public CLI contract, scoped diagnostics and private reveal flow (AC-01, AC-03, AC-05, AC-07, AC-11).
+- [ ] T8 `plugins/remote-gui/scripts/`, `skills/remote-gui/`, plugin manifests, `tests/remote-gui/`, both marketplace catalogs, `.github/workflows/ci.yml`, `README.md`, `CONTRIBUTING.md`, `docs/reference/marketplace.md` - add installed-package and CI dependency checks first, then pass independent source-install builds and package checks with documented remote activation and auth-refresh boundaries (AC-01, AC-08, AC-09, AC-10, AC-12).
+- [ ] T9 `tests/remote-gui/`, `plugins/remote-gui/internal/` tests - run disposable real-browser and native-agent scenarios, address observed defects within scope, and record actual evidence for first-link forwarding, same-browser handoff, app compatibility and auth-refresh isolation (AC-02, AC-03, AC-05, AC-06, AC-07, AC-08, AC-10, AC-11, AC-12).
+- [ ] T10 `docs/specs/remote-gui.md`, plugin verification scripts - run all required Go/Bun/lint/tidy checks, obtain owner-authorized second-device Tailscale and SSH acceptance evidence, and record exact results without claiming host-only checks establish remote reachability (AC-04, AC-09, AC-10, AC-11).
+
+## Open Questions
+
+None.
+
+## Review Log
+
+| Date | Review | Kind | Commit | Model | Isolation | Outcome |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-25 | R-1 | spec | `141d40c6083c23945a19452a7694fc346b55fd2e` | unknown | procedural | Blocking ownership race; code delivery and CI scope need resolution. |
+| 2026-10-25 | R-2 | spec | `b80de729d634f7b5ad6539160fc60eaef5bbbfb5` | unknown | procedural | NO FINDINGS |
+| 2026-10-28 | R-3 | spec | `fe77f964ab05744740fa41f89d15d9e5ea27046b` | unknown | procedural | Blocking app-cookie isolation gap; clarify functional-readiness failures. |
+| 2026-10-28 | R-4 | spec | `a90306d12a82d8cfc68ef833480be9f9a5c426cd` | unknown | procedural | NO FINDINGS |
+| 2026-11-03 | R-4 | spec | `a90306d12a82d8cfc68ef833480be9f9a5c426cd` | n/a | n/a | accepted by owner |
+| 2026-11-03 | R-5 | spec | `eafc992633c5ab0f0fd673c79263ad84c0e1c778` | unknown | procedural | NO FINDINGS |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Viewer and transport; Stop, expiry and recovery; Test Plan AC-06 and AC-07
+EVIDENCE: docs/specs/remote-gui.md:55 and :75 protect the ownership check with a per-user management lock, but an external Serve writer does not share that lock. An external replacement after this check and before a scoped CLI off operation can therefore be removed. Inspected https://github.com/tailscale/tailscale/blob/main/cmd/tailscale/cli/serve_v2.go, blob 0ec4f5a668d21b30dd550f344967229a2d28df81:440-442 and :514-541: the CLI reads configuration itself, removes the selected scope, then writes its snapshot. Its internal conditional write does not cover the plugin's earlier ownership check. Inspected https://github.com/tailscale/tailscale/blob/main/client/local/serve.go, blob c6e96ec0787653fee09eedbddd60d6d4e05cce6b: GetServeConfig captures the response ETag and SetServeConfig sends it in If-Match.
+PROPOSAL: Require the ownership check and mutation to share the same configuration snapshot and ETag, preserving every unrelated entry; reject conflicts and re-read ownership before retrying. Add deterministic tests that replace or occupy the scope between checking and writing, for both acquisition and removal, and require the foreign configuration to survive.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Viewer and transport; Agent procedure and validation
+EVIDENCE: docs/specs/remote-gui.md:63 permits access-code retrieval only through an interactive terminal on the session host and forbids delivery through chat. The handoff identifies Tailscale as the primary remote connection, while SSH is an optional transport. A human with only the tailnet viewer URL cannot authenticate under the proposed procedure without an additional terminal-access path.
+PROPOSAL: Ask the owner whether terminal or SSH access is an acceptable prerequisite for every remote handoff, or whether a separate authenticated code-delivery mechanism is needed. Fold that decision into the installation requirements and the end-to-end acceptance procedure.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria AC-09; Test Plan AC-09; covers
+EVIDENCE: docs/specs/remote-gui.md:93 requires plugin checks before any existing publication job. At reviewed commit 141d40c6083c23945a19452a7694fc346b55fd2e, .github/workflows/ci.yml:52-57 contains the version job, but .github/workflows/release.yml:3-15 independently publishes on version-tag pushes. The feature covers only ci.yml, and its test plan inspects job dependencies without defining how the separate release workflow satisfies this requirement.
+PROPOSAL: State precisely which publication path must depend on the new plugin check. Either limit this requirement to the existing CI version/tagging job or include and specify the release-workflow changes needed to enforce the broader promise.
+
+### R-2
+
+NO FINDINGS
+
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Automatic remote links and Viewer and transport; Test Plan AC-03 and AC-11
+EVIDENCE: At fe77f964ab05744740fa41f89d15d9e5ea27046b, docs/specs/remote-gui.md:71 applies the enrollment-cookie authentication flow to arbitrary proxied apps, and :83 defines that cookie, but neither section separates proxy credentials from upstream HTTP or WebSocket requests or prevents upstream Set-Cookie responses from replacing proxy authentication cookies. The existing tests at :126 and :134 check access rejection and ordinary log output without checking what the upstream app receives or can overwrite. Concurrent sessions use dedicated ports on the same Tailscale hostname at :85; RFC 6265 section 8.5, https://www.rfc-editor.org/rfc/rfc6265#section-8.5, establishes that cookies are not isolated by port. A conventional proxy can therefore expose proxy bearer cookies to an app, and unscoped app/proxy cookies can collide across concurrent shares.
+PROPOSAL: Define per-session credential binding and the HTTP/WebSocket request and response boundary: consume enrollment material only at proxy-owned endpoints, strip proxy credentials before upstream forwarding, reject upstream attempts to set reserved proxy cookies, and isolate app cookies between shares or explicitly reject incompatible apps. Add recording/malicious-upstream tests with concurrent shares on one hostname that prove proxy secrets never reach either app, credentials cannot authenticate another session, app cookies cannot overwrite proxy or other-share cookies, and normal supported app cookies still work.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Automatic remote links and service-share readiness; Test Plan AC-10 and AC-11
+EVIDENCE: docs/specs/remote-gui.md:71 requires a browser check of the intended page and required WebSockets, while :89 distinguishes transport readiness from app functionality. However, only reserved-route collisions have an explicit compatibility-error outcome. The text does not state whether an authenticated HTTP probe may leave the session ready and its URL advertised as usable after required assets, redirects, origin checks or WebSockets fail. AC-11's test at :134 requires denial of incompatible origin configuration but does not check the returned state or the agent's final link.
+PROPOSAL: Specify that failed required app-functionality checks produce an explicit compatibility blocker and prohibit advertising the URL as a usable app, even when transport probes passed; preserve the upstream app and report any remaining diagnostic share separately. Add a fixture where HTTP succeeds but a required asset, redirect or WebSocket fails, and require the agent to report that blocker without substituting a localhost link.
+
+### R-4
+
+NO FINDINGS
+
+### R-5
+
+NO FINDINGS
+
+## Sources
+
+- Owner handoff: `/home/m/code/.build-cache/remote-gui-handoff.txt`, read 2026-10-25; task boundaries and prototype preservation. Owner replies in this session: existing host tools with doctor guidance, one-time access-code delivery in the task chat, a self-contained Go plugin module, a two-hour default with an eight-hour maximum, and deletion of the temporary browser profile on stop.
+- Prototype: `/home/m/code/.build-cache/linkedin-browser-handoff/supervisor.py:45-104` and `browser.cjs:1-20`, read 2026-10-25; browser/display topology and prototype limits. No authenticated profile, access file or owner-specific check script was read.
+- [S1: Tailscale Serve](https://tailscale.com/docs/features/tailscale-serve), read 2026-10-25; private access, HTTPS setup and tailnet access controls.
+- [S2: Tailscale Serve CLI](https://tailscale.com/docs/reference/tailscale-cli/serve), read 2026-10-25; JSON status, HTTPS forwarding, scoped off and reset semantics.
+- [S3: Playwright connectOverCDP](https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp), read 2026-10-25; attachment to the default Chromium context and CDP limitations.
+- [S4: noVNC proxy launcher](https://github.com/novnc/noVNC/blob/master/utils/novnc_proxy), read 2026-10-25, blob `e1efb9fc7d1e19134be10606494bc546542ae773`; listening/asset configuration and fallback cloning to avoid.
+- [S5: websockify README](https://github.com/novnc/websockify/blob/master/README.md), read 2026-10-25, blob `c5d14cca40332c562b9bd3842d3325626ac6a408`; existing WebSocket bridge and optional recording to disable.
+- [S6: Tailscale LocalAPI Serve client](https://github.com/tailscale/tailscale/blob/main/client/local/serve.go), read 2026-10-25, blob `c6e96ec0787653fee09eedbddd60d6d4e05cce6b`; configuration ETag and `If-Match` conditional writes. Also read [Serve CLI mutation](https://github.com/tailscale/tailscale/blob/main/cmd/tailscale/cli/serve_v2.go), blob `0ec4f5a668d21b30dd550f344967229a2d28df81`, lines 430-545; its separate snapshot cannot protect an earlier external ownership check.
+- [S7: auth-refresh canonical skill](https://github.com/michielvha/auth-refresh/blob/3695e2c73df68d1b3bad8e21dbb204e431adcd3d/skills/auth-refresh/SKILL.md) and [provider/lane workflow](https://github.com/michielvha/auth-refresh/blob/3695e2c73df68d1b3bad8e21dbb204e431adcd3d/skills/auth-refresh/references/workflow.md), read 2026-10-28; configured identity refresh ownership, isolated lanes, single-challenge rules and credential boundaries. Remote-gui changes neither source.
+- [S8: RFC 6265, section 8.5](https://www.rfc-editor.org/rfc/rfc6265#section-8.5), read 2026-10-28; cookies on one hostname are not isolated by TCP port, so concurrent shares require an explicit cookie boundary.
+- Owner scope clarification and approval in this chat on 2026-10-28; automatic tailnet links for task-local web services, general human browser interaction and complementary auth-refresh behavior.
+- [Go template](https://github.com/michielvha/template-go-app/tree/b8f86cd8a50e45c2aa4c95f7f2fa992c8e0ec3cd), inspected 2026-10-25; source for adapting Go application configuration. Read `.golangci.yml`, `.goreleaser.yml`, `Dockerfile` and `.github/workflows/build-and-release.yaml` at this commit.
+- [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md), resolved with vh-adlc knowledge; review, acceptance and evidence rules. Prose edited with `guides/humanize-prose.md` at the same revision.

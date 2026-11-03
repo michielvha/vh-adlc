@@ -33,7 +33,7 @@ Call `knowledge` first, with every docs page the operation will read:
 ```
 
 State the result in one line that also names the prose guide, for example
-`Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md`.
+`Conventions: vhco-pro/docs@0e52f51 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md`.
 Every report opens with this line, after the `deterministic checks unavailable` line when there is one,
 including a report that stops at a gate or waits for the owner. Every call below passes the same
 `--repo` and `--plugin-pin`, written out on each call. The binary needs every word as its own argument:

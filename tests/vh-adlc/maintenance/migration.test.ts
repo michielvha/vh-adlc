@@ -59,7 +59,7 @@ test("missing hosts/helpers, dirty source, failed native commands and changed ev
 
 test("runtime rollback and reapplication preserve unrelated source and raw index bytes", () => {
   const f = project(), base = join(import.meta.dir, "fixtures/migration");
-  const runtime = ["AGENTS.md", "agents/maintenance.md", ".claude/commands/maintenance.md", ".vh-adlc/maintenance.json", "maintenance-project.md"];
+  const runtime = ["AGENTS.md", "agents/maintenance.md", ".claude/commands/maintenance.md", ".vh-adlc/maintenance.yaml", "maintenance-project.md"];
   for (const path of runtime.slice(0, 3)) f.write(path, readFileSync(join(base, "legacy", path), "utf8"));
   f.write("agents/audit.md", "consumer-only audit\n"); f.write("docs/specific.md", "consumer docs workflow\n");
   git(f.root, "add", "AGENTS.md", "agents", ".claude", "docs"); git(f.root, "commit", "-qm", "test: legacy maintenance");
