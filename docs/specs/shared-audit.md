@@ -151,6 +151,17 @@ and scoped recovery rules. No new execution/network grant is introduced. Private
 provenance wording, transient summary text and rebased-run identity gaps, tracked under T91. Q1
 remains the owner product-policy decision; the revised spec is not accepted.
 
+The consumer's separately published YAML triage/maintenance changes advanced default during the
+last check. The retained guards correctly refused unrelated drift and the stale candidate default
+(`T91-consumer-committed-green.log`: 77 pass, 3 fail; the filename is historical, not a pass claim).
+Local merge `222223dd9eb761f956eef4543a15c2b8766c3a9c` reconciles those paths and both changelog
+histories. The maintenance guard keeps upstream's frozen YAML baseline, excludes only the separately
+tested audit routes and checks current triage entries unchanged. All 81 audit/retained-route checks
+now pass (`consumer-source-r15.log`). The merge's normal hooks passed five checks and explicitly
+skipped frontend checks because this isolated worktree has no frontend/node_modules; that is not a
+frontend pass. The real ledger hash remains unchanged. The running bounded parity review targets
+pre-merge `08c0425f`; no final consumer cutover review is inferred from that diagnostic snapshot.
+
 ### Latest spec review and implementation obligation
 
 Actual Copilot `claude-opus-5.5` R-12 reviewed `67a91a17944bb219ce956364963531532577c396`
