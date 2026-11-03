@@ -156,6 +156,11 @@ func Clean(ctx context.Context, o Options) *report.Report {
 	for _, it := range data.Removed {
 		data.FreedBytes += it.Bytes
 	}
+	for _, list := range []*[]Item{&data.Removed, &data.Kept, &data.NeedsFlag, &data.Unmerged} {
+		if *list == nil {
+			*list = []Item{} // print [] rather than null
+		}
+	}
 
 	result := report.Pass
 	if o.DryRun {

@@ -1,6 +1,7 @@
 package clean
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -170,6 +171,9 @@ func TestCleanDryRunChangesNothing(t *testing.T) {
 	}
 	if snapshot(t, c.host.outer) != before || len(c.engine.changes()) != 0 {
 		t.Fatalf("a dry run changed something: %q", c.engine.changes())
+	}
+	if b, err := json.Marshal(data); err != nil || strings.Contains(string(b), "null") {
+		t.Fatalf("data %s, %v: an empty list must print as []", b, err)
 	}
 	if got := names(data.Removed); !slices.Equal(got, []string{"a1", "example-1", "example-run-a", "go-build1"}) {
 		t.Fatalf("would remove %q", got)

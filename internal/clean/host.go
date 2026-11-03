@@ -49,24 +49,27 @@ func itoa(n int) string { return strconv.Itoa(n) }
 // for the repository at repo. Any problem with the file or the value it sets
 // is host-settings-invalid.
 func LoadTempBase(p HostPaths, repo string) (string, error) {
+	if p.ConfigDir == "" {
+		return DefaultTempBase(p), nil // no config directory, so no host.yaml
+	}
 	file := filepath.Join(p.ConfigDir, "vh-adlc", "host.yaml")
 	b, err := os.ReadFile(file)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		return DefaultTempBase(p), nil
 	case err != nil:
-		return "", coded(report.CodeHostSettingsInvalid, "reading %s: %v", file, err)
+		return "", coded(report.CodeHostSettingsInvalid, "reading host.yaml in the user config directory: %v", err)
 	}
 	var raw rawHost
 	if err := decodeStrict(b, &raw); err != nil {
-		return "", coded(report.CodeHostSettingsInvalid, "%s: %v", file, err)
+		return "", coded(report.CodeHostSettingsInvalid, "host.yaml: %v", err)
 	}
 	if raw.TempBase == nil {
 		return DefaultTempBase(p), nil
 	}
 	base := *raw.TempBase
 	if err := validTempBase(base, p.Home, repo); err != nil {
-		return "", coded(report.CodeHostSettingsInvalid, "%s: temp_base %s", file, err)
+		return "", coded(report.CodeHostSettingsInvalid, "host.yaml: temp_base %s", err)
 	}
 	return filepath.Clean(base), nil
 }
