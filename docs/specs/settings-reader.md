@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implemented on feat/settings-reader, local only at the owner's direction; the claim is on that branch, not on main. R-5 returned all four criteria as met, with no findings."
+status: complete
+status_description: "Implemented on feat/settings-reader, local only at the owner's direction; the claim is on that branch, not on main. R-5 returned all four criteria as met, with no findings. Shipping waits on the owner."
 issue: null
 branch: feat/settings-reader
 goal: "`vh-adlc settings read` turns a YAML settings file into a checked value, or refuses it, for the TypeScript operations."
