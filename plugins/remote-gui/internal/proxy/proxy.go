@@ -20,6 +20,8 @@ import (
 	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/tailnet"
 )
 
 const (
@@ -28,6 +30,8 @@ const (
 )
 
 type Options struct {
+	OwnerLogin      string
+	ServePeer       state.Peer
 	ViewerAssets    string
 	ViewerPassword  string
 	ID              string
@@ -38,6 +42,7 @@ type Options struct {
 	OnCompatibility func(string)
 }
 type client struct {
+	probe   bool
 	proof   [32]byte
 	jar     http.CookieJar
 	expires time.Time
@@ -45,6 +50,8 @@ type client struct {
 type (
 	clientKey struct{}
 	Proxy     struct {
+		ownerLogin      string
+		servePeer       state.Peer
 		assets          *os.Root
 		viewerPassword  string
 		landing         string
@@ -82,6 +89,9 @@ func New(o Options) (*Proxy, error) {
 			return nil, errors.New("unencrypted origin must be loopback")
 		}
 	}
+	if o.OwnerLogin != "" && (origin.Scheme != "https" || !tailnet.ValidLogin(o.OwnerLogin) || !o.ServePeer.Alive()) {
+		return nil, errors.New("verified-tailscale-owner-and-peer-required")
+	}
 	target, err := config.Target(o.Target)
 	if err != nil {
 		return nil, err
@@ -100,7 +110,7 @@ func New(o Options) (*Proxy, error) {
 			return nil, errors.New("viewer assets unavailable")
 		}
 	}
-	p := &Proxy{assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[[32]byte]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, onCompatibility: o.OnCompatibility}
+	p := &Proxy{ownerLogin: o.OwnerLogin, servePeer: o.ServePeer, assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[[32]byte]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, onCompatibility: o.OnCompatibility}
 	p.reverse = &httputil.ReverseProxy{Rewrite: p.rewrite, ModifyResponse: p.response, ErrorLog: log.New(io.Discard, "", 0), ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
 		p.fail("upstream-or-compatibility-failure")
 		http.Error(w, "application proxy unavailable", http.StatusBadGateway)
@@ -117,6 +127,9 @@ func random() (string, error) {
 }
 
 func (p *Proxy) Issue() (string, error) {
+	if p.ownerLogin != "" {
+		return "", errors.New("tailscale-access-uses-owner-identity-without-code")
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	now := time.Now()
@@ -182,7 +195,11 @@ func (p *Proxy) Revoke() {
 }
 
 func (p *Proxy) validOrigin(r *http.Request) bool {
-	if !strings.EqualFold(r.Host, p.origin.Host) {
+	if p.ownerLogin != "" && len(r.Header.Values("Tailscale-Funnel-Request")) != 0 {
+		return false
+	}
+	host, err := p.publicHost(r)
+	if err != nil || !strings.EqualFold(host, p.origin.Host) {
 		return false
 	}
 	if len(r.Header.Values("Origin")) > 1 {
@@ -191,8 +208,14 @@ func (p *Proxy) validOrigin(r *http.Request) bool {
 	if origin := r.Header.Get("Origin"); origin != "" && origin != p.origin.String() {
 		return false
 	}
-	if site := r.Header.Get("Sec-Fetch-Site"); site == "same-site" || (site == "cross-site" && r.Method != http.MethodGet) {
-		return false
+	if site := r.Header.Get("Sec-Fetch-Site"); site == "same-site" || site == "cross-site" {
+		if p.ownerLogin != "" {
+			if !topLevelNavigation(r) {
+				return false
+			}
+		} else if site == "same-site" || r.Method != http.MethodGet {
+			return false
+		}
 	}
 	if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") && r.Header.Get("Origin") != p.origin.String() {
 		return false
@@ -206,14 +229,18 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Add("Content-Security-Policy", "worker-src 'none'")
 	if !p.validOrigin(r) {
-		http.Error(w, "request origin rejected", http.StatusForbidden)
+		accessError(w, "request origin rejected", http.StatusForbidden)
 		return
 	}
 	p.mu.Lock()
 	ended := p.revoked || !time.Now().Before(p.deadline)
 	p.mu.Unlock()
 	if ended {
-		http.Error(w, "remote session stopped", http.StatusGone)
+		accessError(w, "remote session stopped", http.StatusGone)
+		return
+	}
+	if p.ownerLogin != "" && (r.URL.Path == loginPath || r.URL.Query().Has("__remote_gui_enroll")) {
+		http.NotFound(w, r)
 		return
 	}
 	if r.URL.Path == loginPath {
@@ -236,15 +263,21 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid application path", http.StatusBadRequest)
 		return
 	}
-	if len(r.Header.Values("Authorization")) == 1 && r.Header.Get("Authorization") != "" && !strings.HasPrefix(strings.ToLower(r.Header.Get("Authorization")), "basic ") {
-		http.Error(w, "compatibility-blocked: application Authorization headers are unsupported", http.StatusConflict)
+	c := p.authorized(r)
+	if p.ownerLogin != "" && c == nil {
+		c = p.identityClient(w, r)
+	}
+	if c == nil {
+		if p.ownerLogin != "" {
+			accessError(w, "remote session requires its owner's Tailscale identity", http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Referrer-Policy", "same-origin")
+		showLogin(w)
 		return
 	}
-	c := p.authorized(r)
-	if c == nil {
-		w.Header().Set("Referrer-Policy", "same-origin")
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		showLogin(w)
+	if len(r.Header.Values("Authorization")) > 1 || (r.Header.Get("Authorization") != "" && ((p.ownerLogin != "" && !c.probe) || !strings.HasPrefix(strings.ToLower(r.Header.Get("Authorization")), "basic "))) {
+		http.Error(w, "compatibility-blocked: application Authorization headers are unsupported", http.StatusConflict)
 		return
 	}
 	if p.upstreamAlive != nil && !p.upstreamAlive() {

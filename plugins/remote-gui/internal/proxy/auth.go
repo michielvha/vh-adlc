@@ -46,7 +46,7 @@ func (p *Proxy) authorized(r *http.Request) *client {
 		return nil
 	}
 	c := p.clients[key]
-	if c == nil || !time.Now().Before(c.expires) {
+	if c == nil || !time.Now().Before(c.expires) || (p.ownerLogin != "" && !c.probe) {
 		delete(p.clients, key)
 		return nil
 	}
@@ -70,7 +70,7 @@ func (p *Proxy) createGrant(password string) (*Grant, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.clients[sha256.Sum256([]byte(token))] = &client{proof: sha256.Sum256([]byte(password)), jar: jar, expires: p.deadline}
+	p.clients[sha256.Sum256([]byte(token))] = &client{probe: p.ownerLogin != "", proof: sha256.Sum256([]byte(password)), jar: jar, expires: p.deadline}
 	return &Grant{Cookie: &http.Cookie{Name: CookiePrefix + p.id, Value: token, Path: "/", HttpOnly: true, Secure: p.origin.Scheme == "https", SameSite: http.SameSiteStrictMode, Expires: p.deadline}, Authorization: "Basic " + base64.StdEncoding.EncodeToString([]byte("viewer:"+password))}, nil
 }
 

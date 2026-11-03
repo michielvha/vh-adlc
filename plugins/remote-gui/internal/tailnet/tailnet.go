@@ -30,8 +30,9 @@ import (
 type (
 	Document map[string]json.RawMessage
 	Client   struct {
-		Base string
-		HTTP *http.Client
+		Base   string
+		HTTP   *http.Client
+		socket string
 	}
 )
 
@@ -44,7 +45,7 @@ func New(socket string) *Client {
 	transport := &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
 		return (&net.Dialer{Timeout: 3 * time.Second}).DialContext(ctx, "unix", socket)
 	}, ResponseHeaderTimeout: 5 * time.Second}
-	return &Client{Base: "http://local-tailscaled.sock", HTTP: &http.Client{Transport: transport, Timeout: 5 * time.Second}}
+	return &Client{Base: "http://local-tailscaled.sock", socket: socket, HTTP: &http.Client{Transport: transport, Timeout: 5 * time.Second}}
 }
 
 func (c *Client) request(ctx context.Context, method, route string, body []byte, etag string) (*http.Response, error) {
