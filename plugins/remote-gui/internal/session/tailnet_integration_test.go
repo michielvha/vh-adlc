@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -51,7 +52,7 @@ func fakeTailnet(t *testing.T, home string) *atomic.Bool {
 		mu.Lock()
 		defer mu.Unlock()
 		if r.URL.Path == "/localapi/v0/status" {
-			_, _ = io.WriteString(w, `{"BackendState":"Running","Self":{"DNSName":"127.0.0.1"},"CertDomains":["127.0.0.1"]}`)
+			_, _ = io.WriteString(w, `{"BackendState":"Running","Self":{"DNSName":"127.0.0.1","UserID":7},"User":{"7":{"LoginName":"owner@example.test"}},"CertDomains":["127.0.0.1"]}`)
 			return
 		}
 		if r.URL.Path != "/localapi/v0/serve-config" {
@@ -106,6 +107,10 @@ func fakeTailnet(t *testing.T, home string) *atomic.Bool {
 			for _, value := range web {
 				target = value.Handlers["/"].Proxy
 			}
+			socketTarget, unixTarget := strings.CutPrefix(target, "unix:")
+			if unixTarget {
+				target = "http://localhost"
+			}
 			selected, err := url.Parse(target)
 			if err != nil || selected.Host == "" {
 				w.WriteHeader(400)
@@ -116,7 +121,20 @@ func fakeTailnet(t *testing.T, home string) *atomic.Bool {
 				w.WriteHeader(503)
 				return
 			}
-			exposed = &http.Server{Handler: httputil.NewSingleHostReverseProxy(selected), ReadHeaderTimeout: time.Second}
+			reverse := httputil.NewSingleHostReverseProxy(selected)
+			if unixTarget {
+				reverse.Transport = &http.Transport{DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					return (&net.Dialer{}).DialContext(ctx, "unix", socketTarget)
+				}}
+				reverse = &httputil.ReverseProxy{Transport: reverse.Transport, Rewrite: func(request *httputil.ProxyRequest) {
+					request.SetURL(selected)
+					request.Out.Host = "localhost"
+					request.Out.Header.Set("X-Forwarded-Host", request.In.Host)
+					request.Out.Header.Set("X-Forwarded-Proto", "https")
+					request.Out.Header.Set("Tailscale-User-Login", "owner@example.test")
+				}}
+			}
+			exposed = &http.Server{Handler: reverse, ReadHeaderTimeout: time.Second}
 			server := exposed
 			secured := tls.NewListener(bound, &tls.Config{Certificates: []tls.Certificate{cert}, MinVersion: tls.VersionTLS12})
 			go func() { _ = server.Serve(secured) }()
@@ -168,14 +186,29 @@ func TestFailedForwardRemovalKeepsDeniedPortReserved(t *testing.T) {
 			if end.State != "cleanup-pending" {
 				t.Fatal("failed removal was reported cleaned")
 			}
-			client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: time.Second}
+			transport := &http.Transport{Proxy: nil}
+			if r.ProxyNetwork == "unix" {
+				transport.DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) {
+					return (&net.Dialer{}).DialContext(ctx, "unix", r.ProxyAddress)
+				}
+			}
+			client := &http.Client{Transport: transport, Timeout: time.Second}
 			defer client.Transport.(*http.Transport).CloseIdleConnections()
 			deadline := time.Now().Add(3 * time.Second)
 			denied := false
 			for time.Now().Before(deadline) {
-				request, _ := http.NewRequest(http.MethodGet, "http://"+r.ProxyAddress+"/", nil)
+				address := "http://" + r.ProxyAddress + "/"
+				if r.ProxyNetwork == "unix" {
+					address = "http://localhost/"
+				}
+				request, _ := http.NewRequest(http.MethodGet, address, nil)
 				origin, _ := url.Parse(v.URL)
 				request.Host = origin.Host
+				if r.ProxyNetwork == "unix" {
+					request.Host = "localhost"
+					request.Header.Set("X-Forwarded-Host", origin.Host)
+					request.Header.Set("X-Forwarded-Proto", "https")
+				}
 				response, e := client.Do(request)
 				if e == nil {
 					_ = response.Body.Close()
@@ -189,7 +222,11 @@ func TestFailedForwardRemovalKeepsDeniedPortReserved(t *testing.T) {
 			if !denied {
 				t.Fatal("cleanup-pending listener did not deny access")
 			}
-			listener, e := net.Listen("tcp", r.ProxyAddress)
+			network := "tcp"
+			if r.ProxyNetwork == "unix" {
+				network = "unix"
+			}
+			listener, e := net.Listen(network, r.ProxyAddress)
 			if e == nil {
 				_ = listener.Close()
 				t.Fatal("stale forward target became reusable")
@@ -214,7 +251,7 @@ func TestFailedForwardRemovalKeepsDeniedPortReserved(t *testing.T) {
 			if current.Forward != nil {
 				t.Fatal("conditional removal did not recover")
 			}
-			response, err := client.Get(app.URL)
+			response, err := app.Client().Get(app.URL)
 			if err != nil {
 				t.Fatal("cleanup stopped upstream app")
 			}

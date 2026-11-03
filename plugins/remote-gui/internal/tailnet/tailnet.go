@@ -243,7 +243,7 @@ func (c *Client) Install(ctx context.Context, f *state.Forward, intent func(*sta
 	if f.Port < 1 || f.Port > 65535 || f.Host == "" || strings.ContainsAny(f.Host, "/:@?# \t\r\n") {
 		return errors.New("invalid-tailscale-scope")
 	}
-	if _, err := config.Target(f.Target); err != nil {
+	if !validBackend(f.Target) {
 		return errors.New("invalid-tailscale-target")
 	}
 	f.TCP = encoded(map[string]any{"HTTPS": true})
@@ -490,4 +490,13 @@ func (c *Client) Plan(ctx context.Context, target string) (*state.Forward, error
 		}
 	}
 	return nil, errors.New("tailscale-no-free-scope")
+}
+
+func validBackend(target string) bool {
+	if name, ok := strings.CutPrefix(target, "unix:"); ok {
+		_, err := state.CaptureSocket(name)
+		return err == nil
+	}
+	_, err := config.Target(target)
+	return err == nil
 }

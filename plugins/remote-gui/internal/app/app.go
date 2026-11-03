@@ -38,7 +38,7 @@ func RunWith(args []string, out io.Writer, execute Executor) int {
 		return 2
 	}
 	if c.Command == "help" {
-		_, _ = fmt.Fprintln(out, "remote-gui: doctor | share <local-http-url> | start | status [id] | access <id> [--reveal] | stop <id> | cleanup\nOptions: --transport tailscale|loopback --ttl 2h --home <private-directory> --kind share|browser")
+		_, _ = fmt.Fprintln(out, "remote-gui: doctor | share <local-http-url> | start | status [id] | access <id> [--reveal] | stop <id> | cleanup\nOptions: --transport tailscale|loopback --ttl 2h --home <private-directory> --kind share|browser --owner-login <tailscale-login>")
 		return 0
 	}
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
@@ -112,7 +112,11 @@ func Doctor(c config.Config) Result {
 		if c.Transport == "tailscale" {
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			_, err := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET")).Plan(ctx, "http://127.0.0.1:1")
+			client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
+			_, _, err := client.ResolveOwner(ctx, c.OwnerLogin)
+			if err == nil {
+				_, err = client.Plan(ctx, "http://127.0.0.1:1")
+			}
 			if err != nil {
 				r.Result = "capability-unavailable"
 				r.Diagnostic = err.Error() + "; conditional LocalAPI reads and ETag/If-Match updates are required; no configuration was changed"

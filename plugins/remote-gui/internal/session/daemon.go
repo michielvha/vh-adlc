@@ -187,6 +187,9 @@ func finish(home, id string, controller bool) error {
 	if err = state.ReleaseDisplay(r.Display); err != nil {
 		return err
 	}
+	if err = releaseBackend(r); err != nil {
+		return err
+	}
 	if err = privateCleanup(home, id); err != nil {
 		return err
 	}
@@ -198,6 +201,8 @@ func finish(home, id string, controller bool) error {
 		}
 		r.Origin = ""
 		r.ProxyAddress = ""
+		r.ProxySocket = nil
+		r.CleanupDiagnostic = ""
 		r.CDPAddress = ""
 		r.Marker = ""
 		r.Display = nil
@@ -215,7 +220,13 @@ func redactedTarget(raw string) string {
 }
 
 func markPending(home, id string, err error) {
-	_ = update(home, id, func(r *state.Record) { r.State = "cleanup-pending"; r.Diagnostic = err.Error() })
+	_ = update(home, id, func(r *state.Record) {
+		r.State = "cleanup-pending"
+		r.CleanupDiagnostic = err.Error()
+		if r.Diagnostic == "" {
+			r.Diagnostic = err.Error()
+		}
+	})
 }
 
 func guard(home, id string) int {
@@ -225,16 +236,31 @@ func guard(home, id string) int {
 	if err != nil {
 		return 1
 	}
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if r.Config.Transport == "tailscale" {
+		if err = update(home, id, func(current *state.Record) {
+			current.ProxyNetwork = "unix"
+			current.ProxyAddress = filepath.Join(home, id, "proxy.sock")
+		}); err != nil {
+			return 1
+		}
+	}
+	listener, lease, err := reserveBackend(r)
 	if err != nil {
 		_ = update(home, id, func(r *state.Record) { r.State = "failed"; r.Diagnostic = "proxy-listener-unavailable" })
 		return 1
 	}
 	defer func() { _ = listener.Close() }()
-	if err = update(home, id, func(r *state.Record) { r.ProxyAddress = listener.Addr().String() }); err != nil {
+	if err = update(home, id, func(r *state.Record) {
+		r.ProxyAddress = listener.Addr().String()
+		r.ProxyNetwork = listener.Addr().Network()
+		r.ProxySocket = lease
+	}); err != nil {
+		if lease != nil {
+			_ = state.ReleaseSocket(listener.Addr().String(), lease)
+		}
 		return 1
 	}
-	file, err := listener.(*net.TCPListener).File()
+	file, err := listener.(interface{ File() (*os.File, error) }).File()
 	if err != nil {
 		return 1
 	}
@@ -369,6 +395,9 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		return errors.New("inherited-proxy-listener-unavailable")
 	}
 	defer func() { _ = listener.Close() }()
+	if unix, ok := listener.(*net.UnixListener); ok {
+		unix.SetUnlinkOnClose(false)
+	}
 
 	var bundle BrowserHandle
 	target := r.Config.Target
@@ -399,8 +428,17 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	origin := "http://" + r.ProxyAddress
 	client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
 	var forward *state.Forward
+	var ownerLogin string
+	var servePeer state.Peer
 	if r.Config.Transport == "tailscale" {
-		forward, err = client.Plan(ctx, "http://"+r.ProxyAddress)
+		ownerLogin, servePeer, err = client.ResolveOwner(ctx, r.Config.OwnerLogin)
+		if err != nil {
+			return err
+		}
+		if err = update(home, id, func(current *state.Record) { current.OwnerLogin = ownerLogin; current.ServePeer = servePeer }); err != nil {
+			return err
+		}
+		forward, err = client.Plan(ctx, "unix:"+r.ProxyAddress)
 		if err != nil {
 			return err
 		}
@@ -417,12 +455,12 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		}
 		return true
 	}
-	p, err := proxy.New(proxy.Options{ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password})
+	p, err := proxy.New(proxy.Options{OwnerLogin: ownerLogin, ServePeer: servePeer, ID: id, Origin: origin, Target: target, Deadline: r.Expires, UpstreamAlive: alive, ViewerAssets: bundle.Assets, ViewerPassword: bundle.Password})
 	if err != nil {
 		return err
 	}
 	defer p.Revoke()
-	public := &http.Server{Handler: p, ConnState: p.ConnState, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 0, IdleTimeout: 30 * time.Second}
+	public := &http.Server{Handler: p, ConnContext: p.ConnContext, ConnState: p.ConnState, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 0, IdleTimeout: 30 * time.Second}
 	publicErrors := make(chan struct{})
 	go func() { _ = public.Serve(listener); close(publicErrors) }()
 	// Remove remote exposure while the lifetime guard still reserves this listener.
@@ -448,6 +486,11 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		current, e := state.Load(home, id)
 		if e != nil || current.State != "ready" {
 			w.WriteHeader(409)
+			return
+		}
+		if current.OwnerLogin != "" {
+			w.Header().Set("Cache-Control", "no-store")
+			_ = json.NewEncoder(w).Encode(view(current, true))
 			return
 		}
 		issuedAt := time.Now().UTC()
@@ -549,6 +592,9 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		case <-publicErrors:
 			return errors.New("proxy-server-stopped")
 		case <-ticker.C:
+			if ownerLogin != "" && !servePeer.Alive() {
+				return errors.New("tailscale-daemon-identity-changed")
+			}
 			if !time.Now().Before(r.Expires) {
 				return nil
 			}

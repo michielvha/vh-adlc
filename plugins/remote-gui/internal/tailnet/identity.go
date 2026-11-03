@@ -9,26 +9,14 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
-	"unicode"
-	"unicode/utf8"
 
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
 
 // ValidLogin accepts one exact identity, never a wildcard or a header list.
-func ValidLogin(login string) bool {
-	if login == "" || len(login) > 320 || !utf8.ValidString(login) || strings.ContainsAny(login, ",*") {
-		return false
-	}
-	for _, r := range login {
-		if unicode.IsSpace(r) || unicode.IsControl(r) {
-			return false
-		}
-	}
-	return true
-}
+func ValidLogin(login string) bool { return config.ValidOwnerLogin(login) }
 
 // ResolveOwner reads status on the same Unix connection whose kernel peer is
 // pinned. No credential, display name or HTTP header determines daemon identity.

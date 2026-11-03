@@ -12,17 +12,20 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 type Config struct {
-	Command   string        `json:"command"`
-	Kind      string        `json:"kind"`
-	ID        string        `json:"id,omitempty"`
-	Target    string        `json:"target,omitempty"`
-	Transport string        `json:"transport"`
-	Home      string        `json:"home"`
-	TTL       time.Duration `json:"ttl"`
-	Reveal    bool          `json:"-"`
+	OwnerLogin string        `json:"owner_login,omitempty"`
+	Command    string        `json:"command"`
+	Kind       string        `json:"kind"`
+	ID         string        `json:"id,omitempty"`
+	Target     string        `json:"target,omitempty"`
+	Transport  string        `json:"transport"`
+	Home       string        `json:"home"`
+	TTL        time.Duration `json:"ttl"`
+	Reveal     bool          `json:"-"`
 }
 
 func Parse(args []string) (Config, error) {
@@ -53,6 +56,7 @@ func Parse(args []string) (Config, error) {
 	}
 	fs := flag.NewFlagSet("remote-gui", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
+	fs.StringVar(&c.OwnerLogin, "owner-login", "", "")
 	fs.StringVar(&c.Kind, "kind", c.Kind, "")
 	fs.StringVar(&c.Transport, "transport", c.Transport, "")
 	fs.DurationVar(&c.TTL, "ttl", c.TTL, "")
@@ -85,6 +89,9 @@ func Parse(args []string) (Config, error) {
 	}
 	if c.Transport != "tailscale" && c.Transport != "loopback" {
 		return c, errors.New("transport must be tailscale or loopback")
+	}
+	if c.OwnerLogin != "" && (!ValidOwnerLogin(c.OwnerLogin) || c.Transport != "tailscale" || (c.Command != "start" && c.Command != "share" && c.Command != "doctor")) {
+		return c, errors.New("owner-login requires one exact identity on a Tailscale create/doctor command")
 	}
 	if c.TTL <= 0 || c.TTL > 8*time.Hour {
 		return c, errors.New("ttl must be positive and no more than eight hours")
@@ -180,4 +187,16 @@ func Target(raw string) (*url.URL, error) {
 		u.Host = ip.String() + ":" + strconv.Itoa(port)
 	}
 	return u, nil
+}
+
+func ValidOwnerLogin(login string) bool {
+	if login == "" || len(login) > 320 || !utf8.ValidString(login) || strings.ContainsAny(login, ",*") {
+		return false
+	}
+	for _, r := range login {
+		if unicode.IsSpace(r) || unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
 }

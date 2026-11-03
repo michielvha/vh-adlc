@@ -21,6 +21,9 @@ import (
 )
 
 type View struct {
+	CleanupDiagnostic string     `json:"cleanup_diagnostic,omitempty"`
+	AuthMode          string     `json:"auth_mode"`
+	OwnerLogin        string     `json:"owner_login,omitempty"`
 	SchemaVersion     int        `json:"schema_version"`
 	Result            string     `json:"result"`
 	LocalTarget       string     `json:"local_target,omitempty"`
@@ -50,7 +53,12 @@ type BrowserHandle struct {
 var BrowserLauncher func(context.Context, config.Config, string) (BrowserHandle, error)
 
 func view(r state.Record, revealURL bool) View {
-	v := View{SchemaVersion: 1, ID: r.ID, Kind: r.Kind, State: r.State, Result: r.State, LocalTarget: redactedTarget(r.Config.Target), Expires: r.Expires, Diagnostic: r.Diagnostic, CDPAddress: r.CDPAddress, Marker: r.Marker}
+	v := View{SchemaVersion: 1, ID: r.ID, Kind: r.Kind, State: r.State, Result: r.State, LocalTarget: redactedTarget(r.Config.Target), Expires: r.Expires, Diagnostic: r.Diagnostic, CleanupDiagnostic: r.CleanupDiagnostic, CDPAddress: r.CDPAddress, Marker: r.Marker}
+	v.AuthMode = "native-code"
+	if r.OwnerLogin != "" {
+		v.AuthMode = "tailscale-identity"
+		v.OwnerLogin = r.OwnerLogin
+	}
 	if r.State == "ready" {
 		v.ReadinessScope = "host-transport-only"
 		v.AppVerification = "not-attested"

@@ -39,26 +39,31 @@ type Forward struct {
 	Web       json.RawMessage `json:"web"`
 }
 type Record struct {
-	Display        *Display      `json:"display,omitempty"`
-	Owner          string        `json:"owner"`
-	UpstreamSocket string        `json:"upstream_socket,omitempty"`
-	Version        int           `json:"version"`
-	ID             string        `json:"id"`
-	Kind           string        `json:"kind"`
-	State          string        `json:"state"`
-	Config         config.Config `json:"config"`
-	Created        time.Time     `json:"created"`
-	Expires        time.Time     `json:"expires"`
-	Guard          Identity      `json:"guard"`
-	Supervisor     Identity      `json:"supervisor"`
-	Owned          []Process     `json:"owned,omitempty"`
-	Upstream       Identity      `json:"upstream"`
-	Origin         string        `json:"origin,omitempty"`
-	ProxyAddress   string        `json:"proxy_address,omitempty"`
-	CDPAddress     string        `json:"cdp_address,omitempty"`
-	Marker         string        `json:"marker,omitempty"`
-	Forward        *Forward      `json:"forward,omitempty"`
-	Diagnostic     string        `json:"diagnostic,omitempty"`
+	CleanupDiagnostic string        `json:"cleanup_diagnostic,omitempty"`
+	OwnerLogin        string        `json:"owner_login,omitempty"`
+	ServePeer         Peer          `json:"serve_peer,omitempty"`
+	ProxyNetwork      string        `json:"proxy_network,omitempty"`
+	ProxySocket       *FileIdentity `json:"proxy_socket,omitempty"`
+	Display           *Display      `json:"display,omitempty"`
+	Owner             string        `json:"owner"`
+	UpstreamSocket    string        `json:"upstream_socket,omitempty"`
+	Version           int           `json:"version"`
+	ID                string        `json:"id"`
+	Kind              string        `json:"kind"`
+	State             string        `json:"state"`
+	Config            config.Config `json:"config"`
+	Created           time.Time     `json:"created"`
+	Expires           time.Time     `json:"expires"`
+	Guard             Identity      `json:"guard"`
+	Supervisor        Identity      `json:"supervisor"`
+	Owned             []Process     `json:"owned,omitempty"`
+	Upstream          Identity      `json:"upstream"`
+	Origin            string        `json:"origin,omitempty"`
+	ProxyAddress      string        `json:"proxy_address,omitempty"`
+	CDPAddress        string        `json:"cdp_address,omitempty"`
+	Marker            string        `json:"marker,omitempty"`
+	Forward           *Forward      `json:"forward,omitempty"`
+	Diagnostic        string        `json:"diagnostic,omitempty"`
 }
 
 func private(path string, mode os.FileMode) error {

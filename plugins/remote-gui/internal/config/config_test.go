@@ -32,3 +32,15 @@ func TestReservedEnrollmentQueryCannotBeAnAppTarget(t *testing.T) {
 		t.Fatal("app target collides with native enrollment route")
 	}
 }
+
+func TestTailscaleOwnerOverrideIsCreationOnly(t *testing.T) {
+	c, err := Parse([]string{"start", "--owner-login", "human@example.test"})
+	if err != nil || c.OwnerLogin != "human@example.test" {
+		t.Fatal("explicit owner not accepted")
+	}
+	for _, args := range [][]string{{"start", "--transport", "loopback", "--owner-login", "human@example.test"}, {"status", "--owner-login", "human@example.test"}, {"start", "--owner-login", "*"}} {
+		if _, err := Parse(args); err == nil {
+			t.Fatal("ambiguous/inapplicable owner accepted")
+		}
+	}
+}
