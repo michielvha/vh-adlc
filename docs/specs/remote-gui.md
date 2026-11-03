@@ -1,7 +1,7 @@
 ---
 status: draft
 branch: feat/remote-gui
-status_description: "Owner-approved CI test path added; fresh spec review is in progress before implementation resumes."
+status_description: "Independent review found a cross-port cookie exposure gap; hostname trust or stronger authentication needs an owner decision."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
@@ -168,7 +168,17 @@ Add a Linux CI job for plugin build/test/vet/lint and package checks. The existi
 
 ## Open Questions
 
-None.
+### Q1: What trust boundary should protect sessions from unmanaged handlers on the same hostname?
+
+**Recommendation:** A for the first version, with a clear activation requirement and refusal until the owner has made that trust declaration. Browser cookies cross ports, so a different web handler on the same hostname can receive and replay a session cookie. Managed proxy cookie jars do not protect that boundary.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Explicit hostname trust** | Automatic sharing on the existing host after the owner explicitly trusts every current and future web handler on that hostname to receive temporary session cookies. Unknown or mixed-trust hosting stays blocked. | Unmanaged handlers on that hostname remain inside the security boundary; this does not isolate a session from a malicious one. |
+| B. Isolated hostname only | Sharing requires a hostname used only by remote-gui, with no unmanaged handlers. Existing foreign handlers remain untouched and block that host. | The current agent host may need a dedicated Tailscale node or other separately approved hostname setup. The plugin does not provision it. |
+| C. Authentication redesign | Prototype authentication that does not expose a reusable credential to other ports, then review and validate it before use. | More implementation and browser/WebSocket compatibility work; the final mechanism is not selected yet. |
+
+**Why this is yours:** this chooses which other applications may receive a temporary session credential and whether the existing host remains suitable. No live sharing or authenticated human handoff should proceed until the selected boundary is implemented and independently reviewed.
 
 ## Review Log
 
@@ -181,6 +191,7 @@ None.
 | 2026-11-03 | R-4 | spec | `a90306d12a82d8cfc68ef833480be9f9a5c426cd` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-5 | spec | `eafc992633c5ab0f0fd673c79263ad84c0e1c778` | unknown | procedural | NO FINDINGS |
 | 2026-11-03 | R-6 | spec | `443b0b0c2423017dd6968c9a85929bb0270c5947` | unknown | procedural | Blocking revision-state finding; draft correction preserved for a fresh pass. |
+| 2026-11-03 | R-7 | spec | `9edfd1c82a1e4d2aa85a6a2780fbf6dad1de41b4` | unknown | procedural | Blocking cookie exposure to unmanaged same-host handlers; owner trust-boundary decision required. |
 
 ### R-1
 
@@ -242,6 +253,15 @@ SEVERITY: blocking
 WHERE: Frontmatter, Context and Review Log
 EVIDENCE: At 443b0b0c2423017dd6968c9a85929bb0270c5947, docs/specs/remote-gui.md:2 retains status in-progress while :13 adds cmd/vh-adlc/workflow_test.go to covers. The parent commit lacks this covered path. The pinned conventions/feature-documents.md:70-73 defines a covers change as a normative revision requiring draft, fresh review and renewed acceptance before implementation resumes. The current acceptance at docs/specs/remote-gui.md:181 predates that revision, and :25 incorrectly describes the normative baseline as unchanged.
 PROPOSAL: Move the document to draft, correct the unchanged-baseline claim and obtain a fresh clean review and owner acceptance for the revised baseline before resuming implementation. Preserve the existing commits and review history.
+
+### R-7
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Automatic remote links and Viewer and transport; Test Plan AC-03 and AC-11
+EVIDENCE: At 9edfd1c82a1e4d2aa85a6a2780fbf6dad1de41b4, docs/specs/remote-gui.md:77-79 isolates cookies between managed shares, :91 authenticates with browser cookies, and :93 preserves unrelated Serve handlers on the same hostname. No trust boundary covers those unmanaged handlers. The committed plugins/remote-gui/internal/proxy/proxy.go:288 sets the bearer cookie with Path=/. A fresh sandboxed Chromium experiment set a synthetic HttpOnly, SameSite=Strict cookie on one disposable loopback port, then navigated to another; the second handler received it, producing foreignHandlerReceivedSyntheticProxyCookie=true. RFC 6265 section 8.5, https://www.rfc-editor.org/rfc/rfc6265#section-8.5, confirms that cookies ignore ports. An unrelated handler can therefore receive the credential and replay it to the original session; checking its expected Host or Origin does not prevent server-side replay.
+PROPOSAL: Define an owner-approved hostname trust boundary or authentication that prevents reusable credentials from reaching unrelated handlers, and block unsupported mixed-trust hosting. Add a fresh-browser test with an unmanaged handler on another port that records received cookies and attempts replay against the original session.
 
 ## Sources
 
