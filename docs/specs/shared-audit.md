@@ -1,7 +1,7 @@
 ---
-status: draft
+status: planned
 branch: feat/shared-audit
-status_description: "Draft revision for strict YAML audit settings after shared main merged the settings reader. Prior recovery/review corrections are committed locally. The owner chose separate feature/PR routing for migration-bearing or intentional behavior changes. Revised spec review and acceptance precede YAML implementation."
+status_description: "Owner accepted fresh R-18 on 2026-11-03. The YAML/offline/recovery revision is planned on the existing audit branch; re-enter implementation through the gate. Marketplace publication and consumer cutover remain pending."
 issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -1281,6 +1281,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-03 | R-16 | spec | `0f2e6f71fbb30b2fd40a5403e2f6e1cbf21f72d3` | claude-opus-5.5 | procedural | Pinned-doc cache setup and distinguishable retained-absence observation still need specification. |
 | 2026-11-03 | R-17 | spec | `daeee127e424ee60e74f4b51dd787e461f1b11a1` | claude-opus-5.5 | procedural | Recorder identity, typed-event wording, deterministic page set and evidence details need correction. |
 | 2026-11-03 | R-18 | spec | `e471cf650f687c677b0e6fcd5d4e8709b0623d15` | claude-opus-5.5 | procedural | No blocking/should-fix findings; two nits: setup-time page checking and historical proof label. |
+| 2026-11-03 | R-18 | spec | `e471cf650f687c677b0e6fcd5d4e8709b0623d15` | n/a | n/a | accepted by owner |
 
 ### R-1
 
