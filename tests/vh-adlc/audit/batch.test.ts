@@ -32,7 +32,7 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
     affected_paths: ["src/app.ts", config.ledger_path, path], verification_inputs: ["src/app.ts"],
     members: ["AUD-001", "AUD-002"].map((id, i) => ({ id, disposition: i === 0 && !allAssessment ? "authored-repair" : "assessment-only", contract: "Existing documented return-value contract.", eligibility: "restoration", required_checks: checkNames, ...(i === 0 && !allAssessment ? { pre_fix: taskBase, repair_commit: repaired } : {}) })),
     carried };
-  const sourceSnapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
+  const sourceSnapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, scope_baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
   const sourceRows = sourceSnapshot.selected_ids.map(id => terminal(f, sourceSnapshot, id));
   sourceRows[0].disposition = allAssessment ? "assessment-only" : "authored-repair";
   if (!allAssessment) sourceRows[0].red = { ...sourceRows[0].checks[0], commit: taskBase, exit_code: 1, artifact: f.artifact("source-red.txt") };
@@ -41,7 +41,7 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
   const provisional = { snapshot: sourceSnapshot, document: sourceDocument, candidate };
   f.write(path, renderRecord(definition)); f.write(config.ledger_path, candidate.bytes);
   const target = f.commit("test: finalize fixture ledger and record");
-  const snapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
+  const snapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, scope_baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
   const rows = snapshot.selected_ids.map(id => terminal(f, snapshot, id)); rows[0].disposition = allAssessment ? "assessment-only" : "authored-repair";
   if (!allAssessment) rows[0].red = { ...rows[0].checks[0], commit: taskBase, exit_code: 1, artifact: f.artifact("red.txt") };
   rows[0].batch_review = { producer: "author", reviewer: "independent", result: "NO FINDINGS", source_commit: target, artifact: f.artifact("review.txt", "MODEL: claude-opus-5.5\nNO FINDINGS\n") };
@@ -57,7 +57,7 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
 }
 function retarget(c: ReturnType<typeof context>) {
   const target = git(c.f.root, "rev-parse", "HEAD"), previous = c.input.document.assessments;
-  const snapshot = captureSnapshot(c.config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: c.base, artifact_root: c.f.artifacts, required_checks: { "AUD-001": ["unit"], "AUD-002": ["unit"] } });
+  const snapshot = captureSnapshot(c.config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: c.base, scope_baseline: c.base, artifact_root: c.f.artifacts, required_checks: { "AUD-001": ["unit"], "AUD-002": ["unit"] } });
   const rows = snapshot.selected_ids.map(id => terminal(c.f, snapshot, id));
   rows.forEach((row, i) => { row.disposition = previous[i].disposition; if (row.disposition === "authored-repair") {
     row.red = previous[i].red; row.batch_review = { ...previous[i].batch_review!, source_commit: target };

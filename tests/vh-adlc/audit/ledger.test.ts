@@ -93,7 +93,7 @@ test("an honest UNKNOWN assessment can propose a partial update without inventin
 test("a fix candidate can be explicitly provisional while missing independent final review, and cannot use the reverify application route", () => {
   const c = context(); git(c.f.root, "switch", "-qc", "fix/selected");
   c.f.write("src/app.ts", "export const answer = 43;\n"); c.f.commit("test: selected repair");
-  const snap = captureSnapshot(c.config, { mode: "fix", ids: ["AUD-001"], baseline: c.base, artifact_root: c.f.artifacts, required_checks: { "AUD-001": ["unit"] } });
+  const snap = captureSnapshot(c.config, { mode: "fix", ids: ["AUD-001"], baseline: c.base, scope_baseline: c.base, artifact_root: c.f.artifacts, required_checks: { "AUD-001": ["unit"] } });
   const row = terminal(c.f, snap); row.disposition = "authored-repair"; row.challenge = null;
   row.red = { ...row.checks[0], commit: c.base, exit_code: 1, artifact: c.f.artifact("selected-red.txt") };
   const document = { schema_version: 1, snapshot_digest: snap.digest, assessments: [row] };

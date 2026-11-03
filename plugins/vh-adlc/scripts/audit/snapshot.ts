@@ -71,7 +71,7 @@ export function captureSnapshot(config: Settings, options: {
       history = { status: "scoped", baseline: options.baseline, reason: "Resolved ancestor of assessed source." };
     } catch { /* Missing, shallow and non-ancestor history all require direct reassessment. */ }
   }
-  const scope_baseline = options.scope_baseline ?? (options.mode === "fix" ? history.status === "scoped" ? history.baseline : null : target.commit);
+  const scope_baseline = options.scope_baseline ?? (options.mode === "fix" ? null : target.commit);
   if (scope_baseline) {
     if (!/^[a-f0-9]{40,64}$/.test(scope_baseline)) throw Error("invalid audit scope baseline");
     git(config.root, "merge-base", "--is-ancestor", scope_baseline, target.commit);
