@@ -1,0 +1,596 @@
+{
+  "pass_all": true,
+  "observed_at": "2026-11-03T17:51:40.827324+00:00",
+  "binary": "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin/vh-adlc",
+  "binary_version": "vh-adlc 0.9.0",
+  "binary_sha256": "ea918c2ce0c99c9312913ab09857f17f29287fcd263c84ace69a51aa264a7cfa",
+  "binary_source": "/home/m/.cache/vh-adlc/bin/0.9.0/linux_amd64/vh-adlc",
+  "binary_verified_by": {
+    "argv": [
+      "bash",
+      "/home/m/code/vh-adlc-migration-roadmap/plugins/vh-adlc/scripts/ensure-vh-adlc.sh",
+      "--offline"
+    ],
+    "cwd": "/home/m/code",
+    "exit_code": 0
+  },
+  "binary_copied_to_isolated_PATH": true,
+  "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+  "sentinel": {
+    "type": "local-rejecting-HTTP-proxy",
+    "url": "http://127.0.0.1:33205",
+    "outside_forwarding": false,
+    "requests": []
+  },
+  "results": [
+    {
+      "case": "cold",
+      "argv": [
+        "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin/vh-adlc",
+        "knowledge",
+        "--offline",
+        "--repo",
+        "/home/m/code/vh-adlc-migration-roadmap",
+        "--plugin-pin",
+        "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+        "--page",
+        "conventions/feature-documents.md",
+        "--page",
+        "conventions/coding.md",
+        "--page",
+        "conventions/documentation.md",
+        "--page",
+        "conventions/delivery.md",
+        "--page",
+        "guides/humanize-prose.md",
+        "--page",
+        "conventions/typescript.md"
+      ],
+      "environment": {
+        "HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/cold",
+        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/cold/cache",
+        "PATH": "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "HTTPS_PROXY": "http://127.0.0.1:33205",
+        "HTTP_PROXY": "http://127.0.0.1:33205",
+        "NO_PROXY": "",
+        "LANG": "C.UTF-8"
+      },
+      "base_environment_inherited": false,
+      "credentials_copied": false,
+      "docs_setup": [],
+      "requested_pages": [
+        "conventions/feature-documents.md",
+        "conventions/coding.md",
+        "conventions/documentation.md",
+        "conventions/delivery.md",
+        "guides/humanize-prose.md",
+        "conventions/typescript.md"
+      ],
+      "exit_code": 5,
+      "result": "unreachable",
+      "resolved_revision": null,
+      "cache_and_home_unchanged": true,
+      "before": [
+        {
+          "path": "cache",
+          "mode": 16877,
+          "sha256": null
+        }
+      ],
+      "after": [
+        {
+          "path": "cache",
+          "mode": 16877,
+          "sha256": null
+        }
+      ],
+      "network_requests": 0,
+      "docs_source_override": false
+    },
+    {
+      "case": "partial",
+      "argv": [
+        "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin/vh-adlc",
+        "knowledge",
+        "--offline",
+        "--repo",
+        "/home/m/code/vh-adlc-migration-roadmap",
+        "--plugin-pin",
+        "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+        "--page",
+        "conventions/feature-documents.md",
+        "--page",
+        "conventions/coding.md",
+        "--page",
+        "conventions/documentation.md",
+        "--page",
+        "conventions/delivery.md",
+        "--page",
+        "guides/humanize-prose.md",
+        "--page",
+        "conventions/typescript.md"
+      ],
+      "environment": {
+        "HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial",
+        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache",
+        "PATH": "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "HTTPS_PROXY": "http://127.0.0.1:33205",
+        "HTTP_PROXY": "http://127.0.0.1:33205",
+        "NO_PROXY": "",
+        "LANG": "C.UTF-8"
+      },
+      "base_environment_inherited": false,
+      "credentials_copied": false,
+      "docs_setup": [
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/feature-documents.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/feature-documents.md",
+          "git_blob": "958f628d3b64c89583a0492cdac1013230006828",
+          "sha256": "079ee4d4c8c62b11e6db21c267f0f2eaaa127bb6f71e5f48c467fd18ab14e0ce",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/coding.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/coding.md",
+          "git_blob": "65c15ff058bc9e187601e993f9760dd281029e7a",
+          "sha256": "d96094ed8a738b455e8cf5989393650e1a8a5ef863cfb2bdfab22de463f84ac7",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/documentation.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/documentation.md",
+          "git_blob": "f0c40be51e67d5e6a67533484b09f2408712c38a",
+          "sha256": "4f01a75d76a16d8db72f8ad7f93cc51f0cbc7c653d2e7bae5a5245d7264b08f2",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/delivery.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/delivery.md",
+          "git_blob": "150c899a79311bf5093e237c80b38cc8c5fc687c",
+          "sha256": "92f067227ce08bb4dc906b0de62e2f6819f336763a8b1ba80d10a6b650c816d8",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/typescript.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/typescript.md",
+          "git_blob": "cebd3d4ebbd45e001d5da9b67ef94f7d908a5b19",
+          "sha256": "36dc17f140096809a019fe54fcf533dac0fe3d42cd0b054b67ccec84a5a87eed",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/partial/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md"
+        }
+      ],
+      "requested_pages": [
+        "conventions/feature-documents.md",
+        "conventions/coding.md",
+        "conventions/documentation.md",
+        "conventions/delivery.md",
+        "guides/humanize-prose.md",
+        "conventions/typescript.md"
+      ],
+      "exit_code": 5,
+      "result": "unreachable",
+      "resolved_revision": null,
+      "cache_and_home_unchanged": true,
+      "before": [
+        {
+          "path": "cache",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md",
+          "mode": 33188,
+          "sha256": "d96094ed8a738b455e8cf5989393650e1a8a5ef863cfb2bdfab22de463f84ac7"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md",
+          "mode": 33188,
+          "sha256": "92f067227ce08bb4dc906b0de62e2f6819f336763a8b1ba80d10a6b650c816d8"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md",
+          "mode": 33188,
+          "sha256": "4f01a75d76a16d8db72f8ad7f93cc51f0cbc7c653d2e7bae5a5245d7264b08f2"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md",
+          "mode": 33188,
+          "sha256": "079ee4d4c8c62b11e6db21c267f0f2eaaa127bb6f71e5f48c467fd18ab14e0ce"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md",
+          "mode": 33188,
+          "sha256": "36dc17f140096809a019fe54fcf533dac0fe3d42cd0b054b67ccec84a5a87eed"
+        }
+      ],
+      "after": [
+        {
+          "path": "cache",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md",
+          "mode": 33188,
+          "sha256": "d96094ed8a738b455e8cf5989393650e1a8a5ef863cfb2bdfab22de463f84ac7"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md",
+          "mode": 33188,
+          "sha256": "92f067227ce08bb4dc906b0de62e2f6819f336763a8b1ba80d10a6b650c816d8"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md",
+          "mode": 33188,
+          "sha256": "4f01a75d76a16d8db72f8ad7f93cc51f0cbc7c653d2e7bae5a5245d7264b08f2"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md",
+          "mode": 33188,
+          "sha256": "079ee4d4c8c62b11e6db21c267f0f2eaaa127bb6f71e5f48c467fd18ab14e0ce"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md",
+          "mode": 33188,
+          "sha256": "36dc17f140096809a019fe54fcf533dac0fe3d42cd0b054b67ccec84a5a87eed"
+        }
+      ],
+      "network_requests": 0,
+      "docs_source_override": false
+    },
+    {
+      "case": "warm",
+      "argv": [
+        "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin/vh-adlc",
+        "knowledge",
+        "--offline",
+        "--repo",
+        "/home/m/code/vh-adlc-migration-roadmap",
+        "--plugin-pin",
+        "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+        "--page",
+        "conventions/feature-documents.md",
+        "--page",
+        "conventions/coding.md",
+        "--page",
+        "conventions/documentation.md",
+        "--page",
+        "conventions/delivery.md",
+        "--page",
+        "guides/humanize-prose.md",
+        "--page",
+        "conventions/typescript.md"
+      ],
+      "environment": {
+        "HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm",
+        "XDG_CACHE_HOME": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache",
+        "PATH": "/tmp/audit-offline-knowledge-r2-p46rd1fz/bin",
+        "GIT_CONFIG_GLOBAL": "/dev/null",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_OPTIONAL_LOCKS": "0",
+        "HTTPS_PROXY": "http://127.0.0.1:33205",
+        "HTTP_PROXY": "http://127.0.0.1:33205",
+        "NO_PROXY": "",
+        "LANG": "C.UTF-8"
+      },
+      "base_environment_inherited": false,
+      "credentials_copied": false,
+      "docs_setup": [
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/feature-documents.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/feature-documents.md",
+          "git_blob": "958f628d3b64c89583a0492cdac1013230006828",
+          "sha256": "079ee4d4c8c62b11e6db21c267f0f2eaaa127bb6f71e5f48c467fd18ab14e0ce",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/coding.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/coding.md",
+          "git_blob": "65c15ff058bc9e187601e993f9760dd281029e7a",
+          "sha256": "d96094ed8a738b455e8cf5989393650e1a8a5ef863cfb2bdfab22de463f84ac7",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/documentation.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/documentation.md",
+          "git_blob": "f0c40be51e67d5e6a67533484b09f2408712c38a",
+          "sha256": "4f01a75d76a16d8db72f8ad7f93cc51f0cbc7c653d2e7bae5a5245d7264b08f2",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/delivery.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/delivery.md",
+          "git_blob": "150c899a79311bf5093e237c80b38cc8c5fc687c",
+          "sha256": "92f067227ce08bb4dc906b0de62e2f6819f336763a8b1ba80d10a6b650c816d8",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:guides/humanize-prose.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "guides/humanize-prose.md",
+          "git_blob": "2d7e4bca59ced5a522f63cfecd06acc403c2357a",
+          "sha256": "7a6e4b3124c309b4f4e51ef4c4cdab84e72c3be3a7023448766556a3fb40ee66",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md"
+        },
+        {
+          "method": "exact-Git-blob-to-isolated-docs-cache",
+          "argv": [
+            "git",
+            "-C",
+            "/home/m/code/vhco-pro-docs",
+            "show",
+            "0e52f51f01b84eda75a976763c42d8ec0a07b544:conventions/typescript.md"
+          ],
+          "revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "page": "conventions/typescript.md",
+          "git_blob": "cebd3d4ebbd45e001d5da9b67ef94f7d908a5b19",
+          "sha256": "36dc17f140096809a019fe54fcf533dac0fe3d42cd0b054b67ccec84a5a87eed",
+          "cache_path": "/tmp/audit-offline-knowledge-r2-p46rd1fz/warm/cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md"
+        }
+      ],
+      "requested_pages": [
+        "conventions/feature-documents.md",
+        "conventions/coding.md",
+        "conventions/documentation.md",
+        "conventions/delivery.md",
+        "guides/humanize-prose.md",
+        "conventions/typescript.md"
+      ],
+      "exit_code": 0,
+      "result": "answered",
+      "resolved_revision": "0e52f51f01b84eda75a976763c42d8ec0a07b544",
+      "cache_and_home_unchanged": true,
+      "before": [
+        {
+          "path": "cache",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md",
+          "mode": 33188,
+          "sha256": "d96094ed8a738b455e8cf5989393650e1a8a5ef863cfb2bdfab22de463f84ac7"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md",
+          "mode": 33188,
+          "sha256": "92f067227ce08bb4dc906b0de62e2f6819f336763a8b1ba80d10a6b650c816d8"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md",
+          "mode": 33188,
+          "sha256": "4f01a75d76a16d8db72f8ad7f93cc51f0cbc7c653d2e7bae5a5245d7264b08f2"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md",
+          "mode": 33188,
+          "sha256": "079ee4d4c8c62b11e6db21c267f0f2eaaa127bb6f71e5f48c467fd18ab14e0ce"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md",
+          "mode": 33188,
+          "sha256": "36dc17f140096809a019fe54fcf533dac0fe3d42cd0b054b67ccec84a5a87eed"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md",
+          "mode": 33188,
+          "sha256": "7a6e4b3124c309b4f4e51ef4c4cdab84e72c3be3a7023448766556a3fb40ee66"
+        }
+      ],
+      "after": [
+        {
+          "path": "cache",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md",
+          "mode": 33188,
+          "sha256": "d96094ed8a738b455e8cf5989393650e1a8a5ef863cfb2bdfab22de463f84ac7"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md",
+          "mode": 33188,
+          "sha256": "92f067227ce08bb4dc906b0de62e2f6819f336763a8b1ba80d10a6b650c816d8"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md",
+          "mode": 33188,
+          "sha256": "4f01a75d76a16d8db72f8ad7f93cc51f0cbc7c653d2e7bae5a5245d7264b08f2"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md",
+          "mode": 33188,
+          "sha256": "079ee4d4c8c62b11e6db21c267f0f2eaaa127bb6f71e5f48c467fd18ab14e0ce"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md",
+          "mode": 33188,
+          "sha256": "36dc17f140096809a019fe54fcf533dac0fe3d42cd0b054b67ccec84a5a87eed"
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides",
+          "mode": 16877,
+          "sha256": null
+        },
+        {
+          "path": "cache/vh-adlc/docs/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md",
+          "mode": 33188,
+          "sha256": "7a6e4b3124c309b4f4e51ef4c4cdab84e72c3be3a7023448766556a3fb40ee66"
+        }
+      ],
+      "network_requests": 0,
+      "docs_source_override": false
+    }
+  ],
+  "limit": "Native offline knowledge proof with explicit pinned-page setup, not an executed audit skill or YAML implementation."
+}
