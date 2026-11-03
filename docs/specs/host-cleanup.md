@@ -332,6 +332,7 @@ None.
 | 2026-11-02 | R-6 | spec | `104d96968de60313f1c940edc464180edf015fbb` | claude-opus-5-5 | procedural | 10 findings, 1 blocking |
 | 2026-11-02 | R-7 | spec | `ffe9dd6e7f388e7cfd20918e7f85ddf67b9c54ec` | claude-opus-5-5 | procedural | 9 findings, 0 blocking |
 | 2026-11-02 | R-7 | spec | `ffe9dd6e7f388e7cfd20918e7f85ddf67b9c54ec` | n/a | n/a | accepted by owner |
+| 2026-11-03 | R-8 | spec | `aa5c66e7fe2c62142e7cf330b6fc504a87ec0d6c` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 
 ### R-1
 
@@ -1060,6 +1061,36 @@ SEVERITY: nit
 WHERE: Acceptance Criteria, AC-03
 EVIDENCE: AC-03 opens "`vh-adlc clean` removes those", which points at AC-02's "every declared, abandoned resource". That set includes Compose projects and clusters, which a flagless `clean` must not change under AC-08. The criterion is not readable alone, and a review has to infer the flags.
 PROPOSAL: Write it as `/tmp` entries and temp-root entries past their age, leaving Compose and kind to AC-08.
+
+### R-8
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Manifest and Temp root; frontmatter covers; AC-06
+EVIDENCE: The pin is now 0e52f51, and `conventions/coding.md:70-71` there says "Settings files we define use the `.yaml` suffix and load strictly". PR #43 added the repository's strict reader, `parse` in `internal/settings/settings.go`. It refuses anchors and aliases, merge keys, tags, a second document, non-decimal numbers and boolean spellings other than true and false. I checked it with the locked 0.9.0 binary. `settings read --stdin` refused `a: &p x` / `b: *p` ("anchors and aliases are not accepted") and `a: 1` / `---` / `b: 2` ("more than one document"). Design line 119 decodes `cleanup.yaml` "with `yaml.v3` into typed structs with unknown keys refused", and line 112 does the same for `host.yaml`. That is a second, looser reader. I ran a probe against go.yaml.in/yaml/v3 v3.0.5, the version in `go.mod`, using `Decoder.KnownFields(true)` into typed structs. It decoded `volumes: yes` as true, accepted an anchor and alias, decoded `schema_version: 1.0` as 1, and returned no error on a two-document manifest. In that last case the second document's `compose` rule was dropped without any notice. So someone reviewing `cleanup.yaml` on the default branch can see rules that `clean` never applies, and the binary would ship two definitions of "strict". `internal/settings/` is also not in `covers`, so later changes to the shared reader would not make this feature's reviews stale.
+PROPOSAL: Have Design say that `cleanup.yaml` and `host.yaml` pass through the `internal/settings` parser before the typed, unknown-key-refusing decode, or say why they do not. Add `internal/settings/` to `covers`, and add an anchor and a two-document manifest to the AC-06 refusal cases. This changes the baseline, so it takes the revision path that `status_description` already describes.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Order step 2
+EVIDENCE: Line 251 reads "The lock moves to that release, in `yaml-settings.md`'s PR if that lands next." `docs/specs/yaml-settings.md` is now `status: complete` and merged as PR #43 at `aa5c66e`. That PR already moved `plugins/vh-adlc/vh-adlc.lock.json` to 0.9.0 and the plugin to 0.7.0, and `git describe --tags origin/main` returns `v0.10.0`. The condition can no longer hold, so step 2 now names no PR for the lock bump. Its release-sequence finding also says a stable tag comes only from `main`, so the bump has to be a separate change.
+PROPOSAL: At the next revision, reword step 2 so the lock moves to the release from step 1 in its own PR after that release is tagged.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context; Design, Commands
+EVIDENCE: Context cites "`dispatch` requires `--plugin-pin` (`cmd/vh-adlc/main.go:158`)". The check is now at `main.go:176` as `if !c.noPin && !fullSHA.MatchString(o.pluginPin)`. The `command` struct gained `noPin` (`main.go:66-70`), and `settings read` already uses it (`main.go:108`). `docs/reference/cli.md:39` now reads "Every command above except `settings read` requires `--plugin-pin`". The claim is no longer true without qualification, and Design's exemption for `clean` and `env` can reuse an existing mechanism instead of a new one. The citation `tests/vh-adlc/triage/fixtures.ts:4-5` has also shifted: line 4 is now `import { settingsYAML }`, and the `vh-triage-*` lines are 5-6.
+PROPOSAL: Update both Context citations, which needs no revision. At the next revision, name `noPin` in Design as the way `clean` and `env` are exempted.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Operation and allow rules; AC-14
+EVIDENCE: The new "Repository settings" section in `docs/reference/compatibility.md:56-62` says "Reading a settings file uses the verified `vh-adlc` binary that the plugin installs". Design line 195 has the operation call `vh-adlc` "from `PATH`, unverified", and that binary reads `.vh-adlc/cleanup.yaml`, a YAML file under `.vh-adlc/` that the operation defines. If the page is not changed, it will contradict the feature for that file. AC-14 requires only that the compatibility table "document the commands, the manifest, the Git floor and both rules".
+PROPOSAL: Have AC-14's documentation task limit that sentence to the triage and maintenance settings files, or add that `cleanup.yaml` is read by the `vh-adlc` on `PATH` without verification.
 
 ## Sources
 
