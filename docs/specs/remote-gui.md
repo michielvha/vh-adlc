@@ -1,7 +1,7 @@
 ---
-status: planned
+status: in-progress
 branch: feat/remote-gui
-status_description: "Reviewed passwordless identity revision accepted for the requested local reimplementation."
+status_description: "Implementing owner-restricted passwordless Tailscale access and trusted private Unix ingress."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
