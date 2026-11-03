@@ -124,7 +124,11 @@ An explicitly included local report may become a selected fix's Task base only i
 the still-current fetched default and its delta is exactly the known ledger/index. Present its
 full ID/commit/report scope in the selection summary and obtain that inclusion under the current
 selection. Otherwise retain it privately and start fixes from default with only selected updates.
-Scope baseline remains the default ancestor, not Task base. Review the entire publication range.
+Scope baseline remains the default ancestor, not Task base. Review the entire publication range,
+including every carried commit and the final squash message against current consumer CI rules.
+Show pending private ledger refs and their actual publication state on resume. Offer any separate
+report-only delivery route the consumer permits, under its required current approval; a private
+ledger commit alone never authorizes that publication.
 
 ## Selected fixes and final review
 
@@ -191,7 +195,11 @@ pre-squash Verified source as the sole comparison baseline.
 
 Ordinary cleanup covers clean owned audit-ledger and audit-repair roles only after evidence/outcomes
 are retained/published/safely superseded. Keep pending/unpublished ledger commits and evidence refs.
-If non-forced branch deletion refuses after squash, retain the ref and report it. Never prune, reset,
+If the actual adopted/current merge policy explicitly includes disposal of its own just-merged
+remote head, first observe the selected base, merged reviewed head and unchanged current remote tip.
+Use an expected-tip conditional deletion and reconcile an absent head after lost acknowledgement.
+A changed/unknown tip stops; this creates no general branch-cleanup or repository-setting permission.
+If non-forced local branch deletion refuses after squash, retain the ref and report it. Never prune, reset,
 force-delete or clean unrelated worktrees/index entries. Cleanup cannot discard a pending resource intent.
 
 ### Native journal completion and pending inspection
