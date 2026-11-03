@@ -193,3 +193,8 @@ usable independently of vh-adlc.
 The [lifecycle procedure](../../plugins/vh-adlc/references/lifecycle.md) and
 [feature loop](../../plugins/vh-adlc/references/loop.md) contain the agent-facing
 execution rules.
+
+Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
+runtime reports that prerequisite before the operation starts. Use the same verified Bun version
+when generating and reconstructing a candidate; renderer differences are not proof of equivalent
+ledger bytes. A changed rendering result requires reconciliation and renewed verification.

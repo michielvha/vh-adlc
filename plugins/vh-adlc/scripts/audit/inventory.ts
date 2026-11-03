@@ -1,3 +1,4 @@
+import { requireAuditRuntime } from "./runtime";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -96,6 +97,7 @@ export function visibleLines(text: string): string[] { return markdownVisibility
 export type Section = { at: number; level: number; title: string };
 /** Let the renderer decide which annotated section candidates really render as headings. */
 export function markdownSections(text: string) {
+  requireAuditRuntime();
   const raw = text.split(/\r?\n/), candidates = new Map<number, Section>();
   let marker = "VhAuditSectionMarker";
   while (text.includes(marker)) marker += "X";

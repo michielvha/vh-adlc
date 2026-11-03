@@ -9,6 +9,7 @@ import { evaluateAssessments } from "./assessment";
 import { saveReport } from "./report";
 import { inspectAuthority, inspectCandidatePolicy, inspectAdoptedPolicy } from "./authority";
 import { createLedgerCandidate, applyLedgerCandidate, appendFindings } from "./ledger";
+import { requireAuditRuntime } from "./runtime";
 import { checkBatch } from "./batch";
 import { createRun, registerRun, registeredPending, intent, resourceIntents, noteResource, readRun, outcome, handoff, inspectPending } from "./journal";
 import type { AuditMode } from "./types";
@@ -28,6 +29,7 @@ const argumentsByOperation: Record<string, string[]> = {
   "journal-intent": ["directory", "batch-digest", "input"], "journal-resource": ["directory", "batch-digest", "action-id", "resource-id"],
 };
 export function runCLI(argv: string[]) {
+  requireAuditRuntime();
   const [operation, ...args] = argv, supported = argumentsByOperation[operation];
   if (!supported) throw Error("unknown audit helper operation");
   const options: Record<string, string> = {};

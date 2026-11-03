@@ -1,3 +1,4 @@
+import { requireAuditRuntime } from "./runtime";
 import { markdownSections, markdownVisibility, maskInlineCode, escapeInlineHtml } from "./inventory";
 import { validArtifact } from "./assessment";
 import type { Settings } from "./types";
@@ -6,6 +7,7 @@ export type NewFinding = { id: string; severity: string; title: string; body: st
 export type SectionNote = { heading: string; ids: string[]; text: string; evidence: {path:string;sha256:string}[] };
 const fail = (): never => { throw Error("audit ledger: invalid declared layout, section update or current evidence"); };
 export function boundedBody(text:string,level:number) {
+  requireAuditRuntime();
   const visible=markdownVisibility(text);
   if (!visible.balanced || visible.comments || visible.lines.some(line=>/<[A-Za-z][^>]*|<\//.test(maskInlineCode(line).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g,"")))) fail();
   let escaped=false;Bun.markdown.render(text,{heading(children,attributes){if(attributes.level<=level)escaped=true;return children;}});

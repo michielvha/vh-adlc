@@ -117,3 +117,8 @@ prose guide when the humanizer skill is unavailable.
 
 Continue with [your first feature](../get-started/first-feature.md) or
 [review requirements](../user-guides/workflows.md#reviews).
+
+Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
+runtime reports that prerequisite before the operation starts. Use the same verified Bun version
+when generating and reconstructing a candidate; renderer differences are not proof of equivalent
+ledger bytes. A changed rendering result requires reconciliation and renewed verification.
