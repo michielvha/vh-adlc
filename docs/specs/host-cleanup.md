@@ -39,22 +39,22 @@ before the reboot on host `fedora-43`:
 
 - `/tmp`, a 16G tmpfs, held 9252M of a 12815M quota (`quota -s`) across 4152 entries. The largest were
   `TestConformance_*` (2 x 454 MB), 22 `go-build*`, seven `stackweaver-visuals-*`, and over 100 `vh-triage-*`
-  from vh-adlc's own tests (`tests/vh-adlc/triage/fixtures.ts:4-5`). Those classes account for at most 43% of
+  from vh-adlc's own tests (`tests/vh-adlc/triage/fixtures.ts:5-6`). Those classes account for at most 43% of
   the use, and the rest is unknown. Live entries such as `claude-1000` sat beside them.
 - Docker is one rootful engine shared by every project (`docker context ls`). A live test run's objects
   carried `sh.stackweaver.test-run=fedora-43/461166`. Stackweaver's dev stack is Compose project `deploy`, and
   its database has no backup (Stackweaver `CLAUDE.md:144`).
 
-Stackweaver's `sweepEndedRuns` (`backend/internal/launcher/driver/leftovers_integration_test.go:119` on
-`feat/runner-architecture` at `cc2cbbed`) does this for one test package only: it reads a `host/pid` mark and
+Stackweaver's `sweepEndedRuns` (`backend/internal/launcher/driver/leftovers_integration_test.go:120` on the local
+`feat/runner-architecture` at `619dce9c`) does this for one test package only: it reads a `host/pid` mark and
 forces no removal of a network, volume or image.
 
 The auto-mode classifier refuses to sweep shared `/tmp`, because it cannot tell projects apart. A narrow
 allow rule resolves before it (see Sources), and `codex execpolicy check` on codex-cli 0.163.0 returned
 `allow` for a `prefix_rule` on `vh-adlc clean`.
 
-`dispatch` requires `--plugin-pin` (`cmd/vh-adlc/main.go:158`), and `GOTMPDIR` covers the go command and
-`t.TempDir` (`go doc`, Go 1.27). The Bash tool's `PATH` here is `/usr/local/bin:/usr/bin`.
+`dispatch` requires `--plugin-pin` unless a command sets `noPin`, as `settings read` does
+(`cmd/vh-adlc/main.go:66-70,108,176`), and `GOTMPDIR` covers the go command and `t.TempDir` (`go doc`, Go 1.27). The Bash tool's `PATH` here is `/usr/local/bin:/usr/bin`.
 Disabling lazy fetch needs Git 2.45 (see Sources), while the stated floor is 2.35
 (`docs/get-started/installation.md:10`). In a PID namespace, `kill -0` on a live host pid returns "No such
 process" (a `bwrap --unshare-pid` probe, and `codex sandbox` the same).
