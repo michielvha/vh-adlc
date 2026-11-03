@@ -1388,6 +1388,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-03 | R-19 | implementation | `4a31ee68bb9007648aabf928edb65d3cad28ee74` | claude-opus-5.5 | procedural | All seven criteria not verified: executable review coverage and retained evidence are incomplete. No new code finding. |
 | 2026-11-03 | R-20 | implementation | `0743ef0758d40c18c040f336a28dc88659466666` | claude-opus-5.5 | procedural | AC-01 to AC-04 met; consumer candidate denied after upstream advance, consumer trial equivalence incomplete; strict extra-read deviation disclosed. |
 | 2026-11-03 | R-21 | implementation | `60460709e21529c2e7237ed002e3e1b1a15ace7f` | claude-opus-5.5 | procedural | All seven source criteria met after current consumer verification and policy-object proof. Delivery remains ordered after the source gate. |
+| 2026-11-03 | R-22 | implementation | `951d47f64ceb677e15934286437c8bd4d9b040fe` | claude-opus-5.5 | procedural | All seven criteria met; one should-fix request to execute changed documentation contracts and two factual nits remain for this delivery pass. |
 
 ### R-1
 
@@ -2046,6 +2047,97 @@ EVIDENCE: This verdict covers the source gate and candidate obligations only. I 
 - **Documented procedure:** The consumer README and the audit settings reference document publish-first ordering, exact-commit paired review and installed preflight before merge, post-merge `policy-adopted` parity comparison, the hash-bound scoped rollback and the remaining limits.
 
 Not claimed: publication, signed release verification, real marketplace fresh install and upgrade, the published paired review, final installed preflight, consumer merge and post-merge adoption, including its induced-mismatch rollback handoff. None of these has happened. They remain mandatory ordered delivery work, and consumer cutover stays blocked until they pass.
+### R-22
+
+CRITERION: AC-01 Native skill discovery and ordinary lifecycle intake select the shared audit procedure for its declared modes, preserve other routes, and reject invalid scope without writes or an invented harness/model dependency.
+VERDICT: met
+EVIDENCE:
+- **Source equivalence:** I ran the R-22 fixed launcher once at shared 951d47f6. Its Git diff from 0743ef07 contains exactly four Markdown paths: the two feature documents, compatibility.md and marketplace.md. Every code, test, plugin and workflow object is therefore identical to the source I executed in R-20.
+- **R-20 execution at 0743ef07:** 1092 package tests across 93 files and the required checks all passed. The isolated native installs passed on Codex CLI and Claude CLI with 12 discovered skills and zero model invocations. Hosted run 41717534624 passed.
+- **Published delivery:** The launcher read normal hosted run 41727358677 at published merge afb0c4b8 and observed conclusion success. It also re-verified the raw command artifacts from all four real marketplace cases (fresh Codex, fresh Claude, and a 0.7.0 to 0.8.0 upgrade on each host). Every command exited 0 without timeout, every transcript and stderr hash matches, and each case discovered 12 operations at payload digest 5084c653. That digest matches my R-20 native candidate, and the native pre-upgrade observation recorded version 0.7.0.
+- **Not claimed:** Real Claude model and GUI or phone entry remain owner-deferred.
+
+CRITERION: AC-02 Adopters using strict YAML settings through the shared verified reader can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
+VERDICT: met
+EVIDENCE:
+- **Unchanged source:** The settings, inventory and ledger suites I executed in R-20 at 0743ef07 apply through the four-path equivalence above.
+- **Consumer objects:** The launcher compared all 18 approved consumer workflow objects at adopted default 1057e769 with the R-21 tested consumer 4a469873. All are equal; only the consumer README changed. The settings blob b0aaa0a0 is unchanged.
+- **Release:** The v0.11.0 runtime release verification was confirmed against published source afb0c4b8.
+- **Fresh post-merge inspection:** `policy-adopted` from the marketplace-installed payload read the committed YAML policy and returned valid. The real ledger SHA-256 stayed c0eb6250, and no contents were exported.
+- **Documentation:** I read the changed compatibility and marketplace guides in full. They state the 0.8.0 audit minimum and give no JSON setup. The package documentation contract was not re-executed on these new bytes (F-01).
+
+CRITERION: AC-03 Current assessments and update proposals preserve stable IDs/history and admit FIXED/MOOT only with complete target-bound evidence and the required adversarial check, while stale, missing or contradictory evidence remains visibly incomplete and cannot yield an eligible terminal update.
+VERDICT: met
+EVIDENCE:
+- **Unchanged source:** The assessment, snapshot, report, ledger and batch suites I executed at 0743ef07 apply through the Git equivalence above.
+- **Model-trial regrading in R-20:** It covered nine original native contexts and 90 plugin objects unchanged since the 0bdcacee trial baseline. Toy regressions were red at pre-fix commit 165d6689 and green, with a fresh adversarial check, at e5ffc72c. These remain attributed to their original targets.
+- **Post-merge:** The ledger hash is unchanged, so no audit verdict or ledger write occurred during adoption.
+
+CRITERION: AC-04 Selected audit repairs use the existing reviewed repair/feature lifecycle and the consumer's required verification and authority, preserve workstream boundaries and recover from interruption without silently replaying stale or duplicating completed effects.
+VERDICT: met
+EVIDENCE:
+- **Unchanged source:** The authority, journal, batch, recovery and rebuild suites apply from my 0743ef07 execution through object equality.
+- **Fresh adopted policy:** In the launcher, the installed helper resolved the adopted policy at 1057e769 as valid and adopted with allowed false. Its four modes' effects match the parity map (digest 9b3e9474), and the "reason" and "limit" fields state that it grants no action.
+- **Inventory:** The all-kind registered inventory returned an empty outstanding set.
+- **Preservation:** The launcher made no journal mutation, resource operation, push or merge, and the shared and consumer checkout status was unchanged.
+
+CRITERION: AC-05 Stackweaver's adapter preserves every parity-mapped audit behavior with the owner-approved separate-feature routing change, command/model/arguments, real ledger bytes and unrelated workflows, and can roll back/reapply only its migration paths against current main.
+VERDICT: met
+EVIDENCE:
+- **Adopted objects:** The adopted consumer workflow objects equal the R-21 tested objects, where 100 of 100 contract, parity, preflight, rollback and adjacent tests passed. This includes command metadata and arguments, the procedure blob 0f0a0812 and the parity blob cc4b4d37.
+- **Hosted consumer CI:** Run 41733200706 at squash 14a2779c concluded success.
+- **Fresh post-merge check:** All bindings and per-mode effects match the parity map. The real ledger hash is c0eb6250.
+- **Owned synthetic rehearsal:**
+  - Rollback deactivated the adapter tests and reapplication restored them.
+  - The retained maintenance contract exited 0 after rollback and again after reapplication.
+  - Source and index were preserved.
+  - `unrelated_routes_preserved` is false only because this CLI invocation omits the newer-route option. That variant is asserted in rehearsal.test.ts, which passed in R-21.
+- **No real rollback:** None was performed.
+- **Paired review:** The returned paired-review bytes are identical to the artifact checked by the launcher (MODEL claude-opus-5.5, NO FINDINGS). The launcher confirmed its provenance exit 0, tool pass, shared target afb0c4b8 and consumer 5784c6db.
+
+CRITERION: AC-06 The committed source passes its required automated suites, independent exact-commit review, isolated native Codex/Claude installation and helper checks, and bounded actual Copilot Opus 5.5 generic/consumer behavior trials with adversarial negative controls and explicit test limits.
+VERDICT: met
+EVIDENCE:
+- **Suites:** In R-20 I executed the full package suite (1092 tests), every required Go, lint, workflow and companion check, and both native candidates at 0743ef07. Hosted run 41717534624 passed Linux (1092 tests), macOS (935 tests) and Go.
+- **Equivalence:** The current code at 951d47f6 is object-identical to that source. Published merge afb0c4b8 passed normal hosted CI, and its marketplace payload digest equals my candidate's.
+- **Model trials:** The nine regraded Copilot Opus 5.5 trials and the delivery-model-r3 consumer equivalence keep their original targets.
+- **Reviews:** R-21 returned no open blocking finding at 60460709 and 4a469873. This R-22 pass reviews exact 951d47f6.
+- **Not claimed:** The real Claude model and GUI or phone remain owner-deferred.
+
+CRITERION: AC-07 Consumer cutover is blocked without matching published-marketplace and paired-review artifacts, and the documented delivery procedure verifies the published shared component and installed operation before adopting Stackweaver, retaining exact revisions, rollback and deferred capability limits.
+VERDICT: met
+EVIDENCE: The source gate was established in R-21. This pass adds observed delivery evidence in the accepted order:
+1. **Release:** v0.11.0 verification passed against afb0c4b8.
+2. **Marketplace:** All four real marketplace artifacts were re-verified with exits and hashes.
+3. **Paired review:** Exact bytes matched at afb0c4b8 and 5784c6db.
+4. **Preflight:** The artifact-bound installed adoption result is pass with preflight pass, bound to consumer 5784c6db.
+5. **Consumer merge:** Squash 14a2779c, with hosted CI success.
+6. **Post-merge inspection:** A fresh read-only check from the installed payload found policy and parity matching at 1057e769.
+7. **Induced mismatch:** It returned `adoption_accepted: false` with the scoped rollback handoff and `real_policy_mutated: false`.
+
+The required local verification log reports 18 passes, 0 failures and 0 skips. The changed documents record the exact revisions, the retained failed attempts, rollback and the remaining limits (operator attestations, real Claude, GUI or phone, and product or live operations).
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/reference/compatibility.md and docs/reference/marketplace.md at 951d47f6; Test Plan AC-02 package documentation contract
+EVIDENCE: The AC-02 Test Plan requires a package contract over compatibility.md and the marketplace guidance, checking the YAML path, the 0.8.0 minimum, and no JSON setup or 0.7.0 audit claim. Both files changed after the last package execution I observed: R-20 at 0743ef07 and hosted CI at afb0c4b8. The R-22 launcher checks object equality but does not execute that contract on the new bytes. My full reading finds the text consistent; it mentions 0.7.0 only as an upgrade source.
+PROPOSAL: Run the existing package and documentation checks, or observe normal CI, at 951d47f6 and record the result. Do not infer it from the earlier runs.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: docs/specs/shared-audit.md, Published audit and Stackweaver adoption table (Shared publication and Normal shared CI rows)
+EVIDENCE: The row says the published tree equals "reviewed final source c955644f". That commit appears in no Review Log row; R-21 reviewed 60460709. The CI row attaches 1,092 and 935 test counts to run 41727358677, but the launcher observed only that run's success conclusion. Those counts were observed on run 41717534624 at 0743ef07.
+PROPOSAL: Describe c955644f as the source-complete commit whose non-document objects equal reviewed 60460709 and 0743ef07, and attribute the test counts to the run where they were actually observed.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: docs/specs/shared-workflow-migration.md, Context line 23
+EVIDENCE: Line 23 still says the audit child has passed source review and that "publication and Stackweaver adoption remain pending". Row D-02, line 43 and ticked T6 in the same document record publication through #44 and adoption through #1020.
+PROPOSAL: Update line 23 so it says audit is published and adopted, and point to the child's delivery evidence.
+
 ## Sources
 
 - [Current configuration rule](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md#configuration-format) and [TypeScript conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md): YAML for human-written settings, typed boundaries and repository-specific verification after the pin adopted on main.
