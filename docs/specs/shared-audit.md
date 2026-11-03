@@ -1044,6 +1044,7 @@ decision; unrelated correctness fixes and tests continue. No choice is inferred 
 | 2026-11-02 | R-11 | spec | `7eda0b6b00931ac1114861619e87bc73dc528f8c` | claude-opus-5.5 | procedural | Track temporary live-test resources across interruption and resume cleanup. |
 | 2026-11-02 | R-12 | spec | `67a91a17944bb219ce956364963531532577c396` | claude-opus-5.5 | procedural | No blocking findings; post-merge outcome placement/recovery remains an implementation proof obligation. |
 | 2026-11-02 | R-12 | spec | `67a91a17944bb219ce956364963531532577c396` | n/a | n/a | accepted by owner |
+| 2026-11-03 | R-13 | spec | `dd878483b9eb6908b56c9c401db766cae2f46c3a` | claude-opus-5.5 | procedural | YAML validation/offline/cutover/ordering clarifications required; factual coverage and wording corrections. |
 
 ### R-1
 
@@ -1236,6 +1237,71 @@ SEVERITY: should-fix
 WHERE: Design, Remediation and delivery authority (squash merge outcome); Test Plan AC-04
 EVIDENCE: shared-audit.md:524-527 says "A conditional squash merge carries the record and ledger to main" and requires the procedure to "Retain the actual merge outcome in the batch's durable outcome record after observing it". This is the only mention of a "durable outcome record" in the spec. The batch record (lines 405-407, 440-448) lives on the selected source branch. It reaches main only inside the squash commit, and that branch is then deleted. The spec never names the artifact that receives the post-merge outcome. It could be the in-tree record on main, the tracking issue, the private run journal or the external report directory. The spec also never names the authority for that write. The fix_effects vocabulary at line 326 covers `branch-push`, `pr-write`, `issue-write` and `conditional-merge`, but it has no effect for a later commit or push to the default branch. Line 52 of lifecycle.md says other non-feature publishing gaps "remain unsupported". In AC-04 (line 673), the squash case only checks a later reverify against the Scope baseline. Nothing checks where the merge outcome is recorded, or that recording it needs no unauthorized default-branch write. One implementation could push an outcome commit straight to main without any grant. Another could keep the outcome only in a local file, which a fresh-context resume or a later status run would not see. The interruption rule at lines 263-268 then cannot tell whether a merge whose response was lost was already recorded.
 PROPOSAL: Name the post-merge outcome location and the authority that covers it. For example, use the private run journal plus the existing `issue-write` on the workstream's tracking issue, and state that no default-branch commit follows the merge. Alternatively, define a new declared effect for that write. Add an AC-04 case where a merge acknowledgement is lost after a squash merge, and check that resume records the outcome once and makes no write outside the grant.
+
+### R-13
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Consumer settings and format preservation; Design, Remediation and delivery authority
+EVIDENCE: shared-audit.md:325-329 says to "validate the existing audit schema" and that "All committed-policy and candidate inspections parse the exact committed YAML bytes through the same strict reader". The existing schema validator only works on the working tree. It resolves origin, `ledger_path`, `project_procedure` and `settings_path` with existsSync/statSync under the checkout root (plugins/vh-adlc/scripts/audit/settings.ts:31-38, 41-88). The committed paths currently check only `JSON.parse(...).project_procedure` (scripts/audit/authority.ts:95, 145), plus byte equality with the working-tree file (authority.ts:90, 145). The draft does not say whether committed YAML gets the full validator, a pure shape check with paths resolved in the same commit, or only the `project_procedure` key. It also does not say whether "configured" (working-tree) and committed settings must match by bytes or by validated value. Two committed-tree states have no defined outcome: a default branch whose AGENTS.md still links `.vh-adlc/audit.json`, and a committed `.json`/`.yml` leftover beside the linked YAML when the working tree lacks it. The draft does not say whether these report unadopted or invalid. The yaml-settings precedent (yaml-settings.md:70-72, R-2 F-03, R-5 F-04) settled both questions for maintenance. Finally, a missing reader on the candidate path falls into the catch at authority.ts:104 as "Invalid or uncommitted candidate declaration/default identity." That result would block AC-05 cutover with a misleading reason.
+PROPOSAL: State the committed-YAML rule: the reader parses the blob, then which validation runs (shape only, or paths resolved in the same commit) and which validated fields must equal the configured settings. Name the outcome for a stale `.json` link, for a committed leftover suffix and for an unavailable reader on the adopted and candidate paths, and add each case to T84 and the AC-04/AC-05 proofs.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Consumer settings and format preservation; Entry points and modes (`status`); Test Plan AC-01, AC-06
+EVIDENCE: shared-audit.md:331-334 says "Reader bootstrap may install the exact locked, verified binary in its normal private cache" and asks for the effect to be documented. shared-audit.md:250-252 says `status` "reads only", and audit-settings.md:119 defines `read-only` and `no-write` restriction tokens. `readYAML` calls `ensure-vh-adlc.sh` without `--offline` (scripts/settings-file.ts:34). When the binary is not cached, that script downloads with curl and writes under the user cache (ensure-vh-adlc.sh:105-126). So a `status` call, a read-only or no-fetch request, a copied example test, or an isolated credential-free native or Copilot trial profile can now make a network download and a cache write, or fail as "binary unavailable". The draft does not say whether read-only restrictions and status permit that download or require `--offline` and a pre-installed binary. It also does not say how the isolated AC-06 install/helper profiles and actual model trials obtain the verified binary. Without that, results depend on host cache state.
+PROPOSAL: State whether read-only, status and no-fetch audit invocations may bootstrap the binary or must use the offline path with a visible prerequisite failure. Name how isolated trial and native install profiles supply the locked binary, for example on PATH with a matching digest, and add one AC-01/AC-06 case each for a cached binary and an uncached one.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Tasks T84-T88; Context (implementation sequencing correction)
+EVIDENCE: Context at shared-audit.md:87-91 records that the first settings commit was made "despite the existing package checker rejecting the missing candidate version bump", and T26 (line 839) fixed this by moving the version bump "before further package work". Both manifests are now 0.7.0 at this target (plugins/vh-adlc/plugin.json:4, .claude-plugin/plugin.json:3). That is the same version as published main, which contains YAML triage/maintenance and no audit (shared-audit.md:691-692). The new tail does package work first, in T85 (scripts) and T86/T87 (references, examples). It reserves 0.8.0 only in T88, the last task. This repeats the recorded ordering failure, because each earlier package commit would land with an unchanged version.
+PROPOSAL: Move the coherent 0.8.0 manifest reservation and its package-version check ahead of T85, as T26 did, and leave the native trial rerun and consumer minimum-version checks in the later task.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stackweaver adapter, parity and rollback (configuration cutover); Design, Evidence, updates and recovery
+EVIDENCE: shared-audit.md:700-703 says to "Finish active runs on their original verified plugin before configuration cutover" and, "If unresolved effects remain, use the existing explicit current-policy reconciliation/handoff before any new work". T82 (line 990) and references/audit.md:190-196 make a declined non-resource intent a permanent retained handoff that "cannot retire". So such a run can never finish. Journal headers bind `settings_digest` to the settings bytes (scripts/audit/journal.ts:16, 25), so the YAML cutover marks every such run policy-changed. The policy transition then admits only observations and handoffs (audit.md:268-270), and an absent declined effect stays pending. audit.md:194 says a retained non-resource-only handoff does not block a later resource plan. Neither document says whether that still holds once the run is also policy-changed, so the draft cannot answer whether "before any new work" blocks all work after cutover. The draft also does not say whether cutover itself must wait.
+PROPOSAL: State the cutover outcome for runs that hold only retained declined non-resource handoffs: whether they block cutover, need the policy transition, or carry over unchanged without blocking later runs. Add an AC-04 recovery case that crosses the JSON-to-YAML settings digest change with such a run.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter covers
+EVIDENCE: The revised Design makes every audit settings read depend on "the plugin's verified `vh-adlc settings read` binary" and "the exact locked, verified binary" (shared-audit.md:323-334). That binary is chosen by plugins/vh-adlc/vh-adlc.lock.json and obtained by plugins/vh-adlc/scripts/ensure-vh-adlc.sh (settings-file.ts:34). Neither path is in `covers` (shared-audit.md:7-29). yaml-settings.md:9 and :19 cover both, for the same dependency. feature-documents.md:43-44 says covers lists every path whose change can affect the feature. A lock bump could therefore change AC-02 reader behavior without making the audit reviews stale.
+PROPOSAL: Add `plugins/vh-adlc/scripts/ensure-vh-adlc.sh` and `plugins/vh-adlc/vh-adlc.lock.json` to `covers`.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T81; Design, Evidence, updates and recovery
+EVIDENCE: T81 (line 988-989) says fix-mode inline notes "now retain every selected member while index/status markers remain changed-only". references/audit-settings.md:174-177 agrees: a selected fix "writes a per-finding evidence note for every selected member, including unchanged statuses, because it has no pass summary". references/audit.md:119-121, which is also in `covers`, still says "Selected fix candidates add only their changed finding markers/index cells/inline notes". A model following audit.md would expect no note for an unchanged selected member.
+PROPOSAL: Reword audit.md:119-121 so that markers and index cells are changed-only while every selected fix member gets a per-finding note, matching audit-settings.md.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context; Sources
+EVIDENCE: shared-audit.md:48-50 says "Shared main is `fcf7cd51...`", that plugin.json "reports plugin 0.6.0" and that there are "eleven skills". The manifests at this target are 0.7.0, and line 132 and lines 691-692 describe the later merged main. Line 76 says conventions resolve from AGENTS.md to `e4d58d2...`, but AGENTS.md:4 now pins `0e52f51f01b84eda75a976763c42d8ec0a07b544`, which line 336 and the first Sources entry rely on. Sources still cite feature-documents.md and delivery.md at `e4d58d2`.
+PROPOSAL: Mark lines 48-50 and 76 as the original authoring baseline, or update them to the merged state and the `0e52f51` pin. Cite the pinned revision in Sources.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Open Questions
+EVIDENCE: feature-documents.md:120-133 requires each question to have a "**Recommendation:**" line, an option table with "You get" and "It costs" columns, and "**Why this is yours:**". Q1 (shared-audit.md:1012-1018) is narrative only. It names the two routes (explicit reselection into a separate accepted feature/PR, or an owner-approved audit exception that only the owner merges) but has no table or "why this is yours" line. The preamble at lines 1007-1010 also keeps answered decisions there, while line 135 of the standard says answered questions are folded in and removed.
+PROPOSAL: Restate Q1 in the standard form, with both routes as options and their benefits and costs, and leave the choice to the owner. Move the preamble's answered decisions into Context, where lines 80-84 already record them.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan AC-02, AC-04
+EVIDENCE: The AC-02 proof (line 826) now includes "committed-policy YAML parsing against clean/dirty, stale-link, unmerged and alternate-origin inputs; no reader failure may yield a grant". The AC-02 criterion text (line 814) covers settings and ledger inventory, not grants. Grants belong to AC-04's "consumer's required verification and authority" (line 816), whose proof (line 828) has no YAML or reader-failure case. T84 and T85 map to AC-04, but an implementation reviewer judging AC-04 against its proof row would not find these checks.
+PROPOSAL: Move or copy the committed-YAML no-grant cases into the AC-04 proof row and keep the parsing and leftover cases under AC-02.
 
 ## Sources
 
