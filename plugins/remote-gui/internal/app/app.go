@@ -68,6 +68,7 @@ func Tool(env, fallback string) string {
 	}
 	return fallback
 }
+
 func Doctor(c config.Config) Result {
 	r := Result{SchemaVersion: 1, Command: "doctor", Kind: c.Kind, Result: "ready"}
 	tools := map[string]string{}

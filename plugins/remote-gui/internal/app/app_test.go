@@ -16,6 +16,7 @@ func TestHelpAndInvalidCommands(t *testing.T) {
 		t.Fatalf("invalid command: %d %s", code, out.String())
 	}
 }
+
 func TestServiceDoctorDoesNotNeedGUI(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	var out bytes.Buffer
