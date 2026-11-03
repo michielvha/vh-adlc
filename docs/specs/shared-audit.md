@@ -1160,6 +1160,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-02 | R-12 | spec | `67a91a17944bb219ce956364963531532577c396` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-13 | spec | `dd878483b9eb6908b56c9c401db766cae2f46c3a` | claude-opus-5.5 | procedural | YAML validation/offline/cutover/ordering clarifications required; factual coverage and wording corrections. |
 | 2026-11-03 | R-14 | spec | `adb0c49988fc9fee05329fd21494e2f94729fe15` | claude-opus-5.5 | procedural | Skill-level offline, cutover enforcement, superseded record and fixture proof corrections required. |
+| 2026-11-03 | R-15 | spec | `24831961330d64f9e7f12649a95bee7129638bff` | claude-opus-5.5 | procedural | Intake/offline evidence, active-effect cutover checks, shared routing and guide proof corrections required. |
 
 ### R-1
 
@@ -1476,6 +1477,50 @@ EVIDENCE:
 - Line 154 is headed "Latest spec review" but discusses R-12, while R-13 is the latest returned review.
 - Line 124 presents "Current local validation at c98a6e42" as current, although the draft has since moved.
 PROPOSAL: Change line 143 to T89, give R-13's exact target, retitle line 154 as an earlier review, and mark the c98a6e42 validation as historical.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Consumer settings and format preservation (offline bootstrap); Tasks T92; Test Plan AC-01, AC-06
+EVIDENCE: shared-audit.md:394-397 says audit's first step overrides the loop's online installer "for every audit invocation" and "must not fall back to online setup or a knowledge fetch". shared-audit.md:286-287 sends ordinary-language audit requests "through the existing lifecycle intake". In lifecycle.md:18-19, intake step 2 says to "Resolve engineering knowledge through the existing installer and `vh-adlc knowledge` procedure", and the procedure is only selected in step 3 (lifecycle.md:23). SKILL.md:8 makes generic requests follow lifecycle.md first. That installer is the online one (loop.md:14), and it downloads and writes the cache when no binary is found (ensure-vh-adlc.sh:105-126 only refuses under `--offline`). An ordinary "show our audit status" request with an empty cache therefore downloads and writes the cache during intake, before the audit skill's offline step can run. T92 changes only SKILL.md and loop.md. The AC-01 and AC-06 proofs run the "audit skill-entry plan" and the operator bootstrap, not intake-routed entry, so they pass while this path stays online.
+PROPOSAL: State how lifecycle intake handles a request it will route to audit, for example by deferring installer and knowledge resolution until routing or by using the offline path for audit-intent requests. Add lifecycle.md to T92, and add an intake-routed cached/uncached sentinel case to the AC-01 proof.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Consumer settings and format preservation; Tasks T92
+EVIDENCE: shared-audit.md:395 makes `vh-adlc knowledge --offline` a normative audit entry step. No source in this tree documents such a flag. loop.md:32 gives the only knowledge form, `knowledge --repo <dir> --plugin-pin <pin> --page <path> ...`, and loop.md:47-48 lists `unreachable` as a knowledge result, which suggests a network fetch when a page is missing. The only `--offline` in the plugin is the installer's (ensure-vh-adlc.sh:10-16, 106-107). The locked binary is v0.9.0 (yaml-settings.md:142-143), and no Go source, CLI reference or lock bump is in `covers` or in any open task. The feature-document standard requires Design claims to be cited. If v0.9.0 has no offline knowledge mode, T92 cannot meet its done condition within this feature's scope.
+PROPOSAL: Cite the observed v0.9.0 `knowledge` flag and its cache-only behavior. If it does not exist, say how audit resolves pinned pages without a fetch (for example by reading already cached pages for the resolved revision and failing visibly when any is absent), or add the required binary change and its release ordering to the scope.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Stackweaver adapter, parity and rollback (cutover preflight); Tasks T87; Test Plan AC-05
+EVIDENCE: shared-audit.md:816 requires "Finish actively executing repair batches" before cutover. The mandatory gate at lines 824-828 refuses only "pending keys/rows, missing/unreadable registered roots or unknown registry state", and only a "declined-non-resource-only" run is named as passing. scripts/audit/journal.ts:163-180 (`registeredPending`) collects only `pendingResources(run)`. A pending merge, push, PR or issue intent with no observed outcome and no handoff (for example a lost merge acknowledgement, audit.md:200-202) is therefore invisible to the gate the Design builds on. The text does not say whether such a run passes or fails. The AC-05 proof covers only pending key/row, unreadable/missing root and the declined handoff. A cutover can therefore merge while a batch's remote effect is unreconciled, and every listed proof still passes. The YAML settings digest change then forces that run through the policy transition instead of ordinary recovery.
+PROPOSAL: State that any non-resource intent without an observed outcome or a recorded handoff blocks cutover, and require the preflight to tell such intents apart from retained declined handoffs. Add an AC-05 case with an unreconciled merge or push intent that must refuse.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Remediation and delivery authority; Tasks T94
+EVIDENCE: The owner's answer is folded in at shared-audit.md:621-630: a changed boundary, format, migration or intent leaves through "a separately specified feature and PR", and an audit PR cannot keep it "through a planning exception". The shared files that generic adopters and the batch reviewer follow still say only "feature/owner route": audit.md:140, audit-record.md:52, audit-review.md:17, lifecycle.md:109 and the helper message at scripts/audit/authority.ts:174. The Design itself keeps that wording at shared-audit.md:567 ("feature/owner route") and :646 ("feature/owner path"). Those references also do not require the member to stay visible or an explicit replacement selection. "Owner route" can be read as the superseded owner-approved in-batch exception. T94 names only "consumer audit policy/parity and generic/consumer selection contracts". No open task names these shared references, so the audit-specific reviewer could accept a superseded exception and every listed task would still be done.
+PROPOSAL: Replace "feature/owner route/path" in Design lines 567 and 646 with the separate feature and PR route. Name audit.md, audit-record.md, audit-review.md, lifecycle.md and the authority message in T94 (or a new task), with a package contract that the shared procedure states the separate-PR route, visibility and explicit reselection.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan AC-01, AC-02; Tasks T86, T89; Design, Stackweaver adapter (plugin 0.8.0)
+EVIDENCE: The Design converts audit settings to `.vh-adlc/audit.yaml` (shared-audit.md:385-389, 424) and makes 0.8.0 the audit candidate, saying to update "audit installation guidance" consistently (lines 807-811). Active guidance currently says otherwise. references/audit-settings.md:3 and :43 name `.vh-adlc/audit.json`, and :8-21 is a ```json example. docs/user-guides/workflows.md:73 says "Create `.vh-adlc/audit.json`". workflows.md:76, installation.md:124 and compatibility.md:31 say audit needs "plugin 0.7.0+", but published 0.7.0 has no audit operation (shared-audit.md:807-808). The AC-02 example check covers `examples/audit/basic/` and fixture writers. No proof row asserts that the reference and guides name only the `.yaml` path, that the reference's inline example is commented block YAML which loads, or that the guides state the 0.8.0 minimum. T86's "examples load" does not make this explicit. yaml-settings.md settled the same gap with AC-13 and a package test (yaml-settings.md:147-148, R-3 F-02).
+PROPOSAL: Add a pass condition, under AC-01 or AC-02, for a package test: audit-settings.md, workflows.md, installation.md and compatibility.md name only `.vh-adlc/audit.yaml` and plugin 0.8.0 for audit, and the reference's inline example fails `JSON.parse`, has a comment and loads through the audit loader. Name these files in T86 or T89.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks T75
+EVIDENCE: T75 is still unchecked and its title says "retain the pending owner route decision". Its progress line says "The owner route choice remains Q1, so this task and final completion stay open." Open Questions now reports Q1 answered and folded into T94 (shared-audit.md:1140-1142, 191-197). T75 therefore has no remaining done condition distinct from T94, and the standard requires each task to name a check that completes it.
+PROPOSAL: Restate T75's remaining done condition without the pending-Q1 dependency, or mark the route part as moved to T94 and tick T75 when its other listed work has evidence.
 
 ## Sources
 
