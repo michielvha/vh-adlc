@@ -10,7 +10,7 @@ import { fixture, git } from "./fixtures";
 import { terminal } from "./evidence";
 import { createLedgerCandidate } from "../../../plugins/vh-adlc/scripts/audit/ledger";
 const projects: ReturnType<typeof fixture>[] = [];
-function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"], defaultBranch = "main", indexBeforeFreeze=false, oldPolicyRun=false) {
+function context(carry = false, allAssessment = false, priorLedger = false, checkNames = ["unit"], defaultBranch = "main", indexBeforeFreeze=false, oldPolicyRun=false, extraRecord=false, history="") {
   const f = fixture(); projects.push(f);
   let pendingPolicyRun:ReturnType<typeof createRun>|undefined;
   if(oldPolicyRun){
@@ -19,6 +19,7 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
     intent(pendingPolicyRun,{id:"key",kind:"key",correlation:"owned-key",target:"dev:slot",actor:"actor",organization:"org",cleanup_method:"#cleanup"});
     f.write("audit-project.md",policy);f.commit();
   }
+  if (history) { f.write(history, '# Audit repair batch\n\n## Definition\n\n```json\n{"run_id":"historical"}\n```\n'); f.commit(); }
   const config = loadSettings(f.root), base = git(f.root, "rev-parse", "HEAD");
   git(f.root, "update-ref", "refs/remotes/origin/main", base); git(f.root, "switch", "-qc", "fix/audit-batch");
   let taskBase = base, carried: Definition["carried"] = null;
@@ -34,13 +35,20 @@ function context(carry = false, allAssessment = false, priorLedger = false, chec
   if (priorLedger) f.write(config.ledger_path, readFileSync(join(f.root, config.ledger_path), "utf8") + "\n### AUD-099 - Unapproved before freeze\nUnchecked source metadata.\n");
   // Actual disposable regression execution is retained separately by the model trial; these unit records are structural attestations.
   if(indexBeforeFreeze)f.write("docs/internal/README.md","# Internal docs\n\n| Audit record | Bounded audit repair evidence |\n");
-  if (!allAssessment) f.write("src/app.ts", "export const answer = 43;\n"); const repaired = allAssessment ? taskBase : f.commit("test: authored fixture repair");
+  if (!allAssessment) f.write("src/app.ts", "export const answer = 43;\n"); let repaired = allAssessment ? taskBase : f.commit("test: authored fixture repair");
   const path = "docs/internal/maintenance/audit-A-test.md";
   const definition: Definition = { schema_version: 1, repository: config.repository, hostname: config.hostname, default_branch: defaultBranch, run_id: "batch-test", workstream: "A",
     scope_baseline: base, task_base: taskBase, source_target: repaired, ledger_path: config.ledger_path, record_path: path,
     affected_paths: ["src/app.ts", config.ledger_path, path,...(indexBeforeFreeze?["docs/internal/README.md"]:[])], verification_inputs: ["src/app.ts",...(indexBeforeFreeze?["docs/internal/README.md"]:[])],
     members: ["AUD-001", "AUD-002"].map((id, i) => ({ id, disposition: i === 0 && !allAssessment ? "authored-repair" : "assessment-only", contract: "Existing documented return-value contract.", eligibility: "restoration", required_checks: checkNames, ...(i === 0 && !allAssessment ? { pre_fix: taskBase, repair_commit: repaired } : {}) })),
     carried };
+  if (extraRecord) {
+    const oldPath = "docs/internal/maintenance/audit-A-superseded.md";
+    definition.affected_paths.push(oldPath);
+    f.write(oldPath, renderRecord({ ...definition, run_id: "superseded-run", record_path: oldPath }));
+    repaired = f.commit("test: retain an old run record before source freeze");
+    definition.source_target = repaired;
+  }
   const sourceSnapshot = captureSnapshot(config, { mode: "fix", ids: ["AUD-001", "AUD-002"], baseline: base, scope_baseline: base, artifact_root: f.artifacts, required_checks: { "AUD-001": checkNames, "AUD-002": checkNames } });
   const sourceRows = sourceSnapshot.selected_ids.map(id => terminal(f, sourceSnapshot, id));
   sourceRows[0].disposition = allAssessment ? "assessment-only" : "authored-repair";
@@ -276,4 +284,30 @@ test("default advancement after publication blocks the old batch without a histo
  const result=checkBatch(c.config,c.input,{observe:c.observe});expect(result.pass).toBe(false);
  expect(result.errors).toContain("Scope baseline is not the fresh observed actual remote default/tracking tip.");
  expect(git(c.f.root,"rev-parse","HEAD")).toBe(c.target);
+});
+
+test("another run's changed record is refused even when declared in the full diff", () => {
+  const c = context(false, false, false, ["unit"], "main", false, false, true);
+  const result = checkBatch(c.config, c.input, { observe: c.observe });
+  expect(result.pass).toBe(false); expect(result.errors).toContain("Additional changed audit-batch record belongs to another run.");
+});
+
+test("literal record examples in changed source are not extra published records", () => {
+  const c = context(), path = "src/example.md";
+  c.definition.affected_paths.push(path); c.definition.verification_inputs.push(path);
+  c.f.write(path, "```markdown\n# Audit repair batch\n\n## Definition\nExample only.\n```\n");
+  c.f.write(c.config.ledger_path, readFileSync(join(c.f.root, c.config.ledger_path), "utf8"));
+  // Source edits after freeze are independently invalid; the example must not add a record finding.
+  c.f.commit(); retarget(c);
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).errors).not.toContain("Additional changed audit-batch record belongs to another run.");
+});
+
+
+test("an unchanged historical record already in Task base remains valid history", () => {
+  const c = context(false, false, false, ["unit"], "main", false, false, false, "docs/history.md");
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).pass).toBe(true);
+});
+test("a new run cannot overwrite a historical record at its own record path", () => {
+  const c = context(false, false, false, ["unit"], "main", false, false, false, "docs/internal/maintenance/audit-A-test.md");
+  expect(checkBatch(c.config, c.input, { observe: c.observe }).errors).toContain("A new audit run requires a record path absent from Task base.");
 });

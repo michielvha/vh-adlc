@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { canonicalJSON } from "../maintenance/journal";
 import { repositoryPath } from "../maintenance/authority";
-import { tableCells } from "./inventory";
+import { markdownSections, tableCells } from "./inventory";
 import { validateHistoricalCandidate, validateFrozenFixCandidate, type Candidate } from "./ledger";
 import { evaluateCommittedAssessments, validArtifact } from "./assessment";
 import { digest, git, gitBytes, hash, type Snapshot } from "./snapshot";
@@ -106,9 +106,22 @@ export function checkBatch(config: Settings, input: {
     if (!Array.isArray(def.affected_paths) || !Array.isArray(def.verification_inputs) ||
         [...def.affected_paths, ...def.verification_inputs].some(path => repositoryPath(path) !== path) ||
         !def.affected_paths.includes(config.ledger_path) || !def.affected_paths.includes(recordPath)) errors.push("Definition lacks its actual affected paths and verification inputs.");
+    if (git(config.root, "ls-tree", def.task_base, "--", recordPath)) errors.push("A new audit run requires a record path absent from Task base.");
     const metadata = new Set([config.ledger_path, recordPath]);
     if (def.verification_inputs.some(path => metadata.has(path)) || changed(config, def.source_target, target).some(path => !metadata.has(path))) errors.push("Source/test/config changed after frozen Verified source.");
     if (changed(config, def.scope_baseline, target).some(path => !def.affected_paths.includes(path))) errors.push("Full publication diff contains undeclared paths.");
+    for (const path of changed(config, def.task_base, target).filter(path => path !== recordPath)) {
+      const versions = [def.task_base, target].flatMap(commit => {
+        try { return [gitBytes(config.root, "show", `${commit}:${path}`).toString()]; } catch { return []; }
+      });
+      // Existing history is untouched; only this run's changed record may travel with the batch.
+      if (versions.some(bytes => {
+        const headings = [...markdownSections(bytes).headings.values()];
+        return headings.some(h => h.level === 1 && h.title === "Audit repair batch") && headings.some(h => h.level === 2 && h.title === "Definition");
+      })) {
+        errors.push("Additional changed audit-batch record belongs to another run.");
+      }
+    }
     if (!preservedLedger(gitBytes(config.root, "show", `${def.scope_baseline}:${config.ledger_path}`).toString(),
       gitBytes(config.root, "show", `${target}:${config.ledger_path}`).toString(), [...input.selection.ids, ...(def.carried?.ids ?? [])])) errors.push("Existing finding content, IDs or unrelated index cells were removed or rewritten.");
     if (def.carried) {

@@ -16,6 +16,16 @@ never relax the source-equivalence allowlist or hand-edit generated indexes. Thi
 support a separate tracked index whose bytes depend on the final ledger's status/content; it cannot
 be changed in the post-freeze metadata phase. Keep that proposal private until an accepted design
 supports its independently verified generation.
+After default advancement, archive the superseded record/reviews/commit references privately.
+A rebuilt run has a new record path, run ID, journal and current Scope baseline/Task base. Remove
+only its old branch-owned record and generated-index entry before the new scaffold/index/freeze;
+never remove or overwrite history already in the new Task base. Another changed audit-batch record
+cannot be carried merely by adding it to affected_paths. Preserve unchanged historical records.
+Re-observe each authored member's regression failing at the actual new pre-fix commit, then green
+at the final target. Earlier red artifacts are history; they cannot certify or be relabelled for the
+new Task base. Resolve scope anew for already-fixed or unresolved members. Rebuilding specifies
+proof identity and never grants a rewrite or force push.
+
 Replace every field with observed values. Its schema is:
 
 ```json
