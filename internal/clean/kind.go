@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
@@ -162,5 +163,22 @@ func (res *engineResult) deleteCluster(ctx context.Context, e *Engine, h kindHos
 		res.change(Item{Kind: KindKindMark, Name: m.Name, Rule: item.Rule}, dry, func() error {
 			return e.removeVolume(ctx, m.Name)
 		})
+	}
+}
+
+// realKindHost is this host's kindHost.
+func realKindHost() kindHost {
+	host, _ := os.Hostname()
+	return kindHost{
+		Hostname: host,
+		Kill:     func(pid int) error { return syscall.Kill(pid, 0) },
+		LookPath: exec.LookPath,
+		Run: func(ctx context.Context, name string, args ...string) error {
+			out, err := exec.CommandContext(ctx, name, args...).CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+			}
+			return nil
+		},
 	}
 }

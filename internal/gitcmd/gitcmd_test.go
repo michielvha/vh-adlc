@@ -41,7 +41,7 @@ func TestCheckVersionOutput(t *testing.T) {
 		{"not git", 2, 45, false, "git not git is older than the required 2.45"},
 	}
 	for _, c := range cases {
-		err := checkVersionOutput(c.out, c.major, c.minor)
+		err := CheckVersionOutput(c.out, c.major, c.minor)
 		if c.ok {
 			if err != nil {
 				t.Errorf("%q at %d.%d: %v", c.out, c.major, c.minor, err)

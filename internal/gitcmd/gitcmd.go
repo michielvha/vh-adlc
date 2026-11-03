@@ -114,10 +114,10 @@ func (g Git) CheckMinVersion(ctx context.Context, major, minor int) error {
 	if err != nil {
 		return err
 	}
-	return checkVersionOutput(out, major, minor)
+	return CheckVersionOutput(out, major, minor)
 }
 
-func checkVersionOutput(out string, major, minor int) error {
+func CheckVersionOutput(out string, major, minor int) error {
 	m := versionRe.FindStringSubmatch(out)
 	if m == nil {
 		return &TooOldError{Version: out, Major: major, Minor: minor}
