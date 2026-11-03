@@ -26,7 +26,9 @@ export function createIndependentRepairCase(root: string, transport: RecordingTr
   const sourceState = { id: "primary-repair", repository, branch: "main", remote, push_mode: "normal", pidfile: transport.pidfile };
   writeFileSync(join(git(owner, "rev-parse", "--path-format=absolute", "--git-common-dir"), "maintenance-fixture-transport.json"), JSON.stringify(sourceState));
   writeFileSync(join(root, "control/clone-sources.json"), JSON.stringify({ [remote]: { state: sourceState, hooks: join(dirname(item.primary.main), "hooks") } }));
-  const settings = Bun.YAML.parse(readFileSync(join(item.primary.main, ".vh-adlc/maintenance.yaml"), "utf8")) as Record<string, unknown>; settings.repositories = [{ repository, role: topology === "satellite" ? "synced" : "independent", ...(topology === "satellite" ? { sync_workflow: ".github/workflows/sync-builder.yml" } : {}) }];
+  const parsed: unknown = Bun.YAML.parse(readFileSync(join(item.primary.main, ".vh-adlc/maintenance.yaml"), "utf8"));
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw Error("fixture settings are not a mapping");
+  const settings = parsed as Record<string, unknown>; settings.repositories = [{ repository, role: topology === "satellite" ? "synced" : "independent", ...(topology === "satellite" ? { sync_workflow: ".github/workflows/sync-builder.yml" } : {}) }];
   if (topology === "satellite") {
     mkdirSync(join(item.primary.main, ".github/workflows"), { recursive: true }); mkdirSync(join(item.primary.main, "deps")); mkdirSync(join(root, "builds"));
     writeFileSync(join(item.primary.main, ".github/workflows/sync-builder.yml"), "name: Sync synthetic builder\non:\n  workflow_dispatch: {}\npermissions:\n  contents: read\njobs:\n  compare:\n    runs-on: ubuntu-latest\n    env:\n      SOURCE_REPOSITORY: example/builder\n      DESTINATION_FILE: deps/builder.version.json\n    steps:\n      - run: echo synthetic source ownership only\n");
