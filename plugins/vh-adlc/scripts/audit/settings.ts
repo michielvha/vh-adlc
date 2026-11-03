@@ -56,6 +56,29 @@ function file(root: string, value: unknown, field: string): string {
   return normalized;
 }
 
+export const AUDIT_KNOWLEDGE_PAGES = [
+  "conventions/feature-documents.md", "conventions/coding.md", "conventions/documentation.md",
+  "conventions/delivery.md", "guides/humanize-prose.md",
+] as const;
+function validPage(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._/-]*\.md$/.test(value) &&
+    value.split("/").every(part => !!part && ![".", "..", ".git"].includes(part.toLowerCase()));
+}
+function knowledgePages(value: unknown): string[] {
+  const additional = value === undefined ? [] : value;
+  if (!Array.isArray(additional) || additional.some(page => !validPage(page))) invalid("knowledge_pages");
+  const pages = [...AUDIT_KNOWLEDGE_PAGES, ...additional as string[]];
+  if (new Set(pages).size !== pages.length) invalid("knowledge_pages must not duplicate required or declared pages");
+  return pages;
+}
+/** Explicit setup supplies the local obligations; invocation never guesses a language. */
+export function requireKnowledgePages(config: Settings, required: readonly string[]): string[] {
+  if (required.some(page => !validPage(page) || !config.knowledge_pages.includes(page))) {
+    throw Error("audit setup/config mismatch: required engineering pages must be declared in knowledge_pages");
+  }
+  return [...config.knowledge_pages];
+}
+
 /** Reading settings performs no setup, permission refresh, or filesystem mutation. */
 export function loadSettings(directory: string, options: { settingsPath?: string } = {}): Settings {
   const root = realpathSync(directory);
@@ -72,7 +95,7 @@ export function loadSettings(directory: string, options: { settingsPath?: string
 export function settingsFromValue(value: unknown, identity: { root: string; repository: string; hostname: string },
   requested: string, resolveFile: (value: unknown, field: string) => string): Settings {
   const { root, repository, hostname } = identity, input = object(value, "settings object");
-  keys(input, ["schema_version", "repository", "hostname", "ledger_path", "project_procedure", "id_prefix", "profile"], "settings");
+  keys(input, ["schema_version", "repository", "hostname", "ledger_path", "project_procedure", "id_prefix", "profile", "knowledge_pages"], "settings");
   if (input.schema_version !== 1) invalid("schema_version must be 1");
   if (input.repository !== undefined && text(input.repository, "repository").toLowerCase() !== repository) invalid("repository conflicts with origin");
   if (input.hostname !== undefined && text(input.hostname, "hostname").toLowerCase() !== hostname) invalid("hostname conflicts with origin");
@@ -95,7 +118,7 @@ export function settingsFromValue(value: unknown, identity: { root: string; repo
   }
   if(profile.workstream_heading!==undefined)layout.workstream_heading=text(profile.workstream_heading,"workstream_heading");
   return {
-    schema_version: 1, root, repository, hostname,
+    schema_version: 1, root, repository, hostname, knowledge_pages: knowledgePages(input.knowledge_pages),
     settings_path: resolveFile(requested, "settings path"),
     ledger_path: resolveFile(input.ledger_path, "ledger_path"),
     project_procedure: resolveFile(input.project_procedure, "project_procedure"),

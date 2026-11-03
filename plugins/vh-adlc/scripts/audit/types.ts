@@ -15,6 +15,7 @@ export type Settings = {
   repository: string;
   hostname: string;
   settings_path: string;
+  knowledge_pages: string[];
   ledger_path: string;
   project_procedure: string;
   id_prefix: string;
