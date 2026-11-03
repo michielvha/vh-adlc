@@ -141,3 +141,21 @@ test("an invalid backtick fence does not hide an actual rendered finding", () =>
   expect(Bun.markdown.html(text)).toContain("<h3>AUD-002");
   expect(inventory(loadSettings(project(text).root)).findings.find(row=>row.id==="AUD-002")?.identity_valid).toBe(true);
 });
+
+
+test.each(["<pre>\n### AUD-099 - raw HTML text\n</pre>", "- item\n  <!--\n### AUD-099 - container edge\n-->"])("unsupported rendered block context is an explicit inventory gap: %s", extra => {
+  const result=inventory(loadSettings(project(ledger+"\n"+extra+"\n").root));
+  expect(result.diagnostics.some(row=>row.code==="unsupported-markdown-structure")).toBe(true);
+  expect(result.complete).toBe(false);expect(result.next_id).toBeNull();
+  expect(result.findings.every(row=>!row.identity_valid)).toBe(true);
+});
+
+
+test("a rendered index may retain a closed inline comment without hiding its table", () => {
+  const result=inventory(loadSettings(project(ledger.replace("## Severity index","## Severity index <!-- retained note -->")).root));
+  expect(result.complete).toBe(true);expect(result.findings.every(row=>row.identity_valid)).toBe(true);
+});
+test("an unsupported multiline setext title is a gap rather than a guessed insertion boundary", () => {
+  const result=inventory(loadSettings(project(ledger+"\nSummary first line\ncontinued title\n---\n").root));
+  expect(result.diagnostics.some(row=>row.code==="unsupported-markdown-structure")).toBe(true);expect(result.next_id).toBeNull();
+});

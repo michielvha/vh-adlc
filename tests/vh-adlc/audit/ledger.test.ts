@@ -288,3 +288,18 @@ test("an invalid backtick fence info string cannot hide a rendered section escap
   expect(Bun.markdown.html(body)).toContain("<h2>Escaped section</h2>");
   expect(()=>appendFindings(c.config,c.snap,[{id:"AUD-003",severity:"High",title:"Observed cause",body}])).toThrow();
 });
+
+
+test.each(["Impact\n===", "Details\n---"])("setext body heading cannot escape its finding section: %s", body => {
+  const c=context("full");expect(Bun.markdown.html(body)).toMatch(/<h[12]>/);
+  expect(()=>appendFindings(c.config,c.snap,[{id:"AUD-003",severity:"High",title:"New cause",body}])).toThrow();
+});
+test("notes and new findings stop before an existing setext section", () => {
+  const c=context("full"),tail="Later summary\n-------------\nKeep unrelated summary.\n";
+  c.f.write(c.config.ledger_path,ledger+"\n"+tail);c.f.commit();
+  const snap=captureSnapshot(c.config,{mode:"full",ids:["AUD-002"],artifact_root:c.f.artifacts});
+  const candidate=createLedgerCandidate(c.config,snap,{document:{schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(c.f,snap,"AUD-002")]},at:"2026-11-02",run_id:"setext-boundary"});
+  expect(candidate.bytes.indexOf("<!-- audit-run:setext-boundary:AUD-002 -->")).toBeLessThan(candidate.bytes.indexOf(tail));
+  const added=appendFindings(c.config,snap,[{id:"AUD-003",severity:"High",title:"New cause",body:"Current original scenario."}]);
+  expect(added.bytes.indexOf("### AUD-003")).toBeLessThan(added.bytes.indexOf(tail));
+});

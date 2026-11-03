@@ -63,7 +63,7 @@ function commentStart(text: string) {
   return -1;
 }
 export function markdownVisibility(text: string) {
-  let fence: { char: string; size: number } | undefined, comment = false, comments = false;
+  let fence: { char: string; size: number } | undefined, comment = false, comments = false, unsupported = false, list = false;
   const lines = text.split(/\r?\n/).map(raw => {
     const marker = raw.match(/^ {0,3}([~\x60])\1{2,}/);
     if (fence) {
@@ -73,7 +73,11 @@ export function markdownVisibility(text: string) {
     if (comment) { if (raw.includes("-->")) comment = false; return ""; }
     if (/^(?: {4}|\t)/.test(raw)) return "";
     if (marker && (marker[1] !== "`" || !raw.slice(marker[0].length).includes("`"))) { fence = { char: marker[1], size: marker[0].trim().length }; return ""; }
+    const indent = raw.match(/^[ \t]*/)![0].length, listMarker = /^ {0,3}(?:[-+*]|[0-9]+[.)])[ \t]+/.test(raw);
+    if (listMarker) list = true; else if (raw.trim() && !indent) list = false;
     const first = commentStart(raw);
+    if ((list && (indent > 0 || listMarker) || /^ {0,3}>/.test(raw)) && first >= 0) unsupported = true;
+    if (/^ {0,3}<\/?[A-Za-z][A-Za-z0-9-]*(?=[ \t/>]|$)/.test(maskInlineCode(raw))) unsupported = true;
     if (first >= 0) comments = true;
     // Only a line-start HTML comment opens a block across later headings.
     if (first >= 0 && /^ {0,3}<!--/.test(raw)) { comment = !raw.includes("-->", first + 4); return ""; }
@@ -85,10 +89,41 @@ export function markdownVisibility(text: string) {
     }
     return value;
   });
-  return { lines, balanced: !fence && !comment, comments };
+  return { lines, balanced: !fence && !comment, comments, unsupported };
 }
 export function visibleLines(text: string): string[] { return markdownVisibility(text).lines; }
 
+export type Section = { at: number; level: number; title: string };
+/** Let the renderer decide which annotated section candidates really render as headings. */
+export function markdownSections(text: string) {
+  const raw = text.split(/\r?\n/), candidates = new Map<number, Section>();
+  let marker = "VhAuditSectionMarker";
+  while (text.includes(marker)) marker += "X";
+  const annotated = raw.map((line, at) => {
+    const heading = line.match(/^ {0,3}(#{1,6})(?:[ \t]+(.*?)|$)$/);
+    if (heading) {
+      const visible = visibleLines(line)[0], visibleHeading = visible.match(/^ {0,3}#{1,6}(?:[ \t]+(.*?)|$)$/);
+      const title = (visibleHeading?.[1] ?? "").replace(/[ \t]+#+[ \t]*$/, "").trim();
+      candidates.set(at, { at, level: heading[1].length, title });
+      return line.slice(0, line.indexOf("#")) + heading[1] + " " + marker + at + "End " + (heading[2] ?? "");
+    }
+    const underline = raw[at + 1]?.match(/^ {0,3}(=+|-+)[ \t]*$/);
+    if (underline && /^ {0,3}\S/.test(line) && !/^(?: {0,3}(?:[-+*>#]|[0-9]+[.)])[ \t]| {0,3}[<`~]|[ \t]*[=-]+[ \t]*$)/.test(line) && !line.includes("|")) {
+      candidates.set(at, { at, level: underline[1][0] === "=" ? 1 : 2, title: visibleLines(line)[0].trim() });
+      return line.slice(0, line.length - line.trimStart().length) + marker + at + "End " + line.trimStart();
+    }
+    return line;
+  });
+  const headings = new Map<number, Section>(); let unsupported = false;
+  Bun.markdown.render(annotated.join("\n"), { heading(children, { level }) {
+    const found = children.match(new RegExp("^" + marker + "([0-9]+)End(?: |$)")), at = found ? Number(found[1]) : -1;
+    const candidate = candidates.get(at);
+    if (!candidate || candidate.level !== level) unsupported = true;
+    else headings.set(at, candidate);
+    return children;
+  } });
+  return { headings, unsupported };
+}
 function status(value: string): RecordedStatus {
   // A historical cell is never current proof; ambiguous prose is not a positive status.
   if (/\b(?:not|never|unverified|pending|was|previously)\b/i.test(value)) return "UNKNOWN";
@@ -107,7 +142,9 @@ function titleStatus(value: string): { raw: string; state: RecordedStatus } {
 export function inventory(config: Settings): Inventory { return inventoryMarkdown(config, readFileSync(join(config.root, config.ledger_path))); }
 export function inventoryMarkdown(config: Settings, input: string | Uint8Array): Inventory {
   const bytes = Buffer.from(input), text = bytes.toString("utf8"), visibility = markdownVisibility(text);
+  const sections = markdownSections(text), unsupported = visibility.unsupported || sections.unsupported;
   const lines = visibility.lines, diagnostics: Diagnostic[] = [], entries = new Map<string, number[]>();
+  if (unsupported) diagnostics.push({ code: "unsupported-markdown-structure" });
   if (!visibility.balanced) diagnostics.push({ code: "unterminated-markdown-block" });
   const indices = new Map<string, { line: number; state: RecordedStatus; raw: string; severity: string; aggregate: boolean }[]>();
   const range_summaries: Inventory["range_summaries"] = [];
@@ -116,9 +153,9 @@ export function inventoryMarkdown(config: Settings, input: string | Uint8Array):
   const rangeID = new RegExp("^(" + config.id_prefix + "-([0-9]+))\\.\\.(" + config.id_prefix + "-([0-9]+))$");
   let indexLevel = 0, indexSections = 0, statusColumn = -1, severityColumn = -1, titleColumn = -1;
   for (const [offset, line] of lines.entries()) {
-    const number = offset + 1, heading = line.match(/^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/);
+    const number = offset + 1, heading = sections.headings.get(offset);
     if (heading) {
-      const level = heading[1].length, title = heading[2].trim();
+      const { level, title } = heading;
       if (indexLevel && level <= indexLevel) indexLevel = 0;
       if (title === config.profile.index_heading) {
         indexLevel = level; indexSections++; statusColumn = -1; severityColumn = -1; titleColumn = -1;
@@ -191,7 +228,7 @@ export function inventoryMarkdown(config: Settings, input: string | Uint8Array):
       recorded_status_text: rows.length === 1 ? rows[0].raw : "",
       severity: rows.length === 1 ? rows[0].severity : "unknown",
       aggregate: rows.some(row => row.aggregate),
-      identity_valid: indexSections === 1 && rows.length === 1 && heads.length === 1 && !alias && !rows[0].aggregate &&
+      identity_valid: !unsupported && indexSections === 1 && rows.length === 1 && heads.length === 1 && !alias && !rows[0].aggregate &&
         id.slice(config.id_prefix.length + 1).length <= 16 &&
         Number.isSafeInteger(numeric) && numeric > 0,
     };
@@ -205,7 +242,7 @@ export function inventoryMarkdown(config: Settings, input: string | Uint8Array):
     ledger_path: config.ledger_path, ledger_digest: createHash("sha256").update(bytes).digest("hex"),
     findings, diagnostics, complete: !diagnostics.length && findings.length > 0,
     highest_id: highest,
-    next_id: unsafe || highest === Number.MAX_SAFE_INTEGER ? null : config.id_prefix + "-" + String(highest + 1).padStart(width, "0"),
+    next_id: unsupported || unsafe || highest === Number.MAX_SAFE_INTEGER ? null : config.id_prefix + "-" + String(highest + 1).padStart(width, "0"),
     recorded_counts, range_summaries, verification: "not-performed",
   };
 }

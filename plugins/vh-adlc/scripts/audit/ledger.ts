@@ -3,7 +3,7 @@ import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
 import { inspectAuthority, refreshDefault, validRequest, validConstraints, type AuthorityOptions } from "./authority";
 import { evaluateAssessments, evaluateCandidateAssessments, evaluateCommittedAssessments, evaluateFrozenCandidateAssessments, type Assessment } from "./assessment";
-import { tableCells, visibleLines, markdownVisibility, maskInlineCode, escapeInlineHtml, inventoryMarkdown } from "./inventory";
+import { tableCells, visibleLines, markdownVisibility, maskInlineCode, escapeInlineHtml, inventoryMarkdown, markdownSections } from "./inventory";
 import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
 import { loadSettings } from "./settings";
@@ -40,6 +40,7 @@ export function createLedgerCandidate(config: Settings, snap: Snapshot, options:
   return renderCandidate(config, snap, options, readFileSync(join(config.root, config.ledger_path), "utf8"));
 }
 function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOptions, original: string): Candidate {
+  if (snap.inventory.diagnostics.some(row => row.code === "unsupported-markdown-structure")) fail("unsupported Markdown structure requires explicit reconciliation");
   if (!snap.scope_baseline) fail("a reachable next scope baseline is required for this update");
   const lines = original.split("\n");
   const datedLayout = visibleLines(original).some(line => /^ {0,3}#{1,6}[ \t]+How this audit was performed(?:[ \t]+#+)?[ \t]*$/i.test(line));
@@ -71,10 +72,10 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
   for (const row of rows) {
     const finding = snap.inventory.findings.find(f => f.id === row.id)!;
     let end = finding.entry_lines[0];
-    const visible = visibleLines(lines.join("\n"));
+    const sections = markdownSections(lines.join("\n")).headings;
     while (end < lines.length) {
-      const heading = visible[end]?.match(/^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/);
-      if (heading && heading[1].length <= config.profile.finding_level) break;
+      const heading = sections.get(end);
+      if (heading && heading.level <= config.profile.finding_level) break;
       end++;
     }
     const marker = `<!-- audit-run:${options.run_id}:${row.id} -->`;
@@ -121,7 +122,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
 }
 function verifyRenderedInventory(config: Settings, snap: Snapshot, original: string, bytes: string, newIDs: string[], changed: string[]) {
   const before = inventoryMarkdown(config, original), after = inventoryMarkdown(config, bytes);
-  if (digest(before) !== digest(snap.inventory) || !markdownVisibility(bytes).balanced || digest(after.findings.map(f => f.id).sort()) !== digest([...before.findings.map(f => f.id), ...newIDs].sort())) fail("rendered ledger changes finding visibility or declared identity scope");
+  if (digest(before) !== digest(snap.inventory) || !markdownVisibility(bytes).balanced || after.diagnostics.some(row => row.code === "unsupported-markdown-structure") || digest(after.findings.map(f => f.id).sort()) !== digest([...before.findings.map(f => f.id), ...newIDs].sort())) fail("rendered ledger changes finding visibility or declared identity scope");
   const oldLines = original.split("\n"), newLines = bytes.split("\n");
   for (const finding of before.findings) {
     const next = after.findings.find(f => f.id === finding.id);
@@ -157,6 +158,7 @@ export function validateFrozenFixCandidate(config: Settings, snap: Snapshot, can
   } catch { return false; }
 }
 function appendBytes(config: Settings, snap: Snapshot, original: string, findings: NewFinding[]) {
+  if (snap.inventory.diagnostics.some(row => row.code === "unsupported-markdown-structure")) fail("unsupported Markdown structure requires explicit reconciliation");
   if (!["full", "reverify"].includes(snap.mode) || snap.inventory.next_id === null || !findings.length) fail("new findings require a selected audit pass and safe allocation");
   const delta = snap.mode === "reverify" && snap.history.status === "scoped" && snap.history.baseline ?
     new Set(git(config.root, "diff", "--name-only", "-z", snap.history.baseline, snap.source.commit, "--").split("\0").filter(Boolean)) : null;
@@ -168,23 +170,21 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
         /[\x00-\x1f\x7f|]/.test(finding.title + finding.severity) || finding.body.includes("\0") || new RegExp("^#{1,6}\\s+" + config.id_prefix + "-", "m").test(finding.body)) fail("new IDs must follow the reserved high-water mark with a single supported finding identity");
     const visibility = markdownVisibility(finding.body);
     if (!visibility.balanced || visibility.comments || visibility.lines.some(line => /<[A-Za-z][^>]*|<\//.test(maskInlineCode(line).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g, "")))) fail("new finding body requires balanced Markdown and HTML examples in code");
-    if (visibleLines(finding.body).some(line => {
-      const heading = line.match(/^ {0,3}(#{1,6})[ \t]+/); return heading && heading[1].length <= config.profile.finding_level;
-    })) fail("new finding body cannot escape its configured section level");
+    let escapingHeading = false;
+    Bun.markdown.render(finding.body, { heading(children, { level }) { if (level <= config.profile.finding_level) escapingHeading = true; return children; } });
+    if (escapingHeading) fail("new finding body cannot escape its configured section level");
     if (snap.mode === "reverify" && (!delta || !Array.isArray(finding.delta_paths) || !finding.delta_paths.length ||
         finding.delta_paths.some(path => repositoryPath(path) !== path || !delta.has(path) || [config.ledger_path, config.settings_path, config.project_procedure].includes(path) ||
           !/^100(?:644|755) blob /.test(git(config.root, "ls-tree", snap.source.commit, "--", path))))) fail("reverify new findings must cite actual related changed source paths; missing history never triggers full audit");
   }
   const lines = original.split("\n");
-  const visibleIndex = visibleLines(lines.join("\n")), sections = visibleIndex.flatMap((line, at) => {
-    const heading = line.match(/^ {0,3}(#{1,6})[ \t]+(.+?)(?:[ \t]+#+)?[ \t]*$/);
-    return heading && heading[2].trim() === config.profile.index_heading ? [{ at, level: heading[1].length }] : [];
-  });
+  const visibleIndex = visibleLines(lines.join("\n")), sectionMap = markdownSections(lines.join("\n")).headings;
+  const sections = [...sectionMap.values()].filter(heading => heading.title === config.profile.index_heading);
   if (sections.length !== 1) fail("one visible index heading is required");
   const section = sections[0]; let header = section.at + 1;
   while (header < lines.length && tableCells(visibleIndex[header])[0]?.toUpperCase() !== "ID") {
-    const heading = visibleIndex[header].match(/^ {0,3}(#{1,6})[ \t]+/);
-    if (heading && heading[1].length <= section.level) fail("index table missing"); header++;
+    const heading = sectionMap.get(header);
+    if (heading && heading.level <= section.level) fail("index table missing"); header++;
   }
   if (header >= lines.length) fail("index table missing");
   const cells = tableCells(lines[header]); let end = header + 2;
@@ -197,14 +197,12 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
     return "";
   }).join(" | ") + " |");
   lines.splice(end, 0, ...rows);
-  const visible = visibleLines(lines.join("\n")), findingHeading = new RegExp("^ {0,3}#{" + config.profile.finding_level + "}[ \t]+" + config.id_prefix + "-[0-9]+(?=\\s|$|:)");
+  const sectionHeads = markdownSections(lines.join("\n")).headings;
+  const findingTitle = new RegExp("^" + config.id_prefix + "-[0-9]+(?=\\s|$|:)");
   let last = -1;
-  for (const [at, line] of visible.entries()) if (findingHeading.test(line)) last = at;
+  for (const heading of sectionHeads.values()) if (heading.level === config.profile.finding_level && findingTitle.test(heading.title)) last = heading.at;
   let insertion = lines.length;
-  for (let at = last + 1; last >= 0 && at < visible.length; at++) {
-    const heading = visible[at].match(/^ {0,3}(#{1,6})[ \t]+/);
-    if (heading && heading[1].length <= config.profile.finding_level) { insertion = at; break; }
-  }
+  for (const heading of sectionHeads.values()) if (last >= 0 && heading.at > last && heading.level <= config.profile.finding_level) { insertion = heading.at; break; }
   lines.splice(insertion, 0, ...findings.flatMap(finding => ["", "#".repeat(config.profile.finding_level) + " " + finding.id + " - " + escapeInlineHtml(finding.title), finding.body, ""]));
   return lines.join("\n");
 }

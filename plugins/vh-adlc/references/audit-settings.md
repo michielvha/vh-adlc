@@ -125,7 +125,17 @@ rejects a prohibited write/commit before refreshing refs or creating an owned br
 
 New title/severity text is rendered as literal HTML text outside code spans. New bodies must keep
 fences and comments balanced; put HTML examples in code spans or fenced code rather than raw tags.
-The renderer locates the visible index with the inventory grammar, then re-inventories its complete
-output. Original identities, heading/index classes and unselected rows must remain visible; each
+The audit helper requires Bun 1.4+ and uses its Markdown renderer to establish which section
+headings actually render, including single-line setext sections. New bodies cannot introduce a
+rendered heading at or above the finding level. The renderer locates the actual index and then
+re-inventories its complete output. Original identities, heading/index classes and unselected rows must remain visible; each
 new ID needs one visible OPEN index row and finding entry. An unbalanced existing ledger remains
 inspectable as a gap, but canonical updates wait for explicit reconciliation rather than rewriting it.
+
+
+Raw HTML blocks, container-nested comments and unsupported multiline setext section titles
+are explicit inventory gaps. Status and private reporting remain available, while terminal verdicts,
+new IDs and canonical ledger updates wait for reconciliation. No format rewrite is performed. Use
+ATX finding headings for this profile; supported single-line setext section boundaries retain their
+original lines. Fence info-string and inline-comment handling follow the renderer, rather than
+hiding a heading merely because it looks like code or a comment to a line scanner.
