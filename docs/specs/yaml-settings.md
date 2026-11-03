@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-02 at R-5. R-5's non-blocking findings carry into the task list, outside the normative baseline."
+status: in-progress
+status_description: "Implementing on feat/yaml-settings, claimed locally and unpushed by the owner's instruction. The vhco-pro/docs rule, the pin move and Stackweaver's branch come after this repository's tasks."
 issue: null
+branch: feat/yaml-settings
 goal: "Triage and maintenance settings are YAML, Stackweaver's move is reviewed, and the pinned conventions forbid choosing JSON over YAML. Audit is a known exception until its revision lands."
 covers:
   - plugins/vh-adlc/scripts/settings-file.ts
