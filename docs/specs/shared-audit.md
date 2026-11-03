@@ -179,6 +179,14 @@ changed package content before reserving 0.8.0, while the known colliding-versio
 red; nothing was published. T89 must cover the entire package diff, including T91, before further
 package implementation. This ordering failure is retained alongside the earlier `90b2416` failure.
 
+The corrected draft at `5ed104cd14ace9ffab4174543b8e53ee75d9e2b6` passes all 371 focused audit
+checks/988 assertions with source/index/refs preserved (`revision-r15-prepared/input/execution.json`).
+Its lint and the actual reissued R-14 record check pass. The binary's next operation is owner decision
+because Q1 is unanswered. The next full spec review waits for that route choice so the decision and
+YAML corrections can be reviewed together; no R-15 review or revised acceptance is claimed. YAML
+implementation, version reservation, final complete gates, actual marketplace tests and cutover
+remain pending. Both owning worktrees are clean at their recorded local commits.
+
 ### Earlier accepted R-12 review and implementation obligation
 
 Actual Copilot `claude-opus-5.5` R-12 reviewed `67a91a17944bb219ce956364963531532577c396`
