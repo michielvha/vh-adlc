@@ -28,7 +28,7 @@ The historical results below retain their original scope.
 
 ## Persistent codebase audit
 
-The audit operation is a harness-agnostic skill and Bun/Git helper package in the 0.7.0 candidate.
+The audit operation is a harness-agnostic skill and Bun/Git helper package in the 0.8.0 candidate.
 Its local structural tests cover historical inventory, current-source bindings, conservative verdicts,
 owned ledger updates, selected repair batches, scoped policy, interruption recovery and cutover denials.
 These tests do not establish that a model actually followed the procedure.

@@ -21,7 +21,7 @@ Both pin auth-refresh to the same component commit.
 
 ## Persistent audit
 
-`vh-adlc-audit` is packaged in the 0.7.0 candidate. It keeps persistent findings, re-verification and
+`vh-adlc-audit` is packaged in the 0.8.0 candidate. It keeps persistent findings, re-verification and
 selected repairs portable while consumers retain their ledgers and operating rules. Candidate source
 checks do not establish marketplace availability. Publish and test actual fresh/upgrade/reinstall
 behavior before adopting a consumer migration. See the [audit workflow](../user-guides/workflows.md#persistent-codebase-audit)

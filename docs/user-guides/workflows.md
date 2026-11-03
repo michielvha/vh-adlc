@@ -70,10 +70,12 @@ The configured ledger keeps stable finding IDs and dated evidence. Recorded FIXE
 current verification needs the original scenario, current source, observed checks and independent
 challenge. Missing or stale evidence remains unknown or partial.
 
-Create `.vh-adlc/audit.json` and a project procedure using the
+Create `.vh-adlc/audit.yaml` and a project procedure using the
 [audit settings and complete example](../../plugins/vh-adlc/references/audit-settings.md).
 Keep domain knowledge, finding format, verification commands and operating policy in your repository.
-The shared operation requires plugin 0.7.0+, Bun 1.4+ with its Markdown renderer and Git. A missing operation is an installation blocker.
+The shared operation requires plugin 0.8.0+, Bun 1.4+ with its Markdown renderer and Git. A missing operation is an installation blocker. Explicit setup must cache the locked verified binary and
+every normalized `knowledge_pages` page at the consumer’s pinned revision. Audit entry is offline;
+missing binary or pages gets a setup handoff without an automatic download.
 A dependency/security sweep still uses maintenance; diagnosis without a persistent ledger still uses
 investigation. Ambiguous audit requests need a scope question.
 

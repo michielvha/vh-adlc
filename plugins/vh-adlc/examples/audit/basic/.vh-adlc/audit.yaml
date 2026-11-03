@@ -1,10 +1,12 @@
-# Fixture settings, written the way a person edits them.
+# Audit settings for a TypeScript project; adapt paths and declared pages.
 schema_version: 1
 repository: example/project
 hostname: github.com
 ledger_path: docs/audit.md
 project_procedure: audit-project.md
 id_prefix: AUD
+knowledge_pages:
+  - conventions/typescript.md
 profile:
   name: markdown-audit-v1
   index_heading: Severity index

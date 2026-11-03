@@ -121,9 +121,11 @@ Maintenance uses an agent procedure with observed evidence, rather than triage's
 managed publication controller. The other feature operations continue to use the
 verified binary without requiring Bun.
 
-Persistent codebase audit requires plugin 0.7.0+, Bun and Git. Create the
+Persistent codebase audit requires plugin 0.8.0+, Bun and Git. Create the
 [audit settings and project procedure](../../plugins/vh-adlc/references/audit-settings.md) in the
-consumer repository before running its helpers. The example supplies new files; no existing personal
+consumer repository before running its helpers. Use `.vh-adlc/audit.yaml`, declare the required language
+pages in `knowledge_pages`, then explicitly cache the locked binary and the complete normalized docs
+page set. Audit entry always uses offline bootstrap and knowledge; missing caches stop at setup. The example supplies new files; no existing personal
 configuration is assumed. The operation uses artifact-backed agent verification. It does not inherit
 triage's controller, provision credentials or grant remote effects merely by being installed.
 

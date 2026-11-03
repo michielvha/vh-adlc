@@ -1,25 +1,57 @@
 # Audit settings and project policy
 
-The consumer owns `.vh-adlc/audit.json`, its existing Markdown ledger and its project procedure.
+The consumer owns `.vh-adlc/audit.yaml`, its existing Markdown ledger and its project procedure.
 Use the complete files under `examples/audit/basic/` for a new adopter. Create and adapt those files;
 do not assume the user has another host's configuration. An explicit audit request without settings
 gets these paths and a setup handoff. Merely invoking status does not create them.
 
-```json
-{
-  "schema_version": 1,
-  "repository": "example/project",
-  "hostname": "github.com",
-  "ledger_path": "docs/audit.md",
-  "project_procedure": "audit-project.md",
-  "id_prefix": "AUD",
-  "profile": {
-    "name": "markdown-audit-v1",
-    "index_heading": "Severity index",
-    "finding_level": 3
-  }
-}
+```yaml
+# Audit settings for a TypeScript project; adapt paths and declared pages.
+schema_version: 1
+repository: example/project
+hostname: github.com
+ledger_path: docs/audit.md
+project_procedure: audit-project.md
+id_prefix: AUD
+knowledge_pages:
+  - conventions/typescript.md
+profile:
+  name: markdown-audit-v1
+  index_heading: Severity index
+  finding_level: 3
 ```
+
+## Explicit setup and offline entry
+
+Audit requires plugin 0.8.0+, Bun 1.4+ and Git. First obtain the verified locked `vh-adlc` binary
+with `bash <plugin>/scripts/ensure-vh-adlc.sh`. This explicit setup may download into the private
+binary cache. Create the YAML, ledger and project procedure using the complete example. Remove
+alternate `.json` or `.yml` audit settings; they fail closed even with an explicit YAML path.
+
+Read `bun <plugin>/scripts/audit/cli.ts settings --repo <checkout>` for the normalized
+`knowledge_pages`. The effective list contains feature-documents, coding, documentation, delivery
+and humanize-prose, followed by the additional pages in declared order. Declare every locally
+required language page before setup: this TypeScript example adds TypeScript; a Go/React project
+must declare its own applicable pages. Setup must compare that list with the repository's pinned
+instruction obligations and stop on a mismatch. Invocation never guesses languages or drops pages.
+Unknown, duplicate, absolute, URL, traversal or non-Markdown page paths are invalid.
+
+Resolve the entire normalized list with an explicit online `vh-adlc knowledge --repo <checkout>
+--plugin-pin <knowledge.md pin> --page <path> ...` setup call. Retain its resolved revision and page
+list; every page must be available in the caller's docs cache at that revision. A copied binary
+alone does not prepare the docs cache. Stop setup if any required page is missing.
+
+Every later audit entry, including status and lifecycle intake, uses `ensure-vh-adlc.sh --offline`,
+reads only this validated metadata, then runs `vh-adlc knowledge --offline` for that exact page set.
+A missing binary or incomplete docs cache gives a prerequisite handoff before any audit work;
+run explicit setup separately. Entry never retries online. Settings reads themselves download
+nothing and create no audit artifacts, ledger, journal, worktree or permission.
+
+Reader failures stay distinct: `settings-reader-unavailable` means the locked verified binary is
+unavailable; `settings-reader-refused` means YAML was refused without disclosing its content.
+Candidate/adopted inspections report `settings-link-stale` for a stale instruction link and
+`settings-suffix-conflict` for a committed alternate suffix. They validate the complete schema and
+same-commit files, comparing exact working/committed YAML bytes and values. Neither failure grants an action.
 
 Identity comes from origin. Optional repository/hostname values must match it; a nonstandard host
 must be explicit. Paths must name existing regular files contained in the checkout. Unknown keys,
@@ -40,7 +72,7 @@ remain visible gaps. Historical FIXED/emoji counts are never current verificatio
 ## Optional standing effects
 
 A generic adopter has no standing live or remote permission. For an adopted rule, committed default
-AGENTS.md must link to `.vh-adlc/audit.json`; that committed settings file names this project procedure.
+AGENTS.md must link to `.vh-adlc/audit.yaml`; that committed settings file names this project procedure.
 Resolve that chain from freshly fetched origin/default Git objects before each applicable effect.
 Do not read a candidate declaration, copied settings, finding, report or journal as authorization.
 Current explicit selection and restrictions still apply. Failed fetch or a no-fetch request gives
