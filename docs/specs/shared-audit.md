@@ -147,6 +147,24 @@ The consumer reconciled current default `7428e487` into local migration commit `
 audit and preserved-route tests passed and the real ledger checksum stayed unchanged. Private
 semantic parity review still requires its separate payload approval. Feature publication stays pending.
 
+Public implementation progress review R5 at `bff70effa6a7cefa34326586264ce1a2a001b158`
+returned resource-reselection/restart, Markdown boundary and committed-history validation gaps.
+T50-T52 track them. The separately renderer-confirmed backtick-info defect is already corrected
+under T49 at `99d105e0`. The complete plugin suite there passes 902 tests/3399 assertions using
+owned RAM-backed fixtures with unchanged deadlines. Native candidate installs and final-helper
+repair validation also pass. Actual recovery still records one commit, one squash and exactly two
+resource cleanups. A later allocation-only model response used nonterminal STILL_PRESENT rather
+than the oracle's UNKNOWN; its native failure remains retained and T53 requires a justified,
+independently reviewed correction rather than a fabricated pass.
+
+The owner separately approved the bounded private audit workflow review on 2026-11-03. Its first
+actual Opus pass at shared `99d105e0` and consumer `721fac53` found substantive retained-policy,
+ledger-maintenance and rollback gaps tracked in T54-T61. The return and private packet remain
+local; the packet excludes the real ledger, application source, tracker data, credentials and host
+configuration and passed its secret scan. The first pass missed two required complete duplicate-file
+reads, so it is not a clean acceptance review. All findings still require correction and a complete
+fresh paired review. The accepted normative spec and every criterion remain unchanged/unchecked.
+
 ## Scope
 
 Deliver one discoverable `vh-adlc-audit` skill and canonical audit procedure for status,
@@ -841,6 +859,18 @@ live operations remain separate owner-selected tasks.
       Evidence: A fix snapshot incorrectly inherits its historical comparison before correction (`T45-T48-red.log`). Snapshot/ledger/batch integration then passes 100 tests/221 assertions (`T48-green.log`). Omitting fix scope now leaves it null and the actual provisional candidate refuses to render; explicitly naming the reachable default ancestor succeeds. Positive fixtures now provide that separate scope input. Historical comparison remains independent.
 - [x] T49 inventory/ledger fence grammar - reject a backtick in a backtick-fence info string as a fence opener, preserving actual rendered finding and section boundaries (renderer-observed follow-up to R4 F-01; AC-02, AC-03).
       Evidence: Bun Markdown renders the escaped heading while inventory/new-body checks incorrectly hide it (`T49-red.log`, two observed failures). The full inventory/ledger rerun passes (`T49-green.log`) after the parser refuses backticks in a backtick-fence info string. Literal valid fences and code examples retain the existing behavior.
+- [ ] T50 durable journal registration and controls - bind a run before its first live plan and block completion/live admission on pending resources across artifact roots and reselected runs; preserve read-only recovery after drift (R5 F-01; AC-04).
+- [ ] T51 Markdown section grammar and conservative gaps - recognize setext section boundaries, reject escaping new bodies, and expose unsupported raw HTML/container-comment structures as reconciliation gaps (R5 F-02; AC-02, AC-03).
+- [ ] T52 committed snapshot history validation - re-derive comparison reachability/reasons and validate next Scope baseline from actual Git objects before reconstructing provisional/carried candidates (R5 F-03; AC-03, AC-04).
+- [ ] T53 bounded allocation-trial oracle - resolve the nonterminal UNKNOWN/STILL_PRESENT ambiguity in the allocation-only observation without admitting terminal claims, retain the original native failure, and obtain independent review of the correction (AC-02, AC-06).
+- [ ] T54 checked full-ledger maintenance - preserve severity placement, adopter-specific index cells, workstream membership, coverage/positive-observation truth and checked line-reference updates without removing historical findings or unrelated prose (private parity feedback; AC-02, AC-03, AC-05).
+- [ ] T55 dated legacy ledger notes - retain changed-status-only inline history and unchanged findings in the summary for the established adopter layout (private parity feedback; AC-02, AC-05).
+- [ ] T56 coherent consumer policy and coverage - restore complete local rules, missing challenge/operational details and valid heading links; keep shipping conventions as references rather than copied grants (private parity feedback; AC-05).
+- [ ] T57 frozen consumer selection - resolve workstream/next/explicit IDs into presented exact compatible batches and reconcile the retained continuation/coupling rules without silent expansion (private parity feedback; AC-04, AC-05).
+- [ ] T58 scoped consumer verification methods - define actual owned development target/key/row lookup, cleanup and absence methods; distinguish owned verification rebuilds from separately approved shared restarts (private parity feedback; AC-04, AC-05).
+- [ ] T59 consumer publication and CI conditions - expose the report-only delivery option, preserve private pending reports, reject skip-marked carry into code publication, retain squash-message CI rules and scope owned branch cleanup (private parity feedback; AC-04, AC-05).
+- [ ] T60 shared-route rollback - remove/reapply only the audit route in shared instruction files and prove newer unrelated routes survive while retaining conflict checks for audit-owned bytes (private parity feedback; AC-05, AC-07).
+- [ ] T61 adoption-safe consumer contracts - distinguish candidate ledger/baseline guards from post-adoption checks and use a squash-stable internal changelog disposition (private parity feedback; AC-05, AC-07).
 - [ ] T22 `tests/vh-adlc/audit/trial-proof.ts` and bounded synthetic trial runners - execute actual Copilot Opus 5.5 audit/repair/recovery trials at a committed payload, including independent repair review and adverse controls; raw transcripts, native exits and manual inspections establish the declared scenarios (AC-01, AC-03, AC-04, AC-06).
 - [x] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
       Evidence: Actual isolated Codex CLI and Claude CLI native installers at `deb1d7fcb60b416a7980fdf0825acd2d3a94e77d` both pass (`native-install-r2/result.json`): twelve native skills, installed settings/inventory/report helpers, unchanged source/index and identical byte/mode payload after uninstall/reinstall. No authentication/configuration is copied or model invoked by installers. The short-SHA launch failure remains `native-install-r1-launch.log`; four verifier negative-control tests pass. This is local-catalog candidate evidence, not published-marketplace, real Claude model or GUI acceptance.
