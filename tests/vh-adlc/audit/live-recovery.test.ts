@@ -116,3 +116,21 @@ test("a missing registered header blocks another live attempt rather than forget
   expect(()=>intent(next,{id:"key",kind:"key",correlation:"new-key",...c.scope})).toThrow();
   expect(()=>liveReady(next)).toThrow();
 });
+
+
+test.each(["changed","unavailable"])("per-resource cleanup resolves current scope and blocks a %s second organization",async kind=>{
+  const c=context(),other={...c.scope,organization:"second-owned-org"};
+  resourceIntents(c.reload(),[{id:"a",kind:"key",correlation:"owned-a",...c.scope},{id:"b",kind:"row",correlation:"owned-b",...other}]);
+  const remaining=new Set(["a","b"]),deleted:string[]=[];
+  const resolve=(action:any)=>{if(action.id==="b"){if(kind==="unavailable")throw Error("current lookup unavailable");return {...other,organization:"changed-org"};}return c.scope;};
+  const result=await cleanupPending(c.reload(),resolve,{authorized:true,lookup:async action=>remaining.has(action.id)?[{id:action.id,...(action.id==="a"?c.scope:other)}]:[],cleanup:async action=>{deleted.push(action.id);remaining.delete(action.id);}});
+  expect(deleted).toEqual(["a"]);expect(result.ready).toBe(false);expect(result.handoffs).toEqual([{action:"b",reason:kind==="unavailable"?"cleanup-policy-unavailable":"cleanup-scope-or-policy-changed"}]);
+});
+
+
+test("a complete authorized multi-organization plan cleans each exact resource once",async()=>{
+  const c=context(),other={...c.scope,organization:"second-owned-org"};resourceIntents(c.reload(),[{id:"a",kind:"key",correlation:"owned-a",...c.scope},{id:"b",kind:"row",correlation:"owned-b",...other}]);
+  const remaining=new Set(["a","b"]),deleted:string[]=[];
+  const result=await cleanupPending(c.reload(),action=>action.id==="a"?c.scope:other,{authorized:true,lookup:async action=>remaining.has(action.id)?[{id:action.id,...(action.id==="a"?c.scope:other)}]:[],cleanup:async action=>{deleted.push(action.id);remaining.delete(action.id);}});
+  expect(result.ready).toBe(true);expect(deleted).toEqual(["a","b"]);expect(result.handoffs).toEqual([]);expect(remaining.size).toBe(0);
+});

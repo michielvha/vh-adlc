@@ -29,7 +29,7 @@ export function liveReady(run: Run): boolean {
   requireRegistered(run);
   return registeredPending(run.config).length === 0;
 }
-export async function cleanupPending(run: Run, scope: Scope, transport: {
+export async function cleanupPending(run: Run, scope: Scope | ((action: Intent) => Scope), transport: {
   authorized: boolean; lookup: (action: Intent, recordedID?: string) => Promise<Resource[]>; cleanup: (action: Intent, resource: Resource) => Promise<void>;
 }) {
   run = reload(run);
@@ -39,13 +39,18 @@ export async function cleanupPending(run: Run, scope: Scope, transport: {
   for (const event of pending) {
     const action = event.payload as Intent;
     const recordedID = (run.events.find(e => e.kind === "resource" && e.action_id === action.id)?.payload as { resource_id: string } | undefined)?.resource_id;
-    let reason = "";
-    if (Object.entries(scope).some(([k, v]) => action[k as keyof Intent] !== v)) reason = "cleanup-scope-or-policy-changed";
+    let reason = "", current: Scope;
+    try {
+      current = typeof scope === "function" ? scope(action) : scope;
+      const fields = ["target", "actor", "organization", "cleanup_method"];
+      if (!current || typeof current !== "object" || Array.isArray(current) || Object.keys(current).some(key => !fields.includes(key)) || fields.some(key => !Object.hasOwn(current,key) || typeof current[key as keyof Scope] !== "string" || !current[key as keyof Scope])) throw Error("scope unavailable");
+    } catch { handoff(run,action.id,"cleanup-policy-unavailable"); handoffs.push({action:action.id,reason:"cleanup-policy-unavailable"}); continue; }
+    if (Object.entries(current).some(([k, v]) => action[k as keyof Intent] !== v)) reason = "cleanup-scope-or-policy-changed";
     else if (!transport.authorized) reason = "cleanup-permission-denied";
     else {
       let resources: Resource[];
       try { resources = await transport.lookup(action, recordedID); } catch { resources = []; reason = "cleanup-lookup-unavailable"; }
-      if (!reason && (resources.length > 1 || resources.some(resource => !resource.id || recordedID && resource.id !== recordedID || Object.entries(scope).some(([k, v]) => resource[k as keyof Resource] !== v)))) reason = "cleanup-ownership-ambiguous";
+      if (!reason && (resources.length > 1 || resources.some(resource => !resource.id || recordedID && resource.id !== recordedID || Object.entries(current).some(([k, v]) => resource[k as keyof Resource] !== v)))) reason = "cleanup-ownership-ambiguous";
       if (!reason) {
         if (resources.length) {
           // The caller resolves this method from current authorized policy, never executes journal strings.

@@ -25,10 +25,15 @@ additional execution or publication permission.
 | Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
 | Merge | Separate approval for that exact action, or the explicitly selected audit batch's current/adopted `conditional-merge` permission and all retained gates in [audit.md](audit.md) |
-| Tag, release, deploy, restart a running app, end a live session | Separate approval for that exact action; audit grants none of these effects |
+| Rebuild/restart an owned audit verification runtime | Current explicit permission or adopted `live-verify` naming that exact owned development target and method, with all local ownership/restriction gates |
+| Tag, release, deploy, restart an unrelated/shared app, end a live session | Separate approval for that exact action; audit grants none of these effects |
 | Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
 | Enabling automatic merged-branch deletion or cleaning stale merged branches | Owner-authorized repository configuration or branch cleanup; verify current tips are merged and preserve active worktrees |
 | Another repository, account or feature | A new scope decision |
+
+Scoped audit `live-verify` covers only the owned development target, temporary test resources and
+methods its current/adopted verification policy actually names. It grants no persistent credential
+change, live-data migration, production/shared operation or unrelated destructive cleanup.
 
 A lifecycle-selected operation inherits only the underlying task's authority.
 Its direct-invocation publication grant does not transfer through selection:

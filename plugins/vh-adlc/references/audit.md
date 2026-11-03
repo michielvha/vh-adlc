@@ -223,3 +223,12 @@ current-policy journal during an explicit handoff; it does not recreate outcomes
 authorize cleanup or reactivate resources. Registration is local private recovery metadata, not a
 tracked file, ref, index update or shell-resistant proof boundary. Another independent Git clone
 needs an explicit journal handoff; do not infer absence from a clone that lacks the prior run state.
+
+
+A permitted live gate may span multiple owned actor/organization scopes. The trusted adapter can
+supply `cleanupPending` a synchronous per-action scope resolver built from its current validated
+policy/manifest. Every resolved scope must contain exactly target, actor, organization and cleanup
+method, match that intent, and be verified against lookup results. Missing/changed resolution leaves
+a handoff; a function or incomplete object is never treated as an empty scope check. This API adds
+no live authority. An owned verification-runtime rebuild needs the exact adopted/current target
+permission; unrelated/shared or production restarts still require their own approval.
