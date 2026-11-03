@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-audit
-status_description: "R-20 verifies the complete shared code and both hosted platforms. The consumer must refresh its advanced default branch, expose candidate-denial diagnostics and prove policy-object equivalence before the final review. PR #44 remains in progress; publication and adoption are pending."
+status_description: "R-21 returns all seven source criteria met at shared 60460709 and consumer 4a469873. The complete source gate is next. PR #44, actual marketplace acceptance and consumer adoption remain in delivery."
 issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -1054,24 +1054,31 @@ live operations remain separate owner-selected tasks.
 ## Acceptance Criteria
 
 - [x] AC-01: Native skill discovery and ordinary lifecycle intake select the shared audit procedure for its declared modes, preserve other routes, and reject invalid scope without writes or an invented harness/model dependency.
+      Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
       Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
 - [x] AC-02: Adopters using strict YAML settings through the shared verified reader can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
+      Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
       Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
 - [x] AC-03: Current assessments and update proposals preserve stable IDs/history and admit FIXED/MOOT only with complete target-bound evidence and the required adversarial check, while stale, missing or contradictory evidence remains visibly incomplete and cannot yield an eligible terminal update.
+      Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
       Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
 - [x] AC-04: Selected audit repairs use the existing reviewed repair/feature lifecycle and the consumer's required verification and authority, preserve workstream boundaries and recover from interruption without silently replaying stale or duplicating completed effects.
+      Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
       Evidence: R-20 returned met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
-- [ ] AC-05: Stackweaver's adapter preserves every parity-mapped audit behavior with the owner-approved separate-feature routing change, command/model/arguments, real ledger bytes and unrelated workflows, and can roll back/reapply only its migration paths against current main.
+- [x] AC-05: Stackweaver's adapter preserves every parity-mapped audit behavior with the owner-approved separate-feature routing change, command/model/arguments, real ledger bytes and unrelated workflows, and can roll back/reapply only its migration paths against current main.
+      Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
       Evidence: R-20 returned not met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
-- [ ] AC-06: The committed source passes its required automated suites, independent exact-commit review, isolated native Codex/Claude installation and helper checks, and bounded actual Copilot Opus 5.5 generic/consumer behavior trials with adversarial negative controls and explicit test limits.
+- [x] AC-06: The committed source passes its required automated suites, independent exact-commit review, isolated native Codex/Claude installation and helper checks, and bounded actual Copilot Opus 5.5 generic/consumer behavior trials with adversarial negative controls and explicit test limits.
+      Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
       Evidence: R-20 returned not met; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
-- [ ] AC-07: Consumer cutover is blocked without matching published-marketplace and paired-review artifacts, and the documented delivery procedure verifies the published shared component and installed operation before adopting Stackweaver, retaining exact revisions, rollback and deferred capability limits.
+- [x] AC-07: Consumer cutover is blocked without matching published-marketplace and paired-review artifacts, and the documented delivery procedure verifies the published shared component and installed operation before adopting Stackweaver, retaining exact revisions, rollback and deferred capability limits.
+      Evidence: R-21 returns met at shared 60460709 and current consumer 4a469873; actual source checks and unchanged-object proof are recorded below. Publication/adoption results remain separate delivery evidence.
       Evidence: R-20 returned not verified; complete shared execution is observed. Consumer refresh and exact policy-object equivalence remain open.
       Evidence: R-19 returned not verified; its focused execution passes, but complete executable and retained-proof coverage remains T98.
 
@@ -1283,10 +1290,14 @@ live operations remain separate owner-selected tasks.
       Evidence: An extra cold-reader canary found that the version probe executed an unverified PATH program and wrote to its isolated HOME (`T97-unverified-probe-red.log`). The committed regression run reproduces three relevant failures (`T97-red-r2.log`); its separate real-release download failure is a sandbox network restriction, and the first attempt could not write its RAM fixture root. Offline mode now skips that unverified probe and tries only verified sources. All 41 installer, YAML and isolated-entry checks pass with network permitted for explicit test setup (`T97-green-r1.log`), preserving the online caller behavior. The earlier complete package run at `0bdcace` passed all 1,090 tests; the new payload still requires its refreshed native and full-gate checks.
 - [x] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
       Evidence: Actual isolated Codex CLI and Claude CLI native installers at `deb1d7fcb60b416a7980fdf0825acd2d3a94e77d` both pass (`native-install-r2/result.json`): twelve native skills, installed settings/inventory/report helpers, unchanged source/index and identical byte/mode payload after uninstall/reinstall. No authentication/configuration is copied or model invoked by installers. The short-SHA launch failure remains `native-install-r1-launch.log`; four verifier negative-control tests pass. This is local-catalog candidate evidence, not published-marketplace, real Claude model or GUI acceptance.
-- [ ] T24 `Stackweaver:tests/agent-audit/parity.json`, migration fixtures and paired review artifacts - independently verify full legacy-to-map/adapter coverage and bounded consumer policy behavior at exact commits, correcting omissions and rerunning affected checks; no private packet is transferred without applicable approval (AC-05, AC-06).
-- [ ] T98 review evidence - retain installed synthetic report/snapshot files; independently bind older model-trial helpers to current Git objects, provide raw bounded native/model and approved consumer evidence, run every required suite through review launchers, and observe hosted Linux/macOS CI at the actual PR commit (R-19; AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
+- [x] T24 `Stackweaver:tests/agent-audit/parity.json`, migration fixtures and paired review artifacts - independently verify full legacy-to-map/adapter coverage and bounded consumer policy behavior at exact commits, correcting omissions and rerunning affected checks; no private packet is transferred without applicable approval (AC-05, AC-06).
+      Evidence: Actual Copilot Opus 5.5 read the complete bound legacy/current consumer workflow and shared implementation in R-20 (68 required files, full reads). R-21 verifies the refreshed consumer 4a469873, 100 passing parity/preflight/rollback/adjacent contracts and the unchanged policy objects, with every source criterion met. The bounded private packet excludes application source, real ledger and tracker data; only public-safe returned records are stored here. Raw evidence stays local.
+- [x] T98 review evidence - retain installed synthetic report/snapshot files; independently bind older model-trial helpers to current Git objects, provide raw bounded native/model and approved consumer evidence, run every required suite through review launchers, and observe hosted Linux/macOS CI at the actual PR commit (R-19; AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
       Progress: R-20 executes all 1,092 package tests, every required check, both new native installs and model-proof regrading successfully; replacement hosted CI 41717534624 passes Linux (1,092) and macOS (935). Its consumer run has 99 passes and one correct live-default refusal: read-only observation confirms remote main advanced to 2c98be05 while the reviewed branch includes f14becc1. The earlier failed run and R-20 remain unchanged. Consumer refresh, diagnostic output and three cited consumer-policy Git-object checks remain open. Hosted run 41715388667 passes Linux and Go, but the portable macOS job exposes the ready-entry fixture seeding Linux’s cache path. The test now seeds the actual Darwin Library/Caches path; local entry checks pass, with a real hosted rerun still required. The independently executable model-proof checker passes nine actual native contexts, verifies 90 unchanged plugin Git objects, both installed payloads and retained report/snapshot bytes, and replays actual toy red/green plus an adversarial check (`T98-model-proof-dry-r1.log`). `T98-native-retention-red.log` proves the prior candidate receipts lack retained report/snapshot files. The native runner now saves their exact bytes before fixture disposal; its four existing structural checks pass. A fresh committed native run will verify the actual retained files. R-19's own launcher passes 117 tests with checkout/index/refs preservation, but its limited packet cannot establish the composite criteria. The actual full primary suite passes 1,092 tests at the same source. Both results are retained honestly. Native report retention and a complete independently executable proof bundle are the next implementation work. Publication for CI may use an explicitly in-progress PR; completion and consumer cutover remain blocked.
-- [ ] T25 `docs/specs/shared-audit.md` and exact committed feature/consumer snapshots - run the complete required local gates and independent implementation review, resolve all criterion gaps and preserve R-12 recovery evidence; source completion requires every current criterion met/residualised by the approved process, while actual marketplace/post-merge checks remain the ordered delivery obligations (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
+      Evidence: R-21 re-observes 100 current-consumer checks with zero failures, actual valid/unadopted/non-granting policy and exact mode-effects parity, an empty registered-state inventory and the unchanged real ledger. The old b844cdd candidate still refuses after default advanced. All three policy files from the actual delivery-model-r3 trial match current Git blobs and copied trial bytes. The whole shared tree is identical to the fully tested 0743ef07 except its own review document. Its 1,092 source tests, native installs, nine regraded model contexts, required checks and hosted Linux/Mac results retain their actual target and are not relabelled as reruns. Same independent reviewer context, requested model 5.5, procedural isolation; the malformed initial headers and AC-07 interpretation are retained in the local original response, completed against the unchanged accepted Test Plan. No delivery event is fabricated.
+- [x] T25 `docs/specs/shared-audit.md` and exact committed feature/consumer snapshots - run the complete required local gates and independent implementation review, resolve all criterion gaps and preserve R-12 recovery evidence; source completion requires every current criterion met/residualised by the approved process, while actual marketplace/post-merge checks remain the ordered delivery obligations (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
+
+      Evidence: R-21 completes the current independent source review with all seven criteria met, after the R-20 failed consumer result was retained and corrected through ordinary current-main reconciliation. The binary review check confirms exact returned records. Source completion still needs the complete gate before status changes; actual publication, marketplace and post-merge obligations follow in order.
 
 ## Open Questions
 
@@ -1318,6 +1329,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-03 | R-18 | spec | `e471cf650f687c677b0e6fcd5d4e8709b0623d15` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-19 | implementation | `4a31ee68bb9007648aabf928edb65d3cad28ee74` | claude-opus-5.5 | procedural | All seven criteria not verified: executable review coverage and retained evidence are incomplete. No new code finding. |
 | 2026-11-03 | R-20 | implementation | `0743ef0758d40c18c040f336a28dc88659466666` | claude-opus-5.5 | procedural | AC-01 to AC-04 met; consumer candidate denied after upstream advance, consumer trial equivalence incomplete; strict extra-read deviation disclosed. |
+| 2026-11-03 | R-21 | implementation | `60460709e21529c2e7237ed002e3e1b1a15ace7f` | claude-opus-5.5 | procedural | All seven source criteria met after current consumer verification and policy-object proof. Delivery remains ordered after the source gate. |
 
 ### R-1
 
@@ -1922,6 +1934,60 @@ CRITERION: none
 LOCATION: review procedure
 EVIDENCE: Before execution, this reviewer used one extra read-only shell command to print the eight argument-free launcher scripts. Each script contains only a fixed invocation of `check.py` with its step number. The command wrote nothing, and every launcher still ran exactly once in order.
 CORRECTION: None required for source. Disclosed for procedural isolation.
+### R-21
+
+CRITERION: AC-01 Native skill discovery and ordinary lifecycle intake select the shared audit procedure for its declared modes, preserve other routes, and reject invalid scope without writes or an invented harness/model dependency.
+VERDICT: met
+EVIDENCE: Shared 60460709 differs from 0743ef07 only in docs/specs/shared-audit.md. The R-21 launcher checked this with a Git diff and a full tree comparison that excluded that one path. In R-20 I ran the following at 0743ef07, and all passed:
+- the five package groups: 1092 tests across 93 files, with a 120000 ms limit per test
+- the required Go, lint, workflow and companion-plugin checks
+- the isolated native install and discovery checks on Codex CLI and Claude CLI: 12 skills, zero model invocations
+- the proof regrading
+
+R-21 confirmed that all eight of those step results are preserved, passed and tied to 0743ef07. Hosted run 41717534624 at 0743ef07 re-observed success for the Linux checker, macOS checker and Go verify jobs. No result is claimed as a new run at 60460709.
+
+CRITERION: AC-02 Adopters using strict YAML settings through the shared verified reader can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
+VERDICT: met
+EVIDENCE: Tree equivalence carries over the settings, inventory and ledger suites I ran at 0743ef07 in R-20. The consumer settings blob b0aaa0a0 is unchanged. In the fresh R-21 consumer run (100 pass, 0 fail, 776 expect calls across 6 files), the YAML settings, parity and preflight contracts passed. The real ledger hash was checked as preserved without exporting its contents.
+
+CRITERION: AC-03 Current assessments and update proposals preserve stable IDs/history and admit FIXED/MOOT only with complete target-bound evidence and the required adversarial check, while stale, missing or contradictory evidence remains visibly incomplete and cannot yield an eligible terminal update.
+VERDICT: met
+EVIDENCE: The snapshot, report and update-validation suites carry over through tree equivalence from my R-20 runs at 0743ef07. The R-20 proof step regraded nine original native trial contexts and verified 90 committed plugin objects unchanged since the model-trial baseline at 0bdcacee. It observed toy regressions red at pre-fix commit 165d6689 and green, with a fresh adversarial check, at e5ffc72c. R-21 confirmed that step result is preserved and passed.
+
+CRITERION: AC-04 Selected audit repairs use the existing reviewed repair/feature lifecycle and the consumer's required verification and authority, preserve workstream boundaries and recover from interruption without silently replaying stale or duplicating completed effects.
+VERDICT: met
+EVIDENCE: The authority, journal, batch and recovery suites carry over through tree equivalence from my R-20 runs at 0743ef07. In R-21, the read-only `journal-registered-outstanding` inspection on the consumer returned an empty outstanding set, with no retry, completion or merge grant. The launcher made no journal change, resource operation or merge, and confirmed that checkout, index and refs were unchanged.
+
+CRITERION: AC-05 Stackweaver's adapter preserves every parity-mapped audit behavior with the owner-approved separate-feature routing change, command/model/arguments, real ledger bytes and unrelated workflows, and can roll back/reapply only its migration paths against current main.
+VERDICT: met
+EVIDENCE:
+- **Consumer files:** Consumer 4a469873 is non-forcibly merged with the current default 2c98be05. Every consumer workflow and test object inspected in R-20 has the same blob at b844cdd and 4a469873, except tests/agent-audit/contract.test.ts. That file only gained a diagnostic that surfaces the helper's refusal reason.
+- **Fresh consumer run:** The agent-audit, agent-maintenance and agent-triage contracts passed 100 of 100 tests. This includes the rollback and reapply rehearsal, the preflight tests and the real candidate test.
+- **Real candidate helper at 4a469873:** It returned valid, not allowed and not adopted, bound to default 2c98be05. Its per-mode effects equal the parity effect matrix, with effects digest 9b3e9474.
+- **Stale candidate at b844cdd:** It still exits 1 with valid false. This confirms that the earlier denial came from the advanced default, not from a code defect.
+- **Ledger:** The real ledger hash is preserved.
+- **Legacy-to-map coverage:** In R-20 I read the full legacy and current consumer policy independently, and the policy blobs have not changed since.
+
+CRITERION: AC-06 The committed source passes its required automated suites, independent exact-commit review, isolated native Codex/Claude installation and helper checks, and bounded actual Copilot Opus 5.5 generic/consumer behavior trials with adversarial negative controls and explicit test limits.
+VERDICT: met
+EVIDENCE:
+- **Suites and checks at 0743ef07:** In R-20 I ran the full package groups (1092 tests), the required Go, lint, workflow and companion-plugin checks, and the native install on both hosts. The native install used Codex 0.163.0 and Claude 2.1.316 with plugin 0.8.0, and kept the report and snapshot files.
+- **Hosted CI at 0743ef07:** Run 41717534624 passed Linux (1092 tests), macOS (935 tests) and Go verify.
+- **Equivalence to 60460709:** It rests on the full Git tree comparison, not on a rerun.
+- **Model trials:** The regraded nine-trial proof applies through the 90 unchanged objects. The consumer delivery-model trial ran at consumer 4a41311f. Its three policy files (agents/audit-project.md, CLAUDE.md, agents/ship.md) match the current consumer and the copied trial input, as Git blobs and as sha256 values.
+- **This review:** This exact-commit independent review of 60460709 and 4a469873 leaves no open blocking finding.
+- **Owner-deferred:** The real Claude model and GUI/phone.
+
+CRITERION: AC-07 Consumer cutover is blocked without matching published-marketplace and paired-review artifacts, and the documented delivery procedure verifies the published shared component and installed operation before adopting Stackweaver, retaining exact revisions, rollback and deferred capability limits.
+VERDICT: met
+EVIDENCE: This verdict covers the source gate and candidate obligations only. I reread Design (line 1038), the AC-07 Test Plan row (line 1088) and T25 (line 1289). They consistently order publication, marketplace fresh install and upgrade, the paired review at the published commit, installed preflight and post-merge adopted-policy inspection after source completion. I find no contradiction with the criterion. Its source-level parts are cutover blocking and the documented ordered procedure, and every source proof the Test Plan names was observed:
+- **Shared adoption unit tests:** These ran in the R-20 full suite at 0743ef07 and carry over through tree equivalence. They reject a local-catalog receipt, a maintenance operation, wrong version, source, consumer commit or payload digest, a wrong review model or review bytes, policy grant, effect, blob or transcript mismatches, an absent policy, a missing or duplicate host, a missing upgrade, native failure, source or index drift, copied credentials, tampered or escaping artifacts, and mixed review content. A valid unchanged receipt passes, with its attestation limit stated.
+- **Consumer preflight tests:** These ran in the fresh R-21 100-test run. They reject a committed local candidate that lacks published receipts, uncommitted scope, a maintenance-only install, pending intents of every kind, free-reason handoffs, unreadable roots and a 0.7 payload.
+- **Candidate installs:** The R-20 native step passed at 0743ef07 on both hosts as local-catalog candidates.
+- **Real committed candidate:** It is valid and grants no action.
+- **Documented procedure:** The consumer README and the audit settings reference document publish-first ordering, exact-commit paired review and installed preflight before merge, post-merge `policy-adopted` parity comparison, the hash-bound scoped rollback and the remaining limits.
+
+Not claimed: publication, signed release verification, real marketplace fresh install and upgrade, the published paired review, final installed preflight, consumer merge and post-merge adoption, including its induced-mismatch rollback handoff. None of these has happened. They remain mandatory ordered delivery work, and consumer cutover stays blocked until they pass.
 ## Sources
 
 - [Current configuration rule](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md#configuration-format) and [TypeScript conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md): YAML for human-written settings, typed boundaries and repository-specific verification after the pin adopted on main.
