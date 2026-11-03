@@ -110,3 +110,10 @@ a duplicate run ID in another root is refused. The helper reads the current poli
 and all registered runs, refusing completion while any key/row cleanup is pending, including a
 denied or ambiguous handoff from an earlier selected scope. Missing registered state is unknown. An empty journal records that no resources
 were registered; it supplies no authority or independent execution proof.
+
+
+Committed provisional and carried reconstruction re-derives comparison status, baseline reachability
+and its standard reason from actual source Git objects. The next Scope baseline must also be a
+hex commit reachable from that assessed source. Rehashing edited snapshot JSON does not validate
+invented history, arbitrary reason text or an invalid next baseline. Missing reachable comparison
+history remains an unscoped reassessment requirement.

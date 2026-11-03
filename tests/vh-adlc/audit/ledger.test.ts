@@ -1,8 +1,8 @@
 import { afterEach, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createLedgerCandidate, validateLedgerCandidate, applyLedgerCandidate, cleanupOwnedLedger, appendFindings } from "../../../plugins/vh-adlc/scripts/audit/ledger";
-import { captureSnapshot, hash } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
+import { createLedgerCandidate, validateLedgerCandidate, applyLedgerCandidate, cleanupOwnedLedger, appendFindings, validateHistoricalCandidate, validateFrozenFixCandidate } from "../../../plugins/vh-adlc/scripts/audit/ledger";
+import { captureSnapshot, hash, digest } from "../../../plugins/vh-adlc/scripts/audit/snapshot";
 import { inventory, visibleLines } from "../../../plugins/vh-adlc/scripts/audit/inventory";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/audit/settings";
 import { fixture, git, ledger } from "./fixtures";
@@ -302,4 +302,26 @@ test("notes and new findings stop before an existing setext section", () => {
   expect(candidate.bytes.indexOf("<!-- audit-run:setext-boundary:AUD-002 -->")).toBeLessThan(candidate.bytes.indexOf(tail));
   const added=appendFindings(c.config,snap,[{id:"AUD-003",severity:"High",title:"New cause",body:"Current original scenario."}]);
   expect(added.bytes.indexOf("### AUD-003")).toBeLessThan(added.bytes.indexOf(tail));
+});
+
+
+test.each(["historical", "provisional"])("%s reconstruction re-derives history and scope rather than trusting a rehashed snapshot", kind => {
+  const c=context(),snap=kind==="historical"?c.snap:captureSnapshot(c.config,{mode:"fix",ids:["AUD-001"],baseline:c.base,scope_baseline:c.base,artifact_root:c.f.artifacts,required_checks:{"AUD-001":["unit"]}});
+  const document={schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(c.f,snap)]};
+  const candidate=createLedgerCandidate(c.config,snap,{document,at:"2026-11-02",run_id:"forged-history",provisional:kind==="provisional"});
+  const check=kind==="historical"?validateHistoricalCandidate:validateFrozenFixCandidate;
+  expect(check(c.config,snap,candidate,document)).toBe(true);
+  for(const change of ["malformed-comparison","missing-ancestor","injected-reason","invalid-scope"]){
+    const {digest:_,...body}=structuredClone(snap);
+    if(change==="malformed-comparison")body.history.baseline="bad <details>";
+    if(change==="missing-ancestor")body.history.baseline="e".repeat(40);
+    if(change==="injected-reason")body.history.reason="Unchecked <details> reason";
+    if(change==="invalid-scope")body.scope_baseline="bad-scope";
+    const forged={...body,digest:digest(body)},doc={...document,snapshot_digest:forged.digest};
+    const comparison=(value:typeof snap)=>`Comparison: ${value.history.status}; baseline: ${value.history.baseline??"unavailable"}. ${value.history.reason}`;
+    const bytes=candidate.bytes.replaceAll(snap.digest,forged.digest).replaceAll(comparison(snap),comparison(forged)).replaceAll("Scope baseline: "+snap.scope_baseline,"Scope baseline: "+forged.scope_baseline);
+    const {digest:__,...candidateBody}=candidate;
+    const altered={...candidateBody,snapshot_digest:forged.digest,assessments_digest:digest(doc),scope_baseline:forged.scope_baseline!,bytes};
+    expect(check(c.config,forged,{...altered,digest:digest(altered)},doc)).toBe(false);
+  }
 });

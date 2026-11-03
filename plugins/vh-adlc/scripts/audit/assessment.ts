@@ -1,7 +1,7 @@
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, sep } from "node:path";
 import { resolveInside } from "../triage/settings";
-import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
+import { validSnapshotHistory, checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
 
 type Artifact = { path: string; sha256: string };
@@ -46,6 +46,7 @@ function evaluate(config: Settings, snap: Snapshot, document: unknown, committed
     if (committed) {
       const { digest: claimed, ...body } = snap;
       if (digest(body) !== claimed) errors.push("Snapshot identity changed.");
+      if (!validSnapshotHistory(config,snap)) errors.push("Committed comparison history or scope differs from actual Git ancestry.");
       for (const [name, path] of [["settings", config.settings_path], ["ledger", config.ledger_path], ["procedure", config.project_procedure]] as const) {
         if (hash(gitBytes(config.root, "show", `${snap.source.commit}:${path}`)) !== snap.bindings[name]) errors.push("Committed audit bindings differ.");
       }

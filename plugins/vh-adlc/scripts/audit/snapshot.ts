@@ -47,6 +47,30 @@ function source(root: string) {
   };
 }
 export type Snapshot = ReturnType<typeof captureSnapshot>;
+function comparisonHistory(config: Settings, baseline: string | null | undefined, target: string) {
+  if (baseline != null && (typeof baseline !== "string" || !/^[a-f0-9]{40,64}$/.test(baseline))) throw Error("invalid audit comparison baseline");
+  const history: {status:"scoped"|"unscoped";baseline:string|null;reason:string} = {
+    status:"unscoped",baseline:baseline??null,reason:"No reachable comparison baseline was supplied; directly reassess selected findings."
+  };
+  if (baseline) {
+    try {
+      git(config.root,"cat-file","-e",baseline+"^{commit}");
+      git(config.root,"merge-base","--is-ancestor",baseline,target);
+      return {status:"scoped" as const,baseline,reason:"Resolved ancestor of assessed source."};
+    } catch { /* Missing history requires direct reassessment. */ }
+  }
+  return history;
+}
+export function validSnapshotHistory(config: Settings, snap: Snapshot): boolean {
+  try {
+    if (!/^[a-f0-9]{40,64}$/.test(snap.source.commit) || digest(comparisonHistory(config,snap.history.baseline,snap.source.commit)) !== digest(snap.history)) return false;
+    if (snap.scope_baseline !== null) {
+      if (typeof snap.scope_baseline !== "string" || !/^[a-f0-9]{40,64}$/.test(snap.scope_baseline)) return false;
+      git(config.root,"merge-base","--is-ancestor",snap.scope_baseline,snap.source.commit);
+    }
+    return true;
+  } catch { return false; }
+}
 export function captureSnapshot(config: Settings, options: {
   mode: AuditMode; ids?: string[]; artifact_root: string; baseline?: string; scope_baseline?: string; required_checks?: Record<string, string[]>;
 }) {
@@ -59,18 +83,7 @@ export function captureSnapshot(config: Settings, options: {
   const required_checks = options.required_checks ?? {};
   if (Object.entries(required_checks).some(([id, checks]) => !selected_ids.includes(id) || !Array.isArray(checks) ||
       new Set(checks).size !== checks.length || checks.some(check => typeof check !== "string" || !check.trim()))) throw Error("invalid required audit checks");
-  if (options.baseline !== undefined && (typeof options.baseline !== "string" || !/^[a-f0-9]{40,64}$/.test(options.baseline))) throw Error("invalid audit comparison baseline");
-  const target = source(config.root);
-  let history: { status: "scoped" | "unscoped"; baseline: string | null; reason: string } = {
-    status: "unscoped", baseline: options.baseline ?? null, reason: "No reachable comparison baseline was supplied; directly reassess selected findings.",
-  };
-  if (options.baseline && /^[a-f0-9]{40,64}$/.test(options.baseline)) {
-    try {
-      git(config.root, "cat-file", "-e", options.baseline + "^{commit}");
-      git(config.root, "merge-base", "--is-ancestor", options.baseline, target.commit);
-      history = { status: "scoped", baseline: options.baseline, reason: "Resolved ancestor of assessed source." };
-    } catch { /* Missing, shallow and non-ancestor history all require direct reassessment. */ }
-  }
+  const target = source(config.root), history = comparisonHistory(config, options.baseline, target.commit);
   const scope_baseline = options.scope_baseline ?? (options.mode === "fix" ? null : target.commit);
   if (scope_baseline) {
     if (!/^[a-f0-9]{40,64}$/.test(scope_baseline)) throw Error("invalid audit scope baseline");
