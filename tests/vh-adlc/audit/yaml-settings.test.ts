@@ -123,7 +123,7 @@ function coldReader(c: ReturnType<typeof project>, unverified = false) {
   }
   if (unverified) {
     const lock = JSON.parse(readFileSync(resolve(import.meta.dir, "../../../plugins/vh-adlc/vh-adlc.lock.json"), "utf8")) as { version: string };
-    writeFileSync(join(bin, "vh-adlc"), `#!/bin/sh\nprintf 'vh-adlc ${lock.version}\\n'\n`); chmodSync(join(bin, "vh-adlc"), 0o755);
+    writeFileSync(join(bin, "vh-adlc"), `#!/bin/sh\nprintf ran > "$HOME/unverified-program-ran"\nprintf 'vh-adlc ${lock.version}\\n'\n`); chmodSync(join(bin, "vh-adlc"), 0o755);
   }
   const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
   writeFileSync(join(bin, "curl"), `#!/bin/sh\nprintf attempted > ${quote(marker)}\nexit 88\n`); chmodSync(join(bin, "curl"), 0o755);

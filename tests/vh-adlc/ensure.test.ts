@@ -179,6 +179,20 @@ describe("valid sources", () => {
 });
 
 describe("rejected sources", () => {
+  test.each([false, true])("offline ignores unverified PATH without probing it; verified cache: %s", warm => {
+    const f = fixture();
+    if (warm) expect(run(f).code).toBe(0);
+    const before = snapshot(f.home), marker = join(f.dir, "unverified-path-ran");
+    const bin = onPath(f, fakeBinary(VERSION, marker, "# unverified\n"));
+    const r = run(f, ["--offline"], [bin]);
+    expect(r.code).toBe(warm ? 0 : 1);
+    expect(r.out).toBe(warm ? cached(f) : "");
+    expect(r.err).toContain("unverified");
+    expect(existsSync(marker)).toBe(false);
+    const after = snapshot(f.home);
+    expect(after).toEqual(before);
+  });
+
   test("ignores another version on PATH with a diagnostic", () => {
     const f = fixture();
     const bin = onPath(f, fakeBinary("1.0.0", join(f.dir, "path-ran")));
