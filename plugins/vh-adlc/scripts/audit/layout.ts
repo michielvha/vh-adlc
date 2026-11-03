@@ -8,7 +8,7 @@ export type SectionNote = { heading: string; ids: string[]; text: string; eviden
 const fail = (): never => { throw Error("audit ledger: invalid declared layout, section update or current evidence"); };
 export function boundedBody(text:string,level:number) {
   requireAuditRuntime();
-  const visible=markdownVisibility(text);
+  const visible=markdownVisibility(text,{inlineHtml:true});
   if (!visible.balanced || visible.comments || visible.unsupported || visible.lines.some(line=>/<[A-Za-z][^>]*|<\//.test(maskInlineCode(line).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g,"")))) fail();
   let escaped=false;Bun.markdown.render(text,{heading(children,attributes){if(attributes.level<=level)escaped=true;return children;}});
   if(escaped)fail();

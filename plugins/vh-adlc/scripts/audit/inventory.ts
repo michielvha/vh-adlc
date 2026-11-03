@@ -63,15 +63,15 @@ function commentStart(text: string) {
   while (at >= 0) { let escapes = 0; for (let i = at - 1; i >= 0 && masked[i] === "\\"; i--) escapes++; if (!(escapes % 2)) return at; at = masked.indexOf("<!--", at + 4); }
   return -1;
 }
-function rawHtml(text:string){
+function rawHtml(text:string,anywhere=false){
   const masked=maskInlineCode(text).replace(/<(?:https?:\/\/[^ <>]+|[^ <>]+@[^ <>]+)>/g,"");
   for(const match of masked.matchAll(/</g)){
     const at=match.index!;let escapes=0;for(let before=at-1;before>=0&&masked[before]==="\\";before--)escapes++;
-    if(!(escapes%2)&&/^<(?:\/?[A-Za-z](?=[A-Za-z0-9:\- \t\r\n/>]|$)|\?|![A-Za-z]|!\[CDATA\[)/.test(masked.slice(at)))return true;
+    if(!(escapes%2)&&(anywhere||/^ {0,3}$/.test(masked.slice(0,at))||/^<\/?(?:script|style|textarea|xmp|iframe|noembed|noframes|plaintext)(?=[ \t\r\n/>]|$)/i.test(masked.slice(at)))&&/^<(?:\/?[A-Za-z](?=[A-Za-z0-9:\- \t\r\n/>]|$)|\?|![A-Za-z]|!\[CDATA\[)/.test(masked.slice(at)))return true;
   }
   return false;
 }
-export function markdownVisibility(text: string) {
+export function markdownVisibility(text: string,options:{inlineHtml?:boolean}={}) {
   let fence: { char: string; size: number } | undefined, comment = false, comments = false, unsupported = false, list = false;
   const lines = text.split(/\r?\n/).map(raw => {
     const marker = raw.match(/^ {0,3}([~\x60])\1{2,}/);
@@ -86,7 +86,7 @@ export function markdownVisibility(text: string) {
     if (listMarker) list = true; else if (raw.trim() && !indent) list = false;
     const first = commentStart(raw);
     if ((list && (indent > 0 || listMarker) || /^ {0,3}>/.test(raw)) && first >= 0) unsupported = true;
-    if (rawHtml(raw)) unsupported = true;
+    if (rawHtml(raw,options.inlineHtml)) unsupported = true;
     if (first >= 0) comments = true;
     // Only a line-start HTML comment opens a block across later headings.
     if (first >= 0 && /^ {0,3}<!--/.test(raw)) { comment = !raw.includes("-->", first + 4); return ""; }
@@ -134,6 +134,21 @@ export function markdownSections(text: string) {
   } });
   return { headings, unsupported };
 }
+/** Map physical pipe rows only when the Markdown renderer places them in an actual table. */
+export function markdownTables(text:string){
+ requireAuditRuntime();const raw=text.split(/\r?\n/);let marker="VhAuditTableRow";while(text.includes(marker))marker+="X";
+ const candidates=new Set<number>();
+ const annotated=raw.map((line,at)=>{
+  if(!/^ {0,3}\|/.test(line)||tableCells(line).every(cell=>/^:?-+:?$/.test(cell)))return line;
+  candidates.add(at);return line.replace(/^ {0,3}\|/,prefix=>prefix+marker+at+"End ");
+ });
+ const tables:{rows:number[]}[]=[];
+ Bun.markdown.render(annotated.join("\n"),{table(children){
+  const rows=[...new Set([...children.matchAll(new RegExp(marker+"([0-9]+)End","g"))].map(match=>Number(match[1])).filter(at=>candidates.has(at)))].sort((a,b)=>a-b);
+  if(rows.length)tables.push({rows});return children;
+ }});
+ return tables;
+}
 function status(value: string): RecordedStatus {
   // A historical cell is never current proof; ambiguous prose is not a positive status.
   if (/\b(?:not|never|unverified|pending|was|previously)\b/i.test(value)) return "UNKNOWN";
@@ -155,11 +170,13 @@ export function inventoryMarkdown(config: Settings, input: string | Uint8Array):
   const sections = markdownSections(text);
   let unsupported = visibility.unsupported || sections.unsupported;
   const lines = visibility.lines, diagnostics: Diagnostic[] = [], entries = new Map<string, number[]>();
+  const tableRows=new Set(markdownTables(text).filter(table=>tableCells(lines[table.rows[0]])[0]?.toLowerCase()==="id").flatMap(table=>table.rows));
   const headings=[...sections.headings.entries()];
   const ambiguousIndexComments=headings.some(([start,heading])=>{
     if(heading.title!==config.profile.index_heading)return false;
     const end=headings.find(([at,next])=>at>start&&next.level<=heading.level)?.[0]??text.split(/\r?\n/).length;
-    return markdownVisibility(text.split(/\r?\n/).slice(start+1,end).join("\n")).comments;
+    const indexVisibility=markdownVisibility(text.split(/\r?\n/).slice(start+1,end).join("\n"),{inlineHtml:true});
+    return indexVisibility.comments||indexVisibility.unsupported;
   });
   unsupported ||= ambiguousIndexComments;
   if (unsupported) diagnostics.push({ code: "unsupported-markdown-structure" });
@@ -183,7 +200,7 @@ export function inventoryMarkdown(config: Settings, input: string | Uint8Array):
         if (match) entries.set(match[1], [...entries.get(match[1]) ?? [], number]);
       }
     }
-    if (!indexLevel || !line.trim().startsWith("|")) continue;
+    if (!indexLevel || !tableRows.has(offset) || !line.trim().startsWith("|")) continue;
     const cells = tableCells(line);
     if (cells.every(cell => /^:?-+:?$/.test(cell))) continue;
     if (cells[0]?.toLowerCase() === "id") {

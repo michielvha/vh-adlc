@@ -3,7 +3,7 @@ import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { canonicalJSON, publishJSON } from "../maintenance/journal";
 import { inspectAuthority, refreshDefault, validRequest, validConstraints, type AuthorityOptions } from "./authority";
 import { evaluateAssessments, evaluateCandidateAssessments, evaluateCommittedAssessments, evaluateFrozenCandidateAssessments, type Assessment } from "./assessment";
-import { tableCells, visibleLines, markdownVisibility, escapeInlineHtml, inventoryMarkdown, markdownSections } from "./inventory";
+import { tableCells, visibleLines, markdownVisibility, escapeInlineHtml, inventoryMarkdown, markdownSections, markdownTables } from "./inventory";
 import { checkSnapshot, digest, git, gitBytes, hash, privateDirectory, type Snapshot } from "./snapshot";
 import type { Settings } from "./types";
 import { loadSettings } from "./settings";
@@ -183,14 +183,10 @@ function appendBytes(config: Settings, snap: Snapshot, original: string, finding
   const visibleIndex = visibleLines(lines.join("\n")), sectionMap = markdownSections(lines.join("\n")).headings;
   const sections = [...sectionMap.values()].filter(heading => heading.title === config.profile.index_heading);
   if (sections.length !== 1) fail("one visible index heading is required");
-  const section = sections[0]; let header = section.at + 1;
-  while (header < lines.length && tableCells(visibleIndex[header])[0]?.toUpperCase() !== "ID") {
-    const heading = sectionMap.get(header);
-    if (heading && heading.level <= section.level) fail("index table missing"); header++;
-  }
-  if (header >= lines.length) fail("index table missing");
-  const cells = tableCells(lines[header]); let end = header + 2;
-  while (end < lines.length && lines[end].trim().startsWith("|")) end++;
+  const section = sections[0],boundary=[...sectionMap.values()].find(head=>head.at>section.at&&head.level<=section.level)?.at??lines.length;
+  const table=markdownTables(original).find(table=>table.rows[0]>section.at&&table.rows[0]<boundary&&tableCells(visibleIndex[table.rows[0]])[0]?.toUpperCase()==="ID");
+  if(!table)fail("index table missing");
+  const header=table.rows[0],cells=tableCells(lines[header]),end=Math.max(header+2,table.rows.at(-1)!+1);
   const rows = findings.map(finding => { const extra=indexMetadata(config,finding,cells); return "| " + cells.map(cell => {
     if (/^ID$/i.test(cell)) return finding.id;
     if (/^(Sev|Severity)$/i.test(cell)) return escapeInlineHtml(finding.severity);

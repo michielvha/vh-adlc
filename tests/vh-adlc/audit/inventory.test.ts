@@ -175,3 +175,15 @@ test.each([["<?legacy","?>"],["<!LEGACY",">"],["<![CDATA[","]]>"],["Note <span t
  expect(result.diagnostics.some(row=>row.code==="unsupported-markdown-structure")).toBe(true);
  expect(result.findings.every(row=>!row.identity_valid)).toBe(true);expect(result.next_id).toBeNull();
 });
+
+test("an existing inline angle placeholder outside the index preserves supported ledger identities",()=>{
+ const f=project(ledger.replace("The return value needs a current check.","Send an example <object-id> to the fixture route."));
+ const result=inventory(loadSettings(f.root));expect(result.diagnostics.some(row=>row.code==="unsupported-markdown-structure")).toBe(false);expect(result.findings.every(row=>row.identity_valid)).toBe(true);expect(result.next_id).toBe("AUD-003");
+});
+
+test("a pipe-shaped paragraph after the real table is a reference rather than an index identity",()=>{
+ const without=ledger.replace("| AUD-002 | Low | Historical observation | FIXED |\n","");
+ const f=project(without.replace("## Findings","Ordinary paragraph after the table.\n| AUD-002 | Low | Paragraph-shaped reference | FIXED |\n\n## Findings"));
+ const result=inventory(loadSettings(f.root)),finding=result.findings.find(row=>row.id==="AUD-002")!;
+ expect(finding.index_lines).toEqual([]);expect(finding.identity_valid).toBe(false);expect(result.diagnostics.some(row=>row.id==="AUD-002"&&row.code==="entry-only")).toBe(true);
+});
