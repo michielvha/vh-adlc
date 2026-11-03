@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { discoveredCodexOperations, discoveredClaudeOperations, inspectComponent, verifyCandidateInstall } from "./install-trial";
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
-function component(version = "0.7.0") {
+function component(version = "0.8.0") {
   const root = mkdtempSync(join(tmpdir(), "audit-install-test-")); roots.push(root);
   for (const path of ["plugin.json", ".claude-plugin/plugin.json", "skills/vh-adlc-audit/SKILL.md", "scripts/audit/cli.ts", "references/audit.md"]) {
     mkdirSync(join(root, path, ".."), { recursive: true });
@@ -19,6 +19,7 @@ test("candidate verification binds every installed byte and mode, discovery, sou
   expect(verifyCandidateInstall(source, installed, receipt).pass).toBe(true);
   for (const change of [{ payload_digest: "wrong" }, { discovery: [] }, { kind: "published-marketplace" }, { commands: [{ exit_code: 1, timed_out: false }] }, { helpers: receipt.helpers.slice(1) }, { helpers: receipt.helpers.map(row => ({ ...row, input_after: "changed" })) }]) expect(verifyCandidateInstall(source, installed, { ...receipt, ...change }).pass).toBe(false);
   expect(() => inspectComponent(component("0.6.0"))).toThrow();
+  expect(() => inspectComponent(component("0.7.0"))).toThrow();
 });
 test("component snapshots reject inconsistent manifests, symlinks and payload mode changes", () => {
   const root = component(), original = inspectComponent(root);

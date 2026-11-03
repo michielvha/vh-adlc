@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
-import { fixture } from "./fixtures";
+import { baseSettings, fixture } from "./fixtures";
 import { git } from "./fixtures";
 const hash = (data: string | Buffer) => createHash("sha256").update(data).digest("hex");
 export function inspectComponent(root: string) {
@@ -20,7 +20,8 @@ export function inspectComponent(root: string) {
   walk(""); files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
   const manifests = ["plugin.json", ".claude-plugin/plugin.json"].map(path => JSON.parse(readFileSync(join(root, path), "utf8")));
   if (manifests.some(row => row.name !== "vh-adlc" || row.version !== manifests[0].version)) throw Error("inconsistent component manifests");
-  if (!/^0\.(?:[7-9]|[1-9]\d+)\.\d+$/.test(manifests[0].version)) throw Error("audit candidate requires version 0.7.0 or later");
+  const version = manifests[0].version;
+  if (typeof version !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version) || Number(version.split(".")[0]) === 0 && Number(version.split(".")[1]) < 8) throw Error("audit candidate requires version 0.8.0 or later");
   for (const path of ["skills/vh-adlc-audit/SKILL.md", "scripts/audit/cli.ts", "references/audit.md"]) if (!files.some(file => file.path === path)) throw Error("audit payload missing");
   return { version: manifests[0].version as string, digest: hash(JSON.stringify(files)), files };
 }
@@ -97,6 +98,7 @@ export async function nativeInstallTrial(repo: string, commit: string, output: s
   repo = resolve(repo); output = resolve(output);
   if (existsSync(output)) throw Error("native trial output must be new");
   if (!/^[a-f0-9]{40}$/.test(commit) || git(repo, "rev-parse", commit) !== commit) throw Error("exact source commit required");
+  if (git(repo, "status", "--porcelain") || git(repo, "rev-parse", "HEAD") !== commit) throw Error("native trial requires its clean exact current source commit");
   mkdirSync(output, { recursive: true, mode: 0o700 }); chmodSync(output, 0o700);
   const catalog = join(output, "catalog"), neutral = join(output, "neutral"), catalogName = "audit-candidate";
   mkdirSync(catalog); mkdirSync(neutral);
@@ -110,7 +112,10 @@ export async function nativeInstallTrial(repo: string, commit: string, output: s
   const hosts: any[] = [];
   for (const host of ["codex-cli", "claude-cli"]) {
     const profile = join(output, host), logs = join(profile, "logs"); mkdirSync(logs, { recursive: true, mode: 0o700 });
-    const env = { ...process.env, CODEX_HOME: join(profile, "codex"), CLAUDE_CONFIG_DIR: join(profile, "claude") } as Record<string, string>;
+    const env: Record<string, string> = { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: join(profile, "home"), XDG_CACHE_HOME: join(profile, "cache"),
+      CODEX_HOME: join(profile, "codex"), CLAUDE_CONFIG_DIR: join(profile, "claude"), BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", LANG: "C.UTF-8",
+      GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_OPTIONAL_LOCKS: "0", TMPDIR: process.env.TMPDIR ?? "/tmp" };
+    mkdirSync(env.HOME, { recursive: true, mode: 0o700 });
     // No credentials/configs are copied. These variables retain their native profile-directory meaning.
     mkdirSync(env.CODEX_HOME, { recursive: true }); mkdirSync(env.CLAUDE_CONFIG_DIR, { recursive: true });
     const commands: any[] = [];
@@ -140,6 +145,18 @@ export async function nativeInstallTrial(repo: string, commit: string, output: s
     if (!installedPath) throw Error(`${host} installed native cache absent`);
     const installed = inspectComponent(installedPath), helpers: any[] = [], project = fixture();
     try {
+      project.settings(baseSettings({ knowledge_pages: ["conventions/typescript.md"] }));
+      const pin = readFileSync(join(installedPath, "knowledge.md"), "utf8").match(/\b[a-f0-9]{40}\b/)![0];
+      project.write("AGENTS.md", `# Instructions\nRead https://github.com/vhco-pro/docs/blob/${pin}/AGENTS.md\n`); project.commit();
+      const setupText = await run([process.execPath, join(installedPath, "scripts/audit/bootstrap.ts"), "--setup", "--repo", project.root, "--plugin-pin", pin, "--required-page", "conventions/typescript.md"]);
+      const setup = JSON.parse(setupText) as { ready: boolean; binary: string; pages: string[]; knowledge: { result: string; knowledge: { revision: string } }; argv: string[] };
+      const lock = JSON.parse(readFileSync(join(installedPath, "vh-adlc.lock.json"), "utf8")) as { version: string; assets: Record<string, { binary_sha256: string }> };
+      const platform = `${process.platform === "darwin" ? "darwin" : "linux"}_${process.arch === "x64" ? "amd64" : "arm64"}`, binarySHA = hash(readFileSync(setup.binary));
+      if (!setup.ready || setup.knowledge.result !== "answered" || setup.knowledge.knowledge.revision !== pin || binarySHA !== lock.assets[platform].binary_sha256) throw Error("isolated binary/docs setup differs from the installed pins");
+      const entryOutput = join(logs, "entry-cases");
+      const entryArgv = [process.execPath, "test", "--timeout", "120000", resolve(import.meta.dir, "entry.test.ts")];
+      const entry = await runOwnedClient(entryArgv, { cwd: neutral, env: { ...env, VH_ADLC_AUDIT_ENTRY_PLUGIN: installedPath, VH_ADLC_AUDIT_ENTRY_EVIDENCE: entryOutput }, stdout: join(logs, "entry.stdout"), stderr: join(logs, "entry.stderr") }, { timeout_ms: 120000, grace_ms: 300, reap_ms: 2000 });
+      if (entry.exit_code !== 0 || entry.timed_out) throw Error("installed offline entry cases failed");
       git(project.root, "update-ref", "refs/remotes/origin/main", git(project.root, "rev-parse", "HEAD"));
       const inputBefore = sourceSnapshot(project.root), indexPath = join(project.root, ".git/index"), before = hash(readFileSync(indexPath));
       const cli = join(installedPath, "scripts/audit/cli.ts");
@@ -156,6 +173,8 @@ export async function nativeInstallTrial(repo: string, commit: string, output: s
       if (!report.path || !existsSync(report.path) || !readFileSync(report.path, "utf8").includes("Recorded")) throw Error("installed audit report missing");
       const requiredHelpers = helpers.filter(row => ["settings", "inventory", "report"].includes(row.stage));
       const receipt = { kind: "local-catalog", host, native_version: version, source_commit: commit, version: installed.version, payload_digest: installed.digest, installed_path: installedPath,
+        setup: { ...setup, platform, binary_sha256: binarySHA, expected_binary_sha256: lock.assets[platform].binary_sha256, binary_version: lock.version, environment_isolated: true, credentials_inherited: false },
+        offline_entry: { argv: entryArgv, ...entry, observations: entryOutput },
         discovery: host === "codex-cli" ? discoveredCodexOperations(discovered, `vh-adlc@${catalogName}`) : discoveredClaudeOperations(discovered, componentOperations(source)), commands, helpers: requiredHelpers, authentication_copied: false, model_invocations: 0 };
       // Some Codex plugin/list versions expose only the component. app-server skills/list provides operation discovery separately.
       await run([client, "plugin", host === "codex-cli" ? "remove" : "uninstall", `vh-adlc@${catalogName}`, "--json"]);

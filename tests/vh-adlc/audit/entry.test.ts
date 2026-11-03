@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { createHash } from "node:crypto";
 import { fixture, baseSettings, git } from "./fixtures";
-const plugin = resolve(import.meta.dir, "../../../plugins/vh-adlc");
+const plugin = process.env.VH_ADLC_AUDIT_ENTRY_PLUGIN ?? resolve(import.meta.dir, "../../../plugins/vh-adlc");
 const pin = "0e52f51f01b84eda75a976763c42d8ec0a07b544";
 const pages = ["conventions/feature-documents.md", "conventions/coding.md", "conventions/documentation.md", "conventions/delivery.md", "guides/humanize-prose.md", "conventions/typescript.md"];
 const made: ReturnType<typeof fixture>[] = [];
