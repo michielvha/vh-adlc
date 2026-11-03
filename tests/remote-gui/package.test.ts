@@ -55,3 +55,13 @@ test('unsupported source-build hosts get a platform diagnostic before compiling'
   expect(result.stdout.toString()).toContain('unsupported-platform');
  }finally{rmSync(root,{recursive:true,force:true})}
 });
+
+test('installed guidance makes Tailscale owner access passwordless',()=>{
+ const skill=read('plugins/remote-gui/skills/remote-gui/SKILL.md');
+ const setup=read('plugins/remote-gui/README.md');
+ expect(skill).toContain('tailscale-identity');
+ expect(skill).toContain('--owner-login');
+ expect(setup).toContain('no viewer password');
+ expect(skill).not.toContain('After successful app checks, issue a new one-time code');
+ expect(read('plugins/remote-gui/scripts/remote-gui.sh')).toContain('-buildvcs=false');
+});

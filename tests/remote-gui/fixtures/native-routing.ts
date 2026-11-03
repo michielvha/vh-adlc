@@ -44,7 +44,7 @@ const app=Bun.serve({hostname:'127.0.0.1',port:0,fetch(request,server){
 
 const api=Bun.serve({unix:join(root,'api.sock'),async fetch(request){
  const path=new URL(request.url).pathname;
- if(path==='/localapi/v0/status')return Response.json({BackendState:'Running',Self:{DNSName:'remote-gui.test'},CertDomains:['remote-gui.test']});
+ if(path==='/localapi/v0/status')return Response.json({BackendState:'Running',Self:{DNSName:'remote-gui.test',UserID:7},User:{'7':{LoginName:'owner@example.test'}},CertDomains:['remote-gui.test']});
  if(path!=='/localapi/v0/serve-config')return new Response(null,{status:404});
  if(request.method==='GET')return Response.json(doc,{headers:{ETag:`"${version}"`}});
  if(request.method!=='POST')return new Response(null,{status:405});
@@ -57,14 +57,21 @@ const api=Bun.serve({unix:join(root,'api.sock'),async fetch(request){
  for(const port of added){
   const target=next.Web?.[`remote-gui.test:${port}`]?.Handlers?.['/']?.Proxy;
   if(typeof target!=='string')return new Response(null,{status:400});
-  const address=new URL(target);
+  const socketPath=target.startsWith('unix:')?target.slice(5):undefined;
+  const address=new URL(socketPath?'http://localhost':target);
+  const headersFor=(incoming:any)=>{
+   const headers={...incoming.headers};
+   for(const key of Object.keys(headers))if(key.toLowerCase().startsWith('tailscale-'))delete headers[key];
+   if(socketPath){headers.host='localhost';headers['x-forwarded-host']=incoming.headers.host;headers['x-forwarded-proto']='https';headers['tailscale-user-login']='owner@example.test'}
+   return headers;
+  };
   const bridge=createHTTPS({key:readFileSync(settings.key),cert:readFileSync(settings.cert)},(incoming,outgoing)=>{
-   const forwarded=requestHTTP({hostname:address.hostname,port:address.port,path:incoming.url,method:incoming.method,headers:incoming.headers},reply=>{outgoing.writeHead(reply.statusCode||502,reply.headers);reply.pipe(outgoing)});
+   const forwarded=requestHTTP({...socketPath?{socketPath}:{hostname:address.hostname,port:address.port},path:incoming.url,method:incoming.method,headers:headersFor(incoming)},reply=>{outgoing.writeHead(reply.statusCode||502,reply.headers);reply.pipe(outgoing)});
    forwarded.on('error',()=>{if(!outgoing.headersSent)outgoing.writeHead(502);outgoing.end('fixture proxy unavailable')});incoming.pipe(forwarded);
   });
   bridge.on('upgrade',(incoming,socket,head)=>{
-   const upstream=connect(Number(address.port),address.hostname,()=>{
-    upstream.write(`${incoming.method} ${incoming.url} HTTP/1.1\r\n`+Object.entries(incoming.headers).map(([key,value])=>`${key}: ${value}`).join('\r\n')+'\r\n\r\n');
+   const upstream=connect(socketPath?{path:socketPath}:{port:Number(address.port),host:address.hostname},()=>{
+    upstream.write(`${incoming.method} ${incoming.url} HTTP/1.1\r\n`+Object.entries(headersFor(incoming)).map(([key,value])=>`${key}: ${value}`).join('\r\n')+'\r\n\r\n');
     if(head.length)upstream.write(head);socket.pipe(upstream).pipe(socket);
    });
    upstream.on('error',()=>socket.destroy());socket.on('error',()=>upstream.destroy());socket.on('close',()=>upstream.destroy());
@@ -78,13 +85,26 @@ const api=Bun.serve({unix:join(root,'api.sock'),async fetch(request){
 
 let native:any;
 let completed=false;
-try{
+async function runScenario(){
  stage='prepare-task';
  const target=`http://127.0.0.1:${app.port}/app`;
+ if(scenario.startsWith('identity-')){
+  const share=await runtime('share',target,'--transport','tailscale','--ttl','2m');
+  const metadata=await runtime('access',share.id,'--reveal');
+  check(metadata.auth_mode==='tailscale-identity'&&!('access_code'in metadata)&&!('enrollment_expires_at'in metadata),'passwordless access exposed enrollment material');
+  const probe=Bun.spawn([settings.bun,join(root,'browser-check.ts'),share.id],{env:process.env,stdout:'pipe',stderr:'pipe'});
+  await Promise.all([probe.exited,new Response(probe.stdout).text(),new Response(probe.stderr).text()]);
+  const result=JSON.parse(readFileSync('browser-result.json','utf8'));
+  diagnostic={browserCheck:result.result,browserStage:result.stage,httpStatus:result.http_status,failureCode:result.failure_code};
+  check(result.result==='passed'&&result.no_http_credentials===true,'real browser failed passwordless owner flow');
+  completed=true;
+  writeFileSync('result.json',JSON.stringify({scenario,result:'passed',browser:settings.browserType,scope:'fresh browser and trusted fake HTTPS/Unix daemon; no real tailnet claim',nativeVersion:'not-invoked',installations,posts}));return;
+ }
+
  let existing:any;
  if(scenario==='reuse'||scenario==='ssh')existing=await runtime('share',target,'--transport',scenario==='ssh'?'loopback':'tailscale','--ttl','2m');
  const task:any={selected_application:target,owned_by_current_task:true};
- if(existing)task.active_share={id:existing.id,target,owned_by_current_task:true,transport:scenario==='ssh'?'loopback':'tailscale'};
+ if(existing)task.active_share={id:existing.id,target,owned_by_current_task:true,transport:scenario==='ssh'?'loopback':'tailscale',owner_login:existing.owner_login,auth_mode:existing.auth_mode};
  if(scenario==='ssh')task.owner_established_ssh={verified:true,viewer_url:existing.url,host_url:existing.url};
  if(authScenario){
   mkdirSync('auth-sentinel',{mode:0o700});
@@ -103,7 +123,7 @@ try{
   process.env.REMOTE_GUI_XVFB=join(root,'missing-Xvfb');
  }
  writeFileSync('task.json',JSON.stringify(task));
- const activation=settings.activation+`\nCurrent task resources and ownership are in task.json. A real browser verification capability is available as \`${settings.bun} ${root}/browser-check.ts <session-id>\`. It creates an isolated browser, checks required app behavior and closes the context; it emits no code. Use it when browser verification is needed. Do not modify application files or use external services.\n`;
+ const activation=settings.activation+`\nCurrent task resources and ownership are in task.json. A real browser verification capability is available as \`${settings.bun} ${root}/browser-check.ts <session-id>\`. Pass the exact 32-character id field from the CLI JSON. It creates an isolated browser, checks required app behavior and closes the context; it emits no code. A verification-error means no app check ran: correct the invocation and retry. Use it when browser verification is needed. Do not modify application files or use external services.\n`;
  writeFileSync('AGENTS.md',activation);
  let prompt='Show me the current app preview. The development server is already running at '+target+'. Do not change application files.';
  if(scenario==='external')prompt='Give me the official documentation link already selected for this task: https://go.dev/doc/. No local app preview is requested.';
@@ -146,7 +166,7 @@ try{
   const own=object.schema_version===1?[object.result,object.state].filter((item):item is string=>typeof item==='string'&&/^[a-z-]{1,32}$/.test(item)):[];
   return [...own,...Object.values(object).filter(item=>item!==value).flatMap(item=>typeof item==='object'||typeof item==='string'?runtimeResults(item):[])];
  };
- diagnostic={...diagnostic,nativeVersion,origins:urls.map(value=>{try{const url=new URL(value);return ['remote-gui.test','127.0.0.1','localhost','[::1]','go.dev'].includes(url.hostname)?url.origin:'unexpected-origin'}catch{return 'invalid'}}),tools:events.filter(e=>e.type==='tool.execution_start').map(e=>({id:e.data.toolCallId,name:e.data.toolName,arguments:safeWords(e.data.arguments)})),toolResults:events.filter(e=>e.type==='tool.execution_complete').map(e=>({id:e.data.toolCallId,success:e.data.success,words:safeWords(e.data),runtimeResults:runtimeResults(e.data.result)})),browserCheck:existsSync('browser-result.json')?JSON.parse(readFileSync('browser-result.json','utf8')).result:'not-run'};
+ diagnostic={...diagnostic,nativeVersion,origins:urls.map(value=>{try{const url=new URL(value);return ['remote-gui.test','127.0.0.1','localhost','[::1]','go.dev'].includes(url.hostname)?url.origin:'unexpected-origin'}catch{return 'invalid'}}),tools:events.filter(e=>e.type==='tool.execution_start').map(e=>({id:e.data.toolCallId,name:e.data.toolName,arguments:safeWords(e.data.arguments)})),toolResults:events.filter(e=>e.type==='tool.execution_complete').map(e=>({id:e.data.toolCallId,success:e.data.success,words:safeWords(e.data),runtimeResults:runtimeResults(e.data.result)})),browserCheck:existsSync('browser-result.json')?JSON.parse(readFileSync('browser-result.json','utf8')).result:'not-run',browserAttempts:existsSync('browser-attempts.jsonl')?readFileSync('browser-attempts.jsonl','utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line)):[]};
  if(authScenario){
   const calls=events.filter(e=>e.type==='tool.execution_start');
   const shell=calls.filter(e=>e.data.toolName==='bash').map(e=>JSON.stringify(e.data.arguments));
@@ -189,6 +209,12 @@ try{
    check(existsSync('browser-result.json'),'native reply lacked real browser verification');
    const verified=JSON.parse(readFileSync('browser-result.json','utf8'));
    check(verified.result==='passed'&&verified.id===active.id,'native reply lacked real browser verification of its share');
+   if(scenario!=='ssh'){
+    const metadata=await runtime('access',active.id,'--reveal');
+    check(metadata.auth_mode==='tailscale-identity'&&!('access_code'in metadata)&&verified.no_http_credentials===true,'native Tailscale share did not use passwordless identity');
+    check(!/username\s*[:*`]*\s*viewer|click.{0,30}open session/i.test(text),'native agent requested obsolete viewer enrollment');
+   }
+
    const expected=scenario==='ssh'?existing.url:active.url;
    check(urls.length>0&&urls[0].startsWith(expected),'first human-facing URL used the wrong route');
    if(existing)check(active.id===existing.id&&installations===before,'existing task share was not reused');
@@ -196,7 +222,8 @@ try{
  }
  completed=true;
  writeFileSync('result.json',JSON.stringify({scenario,result:'passed',scope:authScenario?'recording fake owning interface and deliberately missing GUI; no completed login or handoff':'isolated host fixture; no real tailnet or second-device claim',nativeVersion,installations,posts}));
-}catch(error){
+}
+try{await runScenario()}catch(error){
  const errorKind=error instanceof SyntaxError?'invalid-native-event':error&&['ENOENT','EACCES'].includes((error as any).code)?(error as any).code:'unavailable';
  writeFileSync('result.json',JSON.stringify({scenario,result:'failed',stage,reason:error instanceof FixtureFailure?error.message:'fixture execution unavailable',errorKind,diagnostic,scope:'isolated fixture'}));process.exitCode=1;
 }finally{

@@ -33,7 +33,7 @@ if [[ ! -d $build_cache || ! -O $build_cache || $(stat -c %a -- "$build_cache") 
 fi
 identity=$(
   cd -- "$plugin_root"
-  { "$go_cmd" version; "$go_cmd" env GOOS GOARCH; find cmd internal -type f -name '*.go' -print0 | sort -z | xargs -0 sha256sum; sha256sum go.mod; if [[ -f go.sum ]]; then sha256sum go.sum; fi; } | sha256sum
+  { "$go_cmd" version; "$go_cmd" env GOOS GOARCH; find cmd internal -type f -name '*.go' -print0 | sort -z | xargs -0 sha256sum; sha256sum go.mod scripts/remote-gui.sh; if [[ -f go.sum ]]; then sha256sum go.sum; fi; } | sha256sum
 )
 identity=${identity%% *}
 output=$build_cache/$identity
@@ -46,7 +46,7 @@ if [[ -L $output/remote-gui ]]; then exit 1; fi
 if [[ ! -f $output/remote-gui ]]; then
   staged=$(mktemp "$output/.build-XXXXXX")
   trap 'rm -f -- "$staged"' EXIT
-  (cd -- "$plugin_root" && CGO_ENABLED=0 "$go_cmd" build -mod=readonly -trimpath -o "$staged" ./cmd/remote-gui)
+  (cd -- "$plugin_root" && CGO_ENABLED=0 "$go_cmd" build -buildvcs=false -mod=readonly -trimpath -o "$staged" ./cmd/remote-gui)
   chmod 700 -- "$staged"
   mv -- "$staged" "$output/remote-gui"
   trap - EXIT
