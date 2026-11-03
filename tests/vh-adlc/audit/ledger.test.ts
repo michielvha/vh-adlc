@@ -402,3 +402,12 @@ test("unchanged legacy title-column annotations keep their original dates and ra
   const candidate=createLedgerCandidate(c.config,snap,{document:{schema_version:1,snapshot_digest:snap.digest,assessments:rows},at:"2026-11-02",run_id:"unchanged-title"});
   expect(candidate.bytes).toContain(first);expect(candidate.bytes).toContain(second);expect(candidate.bytes).not.toContain("audit-run:unchanged-title:");expect(candidate.bytes).not.toContain("audit-status:unchanged-title:");
 });
+
+test("a comment-hidden index row blocks terminal updates and new finding insertion",()=>{
+ const f=fixture();projects.push(f);
+ f.write("docs/audit.md",ledger.replace("## Findings","Legacy note <!-- archived\n| AUD-099 | High | Hidden | FIXED |\n-->\n\n## Findings"));const base=f.commit();
+ const config=loadSettings(f.root),snap=captureSnapshot(config,{mode:"full",ids:["AUD-001"],baseline:base,artifact_root:f.artifacts,required_checks:{"AUD-001":["unit"]}});
+ const document={schema_version:1,snapshot_digest:snap.digest,assessments:[terminal(f,snap)]};
+ expect(()=>createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"hidden-index"})).toThrow("unsupported Markdown");
+ expect(()=>appendFindings(config,snap,[{id:"AUD-100",severity:"High",title:"New root cause",body:"Observed with evidence.",root_cause:"distinct"}])).toThrow("unsupported Markdown");
+});

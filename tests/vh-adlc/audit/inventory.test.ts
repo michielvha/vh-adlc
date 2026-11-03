@@ -159,3 +159,10 @@ test("an unsupported multiline setext title is a gap rather than a guessed inser
   const result=inventory(loadSettings(project(ledger+"\nSummary first line\ncontinued title\n---\n").root));
   expect(result.diagnostics.some(row=>row.code==="unsupported-markdown-structure")).toBe(true);expect(result.next_id).toBeNull();
 });
+
+test("a multiline inline comment in the index is an explicit unsupported visibility gap",()=>{
+ const f=project(ledger.replace("## Findings","Legacy note <!-- archived\n| AUD-099 | High | Hidden | FIXED |\n-->\n\n## Findings"));
+ const result=inventory(loadSettings(f.root));
+ expect(result.diagnostics.some(row=>row.code==="unsupported-markdown-structure")).toBe(true);
+ expect(result.complete).toBe(false);
+});

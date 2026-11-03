@@ -170,3 +170,8 @@ for changed statuses. OPEN observed as STILL_PRESENT is unchanged. Current uncha
 in the pass summary with its source/Scope baseline; partial/unknown summary observations include
 residuals. The minimal standalone layout keeps per-finding notes. No unchanged old heading or title
 annotation is rewritten merely to add another date.
+
+Canonical updates reject HTML comments within the declared index section, including multiline
+inline comments: the supported pipe-row scanner cannot establish their rendered row visibility.
+Inspection reports an unsupported-structure gap; reconcile that source explicitly before updating.
+Literal examples inside code fences/spans do not trigger this restriction.

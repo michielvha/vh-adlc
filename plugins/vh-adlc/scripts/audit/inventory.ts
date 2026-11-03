@@ -144,7 +144,13 @@ export function inventoryMarkdown(config: Settings, input: string | Uint8Array):
   const bytes = Buffer.from(input), text = bytes.toString("utf8"), visibility = markdownVisibility(text);
   const sections = markdownSections(text), unsupported = visibility.unsupported || sections.unsupported;
   const lines = visibility.lines, diagnostics: Diagnostic[] = [], entries = new Map<string, number[]>();
-  if (unsupported) diagnostics.push({ code: "unsupported-markdown-structure" });
+  const headings=[...sections.headings.entries()];
+  const ambiguousIndexComments=headings.some(([start,heading])=>{
+    if(heading.title!==config.profile.index_heading)return false;
+    const end=headings.find(([at,next])=>at>start&&next.level<=heading.level)?.[0]??text.split(/\r?\n/).length;
+    return markdownVisibility(text.split(/\r?\n/).slice(start+1,end).join("\n")).comments;
+  });
+  if (unsupported || ambiguousIndexComments) diagnostics.push({ code: "unsupported-markdown-structure" });
   if (!visibility.balanced) diagnostics.push({ code: "unterminated-markdown-block" });
   const indices = new Map<string, { line: number; state: RecordedStatus; raw: string; severity: string; aggregate: boolean }[]>();
   const range_summaries: Inventory["range_summaries"] = [];
