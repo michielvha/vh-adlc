@@ -1,7 +1,7 @@
 ---
 status: draft
 branch: feat/shared-audit
-status_description: "Shared audit and the Stackweaver adapter are implemented locally. Review corrections and final evidence refresh are in progress; local-catalog native trials passed at their recorded target. Marketplace publication and consumer cutover remain pending."
+status_description: "Draft revision for strict YAML audit settings after shared main merged the settings reader. Prior recovery/review corrections are committed locally. The migration-bearing finding route still needs the owner; revised spec review and acceptance precede YAML implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/40
 goal: "Run persistent codebase audits through a harness-agnostic vh-adlc operation while each consumer retains its ledger, product knowledge and delivery policy."
 covers:
@@ -13,6 +13,7 @@ covers:
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/scripts/audit/
+  - plugins/vh-adlc/scripts/settings-file.ts
   - plugins/vh-adlc/examples/audit/
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
@@ -31,6 +32,13 @@ covers:
 # Shared persistent codebase audit
 
 ## Context
+
+Revision summary: audit still checks software for bugs, security and reliability problems, retains
+findings, re-verifies them and handles selected repairs. This revision changes its human-written
+settings to YAML through the strict reader already on shared main. Stackweaver keeps its ledger,
+local operating rules and `/audit` command. Audit's candidate becomes plugin 0.8.0 because 0.7.0
+already belongs to the YAML triage/maintenance release. No YAML implementation has been performed
+or accepted by this revision. Q1 remains the one pending product-policy decision.
 
 The owner selected audit after maintenance on 2026-11-01 and requested the extraction end to end.
 The parent [migration roadmap](shared-workflow-migration.md), row D-02, identifies persistent
@@ -118,7 +126,8 @@ trials pass the policy-change observation/retirement case with one disposable sq
 and ten corrected consumer report/delivery cases. These are local/synthetic results, not marketplace
 or real Claude-model acceptance. Public R9 found an unchanged-status provenance omission (T81) and
 a declined-intent retention documentation gap (T82). Private R5 found the post-publication follow-up
-sequence incomplete (T83). The full returned reviews remain in the local archive. Q1 is still pending.
+sequence incomplete (T83). The full returned reviews remain in the local archive. Q1 is still pending. The committed follow-up rerun now has 79 passing consumer checks and all five
+normal hooks, with no skips.
 
 Published shared main `aa5c66e7` was merged locally as `3f4cd78`, preserving the YAML settings release,
 new conventions pin and unrelated feature documents. Its accepted YAML feature explicitly requires
@@ -311,13 +320,29 @@ what cannot be concluded; never call the same context an independent reviewer.
 
 ### Consumer settings and format preservation
 
-Use strict schema-versioned `.vh-adlc/audit.json`, bound to the actual Git origin (repository and
+Audit configuration uses `.yaml` through the existing operation-neutral settings reader in
+`scripts/settings-file.ts` and the plugin's verified `vh-adlc settings read` binary. Apply the
+same strict YAML profile as triage/maintenance, then validate the existing audit schema. Refuse
+`.vh-adlc/audit.json` and `.yml` leftovers, even with an explicit settings path; do not fall back to
+defaults or convert files automatically. Unknown fields, origin mismatches and path escapes remain
+errors. All committed-policy and candidate inspections parse the exact committed YAML bytes through
+the same strict reader; never substitute working-tree bytes for a reviewed Git object.
+
+Reader bootstrap may install the exact locked, verified binary in its normal private cache. Document
+that prerequisite/cache effect accurately; settings inspection still creates no audit ledger,
+journal, repair worktree or action grant and leaves source, index and refs unchanged. Missing reader,
+refused YAML or unavailable verification fails visibly without exposing file contents or proceeding.
+Examples use readable commented block YAML. Generated snapshots, records and transport JSON keep
+their existing format. This implements the configuration rule at `vhco-pro/docs@0e52f51`, through
+shared main's `settings-file.ts` and `docs/specs/yaml-settings.md:112-125`.
+
+Use strict schema-versioned `.vh-adlc/audit.yaml`, bound to the actual Git origin (repository and
 hostname), with repository-relative ledger and project-procedure paths, ID prefix and Markdown
 profile options. Reject unknown fields, mismatched origin, traversal, symlink escape and unsupported
 profiles. Missing required configuration is an onboarding handoff, not permission to invent a ledger.
 Standalone adopters receive a complete synthetic example that explains how to create their own
 ledger/settings; it references no personal host paths or private configuration. Store complete
-copyable files under `plugins/vh-adlc/examples/audit/basic/`: `.vh-adlc/audit.json`, `docs/audit.md`
+copyable files under `plugins/vh-adlc/examples/audit/basic/`: `.vh-adlc/audit.yaml`, `docs/audit.md`
 and `audit-project.md`, linked from the settings guide. A test copies the entire example into a
 fresh synthetic Git repository with its declared origin and exercises the actual settings and
 inventory helpers, rather than validating an abbreviated configuration fragment.
@@ -663,9 +688,26 @@ No extraction test may operate on the real Stackweaver stack/database or depende
 
 ### Stackweaver adapter, parity and rollback
 
+Plugin 0.8.0 is the audit delivery candidate; main's plugin 0.7.0 contains YAML triage and
+maintenance but no audit operation. Update both component manifests, audit installation guidance,
+consumer minimum version and native acceptance checks consistently. Do not relabel earlier 0.7.0
+local audit candidates as published audit releases. The existing runtime lock brought in by main
+remains authoritative and separate from plugin versioning.
+
+Convert only audit's hand-written settings and their active references; preserve all validated values
+apart from `settings_path`. Keep the parity map, snapshots, receipts and generated evidence as JSON.
+Update rollback/reapply manifests and tests for the YAML path without changing the real ledger.
+Finish active runs on their original verified plugin before configuration cutover; preserve their
+journal roots and proof. A format/digest change never carries old action grants, reviews or terminal
+eligibility forward automatically. If unresolved effects remain, use the existing explicit current-
+policy reconciliation/handoff before any new work; no silent journal reset, replay or deletion.
+Re-ground candidate evidence on the new committed settings and compare actual effects unchanged.
+The separately owned triage/maintenance YAML adoption stays a prerequisite for a compatible consumer
+cutover; do not edit or claim completion of that other feature's work here.
+
 From current remote main create an isolated migration branch. Replace only the reusable audit
 procedure with a thin `agents/codebase-audit.md` forwarder and retain Stackweaver specifics in
-`agents/audit-project.md` plus `.vh-adlc/audit.json`. Update only the audit route in AGENTS.md and
+`agents/audit-project.md` plus `.vh-adlc/audit.yaml`. Update only the audit route in AGENTS.md and
 `.claude/commands/audit.md`; preserve the command name, `model: opus` and `$ARGUMENTS`.
 No rewrite of the real ledger is part of migration. Existing triage, maintenance, SEO, docs, other
 agents, hooks and product paths remain unchanged relative the reconciled current-main baseline.
@@ -769,7 +811,7 @@ live operations remain separate owner-selected tasks.
 ## Acceptance Criteria
 
 - [ ] AC-01: Native skill discovery and ordinary lifecycle intake select the shared audit procedure for its declared modes, preserve other routes, and reject invalid scope without writes or an invented harness/model dependency.
-- [ ] AC-02: Configured adopters can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
+- [ ] AC-02: Adopters using strict YAML settings through the shared verified reader can inspect their existing supported Markdown ledger without format conversion, distinguish finding identities from references and historical claims, expose malformed/incomplete inventory, and propose fresh IDs without reusing existing references.
 - [ ] AC-03: Current assessments and update proposals preserve stable IDs/history and admit FIXED/MOOT only with complete target-bound evidence and the required adversarial check, while stale, missing or contradictory evidence remains visibly incomplete and cannot yield an eligible terminal update.
 - [ ] AC-04: Selected audit repairs use the existing reviewed repair/feature lifecycle and the consumer's required verification and authority, preserve workstream boundaries and recover from interruption without silently replaying stale or duplicating completed effects.
 - [ ] AC-05: Stackweaver's adapter preserves every parity-mapped audit behavior, command/model/arguments, real ledger bytes and unrelated workflows, and can roll back/reapply only its migration paths against current main.
@@ -781,10 +823,10 @@ live operations remain separate owner-selected tasks.
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Extend the package/discovery/intake contracts and native CLI skills enumeration. Run default, status, full, explicit IDs, workstream and next scenarios; verify external proposal versus permitted ledger application/local commit by mode and consumer, including ledger-update without ledger-commit and its isolated assessed-source/branch/base/path scope when invoked from an unrelated feature or dirty main, and no remote action from reverify/full. Add intake negatives where configured audit settings do not intercept maintenance security sweeps, diagnosis or backlog triage; ambiguous security wording must get the focused scope question and explicit audit without config gets onboarding. Invalid mode/ID/workstream fixtures must leave source/index/refs/ledger unchanged. |
-| AC-02 | Unit fixtures for AUD and a second prefix, incidental IDs in headings/prose, reference-only high IDs, duplicate index/entries, index-only/entry-only findings, missing config, identity mismatch, traversal, symlink escape and unknown profiles. Copy and exercise the complete standalone example through actual settings/inventory helpers. Compare local real-ledger structure read-only and retain its hash; no private contents leave the host. |
+| AC-02 | Compare old validated settings with commented block YAML through the real locked reader, allowing only settings_path to differ. Test JSON/yml leftovers with default and explicit paths, refused YAML, missing/failed binary verification and no settings fallback. Test committed-policy YAML parsing against clean/dirty, stale-link, unmerged and alternate-origin inputs; no reader failure may yield a grant. Refused input must not leak settings text or create ledger/journal/action effects. Exercise the complete standalone YAML example. Unit fixtures for AUD and a second prefix, incidental IDs in headings/prose, reference-only high IDs, duplicate index/entries, index-only/entry-only findings, missing config, identity mismatch, traversal, symlink escape and unknown profiles. Copy and exercise the complete standalone example through actual settings/inventory helpers. Compare local real-ledger structure read-only and retain its hash; no private contents leave the host. |
 | AC-03 | Snapshot/report/update-validation tests and actual Copilot trials for valid/false FIXED, genuine MOOT vs renamed code, missing required checks/independent challenge, sibling-surface residual, incomplete coverage, source/settings/ledger drift, a reverify/full verdict assessed on non-default or dirty source being refused for tracked ledger application/commit, resolvable ancestor versus missing/shallow/non-ancestor legacy baseline with honest unscoped reassessment, duplicate/renumber/delete attempts and concurrent new-ID conflict. A fixture terminal proposal passes only with all required evidence; every negative must be rejected. Inspect actual returned transcripts and saved report bytes. |
 | AC-04 | A bounded synthetic selected workstream batch with two findings must show per-finding red/green/current verification and final-head independent review of the single record/branch. Add a later member/commit and changed Definition to prove that prior review is stale. Test a mixed selection where one member is already fixed/moot, one residual reproduces and one cannot be reproduced: no fabricated red evidence, no silent removal/replacement and unresolved required work blocks whole-batch completion; an all-assessment selection creates no empty repair PR. The actual audit-specific reviewer must reject a member missing a cited pre-existing contract, a missing per-member challenge, and a batch where only the second member has a passing final-head check; a valid two-member batch including proposed ledger updates must pass. Provisional candidate FIXED/MOOT cannot be published before that pass. Verify the frozen source_target to ledger/record-final-head Git-object equivalence; source changes after Verified source, a pre-fix SHA, missing SHA and placeholder replacement must fail or stale review. A ledger status/index edit after review must stale it, while a true append-only record review/state update may preserve freshness. Classify documented permission/data-handling restoration versus new boundary/format/migration/intent change, with the latter stopping for feature/owner routing. Exercise the deterministic declaration helper with every missing/duplicate/mismatched/unknown field, duplicated heading/table, valid/coherent restricted effect subsets and cross-mode effect, generic eligible local fix without a declaration, `fix_effects: none`, incoherent remote-only subset and actual local prohibition; reject uncommitted, unmerged, alternate-origin, wrong-mode/selection and report/settings-forged grants; missing adopted policy, failed fetch and generic consumer receive no Stackweaver permissions. Current no-write/no-push/no-merge wins. Synthetic live-gate cases must distinguish adopted/requested permission, permission denial blocking merge, and a genuinely unreachable path with only its permitted residual; temporary key/test-row cleanup and no unrelated restart are observed. Interrupt after durable intent, after key/test-row creation before cleanup, and after accepted cleanup with lost acknowledgement; fresh-context resume must reconcile the exact scoped resource, revoke/clean it once, observe no orphan/second key, and never record secret values. Denied or ambiguous cleanup leaves a specific durable handoff and blocks live retry/completion. Carry an explicitly included known unpublished ledger-only commit into the selected repair base while retaining its default ancestor as Scope baseline; the actual batch reviewer must inspect that full publication diff, and missing carried-report approval, omitted carried ID/evidence or reviewing only Task-base-to-head must prevent push/merge. A fix selection without included report scope keeps that report private; new default source or conflicting ledger must stop/reconcile. Squash a synthetic reviewed batch, delete its branch and reverify using the recorded Scope baseline; legacy pre-squash or missing baselines must become unscoped and trigger direct reassessment without implying an empty delta or invoking full audit. Interrupt after saved report, local commit and accepted fake remote effect with lost response; fresh-context resume reconciles without duplication and blocks after drift/conflict. Exercise ordinary clean owned-worktree cleanup, refusal after squash and retention of private/pending ledger commits; no force cleanup or unrelated worktree change. No real remote or live stack action. |
-| AC-05 | Validate the committed `tests/agent-audit/parity.json` schema/baseline/row/home/contract bindings, then require independent full legacy-to-map/adapter coverage review and bounded Copilot policy trials; omission of a legacy rule must fail even with otherwise passing mapped tests. Run the real authority helper against the exact committed Stackweaver candidate settings/procedure, validating origin, fields, coherence, unique fragments and parity effects with no action grant; a malformed or mismatched real candidate must block cutover; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
+| AC-05 | Convert the exact consumer audit configuration to commented YAML and compare validated values and declared effects before/after apart from settings_path. Update and rehearse YAML-path rollback/reapply and minimum 0.8.0 checks, retaining the original real-ledger hash. Validate the committed `tests/agent-audit/parity.json` schema/baseline/row/home/contract bindings, then require independent full legacy-to-map/adapter coverage review and bounded Copilot policy trials; omission of a legacy rule must fail even with otherwise passing mapped tests. Run the real authority helper against the exact committed Stackweaver candidate settings/procedure, validating origin, fields, coherence, unique fragments and parity effects with no action grant; a malformed or mismatched real candidate must block cutover; unchanged-path and ledger hashes, Claude command metadata/arguments, generic-consumer controls and installed-plugin rollback/reapply must pass with preserved index/dirty sentinels. Refresh source/consumer revisions if current main changes. |
 | AC-06 | Full `bun test tests/vh-adlc`, Go tests/vet/tidy/lint and other-plugin tests, actionlint/whitespace, portable macOS CI, plus isolated native install/discovery/helpers/reinstall. Store actual Copilot model identity/commit/payload, positive and negative grades, manual transcript checks and all failures; independent review verifies the exact committed code and evidence. No live-Claude/GUI inference. |
 | AC-07 | Unit preflight denials for maintenance/wrong operation, local-catalog, missing/wrong artifact/model/version/commit/digest and valid unchanged artifacts. Source completion checks the gate and installation candidates; delivery then requires actual published fresh install/upgrade, signed release verification where produced, a fresh paired review and passing actual preflight including the non-granting actual candidate-policy receipt before consumer merge. After merge require the read-only actual installed-helper check of freshly fetched adopted policy/effects and its parity match before declaring adoption complete; an induced synthetic mismatch must exercise the scoped rollback/repair handoff. This ordered publication obligation is not fabricated as a pre-publication source-test result. |
 
@@ -949,6 +991,11 @@ live operations remain separate owner-selected tasks.
       Evidence: Chose public R9's documentation option: persist a non-resource intent only after its last gate, and retain a later declined/absent effect as an unretired handoff. All 15 recovery checks pass (`T82-retained-handoff-green.log`), including no execution, retirement refusal, later scoped-resource cleanup while the root is retained, and unknown-state refusal if it is removed. No failing code test was applicable: existing behavior already enforces this retained state. No withdrawal grant or event schema was added.
 - [x] T83 `references/audit-record.md`, consumer follow-up policy and batch controls - make non-forced post-CI source refreezing executable and name the owner handoff when default advances after publication (private R5 F-01; AC-04, AC-05).
       Evidence: The real disposable Git rehearsal has 43 passing batch tests (`T83-rehearsal-first.log`): the naive follow-up fails the exact Task-base ledger condition, restored-ledger/new-source/candidate/record refreezing passes without rewriting its published ancestor, and advanced default refuses the old batch. The consumer contract is red on missing instructions (`T83-consumer-red.log`), then the focused guidance test passes. Consumer `4772ade5` retains normal hooks. The intermediate whole-candidate attempt correctly refuses uncommitted procedure bytes; a committed rerun is retained separately. This clarifies the accepted route without adding rewrite/publication authority.
+- [ ] T84 `tests/vh-adlc/audit/settings.test.ts`, authority and example contracts - observe strict YAML, alternate-suffix, exact committed-byte and reader-failure controls fail before converting the audit loader (AC-02, AC-04).
+- [ ] T85 `scripts/audit/settings.ts`, `authority.ts` and shared settings integration - reuse the strict shared reader for working and committed YAML, preserving validation and proving no grant on failure; T84 passes (AC-02, AC-04).
+- [ ] T86 `references/audit-settings.md`, examples and audit user guidance - replace active audit JSON configuration with complete readable YAML and document exact verified-reader/cache prerequisites; examples load and invalid inputs fail (AC-01, AC-02).
+- [ ] T87 `Stackweaver:.vh-adlc/audit.yaml`, audit references and migration fixtures - convert values without drift, update exact parity/rollback bindings and verify the real ledger plus unrelated routes unchanged; keep other settings adoption separately owned (AC-05).
+- [ ] T88 plugin manifests, native audit trial and consumer minimum-version checks - reserve coherent audit plugin 0.8.0, reject older operation payloads and rerun native install/discovery/helper/reinstall with current published reader prerequisites (AC-01, AC-06, AC-07).
 - [ ] T22 `tests/vh-adlc/audit/trial-proof.ts` and bounded synthetic trial runners - execute actual Copilot Opus 5.5 audit/repair/recovery trials at a committed payload, including independent repair review and adverse controls; raw transcripts, native exits and manual inspections establish the declared scenarios (AC-01, AC-03, AC-04, AC-06).
 - [x] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
       Evidence: Actual isolated Codex CLI and Claude CLI native installers at `deb1d7fcb60b416a7980fdf0825acd2d3a94e77d` both pass (`native-install-r2/result.json`): twelve native skills, installed settings/inventory/report helpers, unchanged source/index and identical byte/mode payload after uninstall/reinstall. No authentication/configuration is copied or model invoked by installers. The short-SHA launch failure remains `native-install-r1-launch.log`; four verifier negative-control tests pass. This is local-catalog candidate evidence, not published-marketplace, real Claude model or GUI acceptance.
@@ -1182,6 +1229,8 @@ PROPOSAL: Name the post-merge outcome location and the authority that covers it.
 
 ## Sources
 
+- [Current configuration rule](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md#configuration-format) and [TypeScript conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md): YAML for human-written settings, typed boundaries and repository-specific verification after the pin adopted on main.
+- [YAML settings feature](yaml-settings.md#shared-audit): the existing shared strict reader and the explicit audit revision order, merged as `aa5c66e7` and integrated locally as `3f4cd78`.
 - [Feature document standard](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md): separate child, committed review, owner acceptance and status gates.
 - [Feature delivery conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/delivery.md): default-branch documentation, implementation claim, exact publication and consumer ordering.
 - [Documentation conventions](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/documentation.md) and [humanize prose guide](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md): grounded prose and one canonical feature document.
