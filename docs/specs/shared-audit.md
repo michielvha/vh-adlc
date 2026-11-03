@@ -1396,6 +1396,7 @@ None. Q1 was answered on 2026-11-03 and folded into Design, Test Plan and T94.
 | 2026-11-03 | R-22 | implementation | `951d47f64ceb677e15934286437c8bd4d9b040fe` | claude-opus-5.5 | procedural | All seven criteria met; one should-fix request to execute changed documentation contracts and two factual nits remain for this delivery pass. |
 | 2026-11-03 | R-23 | implementation | `f03068c58fc7b286b92e729c6d343b81f9c8d322` | claude-opus-5.5 | procedural | R-22 findings fixed and 61 current checks pass; AC-05 not verified after unrelated default advancement stopped the receipt wrapper. Helper itself passed; no product defect found. |
 | 2026-11-04 | R-24 | implementation | `88992f2c61369c6bf784346fc3290d501580a0a4` | claude-opus-5.5 | procedural | All seven criteria met, no findings. Executed 61 current contracts and current-default workflow/policy/preservation checks; prior failed passes retained. |
+| 2026-11-04 | R-25 | spec | `88992f2c61369c6bf784346fc3290d501580a0a4` | claude-opus-5.5 | procedural | Two factual should-fix findings about the then-pending R-23 state and one historical-tense nit. Original snapshot and return retained; R-24 subsequently resolves the current-default proof. |
 
 ### R-1
 
@@ -2332,6 +2333,29 @@ EVIDENCE: The launcher re-checked each delivery step at its own recorded target:
 The documents separate source-complete, reviewed, executed and published targets. They keep the limits explicit: receipts are operator attestations, and the real Claude model, GUI or phone use, and product or live operations are not claimed. The parent document lists documentation workflows and the other extractions as deferred.
 
 R-23 F-01 is resolved. The launcher now binds the default it actually observes, compares all 18 objects there, and completes the verify-log and two-repository status checks. The failed R-23 artifacts remain unchanged. No findings remain.
+
+### R-25
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-05
+EVIDENCE: The Review Log row for R-23 (shared-audit.md:1395) and its record (shared-audit.md:2190-2203) return "VERDICT: not verified" for AC-05. AC-05 is correctly unticked (shared-audit.md:1130). However, its evidence lines (shared-audit.md:1131-1133) cite only R-21, R-20 and R-19. The first line still reads "R-21 returns met". No line names R-23 or its verdict. review-protocol.md:79-80 says: "After an implementation review, untick every criterion it did not return as `met` and add an evidence line naming the review and its verdict." actual-gate.json reports `impl_review_clean`: "implementation review R-23: AC-05 is not verified without a residual". A reader of the criterion sees a met result as the latest evidence, while the binary reads it as not verified.
+PROPOSAL: Add an evidence line under AC-05 naming R-23 and its not verified verdict. Say that its launcher stopped when the consumer default advanced to b88aa6d5, so the command, forwarder and adapter-test objects were not compared there. Keep AC-05 unticked with no invented residual until the pending independent implementation review returns.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter status_description; Context, delivery status (line 43) and Published audit and Stackweaver adoption
+EVIDENCE: status_description (shared-audit.md:4) says "Post-merge policy and rollback checks pass". Context line 43 says the "read-only post-merge adoption checks pass". Neither says that AC-05 is currently unticked with no residual. feature-documents.md:54 defines `complete` as "Every criterion met or residualised, reviewed". actual-gate.json shows `vh-adlc gate complete: fail (spec_review_fresh, all_met, impl_review_clean ...)` with "not ticked with evidence or residualised: AC-05". R-23 (shared-audit.md:2196-2202) records that the post-merge launcher stopped at the advanced default b88aa6d5 and left part of the AC-05 comparison unestablished there. The text a reader sees reports a finished state that the gate does not confirm.
+PROPOSAL: Without changing status or any normative section, add a line to status_description and the Context delivery status. It should say that AC-05 re-verification at the current consumer default is pending in the separate independent implementation review, and that the complete gate fails on all_met and impl_review_clean until that review returns. Keep the 1057e769 post-merge result attributed to its own target.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context, R-18 paragraph (lines 225-231) and revision summary (lines 49-50)
+EVIDENCE: shared-audit.md:230-231 says in the present tense: "Revised owner acceptance is still pending; no YAML implementation, source-completion, marketplace or migration acceptance is claimed." The Review Log records the R-18 acceptance (shared-audit.md:1390), and line 49-50 says the owner accepted on 2026-11-03. The historical disclaimer at line 199 covers only the "then-pending Q1 state", not this acceptance sentence. Line 50 also still says "implementation has resumed on the existing branch", although the feature has since been published and adopted.
+PROPOSAL: Put line 230-231 in the past tense, for example "Revised owner acceptance was then pending; the owner accepted R-18 on 2026-11-03". Replace "implementation has resumed" at line 50 with the delivered state, leaving the normative sections unchanged.
 
 ## Sources
 
