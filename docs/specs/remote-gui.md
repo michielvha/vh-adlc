@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner and independently reviewed against current main; preparing implementation tasks."
+status: in-progress
+branch: feat/remote-gui
+status_description: "Implementation claimed in an isolated worktree; test-first tasks are in progress."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
