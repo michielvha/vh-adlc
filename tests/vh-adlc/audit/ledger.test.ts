@@ -442,3 +442,23 @@ test("dated-layout fix proposals retain per-finding history without a permanent 
  const candidate=createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"fix-dated",provisional:true});
  expect(candidate.bytes).toContain("Re-verify (2026-11-03)");expect(candidate.bytes).not.toContain("Provisional verdicts require");expect(candidate.bytes).not.toContain("Re-verification summary (2026-11-03)");expect(candidate.bytes).not.toContain("Audit pass (2026-11-03)");
 });
+
+
+test.each(["assessment-only","authored-repair"] as const)("a dated %s fix recorded FIXED retains its new provenance",disposition=>{
+ const f=fixture();projects.push(f);
+ const original="## How this audit was performed\nHistorical pass.\n\n"+ledger.replace("| Incorrect result | OPEN |","| Incorrect result | FIXED |");
+ f.write("docs/audit.md",original);const base=f.commit(),config=loadSettings(f.root);
+ if(disposition==="authored-repair"){f.write("src/app.ts","export const answer = 43;\n");f.commit("test: structural repair fixture");}
+ const snap=captureSnapshot(config,{mode:"fix",ids:["AUD-001"],baseline:base,scope_baseline:base,artifact_root:f.artifacts,required_checks:{"AUD-001":["unit"]}});
+ expect(snap.inventory.findings.find(row=>row.id==="AUD-001")?.recorded_status).toBe("FIXED");
+ const row=terminal(f,snap);row.disposition=disposition;
+ if(disposition==="authored-repair")row.red={...row.checks[0],commit:base,exit_code:1,artifact:f.artifact("structural-red.txt")};
+ const document={schema_version:1,snapshot_digest:snap.digest,assessments:[row]};
+ const candidate=createLedgerCandidate(config,snap,{document,at:"2026-11-03",run_id:"fixed-again",provisional:true});
+ expect(candidate.bytes).not.toBe(original);
+ expect(candidate.bytes).toContain("Run: fixed-again;");expect(candidate.bytes).toContain("Scope baseline: "+base);expect(candidate.bytes).toContain("Verified source: "+snap.source.commit);
+ expect(candidate.bytes).toContain("previous recorded state: FIXED");
+ expect(candidate.bytes).toContain("| AUD-001 | High | Incorrect result | FIXED |");
+ expect(candidate.bytes).not.toContain("audit-status:fixed-again");expect(candidate.bytes).not.toContain("Re-verification summary");
+ expect(validateFrozenFixCandidate(config,snap,candidate,document)).toBe(true);
+});

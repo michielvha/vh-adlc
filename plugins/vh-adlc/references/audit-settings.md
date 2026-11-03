@@ -168,11 +168,13 @@ A source evidence item may supply `line`; it must name a nonempty line in the sa
 current file. The dated note records that location without rewriting old historical references.
 
 
-Ledgers with the established "How this audit was performed" dated layout keep inline history only
-for changed statuses. OPEN observed as STILL_PRESENT is unchanged. Current unchanged findings stay
-in the pass summary with its source/Scope baseline; partial/unknown summary observations include
-residuals. The minimal standalone layout keeps per-finding notes. No unchanged old heading or title
-annotation is rewritten merely to add another date.
+For reverify/full, ledgers with the established "How this audit was performed" dated layout keep
+inline history only for changed statuses. OPEN observed as STILL_PRESENT is unchanged. Current
+unchanged findings stay in the pass summary with its source/Scope baseline; partial/unknown summary
+observations include residuals. A selected fix writes a per-finding evidence note for every selected
+member, including unchanged statuses, because it has no pass summary. Its note retains the run,
+Scope baseline and Verified source without adding an unchanged index/status annotation. The minimal
+standalone layout keeps per-finding notes. Existing headings remain unchanged.
 
 Comments or raw HTML within the declared index section remain unsupported, including multiline
 inline forms. Although rows come from rendered tables, this profile conservatively invalidates

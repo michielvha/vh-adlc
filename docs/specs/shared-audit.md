@@ -111,6 +111,20 @@ Implementation progress review R2: actual Copilot `claude-opus-5.5` reviewed `a6
 
 Implementation progress review R3: actual Copilot `claude-opus-5.5` read the complete required public packet at `98d05358cd4fee724fe0e4b094337191c7077f6e` with verified exclusive read-only tools. It found five should-fix defects: Markdown visibility/index selection, author-controlled default scope, missing resource-journal completion gates and dropped apply restrictions. T41-T44 cover them. The full suite at that target passed 864 tests/3312 assertions; these are additional counterexamples beyond the green suite. The actual authored two-finding trial now has a clean independent R7 at `09bbd235` and passes the strengthened current batch helper, including append-only bookkeeping. Its failed record/packet iterations remain retained, not relabelled clean. No source criterion is inferred complete.
 
+Current local validation at `c98a6e42`: all 967 plugin tests/3600 assertions and eight required Go,
+module, lint, workflow and secondary-plugin checks pass. The exact local-catalog payload passes native
+Codex/Claude installation/reinstallation and all 78 consumer/preserved-route tests. Actual Copilot
+trials pass the policy-change observation/retirement case with one disposable squash and zero replay,
+and ten corrected consumer report/delivery cases. These are local/synthetic results, not marketplace
+or real Claude-model acceptance. Public R9 found an unchanged-status provenance omission (T81) and
+a declined-intent retention documentation gap (T82). Private R5 found the post-publication follow-up
+sequence incomplete (T83). The full returned reviews remain in the local archive. Q1 is still pending.
+
+Published shared main `aa5c66e7` was merged locally as `3f4cd78`, preserving the YAML settings release,
+new conventions pin and unrelated feature documents. Its accepted YAML feature explicitly requires
+an audit-spec revision before audit's settings move; no settings conversion or feature publication
+is inferred from this merge. Earlier test/review targets remain exact historical evidence.
+
 ### Latest spec review and implementation obligation
 
 Actual Copilot `claude-opus-5.5` R-12 reviewed `67a91a17944bb219ce956364963531532577c396`
@@ -929,6 +943,10 @@ live operations remain separate owner-selected tasks.
       Evidence: A two-run readiness control fails first (`T79-readiness-red.log`), then the inspector reports the same repository-wide cleanup restriction as admission, with a read-only readiness handoff for unknown/unregistered state. Old pipe-row-scanner wording is removed. The combined 166-test recovery/native/batch/ledger set passes (`T78-T80-green.log`).
 - [x] T80 selected-fix ledger and consumer report flow - keep fix-only marker/index/inline history without a permanent provisional overview, allow keep-private report followed by selected fixes, classify report publication under the actual shipping constitution and bind its complete delegated rules (private R4; AC-03, AC-04, AC-05).
       Evidence: The dated fix-layout case fails first (`T80-layout-red.log`); fix proposals now omit pass banners/category summaries/pending-review claims while reverify/full retains them. All 166 affected tests pass (`T78-T80-green.log`). Focused real consumer parity/report-flow checks pass (`T80-consumer-final-green.log`); normal hooks remain required. Q1 remains the separate unresolved route decision and T75 stays open.
+- [x] T81 `scripts/audit/ledger.ts`, dated-layout controls and settings guidance - preserve per-finding provenance for unchanged selected fix statuses without reintroducing a pass summary (public R9 F-01; AC-03, AC-04).
+      Evidence: An all-unchanged FIXED candidate is byte-identical before the correction (`T81-red.log`). Fix-mode inline notes now retain every selected member while index/status markers remain changed-only. Both assessment-only and structurally attested authored-repair cases pass with the frozen candidate checks; 122 ledger/batch tests pass (`T81-final-green.log`). The real ledger remains untouched.
+- [ ] T82 `references/audit.md` and recovery controls - persist non-resource intents only at the execution boundary and document retained handoffs for declined effects, without claiming retirement or absence from missing artifacts (public R9 F-02; AC-04).
+- [ ] T83 `references/audit-record.md`, consumer follow-up policy and batch controls - make non-forced post-CI source refreezing executable and name the owner handoff when default advances after publication (private R5 F-01; AC-04, AC-05).
 - [ ] T22 `tests/vh-adlc/audit/trial-proof.ts` and bounded synthetic trial runners - execute actual Copilot Opus 5.5 audit/repair/recovery trials at a committed payload, including independent repair review and adverse controls; raw transcripts, native exits and manual inspections establish the declared scenarios (AC-01, AC-03, AC-04, AC-06).
 - [x] T23 `tests/vh-adlc/audit/install-trial.ts` and native acceptance artifacts - execute isolated native Codex/Claude candidate install/discovery/helper/reinstall tests, matching actual bytes/modes and source/index preservation; retain failures and distinguish local catalog from published marketplace (AC-01, AC-06, AC-07).
       Evidence: Actual isolated Codex CLI and Claude CLI native installers at `deb1d7fcb60b416a7980fdf0825acd2d3a94e77d` both pass (`native-install-r2/result.json`): twelve native skills, installed settings/inventory/report helpers, unchanged source/index and identical byte/mode payload after uninstall/reinstall. No authentication/configuration is copied or model invoked by installers. The short-SHA launch failure remains `native-install-r1-launch.log`; four verifier negative-control tests pass. This is local-catalog candidate evidence, not published-marketplace, real Claude model or GUI acceptance.

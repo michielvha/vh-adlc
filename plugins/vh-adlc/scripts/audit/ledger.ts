@@ -74,7 +74,7 @@ function renderCandidate(config: Settings, snap: Snapshot, options: CandidateOpt
     snap.inventory.findings.find(f => f.id === b.id)!.entry_lines[0] - snap.inventory.findings.find(f => f.id === a.id)!.entry_lines[0]);
   for (const row of rows) {
     const finding = snap.inventory.findings.find(f => f.id === row.id)!;
-    if (datedLayout && unchangedState(finding.recorded_status,row.verdict)) continue;
+    if (datedLayout && snap.mode !== "fix" && unchangedState(finding.recorded_status,row.verdict)) continue;
     let end = finding.entry_lines[0];
     const sections = markdownSections(lines.join("\n")).headings;
     while (end < lines.length) {
