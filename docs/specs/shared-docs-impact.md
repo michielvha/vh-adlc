@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised around a common documentation coverage convention, a reusable checker and a shared review procedure. Local draft; not yet independently reviewed or accepted."
+status_description: "Claude Code Opus 5.5 R-1 returned no blockers, seven should-fix findings and one nit. Runtime/caller corrections are recorded; coverage/scope decisions await the owner. Local draft, not accepted."
 issue: null
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -11,11 +11,13 @@ covers:
   - plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md
   - plugins/vh-adlc/examples/docs-impact/
   - plugins/vh-adlc/scripts/docs-impact/
+  - plugins/vh-adlc/scripts/settings-file.ts
   - plugins/vh-adlc/vh-adlc.lock.json
   - plugins/vh-adlc/knowledge.md
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - tests/vh-adlc/docs-impact/
+  - tests/vh-adlc/settings-file.test.ts
   - tests/vh-adlc/check.test.ts
   - tests/vh-adlc/direct-operation-compatibility.test.ts
   - tests/vh-adlc/lifecycle/
@@ -118,6 +120,11 @@ plugin directory, for example `bun <plugin>/scripts/docs-impact/cli.ts check --r
 --base <ref> --docs-root <path>`. It can run from an agent, terminal, hook or CI; it requires no
 particular harness, model or active agent session. Prepare its existing runtime dependencies
 explicitly; checking performs no download, index generation, screenshot capture or repository write.
+Standalone and CI setup must provide Bun, Git, Bash and the locked, verified `vh-adlc` binary.
+Resolve that binary once through `ensure-vh-adlc.sh --offline`, then parse frontmatter through the
+existing strict `settings read` report contract. A small reader-helper extraction may be needed;
+preserve existing settings callers. An absent or mismatched binary produces `incomplete`, including
+when the plugin files themselves are present. Checking never installs it or writes the binary cache.
 
 Inputs are the repository, explicit documentation roots and either a Git base or explicit selected
 source paths. Repeated path arguments and NUL-delimited input support filenames safely. Default
@@ -176,6 +183,12 @@ Keep Stackweaver's public/internal style, frontend-triggered visual refresh/chec
 requirements, frontmatter-triggered index rebuild and generated changelog policy in
 `agents/docs-impact-project.md`. Route its existing `agents/docs-impact.md` entry through the
 shared procedure. Preserve implement/ship/CLAUDE callers and their existing permissions.
+The complete migration inventory includes `agents/docs-impact.md`, the new project companion,
+`agents/implement.md`, `agents/ship.md`, `.claude/commands/ship.md`, `CLAUDE.md`, the forwarding list
+in `AGENTS.md`, the docs-impact reference in `agents/public-docs.md`, the checker entry and references
+in `DOCUMENTATION_STANDARDS.md` and `PUBLIC_VISUAL_ASSETS.md`. Preserve or update each route/reference;
+all changed fragments enter the parity comparison and rollback blob set. The public-docs workflow
+retains its existing logic apart from pointing to the adopted docs-impact route.
 
 Move candidate checking to the shared implementation. Retain `scripts/check-doc-coverage.js` as a
 thin compatibility entry if its existing hook/terminal callers need it: preserve arguments/stdin
@@ -232,9 +245,9 @@ unclaimed; a future UI change still owes its existing local visual checks.
 | --- | --- |
 | AC-01 | Review and lint the actual convention change; verify its declared enforcement/examples against the checker and pin the published revision. Existing feature gate/matcher tests remain unchanged and pass. A synthetic second repository uses only Markdown coverage and the shared tool, with no Stackweaver scripts, website generator or generated index. |
 | AC-02 | Red-first checker tests cover exact paths, directory prefixes, wildcard/globstar, several roots, current frontmatter, code-fence false positives, rename/delete, committed/staged/unstaged paths, explicit untracked selections and unusual filenames. Change metadata after creating a deliberately stale index: the direct scan must use current metadata. Preserve source/index/dirty sentinels. |
-| AC-03 | Execute the CLI and inspect real JSON/text/exits for matching, no-match and incomplete results, including mixed known matches plus errors, missing root, no declared coverage, invalid YAML/covers/globs, unreadable data and repository escapes. No error disappears into an empty success; unmatched source paths remain explicit. |
+| AC-03 | Execute the CLI and inspect real JSON/text/exits for matching, no-match and incomplete results, including mixed known matches plus errors, missing root, no declared coverage, invalid YAML/covers/globs, unreadable data and repository escapes. Also remove the verified binary in an isolated offline environment: the real checker must return incomplete without network or cache writes. Existing settings-reader regressions must pass. No error disappears into an empty success; unmatched source paths remain explicit. |
 | AC-04 | Actual Copilot trials review fake code/docs, catch a changed default, make the correct minimal authorized doc edit and expose missing/unknown/wrong-system cases. Exercise direct/intake/implement/ship, manual legacy fallback, report-only requests and malicious doc/output instructions. Confirm no unintended generator/commit/remote action, and covered doc fixes still require fresh feature review. |
-| AC-05 | Compare every material legacy behavior and candidate against current shared/local behavior with independently reviewed parity. Execute the actual legacy CLI wrapper/hook contract from a neutral environment with an explicitly located shared payload; test absence/failure and old arguments/stdin/exits. Synthetic local hooks preserve visual refresh/check even for accurate prose, index/preview conditions and missing-browser blockers. Rehearse conflict-safe rollback/reapply and prove unrelated workflows/generators/customer content unchanged. |
+| AC-05 | Compare every material legacy behavior and candidate against current shared/local behavior with independently reviewed parity. Execute the actual legacy CLI wrapper/hook contract from a neutral environment with an explicitly located shared payload; test missing payload, missing verified binary and old arguments/stdin/exits without network or cache writes. Cover every caller/routing/guideline fragment listed in Design. Synthetic local hooks preserve visual refresh/check even for accurate prose, index/preview conditions and missing-browser blockers. Rehearse conflict-safe rollback/reapply and prove unrelated workflows/generators/customer content unchanged. |
 | AC-06 | Run repository-required tests/vet/lint and the package checker; include portable new tests in macOS CI. Retain original actual Copilot inputs/returns/red-green doc results and tool provenance. Isolated native Codex/Claude installs discover the operation and execute the installed checker outside an agent session. Independent exact-commit implementation review observes the evidence; no fixture outcome becomes a GUI/live-product claim. |
 | AC-07 | Source completion checks the cutover safeguards and exact-source candidates. Delivery then verifies the convention, normal shared CI/release, real marketplace fresh/upgrade payloads, paired review, installed current-consumer preflight and post-merge routing/checker. Reject missing/stale/mismatched evidence, incompatible tool versions and conflicting migration state; record actual observed default revisions rather than demanding an old global default remain current. |
 
@@ -244,7 +257,35 @@ None yet; planned after independent review and owner acceptance. No implementati
 
 ## Open Questions
 
-None introduced by the owner's chosen direction. Material reviewer-identified decisions return to the owner.
+### Q1: Adopt the review refinements for coverage, adoption, change selection and compatibility?
+
+**Recommendation:** A. Make the following defaults explicit before the next review:
+
+1. Keep feature documents visible as documentation candidates. Ordinary coverage supports their
+   existing `?` and bracket patterns too, and may match `**`; label these as coverage-only matches.
+   This checker never interprets freshness or completion, never changes the feature gate and never
+   selects a feature document for its own changed path. Test the two matchers independently.
+2. Declare adoption and roots with one `Documentation impact roots: ["docs/"]` line in root
+   `AGENTS.md`. No line means existing manual review. A malformed or conflicting declaration is a
+   gap. Explicit standalone CLI roots remain sufficient for a one-off run.
+3. With a base, compare HEAD against its merge-base with that base. Include dirty tracked paths
+   only when the caller explicitly selects them; report excluded dirty scope. Explicit path-only
+   runs inspect exactly those paths. Do not infer file ownership from Git status. An integrated
+   caller that cannot identify the requested scope reports a gap.
+4. The shared checker matches explicitly selected paths even if they are documentation. Keep
+   Stackweaver's existing `docs/` source exclusion in its local wrapper/procedure.
+5. The legacy wrapper exits 2 on incomplete checks, shows diagnostics and any known candidates,
+   and never turns that result into legacy candidates-only exit 1. Empty or docs-only legacy
+   input remains a no-op exit 0 and explicitly carries no complete-coverage claim.
+6. Keep host paths and review-dispatch details in local review artifacts, not the published spec.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Adopt these defaults** | Explicit reusable behavior while retaining legacy routes and permission boundaries. | Additional syntax/scope/compatibility tests before adoption. |
+| **B. Change selected defaults** | Different behavior for the choices named above. | Resolve those choices and update their tests before renewed review. |
+
+**Why this is yours:** These defaults decide which documents are selected, when integrated checking
+runs and how existing callers respond. The current accepted direction does not settle those details.
 
 ## Review Log
 
