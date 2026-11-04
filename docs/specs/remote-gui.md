@@ -212,6 +212,7 @@ None.
 | 2026-11-03 | R-8 | spec | `d3b54f67cb8522a063096c1c1421921a8c032a83` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-9 | spec | `2c6aeb22fb8846e3a897d866693fa28378f52b6c` | unknown | procedural | NO FINDINGS; model identity not attested. Passwordless owner identity and trusted Unix ingress reviewed. |
 | 2026-11-03 | R-9 | spec | `2c6aeb22fb8846e3a897d866693fa28378f52b6c` | n/a | n/a | accepted by owner |
+| 2026-11-05 | R-10 | spec | `df4341feb7ee53a96571b88766f284615ea5ba53` | unknown | procedural | NO FINDINGS; refreshed after integrating current main. Model identity not attested; accepted normative baseline unchanged. |
 
 ### R-1
 
@@ -288,6 +289,10 @@ PROPOSAL: Define an owner-approved hostname trust boundary or authentication tha
 NO FINDINGS
 
 ### R-9
+
+NO FINDINGS
+
+### R-10
 
 NO FINDINGS
 
