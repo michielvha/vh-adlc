@@ -1,7 +1,7 @@
 ---
-status: draft
-status_description: "Claude Code Opus 5.5 R-8 has no blocking or should-fix findings. Four implementation proof nits are retained. All owner decisions are recorded; ready for final acceptance and implementation claim publication."
-issue: null
+status: planned
+status_description: "Accepted by the owner on 2026-11-05 after Claude Code Opus 5.5 R-8. Ready for task planning and the published implementation claim."
+issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-docs-impact/
@@ -489,6 +489,7 @@ None. The owner approved all six review refinements.
 | 2026-11-04 | R-6 | spec | `a07f5bf3e43178a0522c1f5b9c1595c868460f5f` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on bootstrap order, uncovered docs and feature/marker boundaries. |
 | 2026-11-04 | R-7 | spec | `0b1ed20d39c2165a0828ba39e30f62264fd7da99` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on local-plan upkeep, corpus collection, policy view and intake routing. |
 | 2026-11-04 | R-8 | spec | `372bd41b8cc56b470e0679b2bb2a8490f52c3969` | claude-opus-5-5 | procedural | No blocking or should-fix findings; four nits retained as implementation proof obligations. |
+| 2026-11-05 | R-8 | spec | `372bd41b8cc56b470e0679b2bb2a8490f52c3969` | n/a | n/a | accepted by owner |
 
 ### R-1
 
