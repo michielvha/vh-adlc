@@ -1,18 +1,18 @@
 ---
 status: draft
-status_description: "Local proposal for docs-impact extraction. Implementation waits for independent spec review and owner acceptance; documentation publication is not yet authorized."
+status_description: "Revised around a common documentation coverage convention, a reusable checker and a shared review procedure. Local draft; not yet independently reviewed or accepted."
 issue: null
-goal: "Review and update documentation affected by an authorized code change through one harness-agnostic shared procedure while consumers retain their scanners, publishing rules and generated outputs."
+goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-docs-impact/
   - plugins/vh-adlc/references/docs-impact.md
-  - plugins/vh-adlc/references/docs-impact-settings.md
   - plugins/vh-adlc/references/lifecycle.md
-  - plugins/vh-adlc/references/authority.md
   - plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md
   - plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md
   - plugins/vh-adlc/examples/docs-impact/
   - plugins/vh-adlc/scripts/docs-impact/
+  - plugins/vh-adlc/vh-adlc.lock.json
+  - plugins/vh-adlc/knowledge.md
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - tests/vh-adlc/docs-impact/
@@ -29,259 +29,222 @@ covers:
 
 # Shared documentation impact
 
-After a code change, identify the documentation it affects, check each candidate against the
-implementation and make the permitted updates. Stackweaver keeps its existing coverage scanner,
-index generator, visual recipes and publishing rules. The shared operation supplies the review
-procedure and a clear result; it does not publish the change.
+After a code change, the shared checker finds documentation that may need updating. The shared
+agent checks those docs against the implementation and makes the permitted corrections.
+
+| Part | What it delivers | Home |
+| --- | --- | --- |
+| Common convention | A document declares the code it describes using `covers:` metadata. | `vhco-pro/docs` |
+| Reusable checker | Read that metadata directly and return affected docs for the selected change. | `vh-adlc` |
+| Review procedure | Read the code and candidate docs, then explain or fix the actual differences. | `vh-adlc` |
+| Project tooling | Generate the documentation site, navigation and maintained screenshots. | Stackweaver or the adopting repository |
+
+For example, a deployment guide declares `covers: [deploy/**]`. Changing a Helm value makes the
+checker list that guide. The agent then decides whether the guide needs an edit. Another project
+can use the same checker without Stackweaver's generated index or website tooling.
 
 ## Context
 
-The owner selected docs impact on 2026-11-04 after the triage, maintenance and audit extractions.
-The parent migration roadmap, `docs/specs/shared-workflow-migration.md:71-78`, defers the broader
-D-03 documentation family and requires comparing existing shared behavior before extraction.
-This child selects docs impact only. Drift audit, drift resolution and docs-truth remain deferred.
+The owner selected docs impact on 2026-11-04 after triage, maintenance and audit. On the same date,
+the owner chose a common convention plus shared checker over the first draft's approach of leaving
+each repository responsible for its own checker. This replaces that unaccepted draft, not an
+accepted implementation. Drift audit, drift resolution and docs-truth remain deferred in the
+[parent roadmap](shared-workflow-migration.md).
 
-The inspected shared default is `8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1`, with plugin 0.8.0.
-`vh-adlc find --slug shared-docs-impact` returned an empty documents list, and the connected GitHub
-issue search for docs impact returned no matches. No competing feature or issue was found.
-`skills/vh-adlc-ship/SKILL.md:30-43` already requires documentation impact, appropriate verification,
-new implementation review for a covered fix, and a passing completion gate. It does not specify
-candidate collection, per-document findings or local index/visual handling. The lifecycle table at
-`references/lifecycle.md:40-62` has a general documentation route but no docs-impact operation.
-Paths in this paragraph are under `plugins/vh-adlc/`.
+Inspected shared main is `8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1`, plugin 0.8.0.
+`plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:32-43` requires documentation review and a fresh
+implementation review when a documentation fix changes covered paths. It does not supply a common
+coverage checker. The lifecycle table at `plugins/vh-adlc/references/lifecycle.md:40-62` has no
+specific docs-impact operation. The pinned `conventions/documentation.md` has no general coverage
+contract; `conventions/feature-documents.md:38-44` already gives feature documents their own `covers`
+role, which this feature must preserve.
 
-The inspected Stackweaver default is `b88aa6d596249f1f7178d3fcdb7a5c9b8221fe2f`.
-`agents/docs-impact.md:17-55` describes changed-file selection, coverage-index mapping, literal
-reference searches, missing-document detection and code-grounded classifications. Lines 57-102
-retain local public/internal documentation rules, visual refresh/check, frontmatter/index handling,
-a five-part report and a ban on deleting docs or dropping coverage to make a check pass.
-`agents/implement.md:57-63` calls this path for maintained UI captures; `agents/ship.md:46-61` and
-`.claude/commands/ship.md:6-24` retain the shipping documentation check. There is no separate
-`.claude/commands/docs-impact.md` in the inspected source.
+At inspected Stackweaver commit `b88aa6d596249f1f7178d3fcdb7a5c9b8221fe2f`,
+`agents/docs-impact.md:17-55` selects changes, maps candidates and checks their accuracy.
+`scripts/build-docs-index.js:1339-1386` builds `docs-coverage.json` from Markdown frontmatter.
+`scripts/check-doc-coverage.js:33-104` uses that index; it exits 1 for candidates but silently exits 0
+when the index is missing. The shared checker removes that index dependency for docs impact.
+Existing site generation, frontend visual refresh/check and public/internal rules remain local
+(`agents/docs-impact.md:57-102`).
 
-A specific integration hazard is visible in `scripts/check-doc-coverage.js:10-12,33-63,93-104`:
-exit 1 means candidate docs were found, while a missing index exits 0 silently. Exit 0 therefore
-cannot establish that documentation coverage was checked. `scripts/build-docs-index.js:1339-1386`
-builds the coverage map, and lines 1474-1485 include it in the normal index generation path.
-Those existing tools stay local. This feature makes their preconditions and result interpretation
-explicit rather than changing their semantics or replacing them with a generic scanner.
-
-The new shared spec checkout is `/home/m/code/vh-adlc-docs-impact-spec`, on default `main` at the
-observed shared commit. Existing feature worktrees and Stackweaver's diverged main are untouched.
-Private consumer workflow text, real docs/findings and application source have not been sent to a
-new external reviewer for this feature. The first review receives only this public-safe proposal,
-public shared source and synthetic examples; private semantic review needs its bounded permission.
+This document is local to `/home/m/code/vh-adlc-docs-impact-spec`. No new checker, convention,
+consumer adapter or external publication has been implemented. Review of bounded private consumer
+workflow files still needs the owner's pending permission; no customer docs, images, application
+source, reports, ledger, credentials or host configuration belong in that packet.
 
 ## Scope
 
-Include one canonical docs-impact procedure, a directly discoverable `vh-adlc-docs-impact` skill,
-explicit lifecycle routing, and reuse of that procedure by the existing implement/ship doc checks.
-Include minimal typed settings/scope helpers, complete examples, meaningful scenario tests and a
-Stackweaver adapter/migration. Optional YAML settings identify local documentation, prerequisites,
-project procedure and generated output scope. They do not contain grants or a command language.
+Deliver the common convention, shared checker, shared agent procedure, existing lifecycle/ship
+integration and a verified Stackweaver migration. The normal path reads Markdown directly and
+requires neither a generated index nor a custom checker in each repository. Keep per-project
+configuration to explicit checker inputs and existing local instructions; do not introduce a new
+YAML configuration framework just to describe existing commands.
 
-Retain scanners, coverage data, generators, screenshots, public/internal style, historical records,
-local shipping conditions and independent-review requirements in the consumer. A consumer without
-settings retains the existing generic documentation check using its local instructions; it does not
-need Stackweaver's layout or tools. Invalid configured settings must not fall back to generic mode.
-
-Exclude corpus-wide drift audit/resolution, semantic docs-truth sweeps, blog/promotion, public-docs
-pipeline redesign, automatic publication, scheduled jobs, notification changes, product/runtime
-repairs, new index formats and a new shell execution or evidence-enforcement system. No governance,
-feature criterion or intended software contract may be rewritten merely to match a software defect.
+Keep site/index generation, visual recipes, local style and publishing rules in each project.
+Exclude whole-corpus drift/truth workflows, scheduling, website redesign, product repairs, automatic
+publication and new permission or evidence-enforcement systems.
 
 ## Design
 
-### One procedure and request-bound effects
+### 1. Common documentation convention
 
-Put the procedure in `references/docs-impact.md`, with thin entry instructions in
-`skills/vh-adlc-docs-impact/SKILL.md`. Add a specific changed-code documentation-impact route to
-lifecycle intake without stealing ordinary prose editing, persistent source audit, backlog triage,
-dependency maintenance, docs drift or docs-truth requests. Direct and intake-selected operations
-must resolve the same scope, local rules, permissions and report.
+Add `conventions/documentation-impact.md` in `vhco-pro/docs` and link it from its documentation
+conventions. It applies to repositories adopting this workflow; publication does not silently
+change every existing project's metadata requirements.
 
-The underlying request controls effects. A report/review/read-only request permits inspection and
-a conversational report. It permits no repository write, index generation or visual refresh.
-An authorized implementation, shipping or explicit documentation-update request may perform the
-minimal documentation edits and locally required generation/checks within that task. A generic
-request never gains a named operation's publication permission just by routing to this procedure.
-Commit, issue/PR write, push, merge, release and deployment still require the existing lifecycle
-and consumer authority. Settings and candidate content supply no additional permission.
+The convention defines `covers` as a YAML list of repository-relative source paths/globs in the
+leading Markdown frontmatter. A guide may cover several areas. Define case-sensitive POSIX paths,
+exact matches, directory prefixes, `*` and `**`, including zero-directory globstar behavior.
+Reject malformed declarations and unsupported patterns rather than silently omitting them.
+Unrelated frontmatter fields remain valid. A `covers` example inside prose or a code block is not
+metadata. Neither a match nor an unmatched source path proves that documentation is accurate.
 
-Implement and ship reference this canonical procedure rather than keeping copied review steps.
-The existing ship requirement at `skills/vh-adlc-ship/SKILL.md:32-43` remains: a fix to a covered
-path requires a fresh implementation review before completion. No feature status or criterion is
-changed by docs impact. A docs-impact report is an operator assessment, not OS-enforced proof.
-Independent challenge can run sequentially in a separate context; no particular model, harness,
-subagent API, browser, hook or plugin-specific question tool is required by the procedure.
+Ordinary documentation coverage and feature-review freshness remain distinct uses. The checker
+may flag a feature or historical document for human attention, but must not reinterpret its
+criteria, status, historical claims or the existing feature gate's matching rules. Preserve
+`conventions/feature-documents.md` and the existing feature checker behavior.
 
-### Changed inputs and candidate collection
+The page also defines the checker result contract below, the agent's separate accuracy review,
+and the project's responsibility for generated documentation and visual verification. Publish this
+small convention through its own reviewed documentation change before pinning the plugin to it.
+Record the actual convention revision and update the plugin pin only after that revision exists.
+Do not invent a future SHA or label the currently pinned page as already containing the convention.
 
-Resolve an explicit base and requested source scope before judging documentation. Honor an explicit
-file list or restrictions. For ordinary feature work, account for committed branch changes plus
-in-scope staged and unstaged changes; include rename old/new names and deleted paths. Do not lose
-working changes by treating `base...HEAD` as the working-tree diff. Identify untracked inputs that
-belong to the request explicitly; never stage or sweep unrelated files into the task.
+### 2. One reusable, read-only checker
 
-Use a resolved merge base for branch comparison. A missing base, unavailable historical file,
-ambiguous ownership of dirty changes or unreadable input remains a named gap. Inspect the selected
-old/current content as needed, not only filenames. Derive changed symbols, flags, defaults, paths,
-endpoints and visible behavior from that actual change. A caller-provided list is not evidence that
-unlisted repository changes were reviewed. Bind the report to observed commit/base, selected paths
-and current source/doc bytes; changed inputs invalidate its conclusions and require affected checks
-again before completion. The helpers expose bindings and gaps, not semantic verdicts or permissions.
+Package the checker under `plugins/vh-adlc/scripts/docs-impact/`, using the repository's existing
+Bun runtime and verified strict YAML reader. Its portable CLI is invoked from the actual installed
+plugin directory, for example `bun <plugin>/scripts/docs-impact/cli.ts check --repo <repo>
+--base <ref> --docs-root <path>`. It can run from an agent, terminal, hook or CI; it requires no
+particular harness, model or active agent session. Prepare its existing runtime dependencies
+explicitly; checking performs no download, index generation, screenshot capture or repository write.
 
-Collect candidates using the consumer's prescribed coverage tool, then literal-reference searches
-and a missing-documentation review of each selected visible change. Every mapped doc is reviewed;
-a map does not prove truth or eliminate the search for uncovered behavior. Include the documentation
-roots and extra authoritative docs the local procedure names, without turning this into a corpus
-sweep. Keep documentation inputs distinct from source inputs according to local policy; do not
-classify executable configuration, contracts or published artifacts by filename alone.
+Inputs are the repository, explicit documentation roots and either a Git base or explicit selected
+source paths. Repeated path arguments and NUL-delimited input support filenames safely. Default
+Git selection combines committed branch changes with the selected staged/unstaged changes and
+accounts for rename old/new names and deletions. Include untracked inputs only when explicitly
+selected. Preserve unrelated dirty files and index entries; ambiguous ownership or an unavailable
+base becomes a reported gap, not a silently narrowed scope.
 
-A configured coverage prerequisite that is missing, malformed or known stale prevents a clean
-collection result. In read-only mode report the blocker. Under update authority, use the local
-index preparation procedure and recheck collection after its permitted writes. If freshness cannot
-be established, say so; never call the missing index an empty successful scan. For a generic adopter
-with no prescribed index, perform the documented source/doc inspection and reference search,
-identify that manual collection method, and do not claim an indexed or exhaustive scan.
+Read current Markdown frontmatter directly from the declared roots. Include tracked documents and
+explicitly selected new docs, avoid generated/ignored trees unless explicitly in scope, and refuse
+repository escapes through traversal or symlinks. A generated coverage index is never required or
+trusted as the source of current metadata. Stackweaver's index remains available to its own tools.
 
-### Local settings and tools
+Return versioned JSON and a readable rendering with the same meaning:
 
-Use optional `.vh-adlc/docs-impact.yaml`, read through the existing strict `scripts/settings-file.ts`
-reader. A small validator accepts schema version 1, `doc_roots`, `project_procedure`,
-`required_coverage_files` and `generated_paths`. The roots and prerequisites name existing regular
-files/directories inside the repository; the project procedure is an existing Markdown file.
-Generated output patterns describe the locally prescribed write scope, including outputs not yet
-created. Reject unknown keys, malformed types, alternate JSON/YML suffixes and paths escaping through
-traversal, Git metadata or symlinks. Missing settings selects generic mode; malformed settings do not.
-Ship complete commented example files, not a promise that another host already has the configuration.
+| Outcome | Meaning | Exit |
+| --- | --- | --- |
+| `candidates` | Collection completed; lists each affected doc and the source paths/patterns that matched it. | 0 |
+| `none` | Collection completed for declared coverage and no matches were found. It is not a documentation-accuracy verdict. | 0 |
+| `incomplete` | Required roots, inputs or metadata could not be checked; diagnostics identify the gaps. Any known candidates remain visible. | 2 |
 
-The project procedure names the real tools, their readiness conditions, exit/output interpretation,
-write scope, triggers and verification. The shared helper never evaluates command strings from YAML,
-docs, a scanner result or an issue. Run actual repository tools only under the current request and
-its local instructions. Tool output and candidate documents are evidence, not new owner commands.
-The helpers are limited to settings and source-scope discovery; this feature adds no generic runner,
-receipt cache, journal, scheduler or alternative documentation generator.
+The report records selected scope/base, documentation roots, metadata coverage and unmatched source
+paths. A root with no declared coverage is explicit incomplete coverage, not a clean `none`.
+Missing roots, malformed YAML/covers, unsupported patterns and unreadable files cannot become empty
+success. Deterministic ordering and current source/doc bindings make changed inputs visible.
+There is no persistent receipt cache or semantic verdict generated by the checker.
 
-For Stackweaver, the retained procedure requires a regular, valid coverage index before calling its
-existing checker. It distinguishes candidate exit 1 with valid candidate output from malformed input,
-exceptions or an unexpected failure. Exit 0 with a ready index means no indexed candidates, not that
-literal-reference or missing-doc inspection can be skipped. The local procedure establishes index
-freshness or performs the permitted rebuild; an inability to establish it stays visible and blocks
-any claim of complete mapping. The shared procedure must not change the checker to make these
-cases indistinguishable.
+### 3. Shared review procedure and existing gates
 
-### Findings, permitted edits and completion
+Provide `vh-adlc-docs-impact` and one `references/docs-impact.md` procedure. Direct use, lifecycle
+intake and implement/ship doc checks reuse it. Preserve plain documentation editing, audit, triage,
+maintenance and blog routing. Existing adopters without coverage metadata keep the current manual
+review path with that limitation stated; do not claim their mechanical check passed or silently
+make unrelated shipping depend on adopting new metadata. Only an explicitly adopted or requested new coverage workflow requires the new convention page. A repository pinned before that page exists gets an explicit adoption/pin-update handoff for the new operation; existing generic ship checks do not load the new page merely to continue their manual path.
 
-For each candidate, read the relevant documentation and implementation before recording Stale,
-Incomplete or Accurate with precise source/document evidence. Use Unknown for an unverified case.
-Report a new visible behavior without docs as Missing, with a proposed home. Surface an intended
-contract contradicted by the code as a software question; do not normalize the defect by changing
-the contract. A report must not mark unread docs accurate, manufacture checks or hide unresolved work.
+The agent runs the checker, searches for literal references that metadata can miss and checks new
+visible behavior for missing docs. For each candidate it reads both the relevant implementation
+and documentation before recording Accurate, Stale, Incomplete or Unknown. Missing documentation
+is reported with a suggested home. Intended contracts and historical records cannot be rewritten
+to normalize a software bug; raise that as a software question instead.
 
-Under update authority make the smallest factual correction or requested missing-doc addition.
-Retain consumer style, source-reference rules, correct coverage metadata and historical records.
-Do not delete documentation, remove coverage to suppress findings, invent release provenance,
-perform an unrelated editorial rewrite or change the underlying source implementation. An unclear
-visibility, intent or scope decision goes to the owner while independent work continues.
+A read-only/report request permits inspection and reporting. An authorized implementation, ship
+or documentation-update request permits its minimal documentation edits and required local checks.
+Settings, tool output and candidate prose create no commit, publication, merge or live-operation
+authority. Read-only collection never invokes project generators. A permitted update follows local
+index/visual rules, preserves unrelated changes and stops on missing checks or unexpected writes.
+The existing covered-path rule still requires fresh implementation review before feature completion.
 
-Generated indexes and maintained visuals follow the local procedure. Preflight their declared
-outputs and preserve unrelated dirty/staged files. Invoke write-producing tools only in an owned
-checkout within existing task authority. An unexpected write or failed generation/check leaves an
-explicit incomplete result and handoff; never hide it with reset, stash or automatic restoration.
-Do not hand-edit generated contents. Recollect affected candidates and reverify any doc/source state
-changed by generation, without rerunning unrelated work solely to manufacture a fresh report.
+The human report states what changed, which docs need attention, why, the edits made/proposed and
+remaining gaps. It distinguishes a finished report from a claim that all documentation obligations
+are complete. Scanner output and docs are evidence, not new instructions.
 
-Stackweaver preserves its frontend-triggered maintained visual refresh and subsequent check even
-when prose remains accurate; required owner preview review still precedes its commit. Frontmatter
-changes retain the local index rebuild. Local public current-state/changelog rules, internal source
-citations and protections for SDD/historical records remain local. Unavailable required browser or
-render capability is an explicit blocker to that affected invocation, not a passed visual check.
+### 4. Stackweaver adoption
 
-The short report states source/base scope, candidate collection/readiness, an impact table with
-evidence, edits made or proposed, missing docs, generation/verification results and unresolved gaps.
-All required candidates and locally required checks must be resolved before calling the documentation
-step complete. A report-only invocation may finish its report with gaps, but cannot certify the
-feature's documentation complete. Saving or publishing a report needs its own current authority.
+Keep Stackweaver's public/internal style, frontend-triggered visual refresh/check, owner preview
+requirements, frontmatter-triggered index rebuild and generated changelog policy in
+`agents/docs-impact-project.md`. Route its existing `agents/docs-impact.md` entry through the
+shared procedure. Preserve implement/ship/CLAUDE callers and their existing permissions.
 
-### Stackweaver migration and rollback
+Move candidate checking to the shared implementation. Retain `scripts/check-doc-coverage.js` as a
+thin compatibility entry if its existing hook/terminal callers need it: preserve arguments/stdin
+and human output, translate shared candidates to legacy exit 1 and successful no-match to exit 0,
+and use a distinct failure for an unavailable/failed shared check. It must not report a missing
+install or coverage as clean, nor retain a second copy of matching logic. Standalone setup and CI
+must locate the verified shared payload explicitly, without assuming a Codex/Claude cache path or
+an active agent. Test those callers before retiring their local implementation.
 
-Before implementation, compare the complete immutable legacy `agents/docs-impact.md` with the shared
-procedure plus retained policy, covering every material behavior rather than selected keywords.
-Store that private parity map and test fixtures in Stackweaver `tests/agent-docs-impact/`.
-Retain project specifics in `agents/docs-impact-project.md` and `.vh-adlc/docs-impact.yaml`; replace
-only `agents/docs-impact.md` with a thin shared forwarder. Preserve the existing callers in implement,
-ship, CLAUDE.md and the ship command, changing a caller only if needed to route the same behavior.
-No separate legacy slash command is invented. Other documentation agents, scanners, generators,
-hooks, schedules, real docs, ledgers and product source stay unchanged by migration.
+The website's `docs-coverage.json`, index builder, visual scripts, other documentation agents,
+hooks/schedules and real customer content are not redesigned. Verify all previously selected
+legacy candidates remain selected; explicitly record conservative additions from corrected glob
+semantics. Invalid existing metadata blocks adoption until a separately reviewed correction is
+within scope; do not drop declarations or silently edit unrelated docs to make migration pass.
 
-Refresh actual consumer default before the migration branch; preserve the diverged main checkout
-and unrelated worktrees. Record exact legacy/shared/consumer commits and bound policy files.
-The earlier inspected baseline is evidence, not a permanent acceptance target. Review current
-semantic parity and rerun affected contracts when these inputs change. An unrelated default advance
-requires comparing the actual relevant objects; it does not imply a software defect or justify
-reusing stale policy evidence.
+Before cutover, bind the complete legacy/shared/local behavior comparison and migration paths to
+exact current commits, using private parity tests in `tests/agent-docs-impact/`. Publish and verify
+the convention and shared tool first, then test real Codex/Claude marketplace fresh installs/upgrades
+and installed terminal/hook behavior. A source copy or local catalog is not marketplace proof.
+Perform the paired semantic review and installed current-consumer checks before the migration merge,
+then inspect the adopted route/checker read-only. Preserve the diverged main checkout.
 
-Publish the reviewed shared component first after its source gate. Verify its normal CI and any
-normal runtime release, then perform real Codex/Claude marketplace fresh-install/upgrade discovery
-and installed helper checks at the exact published payload. Plugin version must be newer than the
-0.8.0 baseline; choose the coherent next version after refreshing current main at implementation.
-A local catalog or source copy is development evidence only. Obtain paired review of the published
-shared and current consumer workflows and pass the installed migration checks before consumer merge.
-The installed preflight is a consumer-local check of actual manifests/payload, current migration
-paths/settings and the real recorded publication/review results. It may reuse operation-neutral
-filesystem inspection; audit- or maintenance-specific receipts cannot satisfy docs-impact adoption.
-It confers no action grant and introduces no new shared evidence runtime. Record the adopted
-default/route and inspect the installed operation read-only after merge.
+Record rollback blobs for changed agent/caller/checker fragments and rehearse restore/reapply on a
+disposable repository, preserving newer unrelated edits and index/dirty sentinels. Refuse conflicts
+and symlink substitutions; never reset/stash another checkout or undo other documentation workflows.
 
-The consumer migration records its exact path set and prior blobs, including any modified shared
-caller fragments. Rehearse scoped restore/reapply in a synthetic disposable checkout while preserving
-newer unrelated edits, index bytes and dirty sentinels. Refuse conflicts or symlink replacements;
-never reset/stash a real checkout, undo another workflow or remove a user's history. Actual rollback
-requires the applicable current owner permission. Keep the migration tests and evidence available.
+### 5. Verification and delivery
 
-### Verification boundary
+This feature crosses two repositories: the shared convention has its own reviewed change in
+`vhco-pro/docs`; the executable/procedure and consumer migration follow this child spec. Gate and
+publish those dependencies in order, with actual revisions and separately authorized external writes.
+Do not edit another active docs branch or bump all repository pins as a side effect.
 
-Meaningful automated checks cover settings/scope handling, candidate prerequisites and all routing
-contracts. Actual bounded Copilot Opus 5.5 trials exercise generic and configured behavior with fake
-source/docs, including a meaningful stale-doc repair and adversarial cases; a fixture-only text
-contract is insufficient proof that a model followed the procedure. Native Codex and Claude CLI
-installation/discovery/helper checks run in isolated credential-free profiles, plus the existing
-Linux/macOS automated selections. Actual Claude model, GUI/phone entry and live Stackweaver visual
-capture behavior remain unclaimed; static parity and synthetic trigger/check dispatch do not prove
-those runtime results. A future affected real UI change still owes its existing local visual checks.
-Private consumer workflow transfer to a reviewer needs the owner's bounded permission; never
-substitute public synthetic evidence for an unperformed private semantic review.
+Test the real checker with synthetic Markdown/Git repositories, including malformed/missing
+coverage and preservation cases. Use actual bounded Copilot Opus 5.5 trials for accuracy judgment,
+minimal doc repairs, read-only limits and untrusted input. Native Codex/Claude installation,
+standalone execution and current Linux/macOS selections must exercise the shipped payload.
+Actual Claude model execution, GUI/phone entry and live Stackweaver screenshot capture remain
+unclaimed; a future UI change still owes its existing local visual checks.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Direct docs-impact requests, lifecycle intake and existing implement/ship doc checks use one portable procedure with the same request-bound effects, preserving generic adopters and unrelated routes.
-- [ ] AC-02: Selected committed and working source changes produce a correctly bounded candidate review, with every required mapped candidate and uncovered visible change considered, while missing prerequisites or unverified inputs cannot yield a clean documentation result.
-- [ ] AC-03: Candidate judgments and permitted documentation fixes are grounded in the selected code and local rules, preserve intended contracts and historical records, and leave unverified or wrong-system findings visible rather than asserting unsupported accuracy.
-- [ ] AC-04: Read-only requests perform no repository writes, and authorized local edits and generated checks preserve unrelated files/index state and require all local gates without gaining commit or remote authority from settings or reports.
-- [ ] AC-05: Stackweaver retains every material docs-impact behavior through its shared adapter and local policy, including checker semantics, visual/index triggers, existing callers and unrelated workflows, with a scoped conflict-safe rollback/reapply path.
-- [ ] AC-06: Committed source passes the required automated checks and exact-commit independent review, and actual bounded Copilot trials plus native Codex/Claude installation and helper checks establish the declared behavior with explicit capability limits.
-- [ ] AC-07: Stackweaver adopts only after actual published-marketplace acceptance and paired current-workflow verification, and the recorded post-merge inspection, revisions and remaining deferrals make that adoption reviewable.
+- [ ] AC-01: Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+- [ ] AC-02: The shared checker reads current Markdown coverage and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+- [ ] AC-03: No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+- [ ] AC-04: Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+- [ ] AC-05: Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+- [ ] AC-06: Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+- [ ] AC-07: Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Red-first direct/intake/implement/ship routing tests and a synthetic adopter without settings; assert identical procedure/permissions, no duplicate implementation, no forced Stackweaver tool dependency, no regression to audit/triage/maintenance/blog/plain-doc routes and invalid configured YAML not falling back. |
-| AC-02 | Synthetic Git scenarios combine branch commits, staged and unstaged changes, explicit scope, selected/unrelated untracked files, rename/delete, dirty baseline and unreadable old/current paths. Observe exact selected paths and preserved unrelated state. Exercise ready/no-match index, candidate exit 1, missing index with exit 0, malformed index, scanner exceptions and stale index with/without rebuild permission. Each required unknown blocks a clean result; literal-only references and new undocumented behavior cannot disappear behind a zero-candidate map. |
-| AC-03 | Actual Copilot reads fake code/docs and returns a grounded impact table with Stale/Incomplete/Accurate/Unknown/Missing cases. A stale-default example must produce the correct minimal doc change under update authority. Include malicious instructions in a doc/scanner output, contradictory intended contract, a historically accurate record and an unreadable doc; observe no invented fact/check, unrelated source repair or false Accurate claim. |
-| AC-04 | Run the same synthetic invocation under read-only/report/update request variants. Assert no write/generation for read-only, permitted minimal edits and required local checks for update, preserved staged/index/unrelated dirty sentinels, no implicit commit/push/PR/merge and rejection/handoff for an unexpected generator write or unavailable required check. Changed source/doc bytes require affected revalidation before completion. |
-| AC-05 | Build an immutable complete legacy-to-shared/local parity map and independent semantic paired review. Real installed metadata/scope checks bind the current consumer paths. Synthetic visual tooling must refresh on a frontend change even with accurate prose, then check, and preserve owner preview and missing-browser blockers; frontmatter changes invoke local index handling. Restore/reapply the actual migration fragments and refuse working/staged/symlink conflicts. Verify all unselected docs workflows, scanners, generators, schedules, ledgers and public/product files are byte-identical. |
-| AC-06 | Run the package and repository commands in AGENTS.md and include the portable new tests in the existing macOS selection. Execute actual synthetic Copilot Opus 5.5 direct/intake/generic/configured/read-only/update/negative trials, retaining original input/return/tool provenance and meaningful red/green doc results. Validate both native CLI isolated installs, discovered operation, strict settings/scope helpers and preserved inputs. Independent implementation review observes current evidence at an exact commit. No Claude-model/GUI/phone/live visual claim is inferred. |
-| AC-07 | Source completion verifies the cutover prerequisites and isolated exact-source candidates; delivery then requires normal shared publication/CI/release verification, real marketplace fresh install and upgrade with exact payloads, published/current-consumer paired review, installed preflight and post-merge route inspection. Deny missing/stale/mismatched evidence, old plugin and uncommitted/conflicting migration scope. Record each event at its actual revision without requiring an earlier default to stay globally current. |
+| AC-01 | Review and lint the actual convention change; verify its declared enforcement/examples against the checker and pin the published revision. Existing feature gate/matcher tests remain unchanged and pass. A synthetic second repository uses only Markdown coverage and the shared tool, with no Stackweaver scripts, website generator or generated index. |
+| AC-02 | Red-first checker tests cover exact paths, directory prefixes, wildcard/globstar, several roots, current frontmatter, code-fence false positives, rename/delete, committed/staged/unstaged paths, explicit untracked selections and unusual filenames. Change metadata after creating a deliberately stale index: the direct scan must use current metadata. Preserve source/index/dirty sentinels. |
+| AC-03 | Execute the CLI and inspect real JSON/text/exits for matching, no-match and incomplete results, including mixed known matches plus errors, missing root, no declared coverage, invalid YAML/covers/globs, unreadable data and repository escapes. No error disappears into an empty success; unmatched source paths remain explicit. |
+| AC-04 | Actual Copilot trials review fake code/docs, catch a changed default, make the correct minimal authorized doc edit and expose missing/unknown/wrong-system cases. Exercise direct/intake/implement/ship, manual legacy fallback, report-only requests and malicious doc/output instructions. Confirm no unintended generator/commit/remote action, and covered doc fixes still require fresh feature review. |
+| AC-05 | Compare every material legacy behavior and candidate against current shared/local behavior with independently reviewed parity. Execute the actual legacy CLI wrapper/hook contract from a neutral environment with an explicitly located shared payload; test absence/failure and old arguments/stdin/exits. Synthetic local hooks preserve visual refresh/check even for accurate prose, index/preview conditions and missing-browser blockers. Rehearse conflict-safe rollback/reapply and prove unrelated workflows/generators/customer content unchanged. |
+| AC-06 | Run repository-required tests/vet/lint and the package checker; include portable new tests in macOS CI. Retain original actual Copilot inputs/returns/red-green doc results and tool provenance. Isolated native Codex/Claude installs discover the operation and execute the installed checker outside an agent session. Independent exact-commit implementation review observes the evidence; no fixture outcome becomes a GUI/live-product claim. |
+| AC-07 | Source completion checks the cutover safeguards and exact-source candidates. Delivery then verifies the convention, normal shared CI/release, real marketplace fresh/upgrade payloads, paired review, installed current-consumer preflight and post-merge routing/checker. Reject missing/stale/mismatched evidence, incompatible tool versions and conflicting migration state; record actual observed default revisions rather than demanding an old global default remain current. |
 
 ## Tasks
 
-None yet; written after spec acceptance. No feature implementation is authorized by this draft.
+None yet; planned after independent review and owner acceptance. No implementation is authorized by this draft.
 
 ## Open Questions
 
-None at initial authoring. Reviewer-identified policy decisions remain for the owner.
+None introduced by the owner's chosen direction. Material reviewer-identified decisions return to the owner.
 
 ## Review Log
 
@@ -290,9 +253,7 @@ None at initial authoring. Reviewer-identified policy decisions remain for the o
 
 ## Sources
 
-- [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md) and [template](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/feature-document-template.md): single feature document, acceptance and review records.
-- [Pinned delivery conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md), [documentation conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md) and [prose guide](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md): scope preservation, human-readable reports and reviewed publication.
-- [Pinned coding](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md) and [TypeScript conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/typescript.md): reuse the existing strict reader and typed boundaries; keep helpers small and preserve the existing runtimes.
-- [Pinned shared delivery knowledge](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/knowledge/shared-delivery.md): reuse current verified delivery components rather than introducing another release path.
-- [Existing shared ship check](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md) and [lifecycle routing](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/plugins/vh-adlc/references/lifecycle.md): behavior to reuse rather than duplicate.
-- Stackweaver Git objects at `b88aa6d596249f1f7178d3fcdb7a5c9b8221fe2f`, inspected locally: `agents/docs-impact.md` blob `c4be4fe28ec8104ee788bf87b91a07b0ba7bf9f5`; `scripts/check-doc-coverage.js` blob `0ad837ebe69f1ac51875911caa190477dbf26378`; implement/ship callers and generator paths cited above. Private source is retained in Stackweaver, not copied into this public specification.
+- [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md) and [template](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/feature-document-template.md): scope, review and acceptance gates; the new convention must preserve feature metadata semantics.
+- [Pinned documentation conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md), [coding](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md), [delivery](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md) and [prose guide](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md): small reusable tooling, local policy and reviewed publication. [Go conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/go.md) were inspected for the existing reader; this draft does not propose Go runtime changes.
+- [Existing strict YAML reader](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/plugins/vh-adlc/scripts/settings-file.ts), [ship check](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md) and [feature matcher](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/internal/doc/covers.go): reuse current parsing and review gates without changing feature matching.
+- Stackweaver workflow sources inspected locally at `b88aa6d596249f1f7178d3fcdb7a5c9b8221fe2f`: `agents/docs-impact.md`, `scripts/check-doc-coverage.js` and `scripts/build-docs-index.js`, with line ranges cited in Context. Private source is not reproduced here.
