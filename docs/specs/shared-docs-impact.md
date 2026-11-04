@@ -467,6 +467,7 @@ None. The owner approved all six review refinements.
 | 2026-11-04 | R-4 | spec | `bd4e45ec41afefb2e4b854fccfbc0e9ba18a61f2` | claude-opus-5-5 | procedural | No blockers; four should-fix findings and four nits on roots resolution, legacy overlays and upgrade effects. |
 | 2026-11-04 | R-5 | spec | `d1cc2374d3eaff699a3a18c4093b659bb28b685a` | claude-opus-5-5 | procedural | No blockers; five should-fix findings and three nits. Actual native result recovered after launcher exit 143; reviewer exit code unobserved. |
 | 2026-11-04 | R-6 | spec | `a07f5bf3e43178a0522c1f5b9c1595c868460f5f` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on bootstrap order, uncovered docs and feature/marker boundaries. |
+| 2026-11-04 | R-7 | spec | `0b1ed20d39c2165a0828ba39e30f62264fd7da99` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on local-plan upkeep, corpus collection, policy view and intake routing. |
 
 ### R-1
 
@@ -786,6 +787,35 @@ SEVERITY: nit
 WHERE: Design, 3. Shared review procedure and existing gates
 EVIDENCE: The callers' textual presence check treats a repository as clearly absent when no raw line starts with `Documentation impact roots:` (shared-docs-impact.md:232-235). The roots CLI alone decides whether a "standalone line" outside code fences is a declaration (lines 204-210). The spec does not say whether the CLI also requires the prefix at column 0. If the CLI accepts an indented line, such as one inside a list item, the caller's precheck calls the repository absent and never invokes the CLI. That declared repository would then silently take the manual path.
 PROPOSAL: Define the CLI's declaration line with the same column-0 prefix the textual check uses, and report a gap for an indented look-alike outside fences. Add an indented-line case to AC-04.
+
+### R-7
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 3. Shared review procedure and existing gates; 4. Stackweaver adoption
+EVIDENCE: The spec defines two cases for covers upkeep after a code area moves. A standard feature document's covers is never edited and is routed to vh-adlc-spec. Local-format candidates follow their retained procedure (shared-docs-impact.md:266-270, Test Plan AC-04 at line 447). A third case gets no rule: a repository with no local-format declaration, where the default-root classification "is only an attention label, not a claim that a document conforms to the standard" (lines 121-123). That case is Stackweaver. Its AGENTS.md has neither a feature-root line nor a local-format line (consumer/AGENTS.md:1-60). Its plans live under docs/internal/plans (consumer/CLAUDE.md:291). The migration deliberately adds no marker (shared-docs-impact.md:300-303). The legacy procedure updates the covers of any doc whose code area moved (consumer/agents/docs-impact.md:74-76; consumer/CLAUDE.md:285). Stackweaver's implement gate also reads plan covers for review staleness (consumer/agents/implement.md:33-36). Line 270 says an attention label "grants no feature-document edit", which does not settle whether ordinary covers upkeep applies. So after a rename, one agent could edit a labelled Stackweaver plan's covers, as legacy does, and another could refuse and route it to vh-adlc-spec. The AC-05 parity set covers only labelling and gates (line 448).
+PROPOSAL: State the covers-upkeep rule for attention-labelled documents in a repository with no local-format declaration. For example, report the moved mapping without editing it, or follow that repository's retained local procedure. Add a renamed code area covered by a Stackweaver plan to the AC-04 and AC-05 cases.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption; Test Plan AC-05 and AC-07
+EVIDENCE: The shared checker reads every tracked Markdown file under the roots through the strict settings reader. Strict-reader failures and malformed HEAD metadata make the result incomplete (shared-docs-impact.md:143-145, 171-174, 194-197). The legacy index builder accepted Stackweaver's frontmatter with its own parser (line 68). Every internal Stackweaver doc carries frontmatter (consumer/CLAUDE.md:281). When source paths remain, the wrapper maps incomplete to exit 2 (lines 351-356). Local ship forbids shipping over a failed doc-impact check (consumer/agents/ship.md:121-122). The only cutover resolution path in the spec is for a valid covers declaration whose meaning changes. That path forbids editing unrelated docs to make migration pass (lines 380-386). AC-05 refuses cutover on candidate loss (line 448). No criterion requires the current HEAD corpus to produce complete collection. So suppose one committed doc has frontmatter the legacy builder accepts but the strict subset refuses. Cutover could then pass candidate parity while every later wrapper run with source paths exits 2, and no permitted fix exists.
+PROPOSAL: Require the current-consumer preflight to show that the exact cutover HEAD corpus under the declared roots collects without incomplete. State the resolution for frontmatter the strict reader refuses: either a separately reviewed syntax-only correction that keeps its meaning for the retained index, audit and drift readers, or a cutover block.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 1. Common documentation convention; 2. One reusable, read-only checker; 3. Shared review procedure and existing gates
+EVIDENCE: The spec defines the metadata view precisely. It is HEAD by default, with working-tree overlays only for explicitly selected docs, so other sessions' dirty edits cannot change results (shared-docs-impact.md:162-174). Two other inputs also come from root AGENTS.md: the roots declaration read by the `roots` command (lines 214-221) and the feature-root and local-format classification (lines 116-120). The caller's textual presence check reads "the current root instructions" (lines 239-247). The spec never says whether `roots` and classification read AGENTS.md from HEAD or from the working tree. Stackweaver's main checkout is shared with other live sessions (consumer/CLAUDE.md:130). A dirty, uncommitted AGENTS.md edit could therefore change roots or classification, even though the same edit to a doc would be excluded.
+PROPOSAL: State which view `roots` and feature classification read for root AGENTS.md, and make the caller's presence check use the same view. Add a dirty AGENTS.md case to AC-04.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 3. Shared review procedure and existing gates
+EVIDENCE: Lifecycle intake reuses the new procedure, and plain documentation editing must keep its route (shared-docs-impact.md:203-205). references/lifecycle.md and tests/vh-adlc/lifecycle/ are in covers (lines 9 and 25). The current intake table has one row, "Documentation or a convention", which edits the requested artifact directly (shared/plugins/vh-adlc/references/lifecycle.md:49). It has no row for reviewing documentation impact after a code change. The spec never says which generic requests intake routes to vh-adlc-docs-impact and which stay on that row. The discovery guard asserts that the existing row is present (shared/tests/vh-adlc/triage/discovery.test.ts:29-36). AC-04 exercises intake (line 447) without an expected routing result.
+PROPOSAL: Name the new lifecycle row and the request that selects it, for example reviewing docs affected by a code change, and keep plain documentation edits on the existing row. Add one intake case for each route to AC-04.
 
 ## Sources
 
