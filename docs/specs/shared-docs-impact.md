@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Claude Code Opus 5.5 R-7 returned no blockers. Local-plan upkeep, complete-corpus preflight, committed policy inputs and intake routing are corrected; renewed review is pending before implementation."
+status_description: "Claude Code Opus 5.5 R-8 has no blocking or should-fix findings. Four implementation proof nits are retained. All owner decisions are recorded; ready for final acceptance and implementation claim publication."
 issue: null
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -488,6 +488,7 @@ None. The owner approved all six review refinements.
 | 2026-11-04 | R-5 | spec | `d1cc2374d3eaff699a3a18c4093b659bb28b685a` | claude-opus-5-5 | procedural | No blockers; five should-fix findings and three nits. Actual native result recovered after launcher exit 143; reviewer exit code unobserved. |
 | 2026-11-04 | R-6 | spec | `a07f5bf3e43178a0522c1f5b9c1595c868460f5f` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on bootstrap order, uncovered docs and feature/marker boundaries. |
 | 2026-11-04 | R-7 | spec | `0b1ed20d39c2165a0828ba39e30f62264fd7da99` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on local-plan upkeep, corpus collection, policy view and intake routing. |
+| 2026-11-04 | R-8 | spec | `372bd41b8cc56b470e0679b2bb2a8490f52c3969` | claude-opus-5-5 | procedural | No blocking or should-fix findings; four nits retained as implementation proof obligations. |
 
 ### R-1
 
@@ -836,6 +837,35 @@ SEVERITY: nit
 WHERE: Design, 3. Shared review procedure and existing gates
 EVIDENCE: Lifecycle intake reuses the new procedure, and plain documentation editing must keep its route (shared-docs-impact.md:203-205). references/lifecycle.md and tests/vh-adlc/lifecycle/ are in covers (lines 9 and 25). The current intake table has one row, "Documentation or a convention", which edits the requested artifact directly (shared/plugins/vh-adlc/references/lifecycle.md:49). It has no row for reviewing documentation impact after a code change. The spec never says which generic requests intake routes to vh-adlc-docs-impact and which stay on that row. The discovery guard asserts that the existing row is present (shared/tests/vh-adlc/triage/discovery.test.ts:29-36). AC-04 exercises intake (line 447) without an expected routing result.
 PROPOSAL: Name the new lifecycle row and the request that selects it, for example reviewing docs affected by a code change, and keep plain documentation edits on the existing row. Add one intake case for each route to AC-04.
+
+### R-8
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 3. Shared review procedure and existing gates; 4. Stackweaver adoption
+EVIDENCE: The R-7 F-01 fix sends attention-labelled Stackweaver plans to Stackweaver's existing local covers-upkeep rule after a rename (shared-docs-impact.md:279-283). Today that rule exists only in consumer/agents/docs-impact.md:74-76, and the migration reroutes that file through the shared procedure (shared-docs-impact.md:309-311). The list of what the new companion retains does not include covers upkeep (lines 307-309). Lines 313-314 keep only the restriction to code and config paths. consumer/CLAUDE.md:285 covers creating or moving docs, not a code move. AC-05 tests this behavior (line 468), but after the reroute the spec names no file that holds the rule.
+PROPOSAL: Name `agents/docs-impact-project.md` as the home of the plan covers-upkeep and review-staleness rule after a code move, and include that fragment in the parity comparison and the rollback blob set.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 4. Stackweaver adoption; Test Plan AC-05
+EVIDENCE: The legacy checker matches against the generated `docs-coverage.json` (consumer/scripts/check-doc-coverage.js:17 and 35-40). The legacy procedure warns that this index can be stale and should then be rebuilt (consumer/agents/docs-impact.md:34-35). The spec requires every previously selected legacy candidate to stay selected and refuses cutover on candidate loss (shared-docs-impact.md:391-393, AC-05 at line 468). It does not say whether the legacy baseline uses the existing index or one rebuilt from the same HEAD. A stale index would report false losses or additions. The only resolution offered is a mapping correction that preserves the old candidates (lines 395-397), which would keep stale mappings alive.
+PROPOSAL: Define the legacy parity baseline as the legacy matcher run over an index rebuilt from the exact cutover HEAD in a disposable copy. Report any drift in the existing index separately from candidate parity.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 1. Common documentation convention; 4. Stackweaver adoption; Test Plan AC-07
+EVIDENCE: knowledge.md holds exactly one docs SHA for the whole package (shared/tests/vh-adlc/check.test.ts:95-100). A repository with no pin uses the plugin pin for every operation (shared/plugins/vh-adlc/references/loop.md:58-60). The spec moves that pin to the recorded convention revision (shared-docs-impact.md:129-132). For existing operations it checks only that triage, maintenance and audit still resolve their pages at the new pin (lines 415-421, AC-07). Any other vhco-pro/docs commits between `0e52f51` and that revision also reach every unpinned consumer. That includes changes to the rules block the binary reads for its gates (engineering/conventions/feature-documents.md:200-203). Line 432 forbids bumping repository pins as a side effect, but nothing requires reviewing the docs diff that this plugin pin move brings in.
+PROPOSAL: Require the pin-move task to record and review the complete vhco-pro/docs diff between the old pin and the recorded convention revision. Any unrelated normative change should be reported and accepted before the pin moves.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 2. One reusable, read-only checker; 3. Shared review procedure and existing gates
+EVIDENCE: The R-7 F-03 fix says that roots resolution, feature-root classification and the callers' presence check all read root `AGENTS.md` from committed HEAD, and that dirty edits are excluded (shared-docs-impact.md:150-151). The entry preflight still tells callers to check whether the declaration is absent from "the current root instructions" (line 249). Read alone, that sentence suggests the working tree, while AC-04 requires HEAD for all three reads (line 467).
+PROPOSAL: Replace "the current root instructions" at line 249 with root `AGENTS.md` at committed HEAD, so the preflight text uses the same view as the policy rule.
 
 ## Sources
 
