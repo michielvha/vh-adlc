@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Claude Code Opus 5.5 R-4 returned no blockers. Central roots resolution, legacy metadata isolation and existing-operation upgrade checks are specified; renewed review is pending before implementation."
+status_description: "Claude Code Opus 5.5 R-5 returned no blockers. Remaining selection, symlink, entry-preflight and caller-inventory details are corrected; renewed review is pending before implementation."
 issue: null
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -21,6 +21,7 @@ covers:
   - tests/vh-adlc/settings-file.test.ts
   - tests/vh-adlc/check.test.ts
   - tests/vh-adlc/direct-operation-compatibility.test.ts
+  - tests/vh-adlc/triage/discovery.test.ts
   - tests/vh-adlc/lifecycle/
   - .github/workflows/ci.yml
   - README.md
@@ -98,7 +99,9 @@ exact matches, directory prefixes, `*`, `?`, bracket patterns and `**`, includin
 globstar behavior. Backslash escapes a literal metacharacter; bracket negation uses `[^...]`,
 compatible with existing feature syntax. A `**` within a segment keeps the legacy meaning of
 matching across separators; a whole `**/` segment also matches zero directories. YAML quoting
-must preserve the pattern's backslash. Validate malformed brackets, escapes and declarations
+must preserve the pattern's backslash. Characters without a defined operator meaning, including
+`{`, `}` and `!`, are literals; there is no brace expansion or leading-pattern negation.
+Validate malformed brackets, escapes and declarations
 instead of silently omitting them; unsupported syntax is an explicit error.
 Unrelated frontmatter fields remain valid. A `covers` example inside prose or a code block is not
 metadata. Neither a match nor an unmatched source path proves that documentation is accurate.
@@ -159,15 +162,21 @@ fixed shared exclusion.
 Read Markdown frontmatter directly from the selected document view. The default tracked-document
 view is HEAD, including all committed branch documentation updates. Only explicitly selected doc
 paths overlay their current working-tree bytes or deletion; selected new docs join that overlay.
-Accept doc-metadata selection separately from source selection, so a local source exclusion does
-not discard a selected metadata update. Reports bind the HEAD and overlay paths/hashes and list
+The shared CLI's repeatable `--metadata-path <doc>` selects those overlays independently from
+source paths. Selecting a doc as a source does not select its metadata; default metadata stays
+HEAD unless that separate option selects it. Integrated callers pass task-owned doc edits through
+`--metadata-path`, as well as passing their source scope. This distinction means a local source
+exclusion does not discard an explicitly selected metadata update. Reports bind the HEAD and overlay paths/hashes and list
 unselected dirty docs as excluded input. Their half-edited frontmatter is not parsed and cannot
 change candidates or make the selected scan incomplete. Malformed selected metadata or malformed
 HEAD metadata still produces incomplete. A task's explicit docs selection uses its current bytes;
 this never claims those bytes are a staged-only snapshot. Include every tracked Markdown file
 under declared roots; do not guess that tracked files are generated and omit them. Untracked or
 ignored paths are excluded unless explicitly selected. Refuse repository escapes through traversal
-or symlinks. A generated coverage index is never required or
+or symlinks. In the selected view, a symlinked root, a tracked symlink doc or a selected overlay
+with a symlink in its path produces incomplete, even for an in-repository target. Inspect Git tree
+modes for HEAD content and use no-follow checks for overlays; never parse a symlink target blob as
+Markdown or traverse it into an empty success. A generated coverage index is never required or
 trusted as the source of current metadata. Stackweaver's index remains available to its own tools.
 
 Return versioned JSON and a readable rendering with the same meaning:
@@ -215,8 +224,15 @@ adds no onboarding files and does not convert the consumer's development loop. A
 operation to the no-onboarding list in `references/loop.md`; the skill and shared reference follow
 that same rule.
 
-For an adopted repository, implement adds a `Documentation impact` section requiring this procedure
-at the existing per-task verification stage before the task commit, for that task's selected paths.
+Implement and ship add a `Documentation impact` section with an entry preflight before any task
+edit or doc fix. At entry, establish whether the declaration is absent from the current root
+instructions without interpreting its value. A clearly absent declaration keeps the existing manual
+path without requiring the new CLI or convention page. If a declaration is present or its absence
+cannot be established, use the one shared roots parser; do not invent a caller YAML parser.
+For an adopted repository, that section adds the convention page to every knowledge request,
+including Start's initial request, and stops on missing-page before the first write. Implement
+then runs this procedure at its existing per-task verification stage before the task commit,
+for that task's selected source and explicit doc-metadata paths.
 Permitted doc/metadata fixes join that task's checks and commit; an incomplete assessment prevents a
 completion claim. Undeclared repositories keep their current implement behavior. Ship reuses the
 same assessment at its existing documentation gate, rechecking changed inputs and retaining its
@@ -266,7 +282,12 @@ The complete migration inventory includes `agents/docs-impact.md`, the new proje
 `agents/implement.md`, `agents/ship.md`, `.claude/commands/ship.md`, `CLAUDE.md`, the forwarding list
 in `AGENTS.md`, the docs-impact reference in `agents/public-docs.md`, the checker entry and references
 in `DOCUMENTATION_STANDARDS.md` and `PUBLIC_VISUAL_ASSETS.md`. Preserve or update each route/reference;
-all changed fragments enter the parity comparison and rollback blob set. Include the roots
+all changed fragments enter the parity comparison and rollback blob set. This is the starting
+inventory: at the exact cutover commit, search the entire repository for the checker invocation and
+docs-impact route references, including CI, local verification, public-docs skill and drift/schedule
+surfaces. Add every hit to the inspected inventory/parity comparison, and changed fragments to
+rollback. An unlisted or unresolved caller fails current-consumer preflight. Retained workflow
+logic stays untouched; any necessary invocation/setup-only change must have bounded parity proof. Include the roots
 declaration, its wrapper consumption and `.githooks/pre-commit` in the inventory. The hook is
 intended to remain byte-identical. Operator inspection at baseline
 `b88aa6d596249f1f7178d3fcdb7a5c9b8221fe2f` found its checker call at lines 72-77 retains nonzero
@@ -287,8 +308,11 @@ metadata must request its overlay explicitly, through that option or direct shar
 report the metadata view and excluded dirty docs so HEAD-only checking cannot stand in for that
 current-metadata assessment. An unrelated malformed dirty doc in a legacy unfiltered diff stays
 excluded; explicitly selecting that malformed overlay produces incomplete. Empty input or input containing
-only excluded docs paths remains a no-op exit 0;
-that no-op makes no complete-coverage claim. When source paths remain, an incomplete shared result
+only excluded docs paths, with no `--metadata-path`, remains a no-op exit 0 before payload,
+runtime or roots checks; that no-op makes no complete-coverage claim. Any explicit metadata option
+forces the shared run even with no source paths, so missing setup or malformed selected metadata
+returns exit 2. Validate option/input syntax before either branch; do not disguise malformed
+arguments as the legacy no-op. When source paths remain, an incomplete shared result
 exits 2, shows its diagnostics and retains any known candidates. Missing/failed payload or binary
 also exits 2, including missing or unusable Bun, Git or Bash in a Node-capable caller environment.
 Print incomplete diagnostics and any known matches on stdout as well as reporting
@@ -299,7 +323,7 @@ retain a second copy of matching logic.
 The wrapper obtains the installed payload from the single `VH_ADLC_PLUGIN_ROOT` environment
 variable, naming the actual installed `vh-adlc` plugin directory. Validate its package identity,
 required checker/lock files and checker protocol 1. That protocol includes the report schema and
-matching/result contract in this spec; reject incompatible or missing protocol reports with exit 2.
+matching/result contract on the published convention page at the recorded revision; reject incompatible or missing protocol reports with exit 2.
 Missing/unusable paths also exit 2 with an actionable setup diagnostic. An older installation that
 still implements protocol 1 is compatible; this wrapper does not claim to discover the latest
 marketplace version. Current cutover evidence must separately bind the exact shipped payload.
@@ -351,6 +375,15 @@ reviewed change in `vhco-pro/docs`; the executable/procedure and consumer migrat
 publish those dependencies in order, with actual revisions and separately authorized external writes.
 Do not edit another active docs branch or bump all repository pins as a side effect.
 
+Ship a complete `examples/docs-impact/` fixture with its own Markdown coverage, source, invocation
+and expected outcomes; tests initialize/copy it and run the real CLI, rather than leaving partial
+snippets to assemble. README links it and lists the new operation. Installation/marketplace guides
+cover greenfield runtime/binary preparation and the consumer wrapper's environment setup. The
+workflow guide explains direct/integrated review and its permissions; compatibility docs add the
+actual tested matrix row and keep unclaimed Claude docs-impact/GUI/live limits explicit. Update the
+discovery guard to recognize the new content operation while preserving the existing engineering
+operation count and protected bodies.
+
 Test the real checker with synthetic Markdown/Git repositories, including malformed/missing
 coverage and preservation cases. Use actual bounded Copilot Opus 5.5 trials for accuracy judgment,
 minimal doc repairs, read-only limits and untrusted input. Native Codex/Claude installation,
@@ -373,10 +406,10 @@ unclaimed; a future UI change still owes its existing local visual checks.
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Review and lint the actual convention change; verify its declared enforcement/examples against the checker and pin the published revision. Existing feature gate/matcher tests remain unchanged and pass. Test a feature document containing `**`, `?`, bracket and trailing-slash entries: ordinary coverage selects candidates with its own declared semantics, marks them coverage-only and excludes self-triggering, while the feature gate retains its existing results. Cover declared/default feature roots and local-format repositories offline, with no downloaded rules or plan-format conversion; a local-format declaration yields ordinary candidates only. A synthetic second repository uses only Markdown coverage and the shared tool, with no Stackweaver scripts, website generator or generated index. |
-| AC-02 | Red-first checker tests cover path-only deleted source strings and exact paths, directory prefixes, wildcard/globstar including mid-segment double-star, escaped literal metacharacters, bracket negation, several roots, current frontmatter, code-fence false positives, rename/delete, committed/staged/unstaged paths, explicit untracked selections and unusual filenames. Diverge both base and feature branches to establish merge-base comparison. In a mixed dirty checkout distinguish default committed selection, explicitly included dirty paths, reported excluded dirty scope and a genuinely unresolved request; unrelated work must not make every run incomplete. Explicitly selected documentation source paths can match other docs. A tracked generated Markdown fixture remains included; an untracked/ignored fixture joins only when selected. With an unrelated malformed dirty doc, use valid HEAD metadata and report its exclusion without an incomplete result. Select that doc explicitly and require incomplete; select a valid metadata edit/new doc and require its current bytes to override HEAD even if a deliberately stale generated index exists. Preserve source/index/dirty sentinels. |
-| AC-03 | Execute the CLI and inspect real JSON/text/exits for matching, no-match and incomplete results, including mixed known matches plus errors, missing root, no declared coverage, invalid YAML/covers/globs, unreadable data and repository escapes. Also remove the verified binary in an isolated offline environment: the real checker must return incomplete without network or cache writes. Existing settings-reader regressions must pass. No error disappears into an empty success; unmatched source paths remain explicit. |
-| AC-04 | Actual Copilot trials review fake code/docs, catch a changed default, make the correct minimal authorized doc edit and expose missing/unknown/wrong-system cases. Exercise direct/intake/implement/ship with a valid adoption/roots declaration, no declaration, a malformed/conflicting declaration, a fenced example, an old pin and an unpinned consumer; all routes use the shared roots CLI with declared/absent/gap outcomes. Adopted old-pin implement/ship must stop with the existing missing-page handoff rather than complete or fall back; no-onboarding behavior must agree between the operation and loop reference; standalone explicit roots must work without enabling integrated adoption. Also exercise manual legacy fallback, report-only requests and malicious doc/output instructions. Confirm no unintended generator/commit/remote action, and covered doc fixes still require fresh feature review. Exercise mapping upkeep after a code-area move and refuse doc/coverage deletion used to silence a finding. Per-candidate citations must support each classification. The direct-operation compatibility guard allows only the named documentation sections and the package checker recognizes the new content operation; all other protected bodies remain unchanged. |
-| AC-05 | Compare every material legacy behavior and candidate against current shared/local behavior with independently reviewed parity. Execute the actual legacy CLI wrapper/hook contract from a neutral environment with an explicitly located shared payload; test missing payload, missing verified binary, unusable Bun/Git/Bash and old arguments/stdin/exits without network or cache writes. Cover every caller/routing/guideline fragment listed in Design. Assert local docs-source exclusion, empty/docs-only no-op exit 0, candidates exit 1 and incomplete exit 2 both with and without known candidates, including the actual advisory hook's response to each. For every preserved caller command, inherit the one setup variable in a fresh agent shell and prove the declared roots reach the installed checker. Missing/unusable paths or incompatible protocols fail visibly; a protocol-compatible older payload is not falsely called stale. Pipe a deleted covered path and require legacy exit 1. Pipe an unrelated malformed dirty doc through the unchanged ship command and require a HEAD-based result with exclusion reported; an explicitly selected malformed --metadata-path overlay produces incomplete. Valid selected overlays survive the local source exclusion, and Stackweaver plan labeling does not change its format or gates. Assert per-candidate citations and the index-rebuild/change report line. Compare valid-but-reinterpreted legacy patterns as well as invalid metadata and refuse cutover on candidate loss; every proposed correction must agree with the retained index/corpus/drift readers. Confirm rename mapping upkeep and the local code/config-only metadata rule. Synthetic local hooks preserve visual refresh/check even for accurate prose, index/preview conditions and missing-browser blockers. Rehearse conflict-safe rollback/reapply and prove unrelated workflows/generators/customer content unchanged. |
+| AC-02 | Red-first checker tests cover path-only deleted source strings and exact paths, directory prefixes, wildcard/globstar including mid-segment double-star, escaped literal metacharacters, bracket negation, several roots, current frontmatter, code-fence false positives, rename/delete, committed/staged/unstaged paths, explicit untracked selections and unusual filenames. Diverge both base and feature branches to establish merge-base comparison. In a mixed dirty checkout distinguish default committed selection, explicitly included dirty paths, reported excluded dirty scope and a genuinely unresolved request; unrelated work must not make every run incomplete. Explicitly selected documentation source paths can match other docs. A tracked generated Markdown fixture remains included; an untracked/ignored fixture joins only when selected. With an unrelated malformed dirty doc, use valid HEAD metadata and report its exclusion without an incomplete result. Select that doc with --metadata-path and require incomplete; source-selection alone must leave its metadata at HEAD. Select a valid metadata edit/new doc with --metadata-path and require its current bytes to override HEAD even if a deliberately stale generated index exists. Preserve source/index/dirty sentinels. |
+| AC-03 | Execute the CLI and inspect real JSON/text/exits for matching, no-match and incomplete results, including mixed known matches plus errors, missing root, no declared coverage, invalid YAML/covers/globs, unreadable data, repository escapes, a Git-tree symlink doc, a symlinked root and an overlay symlink, including in-repository targets. Each symlink case must be incomplete rather than an empty no-match. Also remove the verified binary in an isolated offline environment: the real checker must return incomplete without network or cache writes. Existing settings-reader regressions must pass. No error disappears into an empty success; unmatched source paths remain explicit. |
+| AC-04 | Actual Copilot trials review fake code/docs, catch a changed default, make the correct minimal authorized doc edit and expose missing/unknown/wrong-system cases. Exercise direct/intake/implement/ship with a valid adoption/roots declaration, no declaration, a malformed/conflicting declaration, a fenced example, an old pin and an unpinned consumer; all routes use the shared roots CLI with declared/absent/gap outcomes. Adopted old-pin implement/ship must stop at entry before any task edit/doc fix, with the existing missing-page handoff rather than complete or fall back. Undeclared old consumers must keep manual behavior without the new CLI dependencies; no-onboarding behavior must agree between the operation and loop reference; standalone explicit roots must work without enabling integrated adoption. Also exercise manual legacy fallback, report-only requests and malicious doc/output instructions. Confirm no unintended generator/commit/remote action, and covered doc fixes still require fresh feature review. Exercise mapping upkeep after a code-area move and refuse doc/coverage deletion used to silence a finding. Per-candidate citations must support each classification. Execute the complete shipped example and verify user-guide/matrix claims against actual trial results, keeping untested surfaces unclaimed. The direct-operation compatibility guard allows only the named documentation sections and the package checker recognizes the new content operation; all other protected bodies remain unchanged. |
+| AC-05 | Compare every material legacy behavior and candidate against current shared/local behavior with independently reviewed parity. Execute the actual legacy CLI wrapper/hook contract from a neutral environment with an explicitly located shared payload; test missing payload, missing verified binary, unusable Bun/Git/Bash and old arguments/stdin/exits without network or cache writes. Cover every caller/routing/guideline fragment listed in Design. Assert local docs-source exclusion, empty/docs-only no-op exit 0 before setup checks when no metadata option is present, forced setup/metadata validation when that option is present, candidates exit 1 and incomplete exit 2 both with and without known candidates, including the actual advisory hook's response to each. For every preserved caller command, inherit the one setup variable in a fresh agent shell and prove the declared roots reach the installed checker. Missing/unusable paths or incompatible protocols fail visibly; a protocol-compatible older payload is not falsely called stale. Pipe a deleted covered path and require legacy exit 1. Pipe an unrelated malformed dirty doc through the unchanged ship command and require a HEAD-based result with exclusion reported; an explicitly selected malformed --metadata-path overlay produces incomplete. Valid selected overlays survive the local source exclusion, and Stackweaver plan labeling does not change its format or gates. Assert per-candidate citations and the index-rebuild/change report line. Compare valid-but-reinterpreted legacy patterns as well as invalid metadata and refuse cutover on candidate loss; every proposed correction must agree with the retained index/corpus/drift readers, including literal braces/exclamation marks. A repository-wide caller/reference search at the cutover commit must match the inventory; unlisted hits block preflight. Confirm rename mapping upkeep and the local code/config-only metadata rule. Synthetic local hooks preserve visual refresh/check even for accurate prose, index/preview conditions and missing-browser blockers. Rehearse conflict-safe rollback/reapply and prove unrelated workflows/generators/customer content unchanged. |
 | AC-06 | Run repository-required tests/vet/lint and the package checker; include portable new tests in macOS CI. Retain original actual Copilot inputs/returns/red-green doc results and tool provenance. Isolated native Codex/Claude installs discover the operation and execute the installed checker outside an agent session. Independent exact-commit implementation review observes the evidence; no fixture outcome becomes a GUI/live-product claim. |
 | AC-07 | Source completion checks the cutover safeguards and exact-source candidates. Delivery then verifies the convention, normal shared CI/release, real marketplace fresh/upgrade payloads, knowledge resolution for existing triage/maintenance/audit at the new pin including unwarmed/warmed offline audit cache, paired review, installed current-consumer preflight and post-merge routing/checker. Reject missing/stale/mismatched evidence, incompatible tool versions and conflicting migration state; record actual observed default revisions rather than demanding an old global default remain current. |
 
