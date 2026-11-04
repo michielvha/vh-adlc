@@ -448,6 +448,7 @@ None. The owner approved all six review refinements.
 | 2026-11-04 | R-3 | spec | `cb4d31651366af9562f17e88aa4b53412a1615bc` | claude-opus-5-5 | procedural | No blockers; six should-fix findings and two nits on caller setup, metadata scope and retained readers. |
 | 2026-11-04 | R-4 | spec | `bd4e45ec41afefb2e4b854fccfbc0e9ba18a61f2` | claude-opus-5-5 | procedural | No blockers; four should-fix findings and four nits on roots resolution, legacy overlays and upgrade effects. |
 | 2026-11-04 | R-5 | spec | `d1cc2374d3eaff699a3a18c4093b659bb28b685a` | claude-opus-5-5 | procedural | No blockers; five should-fix findings and three nits. Actual native result recovered after launcher exit 143; reviewer exit code unobserved. |
+| 2026-11-04 | R-6 | spec | `a07f5bf3e43178a0522c1f5b9c1595c868460f5f` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on bootstrap order, uncovered docs and feature/marker boundaries. |
 
 ### R-1
 
@@ -738,6 +739,35 @@ SEVERITY: nit
 WHERE: Design, 1. Common documentation convention
 EVIDENCE: The contract lists `*`, `?`, brackets, `**` and backslash escapes, and it calls unsupported syntax an explicit error (shared-docs-impact.md:96-102). It does not say whether characters such as `{`, `}` or `!` are literals or unsupported syntax. The legacy matcher treats braces as literal characters (consumer/scripts/check-doc-coverage.js:26). The feature matcher's `path.Match` also treats them as literals (shared/internal/doc/covers.go:20-21). A brace pattern in existing metadata would make every run incomplete under one reading and match literally under the other.
 PROPOSAL: Name these characters as literals, which matches both existing readers, or list them as unsupported. Include a brace pattern in the AC-05 parity comparison.
+
+### R-6
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 3. Shared review procedure and existing gates
+EVIDENCE: The entry preflight runs before any task edit or doc fix. It adds the convention page to Start's initial knowledge request, and a present or uncertain marker goes through the shared roots CLI (shared-docs-impact.md:227-240). That CLI reaches the strict reader only through `ensure-vh-adlc.sh --offline`, and it never installs the binary. An absent binary yields `incomplete` (lines 142-146). Start step 1 obtains the binary through the ordinary online installer and runs `knowledge` in the same step (shared/plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:21-24, shared/plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:22-24, shared/plugins/vh-adlc/references/loop.md:18-22). The spec does not order the roots call relative to binary acquisition. On a host with a cold cache, a roots call made before the installer returns a gap. The spec also never says what implement or ship do with a roots `incomplete` or malformed-declaration gap at entry: stop before the first write, take the manual path, or continue and block only completion. Lines 241-243 say an incomplete assessment prevents a completion claim, and ship "reuses the same assessment". Ship can also deliver an in-progress PR with the gate skipped (ship SKILL.md:45-46), and the spec does not say whether an incomplete docs-impact result blocks that path or is only named in the PR.
+PROPOSAL: Fix the entry order: run the ordinary installer first, then `roots`, then the single knowledge request that includes the page. State the implement and ship outcome for a roots gap at entry and for an incomplete assessment at ship, including whether an in-progress PR may proceed with the gap reported. Add those cases to AC-04.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker; Test Plan AC-02 and AC-03
+EVIDENCE: The outcome table defines `none` as collection completed for declared coverage, and `incomplete` as roots, inputs or metadata that could not be checked (shared-docs-impact.md:184-188). Only a root with no declared coverage at all is named as incomplete coverage (line 191). The checker includes every tracked Markdown file under the roots without guessing which ones are generated (lines 173-174). AC-03 requires missing coverage to be visible (line 416). The spec never classifies a single tracked Markdown file that has no leading frontmatter, or that has valid frontmatter without `covers`. One reading makes such a file a reported but uncovered document. The other makes it unreadable metadata, so the whole run is incomplete. Stackweaver requires only `description` for internal docs (consumer/CLAUDE.md:281). Its legacy checker simply never matches a doc that is absent from the index (consumer/scripts/check-doc-coverage.js:69-77). Under the second reading, every wrapper run with source paths could exit 2 instead of 0 or 1, and no generic adopter with partly annotated docs could ever get `none`.
+PROPOSAL: State that a document with no frontmatter or no `covers` field is listed as uncovered in the metadata coverage report and does not by itself make the run incomplete. Keep malformed or unterminated frontmatter and malformed `covers` as incomplete. Add both cases to AC-02 or AC-03 and to the Stackweaver parity set.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 1. Common documentation convention; 3. Shared review procedure and existing gates
+EVIDENCE: Feature documents inside the roots remain coverage-only candidates (shared-docs-impact.md:109-113). When a code area moves, the procedure requires reviewing and updating the affected `covers` mappings (lines 250-252). The list of things the procedure must not reinterpret names criteria, statuses and historical claims, but not a feature document's `covers` (line 115). A feature document's `covers` is normative frontmatter, so editing it is a revision that sends the document back to draft (engineering/conventions/feature-documents.md:70-73). Implement forbids editing `covers` to fit what was built (shared/plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:81-82). The general clause that metadata corrections stay within the task's authority (lines 253-254) leaves this case to inference.
+PROPOSAL: State that mapping upkeep never edits the `covers` of a standard feature document. The procedure reports the moved path as a software or spec question routed to `vh-adlc-spec`. Add a coverage-only feature candidate to the AC-04 code-area-move case.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 3. Shared review procedure and existing gates
+EVIDENCE: The callers' textual presence check treats a repository as clearly absent when no raw line starts with `Documentation impact roots:` (shared-docs-impact.md:232-235). The roots CLI alone decides whether a "standalone line" outside code fences is a declaration (lines 204-210). The spec does not say whether the CLI also requires the prefix at column 0. If the CLI accepts an indented line, such as one inside a list item, the caller's precheck calls the repository absent and never invokes the CLI. That declared repository would then silently take the manual path.
+PROPOSAL: Define the CLI's declaration line with the same column-0 prefix the textual check uses, and report a gap for an indented look-alike outside fences. Add an indented-line case to AC-04.
 
 ## Sources
 
