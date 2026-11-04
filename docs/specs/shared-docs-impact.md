@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-05 after Claude Code Opus 5.5 R-8. Ready for task planning and the published implementation claim."
+status: in-progress
+branch: feat/shared-docs-impact
+status_description: "Implementation claimed after owner acceptance; first task authors the common convention, then the portable checker and verified Stackweaver adoption."
 issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
