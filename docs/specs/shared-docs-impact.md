@@ -396,6 +396,7 @@ None. The owner approved all six review refinements.
 | 2026-11-04 | R-2 | spec | `a47be378a6875a97f3dfc86054753190c70e54ac` | claude-opus-5-5 | procedural | No blockers; seven should-fix findings and one nit on matching, setup and migration details. |
 | 2026-11-04 | R-3 | spec | `cb4d31651366af9562f17e88aa4b53412a1615bc` | claude-opus-5-5 | procedural | No blockers; six should-fix findings and two nits on caller setup, metadata scope and retained readers. |
 | 2026-11-04 | R-4 | spec | `bd4e45ec41afefb2e4b854fccfbc0e9ba18a61f2` | claude-opus-5-5 | procedural | No blockers; four should-fix findings and four nits on roots resolution, legacy overlays and upgrade effects. |
+| 2026-11-04 | R-5 | spec | `d1cc2374d3eaff699a3a18c4093b659bb28b685a` | claude-opus-5-5 | procedural | No blockers; five should-fix findings and three nits. Actual native result recovered after launcher exit 143; reviewer exit code unobserved. |
 
 ### R-1
 
@@ -628,6 +629,64 @@ SEVERITY: nit
 WHERE: Design, 1. Common documentation convention; 3. Shared review procedure and existing gates
 EVIDENCE: The new convention page defines the matching rules and the checker result contract (shared-docs-impact.md:95-104 and 123-124). The shared reference `references/docs-impact.md` (line 185) and the protocol 1 definition (lines 280-281) describe the same contract inside the package. The package checker fails when a sentence from a pinned docs page appears in the package, but its canary list names only existing pages (shared/tests/vh-adlc/check.test.ts:52-63 and 364-374). The spec does not add the new page to that list once the pin moves. The docs repository asks for one home per fact (engineering/README.md:34-35).
 PROPOSAL: Name the convention page as the single home of the matching and result contract, link to it from the package reference, and add `conventions/documentation-impact.md` to the canary pages in the same change that moves the pin.
+
+### R-5
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption
+EVIDENCE: The wrapper keeps the legacy no-op: empty input, or input that holds only excluded docs paths, exits 0 (shared-docs-impact.md:289-291). A missing or failed payload, binary, Bun, Git or Bash exits 2 (lines 292-293). An absent roots declaration is an exit-2 setup gap for the wrapper (lines 202-203). Selected `--metadata-path` overlays survive the docs-source exclusion, and a malformed selected overlay produces incomplete (lines 283-289). The spec never says which of these rules is checked first. The legacy script exits 0 for empty or docs-only input before it does anything else except the index existence check (consumer/scripts/check-doc-coverage.js:35-38 and 55-64). The advisory hook runs this script on every commit (consumer/CLAUDE.md:309). Two cases have no defined result. First, a docs-only commit in a shell without `VH_ADLC_PLUGIN_ROOT` could stay silent with exit 0, or print a setup diagnostic with exit 2. Second, docs-only input with a malformed `--metadata-path` overlay could be a no-op with exit 0, or incomplete with exit 2.
+PROPOSAL: State the order. For example: empty or docs-only input with no `--metadata-path` exits 0 before the payload or roots checks, and any `--metadata-path` forces a shared run, so setup and overlay validation apply. Add both cases to the AC-05 wrapper tests.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker; Test Plan AC-02
+EVIDENCE: Line 160 says that only explicitly selected doc paths overlay their working-tree bytes. Lines 161-163 say that doc-metadata selection is accepted separately from source selection. Lines 156-157 say that explicitly selected paths inside documentation roots remain eligible as sources. AC-02 has explicitly selected documentation source paths match other docs, and it also says "select that doc explicitly and require incomplete" (line 376). The spec does not say whether passing a dirty doc path as a source selection also overlays that doc's metadata. Integrated implement and ship pass a task's own doc edits as selected paths (lines 218-223). If source selection does not imply an overlay, a task's `covers` update is checked against HEAD unless the caller also selects it as metadata. If it does imply an overlay, the shared callers bring back the unrelated-dirty-doc exposure that R-4 F-03 fixed only for the wrapper. The shared CLI option for metadata selection is also unnamed. Only the wrapper's `--metadata-path` forwarding mentions it (line 284).
+PROPOSAL: State whether a source selection of a doc path implies a metadata overlay, name the shared CLI metadata-selection input, and say which input integrated callers pass for a task's own doc edits. Make the AC-02 selection cases use that distinction explicitly.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker; Test Plan AC-02 and AC-03
+EVIDENCE: Metadata is read from the HEAD tree view, with working-tree overlays only for selected docs (shared-docs-impact.md:159-161). Every tracked Markdown file under the declared roots is included (lines 167-168). Repository escapes through traversal or symlinks are refused (lines 169-170). AC-03 tests only repository escapes, and AC-02 has no symlink case (lines 376-377). In a Git tree, a tracked symlink is a blob whose content is its target path. If it is read as Markdown, it has no frontmatter. Three cases are therefore undefined: a covered doc that is a symlink to another in-repo file, a declared root that is itself a symlink, and a selected overlay doc that is a symlink in the working tree. Each could silently contribute no coverage and produce a clean-looking `none`. That contradicts the rule that missing or unreadable coverage cannot become empty success (line 183).
+PROPOSAL: Define how in-repo tracked symlinks under a root, symlinked roots and symlinked overlay docs are handled. For example, resolve in-tree targets in the same view, or report an incomplete diagnostic. Add AC-02 or AC-03 cases for each.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 3. Shared review procedure and existing gates; Test Plan AC-04
+EVIDENCE: The loop calls `knowledge` first, with every page the operation will read, and stops on `missing-page` (shared/plugins/vh-adlc/references/loop.md:36-39 and 54-56). The compatibility guard freezes the implement and ship bodies, including their Start page lists (shared/tests/vh-adlc/direct-operation-compatibility.test.ts:10-41). So the new convention page can only be requested from inside the permitted added section. The spec places implement's procedure at the per-task verification stage, before the task commit (shared-docs-impact.md:218-220). A declared repository with an old pin stops that invocation and keeps existing edits (lines 207-211). In that repository, implement would find the stop only after it has written the first task's failing test and change (shared/plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:68-79). That leaves an uncommitted half-finished task, and the page is requested after other work instead of first.
+PROPOSAL: Require the added section to resolve roots and request the convention page once, at operation entry, before the first write. Assert in AC-04 that the old-pin stop happens before any task edit in implement and before any doc fix in ship.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption; Test Plan AC-05 and AC-07
+EVIDENCE: The migration inventory is a fixed list (shared-docs-impact.md:265-270), and it was built from a bounded set of files. Other workflow surfaces that might call or route to the checker are not listed and were not inspected. These include an always-run documentation review CI job and its covered `scripts/verify-local.sh` and `ci.yml` (consumer/docs/internal/guidelines/documentation/PUBLIC_VISUAL_ASSETS.md:3-8 and 28-30), the public-docs skill named in consumer/AGENTS.md:31-32, and the drift workflow and agent (consumer/CLAUDE.md:311). Line 312 says CI sets the setup variable but names no CI caller. Any unlisted caller of the retained script changes behavior silently. It used to get exit 0 or 1 (consumer/scripts/check-doc-coverage.js:35-38 and 104), and without `VH_ADLC_PLUGIN_ROOT` it now gets exit 2.
+PROPOSAL: Require a repository-wide search at the exact cutover commit for every invocation of `scripts/check-doc-coverage.js` and every reference to the docs-impact route. Add each hit to the inventory, parity comparison and rollback set, and make an unlisted caller fail the current-consumer preflight.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 1. Common documentation convention; 4. Stackweaver adoption
+EVIDENCE: The convention page is named as the single prose home for matching and result semantics (shared-docs-impact.md:123-124). Checker protocol 1 is defined as including "the report schema and matching/result contract in this spec" (lines 301-302). After publication, two documents would claim to define the contract behind protocol 1.
+PROPOSAL: Define protocol 1 by reference to the published convention page at its recorded revision, plus the versioned report schema, instead of this feature document.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: covers frontmatter; Design, 5. Verification and delivery
+EVIDENCE: `covers` lists `plugins/vh-adlc/examples/docs-impact/`, `README.md` and four user documentation pages (shared-docs-impact.md:13 and 26-30). Design and the Test Plan never say what these deliver. The pinned documentation convention requires usage examples to be complete files that a test checks against the component's interface (engineering/conventions/documentation.md:81-85). The parent roadmap requires an explicit, tested capability matrix (shared/docs/specs/shared-workflow-migration.md:87-90). Standalone users also need the Bun, Git, Bash, binary and `VH_ADLC_PLUGIN_ROOT` prerequisites documented (lines 139 and 299-312).
+PROPOSAL: State what the examples and the user documentation pages must contain, such as standalone setup, the capability matrix row with the unclaimed Claude and GUI limits, and the example check. Otherwise, remove the unused paths from `covers`.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 1. Common documentation convention
+EVIDENCE: The contract lists `*`, `?`, brackets, `**` and backslash escapes, and it calls unsupported syntax an explicit error (shared-docs-impact.md:96-102). It does not say whether characters such as `{`, `}` or `!` are literals or unsupported syntax. The legacy matcher treats braces as literal characters (consumer/scripts/check-doc-coverage.js:26). The feature matcher's `path.Match` also treats them as literals (shared/internal/doc/covers.go:20-21). A brace pattern in existing metadata would make every run incomplete under one reading and match literally under the other.
+PROPOSAL: Name these characters as literals, which matches both existing readers, or list them as unsupported. Include a brace pattern in the AC-05 parity comparison.
 
 ## Sources
 
