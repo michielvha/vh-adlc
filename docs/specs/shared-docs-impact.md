@@ -250,6 +250,65 @@ None introduced by the owner's chosen direction. Material reviewer-identified de
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-04 | R-1 | spec | `2811de8baa95c8a1e2887b09891badc59b2af6d3` | claude-opus-5-5 | procedural | No blockers; seven should-fix findings and one nit. |
+
+### R-1
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 1. Common documentation convention
+EVIDENCE: The feature matcher shared/internal/doc/covers.go:13-27 skips any entry that contains `**`, treats a trailing `/` as a subtree, and accepts `*`, `?` and `[` through path.Match. The proposed ordinary contract at shared-docs-impact.md:96-98 supports exact paths, directory prefixes, `*` and `**`, and rejects every other pattern. Under it, a feature document's `?` or `[` entry would make the scan incomplete, and its `**` entry would match even though the feature gate ignores it. Lines 102-105 say the checker may flag feature documents for attention, but they do not say which syntax applies when the checker reads a feature document's `covers` inside a declared root. The feature-document standard also says a feature document never covers itself (engineering/conventions/feature-documents.md:43).
+PROPOSAL: State how the checker treats documents under the declared feature root. One option is to exclude them by default. Another is to evaluate them with MatchCovers-compatible semantics and report syntax that only the feature gate accepts as a feature-specific note, so it never makes the scan incomplete. Add a Test Plan case with a feature document whose `covers` holds `**`, `?` and trailing-slash entries.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 3. Shared review procedure and existing gates; Scope
+EVIDENCE: The design says only an explicitly adopted workflow uses the new checker (shared-docs-impact.md:152-154). The CLI needs explicit `--docs-root` values (lines 117-118 and 122). Per-project configuration is limited to explicit inputs and existing local instructions (lines 79-81). The document never defines how integrated implement, ship or intake decides that a repository has adopted the workflow, or where it reads the documentation roots. The current ship step loads only conventions/documentation.md (shared/plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md:22-24). An older pin fails with missing-page if the new page is requested (shared/plugins/vh-adlc/references/loop.md:66-67). Without a defined signal, each agent guesses when to take the manual path or the checker path, and which roots to pass.
+PROPOSAL: Have the new convention define one small adoption declaration in existing local instructions that names the documentation roots, for example a single AGENTS.md line like the feature-root line. Ship, implement and intake then branch on that declaration. Add Test Plan cases for a declared repository, an undeclared repository and an old-pin repository.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker
+EVIDENCE: shared-docs-impact.md:123-127 combines committed changes with the selected staged and unstaged changes, and turns ambiguous ownership into a reported gap. It does not define which dirty paths count as selected by default, or how ownership is judged mechanically. It also leaves the base comparison unspecified: merge-base three-dot or direct two-dot. The current callers each take a different scope: the consumer docs-impact agent uses the branch range against the base, and ship plus CLAUDE use staged and unstaged changes only (consumer/agents/docs-impact.md:18-21, consumer/agents/ship.md:52, consumer/CLAUDE.md:306). The consumer's main checkout is shared with other live sessions (consumer/CLAUDE.md:130). Under one reading every run there is incomplete; under another, unrelated work is silently included.
+PROPOSAL: Define the default Git selection precisely: the base comparison form, whether all staged and unstaged tracked changes are included, and what reports a gap. Name the AC-02 cases that tell included, excluded and gap outcomes apart in a checkout that holds unrelated dirty work.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker; 4. Stackweaver adoption
+EVIDENCE: The legacy checker removes changed paths under `docs/` before matching (consumer/scripts/check-doc-coverage.js:59-64). The legacy agent states the same rule (consumer/agents/docs-impact.md:23). The spec gives this behavior no shared or local home. It would also be wrong as a fixed shared rule: this shared feature document covers documentation paths such as README.md and docs/user-guides/workflows.md (shared-docs-impact.md:23-27). Under the proposed contract, Stackweaver's changed docs would show up as unmatched source paths.
+PROPOSAL: Say whether changed paths inside the declared documentation roots are excluded, reported separately or matched like any other path. Keep the Stackweaver exclusion explicitly in the wrapper or local procedure, and add a parity case for it.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption
+EVIDENCE: The wrapper maps `candidates` to legacy exit 1, successful no-match to exit 0, and an unavailable or failed shared check to a distinct failure (shared-docs-impact.md:180-186). The `incomplete` outcome, exit 2 with known candidates possibly listed (line 140), has no stated legacy mapping or human output. The legacy checker also exits 0 when there is no input, and when every input is a documentation path (consumer/scripts/check-doc-coverage.js:55-64). The design does not say whether those cases still exit 0 or now reach the shared checker as missing inputs. Legacy callers include an advisory pre-commit hook (consumer/CLAUDE.md:309), whose response to a new code depends on this mapping.
+PROPOSAL: Specify the wrapper's exit code and output for `incomplete` with and without known candidates, and for empty or documentation-only input. Add those cases to the AC-05 wrapper tests.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker; Test Plan AC-03 and AC-05
+EVIDENCE: The verified strict reader is readYAML in shared/plugins/vh-adlc/scripts/settings-file.ts:33-36. On every call it runs bash on ensure-vh-adlc.sh, without `--offline` unless asked, and then runs the Go binary's `settings read`. The checker therefore needs Bash plus the locked, verified binary, and could download it unless offline mode is used. The spec says checking performs no download and that dependencies are prepared explicitly (shared-docs-impact.md:119-120). It never says the standalone checker depends on the binary. No test covers an unavailable binary as distinct from a missing shared payload. Standalone hook and CI setup in an adopting repository has to provide this binary too.
+PROPOSAL: State that the checker resolves the verified binary once in offline mode and reports `incomplete` when the binary is unavailable. Name the binary in the standalone and CI setup requirements. Add AC-03 and AC-05 cases for a missing binary in an offline environment, with no network or cache writes.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption
+EVIDENCE: The design preserves the implement, ship and CLAUDE callers (shared-docs-impact.md:178). The packet has further callers and routing for the same workflow: the slash-command ship entry runs the legacy checker directly (consumer/.claude/commands/ship.md:10-11); the public-docs workflow runs the docs-impact check before changelog review (consumer/agents/public-docs.md:226-227); and AGENTS.md lists the only workflows forwarded to installed vh-adlc operations (consumer/AGENTS.md:12-20). Two guidelines also name the docs-impact workflow as an enforcement point (DOCUMENTATION_STANDARDS.md:54, PUBLIC_VISUAL_ASSETS.md:30). The spec's parity and rollback inventory does not include these files.
+PROPOSAL: List every caller and routing file the migration must preserve or update, including the command file, public-docs.md, the AGENTS.md forwarding list and the guideline references. Cover each in the AC-05 parity comparison and the rollback blob set.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: shared-docs-impact.md:70-73 names a host-local checkout path and records the reviewer model choice and private-packet authorization inside the canonical shared document. Once published, that text is host-specific and goes stale. The prose guide treats an account of how the document was produced as writing about the document (engineering/guides/humanize-prose.md:353-356).
+PROPOSAL: Remove the host path and the review-dispatch narration from Context. The Review Log already records model, commit and isolation.
 
 ## Sources
 
