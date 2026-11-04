@@ -68,9 +68,9 @@ Existing site generation, frontend visual refresh/check and public/internal rule
 (`agents/docs-impact.md:57-102`).
 
 This document is local to `/home/m/code/vh-adlc-docs-impact-spec`. No new checker, convention,
-consumer adapter or external publication has been implemented. The owner authorized sending the
-bounded private consumer workflow packet to Copilot Opus 5.5 for review on 2026-11-04; no customer
-docs, images, application source, reports, ledger, credentials or host configuration belong in it.
+consumer adapter or external publication has been implemented. The owner authorized the bounded
+private consumer workflow review and selected Claude Code Opus 5.5 as reviewer on 2026-11-04; no
+customer docs, images, application source, reports, ledger, credentials or host configuration belong in it.
 
 ## Scope
 
