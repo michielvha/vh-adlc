@@ -334,6 +334,7 @@ None. The owner approved all six review refinements.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-04 | R-1 | spec | `2811de8baa95c8a1e2887b09891badc59b2af6d3` | claude-opus-5-5 | procedural | No blockers; seven should-fix findings and one nit. |
 | 2026-11-04 | R-2 | spec | `a47be378a6875a97f3dfc86054753190c70e54ac` | claude-opus-5-5 | procedural | No blockers; seven should-fix findings and one nit on matching, setup and migration details. |
+| 2026-11-04 | R-3 | spec | `cb4d31651366af9562f17e88aa4b53412a1615bc` | claude-opus-5-5 | procedural | No blockers; six should-fix findings and two nits on caller setup, metadata scope and retained readers. |
 
 ### R-1
 
@@ -450,6 +451,64 @@ SEVERITY: nit
 WHERE: Design, 3. Shared review procedure and existing gates
 EVIDENCE: The adoption line's value is defined as a JSON array (shared-docs-impact.md:170-172). The pinned coding convention says configuration a person writes or reviews is YAML and never JSON (engineering/conventions/coding.md:70-72). The example `["docs/"]` is also a valid YAML flow sequence, and the existing strict reader could parse it (shared/plugins/vh-adlc/scripts/settings-file.ts:32-49).
 PROPOSAL: Define the value as a YAML flow sequence read through the existing strict reader. That keeps the same example syntax and avoids an exception to the pinned convention.
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption
+EVIDENCE: The wrapper finds the payload only through `VH_ADLC_PLUGIN_ROOT` (shared-docs-impact.md:257-260). Agent callers are said to pass it command-locally with the discovered plugin directory, while the path arguments and stdin stay the same (lines 262-263). AC-05 then requires every unchanged caller command to reach the installed checker (line 319). The retained callers are Stackweaver workflow files, not vh-adlc skills: consumer/agents/ship.md:52, consumer/.claude/commands/ship.md:10-11, consumer/CLAUDE.md:306 and consumer/agents/docs-impact.md:30. Their command text sets no variable. The host names a plugin directory only when it loads a vh-adlc skill (shared/plugins/vh-adlc/references/loop.md:16-17), so these callers have no way to discover it. Two readings are possible. If the caller text stays unchanged, agents rely on an inherited shell export, which contradicts the command-local rule. If the agents must set the variable, the caller text has to change, and that change is not described. Under either reading an agent following the unchanged text can get exit 2 on every run.
+PROPOSAL: Choose one mechanism for non-plugin callers. Either they inherit the same exported variable as terminal and hooks, with their text unchanged, or each caller's text changes to say how to obtain the value, and those changes enter the parity and rollback set. Test the chosen path from a fresh agent shell.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption; Test Plan AC-05
+EVIDENCE: The wrapper checks only package identity and the required checker and lock files (shared-docs-impact.md:258-259). Line 263 says a marketplace upgrade can change the install location, and line 264 rules out new tracked machine config. AC-05 requires that a stale variable fails visibly (line 319). An exported path to an older installed version that is still on disk passes the identity and file checks. The wrapper has no expected version or report schema to compare against, so it would quietly run an outdated matcher. As written, the stale case in AC-05 cannot be observed.
+PROPOSAL: Define stale in terms the wrapper can check, for example a minimum checker report schema or plugin version written into the wrapper itself, with exit 2 below it. Otherwise, remove stale from AC-05 and state the limitation.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker
+EVIDENCE: A path-only run checks exactly the selected paths, and an unresolved selected path is a gap (shared-docs-impact.md:142-146). The spec never defines unresolved. Every retained legacy caller pipes a diff of tracked changes against HEAD into the wrapper (consumer/agents/ship.md:52, consumer/CLAUDE.md:306), and that list includes deleted files. The legacy script matches each path as a string, without checking that the file exists (consumer/scripts/check-doc-coverage.js:69-77). If unresolved means absent from the working tree, any change that deletes a covered file becomes incomplete with exit 2 instead of legacy exit 1. Deleting a file is a common case, and this changes its exit code. AC-02 tests rename and delete only for base comparisons (line 316).
+PROPOSAL: Define unresolved narrowly, for example as traversal, repository escape or malformed input, and state that a path-only deletion matches by its path string. Add an AC-05 wrapper case that pipes a deleted covered path and expects legacy exit 1.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker; Test Plan AC-02
+EVIDENCE: Candidate metadata always comes from current Markdown in tracked documents (shared-docs-impact.md:149-152), and malformed YAML or covers cannot become success (line 166). AC-02 requires that unrelated work in a mixed dirty checkout does not make every run incomplete (line 316). The consumer's main checkout is shared with other live sessions (consumer/CLAUDE.md:130), and the advisory hook runs the checker there (consumer/CLAUDE.md:309). The spec does not say whether metadata of unselected tracked docs comes from the working tree or from HEAD or the index. If it comes from the working tree, another session's half-edited frontmatter makes every run incomplete, and its unstaged covers edits change other tasks' candidates. That contradicts the AC-02 guarantee.
+PROPOSAL: State which version of each unselected tracked document's metadata the checker reads, and how a malformed dirty edit in an unrelated doc is reported. Add an AC-02 case with an unrelated malformed dirty doc.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 1. Common documentation convention; 4. Stackweaver adoption
+EVIDENCE: Classification honors the local-format line, the declared root and the `docs/internal/plans` default (shared-docs-impact.md:112-117), but the spec never says what honoring the local-format line yields. Under the standard, that line means the standard does not apply (engineering/conventions/feature-documents.md:26-28). The Stackweaver section says only that the migration does not onboard its local plan format (line 231). The consumer AGENTS.md has neither the root line nor the local-format line (consumer/AGENTS.md:1-60), and its plans live under the default root (consumer/CLAUDE.md:291). Without a declaration, the checker would label Stackweaver's locally formatted plans as vh-adlc feature documents with coverage-only results. The concrete case raised in R-2 F-02 therefore remains open.
+PROPOSAL: State that a local-format declaration classifies no document as a feature document, so its documents become ordinary candidates. Also state whether the Stackweaver migration adds that line, putting it in the inventory and rollback set, or accepts the default labeling. Add a parity case for Stackweaver plans.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption
+EVIDENCE: The index builder and other documentation agents stay unchanged (shared-docs-impact.md:267-268). A legacy pattern whose meaning changes is resolved by a reviewed mapping correction or a bounded compatibility treatment, compared against the legacy matcher (lines 269-274). The consumer has other retained `covers` readers: the index builder (consumer/CLAUDE.md:281 and 291), and a corpus audit plus a weekly drift agent that flags dangling `covers` globs and applies safe fixes (consumer/CLAUDE.md:311). A correction written in new syntax, such as a backslash escape, a bracket or a directory prefix, could be read differently by these unchanged readers. The weekly agent could then report or change the corrected entries as dangling, which would undo the migration's candidate preservation.
+PROPOSAL: Require every Stackweaver mapping correction to have the same meaning for the retained local `covers` readers, or limit corrections to syntax that both interpret identically. Add that comparison to the AC-05 parity set.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 4. Stackweaver adoption; Test Plan AC-05
+EVIDENCE: The legacy wrapper needs only Node (consumer/scripts/check-doc-coverage.js:1). The shared checker requires Bun, Git, Bash and the verified binary (shared-docs-impact.md:133). The wrapper's listed exit-2 setup failures name a missing or failed payload or binary (lines 251-252 and 260), and AC-05 tests a missing payload and a missing binary (line 319). A missing or incompatible Bun on a developer host or in a hook environment is not named, so its behavior is unspecified.
+PROPOSAL: Name a missing or unusable Bun as an exit-2 setup diagnostic printed on stdout, and add it to the AC-05 wrapper cases.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 3. Shared review procedure and existing gates; covers frontmatter
+EVIDENCE: For an unpinned consumer, the spec says the new operation adds no onboarding files (shared-docs-impact.md:189-190). The loop reference lists each operation's onboarding behavior when `source` is `plugin`, naming the operations that add none and the ones that onboard (shared/plugins/vh-adlc/references/loop.md:58-64). `vh-adlc-docs-impact` is not in that list, and `plugins/vh-adlc/references/loop.md` is not in `covers` (shared-docs-impact.md:6-29). A skill that follows the loop for every step it describes gets no rule there for this case.
+PROPOSAL: Either add `references/loop.md` to `covers` and list the new operation with the operations that add no onboarding, or state that `references/docs-impact.md` defines this behavior and overrides that loop step.
 
 ## Sources
 
