@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/remote-gui
-status_description: "Implementation and owner device checks passed; awaiting independent implementation review."
+status_description: "Addressing independent review findings in upstream ownership and failure reporting."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
@@ -146,12 +146,12 @@ Add a Linux CI job for plugin build/test/vet/lint and package checks. The existi
       Evidence: T15 process replacement, matching-socket recovery, foreign-socket preservation and denial-listener tests passed under the race detector. T16 real GUI component crash/expiry checks passed. T10 normal stop deleted the temporary browser profile, removed only the task scopes and preserved the exact baseline Serve hash; no cleanup-pending result remained.
 - [x] AC-08: An agent can follow the installed skill to hand control to the human and resume the authorized task in the verified original browser, with clear expiry and cleanup results and no global MCP reconfiguration.
       Evidence: The installed T10 package automatically verified its marker and viewer input before delivering only a direct Tailscale URL and expiry. Agent navigation/input stayed paused until the owner replied; reattachment verified the original marker and human button result, then resumed the original task page. Cleanup removed its profile and forward. No viewer password/code, terminal action or MCP reconfiguration was used.
-- [x] AC-09: Required plugin and repository checks pass in their documented local commands, and the CI version/tagging job waits for the plugin checks to pass.
-      Evidence: At merged source df4341f, root Go tests/vet/tidy and v2.15.0 lint/config passed, plus Bun suites with 1094 lifecycle, six package and 34 registration cases. T16 plugin build/race/vet/tidy/lint and real GUI matrix passed on the unchanged runtime source. The existing CI prerequisite test passed with `remote-gui` required by the version job; the release workflow is unchanged.
-- [x] AC-10: In a configured remote session, the agent gives the human a verified tailnet URL for a task-local app or preview on the first attempt without a forwarding reminder; unrelated external links and internal control endpoints keep their intended routing.
-      Evidence: All 15 Copilot CLI 1.0.105 routing cases passed on the same installed source hash, including first-link sharing without a per-case forwarding hint, reuse, external/internal URLs, explicit SSH and failure labels without a localhost fallback. The first advertised T10 direct app link was browser-verified through real Tailscale, and the owner subsequently confirmed it from the requested other-device context. This establishes the exercised native host, not blanket coverage of other hosts.
-- [x] AC-11: A human can use a shared local app's intended pages, assets, same-app redirects and required WebSocket features through authenticated tailnet access without starting a shared browser; ending the share preserves the original app and unrelated resources.
-      Evidence: T10 direct app preflight passed nested pages, required assets, same-app redirects, isolated server-cookie jars, Origin checks, WebSockets and reconnects over real owner-identity Tailscale HTTPS with no GUI session. The owner then confirmed the enabled app button; its handler recorded one confirmation with the expected jar and Origin. Both apps survived share stop, and foreign Serve values stayed unchanged. T14/T16 security and loopback app-isolation regressions also passed.
+- [ ] AC-09: Required plugin and repository checks pass in their documented local commands, and the CI version/tagging job waits for the plugin checks to pass.
+      Evidence: R-11 at a0088de returned not met: the independent root Bun run hit an existing audit fixture timeout; serial verification remains required.
+- [ ] AC-10: In a configured remote session, the agent gives the human a verified tailnet URL for a task-local app or preview on the first attempt without a forwarding reminder; unrelated external links and internal control endpoints keep their intended routing.
+      Evidence: R-11 at a0088de returned not met: the redirect-failure native reply omitted the required literal failure label.
+- [ ] AC-11: A human can use a shared local app's intended pages, assets, same-app redirects and required WebSocket features through authenticated tailnet access without starting a shared browser; ending the share preserves the original app and unrelated resources.
+      Evidence: R-11 at a0088de returned not met: listener replacement during dial and an added ambiguous listener bypassed continued upstream ownership checks.
 - [x] AC-12: Configured authentication work retains auth-refresh's account, credential and lane ownership, while remote-gui supports authorized human browser interaction without competing login flows, reading its credentials or changing its state.
       Evidence: T16 configured-SSO, active-challenge, unknown-login and non-login native scenarios passed using the recording fake owning interface and protected sentinel state. T10 completed the non-login browser handoff with observed human input and exact-session resume. Auth-refresh credentials, accounts, profiles and lanes remained outside the task; no completed provider login or CLI refresh is claimed.
 
@@ -226,6 +226,7 @@ None.
 | 2026-11-03 | R-9 | spec | `2c6aeb22fb8846e3a897d866693fa28378f52b6c` | unknown | procedural | NO FINDINGS; model identity not attested. Passwordless owner identity and trusted Unix ingress reviewed. |
 | 2026-11-03 | R-9 | spec | `2c6aeb22fb8846e3a897d866693fa28378f52b6c` | n/a | n/a | accepted by owner |
 | 2026-11-05 | R-10 | spec | `df4341feb7ee53a96571b88766f284615ea5ba53` | unknown | procedural | NO FINDINGS; refreshed after integrating current main. Model identity not attested; accepted normative baseline unchanged. |
+| 2026-11-05 | R-11 | implementation | `a0088de11e472099afcf850713900e329634c12c` | unknown | procedural | Blocking upstream ownership findings; AC-09, AC-10 and AC-11 not met. Model identity not attested. |
 
 ### R-1
 
@@ -308,6 +309,77 @@ NO FINDINGS
 ### R-10
 
 NO FINDINGS
+
+### R-11
+
+CRITERION: AC-01 A user can install remote-gui independently from either vhco-tools catalog and build and run its CLI from the installed plugin without the repository checkout or vh-adlc runtime.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, the six package checks passed within the independently executed browser suite. Both catalogs select the same complete plugin source, and its installed-copy test built and ran the helper outside the checkout. The helper disables downloads and requires no vh-adlc runtime.
+
+CRITERION: AC-02 A Linux user with the documented host tools can start a sandboxed headed Chromium session, and a human's harmless viewer input is visible to agent automation attached to that exact session before and after reattachment.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, the independent disposable viewer checks passed actual noVNC canvas input and original-browser CDP reattachment. Inspected the live verification scripts, original-session records and human confirmation receipt under /tmp/rg-live-eojyzsty; they corroborate the owner's confirmation in this conversation. Sandbox arguments and fresh-profile construction were inspected. Physical device location relies on the owner's reported use.
+
+CRITERION: AC-03 Tailscale HTTP and WebSocket access opens directly for the pinned owner identity without a viewer password or enrollment step, rejects other or forged identities, and stops at expiry/revocation; loopback retains native-code authentication, internal interfaces stay local, and secrets/browser contents stay out of ordinary outputs and logs.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, uncached plugin race tests passed the Unix-peer identity, forwarded-origin, forged-client, revocation, metadata and loopback-authentication checks. Independent Chromium and Firefox identity cases passed without HTTP credentials. Inspected kernel peer pinning, per-request owner checks, internal proofs, redaction and local listener configuration. The separate upstream-selection defects are recorded under AC-11.
+
+CRITERION: AC-04 A Tailscale session becomes ready only after trusted HTTPS and authenticated viewer WebSocket probes pass through its real hostname; a loopback session works through an explicitly selected SSH tunnel and reports readiness with its actual scope.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, uncached tailnet readiness tests passed TLS, hostname and upgrade checks. Independently executed the disposable authenticated OpenSSH viewer test; rendered input and reattachment passed, and stopping the tunnel broke browser access while the host viewer remained available. Inspected real-host passwordless HTTPS/WSS scripts and receipts plus the owner's device confirmation in this conversation. Host probes remain explicitly scoped.
+
+CRITERION: AC-05 Missing dependencies, unsupported hosts, unavailable attachment capabilities and failed startup checks leave no usable partial session and give an actionable result without installing packages or changing global host configuration.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, uncached app, config, browser and session tests passed dependency, platform, capability and rollback cases. Package checks passed missing-tool and unsupported-host diagnostics. Inspected argument-array launches, offline source builds and read-only doctor behavior; runtime code does not install packages or mutate operator/global configuration.
+
+CRITERION: AC-06 Concurrent sessions use separate profiles, displays and ports; stopping, expiring or failing one preserves the other session and all pre-existing browser and Serve resources.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, uncached session/state/tailnet tests and the real GUI lifecycle matrix passed concurrency, conditional configuration updates and foreign-resource preservation. Inspected the two-share live receipt: each retained its app jar, stopping one preserved the other, and final cleanup matched the baseline Serve hash. Upstream listener ambiguity is separately contradicted under AC-11.
+
+CRITERION: AC-07 Normal stop, expiry and a child or supervisor crash revoke viewer access and clean up verified owned resources; recovery after interrupted startup or restart preserves changed resources and reports any unresolved cleanup explicitly.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, independently executed REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser -count=1 successfully. Uncached session/state tests passed daemon replacement, foreign socket preservation, denial-listener retention, stale process identity and recovery cases. Inspected live stopped records with no forwards and a deleted browser profile. Cleanup uses recorded identities and preserves unresolved changes.
+
+CRITERION: AC-08 An agent can follow the installed skill to hand control to the human and resume the authorized task in the verified original browser, with clear expiry and cleanup results and no global MCP reconfiguration.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, inspected the installed skill, live verification scripts, confirmation and cleanup receipts, and the inherited owner handoff. Agent input was paused until confirmation; reattachment found the original marker and confirmed task page before resuming that page. Independent viewer reattachment tests passed. The demonstrated Tailscale flow requested neither a viewer password nor SSH/global MCP changes.
+
+CRITERION: AC-09 Required plugin and repository checks pass in their documented local commands, and the CI version/tagging job waits for the plugin checks to pass.
+VERDICT: not met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, plugin build, uncached race tests, vet, tidy and v2.15.0 lint/config passed. Root Go tests, vet, tidy and lint/config passed; package checks passed six cases and registration checks passed 34. However, the independently executed bun test tests/vh-adlc finished 1093 pass and one 5000 ms timeout in the existing audit batch cleanup test; /tmp/rg-r11-root-bun.log retains the failure. Inspected CI: the version job requires remote-gui. A serial rerun of the unchanged required command remains necessary; the earlier parent-run pass does not replace this observed failure.
+
+CRITERION: AC-10 In a configured remote session, the agent gives the human a verified tailnet URL for a task-local app or preview on the first attempt without a forwarding reminder; unrelated external links and internal control endpoints keep their intended routing.
+VERDICT: not met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, the independent native routing run completed 16 pass and one fail across 17 cases. First-link sharing, reuse, external/internal routing and explicit SSH passed. The redirect-failure browser check correctly returned compatibility-blocked and the agent stopped sharing without advertising a usable link, but its final reply omitted the mandatory literal compatibility-blocked label. The accepted failure-reporting check therefore failed. Results are retained in /tmp/rg-r11-native-routing.log and /tmp/rg-r11-native-redirect-failure.json.
+
+CRITERION: AC-11 A human can use a shared local app's intended pages, assets, same-app redirects and required WebSocket features through authenticated tailnet access without starting a shared browser; ending the share preserves the original app and unrelated resources.
+VERDICT: not met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, independent app/browser checks passed supported routes, assets, cookies and WebSockets, and inspected live receipts corroborate the owner's direct-app confirmation and preservation after stop. Two additional read-only overlay regressions failed: a replacement listener received a request between the real ownership check and outbound dial, and adding a second SO_REUSEPORT listener left the existing binding authorized despite ambiguity. These contradict the accepted requirement to revoke access when selected upstream ownership changes. Overlay: /tmp/rg-r11-overlay.json; source: /tmp/rg-r11-upstream-race_test.go.
+
+CRITERION: AC-12 Configured authentication work retains auth-refresh's account, credential and lane ownership, while remote-gui supports authorized human browser interaction without competing login flows, reading its credentials or changing its state.
+VERDICT: met
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, independently executed configured-sso, owned-challenge, unknown-login and nonlogin native scenarios successfully. Inspected their protected sentinel and recording fake owning-interface checks, along with the installed skill's ownership restrictions. The separate live non-login handoff corroborates actual human interaction and original-session resume. These checks establish routing and isolation, not a completed provider login or CLI identity refresh.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: plugins/remote-gui/internal/proxy/proxy.go:117 and :283-291; upstream ownership during connection establishment
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, go -C plugins/remote-gui test -overlay /tmp/rg-r11-overlay.json ./internal/session -run '^TestReviewerUpstreamReplacementBetweenOwnershipCheckAndDial$' -count=1 failed: changed upstream listener received the request after a successful ownership check. The external overlay calls the real bindingAlive check, replaces its selected listener before forwarding, and observes the replacement response. The transport uses a plain DialContext with no ownership validation around its connection establishment. Request data and the selected client's app cookies can therefore be sent to a replacement listener during this interval.
+PROPOSAL: Validate the selected binding immediately around the actual outbound dial. Close and reject a connection before writing any request bytes if ownership changed, revoke the share, and cover HTTP and WebSocket forwarding with the regression. A further check only before dialing leaves another check/use interval.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: plugins/remote-gui/internal/session/listener.go:133-135; continued upstream binding validation
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, go -C plugins/remote-gui test -overlay /tmp/rg-r11-overlay.json ./internal/session -run '^TestReviewerAddedReusePortListenerMakesBindingAmbiguous$' -count=1 failed: existing binding remained authorized after a second SO_REUSEPORT listener made the target ambiguous. The test observed two distinct listener inodes; fresh discover rejected them, while bindingAlive returned true because the original inode remained present.
+PROPOSAL: Require the current listener set to remain unambiguous and match the recorded binding, rather than accepting any set containing its original inode. Add the persistent two-listener regression and ensure ambiguity revokes forwarding without altering either listener.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/remote-gui/skills/remote-gui/SKILL.md; final reporting after an observed compatibility failure
+EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, REMOTE_GUI_ROUTING_E2E=1 bun test tests/remote-gui/native-routing.e2e.test.ts finished 16 pass and one fail. In redirect-failure, browser verification reached the intended redirect-cookie failure, returned compatibility-blocked, and the agent stopped the share without a usable link. The final reply omitted the accepted literal classification, causing the existing oracle to fail. Sanitized evidence is retained at /tmp/rg-r11-native-redirect-failure.json and /tmp/rg-r11-native-routing.log.
+PROPOSAL: Make the required failure reply format explicit in the installed skill, including the literal compatibility-blocked label, failed check and cleanup result. Rerun the unchanged native failure oracle and retain this failed attempt.
 
 ## Sources
 
