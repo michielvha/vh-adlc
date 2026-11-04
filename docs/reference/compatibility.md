@@ -26,6 +26,31 @@ The runtime has no GUI dependency. Other GUI surfaces have no triage support cla
 Copilot's migration runner is test-only and grants no managed execution support.
 The historical results below retain their original scope.
 
+## Persistent codebase audit
+
+The audit operation is a harness-agnostic skill and Bun/Git helper package, included from plugin 0.8.0.
+Configure `.vh-adlc/audit.yaml` using the [audit settings reference](../../plugins/vh-adlc/references/audit-settings.md).
+Actual Codex CLI and Claude CLI marketplace fresh installs, upgrades from 0.7.0, discovery of twelve
+operations, installed offline entry/helpers and reinstall passed at published source
+`afb0c4b84ad0c013614f404bcfea7d12ee9eca78`, with identical complete payload bytes/modes.
+
+The shared source gate includes 1,092 Linux package tests, 935 portable macOS tests and actual bounded
+Copilot Opus 5.5 behavior, repair and interruption-recovery trials. Stackweaver passed 100 consumer
+checks, all 18 applicable pre-push checks with no skips, a clean paired review at published/current
+commits and artifact-bound installed preflight before [adoption #1020](https://github.com/michielvha/stackweaver/pull/1020).
+Post-merge installed policy inspection matched every mode and binding, left the ledger unchanged and
+passed synthetic mismatch/rollback/reapply checks. Exact targets and retained attempts live in the
+[audit delivery evidence](../specs/shared-audit.md#published-audit-and-stackweaver-adoption-2026-11-03).
+
+These checks use operator attestations and provide no OS-level enforcement claim. Real Claude model
+invocation, GUI/phone entry and actual product audit repairs or live token/database/resource operations
+remain unclaimed. Other adopters must verify their own policy and installation.
+
+Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
+runtime reports that prerequisite before the operation starts. Use the same verified Bun version
+when generating and reconstructing a candidate; renderer differences are not proof of equivalent
+ledger bytes. A changed rendering result requires reconciliation and renewed verification.
+
 ## Dependency and security maintenance
 
 Maintenance requires plugin 0.6.0 or later. Isolated native installs of the exact
@@ -52,6 +77,14 @@ Native model report/delivery trials are tracked separately in that feature;
 an installer result does not establish agent behavior. The live Claude command
 trial and GUI maintenance checks remain deferred. Copilot report/reviewer tests
 do not establish general Copilot lifecycle or delivery support.
+
+## Repository settings
+
+Triage reads `.vh-adlc/triage.yaml` and maintenance reads `.vh-adlc/maintenance.yaml`. YAML settings need
+plugin 0.7.0 or later. An earlier plugin does not read these files and runs on its defaults, so upgrade
+the plugin on every host before a repository moves its settings. Plugin 0.7.0 refuses a `.json` or `.yml`
+settings file and names the expected path. Reading a settings file uses the verified `vh-adlc` binary that
+the plugin installs; a repository without settings files needs no binary for settings.
 
 ## Support matrix
 

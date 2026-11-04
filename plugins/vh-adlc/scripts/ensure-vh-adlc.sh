@@ -4,8 +4,10 @@
 # Sources, in order: a vh-adlc on PATH whose digest and version match the lock,
 # then the user cache entry for the locked version, verified on every reuse,
 # then the release asset, verified before extraction and again before it runs
-# or is cached. A matching version with a wrong or missing digest fails closed.
-# The script writes only below the user cache directory.
+# or is cached. Online mode rejects a matching-version PATH entry with a wrong
+# digest; a missing lock digest always fails closed.
+# Offline mode never executes an unverified PATH entry; it tries the verified
+# cache instead. The script writes only below the user cache directory.
 #
 # Usage: ensure-vh-adlc.sh [--offline]
 set -euo pipefail
@@ -87,10 +89,14 @@ if candidate=$(command -v vh-adlc 2>/dev/null) && [[ -n "$candidate" ]]; then
     echo "$candidate"
     exit 0
   fi
-  if reports_version "$candidate"; then
-    die "$candidate reports vh-adlc $version but its digest does not match the lock; remove it or fix PATH"
+  if [[ "$offline" == true ]]; then
+    echo "vh-adlc: ignoring unverified PATH entry $candidate in offline mode" >&2
+  else
+    if reports_version "$candidate"; then
+      die "$candidate reports vh-adlc $version but its digest does not match the lock; remove it or fix PATH"
+    fi
+    echo "vh-adlc: ignoring $candidate, which is not vh-adlc $version" >&2
   fi
-  echo "vh-adlc: ignoring $candidate, which is not vh-adlc $version" >&2
 fi
 
 # 2. The user cache entry, verified before every reuse.

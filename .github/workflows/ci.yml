@@ -72,6 +72,7 @@ jobs:
           tests/vh-adlc/triage/owned-process.test.ts
           tests/vh-adlc/triage/settings.test.ts
           tests/vh-adlc/maintenance/*.test.ts
+          tests/vh-adlc/audit/*.test.ts
           --timeout 60000
 
   remote-gui:

@@ -10,7 +10,7 @@ want separately.
 
 | Plugin | Purpose | Availability |
 | --- | --- | --- |
-| `vh-adlc` | Lifecycle intake, dependency/security maintenance, article/promotion drafts and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
+| `vh-adlc` | Lifecycle intake, persistent codebase audit, dependency/security maintenance, article/promotion drafts and a spec-driven feature loop. | Codex and Claude catalogs. See [installation](../get-started/installation.md). |
 | `remote-gui` | Private tailnet links for local apps and temporary headed-browser handoff. | Codex and Claude catalogs; Linux amd64 runtime. See [setup and remote activation](../../plugins/remote-gui/README.md). Native-host and second-device acceptance remain separate checks. |
 | `auth-refresh` | Check and restore local SSO identities in isolated account lanes, with Claude Remote Control phone notifications. | Codex and Claude catalogs; source lives in [auth-refresh](https://github.com/michielvha/auth-refresh). |
 | `github-app-registration` | Register a GitHub App through its manifest flow, save credentials locally with mode 0600, and export them to project files. | Claude catalog. The scripts require [Bun](https://bun.sh). |
@@ -19,6 +19,16 @@ want separately.
 The [Codex catalog](../../.agents/plugins/marketplace.json) and
 [Claude catalog](../../.claude-plugin/marketplace.json) define package sources.
 Both pin auth-refresh to the same component commit.
+
+## Persistent audit
+
+`vh-adlc-audit` is included from plugin 0.8.0. It keeps persistent findings, re-verification and
+selected repairs portable while consumers retain their ledgers and operating rules. Actual Codex
+and Claude CLI marketplace fresh installs, upgrades from 0.7.0 and reinstalls passed at published
+source `afb0c4b84ad0c013614f404bcfea7d12ee9eca78` before Stackweaver adoption. A new adopter must
+verify its own installed version, project policy and migration preflight. Configure `.vh-adlc/audit.yaml`
+using the [audit settings reference](../../plugins/vh-adlc/references/audit-settings.md). See the [audit workflow](../user-guides/workflows.md#persistent-codebase-audit)
+and [acceptance limits](compatibility.md#persistent-codebase-audit).
 
 ## Shared maintenance
 

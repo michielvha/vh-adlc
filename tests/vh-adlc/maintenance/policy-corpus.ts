@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { syntheticCorpus } from "./fixtures/corpus";
 import { git } from "./fixtures";
+import { settingsYAML } from "../settings-yaml";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/maintenance/settings";
 import { createRun, digest } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
 import type { ExpectedCase } from "./trial-proof";
@@ -16,7 +17,9 @@ export function stackweaverPolicyCorpus(consumer: { root: string; commit: string
   const replace = (text: string) => text.replaceAll("example/project", settings.repository).replaceAll("example/partial", "vhco-pro/terraform-provider-stackweaver").replaceAll("example/no-history", "vhco-pro/stackweaver-registry").replaceAll("example/new-repository", "vhco-pro/fixture-new-repository");
   // Policy and routing are real; caller samples, release notes, tracker state and history remain synthetic.
   const paths = [...new Set(["AGENTS.md", ".vh-adlc/maintenance.json", "agents/maintenance.md", ".claude/commands/maintenance.md", settings.project_procedure, ...settings.source_references, ...settings.backlog_references, ...settings.repositories.map((row: any) => row.sync_workflow).filter(Boolean)])] as string[];
-  for (const path of paths) corpus.project.write(path, frozen(path));
+  // The consumer commit is recorded JSON-era data; the fixture checkout gets its settings values as YAML.
+  const projectPath = (path: string) => path === ".vh-adlc/maintenance.json" ? ".vh-adlc/maintenance.yaml" : path, projectPaths = paths.map(projectPath);
+  for (const path of paths) corpus.project.write(projectPath(path), path === ".vh-adlc/maintenance.json" ? settingsYAML(settings) : frozen(path));
   for (const path of ["src/app.ts", "src/security.ts", "package.json", "versions.json", "security.md", ...Object.keys(corpus.evidence).filter(path => path.startsWith("source/notes/")).map(path => path.slice(7))]) corpus.project.write(path, replace(readFileSync(join(root, path), "utf8")));
   corpus.project.write("frontend/src/fixture.ts", "// Synthetic source sample; production callers were not exported.\nexport const frontendFixture = true;\n");
   corpus.project.write("notes/consumer-routing.md", "Synthetic frontend PR 22 changes package.json and remains sync-owned by the monorepo. Synthetic API PR 23 changes Dockerfile, which the actual API sync excludes. Both need owner selection and applicable checks; production call-site compatibility is unverified from these samples.\n");
@@ -42,7 +45,7 @@ export function stackweaverPolicyCorpus(consumer: { root: string; commit: string
   for (const [path, text] of Object.entries(operatorInputs(root))) if (path.startsWith("operator/")) corpus.project.write(path, text);
   corpus.project.write("operator/consumer-policy.json", JSON.stringify({ repository: settings.repository, commit: consumer.commit, paths: paths.map(path => ({ path, sha256: digest(frozen(path)) })), tracker_and_history: "synthetic only", production_source: "bounded synthetic caller samples only" }, null, 2) + "\n");
   git(root, "remote", "set-url", "origin", `https://github.com/${primary}.git`);
-  git(root, "add", "operator", ...paths, "frontend", "src", "package.json", "versions.json", "security.md", "notes"); git(root, "commit", "-qm", "test: bounded committed Stackweaver maintenance policy with synthetic tracker samples");
+  git(root, "add", "operator", ...projectPaths, "frontend", "src", "package.json", "versions.json", "security.md", "notes"); git(root, "commit", "-qm", "test: bounded committed Stackweaver maintenance policy with synthetic tracker samples");
   const commit = git(root, "rev-parse", "HEAD");
   for (const key of Object.keys(routes)) if (/\/pulls\/\d+$/.test(key) || key === `repos/${primary}/pulls`) {
     const values = Array.isArray(routes[key]) ? routes[key] : [routes[key]]; for (const value of values) if (value.base?.repo?.full_name === primary) value.base.sha = commit;
@@ -50,11 +53,11 @@ export function stackweaverPolicyCorpus(consumer: { root: string; commit: string
   writeFileSync(routesPath, JSON.stringify(routes));
   corpus.config = loadSettings(root); const run = createRun(corpus.config);
   corpus.packet.run_id = run.header.run_id;
-  corpus.packet.source_paths = [...new Set([...corpus.packet.source_paths, ...paths, "frontend"])];
+  corpus.packet.source_paths = [...new Set([...corpus.packet.source_paths, ...projectPaths, "frontend"])];
   corpus.packet.history = corpus.packet.history.map(row => { const text = replace(row.text); return { ...row, text, digest: digest(text) }; });
   for (let index = 0; index < corpus.cases.length; index++) corpus.cases[index] = JSON.parse(replace(JSON.stringify(corpus.cases[index])));
   for (const key of Object.keys(corpus.evidence)) corpus.evidence[key] = replace(corpus.evidence[key]);
-  for (const path of [...paths, "frontend/src/fixture.ts", "notes/consumer-routing.md"]) corpus.evidence[`source/${path}`] = readFileSync(join(root, path), "utf8");
+  for (const path of [...projectPaths, "frontend/src/fixture.ts", "notes/consumer-routing.md"]) corpus.evidence[`source/${path}`] = readFileSync(join(root, path), "utf8");
   corpus.evidence["history/0000.md"] = corpus.packet.history[0].text;
   const line = (path: string, term: string) => { const number = corpus.evidence[`source/${path}`].split("\n").findIndex(value => value.includes(term)) + 1; if (!number) throw Error("actual workflow routing evidence absent"); return number; };
   for (const [id, classification, proposal, owner, path, term] of [["pr:vhco-pro/stackweaver-frontend#22", "sync-owned", "route-to-monorepo", "primary", ".github/workflows/sync-frontend.yml", "monorepo/frontend/ satellite/"], ["pr:vhco-pro/stackweaver-api#23", "satellite-owned", "retain-satellite", "satellite", ".github/workflows/sync-api.yml", "rsync -av --mkpath"]]) corpus.cases.push({ id, classification, proposal, source_owner: owner, batch_eligible: false, measured_count: null, coverage: "not-applicable", claimed_resolved: [], related_ids: [], evidence: [{ path: `source/${path}`, line: line(path, term), ...(id.endsWith("#23") ? { end_line: line(path, term) + 6 } : {}) }, { path: "source/notes/consumer-routing.md", line: 1 }] });

@@ -6,6 +6,13 @@ rule from.
 
 ## 1. Get the binary
 
+Audit entry overrides this section's online bootstrap, including when selected through lifecycle
+intake. Use `scripts/audit/bootstrap.ts --offline` as the audit skill specifies: cached verified binary,
+validated settings metadata, then cache-only knowledge for its normalized `knowledge_pages`. Missing
+prerequisites stop audit work with an explicit setup handoff. Never invoke the online installer first.
+The metadata read is the narrow exception to knowledge-first order. Explicit setup may obtain the
+binary and complete pinned pages separately; other operations keep the ordinary procedure below.
+
 The plugin directory is the one that holds `skills/`: two levels above the skill's own directory, which
 the host names when it loads the skill. Resolve a symlinked skill directory to its real location first.
 Run the installer through Bash from there and use the path it prints for every later call:
@@ -33,7 +40,7 @@ Call `knowledge` first, with every docs page the operation will read:
 ```
 
 State the result in one line that also names the prose guide, for example
-`Conventions: vhco-pro/docs@e4d58d2 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md`.
+`Conventions: vhco-pro/docs@0e52f51 (repository pin, AGENTS.md); prose edited with guides/humanize-prose.md`.
 Every report opens with this line, after the `deterministic checks unavailable` line when there is one,
 including a report that stops at a gate or waits for the owner. Every call below passes the same
 `--repo` and `--plugin-pin`, written out on each call. The binary needs every word as its own argument:
