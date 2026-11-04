@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Claude Code Opus 5.5 R-1 returned no blockers, seven should-fix findings and one nit. Runtime/caller corrections and owner-approved coverage/scope defaults are recorded. Only the public-spec housekeeping question remains open; revised draft awaits renewed review and acceptance."
+status_description: "Claude Code Opus 5.5 R-1 returned no blockers, seven should-fix findings and one nit. All six owner decisions and runtime/caller corrections are recorded. Revised draft awaits renewed independent review before implementation."
 issue: null
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -69,10 +69,7 @@ when the index is missing. The shared checker removes that index dependency for 
 Existing site generation, frontend visual refresh/check and public/internal rules remain local
 (`agents/docs-impact.md:57-102`).
 
-This document is local to `/home/m/code/vh-adlc-docs-impact-spec`. No new checker, convention,
-consumer adapter or external publication has been implemented. The owner authorized the bounded
-private consumer workflow review and selected Claude Code Opus 5.5 as reviewer on 2026-11-04; no
-customer docs, images, application source, reports, ledger, credentials or host configuration belong in it.
+No new checker, convention, consumer adapter or external publication has been implemented.
 
 ## Scope
 
@@ -242,8 +239,8 @@ and symlink substitutions; never reset/stash another checkout or undo other docu
 
 ### 5. Verification and delivery
 
-This feature crosses two repositories: the shared convention has its own reviewed change in
-`vhco-pro/docs`; the executable/procedure and consumer migration follow this child spec. Gate and
+This feature spans `vhco-pro/docs`, `vh-adlc` and Stackweaver. The shared convention has its own
+reviewed change in `vhco-pro/docs`; the executable/procedure and consumer migration follow this child spec. Gate and
 publish those dependencies in order, with actual revisions and separately authorized external writes.
 Do not edit another active docs branch or bump all repository pins as a side effect.
 
@@ -251,7 +248,7 @@ Test the real checker with synthetic Markdown/Git repositories, including malfor
 coverage and preservation cases. Use actual bounded Copilot Opus 5.5 trials for accuracy judgment,
 minimal doc repairs, read-only limits and untrusted input. Native Codex/Claude installation,
 standalone execution and current Linux/macOS selections must exercise the shipped payload.
-Actual Claude model execution, GUI/phone entry and live Stackweaver screenshot capture remain
+Actual Claude docs-impact execution, GUI/phone entry and live Stackweaver screenshot capture remain
 unclaimed; a future UI change still owes its existing local visual checks.
 
 ## Acceptance Criteria
@@ -282,20 +279,7 @@ None yet; planned after independent review and owner acceptance. No implementati
 
 ## Open Questions
 
-### Q2: Keep machine-specific setup details out of the published spec?
-
-**Recommendation:** A. Use repository-relative paths in the public spec. Keep exact review models,
-commits and returned findings in its Review Log; store local checkout paths, launcher setup and
-private-packet dispatch details in the local review artifacts. Stackweaver's required project
-instructions and migration steps remain in their repositories.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Keep machine details local** | A spec that applies on other hosts, with review results still recorded in Git. | Consult local artifacts for the exact launch environment. |
-| **B. Retain the current Context details** | The public spec includes this host's checkout path and dispatch narration. | Those details become stale and do not apply to other users. |
-
-**Why this is yours:** The owner accepted the other five refinements and requested an explanation
-of this housekeeping choice. This remains open until clarified; it does not change feature behavior.
+None. The owner approved all six review refinements.
 
 ## Review Log
 
