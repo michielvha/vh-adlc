@@ -286,6 +286,7 @@ None. The owner approved all six review refinements.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-04 | R-1 | spec | `2811de8baa95c8a1e2887b09891badc59b2af6d3` | claude-opus-5-5 | procedural | No blockers; seven should-fix findings and one nit. |
+| 2026-11-04 | R-2 | spec | `a47be378a6875a97f3dfc86054753190c70e54ac` | claude-opus-5-5 | procedural | No blockers; seven should-fix findings and one nit on matching, setup and migration details. |
 
 ### R-1
 
@@ -344,6 +345,64 @@ SEVERITY: nit
 WHERE: Context
 EVIDENCE: shared-docs-impact.md:70-73 names a host-local checkout path and records the reviewer model choice and private-packet authorization inside the canonical shared document. Once published, that text is host-specific and goes stale. The prose guide treats an account of how the document was produced as writing about the document (engineering/guides/humanize-prose.md:353-356).
 PROPOSAL: Remove the host path and the review-dispatch narration from Context. The Review Log already records model, commit and isolation.
+
+### R-2
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 1. Common documentation convention; 4. Stackweaver adoption
+EVIDENCE: The legacy matcher escapes `?`, `[` and `]` as literal characters and turns `**` anywhere in a pattern into `.*`, which also matches across `/` inside a segment (consumer/scripts/check-doc-coverage.js:23-30). The new contract gives `?` and brackets glob meaning and defines `**` only as globstar with zero-directory behavior (shared-docs-impact.md:94-98). It defines no escape for literal metacharacters and says nothing about `**` inside a segment. A legacy declaration for a literal path that contains brackets is still valid bracket syntax, so it would quietly match different files and the legacy candidate would be lost. A mid-segment `**` would be either rejected or narrowed. The spec says all previously selected legacy candidates must remain selected, and only invalid metadata blocks adoption (lines 224-227). A quietly reinterpreted pattern is not invalid, so nothing blocks adoption, and the contract gives no way to express the old meaning. The feature matcher already accepts Go `path.Match` escapes and `[^...]` negation (shared/internal/doc/covers.go:20-22). The ordinary matcher is supposed to accept existing feature bracket patterns (line 104), but the contract names neither of these.
+PROPOSAL: Define one escape syntax and the bracket negation form so they stay compatible with the existing feature syntax, and state whether `**` inside a segment is rejected or interpreted. Add an AC-05 parity case that finds legacy declarations whose meaning changes, such as literal `?` or brackets and mid-segment `**`, and reports them before cutover.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 1. Common documentation convention; 2. One reusable, read-only checker
+EVIDENCE: The checker must mark feature-document matches as coverage-only and must never select a feature document because its own path changed (shared-docs-impact.md:102-109). The AC-01 test expects both behaviors (line 268). The checker's inputs are only the repository, the documentation roots and a base or selected paths (lines 121-122 and 131). It may not download anything (line 124). So it cannot learn which documents are feature documents from those inputs, and it cannot fetch the pinned rules block. Feature location depends on the `Feature documents:` line, the `docs/internal/plans` default, or the `Feature document format: local` declaration (engineering/conventions/feature-documents.md:20-28 and 217-219). The consumer AGENTS.md has neither declaration (consumer/AGENTS.md:1-60). Under the default, the consumer's own locally formatted plans would be classed as vh-adlc feature documents.
+PROPOSAL: State how the checker identifies feature documents offline: read the root AGENTS.md declarations, apply the default, and honor the local-format line. Alternatively, take an explicit input. Add test cases for a declared root, the default root and a local-format repository.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 3. Shared review procedure and existing gates; 4. Stackweaver adoption
+EVIDENCE: Integrated routes read the documentation roots from one root AGENTS.md declaration. Without it they keep the manual path, and explicit CLI roots are only for one-off direct checks (shared-docs-impact.md:170-175). The Stackweaver section sends the existing docs-impact entry through the shared procedure and lists the AGENTS.md forwarding list in its inventory (lines 200-209). It never says whether Stackweaver adds the adoption declaration, which roots it declares, or where the compatibility wrapper gets its roots. The consumer AGENTS.md has no such line today (consumer/AGENTS.md:10-23). Read as written, the routed shared procedure would fall back to the manual path in Stackweaver, which defeats the migration. The consumer also has no engineering pin line. The loop classifies onboarding behavior per operation when `source` is `plugin` (shared/plugins/vh-adlc/references/loop.md:58-64). The spec covers a repository pinned before the page exists (lines 177-179) but not an unpinned consumer.
+PROPOSAL: Put the Stackweaver adoption declaration and its exact roots into the migration inventory, parity comparison and rollback set, and have the wrapper use the same roots. State that the new operation adds no onboarding files to an unpinned consumer.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption
+EVIDENCE: The wrapper must keep the legacy arguments and stdin (shared-docs-impact.md:212-213). Standalone and CI use must locate the shared payload explicitly, without assuming a harness cache path (lines 219-221). A missing payload exits 2 (line 218). Every retained caller runs the wrapper with only a path list: consumer/agents/ship.md:52, consumer/.claude/commands/ship.md:10-11, consumer/CLAUDE.md:306 and consumer/agents/docs-impact.md:30. Because the argument list is frozen, the payload location has to come from somewhere other than an argument. The spec never names that source, whether an environment variable, a local untracked file or something else. It also does not say how unchanged callers obtain it. AC-05 tests an "explicitly located" payload (line 272) without a defined mechanism, so every existing caller could return exit 2 on every run.
+PROPOSAL: Name the single mechanism the wrapper uses to find the installed payload and its behavior when the value is absent. Add an AC-05 case showing that each unchanged caller command line reaches the shared checker through that mechanism.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, 4. Stackweaver adoption; Test Plan AC-05
+EVIDENCE: A pre-commit hook in the consumer runs the same checker as an advisory warning (consumer/CLAUDE.md:309). AC-05 requires testing the actual advisory hook's response to each exit code (shared-docs-impact.md:272). The complete migration inventory, whose changed fragments enter the parity comparison and rollback set, does not list the hook (lines 204-208). The hook file is not in this bounded packet, so nothing establishes how it treats the new exit 2. That exit code now also covers a missing payload or binary on any commit with source paths, where the legacy script exited 0 silently when its index was missing (consumer/scripts/check-doc-coverage.js:35-38).
+PROPOSAL: Add the hook to the inventory, parity comparison and rollback set, or state that it stays byte-identical and record why exit 2 remains advisory there. Inspect the hook at the exact baseline commit before cutover.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Scope; Design, 3. Shared review procedure and existing gates
+EVIDENCE: Scope describes "existing lifecycle/ship integration" (shared-docs-impact.md:76). Design says implement and ship doc checks reuse the procedure, and that implement reads the adoption declaration (lines 164-165 and 172-173). The shared implement operation has no documentation check today (shared/plugins/vh-adlc/skills/vh-adlc-implement/SKILL.md:66-89), so this adds behavior rather than reusing it. A test freezes the implement and ship bodies against an approved baseline and allows only named carve-outs (shared/tests/vh-adlc/direct-operation-compatibility.test.ts:10-41). The skill-directory test accepts only scheduled or declared content operations (shared/tests/vh-adlc/check.test.ts:16-23 and 225-236). Both test files are covered, but the spec does not say what changes in implement, or which guard exception or new baseline the owner approves for that change.
+PROPOSAL: State the exact new implement step, or say that implement is unchanged. Name the compatibility-guard change, such as a carved-out section or a new approved baseline, and the classification of `vh-adlc-docs-impact` in the package checker.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, 3. Shared review procedure and existing gates; 4. Stackweaver adoption
+EVIDENCE: The legacy procedure requires two things. When a change moves or renames a code area, the agent updates the affected `covers` entries and keeps them limited to code paths (consumer/agents/docs-impact.md:74-76). The agent must also never delete a doc or drop a `covers` entry to make the check pass (consumer/agents/docs-impact.md:99). The shared procedure defines the checker run, literal-reference search, classification and permitted edits (shared-docs-impact.md:181-192). The Stackweaver companion keeps style, visuals, preview, index rebuild and changelog policy (lines 200-202). Neither home states metadata upkeep after a rename. The no-drop rule appears only as a migration constraint (lines 226-227), not as an ordinary update rule. The checker reports old and new rename paths (line 133), but nothing assigns the follow-up metadata correction.
+PROPOSAL: Give metadata upkeep after a move or rename, and the rule against deleting docs or dropping `covers` entries, a home in the shared procedure. Keep the code-paths-only restriction in the Stackweaver companion, and add both to the AC-04 and AC-05 cases.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 3. Shared review procedure and existing gates
+EVIDENCE: The adoption line's value is defined as a JSON array (shared-docs-impact.md:170-172). The pinned coding convention says configuration a person writes or reviews is YAML and never JSON (engineering/conventions/coding.md:70-72). The example `["docs/"]` is also a valid YAML flow sequence, and the existing strict reader could parse it (shared/plugins/vh-adlc/scripts/settings-file.ts:32-49).
+PROPOSAL: Define the value as a YAML flow sequence read through the existing strict reader. That keeps the same example syntax and avoids an exception to the pinned convention.
 
 ## Sources
 
