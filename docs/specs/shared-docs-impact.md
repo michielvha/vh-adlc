@@ -366,6 +366,7 @@ None. The owner approved all six review refinements.
 | 2026-11-04 | R-1 | spec | `2811de8baa95c8a1e2887b09891badc59b2af6d3` | claude-opus-5-5 | procedural | No blockers; seven should-fix findings and one nit. |
 | 2026-11-04 | R-2 | spec | `a47be378a6875a97f3dfc86054753190c70e54ac` | claude-opus-5-5 | procedural | No blockers; seven should-fix findings and one nit on matching, setup and migration details. |
 | 2026-11-04 | R-3 | spec | `cb4d31651366af9562f17e88aa4b53412a1615bc` | claude-opus-5-5 | procedural | No blockers; six should-fix findings and two nits on caller setup, metadata scope and retained readers. |
+| 2026-11-04 | R-4 | spec | `bd4e45ec41afefb2e4b854fccfbc0e9ba18a61f2` | claude-opus-5-5 | procedural | No blockers; four should-fix findings and four nits on roots resolution, legacy overlays and upgrade effects. |
 
 ### R-1
 
@@ -540,6 +541,64 @@ SEVERITY: nit
 WHERE: Design, 3. Shared review procedure and existing gates; covers frontmatter
 EVIDENCE: For an unpinned consumer, the spec says the new operation adds no onboarding files (shared-docs-impact.md:189-190). The loop reference lists each operation's onboarding behavior when `source` is `plugin`, naming the operations that add none and the ones that onboard (shared/plugins/vh-adlc/references/loop.md:58-64). `vh-adlc-docs-impact` is not in that list, and `plugins/vh-adlc/references/loop.md` is not in `covers` (shared-docs-impact.md:6-29). A skill that follows the loop for every step it describes gets no rule there for this case.
 PROPOSAL: Either add `references/loop.md` to `covers` and list the new operation with the operations that add no onboarding, or state that `references/docs-impact.md` defines this behavior and overrides that loop step.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 3. Shared review procedure and existing gates; 4. Stackweaver adoption
+EVIDENCE: The adoption line's value is a YAML flow sequence that must be parsed with the existing strict reader. A malformed, empty, duplicate or conflicting declaration reports a gap (shared-docs-impact.md:191-197). Implement, ship, intake, the Stackweaver forwarding route and the compatibility wrapper all read this declaration (lines 194-195 and 244-245). The strict reader is only reachable through the Bun function readYAML, which spawns the installer and the binary (shared/plugins/vh-adlc/scripts/settings-file.ts:33-36). The legacy wrapper is a Node script (consumer/scripts/check-doc-coverage.js:1), and an agent cannot call readYAML directly. The only CLI shape the spec describes takes explicit `--docs-root` values (lines 133-134 and 143), and explicit roots are described only for one-off checks (line 197). Nothing defines which component locates the line outside code fences, parses it strictly and applies the gap rules. Each integrated route and the Node wrapper would therefore need its own parser. That contradicts the single-implementation goal (lines 275-276), and the gap rules could differ between callers.
+PROPOSAL: Give the shared CLI one documented way to read and validate the root `AGENTS.md` declaration, such as a flag or subcommand that returns the roots or a gap. Require intake, implement, ship and the wrapper to use it, and test it in AC-04 and AC-05 with valid, absent, malformed, duplicate and fenced declarations.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 3. Shared review procedure and existing gates; Test Plan AC-04
+EVIDENCE: An adopted repository's implement step requires the procedure before each task commit, and an incomplete assessment prevents a completion claim (shared-docs-impact.md:207-211). Only adopted or explicitly requested coverage work loads the new convention page. The spec defines two other cases: a repository pinned before the page gets a handoff "for the new operation", and undeclared generic ship checks keep their manual path (lines 199-202). A requested page missing at the pin stops the operation with `missing-page` (shared/plugins/vh-adlc/references/loop.md:54-56 and 66-67). The spec never says what implement or ship do in a repository that has the roots declaration but whose pin predates the convention page. It could stop the whole operation, report an incomplete assessment that blocks completion, or fall back to the manual path. AC-04 exercises "an old pin" (line 349) without an expected outcome for those two operations.
+PROPOSAL: State the implement and ship outcome for a declared repository with a pin older than the convention page, for example a reported gap with a pin-update handoff that blocks only the completion claim. Assert that outcome in AC-04.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 2. One reusable, read-only checker; 4. Stackweaver adoption; Test Plan AC-05
+EVIDENCE: Unselected dirty docs are excluded so that their half-edited frontmatter cannot make a run incomplete. Explicitly selected docs overlay their working-tree bytes, and malformed selected metadata produces incomplete (shared-docs-impact.md:157-165). The wrapper keeps selected docs from its original input as a metadata overlay (lines 266-268). The retained ship callers pipe every staged and unstaged tracked change into the wrapper (consumer/agents/ship.md:52, consumer/.claude/commands/ship.md:10-11, consumer/CLAUDE.md:306). Ship runs from the main checkout (consumer/agents/ship.md:72-74), which other live sessions share (consumer/CLAUDE.md:130). Every dirty doc from another session therefore becomes a selected overlay. One malformed doc turns the wrapper result into exit 2, and the local ship rule forbids shipping over a failed doc-impact check (consumer/agents/ship.md:121-122). Another session's unstaged `covers` edits also change this run's candidates. The legacy checker read only the index, so neither effect existed before. The AC-02 isolation case (line 347) covers only the shared default scope, not this wrapper path.
+PROPOSAL: State the wrapper's outcome when legacy input includes unrelated dirty docs, either as an accepted limitation that the report names, or by overlaying only docs the caller marks as metadata selections. Add an AC-05 case with an unrelated malformed dirty doc piped through the unchanged ship command.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, 1. Common documentation convention; 4. Stackweaver adoption; Test Plan AC-07
+EVIDENCE: The plugin pin moves to the new convention revision once that revision exists (shared-docs-impact.md:125-127). knowledge.md holds exactly one docs SHA for the whole package (shared/tests/vh-adlc/check.test.ts:95-100). A repository with no pin uses the plugin pin for every operation (shared/plugins/vh-adlc/references/loop.md:58-60). Stackweaver's AGENTS.md declares no engineering pin (consumer/AGENTS.md:1-60) and already forwards triage, maintenance and audit to installed vh-adlc operations (consumer/AGENTS.md:12-20). Audit entry reads only cached pages for the resolved pin and stops with a setup handoff when they are missing (loop.md:9-14; lifecycle.md:18-23). After the upgrade, Stackweaver's adopted operations resolve a new revision, and offline audit can stop until pages for that revision are cached. Marketplace and preflight verification in the spec checks only docs-impact behavior (lines 309-312; Test Plan AC-07 at line 352). The scope statement that unrelated workflows stay intact (AC-05) does not name this side effect.
+PROPOSAL: Add to the marketplace upgrade and current-consumer preflight a check that Stackweaver's adopted triage, maintenance and audit entries still resolve under the new plugin pin, including the offline audit page cache. Alternatively, record the required setup step as a stated migration action.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 4. Stackweaver adoption
+EVIDENCE: The spec keeps the legacy script as a thin compatibility entry only "if its existing hook/terminal callers need it" (shared-docs-impact.md:263-264). The same section requires the pre-commit hook to stay byte-identical while it calls that checker (lines 255-260). It then specifies the wrapper's payload location, protocol check and caller setup without any condition (lines 278-293), and the unchanged callers invoke the script directly (consumer/agents/ship.md:52, consumer/CLAUDE.md:306, consumer/agents/docs-impact.md:30). Because the callers stay unchanged, the wrapper is required. The conditional wording suggests an implementer could remove it.
+PROPOSAL: Make retention of the wrapper unconditional for this migration, and keep a later retirement as a separate decision.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, 3. Shared review procedure and existing gates; 4. Stackweaver adoption
+EVIDENCE: The legacy procedure requires each classification to cite the doc and code locations that agree or conflict (consumer/agents/docs-impact.md:54-55). Its report includes an impact table with those citations and a line saying whether the index was rebuilt and whether the coverage index changed (consumer/agents/docs-impact.md:83-88). In the shared procedure, the agent reads both sources and records a classification (shared-docs-impact.md:222-223). The human report lists changes, attention items, reasons, edits and gaps (lines 234-236). The Stackweaver companion keeps the index rebuild rule but not its report line (lines 240-242). Neither home requires per-candidate citations or the index-rebuild report item.
+PROPOSAL: Add the per-candidate doc and code citations to the shared procedure's record. Keep the index-rebuild report line in the Stackweaver companion, and include both in the AC-05 parity comparison.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 2. One reusable, read-only checker
+EVIDENCE: The default document view is tracked HEAD content (shared-docs-impact.md:157-158), and the checker must "avoid generated/ignored trees unless explicitly in scope" (lines 165-166). Ignored files are not in HEAD, but the spec gives no rule that identifies a tracked tree as generated. Stackweaver tracks generated documentation outputs inside its declared docs root (consumer/CLAUDE.md:281; consumer/agents/public-docs.md:231). A heuristic exclusion could drop legacy candidates, and the exclusion cannot be tested without a definition.
+PROPOSAL: Either limit the rule to untracked and ignored paths, or name an explicit exclusion input. Add the chosen behavior to an AC-02 case.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, 1. Common documentation convention; 3. Shared review procedure and existing gates
+EVIDENCE: The new convention page defines the matching rules and the checker result contract (shared-docs-impact.md:95-104 and 123-124). The shared reference `references/docs-impact.md` (line 185) and the protocol 1 definition (lines 280-281) describe the same contract inside the package. The package checker fails when a sentence from a pinned docs page appears in the package, but its canary list names only existing pages (shared/tests/vh-adlc/check.test.ts:52-63 and 364-374). The spec does not add the new page to that list once the pin moves. The docs repository asks for one home per fact (engineering/README.md:34-35).
+PROPOSAL: Name the convention page as the single home of the matching and result contract, link to it from the package reference, and add `conventions/documentation-impact.md` to the canary pages in the same change that moves the pin.
 
 ## Sources
 
