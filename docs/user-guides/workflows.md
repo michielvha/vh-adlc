@@ -12,8 +12,8 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has thirteen skills: this entry,
-ten engineering operations and two content operations. Check
+repository and selects a procedure. The package has fourteen skills: this entry,
+ten engineering operations, two content operations and one host-cleanup operation. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -52,6 +52,7 @@ see [installation](../get-started/installation.md).
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
+| Clean | `vh-adlc-clean` | Plan and remove what killed runs left in `/tmp` and the project's temp root; Compose projects and kind clusters only on request. |
 
 Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
 labels, waits for the report and approval of the exact batch. Local plan patches and their commit
@@ -135,6 +136,23 @@ changes use the feature loop. Dependency pushes, merges, releases and live smoke
 operations still require their own authority. See the
 [canonical procedure](../../plugins/vh-adlc/references/maintenance.md) and
 [tested compatibility](../reference/compatibility.md#dependency-and-security-maintenance).
+
+## Host cleanup
+
+Ask `Use vh-adlc-clean to free space`. The operation runs `vh-adlc clean --dry-run`,
+reports the plan, and applies it when you asked for cleanup or the session is
+blocked because `/tmp` is full. Without a request it removes only `/tmp` entries and
+the project's temp root. Name `--compose` or `--kind` to also stop and remove an
+abandoned Compose project or delete a kind cluster whose runs have all ended.
+
+A project opts in with `.vh-adlc/cleanup.yaml` on its default branch. The binary's
+own `go-build*` and `gopls-tempmod*` globs apply in every repository. A project's
+build and test entry points can take their temp directory from
+`vh-adlc env --sh`, so their files land in a root `clean` owns. The
+[CLI reference](../reference/cli.md#host-cleanup) and the
+[clean reference](../../plugins/vh-adlc/references/clean.md) give the format and
+the report, and [installation](../get-started/installation.md#host-cleanup) the
+binary and the allow rules.
 
 ## Articles and promotion
 

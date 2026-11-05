@@ -7,7 +7,9 @@ invoke the plugin's operations; direct CLI use is useful when inspecting a resul
 or integrating the checks into another tool.
 
 The binary answers mechanical questions and prints a JSON report. It does not
-edit feature documents, fetch Git refs, or run the agent workflow.
+edit feature documents, fetch Git refs, or run the agent workflow. Two commands
+act on the host: `env` creates a project's temp root and `clean` removes what a
+project's killed runs left behind.
 
 ## Get the binary
 
@@ -35,10 +37,12 @@ VH_ADLC=$(bash plugins/vh-adlc/scripts/ensure-vh-adlc.sh)
 | `next <doc>` | What is the next step? |
 | `review check <doc> --review <id> --returned <file>` | Were the reviewer's records stored as returned? |
 | `settings read --stdin` | What value does the YAML settings file on stdin hold? |
+| `env [--sh]` | Where is this project's temp root? Creates it if needed. |
+| `clean [--dry-run] [--older-than <duration>] [--compose] [--kind]` | What did killed runs leave behind? Removes it unless `--dry-run` is given. |
 
-Every command above except `settings read` requires `--plugin-pin`, a full
-40-character lowercase SHA. `settings read` reads no conventions, so it needs no
-pin and ignores one if given.
+Every command above except `settings read`, `env` and `clean` requires
+`--plugin-pin`, a full 40-character lowercase SHA. Those three read no
+conventions, so they need no pin, ignore one if given and report `knowledge: null`.
 Read the current value from [knowledge.md](../../plugins/vh-adlc/knowledge.md).
 `--repo <dir>` selects the repository and defaults to the current directory.
 `--offline` reads documentation from the cache only.
@@ -63,11 +67,47 @@ its strict subset of YAML with `malformed`, `data: null` and one
 `settings-invalid` finding. The finding gives a fixed reason and, when known, a
 line number. It never holds text from the file.
 
+## Host cleanup
+
+`env` and `clean` run on Linux only and report `unsupported-platform` elsewhere.
+Each project declares what it owns in `.vh-adlc/cleanup.yaml`; the
+[clean reference](../../plugins/vh-adlc/references/clean.md) gives the format and
+every report field.
+
+`env` reads the manifest from the working tree and creates `<temp_base>/<project>`
+with mode 0700. `temp_base` defaults to `/tmp/vh-adlc-<uid>`; set another
+absolute path in `host.yaml` under your user config directory
+(`~/.config/vh-adlc/host.yaml` on Linux):
+
+```yaml
+temp_base: /home/me/.cache/vh-adlc-tmp
+```
+
+It may not be your home directory, a directory inside a Git work tree or a
+parent of the repository. `env` reports `TMPDIR` and `GOTMPDIR` in `data`. With
+`--sh` it prints two shell-quoted `export` lines instead, for a build to `eval`:
+
+```sh
+if lines=$(vh-adlc env --sh); then eval "$lines"; fi
+```
+
+On failure `env --sh` prints nothing to stdout, writes the report to stderr and
+exits non-zero, and `env` creates nothing.
+
+`clean` requires Git 2.45 or newer and refuses to run as root or outside the
+initial PID namespace. It reads the manifest from `origin`'s default branch
+without fetching, and always applies the built-in `go-build*` and
+`gopls-tempmod*` globs, 24 hours old. `--dry-run` changes nothing and also plans
+a differing working-tree manifest under `unmerged`. `--older-than` can only
+raise an age. Compose projects and kind clusters change only with `--compose`
+and `--kind`; without them a run lists them under `needs_flag`.
+
 ## Output and exit codes
 
 Commands return one JSON object with `schema_version`, `command`, `result`,
 `knowledge`, `data`, and `findings`. The `--version` option prints a plain version
-line. See the [JSON schema](../../schema/vh-adlc.schema.json) for the full contract.
+line, and `env --sh` prints shell lines. See the
+[JSON schema](../../schema/vh-adlc.schema.json) for the full contract.
 
 | Exit | Result |
 | --- | --- |

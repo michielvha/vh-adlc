@@ -90,8 +90,25 @@ marketplace upgrade, automatic scanner collection or live advisory remediation.
 Triage reads `.vh-adlc/triage.yaml` and maintenance reads `.vh-adlc/maintenance.yaml`. YAML settings need
 plugin 0.7.0 or later. An earlier plugin does not read these files and runs on its defaults, so upgrade
 the plugin on every host before a repository moves its settings. Plugin 0.7.0 refuses a `.json` or `.yml`
-settings file and names the expected path. Reading a settings file uses the verified `vh-adlc` binary that
-the plugin installs; a repository without settings files needs no binary for settings.
+settings file and names the expected path. Reading a triage or maintenance settings file uses the verified
+`vh-adlc` binary that the plugin installs; a repository without settings files needs no binary for
+settings. `.vh-adlc/cleanup.yaml` is different: the `vh-adlc` on `PATH` reads it, without verification, as
+described under [host cleanup](#host-cleanup).
+
+## Host cleanup
+
+`vh-adlc-clean` needs plugin 0.11.0 and a binary with the `clean` command, installed on the shell's `PATH`
+as the [installation guide](../get-started/installation.md#host-cleanup) shows. The operation calls that
+binary unverified, so the allow rule can match it. `clean` and `env` run on Linux only, and `clean` needs
+Git 2.45 or newer, above the 2.35 the other commands need.
+
+`clean` refuses with `pid-namespace` inside a PID-namespace sandbox, because `kill` and `/proc` give
+wrong answers there. A default `workspace-write` Codex session may be one; run the command in a terminal
+then. `DOCKER_HOST` values other than `unix://`, and Docker contexts, read as no engine. Age is the only
+protection against other users' processes, same-user processes whose `/proc` entries cannot be read,
+and Podman bind mounts.
+
+No host run of the operation is recorded yet. Until one passes, it is unverified on every host.
 
 ## Support matrix
 

@@ -47,9 +47,9 @@ test("public guides agree on engineering and content operations, runtime needs a
   const guide = readFileSync(resolve(root, "docs/user-guides/workflows.md"), "utf8");
   const install = readFileSync(resolve(root, "docs/get-started/installation.md"), "utf8");
   const compatibility = readFileSync(resolve(root, "docs/reference/compatibility.md"), "utf8");
-  expect(guide).toContain("thirteen skills");expect(guide).toContain("ten engineering operations"); expect(guide).toContain("`vh-adlc-triage`"); expect(guide).toContain("`vh-adlc-blog`"); expect(guide).toMatch(/exact.*batch/i);
+  expect(guide).toContain("fourteen skills"); expect(guide).toContain("`vh-adlc-clean`");expect(guide).toContain("ten engineering operations"); expect(guide).toContain("`vh-adlc-triage`"); expect(guide).toContain("`vh-adlc-blog`"); expect(guide).toMatch(/exact.*batch/i);
 
-  expect(install).toContain("thirteen skills"); expect(install).toMatch(/(?:Bun[^\n]*triage|triage[^\n]*Bun)/i); expect(install).toContain("GitHub CLI");
+  expect(install).toContain("fourteen skills"); expect(install).toContain("vh-adlc clean"); expect(install).toMatch(/(?:Bun[^\n]*triage|triage[^\n]*Bun)/i); expect(install).toContain("GitHub CLI");
   expect(compatibility).toContain("Shared triage"); expect(compatibility).toMatch(/triage[\s\S]*unverified/i);
   expect(readFileSync(resolve(root, "README.md"), "utf8")).toMatch(/triage/i);
 });
