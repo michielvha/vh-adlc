@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { digest } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
@@ -7,8 +7,8 @@ import { verifyScannerEvidence } from "../../../plugins/vh-adlc/scripts/maintena
 
 const roots: string[] = [];
 afterEach(() => { roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })); });
-function packet() {
-  const root = mkdtempSync(join(tmpdir(), "scanner-packet-")); roots.push(root);
+function packet(parent=tmpdir()) {
+  const root = realpathSync(mkdtempSync(join(parent, "scanner-packet-"))); roots.push(root);
   const raw = JSON.stringify({ vulnerabilities: [{ id: "CVE-2026-1234", package: "widget" }] });
   writeFileSync(join(root, "raw.json"), raw);
   const manifest = { schema_version: 1, kind: "maintenance-scanner-evidence-v1", hostname: "github.com", repository: "example/project", source_commit: "a".repeat(40),
@@ -31,6 +31,12 @@ test("report-only zero exit with findings is complete but never an empty scan", 
 test("a complete empty scan and synthetic provenance remain distinct", () => {
   const p = packet(); p.manifest.findings = []; p.manifest.synthetic_input = true; p.save();
   expect(verifyScannerEvidence(p.root)).toMatchObject({ complete: true, synthetic: true, findings: [] });
+});
+test("owned packet fixtures support system temporary-directory aliases",()=>{
+  const parent=realpathSync(mkdtempSync(join(tmpdir(),"scanner-alias-")));roots.push(parent);
+  mkdirSync(join(parent,"physical"));symlinkSync(join(parent,"physical"),join(parent,"alias"),"dir");
+  const p=packet(join(parent,"alias"));
+  expect(verifyScannerEvidence(p.root).findings).toHaveLength(1);
 });
 test.each(["tamper", "missing", "extra", "symlink", "traversal", "pointer", "schema", "target", "duplicate"])("rejects %s evidence", kind => {
   const p = packet();
