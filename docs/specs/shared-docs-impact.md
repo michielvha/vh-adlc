@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 branch: feat/shared-docs-impact
-status_description: "Shared source and the local Stackweaver migration are reviewed; ordered CI, publication, installed marketplace acceptance, cutover and final completion review remain open."
+status_description: "Published plugin 0.9.0 and Stackweaver adoption verified; all seven criteria met in independent Opus R-16 and the completion gate passes. Agreed host limits remain explicit."
 issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -74,7 +74,7 @@ Existing site generation, frontend visual refresh/check and public/internal rule
 
 Implementation is underway on the claimed feature branch. The common convention is published
 and independently reviewed. Local reader/matcher/collector/CLI and native trial checks pass;
-shared publication, installed marketplace acceptance, final review and consumer cutover remain
+publication and Stackweaver adoption are verified below; only final completion review remains
 open. The initial strict-reader refusal was resolved locally by a separately reviewed syntax-only
 correction; its exact commit, bounded review and retained-reader equivalence are recorded below.
 
@@ -455,19 +455,19 @@ unclaimed; a future UI change still owes its existing local visual checks.
 ## Acceptance Criteria
 
 - [x] AC-01: Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
-  Evidence: R-13 at `957597d` returned met; exact criterion records and observed limits are retained below.
+  Evidence: R-16 at `2dd76e7` returned met; executed and carried-forward observations with their limits are preserved verbatim below.
 - [x] AC-02: The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
-  Evidence: R-13 at `957597d` returned met; exact criterion records and observed limits are retained below.
+  Evidence: R-16 at `2dd76e7` returned met; executed and carried-forward observations with their limits are preserved verbatim below.
 - [x] AC-03: No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
-  Evidence: R-13 at `957597d` returned met; exact criterion records and observed limits are retained below.
+  Evidence: R-16 at `2dd76e7` returned met; executed and carried-forward observations with their limits are preserved verbatim below.
 - [x] AC-04: Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
-  Evidence: R-13 at `957597d` returned met; exact criterion records and observed limits are retained below.
-- [ ] AC-05: Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
-  Evidence: R-13 at `957597d` returned not verified; exact criterion records and observed limits are retained below.
-- [ ] AC-06: Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
-  Evidence: R-13 at `957597d` returned not verified; exact criterion records and observed limits are retained below.
-- [ ] AC-07: Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
-  Evidence: R-13 at `957597d` returned not met; exact criterion records and observed limits are retained below.
+  Evidence: R-16 at `2dd76e7` returned met; executed and carried-forward observations with their limits are preserved verbatim below.
+- [x] AC-05: Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+  Evidence: R-16 at `2dd76e7` returned met; executed and carried-forward observations with their limits are preserved verbatim below.
+- [x] AC-06: Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+  Evidence: R-16 at `2dd76e7` returned met; executed and carried-forward observations with their limits are preserved verbatim below.
+- [x] AC-07: Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+  Evidence: R-16 at `2dd76e7` returned met; executed and carried-forward observations with their limits are preserved verbatim below.
 
 ## Test Plan
 
@@ -499,10 +499,10 @@ unclaimed; a future UI change still owes its existing local visual checks.
   Evidence: `DOCS_IMPACT_TEST_PLUGIN=<exact shared payload> node --test tests/agent-docs-impact/*.test.cjs` passes 16 tests at consumer `7a1e905635192c84c177260df26e8df0b811af00`; rebuilt-HEAD parity and scoped rollback results are recorded below.
 - [x] T8 `plugins/vh-adlc/knowledge.md`, lock/manifests as required by the published dependency, `tests/vh-adlc/docs-impact/` - record and independently review the entire old-to-new convention diff before moving the pin; surface unrelated normative drift for owner acceptance. Execute actual bounded model trials and isolated native Codex/Claude candidate discovery/standalone checks, retaining exact payloads, returned evidence and unclaimed surfaces (AC-01, AC-04, AC-06).
   Evidence: actual Copilot Opus 5.5 trials 8/9/10 record successful observations for all 15 cases after focused recovery: 12 unaffected cases at `8de398e35f78f5b03964496c7589dbafd34d135f`, contracts at `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`, and both manual routes at `1786f48929f66b966bb8739e5c245ac1722f2191`. The 12 run-8 classifications predate the target reference's general classification rule; their behavior under that revised text is unclaimed. Failed original results and exact reference/request deltas remain retained. Native Codex/Claude candidate 7 and installed standalone/new-pin checks pass at `4f29be5`, whose plugin tree equals the integrated target.
-- [ ] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
+- [x] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
   Evidence: R-11 independently executes source-candidate parity/preflight at shared `7a3c613` and consumer `7a1e905`: 790 docs, 3,336 source paths, zero losses/gaps, 16 contracts including named rollback. R-12 reads the whole auxiliary preflight and confirms the unchanged source. Root-addition and missing-rollback negative probes are retained. Migration readiness remains false until published acceptance; current consumer will be refreshed again for cutover.
 
-- [ ] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
+- [x] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
 
 ### Implementation progress
 
@@ -630,6 +630,158 @@ explicitly unsupported on macOS; valid UTF-8/BOM and all other portable cases
 remain selected. The original failure stays retained. Claude Code Opus 5.5
 independently reviewed the Git-default fixture correction and returned NO FINDINGS.
 
+
+Shared PR #51 merged at `02096e780deea4d695c7352dca0bfd54808574b6` after every
+job passed at `32db579625dffb6675399475321c2a4cdd98c6ac`. A later upstream
+registration feature had already removed the obsolete guard against changing
+that unrelated plugin; merging its published changes resolved the moving-main
+failure without editing registration behavior. The actual published payload is
+plugin 0.9.0, canonical digest
+`2e0b09a6079e12f5a820853aaeb1a395ab971189872a2005ad8a5f0e754b5781`.
+
+Actual GitHub-marketplace fresh installs and 0.8.0-to-0.9.0 upgrades pass in both
+Codex and Claude CLI isolated profiles at that published commit. Each discovers
+13 skills, runs installed roots/candidate/no-match checks preserving inputs,
+HEAD and index, and passes uninstall/reinstall. Initial native install/discovery
+and runtime setup succeeded; the acceptance operator then used a source path in
+a log filename and hit ENOENT. The original transcripts and failure stay intact.
+A separate continuation finishes those same installs, retaining the original
+upgrade commands instead of relabelling an already upgraded profile as a fresh
+upgrade. Native inventory and canonical controller hashes are both recorded with
+their distinct algorithms; credentials were not copied and no model was invoked.
+
+Installed triage/maintenance knowledge and unwarmed, explicitly prepared and warmed
+offline audit setup pass at f8ccacb. Copilot Opus 5.5 trial 11 passes all twelve
+previously pre-clarification cases under the current plugin tree, with complete
+native read coverage. Together with the three earlier cases at that identical
+plugin tree this closes the former twelve-case guidance limit. The earlier failed
+runs and their original revision limits remain historical records above.
+Stackweaver integration passes 18 applicable checks with zero failures/skips;
+refreshed source-candidate wrapper/caller/rollback contracts pass 16 of 16.
+Post-merge normal CI/release and fresh installed-consumer paired acceptance are
+still required before migration or feature completion is claimed.
+
+
+Normal post-merge CI passes at published source `02096e7`; the configured normal
+release is v0.14.0 at that exact commit. Its detached signature is valid against
+the repository public signing key, all four archive hashes match signed checksums,
+and the Linux binary reports vh-adlc 0.14.0. Other release binaries were not
+executed locally. Plugin installation deliberately retains its signed 0.9.0
+runtime lock; the new release does not silently change that dependency.
+The consumer's first final hook attempt had one unchanged frontend test timeout
+while 1,248 tests passed. The focused file then passed both tests and the full
+normal hook retry passed 18 applicable checks with zero failures or skips; no
+product code was edited for that retry. Failure and retry artifacts are retained.
+
+### Final delivery observations
+
+Published main `02096e780deea4d695c7352dca0bfd54808574b6` passed all five jobs
+in run 41979677921: Linux 1,226 pass, macOS 1,068 pass with its one documented
+raw-byte-filename skip. All four actual Codex/Claude marketplace fresh/upgrade
+cases pass. Trial 11 re-executes the twelve earlier classifications under the
+current plugin component and passes all twelve; trials 9 and 10 supply the other
+three passing cases under that same component. Native read coverage is retained.
+This closes the earlier twelve-case guidance limitation without rewriting its
+historical failed attempts or claiming fifteen cases passed in one run.
+
+This host's user-scoped native plugins are also updated to 0.9.0: Codex from
+0.8.0, Claude from 0.7.0. Enabled state, Claude scope/project settings and every
+other installed plugin row are preserved. Desktop discovery refresh and Claude
+model execution are not claimed by these native cache updates.
+
+The final source checkout also incorporates published default
+`1f5ac3d5b2b91c03fdc13dd7c73de529d5935c8d` and its separate YAML v4 repair.
+The installed plugin tree remains byte-identical to source publication `02096e7`.
+The following adoption record establishes consumer cutover. Final completion review remains open.
+
+### Published Stackweaver adoption
+
+Stackweaver [PR #1033](https://github.com/michielvha/stackweaver/pull/1033)
+merged at `009a1c5f4d1761d28fb4bc896a9450823f3fc642` after the actual installed
+migration preflight returned source_ready true, migration_ready true and no
+failures. The approved consumer head is
+`a85b41a3627d53c67f34b525a1fdfcc7e2498432`; the merge tree is byte-identical.
+The source checkout at that gate is `3866058a54455e198dd569d0940f341b8aeb57a5`,
+with the unchanged published plugin digest and convention recorded above.
+
+Fresh installed checking on the actual merged revision passes: 794 documents,
+756 patterns, 3,342 source paths, zero lost candidates or unresolved meaning
+changes, no committed-index drift, all 16 contracts and 123 reviewed reference
+entries with no unresolved caller. The contracts include the named scoped
+rollback/reapply test. The frozen rollback baseline is
+`1e0287936ace2e0910abcab8e770a5e312e8694b`; it preserves that published main's
+manual-only hosted CI policy and unrelated product/visual changes. The prior
+syntax prerequisite remains separately published through `57ff7884` and outside
+rollback. All 18 applicable final local verification checks pass without skips.
+An earlier integration hook had 24 passes and one explicit FAST=1 backend
+vulnerability-check skip; that run is retained separately, not promoted to a
+non-skipped pass. Product integration/E2E tests do not apply to the migration's
+27 workflow/checker/test/metadata files, which change no application source.
+
+Final paired Claude Code Opus 5.5 reviews are `paired-published-3` and its bounded
+follow-up `paired-published-4`. The first independently executes current installed
+checks and reads all 57 required files/chunks; its sole rollback-baseline wording
+nit is fixed. The follow-up reads all eight required chunks, independently reruns
+installed parity/contracts and publication proof checks at the exact consumer
+head, and returns NO FINDINGS. Isolation is procedural. The earlier ambiguous
+pin nit uses a companion clarification: engineering rules are `0e52f51`, installed
+documentation coverage is `f8ccacb`. The first full-coverage validator retained an
+operator-generated review-targets.json exception, checked explicitly against the
+launch target, consumer and both pins; all material prepared files remain bound.
+Earlier partial-read review artifacts and failed preparation attempts remain
+retained rather than relabelled as full initial successes.
+
+T9 is now complete with actual published acceptance, paired review, fresh corpus,
+caller inventory and scoped rollback. R-14 returns NO FINDINGS and retains the
+owner's R-8 acceptance because the normalized normative baseline is unchanged.
+Final criterion/completion review remains open. GUI/phone, actual Claude
+docs-impact model execution and live product screenshot capture stay unclaimed.
+
+The first final implementation review R-15 executes all 1,226 shared tests,
+Go tests/vet/lint/module checks, then ends with exit 143 during typecheck setup.
+The operator misread the quiet full-suite log as a stall and interrupted that
+owned process group. This is an incomplete review, not a complete delivery pass.
+Its two should-fix findings concern the wrapper: split the completed long suite
+from remaining checks, and accept only trial 9's passing contracts case while
+preserving its failed manual/fenced cases, which trial 10 separately fixes.
+The two wording nits are corrected: Context now points to actual delivery, and
+all review subsections precede the final Sources section. No product code or
+accepted criterion changes. A redundant bounded host diagnostic is retained as
+an additional partial attempt, not substituted for the independently observed
+1,226-test pass. Follow-up must observe the remaining delivery checks.
+
+R-16 returns met for all seven criteria after independently executing the
+remaining delivery checks to completion. It verifies the prior 1,226-test log's
+SHA256 and the unchanged implementation, then passes Go/vet/lint/module checks,
+strict typecheck, actionlint, installed post-merge parity/contracts, all four
+marketplace transcript hashes, actual published CI/release and every retained
+model-case/component binding. Final source/consumer clean-state and index hashes
+are preserved. The first full-suite pass is carried forward, not repeated or
+presented as a new run. R-16 reads all required follow-up material; isolation is
+procedural. Its two nits are addressed in an immutable companion receipt: the
+actual executed script and reviewed packet script have identical SHA256, and
+actual CI run 41979677921 contains successful job checker-macos (the
+companion receipt retains its actual returned job ID and URL). No code changed.
+
+Stackweaver's adoption-record correction is published at
+`d77259358c87aebc93ad76231ae245fd790c043a`. It updates only its migration note,
+test README, inventory hashes and internal changelog classification for merge
+009a1c5. All 16 installed contracts and five normal hook checks pass. The first
+hook refusal for that unclassified merge is retained and corrected through the
+normal disposition mechanism. The read-only release watcher for merge 009a1c5
+exits successfully: monorepo tag 5.109.13, frontend sync PR #313, frontend release
+0.79.27. No manual CI or unrelated satellite action was dispatched by this work.
+T10's final complete gate and status publication are the remaining bookkeeping.
+
+Completion: R-16 establishes all seven criteria, T1 through T10 are done and
+`vh-adlc gate complete: pass (rules 1, docs 0e52f51)`. Both final reviews are fresh,
+the normalized normative baseline equals the owner's accepted R-8 version, and
+review records remain byte-identical to the returned text. The published source,
+actual marketplace acceptance, gated migration, post-merge checks and successful
+configured release chain are recorded above. GUI/phone, actual Claude
+docs-impact model execution and live screenshot capture remain the agreed
+unclaimed surfaces. Drift audit/resolution/truth remain separate roadmap scope.
+
 ## Open Questions
 
 None. The owner approved all six review refinements.
@@ -652,6 +804,9 @@ None. The owner approved all six review refinements.
 | 2026-11-05 | R-11 | implementation | `7a3c613f64e352084c6bc5730c09cf899fee2843` | claude-opus-5-5 | procedural | AC-01 through AC-04 met; AC-05/06 not verified, AC-07 not met; one wording nit addressed. Source review only; final delivery review remains open. |
 | 2026-11-05 | R-12 | implementation | `abb576b068ae62ffe057a4692a314ed0601f0681` | claude-opus-5-5 | procedural | Full requested follow-up coverage; AC-01 through AC-04 met, delivery criteria open; two wording nits addressed. |
 | 2026-11-05 | R-13 | implementation | `957597d23607146e3ac218d2ec96250d0f2f8f97` | claude-opus-5-5 | procedural | Full requested follow-up coverage; AC-01 through AC-04 met, delivery criteria open; two feature-document nits corrected. |
+| 2026-11-05 | R-14 | spec | `3866058a54455e198dd569d0940f341b8aeb57a5` | claude-opus-5-5 | procedural | NO FINDINGS; full required coverage; refreshed default drift with unchanged R-8 normative acceptance. |
+| 2026-11-05 | R-15 | implementation | `6e7630f1f3c64070b97f5c3f072eb159d7d4ab63` | claude-opus-5-5 | procedural | AC-01 through AC-04 met; delivery criteria not verified. Full suite 1,226 pass; wrapper interrupted during typecheck. Two operator-check should-fixes and two wording nits addressed for follow-up. |
+| 2026-11-05 | R-16 | implementation | `2dd76e77e739080ee1027bf60c12f122273be6ac` | claude-opus-5-5 | procedural | All seven criteria met; full required follow-up coverage and completed delivery checks. Two metadata nits addressed without source changes. |
 
 ### R-1
 
@@ -1190,6 +1345,118 @@ SEVERITY: nit
 WHERE: frontmatter status_description
 EVIDENCE: The new status_description lists only "ordered CI, publication, installed marketplace acceptance and cutover" as open (shared-docs-impact.md:4; last-followup-diff.patch:22-23). It dropped the earlier "final independent review". The progress text still lists "final completion review" as open (shared-docs-impact.md:596-598), and T10, which requires the completion implementation review, is unticked (line 505).
 PROPOSAL: Add the final completion review back to the open items in status_description.
+
+### R-14
+
+NO FINDINGS
+
+### R-15
+
+CRITERION: AC-01 Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+VERDICT: met
+EVIDENCE: Ran bash /home/m/code/.docs-impact-review-archive/check-delivery-implementation.sh once, in the foreground, against shared 6e7630f1f3c64070b97f5c3f072eb159d7d4ab63. Before it stopped, these steps passed: the full Bun plugin suite (1226 pass, 0 fail, 100 files); go test ./... with internal/doc, internal/fresh and internal/gate ok; go vet; golangci-lint config verify and run ("0 issues"); and go mod tidy -diff. I read the published conventions/documentation-impact.md at f8ccacb in full. It is self-contained. Lines 69-78 keep ordinary coverage separate from the feature-review matcher and label feature candidates coverage-only. Lines 26-30 assign enforcement to vh-adlc, with no Stackweaver generator or index. The pinned feature-documents rules block at 0e52f51 is the one I read. Limitations: the script printed only aggregate counts, so I did not see which test covers the second-repository example. The run ended before typecheck finished (see F-01).
+CRITERION: AC-02 The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+VERDICT: met
+EVIDENCE: Same fixed script run at 6e7630f. The whole tests/vh-adlc Bun suite passed: 1226 pass, 0 fail, 4473 expect() calls. It contains the matching, collection and CLI suites for HEAD and overlay views, merge-base scope, rename and delete, dirty exclusion, NUL input and source/index preservation. The published convention at lines 80-101 defines the same HEAD and overlay contract, and the trial 11 "update" and "feature-move" cases show --metadata-path overlays overriding HEAD with HEAD and index preserved. Limitations: no per-test names were printed. The script was terminated before its final clean-tree and index-hash assertions ran, so I did not observe preservation in this run.
+CRITERION: AC-03 No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+VERDICT: met
+EVIDENCE: Same fixed script run at 6e7630f: the full plugin suite passed (1226 pass, 0 fail), including the CLI exit/outcome, collection gap, symlink, uncovered-document and settings-reader regression tests. The published convention lines 96-99 and 122-148 define candidates/none exit 0 and incomplete exit 2, with known candidates kept visible. Trial 11 shows incomplete results with exit 2 alongside known candidates in implement-gap, ship-gap and ship-progress, and roots exit 2 for malformed. Limitations: aggregate counts only. The script did not reach the consumer wrapper contracts, so I did not observe legacy exit mapping in this run.
+CRITERION: AC-04 Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+VERDICT: met
+EVIDENCE: The fixed script run at 6e7630f passed the package, discovery, protected-body, lifecycle and example tests inside the 1226-test suite. I read the retained Copilot claude-opus-5.5 returns and results for trials 9, 10 and 11:
+- Trial 11 (12 cases, pass true, no failures): report and intake were report-only and classified Stale with guide.md:6 against src/app.ts:1. Update made a minimal edit. Malformed stopped at roots exit 2. Old-pin stopped at knowledge exit 5 with a handoff. Implement-gap and ship-gap were blocked. Ship-progress wrote only a local draft. In feature-move the feature doc was left unedited and routed to vh-adlc-spec. Local-plan and unmarked-plan followed the local procedure, and unknown-plan was classified Unknown with no edit.
+- Trial 9 contracts kept the 8080 contract and called 9090 a software bug. It treated injection.md as untrusted and gave other-system.md no source citation, with a stated reason.
+- Trial 10: manual and fenced kept manual review with no check, both classified Stale.
+- Every case preserved HEAD and index, and read-coverage shows no missing lines.
+Limitations: the trials are retained artifacts I did not re-execute. The script ended before its component-binding assertion, so I did not observe that the trials ran on the current plugin tree. Actual Claude docs-impact execution is unclaimed.
+CRITERION: AC-05 Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+VERDICT: not verified
+EVIDENCE: The fixed script includes installed parity.cjs, preflight.cjs and the 16 consumer contracts on merged Stackweaver 009a1c5f4d1761d28fb4bc896a9450823f3fc642. The run was terminated with exit 143 during the docs-impact typecheck step, before those steps ran, so I observed none of them. The supplied postmerge.json claims all of the following, but I could not confirm it independently: pass true, an identical merge tree, 794 documents, 0 lost candidates, contract TAP 16/16 including named rollback test 7, and 123 inventory entries with none unresolved. Limitations: a check exists, but I did not observe it executing in this review.
+CRITERION: AC-06 Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+VERDICT: not verified
+EVIDENCE: At 6e7630f I observed the local Linux Bun suite (1226 pass), Go tests, vet, lint and module tidy passing. The run then stopped with exit 143 before typecheck, actionlint, the gh check of CI run 41979677921, the marketplace transcript hash checks and the trial component-binding assertions. The supplied trial-9 result.json records pass false with failures for manual and fenced, which the fixed assertion would reject (see F-02). compatibility.md:63-93 states the limits explicitly. Limitations: macOS CI, native marketplace execution and trial-to-component binding were not observed. A passing subset does not upgrade this composite criterion.
+CRITERION: AC-07 Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+VERDICT: not verified
+EVIDENCE: The fixed script's publication, marketplace, release, premerge-gate, postmerge and paired-validation assertions sit after the step where the run was terminated (exit 143 during typecheck), so none were observed. Supplied artifacts claim the delivery: published-receipt.json, postmerge.json, paired-validation.json with pass true and 8/8 files read, and paired-review.txt NO FINDINGS. The spec records publication at 02096e7, release v0.14.0 and merge 009a1c5 at lines 654-695. I did not verify any of these by execution. Limitations: a check exists, but I did not observe it executing in this review.
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: delivery check script, check-delivery-implementation.sh
+EVIDENCE: The single foreground run of bash /home/m/code/.docs-impact-review-archive/check-delivery-implementation.sh ended with exit 143 ("Terminated") right after "bun install" inside "bash typecheck.sh". The Bun suite alone reported "[413.69s]", so the script cannot finish under the 600000 ms synchronous limit. Typecheck, actionlint, git diff --check, consumer parity/preflight, every publication/marketplace/trial/CI/release/postmerge assertion and the final cleanliness checks never ran.
+PROPOSAL: Run the gate as a background command with native-owned output, or split the long plugin suite from the delivery assertions. Then repeat the independent review so that AC-05 through AC-07 rest on an observed completed run.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: delivery/trial-9/result.json; fixed check trial assertion
+EVIDENCE: delivery/trial-9/result.json:17-21 records "pass": false with failures "manual:unclassified-or-uncited:docs/guide.md" and "fenced:unclassified-or-uncited:docs/guide.md". checks.sh:35 asserts v['pass'] and not v['failures'] for trial 9, the case it relies on for contracts. If the archive copy matches the packet copy, the gate fails at that assertion. If it does not match, the packet does not bind the evidence the gate checks. Only the contracts case is claimed from trial 9, and its per-case evidence is sound.
+PROPOSAL: Make the trial-9 assertion per case, requiring the contracts case to have no failures while keeping the overall failure as history, or bind a passing contracts-only artifact. Confirm that the packet copy and the archive copy are byte-identical.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: shared-docs-impact.md:75-78 still says "shared publication, installed marketplace acceptance, final review and consumer cutover remain open". Lines 654-695 record publication at 02096e7, marketplace acceptance and the Stackweaver merge at 009a1c5.
+PROPOSAL: Update the Context sentence so only the final completion review remains open, and point to the publication and adoption sections.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Review Log; Sources
+EVIDENCE: The "### R-14" subsection with "NO FINDINGS" is at shared-docs-impact.md:1310-1312, after "## Sources" at line 1302. Structurally it therefore sits under Sources rather than Review Log, while engineering/conventions/feature-documents.md:66-67 makes Sources the last section.
+PROPOSAL: Move the R-14 subsection up to follow R-13 inside Review Log, so Sources stays last.
+
+### R-16
+
+CRITERION: AC-01 Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+VERDICT: met
+EVIDENCE: I ran `bash /home/m/code/.docs-impact-review-archive/check-delivery-implementation-2.sh` once, in the foreground, at 2dd76e7. It ran to the end and printed "Final delivery checks passed". The full Bun suite was not run again in this review. The script checked the SHA256 of the R-15 suite log from 6e7630f (1226 pass, 0 fail, 100 files). It also showed that `git diff --name-only 6e7630f HEAD` changes only `docs/specs/shared-docs-impact.md`, so that suite result still applies to unchanged code. Observed in this run: go test ./... passed, with doc, fresh and gate ok. The results came from Go's test cache, which reuses them only when inputs are unchanged. go vet, golangci-lint config verify and run ("0 issues"), go mod tidy -diff, typecheck, actionlint and git diff --check also passed. The convention reading at f8ccacb is carried forward from R-15 and the convention is unchanged: lines 26-30 and 69-78 keep it self-contained, keep feature matching separate, and need no Stackweaver generator or index. Limitation: the suite printed totals only, not per-test names.
+CRITERION: AC-02 The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+VERDICT: met
+EVIDENCE: The 1226/0 suite result is carried forward, bound by hash and by the unchanged code. It includes the HEAD and overlay, merge-base, rename and delete, dirty-exclusion, NUL and preservation suites. Observed in this run: the installed parity.cjs on Stackweaver 009a1c5 printed 794 documents, 3342 sources, 0 losses, 0 meaning risks and committed_index_differs false. The final assertions also passed: source and consumer `git status` were clean and both index SHA256 values were unchanged. Trial 11 "update" and "feature-move" overlay evidence is a retained file, now shown to run on the current plugin tree: its `source_commit:plugins/vh-adlc` tree equals `HEAD:plugins/vh-adlc`, with head_preserved and index_preserved for every case.
+CRITERION: AC-03 No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+VERDICT: met
+EVIDENCE: The suite's CLI outcome, gap, symlink, uncovered-document and settings-reader tests are carried forward (1226/0, hash-bound, code unchanged). Observed in this run: preflight.cjs reported source_ready true, and the 16 consumer contracts, which include the legacy exit mapping, exited 0. The published convention, lines 96-99 and 122-148, is carried forward unchanged. The trial 11 cases implement-gap, ship-gap, ship-progress and malformed (exit 2 with known candidates kept visible) are retained files, now shown to run on the current plugin tree.
+CRITERION: AC-04 Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+VERDICT: met
+EVIDENCE: Observed in this run: the trial assertions passed for 15 retained Copilot claude-opus-5.5 cases. Trial 9 checks contracts only, and none of its failures fall in that case set. Trial 10 covers manual and fenced; trial 11 covers 12 cases with pass true and no failures. All have read-coverage pass. Each trial's `source_commit:plugins/vh-adlc` tree equals the current plugin tree, and HEAD and index were preserved in every case. Trial 9's failed manual and fenced cases stay as history; trial 10 passes them. The case behaviour I described in R-15 is carried forward. The trials themselves were not re-run. Actual Claude docs-impact model runs, GUI, phone and live screenshots are not claimed.
+CRITERION: AC-05 Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+VERDICT: met
+EVIDENCE: Observed in this run with the installed plugin at `VH_ADLC_PLUGIN_ROOT=…/vhco-tools/vh-adlc/0.9.0`, on Stackweaver 009a1c5:
+- Parity: 756 patterns, 794 documents, 0 losses, 0 meaning risks, committed index unchanged.
+- Preflight: source_ready true, and the contract command, which runs the 16 contracts including the rollback contract, exited 0.
+- The preflight payload digest equals the retained premerge gate digest and the retained postmerge plugin_payload.
+- The retained postmerge-summary.json reports pass true and merge_tree_identical_to_reviewed_head true.
+The consumer stayed clean with its index hash unchanged. Retention of site generation, visuals and local policy, and the 123-entry inventory, rest on the retained postmerge summary and earlier reviews; I did not execute them separately.
+CRITERION: AC-06 Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+VERDICT: met
+EVIDENCE: Observed in this run:
+- Local Linux: Go tests, vet, lint, tidy, typecheck and actionlint passed. The 1226/0 Bun suite is carried forward, hash-bound.
+- Published CI: `gh run view 41979677921` returned headSha 02096e7 and conclusion success. In the packet copy of ci.yml, a `checker-macos` job (`macos-latest`) is required by the final job.
+- Marketplace: all four retained runs (codex and claude, fresh and upgrade) passed with the matching payload digest, 13 discovery operations and no authentication copied. Every command exited 0, did not time out and was reaped, and every transcript and stderr SHA256 matched.
+- Copilot trials: the 15 cases are bound to the current plugin tree.
+compatibility.md:63-93 states the capability limits; it is carried forward unchanged. Limitation: the macOS result comes from the run-level conclusion. The script did not print each job's platform or conclusion (see F-02).
+CRITERION: AC-07 Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+VERDICT: met
+EVIDENCE: Observed in this run:
+- Published CI at 02096e7: success.
+- runtime-release-v0.14.0: pass, with 4 archives (the signature and checksum check).
+- installed-published-gated-preflight.json: migration ready with no failures.
+- paired-published-4 and spec-delivery-2 validations: pass.
+- published-existing-operation-knowledge: pass, not ready cold, ready after warm-up.
+- Postmerge: tree and routes pass.
+- Marketplace: transcript hashes verified for all four runs.
+- Exact revisions in the retained files: consumer 009a1c5, payload digest equal across the premerge gate, postmerge and current installed preflight.
+Rollback evidence is the retained rollback contract inside the 16-contract command, which exited 0 in this run. The ordering (publication and marketplace before migration) comes from the retained premerge gate file plus the CI result, not from re-running the migration. The current post-merge preflight printed migration_ready false with "published convention, marketplace and paired-review evidence absent". That is expected for a source-only post-merge preflight, and the script does not assert it.
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: review procedure; check-delivery-implementation-2.sh
+EVIDENCE: I read the packet copy `followup-chunks/checks.sh/00001.txt` (58 lines) before running. Reading the archive file directly would be an outside read, so I did not compare the two byte for byte. The output lines match the packet's steps in order and wording: "Carried-forward…", parity JSON, preflight JSON, summary JSON, "Final delivery checks passed…".
+PROPOSAL: Add the executed script's SHA256 to review-targets.json so the packet copy is bound to the executed file.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: check-delivery-implementation-2.sh line 48 (gh CI assertion)
+EVIDENCE: The script fetches `jobs` but asserts only headSha and the run-level conclusion. AC-06's macOS part therefore depends on the run-level success and on the packet copy of ci.yml (lines 54-55 and 117), which the script does not bind to 02096e7.
+PROPOSAL: Assert that a job named `checker-macos` exists in run 41979677921 and concluded success.
 
 ## Sources
 
