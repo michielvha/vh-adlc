@@ -28,3 +28,10 @@ test.each(["", "/src/a", "../a", "src/../a", "a//b", "src/[", "src/[]", "src/[^]
 test("a repetitive wildcard pattern answers without exponential backtracking", () => {
   expect(compileCoverage("a**".repeat(80) + "z")("a".repeat(160) + "y")).toBe(false);
 });
+
+test('reversed ranges retain the existing Go empty-class semantics', () => {
+  for (const source of ['src/a.ts', 'src/m.ts', 'src/z.ts']) {
+    expect(compileCoverage('src/[z-a].ts')(source)).toBe(false);
+    expect(compileCoverage('src/[^z-a].ts')(source)).toBe(true);
+  }
+});

@@ -42,6 +42,7 @@ export function compileCoverage(pattern: string): (source: string) => boolean {
         if (chars[at] === "]" && ranges.length > 0) { at++; break; }
         const low = read(); let high = low;
         if (chars[at] === "-") { at++; high = read(); }
+        // path.Match treats reversed ranges as empty, not malformed syntax.
         ranges.push([low, high]);
         if (at >= chars.length) malformed();
       }

@@ -158,3 +158,46 @@ test("declared missing and symlinked roots fail entry roots preflight", () => {
   const linked = fixture(); git(linked, "mv", "docs", "real-docs"); symlinkSync("real-docs", join(linked, "docs")); commit(linked);
   expect(resolveRoots(linked).outcome).toBe("incomplete");
 });
+
+test('frontmatter delimiters accept trailing spaces and tabs without losing declared candidates', () => {
+  const root = fixture({ 'docs/space.md': '--- \t\r\ncovers: ["extra/**"]\r\n--- \t\r\nA guide.\r\n' });
+  const result = collectImpact({ repo: root, paths: ['extra/app.ts'] });
+  expect(result.outcome).toBe('candidates'); expect(paths(result)).toContain('docs/space.md');
+});
+test('tracked directory links inside a documentation root are explicit gaps', () => {
+  const root = fixture({ 'generated/api/guide.md': guide('extra/**') });
+  symlinkSync('../generated/api', join(root, 'docs/api')); commit(root);
+  expect(resolveRoots(root).outcome).toBe('incomplete');
+  const result = collectImpact({ repo: root, roots: ['docs'], paths: ['extra/app.ts'] });
+  expect(result.outcome).toBe('incomplete'); expect(result.diagnostics.some(item => item.code === 'symlink')).toBe(true);
+});
+test('invalid UTF-8 metadata is refused before it can become a replacement-character pattern', () => {
+  const root = fixture();
+  writeFileSync(join(root, 'docs/invalid.md'), Buffer.concat([Buffer.from('---\ncovers: ["src/'), Buffer.from([0xff]), Buffer.from('.ts"]\n---\n')])); commit(root);
+  const result = collectImpact({ repo: root, paths: ['src/app.ts'] });
+  expect(result.outcome).toBe('incomplete'); expect(paths(result)).toContain('docs/guide.md');
+});
+
+test('offline feature classification agrees with the actual pinned Go resolver', () => {
+  const plugin = join(import.meta.dir, '../../../plugins/vh-adlc');
+  // Explicit test preparation may acquire the verified runtime; the checker stays offline.
+  const ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh')], { stdout: 'pipe', stderr: 'pipe' });
+  expect(ensured.exitCode).toBe(0); const binary = ensured.stdout.toString().trim();
+  const pin = readFileSync(join(plugin, 'knowledge.md'), 'utf8').match(/\b[a-f0-9]{40}\b/u)?.[0];
+  expect(pin).toBeDefined(); if (!pin) throw Error('missing exact plugin pin');
+  const inputs = [
+    '', 'Feature documents: docs/specs/\n',
+    'Feature documents: `docs/first/`\nFeature documents: docs/second/\n',
+    'Feature document format: local\n', 'Feature document format: local \n',
+    '```text\nFeature documents: docs/fenced/\nFeature document format: local\n```\n',
+  ];
+  for (const [index, fields] of inputs.entries()) {
+    const root = fixture({}, declaration + fields);
+    const argv = [binary, 'knowledge', ...(index ? ['--offline'] : []), '--repo', root, '--plugin-pin', pin, '--page', 'conventions/feature-documents.md', '--page', 'guides/humanize-prose.md'];
+    const native = Bun.spawnSync(argv, { stdout: 'pipe', stderr: 'pipe' }); expect(native.exitCode).toBe(0);
+    const report = JSON.parse(native.stdout.toString()); expect(report.result).toBe('answered');
+    const actual = resolveRoots(root);
+    expect(actual.policy.feature_root).toBe(report.knowledge.feature_root.replace(/\/+$/u, ''));
+    expect(actual.policy.local_format).toBe(report.knowledge.local_format);
+  }
+});

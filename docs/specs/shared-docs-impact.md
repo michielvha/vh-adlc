@@ -527,8 +527,25 @@ cache-populating knowledge, requests the full underlying operation page list, gr
 helper exit codes and denies shell-reader shortcuts. No failed result is counted as acceptance.
 The actual installed-candidate knowledge regression passes at the published pin: triage/maintenance
 resolve their pages, and audit stops with an unwarmed cache then succeeds offline after explicit
-setup for all eight normalized pages. Final model trials, independent implementation/paired review,
-marketplace acceptance and consumer migration remain open.
+setup for all eight normalized pages. The corrected second Copilot trial at shared commit `94dce863ce734a394ad8d9469e01c05bfb90c21a`
+passes all 12 behavior cases and delivers every nonempty line of the required operation/policy and
+engineering inputs through actual native views (63 page copies, with identical content grouped by
+hash). Only the four permitted docs change; HEAD/index and report-only cases remain untouched.
+Its reported limitation is being removed from the final trial: the helper will expose actual
+committed root instructions, rather than rely on the fixture request's policy text. Final model
+revalidation, independent implementation/paired review, marketplace acceptance and consumer
+migration remain open.
+
+Early public component review C-1 at `955275be4ce1fc0bd917130c29f3c33779cc5636` is not a formal
+feature implementation review. It found four should-fix issues and four nits. Red regressions
+observe repeated unavailable-reader resolution, whitespace-opener candidate loss, nested directory
+symlink omission, inherited Git redirection, invalid UTF-8 replacement and error-rendering drift.
+Those fixes plus actual pinned Go feature-resolver parity pass the 117-test docs-impact selection.
+The reversed-range nit is intentionally resolved through measured compatibility: actual Go
+`path.Match` accepts reversed ranges without a syntax error, with empty positive classes and
+matching negated classes; the ordinary matcher retains that valid syntax and now tests it
+explicitly. The feature matcher is unchanged. Raw C-1 records and the Go comparison remain in the
+operator archive; final exact-commit review still has to establish the feature criteria.
 
 ## Open Questions
 

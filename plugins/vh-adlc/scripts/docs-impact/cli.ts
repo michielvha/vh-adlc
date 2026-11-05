@@ -17,7 +17,12 @@ declared/absent with exit 0, incomplete with exit 2. No result certifies accurac
 
 function main(argv: string[]): number {
   if (argv.length === 1 && (argv[0] === "--help" || argv[0] === "help")) { writeSync(1, usage); return 0; }
-  let format = "json", command = argv[0] ?? "check";
+  let format = "json"; const command = argv[0] ?? "check";
+  // Preserve the requested rendering even when an earlier option fails validation.
+  for (let at = 1; at < argv.length; at++) {
+    const value = argv[at] === "--format" ? argv[at + 1] : argv[at].startsWith("--format=") ? argv[at].slice(9) : undefined;
+    if (value === "json" || value === "text") format = value;
+  }
   let report: ImpactReport | RootsReport | { schema_version: 1; protocol: 1; command: string; outcome: "incomplete"; candidates: []; diagnostics: Array<{ code: string; message: string }> };
   try {
     if (command !== "check" && command !== "roots") throw Error("expected check or roots");

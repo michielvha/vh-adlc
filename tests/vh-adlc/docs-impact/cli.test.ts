@@ -13,6 +13,7 @@ git("init", "-q"); git("config", "user.email", "fixture@example.invalid"); git("
 mkdirSync(join(root, "docs"));
 writeFileSync(join(root, "docs/guide.md"), "---\ncovers: ['src/**']\n---\nGuide.\n");
 writeFileSync(join(root, "AGENTS.md"), 'Documentation impact roots: ["docs"]\n');
+for (const name of ["other-a", "other-b"]) writeFileSync(join(root, `docs/${name}.md`), "---\ncovers: ['other/**']\n---\nOther guide.\n");
 git("add", "."); git("commit", "-qm", "fixture");
 function run(args: string[], stdin = Buffer.alloc(0)) {
   const child = Bun.spawnSync(["bun", cli, ...args], { cwd: tmpdir(), stdin, stdout: "pipe", stderr: "pipe" });
@@ -76,12 +77,32 @@ test("real checker refuses an unavailable locked reader offline without download
     }
     const lock = JSON.parse(readFileSync(join(copied, "vh-adlc.lock.json"), "utf8")); lock.version = `99999.${process.pid}.0`;
     writeFileSync(join(copied, "vh-adlc.lock.json"), JSON.stringify(lock, null, 2) + "\n");
-    const cache = join(isolated, "cache"), bin = join(isolated, "bin"), fetched = join(isolated, "network-attempt"); mkdirSync(bin);
+    const cache = join(isolated, "cache"), bin = join(isolated, "bin"), fetched = join(isolated, "network-attempt"), counter = join(isolated, "reader-attempts"); mkdirSync(bin);
+    writeFileSync(join(bin, "bash"), '#!/bin/bash\nprintf "attempt\\n" >> "$VH_DOCS_READER_COUNTER"\nexec /bin/bash "$@"\n', { mode: 0o700 });
     writeFileSync(join(bin, "curl"), `#!/bin/sh\nprintf attempted > '${fetched}'\nexit 99\n`, { mode: 0o700 });
     const child = Bun.spawnSync(["bun", join(copied, "scripts/docs-impact/cli.ts"), ...args, "--path", "src/app.ts"], {
-      stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CACHE_HOME: cache, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", PATH: bin + ":" + process.env.PATH },
+      stdout: "pipe", stderr: "pipe", env: { ...process.env, XDG_CACHE_HOME: cache, VH_DOCS_READER_COUNTER: counter, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0", PATH: bin + ":" + process.env.PATH },
     });
     expect(child.exitCode).toBe(2); expect(JSON.parse(child.stdout.toString()).outcome).toBe("incomplete");
     expect(existsSync(cache)).toBe(false); expect(existsSync(fetched)).toBe(false);
+    expect(readFileSync(counter, "utf8")).toBe("attempt\n");
+    const report = JSON.parse(child.stdout.toString());
+    expect(report.diagnostics.filter((finding: {code: string}) => finding.code === "reader")).toHaveLength(1);
+    expect(report.diagnostics.some((finding: {code: string}) => finding.code === "metadata")).toBe(false);
   } finally { rmSync(isolated, { recursive: true, force: true }); }
+});
+
+test('readable output is honored even when validation fails before the format option', () => {
+  const result = run([...args, '--path', '../escape', '--format', 'text']);
+  expect(result.exitCode).toBe(2); expect(result.stdout.toString()).toStartWith('check: incomplete');
+});
+test('inherited Git hook variables cannot redirect an explicitly selected repository', () => {
+  const foreign = mkdtempSync(join(tmpdir(), 'vh-docs-foreign-'));
+  try {
+    Bun.spawnSync(['git', 'init', '-q', foreign], { stdout: 'pipe', stderr: 'pipe' });
+    const result = Bun.spawnSync(['bun', cli, ...args, '--path', 'src/app.ts'], {
+      stdout: 'pipe', stderr: 'pipe', env: { ...process.env, GIT_DIR: join(foreign, '.git'), GIT_WORK_TREE: root, GIT_INDEX_FILE: join(foreign, '.git/index'), BUN_RUNTIME_TRANSPILER_CACHE_PATH: '0' },
+    });
+    expect(result.exitCode).toBe(0); expect(JSON.parse(result.stdout.toString()).outcome).toBe('candidates');
+  } finally { rmSync(foreign, { recursive: true, force: true }); }
 });

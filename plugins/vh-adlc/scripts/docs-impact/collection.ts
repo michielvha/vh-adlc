@@ -23,6 +23,13 @@ export type ImpactReport = {
 export type CheckOptions = { repo: string; roots?: string[]; base?: string; paths?: string[]; metadataPaths?: string[] };
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 function fail(message: string): never { throw new Error(message); }
+function gitEnvironment(): Record<string, string | undefined> {
+  const env: Record<string, string | undefined> = { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1", GIT_NO_REPLACE_OBJECTS: "1" };
+  // Git exports these when calling hooks; --repo always selects this command's own checkout.
+  for (const key of ["GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE", "GIT_INDEX_FILE", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE", "GIT_COMMON_DIR", "GIT_NAMESPACE"]) delete env[key];
+  for (const key of Object.keys(env)) if (/^GIT_CONFIG_(?:KEY|VALUE)_/u.test(key)) delete env[key];
+  return env;
+}
 const sorted = (values: Iterable<string>) => [...new Set(values)].sort();
 const within = (path: string, root: string) => root === "." || path === root || path.startsWith(root + "/");
 const decode = (bytes: Uint8Array) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);
@@ -35,12 +42,14 @@ export function repositoryPath(value: string): string {
   return path;
 }
 
+class ReaderUnavailable extends Error {}
+
 class Snapshot {
   diagnostics: Diagnostic[] = [];
   head: string | null = null;
   tree = new Map<string, Entry>();
   dirty: string[] = [];
-  reader?: (bytes: Uint8Array) => unknown;
+  reader: ((bytes: Uint8Array) => unknown) | null | undefined;
   constructor(readonly repo: string) {
     try {
       const top = this.git("rev-parse", "--show-toplevel").toString().trim();
@@ -57,7 +66,7 @@ class Snapshot {
   }
   git(...args: string[]): Buffer {
     const result = Bun.spawnSync(["git", "--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false", ...args], {
-      cwd: this.repo, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1" }, stdout: "pipe", stderr: "pipe",
+      cwd: this.repo, env: gitEnvironment(), stdout: "pipe", stderr: "pipe",
     });
     if (result.exitCode !== 0) fail("Git collection failed");
     return result.stdout;
@@ -72,10 +81,18 @@ class Snapshot {
     return paths;
   }
   gap(code: string, message: string, path?: string) { this.diagnostics.push({ code, ...(path === undefined ? {} : { path }), message }); }
-  yaml(bytes: Uint8Array): unknown {
-    this.reader ??= createYAMLReader(fail, { offline: true });
-    return this.reader(bytes);
+  ensureReader(): (bytes: Uint8Array) => unknown {
+    if (this.reader === null) throw new ReaderUnavailable();
+    if (this.reader === undefined) {
+      try { this.reader = createYAMLReader(fail, { offline: true }); }
+      catch { this.reader = null; throw new ReaderUnavailable(); }
+    }
+    return this.reader;
   }
+  readerGap() {
+    if (!this.diagnostics.some(item => item.code === "reader")) this.gap("reader", "the locked verified YAML reader is unavailable offline");
+  }
+  yaml(bytes: Uint8Array): unknown { return this.ensureReader()(bytes); }
   headBytes(path: string): Buffer {
     const entry = this.tree.get(path);
     if (!entry || entry.mode === "120000") fail("missing file or symlink in HEAD");
@@ -128,10 +145,14 @@ function policy(snapshot: Snapshot): RootsReport {
       report.outcome = "declared";
       for (const root of report.roots) {
         if (![...snapshot.tree.keys()].some(path => within(path, root))) fail("declared documentation root is missing from HEAD");
-        for (const [path, entry] of snapshot.tree) if (entry.mode === "120000" && within(root, path)) fail("declared documentation root contains a symlink");
+        for (const [path, entry] of snapshot.tree) if (entry.mode === "120000" && (within(root, path) || within(path, root))) snapshot.gap("symlink", "tracked symlink inside or above a documentation root", path);
       }
     }
-  } catch { snapshot.gap("policy", "could not read the committed documentation roots or feature classification", "AGENTS.md"); report.outcome = "incomplete"; }
+  } catch (error) {
+    if (error instanceof ReaderUnavailable) snapshot.readerGap();
+    else snapshot.gap("policy", "could not read the committed documentation roots or feature classification", "AGENTS.md");
+    report.outcome = "incomplete";
+  }
   if (snapshot.diagnostics.length) report.outcome = "incomplete";
   return report;
 }
@@ -143,9 +164,9 @@ function record(value: unknown): Record<string, unknown> | undefined {
 }
 
 function patterns(snapshot: Snapshot, bytes: Buffer): string[] {
-  const text = bytes.toString("utf8").replace(/^\uFEFF/u, "");
-  if (!/^---\r?\n/u.test(text)) return [];
-  const close = /^---\s*$/gmu; close.lastIndex = text.indexOf("\n") + 1;
+  const text = decode(bytes).replace(/^\uFEFF/u, "");
+  if (!/^---[ \t]*(?:\r?\n|$)/u.test(text)) return [];
+  const close = /^---[ \t]*\r?$/gmu; close.lastIndex = text.indexOf("\n") + 1;
   const end = close.exec(text);
   if (!end) fail("unterminated frontmatter");
   const value = snapshot.yaml(Buffer.from(text.slice(text.indexOf("\n") + 1, end.index))), object = record(value);
@@ -191,16 +212,16 @@ export function collectImpact(options: CheckOptions): ImpactReport {
   }
   for (const root of report.roots) {
     if (![...snapshot.tree.keys(), ...metadata].some(path => within(path, root))) snapshot.gap("root", "documentation root is absent from the selected view", root);
-    for (const [path, entry] of snapshot.tree) if (entry.mode === "120000" && within(root, path)) snapshot.gap("symlink", "documentation root contains a tracked symlink", path);
+    for (const [path, entry] of snapshot.tree) if (entry.mode === "120000" && (within(root, path) || within(path, root))) snapshot.gap("symlink", "tracked symlink inside or above a documentation root", path);
   }
   // Resolve the reader even when every file is uncovered: setup is an explicit prerequisite.
-  try { snapshot.reader ??= createYAMLReader(fail, { offline: true }); } catch { snapshot.gap("reader", "the locked verified YAML reader is unavailable offline"); }
+  try { snapshot.ensureReader(); } catch { snapshot.readerGap(); }
   const covered = new Set<string>(), matched = new Set<string>();
   for (const path of sorted(docs)) {
     try {
       const overlay = metadata.includes(path), bytes = overlay ? snapshot.overlay(path) : snapshot.headBytes(path);
       report.metadata.bindings.push({ path, view: overlay ? "working-tree" : "HEAD", sha256: bytes === null ? null : hash(bytes) });
-      if (bytes === null) continue;
+      if (bytes === null || snapshot.reader === null) continue;
       const declarations = patterns(snapshot, bytes);
       if (!declarations.length) { report.metadata.uncovered_docs.push(path); continue; }
       for (const root of report.roots) if (within(path, root)) covered.add(root);
@@ -213,7 +234,7 @@ export function collectImpact(options: CheckOptions): ImpactReport {
       if (matches.length) report.candidates.push({ path, coverage_only: true, feature_attention: attention, matches });
     } catch { snapshot.gap("metadata", "could not read valid frontmatter and coverage patterns in the selected view", path); }
   }
-  for (const root of report.roots) if (!covered.has(root)) snapshot.gap("coverage", "documentation root has no usable declared coverage", root);
+  for (const root of report.roots) if (snapshot.reader !== null && !covered.has(root)) snapshot.gap("coverage", "documentation root has no usable declared coverage", root);
   for (const path of explicit) {
     // Source scope is a name selection. Missing files and symlinks are not followed.
     let bytes: Buffer | null = null;
