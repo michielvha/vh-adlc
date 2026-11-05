@@ -10,6 +10,14 @@ const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
 function project() { const f = fixture(); projects.push(f); return f; }
 
+test("security policy is an optional repository-contained reference, not executable settings", () => {
+  const f = project(); f.write("security-policy.md", "Consumer deadlines and risk decisions.\n");
+  f.settings({ schema_version: 1, security_policy: "security-policy.md" });
+  expect(loadSettings(f.root).security_policy).toBe("security-policy.md");
+  f.settings({ schema_version: 1, security_policy: "../elsewhere.md" });
+  expect(() => loadSettings(f.root)).toThrow();
+});
+
 test("an unconfigured project has one repository and creates no settings or output", () => {
   const f = project(), before = git(f.root, "status", "--porcelain"), config = loadSettings(f.root);
   expect(config.repository).toBe("example/project");

@@ -22,9 +22,18 @@ are unavailable; missing inputs remain blockers. Normal runs follow these steps.
 3. Follow the canonical procedure for a sweep, supplied-packet `report-stage`, selected repair or
    continuation. A normal sweep reports first and asks for selection. Existing explicit selection
    or preauthorization remains valid within its unchanged scope. Current restrictions win.
+   For dependency advisories, prefer a sufficient supported upstream version bump over custom source
+   changes. Use an existing bot update when suitable; record evidence before choosing another repair.
 4. For an authored repair, use `references/maintenance-record.md` and
    `references/maintenance-review.md` with the lifecycle's bounded-maintenance procedure.
    Wider behavior, permission or delivery-policy changes use the feature loop.
+5. Follow the security accounting contract in `references/maintenance.md`. Preserve every observed
+   occurrence and coverage gap, reconcile through `security-reconcile`, and carry its typed result into
+   the report. Complete accounting requires a verified outcome or a concrete tracked follow-up.
+   A reconciled sweep can still have open remediation, exceptions, incomplete coverage or pending delivery.
+   Treat packet receipts as procedural evidence; they grant no selection, dismissal or publication.
+   A read-tools host needs the trusted operator's verified typed result for reconciliation; without
+   it, keep its analysis and security accounting visibly pending.
 
 Use available host capabilities; serial analysis is supported. Do not depend on commands, hooks,
 subagents, question tools or a particular model. An unavailable collector requires a verified supplied

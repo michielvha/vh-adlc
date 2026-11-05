@@ -3,17 +3,20 @@ import { randomUUID } from "node:crypto";
 import { loadSettings } from "./settings";
 import { collect } from "./collect";
 import { appendRun, canonicalJSON, createRun, digest, readRun } from "./journal";
-import { appendReport, renderReport, reserveReport, saveReport } from "./report";
+import { appendReport, renderReport, reserveReport, saveReport, portableObservations } from "./report";
 import { compareHistory, parseObservation, readHistory } from "./history";
 import { parseReportRequest, reportPermission, resolveStanding } from "./authority";
-import { capturePendingOutcome, pendingOutcomes, storeCollection } from "./artifacts";
+import { capturePendingOutcome, pendingOutcomes, storeCollection, storeSecurity, validateReportSecurity } from "./artifacts";
+import { reconcileSecurityPacket, verifySecurityResult } from "./security-io";
+import { createSecurityRevision } from "./security-history";
 import { adoptionPreflight } from "./migration";
 import { beginCandidate, candidateSnapshot, commitCandidate, promoteOriginal, publicationReadiness, type Candidate } from "./report-candidate";
 
 const commands: Record<string, string[]> = {
-  settings: [], collect: ["--repository", "--pull"], start: ["--repository", "--pull", "--request"], resume: ["--run-id"],
+  settings: [], collect: ["--repository", "--pull", "--terminal"], start: ["--repository", "--pull", "--request"], resume: ["--run-id"],
   checkpoint: ["--run-id", "--revision", "--digest", "--state", "--kind"],
-  report: ["--run-id", "--inventory", "--default-commit", "--default-branch", "--request", "--report-output", "--metadata", "--analysis"],
+  report: ["--run-id", "--inventory", "--default-commit", "--default-branch", "--request", "--report-output", "--metadata", "--analysis", "--security"],
+  "security-reconcile": ["--run-id", "--input"],
   append: ["--run-id", "--update", "--request"], history: ["--default-commit", "--observations"],
   authority: ["--run-id", "--default-commit", "--default-branch", "--request", "--later-update"],
   candidate: ["--run-id", "--permission", "--default-commit", "--refresh-of"],
@@ -50,7 +53,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   const selected = args["--repository"], pull = args["--pull"] === undefined ? undefined : number(args["--pull"]);
   if (pull === 0) throw Error("maintenance pull must be positive");
-  if (operation === "collect") return collect(config, { scope: { repository: selected, pull } });
+  if (operation === "collect") return collect(config, { scope: { repository: selected, pull }, terminal:args["--terminal"]?input(args["--terminal"]):undefined });
   if (operation === "start") {
     const request = parseReportRequest(args["--request"] ? input(args["--request"]) : { authorized_sweep: true });
     if (request.no_filesystem === true) return { persisted: false, mode: "chat-only", reason: "current request forbids filesystem writes" };
@@ -65,7 +68,11 @@ export async function main(argv = process.argv.slice(2)) {
     const { exportAnalysisInput } = await import("./analysis-input"); return exportAnalysisInput(config, input(args["--input"]));
   }
   const id = required(args, "--run-id"), run = readRun(config, id);
-  if (operation === "resume") return run;
+  if(operation==="security-reconcile")return reconcileSecurityPacket(config,id,required(args,"--input"));
+  if (operation === "resume") {
+    if(typeof run.state.report?.path==="string")validateReportSecurity(config,id,readFileSync(run.state.report.path,"utf8"));
+    return run;
+  }
   if (operation === "pending-outcomes") return pendingOutcomes(config, id);
   if (operation === "pending-outcome" || operation === "store-collection") {
     const request = parseReportRequest(args["--request"] ? input(args["--request"]) : run.state.request ?? { authorized_sweep: true });
@@ -84,9 +91,13 @@ export async function main(argv = process.argv.slice(2)) {
     let authority = reportPermission(config, standing, request, { run_id: id, report_path: relative, later_update: flag(args["--later-update"]) });
     if (operation === "authority") return authority;
     const analysis = args["--analysis"] ? readFileSync(args["--analysis"], "utf8") : undefined;
-    const text = renderReport(config, run, inventory, { metadata: args["--metadata"] ? input(args["--metadata"]) : undefined, analysis });
+    const securityResult=args["--security"]?verifySecurityResult(config,id,input(args["--security"])):null;
+    const security=securityResult?securityResult.revision.snapshot_revision===1?createSecurityRevision(securityResult.revision.snapshot,null,digest(canonicalJSON(portableObservations(run,inventory)))):securityResult.revision:undefined;
+    const text = renderReport(config, run, inventory, { metadata: args["--metadata"] ? input(args["--metadata"]) : undefined, analysis, security });
     if (authority.save === "chat") return { saved: false, text, authority };
-    if (canonicalJSON(run.state.request) !== canonicalJSON(request)) appendRun(config, id, run, { ...run.state, request: request as never });
+    if(securityResult && security)storeSecurity(config,id,securityResult,security);
+    const requestRun=readRun(config,id);
+    if (canonicalJSON(requestRun.state.request) !== canonicalJSON(request)) appendRun(config, id, requestRun, { ...requestRun.state, request: request as never });
     if (run.state.collection?.inventory_digest !== digest(canonicalJSON(inventory))) storeCollection(config, id, inventory, randomUUID());
     const saved = saveReport(config, id, text, { default_commit: defaultCommit, draft: authority.save === "draft" || authority.commit, output: args["--report-output"] });
     const current = readRun(config, id);
@@ -98,7 +109,11 @@ export async function main(argv = process.argv.slice(2)) {
   if (operation === "append") {
     const request = parseReportRequest(args["--request"] ? input(args["--request"]) : run.state.request ?? { authorized_sweep: true });
     if (request.no_filesystem || (request.read_only || request.draft_only || request.no_commit) && run.state.report?.kind === "checkout-draft") throw Error("maintenance current request requires private outcome capture instead of editing this report");
-    return appendReport(config, id, input(required(args, "--update")));
+    const update=input(required(args,"--update"));
+    if(typeof update.security==="string"){
+      const security=verifySecurityResult(config,id,input(update.security));storeSecurity(config,id,security,security.revision);update.security=security.revision;
+    }else if(update.security!==undefined)throw Error("maintenance typed security update requires a verified result file");
+    return appendReport(config, id, update);
   }
   const authority = args["--permission"] ? input(args["--permission"]) : null;
   if (operation === "candidate") return beginCandidate(config, id, authority, { default_commit: required(args, "--default-commit"), refresh_of: args["--refresh-of"] });

@@ -27,5 +27,6 @@ export type Settings = {
   report_dir: string;
   history_dir: string;
   project_procedure?: string;
+  security_policy?: string;
   surface_expectations: SurfaceExpectation[];
 };

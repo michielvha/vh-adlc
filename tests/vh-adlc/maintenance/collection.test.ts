@@ -2,6 +2,8 @@ import { afterEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { collect } from "../../../plugins/vh-adlc/scripts/maintenance/collect";
+import * as collector from "../../../plugins/vh-adlc/scripts/maintenance/collect";
+import { createMaintenanceReader } from "../../../plugins/vh-adlc/scripts/maintenance/cursor-reader";
 import { createGitHubReader } from "../../../plugins/vh-adlc/scripts/github-read";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/maintenance/settings";
 import { fixture } from "./fixtures";
@@ -9,6 +11,41 @@ import { fixture } from "./fixtures";
 const projects: ReturnType<typeof fixture>[] = [];
 afterEach(() => { for (const f of projects.splice(0)) f.dispose(); });
 const sha = "a".repeat(40);
+
+test("security occurrences retain advisory/dependency context and raw response provenance", async () => {
+  const raw = { number: 7, state: "open", dependency: { package: { ecosystem: "npm", name: "widget" }, manifest_path: "package-lock.json", scope: "development", relationship: "transitive", version_requirement: "1.0.0" },
+    security_advisory: { ghsa_id: "GHSA-abcd-1234-abcd", cve_id: "CVE-2026-1234", severity: "high", summary: "finding" },
+    security_vulnerability: { vulnerable_version_range: "<1.0.1", first_patched_version: { identifier: "1.0.1" } } };
+  const f = setup({ "repos/example/project/dependabot/alerts": [raw] });
+  const alert = (await collect(loadSettings(f.root), { reader: f.reader })).repositories[0].dependabot.alerts![0];
+  expect(alert.context).toMatchObject({ identity: "github.com/example/project/dependabot:7", ecosystem: "npm", installed_version: "1.0.0", relationship: "transitive", scope: "development", affected_range: "<1.0.1", fixed_versions: ["1.0.1"], advisory_ids: ["CVE-2026-1234", "GHSA-abcd-1234-abcd"], raw });
+  expect(alert.context!.raw_digest).toMatch(/^[a-f0-9]{64}$/);
+});
+
+test("Dependabot cursor collection never sends the rejected initial page parameter",()=>{
+  const f=setup({"repos/example/project/dependabot/alerts":{__headers:'Link: <https://api.github.com/repos/example/project/dependabot/alerts?state=open&per_page=100&after=cursor>; rel="next"\r\n',body:[]},
+    "repos/example/project/dependabot/alerts?page=2":[]});
+  // This server rejects numeric pagination on this one surface, as the actual provider does.
+  const path=join(f.root,".tools/gh"),old=readFileSync(path,"utf8");
+  f.write(".tools/gh",old.replace('const route=url.pathname', 'if(url.pathname.endsWith("/dependabot/alerts")&&url.searchParams.has("page")){writeSync(1,\'HTTP/2.0 400 Bad Request\\r\\n\\r\\n{"message":"Pagination using page is not supported"}\');process.exit(1);}\nconst route=url.pathname')
+    .replace('page=url.searchParams.get("page")??"1"','page=url.searchParams.has("after")?"2":url.searchParams.get("page")??"1"'));
+  chmodSync(path,0o755);
+  const reader=createMaintenanceReader("github.com",{env:f.env});
+  const result=reader.pages("repos/example/project/dependabot/alerts?state=open&per_page=100",{repositoryId:42});
+  expect(result.complete).toBe(true);expect(result.pages).toBe(2);
+  expect(reader.trace()).toHaveLength(2);
+  expect(f.requests().every(argv=>!new URL(argv.at(-1)!,"https://api.github.com/").searchParams.has("page"))).toBe(true);
+});
+
+test("terminal reads accept only previously observed in-scope identities and retain dismissals", () => {
+  const f = setup({ "repos/example/project/dependabot/alerts/7": { number: 7, state: "dismissed", dismissed_reason: "tolerable_risk", fixed_at: null } });
+  const c = loadSettings(f.root);
+  const prior = { hostname: "github.com", repository: "example/project", surface: "dependabot", number: 7 };
+  const observed = collector.collectTerminal(c, [prior], { reader: f.reader });
+  expect(observed[0]).toMatchObject({ ...prior, state: "dismissed", reason: "tolerable_risk", status: "complete" });
+  expect(() => collector.collectTerminal(c, [{ ...prior, repository: "other/project" }], { reader: f.reader })).toThrow("scope");
+  expect(f.requests().filter(argv => argv.at(-1)!.endsWith("/7"))).toHaveLength(1);
+});
 function pull(number = 1, login = "renovate[bot]", type = "Bot") {
   return { number, title: `Update dependency ${number}`, body: "Untrusted $(touch should-not-exist)", state: "open", draft: false,
     user: { login, type }, head: { sha, ref: `update-${number}` }, base: { sha: "b".repeat(40), ref: "main", repo: { full_name: "example/project" } },
