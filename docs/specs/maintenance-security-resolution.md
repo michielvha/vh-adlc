@@ -256,6 +256,8 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | 2026-11-05 | R-8 | implementation | `da44309e5719c17a79889dba8badd739fd5fe6f1` | unknown | procedural | AC-01 through AC-09 met; AC-10 not met due to reproducible temporary-directory alias fixture failure. Native CI still running at review time. Model identity not attested. |
 | 2026-11-05 | R-9 | implementation | `d98b6c52ba17ded76cfc0efd080a509a01603ead` | unknown | procedural | All ten criteria met after exact-head Linux and macOS CI; no findings. Model identity not attested. |
 
+| 2026-11-05 | R-10 | implementation | `d74b27b3dccfdfc923e5d194f51e02358d6e978a` | unknown | procedural | All ten criteria met; upstream update preference preserves existing gates. Model identity not attested. |
+
 ### R-1
 
 FINDING: F-01
@@ -553,3 +555,45 @@ EVIDENCE: Independently verified completed push CI run 42089505099 at exact d98b
 - [Pinned prose guide](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md): prose editing.
 - [Pinned agent entry point](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/AGENTS.md) and [README](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/README.md): engineering reference routing and local instruction precedence.
 - Shared source citations in Context refer to the measured baseline commit above. The source and policy contracts were read in this checkout; no historical consumer snapshot is used as a current observation.
+
+### R-10
+
+CRITERION: AC-01 Every imported security occurrence retains its provider identity, target, available advisory/dependency context and evidence provenance, and malformed or conflicting observations cannot become accepted complete evidence.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently ran 179 tests across eleven analysis, collection, settings, scanner, security, history, CLI, report, journal, publication and compatibility files: 688 assertions, zero failures. Namespaced identities, raw-context validation and incomplete-evidence boundaries pass. Executable source is unchanged from the previously verified cross-platform candidate; the accepted normative baseline hash is unchanged.
+
+CRITERION: AC-02 Proven equivalent occurrences can share canonical remediation without losing per-repository targets or outcomes, and unknown ownership or incomplete coverage remains an actionable handoff.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently reran equivalent-source grouping, divergent outcome, missing ownership, unavailable-surface and coverage-handoff checks. They pass without merging per-occurrence targets or inventing complete coverage. The new upstream-version-first prose does not change source ownership, grouping, scope or handoff semantics. Earlier consumer observations remain historical trial evidence, not current advisory remediation claims.
+
+CRITERION: AC-03 Versioned scanner evidence packets participate in the same finding accounting with verified bytes and explicit completion, while unsupported, tampered, synthetic or incomplete inputs cannot establish a live fix or a clean surface.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently reran all scanner cases and actual-helper synthetic/missing-surface cases within the passing 179-test run. Canonicalized temporary fixtures and intentional symlink rejection remain intact. Complete scans, findings exits, malformed evidence and synthetic provenance remain distinct. Production scanner code and tests are unchanged from the candidate whose native macOS alias case passed.
+
+CRITERION: AC-04 Each outstanding finding has a concrete route and next action through the existing batch, bounded-maintenance, investigation, feature, audit-reference or consumer-policy path without creating duplicate implementation loops or selecting work implicitly.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently reran existing-loop route and concrete-follow-up tests. Inspected maintenance.md:87-96 and the skill entry: sufficient maintained upstream updates take priority; authored dependency changes retain review, source adaptation requires evidence, and majors retain the feature loop. These instructions introduce no additional implementation loop or implicit selection. Existing ownership and consumer procedures remain authoritative.
+
+CRITERION: AC-05 Disappeared alerts remain distinguishable from verified fixes, dismissals, exceptions, reopened findings and unavailable terminal evidence, and retiring a replaced immutable target never marks its historical vulnerable bytes patched.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently reran actual-helper terminal state and immutable retirement/reactivation cases. Additional production-helper probes accept matching current code-scanning commit evidence while rejecting changed package/location, future terminal receipts and wrong commit targets. Corrected target evidence remains required for verified closure; a maintained fixed version or upstream PR alone cannot satisfy it.
+
+CRITERION: AC-06 Valid consumer-authorized exceptions retain their rationale and validity independently of fixed outcomes, and missing, changed or expired evidence returns the affected decision to pending assessment.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently executed exception payload replay, expiry, target and policy-drift checks. The temporary-mitigation-to-indefinite-risk probe remains rejected with unchanged approval. Exact normalized decisions and assessment/context remain bound to authority receipts. The added upstream preference grants no exception or risk-acceptance authority.
+
+CRITERION: AC-07 A security reconciliation result exposes complete finding accounting independently of coverage, open remediation and delivery, and cannot conceal an untracked occurrence or override missing evidence with report status text.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently reran orphan, concrete handoff, missing scanner, forged result and typed append/resume cases. All pass. The production history-authority probe still rejects changed conflict sets or chosen decisions with unchanged approval. Upstream-version-first advice does not mark an update ready, select it, or convert a proposed fixed version into a verified security outcome.
+
+CRITERION: AC-08 A resumed run or fresh sweep recovers pending findings, decisions and evidence from every relevant compatible history, preserves collection-bound snapshot revisions, and never drops work through a newer narrowed scope or rewrites earlier evidence.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently reran overlapping history, fork, committed-history import, narrowed/changed/omitted successor and append/resume/retry tests. Exact approved historical conflict sets are accepted; changed sets/outcomes are rejected until renewed approval. Existing source, journal and report code is unchanged, and no earlier review or observation is rewritten by the instruction clarification.
+
+CRITERION: AC-09 Existing consumers retain readable settings, inventories and reports, while legacy disappearance comparisons cannot be presented as newly verified fixes and incompatible schemas produce an explicit handoff.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, baseline settings/report/history compatibility tests pass. Repeated the actual installed prior-helper probe: baseline settings succeed, security_policy settings are rejected, and original disposable configuration bytes are restored. Legacy comparisons remain no_longer_open, not verified patches. The new prose requires no consumer settings migration and changes no schema or rollback contract.
+
+CRITERION: AC-10 Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
+VERDICT: met
+EVIDENCE: At d74b27b3dccfdfc923e5d194f51e02358d6e978a, independently observed 179 focused tests passing, a clean reviewed tree and passing vh-adlc lint. Publication/restriction and authored-review boundaries remain intact. Earlier independently inspected CI run 42089505099 belongs to d98b6c5, not this commit; its Linux and portable macOS checks cover the unchanged executable code/tests. The only package delta is reviewed upstream-version-first instruction text, with no new native model trial or exact-head hosted CI asserted here. This reviewer made no real advisory, setting or service change and grants no publication or rollout authority.
