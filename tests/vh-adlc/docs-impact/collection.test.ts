@@ -28,7 +28,9 @@ function commit(root: string) { git(root, "add", "."); git(root, "commit", "-qm"
 const paths = (report: ReturnType<typeof collectImpact>) => report.candidates.map(candidate => candidate.path);
 const fingerprint = (root: string) => createHash("sha256").update(readFileSync(join(root, ".git/index"))).digest("hex");
 
-test("unrelated byte filenames are excluded without blocking valid selected coverage", () => {
+// macOS rejects this filename with EILSEQ before Git or the checker can observe it.
+// Linux exercises the raw-byte preservation path; UTF-8 and BOM cases run on both.
+test.skipIf(process.platform === "darwin")("unrelated byte filenames are excluded without blocking valid selected coverage", () => {
   const root = fixture();
   writeFileSync(Buffer.concat([Buffer.from(root + "/unrelated-"), Buffer.from([255])]), "other task\n");
   expect(resolveRoots(root).outcome).toBe("declared");

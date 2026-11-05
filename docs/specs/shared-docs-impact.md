@@ -623,6 +623,13 @@ makes all 30 collection checks pass under that master-default configuration and
 this host's ordinary configuration. The original CI log and red/green artifacts
 remain retained; the corrected exact-head Linux/macOS run is still required.
 
+The corrected Linux CI at `60bb413` passes all 1,225 tests. Its macOS selection
+passes 1,067 tests and fails only the invalid-byte filename fixture: the filesystem
+returns EILSEQ before the checker runs. That Linux raw-byte filesystem case is
+explicitly unsupported on macOS; valid UTF-8/BOM and all other portable cases
+remain selected. The original failure stays retained. Claude Code Opus 5.5
+independently reviewed the Git-default fixture correction and returned NO FINDINGS.
+
 ## Open Questions
 
 None. The owner approved all six review refinements.
