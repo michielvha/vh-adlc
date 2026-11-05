@@ -18,7 +18,7 @@ Required checks: Inspect the failed main-run setup log before the edit; verify t
 
 ## Evidence
 
-The task owns branch `codex/fix-linux-ci-apparmor` in the new worktree `/tmp/vh-adlc-ci-apparmor-20261105`, created from freshly fetched main. Existing feature worktrees and local edits remain untouched. The three open PRs at intake change dependency manifests or github-app-registration paths; none changes CI.
+The task owns branch `fix/linux-ci-apparmor` in the new worktree `/tmp/vh-adlc-ci-apparmor-20261105`, created from freshly fetched main. Existing feature worktrees and local edits remain untouched. The three open PRs at intake change dependency manifests or github-app-registration paths; none changes CI.
 
 Main [run 41953109781](https://github.com/michielvha/vh-adlc/actions/runs/41953109781), job `127001465430`, uses Ubuntu 26.04. Its setup printed `File /usr/share/apparmor/extra-profiles/bwrap-userns-restrict not found, skipping...` and exited 2. The checker tests were skipped. The remote-gui and Go jobs passed.
 
