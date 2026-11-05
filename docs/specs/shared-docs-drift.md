@@ -305,6 +305,7 @@ None. The owner accepted risk-based upgrade verification and closure only after 
 | 2026-11-05 | R-11 | spec | `0ab5263042caaf6b7dc6330aaa16f3a9ad80b4ac` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-12 | spec | `0ef1a82c73177e9c888651e001af7c80039bf510` | claude-opus-5.5 | procedural | 1 should-fix; 2 nit. Full requested read coverage. |
 | 2026-11-05 | R-13 | spec | `ed2944ff8ffad64146318c5cce36c380ec44f277` | claude-opus-5.5 | procedural | 2 should-fix; 2 nit. Full requested read coverage. |
+| 2026-11-05 | R-14 | spec | `207023518dc437c49f5cca36fe209df12d917add` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -674,6 +675,27 @@ SEVERITY: nit
 WHERE: Design, Authority and delivery (scoped docs-drift locations); Resolution and feedback (owned assessment object store); Scheduled worker and staged adoption (scratch fixture repository)
 EVIDENCE: Authority adds exactly "two scoped docs-drift locations": an assessment checkout and an owned prepare/resolve branch or worktree (00161 line 10). Resolve also needs "a recorded owned assessment object store" into which it read-only-fetches selected PR head and base objects (00081 line 72). The trial creates "an isolated scratch Git repository" for the fixture (00161 line 44). The spec does not say whether these are the assessment role, which may be "an existing owned checkout" whose object store and FETCH_HEAD a fetch would write to, or separate resources. If they are separate, it does not give their creation, ownership recording or cleanup authority.
 PROPOSAL: State that the PR object store and the trial scratch repository either belong to a named docs-drift role or are separate temporary resources outside any caller checkout. Give their recording and non-forced cleanup rules, and require fetches that leave caller refs and FETCH_HEAD unchanged.
+
+### R-14
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Owner decisions; Protected adoption bindings and ordinary scan inputs; Upgrades after adoption; Test Plan AC-06
+EVIDENCE: Upgrades defines a compatible change as one that "preserves assessment/scan contracts, selected inputs and decisions, worker execution, provider/reviewer identity, permissions, secret exposure, lease behavior and publication/closure semantics" (00241 line 3). A new trial is required only for changes to "the protected execution/protocol, provider/reviewer, permission/secret, lease or publication/closure behavior" and for uncertainty (00241 line 9; Owner decisions 00081 line 23; AC-06 00241 line 40). The protected-inputs section says a change to the "worker invocation, decision or effect-authority contract" is classified "through re-adoption" (00161 line 75), but it never says which route that is. The resolve collector trial runs only "when resolve publication or superseded closure changes" (00241 line 11). That leaves a known change to shared assessment or resolve decision behavior without a route. Examples are new rules for historical documents or a changed hunk-classification or supersession rule. Such a change is not compatible, because it does not preserve decisions. It also matches no trial trigger and is not uncertain. No trial is required to exercise it, so it could take a path with neither the compatible-route checks nor a trial.
+PROPOSAL: State that every shared change that fails the compatible definition takes the trial route. This includes a known assessment, resolve-decision or scan-contract change. Also require the installed-model resolve/closure collector trial when resolve classification or supersession decisions change. Use the same wording in Owner decisions, the protected-inputs section, Upgrades and AC-06, and add an AC-06 case for a decision-only procedure change.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (real unattended trial, trial definition, caller comparison); Independent candidate review and publication; Test Plan AC-06
+EVIDENCE: The trial handoff is "a draft PR" with "allowed draft-only effects" (00161 lines 51, 55). The trial is valid only when "Expected differences are limited to trigger, the explicitly bound synthetic input/output namespace and that fixture materialization", and "The candidate-review and publication steps themselves are unchanged". Any different "publisher behavior invalidates the trial" (00161 line 59). The caller comparison allows differences only in `on` and "the specifically declared literal synthetic-input/output values under `with`" (00161 line 59). The spec never says whether production scheduled advisory or resolve PRs are drafts (00161 lines 19, 25; legacy PR publication at 00001 line 69). If production opens ready-for-review PRs, the draft flag is an undeclared publisher difference. Under the trial's own rule, that difference invalidates the trial; otherwise production runs a PR-creation path the trial never exercised.
+PROPOSAL: State the production advisory and resolve PR draft state. Either make production match the trial, or declare draft state as an explicitly bound trial input in the trial definition and caller `with` comparison. Add an AC-06 assertion that the scheduled caller's PR-state input matches the declared production value.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Authority and delivery (authority table); Scheduled worker and staged adoption (trial, cutover quiescence)
+EVIDENCE: The authority table lists read-only output, edits, commits, pushes/PRs, the consolidation history rewrite, issue creation, the explanation comment, closure, lease acquire/release, merged-branch cleanup and merge/release (00161 line 15). The design also requires several other remote effects. The trial needs "Trial setup, paid/provider execution, draft-PR creation and exact owned cleanup" (00161 line 51). Cutover needs a control-plane disable of the legacy scheduled workflow, cancellation of identified runs and later enabling of the shared schedule (00161 line 61). Each of these is said to need separate explicit authority, but none has a table row. The shared authority table lists each remote write explicitly (authority.md 00001 lines 10-32).
+PROPOSAL: Add authority-table rows for workflow dispatch, workflow disable/enable, run cancellation, trial draft-PR creation and trial branch/PR cleanup, each with the exact grant it requires.
 
 ## Sources
 
