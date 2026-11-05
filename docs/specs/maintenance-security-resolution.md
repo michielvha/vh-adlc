@@ -183,7 +183,7 @@ Run native installed-operation trials for a report-first sweep, selected compati
 - [x] AC-09: Existing consumers retain readable settings, inventories and reports, while legacy disappearance comparisons cannot be presented as newly verified fixes and incompatible schemas produce an explicit handoff.
       Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
 - [ ] AC-10: Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
-      Evidence: R-7 returned not verified. Linux, native installation and consumer preservation evidence exists; configured portable macOS CI remains unobserved. T13 retains this verification work; no residual is approved.
+      Evidence: R-8 returned not met after the scanner fixture failed under an owned temporary-directory alias. The native run remains unclaimed; T13 fixes the fixture and T14 retains exact-head macOS CI verification.
 
 ## Test Plan
 
@@ -228,7 +228,8 @@ Run native installed-operation trials for a report-first sweep, selected compati
 
       Evidence: Exact reviewed source 76e6747 passes `bun test tests/vh-adlc --timeout 60000`: 1274 tests, 4621 assertions, zero failures. Strict TypeScript, all root Go tests/vet/tidy and golangci-lint 2.15.0 pass; the registration plugin passes 34 tests. Final frozen local-catalog Codex/Claude installs, helper execution and reinstall preservation pass. Synthetic native authored preparation stops at independent review pending; native real report/resume supplies an unselected feature handoff. Final installed helper validation preserves Stackweaver source/index/HEAD/refs/settings/report bytes, retaining 82 occurrences, 69 groups, eight coverage handoffs and three linked security snapshots. Accounting is reconciled, coverage incomplete, all-clear false, all 82 obligations remain tracked, and no advisory work is selected. R-7 independently verifies AC-01 through AC-09; AC-10 remains unverified solely for macOS CI. Earlier constrained-run infrastructure failures, the five-second audit timeout, and all red regression logs are retained as failed evidence.
 
-- [ ] T13 `.github/workflows/ci.yml` - observe the configured portable macOS checker on the exact candidate after separately authorized feature publication; retain its actual result and rerun independent review for AC-10. No Mac host is available in this session. On 2026-11-05 the owner authorized the presented feature branch push solely for CI; no residual, PR, merge, release or advisory remediation is authorized.
+- [ ] T13 `tests/vh-adlc/maintenance/scanner-evidence.test.ts` - reproduce R-8 F-01 with an aliased temporary directory, normalize owned packet fixture roots, and retain positive and malicious-symlink cases; normal and aliased focused tests pass without changing production validation (AC-03, AC-10).
+- [ ] T14 `.github/workflows/ci.yml` - observe the configured portable macOS checker on the exact candidate after separately authorized feature publication; retain its actual result and rerun independent review for AC-10. No Mac host is available in this session. On 2026-11-05 the owner authorized the presented feature branch push solely for CI; no residual, PR, merge, release or advisory remediation is authorized.
 
 ## Open Questions
 
@@ -246,6 +247,7 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | 2026-11-05 | R-5 | implementation | `b69d61de725ec5722bb2097863a6dcdf7d5eab7c` | unknown | procedural | Five criteria met; AC-05 through AC-08 not met; AC-10 not verified. Three blocking defects retained; model identity not attested. |
 | 2026-11-05 | R-6 | implementation | `c1098997ac497d874b42ccf764c38ec973896db7` | unknown | procedural | Seven criteria met; AC-07 and AC-08 not met due to history approval replay; AC-10 not verified pending macOS CI. Model identity not attested. |
 | 2026-11-05 | R-7 | implementation | `76e674705f361f0ef3de41c2d67a823639fe74cd` | unknown | procedural | AC-01 through AC-09 met; no new code finding. AC-10 not verified pending macOS execution. Model identity not attested. |
+| 2026-11-05 | R-8 | implementation | `da44309e5719c17a79889dba8badd739fd5fe6f1` | unknown | procedural | AC-01 through AC-09 met; AC-10 not met due to reproducible temporary-directory alias fixture failure. Native CI still running at review time. Model identity not attested. |
 
 ### R-1
 
@@ -440,6 +442,55 @@ EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently reran basel
 CRITERION: AC-10 Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
 VERDICT: not verified
 EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently observed 164 focused/publication/recovery/compatibility tests passing. Verified every current plugin file hash/mode against exact-final local-catalog payload 3832a6c3ce40a431c2056e3e1147b74866b74e32837fadfb00c4698f7bb097b7; Codex and Claude installation grades pass. Inspected final installed helper resume evidence, which preserves consumer source/settings/report state and selects no advisory work. The final full Linux run was still progressing at the last observed read, and required portable macOS execution remains unavailable and unobserved. No residual, publication, Mac execution or completed overall verification is inferred.
+
+### R-8
+
+CRITERION: AC-01 Every imported security occurrence retains its provider identity, target, available advisory/dependency context and evidence provenance, and malformed or conflicting observations cannot become accepted complete evidence.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, verified that executable source and the accepted normative baseline are unchanged from independently reviewed 76e6747. The earlier independent 164-test run and actual-packet metadata probes establish namespaced identity, raw-context reconstruction and rejection of changed terminal package/location, future receipts and mismatched code-scanning commits. Current lint and verbatim R-7 review-check pass.
+
+CRITERION: AC-02 Proven equivalent occurrences can share canonical remediation without losing per-repository targets or outcomes, and unknown ownership or incomplete coverage remains an actionable handoff.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, grouping and coverage implementation is byte-identical to the independently tested 76e6747 code. Grouping retains per-occurrence targets/outcomes and requires equivalent-source evidence. The inspected exact-payload consumer report retains 82 occurrences, 69 groups, 13 canonical groups and eight coverage handoffs with incomplete coverage and no all-clear; installed resume preserves it.
+
+CRITERION: AC-03 Versioned scanner evidence packets participate in the same finding accounting with verified bytes and explicit completion, while unsupported, tampered, synthetic or incomplete inputs cannot establish a live fix or a clean surface.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, production scanner validation is unchanged from the independently passing canonical-root packet, completion, synthetic and adversarial cases. Symlink ancestors remain rejected as required. A new temporary-directory alias probe exposes a portability defect in test fixture construction, recorded separately under AC-10; it does not establish a production acceptance of unsafe evidence or a successful native macOS run.
+
+CRITERION: AC-04 Each outstanding finding has a concrete route and next action through the existing batch, bounded-maintenance, investigation, feature, audit-reference or consumer-policy path without creating duplicate implementation loops or selecting work implicitly.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, route and follow-up code is unchanged from the six independently tested existing-loop routes. Native authored preparation retains paired source/record targets and stops at missing independent review; the inspected Stackweaver migration handoff selects no feature work. Final helper validation is distinct from earlier native model trials, and neither claims advisory remediation.
+
+CRITERION: AC-05 Disappeared alerts remain distinguishable from verified fixes, dismissals, exceptions, reopened findings and unavailable terminal evidence, and retiring a replaced immutable target never marks its historical vulnerable bytes patched.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, terminal and retirement code remains identical to the independently executed 76e6747 actual-packet probes. Current terminal/source/check/scan proof verifies closure; changed package/location, future receipts and wrong code-scanning commits remain unknown. Fixed/dismissed/auto-dismissed/open/denied/stale/wrong-target and immutable retirement/reactivation cases passed. Live provider-fixed historical alerts retain unknown remediation where full target proof is absent.
+
+CRITERION: AC-06 Valid consumer-authorized exceptions retain their rationale and validity independently of fixed outcomes, and missing, changed or expired evidence returns the affected decision to pending assessment.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, exact-decision approval binding and exception validation are unchanged from independent replay, expiry and policy-drift verification. Identical authority cannot approve changed kind, rationale, expiry or assessment. The earlier independent temporary-mitigation-to-indefinite-risk probe is rejected; fresh bound approval is required for changed terms.
+
+CRITERION: AC-07 A security reconciliation result exposes complete finding accounting independently of coverage, open remediation and delivery, and cannot conceal an untracked occurrence or override missing evidence with report status text.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, accounting and conflict-resolution source is unchanged from the independent 164-test run and production-helper replay probes. Orphan, forged snapshot, missing surface and malformed narrowing cases prevent unsupported reconciliation. Changed history conflict sets and successor decisions require renewed approval. The retained consumer report distinguishes reconciled accounting from incomplete coverage and 82 open obligations.
+
+CRITERION: AC-08 A resumed run or fresh sweep recovers pending findings, decisions and evidence from every relevant compatible history, preserves collection-bound snapshot revisions, and never drops work through a newer narrowed scope or rewrites earlier evidence.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, history/chain/persistence code is unchanged from independent overlapping-run, fork, committed-history import, append/resume/retry and actual-packet scope/identity/omission tests. The production history-authority probe accepts exact approved conflict sets, rejects changed sets/outcomes, and accepts renewed bound approval. Exact-final installed resume preserves three security snapshots and one original compatibility block.
+
+CRITERION: AC-09 Existing consumers retain readable settings, inventories and reports, while legacy disappearance comparisons cannot be presented as newly verified fixes and incompatible schemas produce an explicit handoff.
+VERDICT: met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, settings/history/compatibility implementation is unchanged from the independently executed baseline and prior-reader probes. The actual installed 0.9.0 reader accepts baseline settings and rejects security_policy settings without silently restoring configuration. History schema 2 uses no_longer_open; legacy data is not upgraded into verified closure. No real consumer rollback or settings restoration occurred.
+
+CRITERION: AC-10 Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
+VERDICT: not met
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, independently confirmed the pushed exact-head CI run 42088333743 and inspected the completed exact-code local Linux result: 1274 tests passed, zero failed, 4621 assertions. The native macOS job remains in progress at the last live observation and is not claimed passed or failed. An independent owned temporary-alias execution of scanner-evidence.test.ts produces nine passes and two positive-case failures because fixture roots retain a symlink ancestor. Required portable verification therefore remains unmet. No real advisory, repository setting or service was changed by this reviewer.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: tests/vh-adlc/maintenance/scanner-evidence.test.ts:11
+EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, the packet fixture uses mkdtempSync(join(tmpdir(), ...)) without canonicalizing the resulting directory. verifyScannerEvidence intentionally rejects any symlink ancestor. Independently running the suite with TMPDIR set to an owned symlink to a physical directory produced nine passes and two failures in the positive packet cases; raw output is /tmp/vh-security-review-macos-dfmxun7_/scanner.log. macOS temporary-directory aliases can exercise this same fixture error. The actual macOS CI job is still running, so this finding does not assert its native outcome.
+PROPOSAL: Canonicalize the owned scanner packet fixture root with realpathSync, as the shared maintenance repository fixtures already do, while preserving production symlink rejection and deliberate symlink-negative cases. Add a temporary-alias fixture regression and rerun actual exact-head macOS CI before claiming portable verification.
 
 ## Sources
 
