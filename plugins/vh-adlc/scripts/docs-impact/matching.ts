@@ -49,7 +49,14 @@ export function compileCoverage(pattern: string): (source: string) => boolean {
     } else tokens.push({ kind: "literal", value: char });
   }
   const directory = normalized.endsWith("/");
+  const firstOperator = tokens.findIndex(token => token.kind !== "literal");
+  const prefix = tokens.slice(0, firstOperator < 0 ? tokens.length : firstOperator)
+    .map(token => token.kind === "literal" ? token.value : "").join("");
+  if (!directory && firstOperator < 0) return source => source === prefix;
+  const remainder = tokens.slice(firstOperator);
+  if (!directory && remainder.length === 1 && remainder[0].kind === "star" && remainder[0].separators) return source => source.startsWith(prefix);
   return source => {
+    if (prefix && !((directory ? source + "/" : source).startsWith(prefix))) return false;
     const input = Array.from(directory ? source + "/" : source);
     let states = new Uint8Array(input.length + 1); states[0] = 1;
     for (const token of tokens) {

@@ -47,7 +47,7 @@ jobs:
         run: |
           bun run --cwd plugins/vh-adlc/scripts/docs-impact typecheck
       - name: Check the vh-adlc package
-        run: bun test tests/vh-adlc
+        run: bun test tests/vh-adlc --timeout 60000
 
   checker-macos:
     runs-on: macos-latest

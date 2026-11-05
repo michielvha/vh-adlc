@@ -493,6 +493,37 @@ unclaimed; a future UI change still owes its existing local visual checks.
 - [ ] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
 - [ ] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
 
+### Implementation progress
+
+The convention is published at `vhco-pro/docs@f8ccacbedf057159ea24136ba115cd9857bb22ac`
+(PR #21, merged after its exact-head docs check passed). The complete diff from the old pin contains
+the new page, its documentation link and the owner-accepted five-line testing guidance; the rules
+block and feature matcher are unchanged. Local native Codex/Claude candidate installs at shared
+commit `3ca164784749deca02825270f747a9d53f543589` discovered all 13 skills and ran the installed docs
+checker outside an agent session with source/index preservation. This is local-catalog proof, not
+marketplace acceptance, and source changes still require final exact-payload revalidation.
+
+The first whole-corpus comparison was too slow and was interrupted by exact owned-process identity.
+A literal-prefix fast path preserves all 41 matcher tests. The optimized actual comparison rebuilt
+the legacy index from corrected Stackweaver HEAD `3b655311558c69803528c1d9fbf9bf452a05494f` in
+disposable scratch: 779 docs, 747 patterns and 3,322 source names, zero lost candidates, no valid
+pattern meaning risks, 3,623 conservative match additions and no committed-index drift. Raw evidence
+retains the interrupted run and optimized result; final preflight must bind the committed shared
+matcher and actual installed cutover payload again.
+
+The separately authorized bounded Claude Code Opus 5.5 syntax review returned NO FINDINGS. Local
+actual-parser checks preserve every parsed field/body, and the real strict reader now answers for
+the original description value. Its one-line/two-quote correction is a separate local Stackweaver
+commit; no report body was sent to the reviewer. Hook/rollback checks pass in disposable fixtures.
+
+The broad host run recorded 1,145 passes and 31 failures: nine inherited recovery tests hit the
+five-second runner deadline, one skill-count guard needed the new total, and the remaining failures
+correctly rejected generated compiler symlinks in the plugin tree. Compiler dependencies now stay
+outside that tree; the count guard is corrected and the 49-test focused recovery/export selection
+passes with the portable 60-second deadline. The failed runs remain retained; the final full run
+is still required. Actual model trials, final independent implementation/paired review, marketplace
+acceptance and consumer migration remain open.
+
 ## Open Questions
 
 None. The owner approved all six review refinements.
