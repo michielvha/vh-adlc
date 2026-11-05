@@ -1,5 +1,5 @@
 import { canonicalJSON, digest, runID } from "./journal";
-import { parseSecurityInput, validateSecuritySnapshot, evidenceBinding, type SecurityInput, type SecuritySnapshot } from "./security";
+import { parseSecurityInput, validateSecuritySnapshot, decisionAuthorityBinding, type SecurityInput, type SecuritySnapshot } from "./security";
 import * as v from "./security-value";
 
 export type SecurityRevision = { schema_version:1; kind:"maintenance-security-revision-v1"; run_id:string; snapshot_revision:number;
@@ -7,6 +7,11 @@ export type SecurityRevision = { schema_version:1; kind:"maintenance-security-re
 function retainsRun(previous:SecuritySnapshot,next:SecuritySnapshot):boolean {
   return previous.input.hostname===next.input.hostname&&previous.input.repository===next.input.repository&&canonicalJSON(previous.input.scope)===canonicalJSON(next.input.scope)&&
     previous.input.observations.every(o=>next.input.observations.some(n=>n.id===o.id));
+}
+export function historyAuthorityBinding(value:unknown,id:string,prior:string[]):string {
+  const input=parseSecurityInput(value),digests=prior.map(v.hash).sort();
+  if(!digests.length||new Set(digests).size!==digests.length)throw Error("history authority requires unique prior digests");
+  return digest(canonicalJSON({decision:decisionAuthorityBinding(input,id),prior_digests:digests}));
 }
 export function createSecurityRevision(value:SecuritySnapshot,previous:SecurityRevision|null,projection:string|null=null):SecurityRevision {
   const snapshot=validateSecuritySnapshot(value);
@@ -84,7 +89,7 @@ export function mergeSecurityHistory(value:unknown,revisions:SecurityRevision[],
   for(const raw of v.list(resolutions)){
     const r=v.record(raw,["occurrence_id","prior_digests","evidence_id"]),id=v.text(r.occurrence_id),named=v.strings(r.prior_digests).sort(),o=current.get(id),e=input.evidence.find(e=>e.id===r.evidence_id);
     if(!o||!e||!named.length||canonicalJSON(named)!==canonicalJSON([...(priorDigests.get(id)??[])].sort())||e.kind!=="authority"||e.result!=="supersedes-history"||e.occurrence_id!==id||!e.complete||e.synthetic||
-      e.binding!==evidenceBinding(input.source_commit,input.policy,input.scope,o.target)||Date.parse(e.observed_at)<Date.parse(o.observed_at)||Date.parse(e.observed_at)>Date.parse(input.evaluated_at))throw Error("historical outcome resolution evidence missing or changed");
+      e.binding!==historyAuthorityBinding(input,id,named)||Date.parse(e.observed_at)<Date.parse(o.observed_at)||Date.parse(e.observed_at)>Date.parse(input.evaluated_at))throw Error("historical outcome resolution evidence missing or changed");
     acknowledged.add(id);
   }
   for(const [id,states] of priorStates) if(states.size>1&&!acknowledged.has(id))gaps.push(`historical outcome conflict: ${id}`);

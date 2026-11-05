@@ -12,7 +12,7 @@ import type { Inventory } from "../../../plugins/vh-adlc/scripts/maintenance/col
 import { verifySecurityResult } from "../../../plugins/vh-adlc/scripts/maintenance/security-io";
 import { record, text } from "../../../plugins/vh-adlc/scripts/maintenance/security-value";
 import { evidenceBinding, reconcileSecurity } from "../../../plugins/vh-adlc/scripts/maintenance/security";
-import { createSecurityRevision, readSecurityRevisions, selectSecurityChain } from "../../../plugins/vh-adlc/scripts/maintenance/security-history";
+import { createSecurityRevision, readSecurityRevisions, selectSecurityChain, historyAuthorityBinding } from "../../../plugins/vh-adlc/scripts/maintenance/security-history";
 function reportResult(value:unknown){const row=record(value);return{path:text(row.path),digest:text(row.digest)};}
 const projects:ReturnType<typeof fixture>[]=[];afterEach(()=>projects.splice(0).forEach(f=>f.dispose()));
 function setup(policyPath="policy.md"){
@@ -133,4 +133,21 @@ test("imported digest-valid successors cannot narrow a run or erase its earlier 
     const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/import.json")]));
     expect(result.revision.snapshot.findings).toHaveLength(1);expect(result.revision.snapshot.accounting_state).toBe("pending");expect(result.revision.snapshot.all_clear).toBe(false);
   }
+});
+
+test("actual packet history resolution approval is specific to conflict digests and chosen outcome",async()=>{
+  const f=setup(),args=["--repo",f.root,"--run-id",f.run.header.run_id];
+  const base=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")])).revision.snapshot.input,o=base.observations[0];
+  f.write(".tools/verification.json","Observed verification and approval receipt.\n");const fileDigest=digest(readFileSync(join(f.root,".tools/verification.json")));
+  const evidence=(id:string,kind:string,result:string)=>({id,kind,result,occurrence_id:o.id,target:o.target,binding:evidenceBinding(base.source_commit,base.policy,base.scope,o.target),reference:"local:verification",digest:fileDigest,observed_at:base.evaluated_at,complete:true,synthetic:false});
+  const follow={reference:"local:verification",owner:null,assignment_handoff:"local:assignment",next_action:"investigate"},d={id:o.id,change:"unknown",outcome:"open",follow_up:follow,delivery_required:false,delivery_evidence:[],exception:null,successor:null};
+  const priorA=createSecurityRevision(reconcileSecurity({...base,run_id:randomUUID()}),null),priorB=createSecurityRevision(reconcileSecurity({...base,run_id:randomUUID(),decisions:[{...d,outcome:"fixed"}],evidence:[evidence("source","source","corrected"),evidence("check","check","pass"),evidence("scan","scan","absent")]}),null),priorC=createSecurityRevision(reconcileSecurity({...base,run_id:randomUUID(),decisions:[{...d,outcome:"unknown"}]}),null);
+  const prior=(rows:typeof priorA[])=>rows.map(r=>'```maintenance-security-v1\n'+JSON.stringify(r)+'\n```\n').join('\n');let markdown=prior([priorA,priorB]);f.write(".tools/conflicts.md",markdown);
+  const packet={...f.packet,analysis:{...f.packet.analysis,decisions:[d],evidence:[evidence("tracking","tracking","accessible"),evidence("approval","authority","supersedes-history")]},history:[{path:"conflicts.md",sha256:digest(markdown)}],history_resolutions:[{occurrence_id:o.id,prior_digests:[priorA.digest,priorB.digest],evidence_id:"approval"}],evidence_files:[{reference:"local:verification",path:"verification.json",sha256:fileDigest}]};
+  packet.analysis.evidence[1].binding=historyAuthorityBinding({...base,decisions:[d]},o.id,[priorA.digest,priorB.digest]);
+  f.write(".tools/resolve.json",JSON.stringify(packet));await main(["security-reconcile",...args,"--input",join(f.root,".tools/resolve.json")]);
+  markdown=prior([priorA,priorC]);f.write(".tools/conflicts.md",markdown);packet.history[0].sha256=digest(markdown);packet.history_resolutions[0].prior_digests=[priorA.digest,priorC.digest];f.write(".tools/resolve.json",JSON.stringify(packet));
+  await expect(main(["security-reconcile",...args,"--input",join(f.root,".tools/resolve.json")])).rejects.toThrow();
+  markdown=prior([priorA,priorB]);f.write(".tools/conflicts.md",markdown);packet.history[0].sha256=digest(markdown);packet.history_resolutions[0].prior_digests=[priorA.digest,priorB.digest];d.outcome="unknown";f.write(".tools/resolve.json",JSON.stringify(packet));
+  await expect(main(["security-reconcile",...args,"--input",join(f.root,".tools/resolve.json")])).rejects.toThrow();
 });

@@ -300,6 +300,12 @@ policy files, scope and target. Changing exception kind, rationale, expiry or ap
 requires a new approval receipt. Other evidence uses `evidenceBinding`; a generic target approval
 cannot authorize changed exception terms. These receipts record consumer authority procedurally.
 
+For explicit conflicting-history decisions, `historyAuthorityBinding(input, occurrenceId, priorDigests)`
+from `security-history.ts` binds the sorted exact prior snapshot digests and the chosen normalized
+decision and policy assessment. Supply it on the `authority` receipt whose result is
+`supersedes-history`. A new conflict set or chosen outcome requires renewed authority; changing only
+the packet's resolution list cannot reuse an earlier approval. Every prior occurrence remains visible.
+
 For a disappeared provider alert, a fresh exact terminal read and a complete, nonsynthetic `source`
 receipt with result `observed` or `corrected` can re-observe its current target. Bind that receipt to
 the occurrence, current source/policy/scope and exact target, and retain its physical proof file.
