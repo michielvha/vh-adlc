@@ -20,10 +20,13 @@ test('the explicit unavailable-system fixture needs a real doc citation and Unkn
   const input=mkdtempSync(join(tmpdir(),'docs-assessment-'));
   try {
     mkdirSync(join(input,'contracts/docs'),{recursive:true});writeFileSync(join(input,'contracts/docs/other-system.md'),'Different unavailable system.\n');
-    const answer={path:'docs/other-system.md',classification:'Unknown',doc_citations:['contracts/docs/other-system.md:1'],source_citations:[]};
+    const answer={path:'docs/other-system.md',classification:'Unknown',doc_citations:['contracts/docs/other-system.md:1'],source_citations:[] as string[],source_unavailable_reason:'The other system implementation is unavailable.'};
     const report=()=>`BEGIN_ASSESSMENTS_JSON\n${JSON.stringify({cases:[{id:'contracts',candidates:[answer]}]})}\nEND_ASSESSMENTS_JSON`;
     const calls=[{case:'contracts',op:'check',stdout:JSON.stringify({candidates:[{path:answer.path}]})}];
     expect(assessmentFailures(report(),input,['contracts'],calls)).toEqual([]);
+    mkdirSync(join(input,'contracts/src'));writeFileSync(join(input,'contracts/src/app.ts'),'Current system.\n');
+    answer.source_citations=['contracts/src/app.ts:1'];expect(assessmentFailures(report(),input,['contracts'],calls).length).toBeGreaterThan(0);
+    answer.source_citations=[];
     answer.classification='Accurate';expect(assessmentFailures(report(),input,['contracts'],calls).length).toBeGreaterThan(0);
   } finally {rmSync(input,{recursive:true,force:true});}
 });

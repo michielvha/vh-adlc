@@ -72,11 +72,11 @@ when the index is missing. The shared checker removes that index dependency for 
 Existing site generation, frontend visual refresh/check and public/internal rules remain local
 (`agents/docs-impact.md:57-102`).
 
-Implementation is underway on the claimed feature branch. The common convention is authored in
-its own docs branch and reviewed with actual Claude Code Opus 5.5. Reader, matcher, collector and
-CLI tests pass locally; publication, installed acceptance, full review and consumer cutover remain
-open. The actual checker found one strict-reader refusal in the current consumer HEAD corpus;
-that finding is a migration blocker until its separate syntax correction is reviewed and verified.
+Implementation is underway on the claimed feature branch. The common convention is published
+and independently reviewed. Local reader/matcher/collector/CLI and native trial checks pass;
+shared publication, installed marketplace acceptance, final review and consumer cutover remain
+open. The initial strict-reader refusal was resolved locally by a separately reviewed syntax-only
+correction; its exact commit, bounded review and retained-reader equivalence are recorded below.
 
 ## Scope
 
@@ -530,6 +530,15 @@ warmed offline audit entry pass at the new pin. These are local-catalog checks;
 actual published-marketplace fresh/upgrade acceptance remains separate. Later
 changes to the trial evaluator are test-only; the entire plugin tree remains
 byte-identical to the exercised candidate and must be bound at final review.
+
+The initial strict-reader blocker was cleared separately by consumer commit
+`3b655311558c69803528c1d9fbf9bf452a05494f`. Separate bounded review `syntax-fix-r2` executed
+Claude Code Opus 5.5 and returned NO FINDINGS; its packet contained only the
+original/proposed description line and actual parser excerpts. Local full-file
+checks prove that only two quote bytes changed, every other body byte remained
+identical, and retained index/audit/drift parsing kept the same values. The actual
+strict reader changes from malformed to answered with the original description.
+The private report body was never sent for that syntax review.
 
 The complete corrected plugin suite passes 1,221 tests with zero failures; the two
 new citation-evaluator tests pass separately. Go tests/vet/lint/module checks,
