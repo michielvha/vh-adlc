@@ -280,6 +280,7 @@ None. The owner accepted risk-based upgrade verification and closure only after 
 | 2026-11-05 | R-7 | spec | `8d7d7182ac996ac8840dfebc95a2c08f6129efe6` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-8 | spec | `3066499a013d7861d533d895cecebfb9c21b4b20` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 | 2026-11-05 | R-9 | spec | `e787d453b07c095dbe83c6699c44d7b90e8b20f1` | claude-opus-5.5 | procedural | 4 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-10 | spec | `5d9197b2dd7500319399ca102c135e5edf6cf7a4` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -553,6 +554,27 @@ SEVERITY: nit
 WHERE: Design, Entry and consumer contract (helper reuse)
 EVIDENCE: The spec says to "Reuse the pure `hash`, `git` and `gitBytes` exports in `scripts/audit/snapshot.ts`" (00081 line 22). `gitBytes` and `git` spawn Git subprocesses and throw "audit cannot read Git" (snapshot.ts lines 16-25). `git` applies `trimEnd()`, which changes output such as path names with trailing whitespace. The module also imports audit's `./inventory` and `./settings` at load time (lines 4-5). The protocol requires literal path preservation (00081 line 42).
 PROPOSAL: Describe these exports as side-effect-free Git helpers, not pure ones. Require byte-exact `-z` reads through `gitBytes` rather than the trimming `git` wrapper for paths and blobs. Note the audit-labelled error text, or move these primitives into a neutral shared module.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Resolution and feedback (superseded closure after merge); Entry and consumer contract (lifecycle route); Test Plan AC-04
+EVIDENCE: Under the owner's settled policy, closure "happens only after the consolidated PR is observed merged from its reviewed head" (00081 line 72). The owner merges later, so the resolve run that published the PR has already ended. Closure is therefore always a separate later run. To perform it, that run must know the consolidation's "head SHA equal to the independently reviewed published checkpoint", "the approved consolidation-body digest", each file's "expected postimage raw-blob SHA" and "the same bounded assessment read set used for publication" (00081 line 72). The spec never names the durable, trusted record that supplies those bindings to the later run. Review evidence stays "in the PR body and separately retained external artifacts" (00161 line 10). The PR body is mutable data that cannot authorize itself (00081 line 28). An external artifact may be unavailable to another machine or run. The spec also gives no entry for this follow-up. The lifecycle route names only "recheck and consolidate these docs-audit PRs" for resolve (00081 line 24), and "closure-only assessment/review" is defined only for the changed-input case (00081 line 72). AC-04 tests closure states, but no test starts closure in a fresh run that holds only the merged PR.
+PROPOSAL: Define the post-merge closure entry: its lifecycle request example, the intent it selects (a resolve sub-mode or resume) and whether a scheduled run can perform it under an adopted grant. Name the authoritative source of the reviewed checkpoint, body digest, postimages and read set, for example a retained resolve record bound by digest in the published PR and verified against the reviewed head tree. Add an AC-04 case where closure runs in a new session or on another machine.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (C/D assembly, first post-cutover gate); Upgrades after adoption; Migration and rollback; Test Plan AC-06, AC-07
+EVIDENCE: For upgrades, the spec says the unattended advisory trial alone "cannot verify a changed resolver" and "A missing affected-surface trial leaves the upgrade unverified". An upgrade that changes resolve publication or closure must also pass "an additional bounded actual model resolve trial ... using the exact installed candidate" that observes "consolidation publication, denial before merge, verified post-merge explanation/closure, and abandonment/revert refusal" (00161 line 70). First adoption turns on shared resolve publication and superseded closure for the first time (00161 lines 20, 22). Yet its prerequisites are only "the observed trial, paired review and normal checks" (00161 line 30), and the attestation records only "trial-passed and paired source-candidate acceptance" (00161 line 44). The first-adoption trial covers only the advisory draft-PR handoff (00161 line 32). Migration requires synthetic actual model trials only in general terms (00161 line 76), and AC-06 names the collector trial only for "affected resolver/closure changes" in an upgrade (00241 line 19). As a result, a first cutover could enable real-corpus closure that no installed-model trial has exercised, a weaker standard than the rule for an upgrade that changes the same surface.
+PROPOSAL: Make the installed-model resolve/closure collector trial an explicit first-adoption prerequisite. Bind its result in the pre-cutover attestation and check it at the C/D assembly. Add that requirement to AC-06 and AC-07.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter covers
+EVIDENCE: `covers` lists every path whose change can affect the feature (feature-documents.md 00001 lines 43-44). It already includes reused helpers such as `scripts/settings-file.ts`, `scripts/github-read.ts` and `scripts/audit/snapshot.ts` (00001 lines 15-17). The candidate review depends on "the existing model-identity/isolation/returned-record protocol" (00161 line 8). Unattended publication compares the returned `MODEL:` "using the protocol's family/full-ID rule" (00161 line 12). That rule lives in `plugins/vh-adlc/references/review-protocol.md` (lines 46-60), which is not in covers.
+PROPOSAL: Add `plugins/vh-adlc/references/review-protocol.md` to covers, or state why changes to it cannot affect docs-drift publication gating.
 
 ## Sources
 
