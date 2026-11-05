@@ -253,6 +253,7 @@ None. The owner accepted the bounded completeness correction after its read/skip
 | 2026-11-05 | R-4 | spec | `5f2b0236c9cd90356e01bae330f82cfa3cb4a753` | claude-opus-5.5 | procedural | 5 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-5 | spec | `21fbd73b9a1c80ef15f4765652bb11550705ba17` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-6 | spec | `32ee1e88b64f7fbee29b8d44fc90f36e0c5ffd19` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-7 | spec | `8d7d7182ac996ac8840dfebc95a2c08f6129efe6` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -441,6 +442,33 @@ SEVERITY: nit
 WHERE: Design, Authority and delivery (publication lease); Scheduled worker and staged adoption (trial definition)
 EVIDENCE: The cooperative publication lease is defined only "After scheduled cutover" (00161 line 22), and its ref namespace is named by the adoption procedure and the `publication` block (lines 14, 22). The pre-cutover trial nonetheless relies on "The trial publication lease and namespace are disjoint from legacy real-corpus proposals" (line 30). The committed trial definition binds "exact output-path and branch namespace, worker entry and allowed draft-only effects" (line 34), but it names no trial lease ref, and no acquire/release authority covers it. As a result, the "same publisher" trial either takes a lease the staged policy does not define or skips the lease step that production runs.
 PROPOSAL: Add the trial lease ref namespace and its acquire/release effect to the committed trial definition. State that the unchanged publisher's lease step uses that ref in trial mode. Add an AC-06 assertion that the trial lease cannot overlap the real-corpus lease ref.
+
+### R-7
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (worker pin, first post-cutover gate); Migration and rollback; Test Plan AC-06
+EVIDENCE: The scheduled worker pins the published vh-adlc source at an exact commit. That pin stays visible to the dependency updater, but "Updater proposals do not authorize automatic route changes or waive adoption/review checks" (00161 line 28). The post-cutover gate requires "matching current protected route/component/policy bindings", and "current protected publication/worker inputs must continue to match the adopted record" (00161 line 44). The adopted record is immutable and bound to the trial's exact component (00161 lines 18, 42). Cutover also retires every legacy publication route (00161 line 20). After cutover, the first updater bump of the shared source SHA or plugin version therefore makes the gate deny all scheduled and interactive real-corpus publication, with no legacy fallback. The spec never defines how a new component is re-adopted. It does not say whether that needs another real unattended trial, another C/D assembly and paired review, or a lighter procedure. AC-06 tests a mismatched component only as a refusal.
+PROPOSAL: Define the post-cutover upgrade route for a changed component or worker binding. Present the owner trade-off: either require a new paid unattended trial plus C/D record for every upgrade, or allow a reviewed re-adoption record without a new trial for specified compatible changes. Add an AC-06 case where an updater bump is denied until that route completes.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Independent candidate review and publication; Scheduled worker and staged adoption; Test Plan AC-05, AC-06
+EVIDENCE: Publication is blocked by "A missing reviewer, model mismatch or blocking/should-fix finding" (00161 line 12). Review uses "the existing model-identity/isolation/returned-record protocol" (00161 line 8). Under that protocol, a model mismatch exists only against an owner-requested model. With no requested model, the host default is inherited and `MODEL: unknown` is acceptable (review-protocol.md lines 29-40, 46-60). Under unattended scheduled runs there is no owner in session to name a model. Neither the consumer settings (00081 line 28), the `publication` block (00161 line 16) nor the trial definition (00161 line 36) names the expected candidate-reviewer model. The trial only records "provider/model identities" (00161 line 40). The AC-05 "mismatched review" denial therefore has no reference value. An unattended run could either publish with an unattested reviewer identity or never be able to show a match.
+PROPOSAL: Add a committed expected candidate-reviewer model to the adopted policy, or explicitly declare that the host default with unknown identity is allowed. Bind that choice in the trial definition and adoption record, and add AC-05 and AC-06 cases for a matching, a different and an `unknown` reviewer identity in unattended mode.
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (dispatch-only trial, cutover bindings); Test Plan AC-06
+EVIDENCE: The trial runs from a separate file such as `.github/workflows/docs-drift-shared-trial.yml` with no cron trigger, and "does not replace the existing job" (00161 line 30). Cutover later switches the existing scheduled worker (00161 line 20). The trial must use "the same install, worker, reviewer and publisher entry points". Expected differences are limited to trigger and namespace, while any different "permissions, invocation, reviewer or publisher behavior invalidates the trial" (00161 line 40). The adoption helper validates "exact component/worker/reviewer/publisher bindings" (00161 line 18). Only "exact workflow/job blobs" are recorded, so the two files' blobs necessarily differ. The spec defines no mechanical comparison that proves the cutover scheduled job matches the trial job apart from its trigger. That includes job permissions, environment, secrets exposure, runner and step invocation. AC-06 "changed-worker invalidation" has no pass condition for this comparison.
+PROPOSAL: Require both the trial and the scheduled workflows to be thin trigger files that call one committed reusable workflow or job definition, and bind that definition's blob plus each caller's permissions and inputs. Alternatively, define a normalized job comparison that excludes only the `on` trigger and the declared namespace inputs. Add AC-06 cases where differing permissions, environment or steps in the cutover job deny adoption.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-01; frontmatter covers
+EVIDENCE: covers includes `plugins/vh-adlc/examples/docs-drift/` (00001 line 12). The pinned documentation convention says "A test or linter checks each example against the component's current inputs, outputs and secrets, so an example cannot drift from the interface it shows" (documentation.md 00081 lines 1-5). Existing features follow this rule, for example `tests/vh-adlc/audit/settings.test.ts` and `tests/vh-adlc/docs-impact/example.test.ts`. No Test Plan row validates the docs-drift example settings, including `detector_inputs`, `publication` and `trial`, against the strict validator and scan protocol.
+PROPOSAL: Add an AC-01 or AC-02 proof that loads the shipped example through the docs-drift settings validator and runs the scan helper against it.
 
 ## Sources
 
