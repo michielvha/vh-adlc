@@ -219,6 +219,7 @@ None. The owner accepted the bounded completeness correction after its read/skip
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-05 | R-1 | spec | `09872e18edd77fed61336bc4d10a31eafd46021f` | claude-opus-5.5 | procedural | 2 blocking; 4 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-2 | spec | `748ed4a32151b508fc490d3ae81becb4c62435c7` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
+| 2026-11-05 | R-3 | spec | `0f4c691ca6e7c311f117c79d2be213c993e18c3a` | claude-opus-5.5 | procedural | 2 should-fix; 3 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -285,6 +286,41 @@ SEVERITY: should-fix
 WHERE: Design, Scan-result protocol and local correction; Entry and consumer contract; Test Plan AC-02
 EVIDENCE: The design states "Missing required detector execution is a gap even if all document reads succeeded" (00081 line 38), and AC-02 tests "missing requested detectors" (00161 line 33). The v1 schema lists only declared "detector options", the document inventory, collection failures, findings, suppressed findings and stale suppressions (00081 line 36). It has no per-detector execution or outcome record. The consumer settings list scanner argv, scope, feedback files, procedure and commands, but no required detector set (00081 line 28). So the shared helper has no defined source for which detectors are required, and no observation proving they ran. A scanner that aborts or skips a detector after reading every document would still produce a complete inventory with fewer findings, which is the "lower finding count" case the spec forbids treating as proof (00081 line 32).
 PROPOSAL: Add a required detector set to the committed settings, or derive it from the bound scanner options, and add a schema field recording each detector's execution outcome. Have the helper mark the result incomplete when a required detector is absent or failed, and require the Stackweaver correction to emit that field.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Authority and delivery (staged interval and publication lease); Scheduled worker and staged adoption; Migration and rollback; Test Plan AC-05, AC-06
+EVIDENCE: Before cutover, the spec says "shared real-corpus push, advisory/resolve PR publication and superseded-proposal closure are unavailable until the scheduled cutover" (00161 line 2). AC-05 requires "deny shared real-corpus publication/closure even if a legacy run starts concurrently". The authority table allows each effect with "the actual current request or an adopted consumer procedure that names that effect and scope" (00081 line 70). The lease applies only "After scheduled cutover" (00161 line 4). The scheduled states `legacy` through `adopted` are described only as "Adoption evidence" (00161 line 16). The spec does not name a committed, adoption-bound input that the shared publisher reads to decide that the consumer is still pre-cutover. It also does not say whether that denial outranks an owner's current explicit publication request. Rollback "restores only migration-owned routing/configuration" (00161 line 24) and brings back the legacy worker, which does not take the lease. Nothing states that rollback also returns shared publication to denied. If it does not, the legacy-versus-shared race that R-2 F-01 raised returns after a rollback.
+PROPOSAL: Name the single authoritative committed input that the shared publisher must validate before any real-corpus push, PR or closure. For example, a cutover state or lease namespace in `.vh-adlc/docs-drift.yaml`, checked against a passing trial receipt by the adoption helper. State that a missing or pre-cutover value denies publication even when a current request asks for it. Make that value migration-owned so rollback restores the denial, and add a rollback test that requires denial again.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (real unattended trial); Independent candidate review and publication; Test Plan AC-06
+EVIDENCE: The trial input is "a committed bounded synthetic documentation/code/feedback fixture in an isolated scratch Git repository". Its handoff is "a draft PR in the selected consumer repository ... containing only identified synthetic fixture output under `tests/agent-docs-drift/fixtures/trial-output/`" (00161 line 12). The publisher may publish "only after a clean matching result" for the reviewed "exact candidate commit" (00081 lines 76, 78). The trial must use "the same install, worker, reviewer and publisher entry points", and "Expected differences are limited to trigger and the explicitly bound synthetic input/output namespace". Any different "invocation, reviewer or publisher behavior invalidates the trial" (00161 line 14). With these inputs the reviewed checkpoint is a commit in the scratch repository, but the draft-PR head is a different commit, tree and path set in the consumer repository. Getting from one to the other needs a transplant or path-remapping step that the real worker never runs. So the trial either changes publisher behavior, which invalidates it by its own rule, or never exercises the reviewed-candidate-equals-published-head check that cutover depends on.
+PROPOSAL: Define the trial so that the reviewed checkpoint commit is the exact pushed draft-PR head. For example, commit the synthetic fixture in the consumer repository under the trial namespace, point the trial-scoped settings roots at it, and branch from the consumer default. If a transplant step is kept, make it part of the reviewed candidate identity and test that the published head tree equals the reviewed mapping.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Scan-result protocol and local correction
+EVIDENCE: Each inventory entry binds "its normalized relative path and content digest", and each required detector unit has a "bound input digest" (00081 lines 38, 40). Two independent implementations must agree on these values: the shared helper, which enumerates the Git tree, and the local Stackweaver scanner, which emits the protocol (00081 line 44). The spec names neither the digest algorithm and its input (blob bytes, Git blob OID or worktree bytes) nor the path normalization. It also does not say what a detector's input digest covers.
+PROPOSAL: Specify the v1 digest, for example SHA-256 of the Git blob bytes at `source_commit`. Specify the path normalization rule and define each detector's input digest as a digest over its sorted applicable inventory entries.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Entry and consumer contract
+EVIDENCE: The spec says not to import the maintenance or audit `adoptionPreflight` because "those receipts bind dependency topology or persistent-ledger policy" (00081 line 22). `scripts/maintenance/migration.ts:12-58` binds no dependency topology. It hard-codes `operation !== "vh-adlc-maintenance"` (line 19) and helper stages `settings`, `collection` and `report` bound to `scripts/maintenance/cli.ts` (lines 46-50). Audit hard-codes `vh-adlc-audit`, policy blobs and audit mode effects (`scripts/audit/adoption.ts:12-13, 24, 46-50`).
+PROPOSAL: Give the actual reason: each helper hard-codes its own operation name, helper stages and CLI path, and audit also binds ledger policy and mode effects. The conclusion not to reuse them directly stays the same.
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter status_description; Context
+EVIDENCE: status_description says "First Copilot Opus 5.5 review is recorded" (00001 line 3). The Review Log contains both R-1 and R-2 (00161 lines 60-61), and R-2's three should-fix findings are folded into the Design. The parent roadmap repeats "has its first Copilot Opus 5.5 review" (shared-workflow-migration.md 00001 line 3).
+PROPOSAL: Update status_description to say that R-1 and R-2 are recorded and folded in, and that a fresh review and acceptance remain.
+
+I read every required chunk. The three owner decisions are mostly carried into the Design, Acceptance Criteria and Test Plan. The independently compared scan inventory with per-detector accounting resolves R-1 F-02. The pre-publication review of the exact candidate resolves R-1 F-05. R-1 F-06, the staged cutover, has two remaining gaps, F-01 and F-02 above.
 
 ## Sources
 
