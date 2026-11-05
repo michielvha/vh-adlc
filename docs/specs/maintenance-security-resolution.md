@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 branch: feat/maintenance-security-resolution
-status_description: "Shared implementation and read-only Stackweaver trial pass local verification and independent code review. AC-10 remains unverified pending configured macOS CI. The owner authorized this feature branch push for CI; advisory remediation remains excluded."
+status_description: "Shared security maintenance is implemented and independently reviewed. Exact-head Linux and macOS CI pass, and the read-only Stackweaver trial preserves consumer state. Completion records are local; PR, merge, release and advisory remediation remain separate."
 issue: null
 goal: "Every security finding in a maintenance scope retains its evidence, an explicit route through an existing loop, and an outcome that distinguishes verified fixes from outstanding work and exceptions."
 covers:
