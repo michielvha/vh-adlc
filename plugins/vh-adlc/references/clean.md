@@ -45,6 +45,15 @@ The binary prints one JSON report. `knowledge` is `null`, because neither comman
 `manifest-missing`, `default-branch-unknown`, `manifest-unmerged` and `engine-absent` are notes. With
 `engine-absent`, no Docker engine answered, so container bind mounts were not checked.
 
+## What counts as in use
+
+An entry is in use when a process of the same user holds the entry or a path inside it, through its
+`cwd`, `exe`, an open file, a mapping or a bound socket, or when a running container bind-mounts the entry
+or a path inside it. A container that bind-mounts all of `/tmp` or `/` marks no entry as in use, so only
+age protects what it uses; such a container should never run on a host that uses `clean`. Age is also
+the only protection against other users' processes, same-user processes whose `/proc` entries cannot be
+read, and Podman bind mounts.
+
 ## When the binary cannot run
 
 - No `vh-adlc` on `PATH`, or `clean` answered with `usage` by an older binary: say in one line that the
