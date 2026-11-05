@@ -141,7 +141,7 @@ The current local candidate is `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`
 
 | Surface | Observed result | Limit |
 | --- | --- | --- |
-| Copilot CLI, Opus 5.5 | All 15 synthetic cases have successful observed results across trials 8/9/10, including manual entry, contract/omission handling, task/completion gaps and an authorized progress-PR draft. | Focused retries after retained failures; exact source/reference/request changes are recorded in the feature document. No remote write. |
+| Copilot CLI, Opus 5.5 | All 15 synthetic cases have successful observed results across trials 8/9/10, including manual entry, contract/omission handling, task/completion gaps and an authorized progress-PR draft. | Focused retries after retained failures; 12 classifications predate the revised general classification guidance. Exact source/reference/request changes are recorded in the feature document. No remote write. |
 | Codex CLI 0.163.0 local catalog | Candidate 7 discovers all 13 skills; installed roots/check preserve inputs/index outside an agent session. | Candidate install, not published marketplace proof. |
 | Claude Code CLI 2.1.316 local catalog | Candidate 7 discovers all 13 skills; installed standalone checking preserves inputs/index. | Native install/helper check, not Claude docs-impact model execution. |
 
