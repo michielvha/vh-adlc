@@ -121,7 +121,7 @@ export function renderReport(config: Settings, run: Run, inventory: Inventory, o
     const revision=validateSecurityRevision(options.security);
     if(revision.run_id!==run.header.run_id||revision.collection_digest!==digest(canonicalJSON(inventory))||revision.original_projection_digest!==digest(canonicalJSON(observations)))throw Error("security report collection binding changed");
     lines.push("",securitySummary(revision));
-  }
+  }else lines.push("", "Security accounting: pending (no typed security snapshot supplied).", "");
   return lines.join("\n");
 }
 

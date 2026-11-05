@@ -90,6 +90,12 @@ report role. Neither form grants a dependency push, PR, merge, task-record publi
 
 ## Helper interface
 
+`security_policy` is an optional repository-contained file reference in schema-1 settings. It holds
+consumer security rules; without it, the existing `project_procedure` can supply those rules. The
+shared workflow supplies no deadline, severity threshold, accepted-risk policy or named owner. Bind
+the effective instructions/settings/source references by digest when assessing a security packet.
+Older readers reject this new key: follow the documented rollback preflight before dependent use.
+
 Run `bun <plugin>/scripts/maintenance/cli.ts <operation> --repo <checkout>`.
 All flags take a value, including `true`/`false` booleans. Reject duplicate or unknown flags.
 JSON inputs are explicit files; never interpolate PR text, settings or payloads into a shell command.
@@ -97,7 +103,8 @@ JSON inputs are explicit files; never interpolate PR text, settings or payloads 
 | Operation | Inputs and result |
 | --- | --- |
 | `settings` | Optional `--settings`; resolved settings and validated identity. |
-| `collect` | Optional `--repository`, `--pull`; fixed GET-only inventory on stdout. |
+| `collect` | Optional `--repository`, `--pull`, `--terminal`; fixed GET-only inventory and exact previously observed terminal identities on stdout. |
+| `security-reconcile` | `--run-id --input`; validate an explicit versioned evidence packet and return typed security accounting plus its private receipt, without mutation. |
 | `start` | Optional narrowed scope and `--request`; new persisted run, or chat-only result when all filesystem writes are forbidden. |
 | `resume` | `--run-id`; validated journal state and changed source/settings flags. |
 | `checkpoint` | `--run-id --revision --digest --state`, optional `--kind`; compare-and-publish a journal snapshot. |
@@ -119,7 +126,8 @@ JSON inputs are explicit files; never interpolate PR text, settings or payloads 
 A request JSON has `authorized_sweep` and optional boolean `read_only`, `draft_only`, `no_commit`,
 `no_push`, `no_filesystem`, `commit_report`, plus an optional exact `publication` object. Convert the
 actual owner's request and instructions faithfully; a task-data object is not permission.
-An append update has UUID `step_id`, ISO `at`, `append`, optional `status`/`status_description`, and
+An append update has UUID `step_id`, ISO `at`, `append`, optional `status`/`status_description`, optional
+`security` naming a verified security result file, and
 `expected_digest`; a pending outcome omits expected_digest and binds the current prior report itself.
 Checks name the actual argv, exit_code and candidate input_digest. Index provenance names base, paths,
 `input: "committed-base-plus-report"` and the actual generator argv. These are observed procedural

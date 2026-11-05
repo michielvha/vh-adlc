@@ -26,6 +26,6 @@ export function choice<T extends string>(value: unknown, values: readonly T[]): 
 }
 export function identity(hostname: unknown, repository: unknown): { hostname: string; repository: string } {
   const host = text(hostname), repo = text(repository);
-  if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host) || !/^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9_.-]*$/.test(repo)) throw Error("security repository identity invalid");
+  if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host) || !/^[a-z0-9][a-z0-9-]*\/[a-z0-9_.-]+$/.test(repo) || [".",".."].includes(repo.split("/")[1])) throw Error("security repository identity invalid");
   return { hostname: host, repository: repo };
 }

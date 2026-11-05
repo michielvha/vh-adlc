@@ -2,8 +2,8 @@ import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { resolveInside, git } from "../triage/settings";
 import { canonicalJSON, digest, readRun } from "./journal";
-import { alertContext, type Inventory } from "./collect";
-import { parseObservation } from "./history";
+import { alertContext, isSecurityPull, type Inventory } from "./collect";
+import { parseObservation, readHistory } from "./history";
 import { reconcileSecurity, parseSecurityInput, type Occurrence, type PolicyBinding, type SecurityCoverage, type SecurityInput, type SecuritySnapshot } from "./security";
 import { createSecurityRevision, mergeSecurityHistory, readSecurityRevisions, selectSecurityChain, type SecurityRevision } from "./security-history";
 import { verifyScannerEvidence } from "./scanner-evidence";
@@ -31,7 +31,7 @@ export function currentSecurityPolicy(config:Settings):PolicyBinding[]{
   return [...new Set(paths)].sort().map(path=>({path,digest:digest(physicalFile(resolveInside(config.root,path)))}));
 }
 export function inventorySecurityInput(config:Settings,id:string,inventory:Inventory,analysis:unknown):SecurityInput {
-  const run=readRun(config,id),a=v.record(analysis,["evaluated_at","collection_revision","policy_assessment","decisions","evidence","groups","coverage_handoffs"]);
+  const run=readRun(config,id),a=v.record(analysis,["evaluated_at","collection_revision","policy_assessment","decisions","evidence","groups","coverage_handoffs","required_surfaces"]);
   if(inventory.schema_version!==1||inventory.hostname!==config.hostname||inventory.repository!==config.repository||
     inventory.source_commit!==git(config.root,"rev-parse","HEAD")||canonicalJSON(inventory.scope)!==canonicalJSON(run.header.scope)||run.settings_changed)throw Error("security collection source/scope/settings changed");
   const expected=[...run.header.scope.repositories].sort();
@@ -59,6 +59,18 @@ export function inventorySecurityInput(config:Settings,id:string,inventory:Inven
         complete:input.coverage.status==="complete"&&context!==null,synthetic:false,reactivated:false});
     }
   }
+  for(const repo of inventory.repositories){
+    const candidates=repo.pulls.filter(isSecurityPull);
+    coverage.push({hostname:config.hostname,repository:repo.repository,surface:"security-pr",status:repo.coverage.pulls.status,count:repo.coverage.pulls.status==="complete"?candidates.length:null,reason:repo.coverage.pulls.reason??null,handoff:null,synthetic:false});
+    for(const pull of candidates)observations.push({id:`${config.hostname}/${repo.repository}/security-pr:${pull.number}`,hostname:config.hostname,repository:repo.repository,surface:"security-pr",provider_id:String(pull.number),provider_state:"open",
+      target:{kind:"source",reference:pull.head,platform:"unknown"},package:null,ecosystem:null,version:null,location:null,severity:"unknown",advisory_ids:[],affected_range:null,fixed_versions:[],relationship:null,dependency_scope:null,rule:"security-update-pr",
+      observed_at:inventory.collected_at,raw_digest:digest(canonicalJSON(pull)),raw_reference:`inventory:${digest(canonicalJSON(inventory))}/${repo.repository}/pull/${pull.number}`,complete:pull.evidence.status==="complete",synthetic:false,reactivated:false});
+  }
+  for(const item of a.required_surfaces===undefined?[]:v.list(a.required_surfaces)){
+    const required=v.record(item,["repository","surface","reason"]),repository=v.text(required.repository),surface=v.text(required.surface);
+    if(!run.header.scope.repositories.includes(repository))throw Error("required security surface outside scope");
+    if(!coverage.some(c=>c.repository===repository&&(c.surface===surface||c.surface.startsWith(surface+"/"))))coverage.push({hostname:config.hostname,repository,surface,status:"incomplete",count:null,reason:v.text(required.reason),handoff:null,synthetic:false});
+  }
   const handoffs=v.list(a.coverage_handoffs);
   for(const item of handoffs){const h=v.record(item,["repository","surface","handoff"]),row=coverage.find(c=>c.repository===h.repository&&c.surface===h.surface);if(!row)throw Error("coverage handoff outside scope");row.handoff=h.handoff as SecurityCoverage["handoff"];}
   return parseSecurityInput({schema_version:1,run_id:id,hostname:config.hostname,repository:config.repository,source_commit:inventory.source_commit,
@@ -67,16 +79,19 @@ export function inventorySecurityInput(config:Settings,id:string,inventory:Inven
 }
 
 export function reconcileSecurityPacket(config:Settings,id:string,packetPath:string):SecurityResult {
-  const absolute=resolve(packetPath),packetBytes=physicalFile(absolute),base=dirname(absolute),packet=v.record(JSON.parse(packetBytes.toString()),["schema_version","inventory","analysis","scanner_packets","history","evidence_files"]);
+  const absolute=resolve(packetPath),packetBytes=physicalFile(absolute),base=dirname(absolute),packet=v.record(JSON.parse(packetBytes.toString()),["schema_version","synthetic_input","inventory","analysis","scanner_packets","history","evidence_files","history_resolutions"]);
   if(packet.schema_version!==1)throw Error("unsupported security packet schema");
+  const synthetic=v.flag(packet.synthetic_input);
   const inventory=JSON.parse(reference(base,packet.inventory).bytes.toString()) as Inventory;
-  let input=inventorySecurityInput(config,id,inventory,packet.analysis);
+  const analysis=v.record(packet.analysis);
+  let input=inventorySecurityInput(config,id,inventory,{...analysis,decisions:[],evidence:[],groups:[]});
   for(const item of v.list(packet.scanner_packets)){
     const row=v.record(item,["path","manifest_digest"]),relative=v.text(row.path);
     if(isAbsolute(relative)||relative.includes("\\")||relative.split("/").some(p=>!p||p==="."||p===".."))throw Error("scanner packet outside envelope");
     const scan=verifyScannerEvidence(join(base,relative));
     if(scan.manifest_digest!==v.hash(row.manifest_digest)||scan.hostname!==config.hostname||!input.scope.repositories.includes(scan.repository)||scan.source_commit!==input.source_commit)throw Error("scanner packet source/scope changed");
-    const surface=`scanner/${scan.producer.name}/${scan.scope.category}/${digest(canonicalJSON({target:scan.target,scope:scan.scope,producer:scan.producer})).slice(0,16)}`;
+    const surface=`scanner/${scan.producer.name}/${scan.scope.category}/${digest(canonicalJSON({target:scan.target,scope:scan.scope})).slice(0,16)}`;
+    input.coverage=input.coverage.filter(c=>!(c.repository===scan.repository&&c.status==="incomplete"&&surface.startsWith(c.surface+"/")));
     input.coverage.push({hostname:scan.hostname,repository:scan.repository,surface,status:scan.complete?"complete":"incomplete",count:scan.complete?scan.findings.length:null,reason:scan.complete?null:"scan incomplete",handoff:null,synthetic:scan.synthetic});
     for(const finding of scan.findings){const provider_id=digest(canonicalJSON({fingerprint:finding.fingerprint,target:scan.target,rule:finding.rule}));
       input.observations.push({id:`${scan.hostname}/${scan.repository}/${surface}:${provider_id}`,hostname:scan.hostname,repository:scan.repository,surface,provider_id,provider_state:"open",target:scan.target,
@@ -85,8 +100,15 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
     }
   }
   const revisions:SecurityRevision[]=[];
-  for(const item of v.list(packet.history)){
-    const file=reference(base,item),markdown=file.bytes.toString();
+  const primary=inventory.repositories.find(r=>r.repository===config.repository),defaultBranch=primary?.identity?.default_branch??git(config.root,"symbolic-ref","--short","refs/remotes/origin/HEAD").replace(/^origin\//,"");
+  const defaultCommit=git(config.root,"rev-parse",`refs/remotes/origin/${defaultBranch}`);
+  const committed=readHistory(config,defaultCommit);
+  const history=[...committed.map(report=>({bytes:Buffer.from(report.text),entry:{sha256:report.digest},provenance:`commit:${report.commit}:${report.path}:${report.digest}`})),
+    ...v.list(packet.history).map(item=>{const file=reference(base,item);return{...file,provenance:`local:${file.entry.sha256}`};})];
+  const historySeen=new Set<string>();
+  for(const file of history){
+    if(historySeen.has(file.entry.sha256))continue;historySeen.add(file.entry.sha256);
+    const markdown=file.bytes.toString();
     revisions.push(...readSecurityRevisions(markdown));
     // Older reports remain evidence of outstanding observations, never proof of their resolution.
     const legacy=parseObservation(markdown);
@@ -95,11 +117,16 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
       for(const alert of observation.alerts??[]){const identity=`${observation.hostname}/${observation.repository}/${alert.identity}`;
         if(!input.observations.some(o=>o.id===identity))input.observations.push({id:identity,hostname:observation.hostname,repository:observation.repository,surface:observation.surface,provider_id:String(alert.number),provider_state:"unknown",target:{kind:"source",reference:null,platform:"unknown"},
           package:alert.package,ecosystem:null,version:null,location:alert.manifest,severity:alert.severity,advisory_ids:[],affected_range:null,fixed_versions:[],relationship:null,dependency_scope:null,rule:null,observed_at:observation.observed_at,
-          raw_digest:digest(canonicalJSON(alert)),raw_reference:`history:${file.entry.sha256}/${alert.identity}`,complete:false,synthetic:false,reactivated:false});}
+          raw_digest:digest(canonicalJSON(alert)),raw_reference:`${file.provenance}#${alert.identity}`,complete:false,synthetic:false,reactivated:false});}
     }
   }
   const sameRun=revisions.filter(r=>r.run_id===id),chain=selectSecurityChain(sameRun);
   input=mergeSecurityHistory(input,revisions).input;
+  const overlay=(old:unknown[],fresh:unknown[])=>{const map=new Map(old.map(value=>{const row=v.record(value);return[v.text(row.id),row];}));for(const value of fresh){const row=v.record(value);map.set(v.text(row.id),row);}return[...map.values()];};
+  input=parseSecurityInput({...input,decisions:overlay(input.decisions,v.list(analysis.decisions)),evidence:overlay(input.evidence,v.list(analysis.evidence)),groups:v.list(analysis.groups)});
+  if(packet.history_resolutions!==undefined)input=mergeSecurityHistory({...input,history_gaps:[]},revisions,packet.history_resolutions).input;
+  input.history_provenance=[...new Set([...(input.history_provenance??[]),...history.map(file=>file.provenance)])].sort();
+  if(synthetic){input.observations=input.observations.map(o=>({...o,synthetic:true}));input.coverage=input.coverage.map(c=>({...c,synthetic:true}));input.evidence=input.evidence.map(e=>({...e,synthetic:true}));}
   for(const terminal of inventory.terminal??[]){
     const identity=`${terminal.hostname}/${terminal.repository}/${terminal.surface}:${terminal.number}`,observed=input.observations.find(o=>o.id===identity);
     if(!observed||terminal.hostname!==input.hostname||!input.scope.repositories.includes(terminal.repository))throw Error("terminal result has no in-scope prior occurrence");

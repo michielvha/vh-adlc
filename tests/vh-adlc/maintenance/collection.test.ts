@@ -3,6 +3,7 @@ import { chmodSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { collect } from "../../../plugins/vh-adlc/scripts/maintenance/collect";
 import * as collector from "../../../plugins/vh-adlc/scripts/maintenance/collect";
+import { createMaintenanceReader } from "../../../plugins/vh-adlc/scripts/maintenance/cursor-reader";
 import { createGitHubReader } from "../../../plugins/vh-adlc/scripts/github-read";
 import { loadSettings } from "../../../plugins/vh-adlc/scripts/maintenance/settings";
 import { fixture } from "./fixtures";
@@ -19,6 +20,21 @@ test("security occurrences retain advisory/dependency context and raw response p
   const alert = (await collect(loadSettings(f.root), { reader: f.reader })).repositories[0].dependabot.alerts![0];
   expect(alert.context).toMatchObject({ identity: "github.com/example/project/dependabot:7", ecosystem: "npm", installed_version: "1.0.0", relationship: "transitive", scope: "development", affected_range: "<1.0.1", fixed_versions: ["1.0.1"], advisory_ids: ["CVE-2026-1234", "GHSA-abcd-1234-abcd"], raw });
   expect(alert.context!.raw_digest).toMatch(/^[a-f0-9]{64}$/);
+});
+
+test("Dependabot cursor collection never sends the rejected initial page parameter",()=>{
+  const f=setup({"repos/example/project/dependabot/alerts":{__headers:'Link: <https://api.github.com/repos/example/project/dependabot/alerts?state=open&per_page=100&after=cursor>; rel="next"\r\n',body:[]},
+    "repos/example/project/dependabot/alerts?page=2":[]});
+  // This server rejects numeric pagination on this one surface, as the actual provider does.
+  const path=join(f.root,".tools/gh"),old=readFileSync(path,"utf8");
+  f.write(".tools/gh",old.replace('const route=url.pathname', 'if(url.pathname.endsWith("/dependabot/alerts")&&url.searchParams.has("page")){writeSync(1,\'HTTP/2.0 400 Bad Request\\r\\n\\r\\n{"message":"Pagination using page is not supported"}\');process.exit(1);}\nconst route=url.pathname')
+    .replace('page=url.searchParams.get("page")??"1"','page=url.searchParams.has("after")?"2":url.searchParams.get("page")??"1"'));
+  chmodSync(path,0o755);
+  const reader=createMaintenanceReader("github.com",{env:f.env});
+  const result=reader.pages("repos/example/project/dependabot/alerts?state=open&per_page=100",{repositoryId:42});
+  expect(result.complete).toBe(true);expect(result.pages).toBe(2);
+  expect(reader.trace()).toHaveLength(2);
+  expect(f.requests().every(argv=>!new URL(argv.at(-1)!,"https://api.github.com/").searchParams.has("page"))).toBe(true);
 });
 
 test("terminal reads accept only previously observed in-scope identities and retain dismissals", () => {

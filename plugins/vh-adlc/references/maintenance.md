@@ -222,6 +222,102 @@ existing publication is pending. After explicit safe reconciliation and verified
 pending deltas once, in order, into a fresh candidate. Compare step receipts and body prefixes before
 replay; applied and published are distinct states. Retain immutable artifacts and journal refs.
 
+## Security finding accounting
+
+Use the existing dependency batch, bounded-maintenance, investigation and feature procedures for
+security work. A finding's route does not select its execution. A compatible bot patch retains its
+normal batch checks; a manual repair retains exact-target independent review; a major or wider
+contract/trust/data/delivery change starts or links its feature spec. Link a selected persistent audit
+record without creating another audit ledger. Repository posture and operational changes retain the
+consumer's local decision and authority requirements. Keep deadlines, owners, required surfaces,
+exception rules, topology and release/deployment checks in the consumer policy/procedure.
+
+Collect advisory aliases, package/ecosystem/version/ranges, dependency scope/relationship and raw
+response digests when available. Namespace occurrences by host/repository/surface/provider identity.
+Unknown fields and ownership stay unknown. Group only occurrences whose source mapping, package
+and advisory equivalence are evidenced; preserve every original target and outcome. No group grants
+execution in another repository or verifies its satellite/image automatically.
+
+For findings absent from a complete comparable open list, collect exact previously observed IDs with
+`collect --terminal <references.json>`. Each reference has hostname, repository, surface
+(`dependabot` or `code_scanning`) and positive numeric number. Never supply arbitrary advisory URLs
+or IDs outside the declared request. The fixed GET reader retains fixed, dismissed/auto-dismissed,
+open and unknown/unavailable outcomes separately. History comparison schema 2 names disappearance
+`no_longer_open`, not a verified fix; legacy disappearance claims remain unverified history.
+
+Use `security-reconcile --run-id <id> --input <packet.json>` for typed accounting. This operation
+reads and validates local evidence and returns a revision plus a private validation receipt; it does
+not mutate the run, execute scanners or change GitHub. A version-1 packet contains:
+
+| Field | Contract |
+| --- | --- |
+| `synthetic_input` | Explicit boolean; synthetic packets cannot establish live fixes or an all-clear |
+| `inventory` | `{path, sha256}` for the exact current collected inventory |
+| `analysis` | Evaluation time, positive collection revision, explicit local policy assessment, decisions, evidence, groups, locally required surfaces and coverage handoffs |
+| `scanner_packets` | Contained packet directories and their normalized manifest digests |
+| `history` | `{path, sha256}` copies of relevant prior reports, retaining their provenance |
+| `evidence_files` | `{reference, path, sha256}` raw receipts for each proposed verification/tracking decision |
+| `history_resolutions` | Optional conflicting snapshot digests and current authority evidence IDs for explicit supersession |
+
+Every path is relative to the packet's physical directory; reject traversal, symlinks, undeclared
+scanner files and changed digests. Policy/settings/source bindings are read from the owning consumer.
+A local operator assesses prose policy; a digest proves its bytes, not enforcement of its meaning.
+Use the returned input/validation errors to prepare missing decisions; never invent an owner,
+deadline, accessible tracker, approved exception or executed check to make accounting green.
+
+Scanner intake uses `maintenance-scanner-evidence-v1`, schema 1, with producer schema `normalized-v1`.
+The operator supplies tool/version/database/configuration identity, exact source commit or image
+digest/platform, scan scope/exclusions, completion, exit receipt, synthetic flag and normalization
+receipt. Each finding names a unique producer fingerprint, rule, package/version/location/severity,
+advisory aliases and a JSON pointer in a declared raw machine-output file. The manifest enumerates
+all files and SHA-256 digests. The same normalized envelope accepts Trivy vulnerability or
+misconfiguration and govulncheck evidence; consumers produce their own mapping and retain the raw
+output. The shared reader does not parse human CI summaries, download artifacts or run a supplied argv.
+An exit-zero report can contain findings; a nonzero findings exit can describe a complete scan.
+Incomplete or synthetic evidence cannot establish a clean live surface or verified fix.
+
+For each occurrence, record the existing-loop change class, intended outcome and either verified
+evidence or an accessible follow-up with a next action and owner/assignment handoff. Evidence binds
+the exact target, source/policy/scope digest, observation time, reference and raw-file digest.
+Source correction, checks and a comparable absence scan are all required for `fixed-verified`;
+provider state, green CI or a merged PR alone is insufficient. Non-affected, mitigation and risk
+acceptance are separate consumer-authorized exceptions with their evidence and local expiry rules.
+Unapproved dismissals, expired exceptions and changed inputs remain pending.
+
+For an immutable image, corrected successor B never patches digest A. Building B or deploying B while
+A remains active keeps A outstanding. Retiring A needs an explicit consumer scope/authority and
+observed inactivity/retirement plus successor verification. Keep A's vulnerable history and separate
+delivery status; reactivation invalidates retirement. The helper performs no rollout or deletion.
+
+The result separates accounting, coverage, open remediation, exceptions and pending delivery.
+`reconciled` requires complete accounting for each finding and an explicit handoff for coverage gaps;
+it does not mean vulnerability-free. Orphan findings prevent reconciliation. No all-clear is possible
+with unknown required coverage, active open findings, proposed exceptions or required pending delivery.
+
+Pass the exact result file to `report --security <result.json>`. The report stores only its portable
+revision; validation paths and raw evidence remain private. For a later outcome, the append update's
+`security` field names the new verified result file. Preserve all earlier report bytes and exactly
+one original `maintenance-observation-v1` block. Linked security revisions bind their own collection
+revision/digest; only the first projects that original block. Reload the latest valid chain and merge
+relevant prior runs per occurrence, including separate repository scopes. A newer narrowed scope
+cannot erase earlier pending work. Forks, missing predecessors and conflicting histories remain pending.
+Committed default-branch report history is read automatically; supplied local copies supplement it.
+Security-labelled or explicitly security-titled PRs remain occurrences even without a provider alert.
+The consumer's `analysis.required_surfaces` adds named missing scanner surfaces; it creates no shared
+scanner requirement or execution. A history supersession names every conflicting prior digest and
+current `authority` evidence with result `supersedes-history`; timestamps alone are insufficient.
+
+Resume and report-candidate commits revalidate current packet/source/policy/evidence bindings. A typed
+snapshot can never gain success from mutable report status text. Keep unresolved source/target,
+approval and capability handoffs explicit. Raw packet and operator receipts are procedural records,
+not execution attestations, signature verification or a new permission boundary.
+
+Before rolling back an adopted policy reference, invoke the actual prior helper's settings reader
+against frozen settings/references. Prior readers reject the new `security_policy` key; retain the
+original configuration and policy and return an incompatible-settings setup handoff. Dependent legacy
+collection requires separately authorized compatible consumer settings restoration. Never remove a
+policy silently or describe an older reader as certifying a new security snapshot.
+
 ## Selected work and authored repairs
 
 Pure bot aggregation combines only selected bot commits with unchanged intended patch content and

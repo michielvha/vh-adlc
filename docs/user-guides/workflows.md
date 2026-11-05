@@ -102,6 +102,16 @@ It saves a dated report and presents proposed work for selection. A scoped reque
 stays scoped; unavailable alerts and incomplete pages remain visible limitations.
 A green bot PR is not by itself compatibility evidence.
 
+Security accounting retains findings even when there is no bot PR or an update needs another loop.
+Every finding needs a verified outcome or a tracked next action before accounting is reconciled.
+The report keeps coverage, outstanding remediation, exceptions and delivery separate. A dismissed
+alert or an alert missing from the next list is not automatically a verified fix.
+
+Supply scanner results through explicit versioned evidence packets; automatic CI artifact retrieval
+is deferred. Keep deadlines, owners, risk decisions and required verification in the consumer policy.
+The operation validates packet bytes and recorded evidence, then uses the existing repair loops.
+It does not authorize fixes, dismissals or publication merely because accounting is reconciled.
+
 Keep repository topology, bots, sync mappings, exclusions, verification commands
 and release/merge rules in the consumer's
 [maintenance settings and project procedure](../../plugins/vh-adlc/references/maintenance-settings.md).

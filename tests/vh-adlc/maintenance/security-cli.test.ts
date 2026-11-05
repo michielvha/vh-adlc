@@ -9,7 +9,10 @@ import { main } from "../../../plugins/vh-adlc/scripts/maintenance/cli";
 import { alertContext } from "../../../plugins/vh-adlc/scripts/maintenance/collect";
 import { parseObservation } from "../../../plugins/vh-adlc/scripts/maintenance/history";
 import type { Inventory } from "../../../plugins/vh-adlc/scripts/maintenance/collect";
+import { verifySecurityResult } from "../../../plugins/vh-adlc/scripts/maintenance/security-io";
+import { record, text } from "../../../plugins/vh-adlc/scripts/maintenance/security-value";
 import { evidenceBinding } from "../../../plugins/vh-adlc/scripts/maintenance/security";
+function reportResult(value:unknown){const row=record(value);return{path:text(row.path),digest:text(row.digest)};}
 const projects:ReturnType<typeof fixture>[]=[];afterEach(()=>projects.splice(0).forEach(f=>f.dispose()));
 function setup(){
   const f=fixture();projects.push(f);f.write("policy.md","Consumer rules.\n");f.settings({schema_version:1,security_policy:"policy.md"});
@@ -18,21 +21,21 @@ function setup(){
   const coverage={status:"complete" as const,pages:1,count:0},raw={number:1,state:"open",dependency:{package:{ecosystem:"npm",name:"widget"},manifest_path:"package-lock.json",version_requirement:"1.0"},security_advisory:{ghsa_id:"GHSA-abcd-1234-abcd",severity:"high",summary:"$(touch forbidden)"}};
   const inventory:Inventory={schema_version:1,hostname:config.hostname,repository:config.repository,source_commit:run.header.source_commit,collected_at:now,requests:[],scope:run.header.scope,discovery:[],repositories:[{repository:config.repository,identity:{id:1,default_branch:"main"},pulls:[],dashboards:[],coverage:{identity:{...coverage,count:1},pulls:coverage,dashboards:coverage},dependabot:{coverage:{...coverage,count:1},alerts:[{number:1,state:"open",package:"widget",manifest:"package-lock.json",severity:"high",description:raw.security_advisory.summary,context:alertContext(raw,config.hostname,config.repository,"dependabot")}]},code_scanning:{coverage,alerts:[]}}]};
   f.write(".tools/inventory.json",JSON.stringify(inventory));
-  const packet={schema_version:1,inventory:{path:"inventory.json",sha256:digest(readFileSync(join(f.root,".tools/inventory.json")))},analysis:{evaluated_at:now,collection_revision:1,policy_assessment:{reviewer:"operator",reference:"local:policy-check",assessed_at:now},decisions:[],evidence:[],groups:[],coverage_handoffs:[]},scanner_packets:[],history:[],evidence_files:[]};
+  const packet={schema_version:1,synthetic_input:false,inventory:{path:"inventory.json",sha256:digest(readFileSync(join(f.root,".tools/inventory.json")))},analysis:{evaluated_at:now,collection_revision:1,policy_assessment:{reviewer:"operator",reference:"local:policy-check",assessed_at:now},decisions:[],evidence:[],groups:[],coverage_handoffs:[]},scanner_packets:[],history:[],evidence_files:[]};
   f.write(".tools/packet.json",JSON.stringify(packet));
   return{...f,config,run,inventory,packet,save:()=>f.write(".tools/packet.json",JSON.stringify(packet))};
 }
 test("actual security-reconcile derives inventory findings without mutating source, index or run",async()=>{
   const f=setup(),before=git(f.root,"status","--porcelain"),index=readFileSync(join(f.root,".git/index"));
-  const result=await main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")]);
+  const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")]));
   expect(result.revision.snapshot).toMatchObject({accounting_state:"pending",open_remediation_count:1,all_clear:false});
   expect(git(f.root,"status","--porcelain")).toBe(before);expect(readFileSync(join(f.root,".git/index"))).toEqual(index);
   expect(result.revision.snapshot.input.observations[0].raw_reference).not.toContain(f.root);
 });
 test("typed snapshots round-trip in private reports while arbitrary claimed reconciliation is rejected",async()=>{
-  const f=setup(),result=await main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")]);
+  const f=setup(),result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")]));
   f.write(".tools/security.json",JSON.stringify(result));f.write(".tools/request.json",JSON.stringify({authorized_sweep:true,read_only:true}));
-  const saved=await main(["report","--repo",f.root,"--run-id",f.run.header.run_id,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json"),"--security",join(f.root,".tools/security.json")]);
+  const saved=reportResult(await main(["report","--repo",f.root,"--run-id",f.run.header.run_id,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json"),"--security",join(f.root,".tools/security.json")]));
   const report=readFileSync(saved.path,"utf8");expect(parseObservation(report)!.observations[0].count).toBe(1);expect(report).toContain("maintenance-security-v1");expect(report).not.toContain("$(touch forbidden)");
   result.revision.snapshot.accounting_state="reconciled";f.write(".tools/security.json",JSON.stringify(result));
   await expect(main(["report","--repo",f.root,"--run-id",f.run.header.run_id,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json"),"--security",join(f.root,".tools/security.json")])).rejects.toThrow();
@@ -41,11 +44,37 @@ test("packet, source and policy drift invalidate a previously computed security 
   const f=setup();f.packet.inventory.sha256="f".repeat(64);f.save();
   await expect(main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")])).rejects.toThrow();
 });
+test("consumer-required scanner evidence remains an explicit missing surface",async()=>{
+  const f=setup(),packet={...f.packet,analysis:{...f.packet.analysis,required_surfaces:[{repository:"example/project",surface:"scanner/trivy/vulnerability",reason:"consumer pipeline evidence required"}]}};
+  f.write(".tools/packet.json",JSON.stringify(packet));
+  const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")]));
+  expect(result.revision.snapshot.input.coverage.find(c=>c.surface==="scanner/trivy/vulnerability")).toMatchObject({status:"incomplete",count:null});
+});
+test("synthetic packets remain visibly synthetic and cannot assert a live all-clear",async()=>{
+  const f=setup();f.packet.synthetic_input=true;f.save();
+  const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")]));
+  expect(result.revision.snapshot.all_clear).toBe(false);expect(result.revision.snapshot.input.observations.every(o=>o.synthetic)).toBe(true);
+});
+test("committed history is imported even when the supplied history list is empty",async()=>{
+  const f=setup(),old={schema_version:1,run_id:randomUUID(),created_at:"2026-11-01T00:00:00Z",observations:[{hostname:"github.com",repository:f.config.repository,surface:"dependabot",scope:{state:"open",filters:[],exclusions:[]},observed_at:"2026-11-01T00:00:00Z",source_reference:"commit:"+f.run.header.source_commit,status:"complete",reason:null,count:1,alerts:[{number:9,identity:"dependabot:9",package:"older",manifest:"old.lock",severity:"high"}]}]};
+  f.write(f.config.history_dir+"/prior.md",'```maintenance-observation-v1\n'+JSON.stringify(old)+'\n```\n');git(f.root,"add",f.config.history_dir);git(f.root,"commit","-qm","docs: prior observation");git(f.root,"update-ref","refs/remotes/origin/main","HEAD");
+  f.inventory.source_commit=git(f.root,"rev-parse","HEAD");f.write(".tools/inventory.json",JSON.stringify(f.inventory));f.packet.inventory.sha256=digest(readFileSync(join(f.root,".tools/inventory.json")));f.save();
+  const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")]));
+  expect(result.revision.snapshot.input.observations.some(o=>o.provider_id==="9"&&!o.complete)).toBe(true);
+  expect(result.revision.snapshot.input.history_provenance?.some(p=>p.startsWith("commit:"))).toBe(true);
+});
+test("an OSV security PR without an alert cannot disappear from security accounting",async()=>{
+  const f=setup(),repo=f.inventory.repositories[0];
+  repo.pulls.push({repository:repo.repository,number:42,title:"chore(deps): update module widget [security]",body:"OSV-only security update",state:"open",draft:false,author:{login:"renovate",type:"Bot"},author_class:"configured",head:"b".repeat(40),base:f.run.header.source_commit,base_ref:"main",files:[],checks:[],statuses:[],evidence:{status:"complete",pages:1,count:0}});
+  f.write(".tools/inventory.json",JSON.stringify(f.inventory));f.packet.inventory.sha256=digest(readFileSync(join(f.root,".tools/inventory.json")));f.save();
+  const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile","--repo",f.root,"--run-id",f.run.header.run_id,"--input",join(f.root,".tools/packet.json")]));
+  expect(result.revision.snapshot.input.observations.some(o=>o.surface==="security-pr"&&o.provider_id==="42")).toBe(true);
+});
 
 test("append and resume preserve one legacy block, revalidate current inputs and recover typed retry",async()=>{
-  const f=setup(),args=["--repo",f.root,"--run-id",f.run.header.run_id],result=await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]);
+  const f=setup(),args=["--repo",f.root,"--run-id",f.run.header.run_id],result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
   f.write(".tools/security.json",JSON.stringify(result));f.write(".tools/request.json",JSON.stringify({authorized_sweep:true,read_only:true}));
-  const saved=await main(["report",...args,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json"),"--security",join(f.root,".tools/security.json")]);
+  const saved=reportResult(await main(["report",...args,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json"),"--security",join(f.root,".tools/security.json")]));
   const first=readFileSync(saved.path,"utf8");f.write(".tools/prior.md",first);
   const nextTime=new Date(Date.parse(f.inventory.collected_at)+1000).toISOString();
   const nextInventory={...f.inventory,collected_at:nextTime};f.write(".tools/inventory2.json",JSON.stringify(nextInventory));
@@ -55,11 +84,11 @@ test("append and resume preserve one legacy block, revalidate current inputs and
     decisions:[{id:occurrence.id,change:"unknown",outcome:"open",follow_up:{reference:"local:assignment",owner:"owner",assignment_handoff:null,next_action:"investigate"},delivery_required:false,delivery_evidence:[]}],
     evidence:[{id:"tracking",kind:"tracking",result:"accessible",occurrence_id:occurrence.id,target:occurrence.target,binding:evidenceBinding(original.source_commit,original.policy,original.scope,occurrence.target),reference:"local:tracking",digest:digest(raw),observed_at:nextTime,complete:true,synthetic:false}]},
     history:[{path:"prior.md",sha256:digest(first)}],evidence_files:[{reference:"local:tracking",path:"tracking.json",sha256:digest(raw)}]};
-  f.write(".tools/packet2.json",JSON.stringify(nextPacket));const next=await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet2.json")]);
+  f.write(".tools/packet2.json",JSON.stringify(nextPacket));const next=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet2.json")]));
   expect(next.revision.snapshot.accounting_state).toBe("reconciled");
   f.write(".tools/security2.json",JSON.stringify(next));const update={expected_digest:digest(first),step_id:randomUUID(),at:nextTime,append:"Tracked handoff observed.",security:join(f.root,".tools/security2.json")};f.write(".tools/update.json",JSON.stringify(update));
-  const applied=await main(["append",...args,"--update",join(f.root,".tools/update.json")]);
-  expect((await main(["append",...args,"--update",join(f.root,".tools/update.json")])).digest).toBe(applied.digest);
+  const applied=record(await main(["append",...args,"--update",join(f.root,".tools/update.json")]));
+  expect(record(await main(["append",...args,"--update",join(f.root,".tools/update.json")])).digest).toBe(applied.digest);
   const final=readFileSync(saved.path,"utf8");expect(final.match(/```maintenance-observation-v1/g)).toHaveLength(1);expect(final.match(/```maintenance-security-v1/g)).toHaveLength(2);
   await main(["resume",...args]);f.write("policy.md","Changed policy.\n");await expect(main(["resume",...args])).rejects.toThrow();
 });

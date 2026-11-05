@@ -164,7 +164,7 @@ export function reconcileSecurity(value: unknown): SecuritySnapshot {
   const open_remediation_count=findings.filter(f=>f.target_lifecycle!=="retired-verified" && f.remediation!=="fixed-verified" && !f.exception).length;
   const exception_count=findings.filter(f=>f.exception).length, pending_delivery_count=findings.filter(f=>f.delivery_pending).length;
   const accounting_state=gaps.length===0 && findings.every(f=>f.accounted)?"reconciled":"pending";
-  const result={ schema_version:1 as const, kind:"maintenance-security-v1" as const, input, input_digest:digest(canonicalJSON(input)), accounting_state, coverage_state,
+  const result:Omit<SecuritySnapshot,"digest">={ schema_version:1, kind:"maintenance-security-v1", input, input_digest:digest(canonicalJSON(input)), accounting_state, coverage_state,
     open_remediation_count, exception_count, pending_delivery_count, group_count:new Set(findings.map(f=>f.group??f.occurrence.id)).size,
     retired_count:findings.filter(f=>f.target_lifecycle==="retired-verified").length,
     all_clear:accounting_state==="reconciled" && coverage_state==="complete" && open_remediation_count===0 && exception_count===0 && pending_delivery_count===0 && !findings.some(f=>f.occurrence.synthetic), findings, gaps };

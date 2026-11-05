@@ -3,6 +3,7 @@ import { git } from "../triage/settings";
 import { classifyAuthor } from "./settings";
 import type { Settings } from "./types";
 import { canonicalJSON, digest } from "./journal";
+import { createMaintenanceReader } from "./cursor-reader";
 
 export type Coverage = { status: "complete" | "complete-unavailable" | "incomplete"; pages: number; count: number | null; reason?: string; http_status?: number | null };
 export type AlertContext = { identity: string; advisory_ids: string[]; ecosystem: string | null; installed_version: string | null;
@@ -31,7 +32,7 @@ export function collectTerminal(config: Settings, prior: AlertReference[], optio
     number(ref.number); const key = `${ref.repository}/${ref.surface}:${ref.number}`;
     if (seen.has(key)) throw Error("duplicate terminal identity"); seen.add(key);
   }
-  const reader = options.reader ?? createGitHubReader(config.hostname);
+  const reader = options.reader ?? createMaintenanceReader(config.hostname);
   return prior.map(ref => {
     const observed_at = new Date().toISOString();
     try {
@@ -50,7 +51,9 @@ export type Pull = {
   head: string; base: string; base_ref: string;
   files: { filename: string; status: string; previous_filename?: string; patch?: string }[];
   checks: Record<string, unknown>[]; statuses: Record<string, unknown>[]; evidence: Coverage;
+  security?: boolean;
 };
+export function isSecurityPull(value:{title:string;security?:boolean}):boolean{return value.security===true||/\[security\]/i.test(value.title);}
 export type RepositoryInventory = {
   repository: string; identity?: { id: number; default_branch: string };
   pulls: Pull[]; dashboards: { number: number; title: string; body: string; state: string }[];
@@ -197,6 +200,7 @@ function collectPull(config: Settings, reader: GitHubReader, repository: string,
     if (number(final.number) !== pullNumber || sha(object(final.head).sha) !== head || sha(object(final.base).sha) !== base || final.state !== detail.state ||
         JSON.stringify(author(final.user)) !== JSON.stringify(currentAuthor) || final.changed_files !== detail.changed_files) throw Error("PR evidence changed during collection");
     empty.state = text(final.state);
+    if(isSecurityPull(empty)||[detail,final].some(row=>Array.isArray(row.labels)&&row.labels.some(label=>label&&typeof label==="object"&&"name" in label&&label.name==="security")))empty.security=true;
     empty.evidence = { status: "complete", count: empty.files.length, pages: evidencePages };
   } catch (error) { empty.evidence = failure(error, evidencePages); }
   return empty;
@@ -266,7 +270,7 @@ export function collect(config: Settings, options: { reader?: GitHubReader; scop
   if (scope.pull !== undefined) number(scope.pull);
   const repositories = selected ? [selected] : allowed;
   if(options.terminal?.some(ref=>!repositories.includes(ref.repository)))throw Error("terminal identity outside requested collection scope");
-  const reader = options.reader ?? createGitHubReader(config.hostname);
+  const reader = options.reader ?? createMaintenanceReader(config.hostname);
   const traceStart = reader.trace().length;
   const result: Inventory = { schema_version: 1, hostname: config.hostname, repository: config.repository,
     source_commit: git(config.root, "rev-parse", "HEAD"), collected_at: new Date().toISOString(),

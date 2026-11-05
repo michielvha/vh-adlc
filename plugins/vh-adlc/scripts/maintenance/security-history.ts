@@ -1,5 +1,5 @@
 import { canonicalJSON, digest, runID } from "./journal";
-import { parseSecurityInput, validateSecuritySnapshot, type SecurityInput, type SecuritySnapshot } from "./security";
+import { parseSecurityInput, validateSecuritySnapshot, evidenceBinding, type SecurityInput, type SecuritySnapshot } from "./security";
 import * as v from "./security-value";
 
 export type SecurityRevision = { schema_version:1; kind:"maintenance-security-revision-v1"; run_id:string; snapshot_revision:number;
@@ -10,6 +10,7 @@ export function createSecurityRevision(value:SecuritySnapshot,previous:SecurityR
     validateSecurityRevision(previous);
     if(previous.run_id!==snapshot.input.run_id || snapshot.input.collection_revision<previous.collection_revision) throw Error("snapshot run/collection revision changed");
     if(snapshot.input.collection_revision===previous.collection_revision && snapshot.input.inventory_digest!==previous.collection_digest) throw Error("collection revision has conflicting bytes");
+    if(canonicalJSON(snapshot.input.scope)!==canonicalJSON(previous.snapshot.input.scope))throw Error("snapshot run scope changed; use a linked new run");
   }
   const row={schema_version:1 as const,kind:"maintenance-security-revision-v1" as const,run_id:snapshot.input.run_id,snapshot_revision:previous?previous.snapshot_revision+1:1,
     collection_revision:snapshot.input.collection_revision,collection_digest:snapshot.input.inventory_digest,original_projection_digest:previous?previous.original_projection_digest:projection,
@@ -46,11 +47,12 @@ export function selectSecurityChain(values:SecurityRevision[]):{latest:SecurityR
 }
 
 /** Union history per occurrence; a newer narrow report never deletes another scope's pending work. */
-export function mergeSecurityHistory(value:unknown,revisions:SecurityRevision[]):{input:SecurityInput;gaps:string[];provenance:string[]} {
+export function mergeSecurityHistory(value:unknown,revisions:SecurityRevision[],resolutions:unknown=[]):{input:SecurityInput;gaps:string[];provenance:string[]} {
   const input=parseSecurityInput(value),byRun=new Map<string,SecurityRevision[]>(),gaps:string[]=[],provenance:string[]=[];
   for(const raw of revisions) {const row=validateSecurityRevision(raw);byRun.set(row.run_id,[...(byRun.get(row.run_id)??[]),row]);}
   const current=new Map(input.observations.map(o=>[o.id,o])),decisions=new Map(input.decisions.map(d=>[d.id,d])),proofs=new Map(input.evidence.map(e=>[e.id,e]));
   const priorStates=new Map<string,Set<string>>();
+  const priorDigests=new Map<string,Set<string>>();
   for(const rows of byRun.values()) {
     const chain=selectSecurityChain(rows);gaps.push(...chain.gaps);if(!chain.latest)continue;
     const snapshot=chain.latest.snapshot,old=snapshot.input;provenance.push(chain.latest.digest);
@@ -61,6 +63,7 @@ export function mergeSecurityHistory(value:unknown,revisions:SecurityRevision[])
       const previousState=snapshot.findings.find(f=>f.occurrence.id===occurrence.id);
       const key=digest(canonicalJSON({target:occurrence.target,remediation:previousState?.remediation,exception:previousState?.exception,target_lifecycle:previousState?.target_lifecycle}));
       const states=priorStates.get(occurrence.id)??new Set();states.add(key);priorStates.set(occurrence.id,states);
+      const digests=priorDigests.get(occurrence.id)??new Set<string>();digests.add(chain.latest.digest);priorDigests.set(occurrence.id,digests);
       // Imported absence is not a new scan. Positive current verification is required to close it.
       if(!current.has(occurrence.id))current.set(occurrence.id,{...occurrence,complete:false});
       if(!comparable)gaps.push(`historical scope reassessment: ${occurrence.id}`);
@@ -72,7 +75,14 @@ export function mergeSecurityHistory(value:unknown,revisions:SecurityRevision[])
       }
     }
   }
-  for(const [id,states] of priorStates) if(states.size>1)gaps.push(`historical outcome conflict: ${id}`);
+  const acknowledged=new Set<string>();
+  for(const raw of v.list(resolutions)){
+    const r=v.record(raw,["occurrence_id","prior_digests","evidence_id"]),id=v.text(r.occurrence_id),named=v.strings(r.prior_digests).sort(),o=current.get(id),e=input.evidence.find(e=>e.id===r.evidence_id);
+    if(!o||!e||!named.length||canonicalJSON(named)!==canonicalJSON([...(priorDigests.get(id)??[])].sort())||e.kind!=="authority"||e.result!=="supersedes-history"||e.occurrence_id!==id||!e.complete||e.synthetic||
+      e.binding!==evidenceBinding(input.source_commit,input.policy,input.scope,o.target)||Date.parse(e.observed_at)<Date.parse(o.observed_at)||Date.parse(e.observed_at)>Date.parse(input.evaluated_at))throw Error("historical outcome resolution evidence missing or changed");
+    acknowledged.add(id);
+  }
+  for(const [id,states] of priorStates) if(states.size>1&&!acknowledged.has(id))gaps.push(`historical outcome conflict: ${id}`);
   input.observations=[...current.values()];input.decisions=[...decisions.values()];input.evidence=[...proofs.values()];
   input.history_gaps=[...new Set([...(input.history_gaps??[]),...gaps])].sort();
   input.history_provenance=[...new Set([...(input.history_provenance??[]),...provenance])].sort();

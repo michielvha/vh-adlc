@@ -80,6 +80,13 @@ do not establish general Copilot lifecycle or delivery support.
 
 ## Repository settings
 
+The security reconciliation candidate adds normalized scanner packets, typed report revisions and
+history comparison schema 2. Its development evidence and unrun surfaces are recorded in
+[the security reconciliation feature](../specs/maintenance-security-resolution.md). Existing
+settings/inventories/reports remain readable; older helpers reject a newly adopted `security_policy`
+key and require the documented settings rollback handoff. Candidate tests do not establish a released
+marketplace upgrade, automatic scanner collection or live advisory remediation.
+
 Triage reads `.vh-adlc/triage.yaml` and maintenance reads `.vh-adlc/maintenance.yaml`. YAML settings need
 plugin 0.7.0 or later. An earlier plugin does not read these files and runs on its defaults, so upgrade
 the plugin on every host before a repository moves its settings. Plugin 0.7.0 refuses a `.json` or `.yml`

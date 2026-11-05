@@ -8,7 +8,7 @@ test("orphan findings block accounting; a concrete assignment handoff accounts f
   input.decisions.push(decision(input)); input.evidence.push(proof(input, "tracking", "accessible"));
   expect(reconcileSecurity(input)).toMatchObject({ accounting_state: "reconciled", open_remediation_count: 1, all_clear: false });
 });
-test.each([["major", "feature"], ["compatible-authored", "bounded-maintenance"], ["compatible-bot", "bot-batch"], ["unknown", "investigation"], ["posture", "consumer-policy"], ["audit", "audit-reference"]])("%s uses existing %s route without selecting work", (change, route) => {
+test.each([["major", "feature"], ["compatible-authored", "bounded-maintenance"], ["compatible-bot", "bot-batch"], ["unknown", "investigation"], ["posture", "consumer-policy"], ["audit", "audit-reference"]] as const)("%s uses existing %s route without selecting work", (change, route) => {
   const input = securityInput(); input.decisions.push({ ...decision(input), change }); input.evidence.push(proof(input, "tracking", "accessible"));
   expect(reconcileSecurity(input).findings[0]).toMatchObject({ route, selected: false });
 });
@@ -53,12 +53,12 @@ test("wrong target, source/policy binding, incomplete evidence or future receipt
   }
 });
 test("an immutable successor is verified separately; only evidenced authorized retirement ends the old obligation", () => {
-  const input = securityInput(), target = { kind: "image", reference: "sha256:" + "a".repeat(64), platform: "linux/amd64" };
+  const input = securityInput(), target = { kind: "image" as const, reference: "sha256:" + "a".repeat(64), platform: "linux/amd64" };
   input.observations[0].target = target;
   const successor = { ...target, reference: "sha256:" + "b".repeat(64) };
   input.decisions.push({ ...decision(input), outcome: "retired", successor });
   input.evidence.push(proof(input, "tracking", "accessible"));
-  for (const [kind,result] of [["source","corrected"],["check","pass"],["scan","absent"]]) input.evidence.push(proof(input, kind, result, successor));
+  for (const [kind,result] of [["source","corrected"],["check","pass"],["scan","absent"]] as const) input.evidence.push(proof(input, kind, result, successor));
   expect(reconcileSecurity(input).findings[0].target_lifecycle).toBe("superseded-pending");
   input.evidence.push(proof(input,"authority","approved"),proof(input,"retirement","inactive"));
   expect(reconcileSecurity(input).findings[0]).toMatchObject({ target_lifecycle: "retired-verified", remediation: "open" });
@@ -81,7 +81,7 @@ test("duplicates, unknown fields, unrequested routes and future schemas are reje
   const input=securityInput(); input.observations.push(structuredClone(input.observations[0])); expect(()=>reconcileSecurity(input)).toThrow();
   expect(()=>reconcileSecurity({...securityInput(),schema_version:2})).toThrow();
   expect(()=>reconcileSecurity({...securityInput(),automerge:true})).toThrow();
-  const selected=securityInput(); selected.decisions.push({...decision(selected),selected:true}); expect(()=>reconcileSecurity(selected)).toThrow();
+  const selected=securityInput(); expect(()=>reconcileSecurity({...selected,decisions:[{...decision(selected),selected:true}]})).toThrow();
 });
 
 test("a complete nonzero surface cannot silently lose its observations", () => {
@@ -92,4 +92,8 @@ test("a partial observation with an unknown target can receive a tracked handoff
   const input=securityInput();input.observations[0].target.reference=null;input.observations[0].complete=false;
   input.decisions.push(decision(input));input.evidence.push(proof(input,"tracking","accessible"));
   expect(reconcileSecurity(input).findings[0]).toMatchObject({accounted:true,remediation:"open"});
+});
+test("organization .github repositories remain valid scoped inventory",()=>{
+  const input=securityInput();input.scope.repositories.push("example/.github");
+  expect(()=>reconcileSecurity(input)).not.toThrow();
 });
