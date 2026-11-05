@@ -191,7 +191,13 @@ Run native installed-operation trials for a report-first sweep, selected compati
 
 ## Tasks
 
-None yet; task planning follows the owner's acceptance. Shared implementation and a report-only Stackweaver trial are authorized; advisory remediation remains excluded.
+- [ ] T1 `plugins/vh-adlc/scripts/maintenance/{collect,settings,types}.ts`, `tests/vh-adlc/maintenance/{collection,settings}.test.ts` - observe metadata/policy/terminal-read regressions failing, then preserve namespaced occurrences, raw evidence and local policy bindings with fixed GET collection; focused collection/settings tests pass (AC-01, AC-02, AC-05, AC-10).
+- [ ] T2 `plugins/vh-adlc/scripts/maintenance/scanner-evidence.ts`, `tests/vh-adlc/maintenance/scanner-evidence.test.ts` - observe packet validation regressions failing, then verify normalized scanner envelopes, physical files, digests, target/completion and synthetic evidence boundaries; scanner tests pass (AC-03, AC-10).
+- [ ] T3 `plugins/vh-adlc/scripts/maintenance/security.ts`, `tests/vh-adlc/maintenance/security.test.ts` - observe reconciliation regressions failing, then derive routes, ownership, outcomes, exceptions, immutable-target retirement and complete accounting from bound evidence; security tests pass (AC-02, AC-04, AC-05, AC-06, AC-07).
+- [ ] T4 `plugins/vh-adlc/scripts/maintenance/{security-history,history}.ts`, `tests/vh-adlc/maintenance/{security-history,report}.test.ts` - observe chain/overlapping-scope/history-schema regressions failing, then retain every relevant occurrence and original projection while selecting valid linked snapshots; history/report tests pass (AC-05, AC-08, AC-09).
+- [ ] T5 `plugins/vh-adlc/scripts/maintenance/{cli,report,report-candidate,artifacts}.ts`, `tests/vh-adlc/maintenance/security-cli.test.ts` - observe actual-helper integration regressions failing, then add security reconciliation and typed report updates with persisted evidence, current-input validation and retained publication restrictions; CLI/publication/recovery tests pass (AC-07, AC-08, AC-10).
+- [ ] T6 `plugins/vh-adlc/{skills/vh-adlc-maintenance,references,plugin.json,.claude-plugin/plugin.json}`, `docs/{user-guides/workflows,reference/compatibility}.md`, `tests/vh-adlc/maintenance/` - document actual interfaces and existing-loop handoffs, verify prior-helper settings rejection and installed-operation scenarios, and keep both package versions aligned; relevant compatibility/native trials pass with their actual limits (AC-04, AC-09, AC-10).
+- [ ] T7 `docs/specs/maintenance-security-resolution.md`, `tests/vh-adlc/maintenance/` - run final applicable repository checks and a private report-only Stackweaver trial through the candidate; retain evidence and verify unchanged consumer source/index/settings/remote state, then obtain an exact-commit independent implementation review (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10).
 
 ## Open Questions
 
