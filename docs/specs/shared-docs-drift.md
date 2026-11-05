@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner continued the proposed audit-plus-resolution scope. Independent spec review and acceptance remain; no implementation or publication is authorized."
+status_description: "Audit-plus-resolution draft passes lint. Claude Code review was refused by its spend limit; reviewer-provider choice and independent acceptance remain pending. No implementation or publication is authorized."
 issue: null
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
 covers:
@@ -51,6 +51,14 @@ Stackweaver source inspected for this draft is `d77259358c87aebc93ad76231ae245fd
 - `scripts/docs-audit.js:45-67` fixes project roots and historical exemptions in the scanner. Its report includes the source commit, findings, suppressed findings and stale suppressions (`scripts/docs-audit.js:927-944`). A read failure currently skips a document (`scripts/docs-audit.js:891-896`), so successful process exit alone cannot establish complete collection.
 - `.github/workflows/docs-drift-audit.yml:49-52,79-99,121-157` owns the scheduled scan, advisory worker and PR publication. `.claude/commands/docs-drift.md` selects the local resolver.
 - `agents/docs-truth.md:3-10` defines a separate semantic verification workflow with its own ledger and shard selector.
+
+A local read-only baseline at that same Stackweaver revision returns process exit 0
+with 466 unverified candidates: 19 error, 239 warning and 208 informational findings,
+plus 54 suppressed findings and one stale suppression. The report has no explicit
+collection-completeness field. The checkout and Git index are preserved. This is
+scanner-output evidence, not a semantic audit, a clean result or an instruction to
+apply any finding. The full private report stays outside the repository and review
+packet; only these aggregate observations inform the contract.
 
 Shared docs impact already supplies coverage matching and an affected-document review procedure; lifecycle intake routes that operation separately from persistent code audit (`plugins/vh-adlc/references/lifecycle.md:52-60`). This feature must not add a second coverage matcher or silently route a docs sweep to codebase audit.
 
@@ -135,6 +143,13 @@ Fresh paired review binds the exact installed shared payload and consumer candid
 ## Tasks
 
 None yet; written after scope decisions, independent spec review and owner acceptance.
+
+The requested Claude Code Opus 5.5 spec review at
+`199977cce9b1a0da4d938c9222de9c9ac0b2d010` was refused by its monthly spend limit.
+The native process exits 1, reports is_error true and returns no valid reviewer
+records. No Review Log row is stored. Its original public-only packet and native
+transcript are retained locally. Switching to Copilot Opus 5.5 is an owner choice;
+no fallback, billing change, implementation or publication follows from this failure.
 
 ## Open Questions
 
