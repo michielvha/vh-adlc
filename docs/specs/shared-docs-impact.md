@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 branch: feat/shared-docs-impact
-status_description: "Shared feature and Stackweaver migration published; actual marketplace and post-merge checks pass. Final exact-commit completion review remains open."
+status_description: "Published plugin 0.9.0 and Stackweaver adoption verified; all seven criteria met in independent Opus R-16 and the completion gate passes. Agreed host limits remain explicit."
 issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -502,7 +502,7 @@ unclaimed; a future UI change still owes its existing local visual checks.
 - [x] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
   Evidence: R-11 independently executes source-candidate parity/preflight at shared `7a3c613` and consumer `7a1e905`: 790 docs, 3,336 source paths, zero losses/gaps, 16 contracts including named rollback. R-12 reads the whole auxiliary preflight and confirms the unchanged source. Root-addition and missing-rollback negative probes are retained. Migration readiness remains false until published acceptance; current consumer will be refreshed again for cutover.
 
-- [ ] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
+- [x] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
 
 ### Implementation progress
 
@@ -772,6 +772,15 @@ normal disposition mechanism. The read-only release watcher for merge 009a1c5
 exits successfully: monorepo tag 5.109.13, frontend sync PR #313, frontend release
 0.79.27. No manual CI or unrelated satellite action was dispatched by this work.
 T10's final complete gate and status publication are the remaining bookkeeping.
+
+Completion: R-16 establishes all seven criteria, T1 through T10 are done and
+`vh-adlc gate complete: pass (rules 1, docs 0e52f51)`. Both final reviews are fresh,
+the normalized normative baseline equals the owner's accepted R-8 version, and
+review records remain byte-identical to the returned text. The published source,
+actual marketplace acceptance, gated migration, post-merge checks and successful
+configured release chain are recorded above. GUI/phone, actual Claude
+docs-impact model execution and live screenshot capture remain the agreed
+unclaimed surfaces. Drift audit/resolution/truth remain separate roadmap scope.
 
 ## Open Questions
 
