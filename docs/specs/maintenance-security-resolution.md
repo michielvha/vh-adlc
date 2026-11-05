@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-1 and R-2 findings addressed, including settings-aware rollback; renewed spec review pending. No advisory remediation is authorized."
+status_description: "Clean independent R-3 spec review after R-1/R-2 corrections; awaiting owner acceptance. No implementation or advisory remediation has started."
 issue: null
 goal: "Every security finding in a maintenance scope retains its evidence, an explicit route through an existing loop, and an outcome that distinguishes verified fixes from outstanding work and exceptions."
 covers:
@@ -203,6 +203,7 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-05 | R-1 | spec | `bfd28ae3561998dc930d6a0f5326964b5de99b07` | unknown | procedural | Two blocking findings and one should-fix finding; model identity not attested. |
 | 2026-11-05 | R-2 | spec | `c2a80eed6e3723fa3cdbcec4168b56289708e57b` | unknown | procedural | No blocking findings; one should-fix rollback compatibility finding; model identity not attested. |
+| 2026-11-05 | R-3 | spec | `a31e4ec836aec1b4908ed74389065cefeee46029` | unknown | procedural | NO FINDINGS; model identity not attested. |
 
 ### R-1
 
@@ -235,6 +236,10 @@ SEVERITY: should-fix
 WHERE: Design sections 2 and 7; AC-09 Test Plan
 EVIDENCE: docs/specs/maintenance-security-resolution.md:72 adds security_policy to settings schema 1, while :154 describes rollback by reinstalling the prior plugin and using its legacy inventory behavior. The baseline loader at plugins/vh-adlc/scripts/maintenance/settings.ts:12-13,69-72 rejects unknown settings keys and does not accept security_policy. A consumer that adopts the new optional field therefore cannot run the prior helper after the specified rollback. The AC-09 scenario covers baseline settings and preserved artifacts, but not settings containing the new field.
 PROPOSAL: Define a rollback preflight and consumer-authorized settings restoration or explicit legacy-compatible settings projection that preserves the adopted policy and original configuration bytes. Add an actual prior-helper rollback case with security_policy present, ensuring it either resumes through that documented compatibility path or returns a concrete setup handoff instead of claiming legacy inventory remains usable.
+
+### R-3
+
+NO FINDINGS
 
 ## Sources
 
