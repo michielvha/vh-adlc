@@ -333,6 +333,7 @@ None.
 | 2026-11-05 | R-15 | spec | `3ea3df8ada7276fa7f678ed478075af1dd216d77` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 | 2026-11-05 | R-16 | spec | `2249cee19e85832605c0f035a0b9c2d070b8e4c2` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 | 2026-11-05 | R-17 | spec | `191fc46516b07a5f66f133d005d35d1ec09501aa` | claude-opus-5.5 | procedural | 3 should-fix; 2 nit. Full requested read coverage. |
+| 2026-11-05 | R-18 | spec | `9f356ebd560c44972e6e433fd36d101ed7e2091e` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -798,6 +799,33 @@ SEVERITY: nit
 WHERE: Open Questions
 EVIDENCE: Open Questions says "None." and then adds narrative about R-16 F-03, the authoring error and the accepted policies (00241 line 69). The standard says "An answered question is folded into the document and removed" and that "None." means every question has been answered (feature-documents.md 00081 lines 55-56). These answers are already folded into Owner decisions and Upgrades (00081 line 23; 00241 line 23).
 PROPOSAL: Leave Open Questions as "None.". Keep the provenance of the R-16 F-03 correction in the Review Log or status_description only.
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Independent candidate review and publication; Audit and preparation (report output); Scheduled worker and staged adoption; Test Plan AC-02, AC-05, AC-06
+EVIDENCE: After cutover, the unattended worker "publishes only after a clean matching result" (shared-docs-drift.md:187). Publication is also prevented by "A missing reviewer, model mismatch or blocking/should-fix finding" (line 189). An incomplete scan "prevents clean/ready claims" (lines 121, 300). The current-default gate can also deny a run (lines 217-219). Report mode saves "a report only at an explicitly selected output location" (line 147). Scope keeps the legacy notification behavior and rules out "an additional notification mechanism" (line 95). The legacy advisory PR is the owner's visible signal. The spec never defines what a non-publishing unattended run leaves behind: its job status, where its report and gaps are retained on the hosted runner, or whether an incomplete assessment may still publish an advisory PR that discloses its gaps. Only the passing trial path is observed (lines 233, 241). AC-05 checks only that a failure has no "clean-success fallback" (line 303). With the new read-failure accounting, one persistently unreadable document or one should-fix review finding could stop every scheduled run with nothing visible to the owner, so accumulated drift would stop surfacing.
+PROPOSAL: Define the unattended non-publication outcome for incomplete assessments, blocked or mismatched reviews and gate denials. For example, the run ends with a non-success job status and retains a bounded report artifact naming the gap, using GitHub's existing run notification. State whether an incomplete assessment may publish a disclosed partial advisory PR. Add AC-05/AC-06 cases for a scheduled run with an incomplete scan and one with a should-fix review result.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Upgrades after adoption; Migration and rollback; Test Plan AC-06
+EVIDENCE: The AC-06 proof requires running "a compatible upgrade with independent diff/dependency review, actual new-version installed checks and a successor record". It also requires running "a separately authorized default-branch dormant candidate worker/trial definition; its new-version execution/permission trial can pass without changing the approved scheduled worker" (shared-docs-drift.md:304). The Design says "Test a permission- or execution-changing candidate trial passing while the old approved scheduled worker continues to pass its production gate" (line 273). A trial-route upgrade means "another separately authorized live unattended trial at the proposed version" on "an actual hosted runner and selected provider/model" (lines 273, 233). At first adoption there is no successor version. Read literally, AC-06, the criterion that completes this feature, needs all of these before it can be met: a second published release, new-version marketplace installs, and a second paid live trial that adds dormant candidate files to Stackweaver's default branch. Neither the stage order (line 231) nor Migration and rollback (lines 279-283) mentions that work or its authorization. The proofs could also be meant as hermetic adoption-helper/gate tests with synthetic pins, workflows and receipts. The spec does not say which.
+PROPOSAL: State that the AC-06 upgrade-route proofs are hermetic adoption-helper and runtime-gate tests using synthetic pins, caller workflows, records and receipts, and that actual installed checks and live trials apply only at real later upgrades. If a real successor exercise is intended, add it to the staged order with its release, trial and default-branch authorizations.
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Authority and delivery (issue creation); Test Plan AC-05
+EVIDENCE: The issue payload carries "the exact repository/title/body/labels, source finding/PR scope, current evidence, disposition and unknowns". An issue-only run keeps "its payload/review artifacts external and digest-bound" without a local checkpoint (shared-docs-drift.md:181). The pinned documentation convention, which this operation lists as a required page (line 115), says "Findings live in documents. An investigation, measurement or root cause goes into the repository's analysis or feature document with its evidence. An issue states the work in a few lines and links that document" (documentation.md lines 52-57). Under the current design, the evidence and reasoning go into the issue itself. An issue-only run also has no committed or reviewable document for the issue to link.
+PROPOSAL: Make the issue body a short statement of the work that links a committed or published report or document holding the evidence, dispositions and unknowns. Alternatively, record why docs-drift issues are an exception to the pinned convention. Add an AC-05 assertion on the issue body shape.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Scheduled worker and staged adoption (upgrade signal); Upgrades after adoption (trial route, rollback)
+EVIDENCE: The only file the updater matches is the non-executing `.vh-adlc/docs-drift-upgrade-signal.yaml` (shared-docs-drift.md:229). A compatible pin bump "refreshes the non-executing upgrade signal to the verified new source/release" (line 269). The trial-route upgrade and rollback paths say nothing about the signal: "Rollback selects the prior approved pin, record and matching migration-owned inputs together" (line 273). After a trial-route upgrade, the signal could stay at the old release, so the updater keeps proposing a version that is already adopted. After a rollback, it is unclear whether the signal reverts and the rolled-back version gets proposed again, or stays ahead of the active pin.
+PROPOSAL: State that every adopted upgrade route refreshes the signal in its C change. Also state whether rollback restores the signal or leaves it, and add both cases to the AC-06 updater proof.
 
 ## Sources
 
