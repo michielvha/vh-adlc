@@ -613,7 +613,6 @@ None. The owner approved all six review refinements.
 | 2026-11-04 | R-7 | spec | `0b1ed20d39c2165a0828ba39e30f62264fd7da99` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on local-plan upkeep, corpus collection, policy view and intake routing. |
 | 2026-11-04 | R-8 | spec | `372bd41b8cc56b470e0679b2bb2a8490f52c3969` | claude-opus-5-5 | procedural | No blocking or should-fix findings; four nits retained as implementation proof obligations. |
 | 2026-11-05 | R-8 | spec | `372bd41b8cc56b470e0679b2bb2a8490f52c3969` | n/a | n/a | accepted by owner |
-
 | 2026-11-05 | R-9 | implementation | `7d7b16673032459c89d9aefb3acba16767f748a0` | claude-opus-5-5 | procedural | AC-01 through AC-04 met; two should-fix findings and three nits, addressed in later commits. Delivery criteria remain open. |
 | 2026-11-05 | R-10 | spec | `7a3c613f64e352084c6bc5730c09cf899fee2843` | claude-opus-5-5 | procedural | No blocking or should-fix findings; one progress-evidence nit addressed. Refreshes default-branch drift; unchanged R-8 acceptance retained. |
 | 2026-11-05 | R-11 | implementation | `7a3c613f64e352084c6bc5730c09cf899fee2843` | claude-opus-5-5 | procedural | AC-01 through AC-04 met; AC-05/06 not verified, AC-07 not met; one wording nit addressed. Source review only; final delivery review remains open. |
