@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-docs-impact
-status_description: "Shared feature published and real marketplace acceptance passed; post-merge release, gated Stackweaver cutover and final completion review remain open."
+status_description: "Shared feature published and real marketplace acceptance passed; gated Stackweaver cutover and final completion review remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -660,6 +660,18 @@ Stackweaver integration passes 18 applicable checks with zero failures/skips;
 refreshed source-candidate wrapper/caller/rollback contracts pass 16 of 16.
 Post-merge normal CI/release and fresh installed-consumer paired acceptance are
 still required before migration or feature completion is claimed.
+
+
+Normal post-merge CI passes at published source `02096e7`; the configured normal
+release is v0.14.0 at that exact commit. Its detached signature is valid against
+the repository public signing key, all four archive hashes match signed checksums,
+and the Linux binary reports vh-adlc 0.14.0. Other release binaries were not
+executed locally. Plugin installation deliberately retains its signed 0.9.0
+runtime lock; the new release does not silently change that dependency.
+The consumer's first final hook attempt had one unchanged frontend test timeout
+while 1,248 tests passed. The focused file then passed both tests and the full
+normal hook retry passed 18 applicable checks with zero failures or skips; no
+product code was edited for that retry. Failure and retry artifacts are retained.
 
 ## Open Questions
 
