@@ -360,6 +360,7 @@ None.
 | 2026-11-05 | R-20 | spec | `b45f738e537a539630aa326b9e949f6634b55813` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-21 | spec | `7215b2fcb2c8147d599a7f58c3c0d4951cc78efb` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-22 | spec | `b6866cfb43389728acafa97b126ca56113266c60` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-23 | spec | `d4fc7f9ecce11da2348119ecae855f66f7249a46` | claude-opus-5.5 | procedural | 1 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -930,6 +931,21 @@ SEVERITY: nit
 WHERE: Design, Common publisher and effect recovery
 EVIDENCE: The Design cites "the audit journal's write-ahead intent/receipt and `recoverEffect` observe-before-replay pattern (`scripts/audit/journal.ts:10-18,98-110`, ...)". Lines 10-18 are the Intent/Receipt/Event types. Lines 98-110 are the end of `retainAbsence` and `createRun`, which publishes the run header and registers the run. The per-effect write-ahead functions are `intent` and `outcome` at journal.ts lines 288-298 (chunk 00241 lines 48-58).
 PROPOSAL: Cite `scripts/audit/journal.ts:10-18,288-298`, adding `createRun` at 100-110 only for the header-registration step.
+
+### R-23
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Entry and consumer contract (helper reuse); Scan-result protocol (raw blob digests); Authority and delivery (PR object store); Test Plan AC-02, AC-03
+EVIDENCE: The spec reuses "`hash` and the Git-read helpers exported by `scripts/audit/snapshot.ts`" and requires "byte-exact `gitBytes`" for paths, inventories and blobs (shared-docs-drift.md 00081 line 35). Protocol v1 requires document entries to "match the bytes of their blob at `source_commit`" (00081 line 57). The scan helper must snapshot and compare "index bytes, HEAD/refs and FETCH_HEAD" (00081 line 45). The PR store must make "no caller refs or FETCH_HEAD writes" and must never fetch "into an existing caller `.git`" (00161 line 23). `snapshot.ts` `gitBytes` runs `git -C root` with `{ ...process.env, GIT_OPTIONAL_LOCKS: "0" }` and nothing else (snapshot.ts lines 16-22). So it inherits `GIT_DIR`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY` and related variables, follows `refs/replace` substitutions, and allows promisor lazy fetches. The shared docs-impact collector already handles this risk. It strips those variables because "Git exports these when calling hooks", sets `GIT_NO_REPLACE_OBJECTS=1` and `GIT_NO_LAZY_FETCH=1`, and runs Git with `--literal-pathspecs -c core.fsmonitor=false` (docs-impact/collection.ts lines 26-31, 87). The spec does not mention any of these controls. With the named helper, a hook-invoked or partial-clone run could hash replaced or wrong-repository bytes, snapshot another index, or write objects during a "read". That breaks the raw-blob agreement between scanner and helper and the caller-preservation guarantees.
+PROPOSAL: Require every docs-drift Git read, fetch and snapshot to use the hardened docs-impact Git environment and arguments. One way is to move that environment into a neutral exported module that both features use, keeping only `hash` from audit. Add AC-02/AC-03 cases for an inherited `GIT_DIR`/`GIT_INDEX_FILE`, a replace ref on a document blob and a promisor lazy fetch. Each must leave the assessment incomplete or produce the unaltered bytes, with no caller-state change.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Owner decisions
+EVIDENCE: The Owner decisions trial-route sentence covers "accepted assessment/classification/scan/publication rules, protected role identity, hosted reusable-worker blob or execution fields (install, runner, environment, invocation/steps), or permission/effect contract" (00081 line 27). The normative Upgrades text also sends "permission/secret, lease or publication/closure rules/behavior" and "resolve-classification/supersession" changes to the trial route. It requires the non-pin "secret" caller fields to stay exact (00241 lines 49, 53). The protected manifest lists "secret-name mappings" and "lease policy" as separate bindings (00241 line 35). The summary sentence that cites the owner therefore names neither secret-name mappings nor lease behavior. A reader could take a lease or secret-mapping change to be compatible, even though the Upgrades section and AC-06 route it to a trial.
+PROPOSAL: Add secret-name mappings, lease behavior and supersession/closure rules to the Owner decisions trial-route sentence, or have that sentence point to the Upgrades trial-route list without restating it.
 
 ## Sources
 
