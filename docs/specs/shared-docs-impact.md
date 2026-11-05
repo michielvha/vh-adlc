@@ -489,9 +489,9 @@ unclaimed; a future UI change still owes its existing local visual checks.
 - [x] T6 `plugins/vh-adlc/skills/vh-adlc-docs-impact/SKILL.md`, `plugins/vh-adlc/references/docs-impact.md`, lifecycle/loop/implement/ship references, package/discovery guards, examples, public guides and `.github/workflows/ci.yml` - observe failed routing/contract checks, add the portable operation and scoped integration, and pass existing protected-body and complete-example checks; both installed entry points remain testable (AC-04, AC-06).
   - Evidence: new routing/procedure checks failed before the skill/reference existed (`t6-red.log`). The package/integration/discovery/example/protected-body selection now passes 76 tests in `t6-package.log`. Implement/ship retain the original approved body after removing only the named Documentation impact section; source/classification preflight uses committed HEAD. Strict typechecking passes with locked compiler dependencies in owned temporary scratch, so compiler symlinks never enter the installed payload or confinement export. Linux and macOS CI select the portable tests and that typecheck; macOS execution remains CI evidence to obtain, not a local-host claim. Package candidate is 0.9.0 with 13 skills and the same 10 engineering operations. The new canary and pin use published convention `f8ccacbedf057159ea24136ba115cd9857bb22ac` from merged vhco-pro/docs#21; its complete three-file diff was reviewed and the only unrelated coding guidance was owner-accepted before the move.
 - [x] T7 `Stackweaver:agents/docs-impact.md`, `agents/docs-impact-project.md`, `scripts/check-doc-coverage.js`, `AGENTS.md`, retained callers and `tests/agent-docs-impact/` - use an isolated current-main migration branch, record the full caller inventory, observe failed compatibility/parity tests, then pass the real wrapper protocol/no-op/error/quoting/overlay cases and scoped rollback while preserving local policy. Rebuild the legacy index from the exact HEAD in disposable scratch; report committed-index drift separately. Keep the plan mapping-upkeep/review-staleness rule explicitly in the companion and rollback set (AC-05).
-  Evidence: `DOCS_IMPACT_TEST_PLUGIN=<exact shared payload> node --test tests/agent-docs-impact/*.test.cjs` passes 16 tests at consumer `75519076246be4875515a8ac02bb0a2dd4d81100`; rebuilt-HEAD parity and scoped rollback results are recorded below.
+  Evidence: `DOCS_IMPACT_TEST_PLUGIN=<exact shared payload> node --test tests/agent-docs-impact/*.test.cjs` passes 16 tests at consumer `7a1e905635192c84c177260df26e8df0b811af00`; rebuilt-HEAD parity and scoped rollback results are recorded below.
 - [x] T8 `plugins/vh-adlc/knowledge.md`, lock/manifests as required by the published dependency, `tests/vh-adlc/docs-impact/` - record and independently review the entire old-to-new convention diff before moving the pin; surface unrelated normative drift for owner acceptance. Execute actual bounded model trials and isolated native Codex/Claude candidate discovery/standalone checks, retaining exact payloads, returned evidence and unclaimed surfaces (AC-01, AC-04, AC-06).
-  Evidence: `bun tests/vh-adlc/docs-impact/native-trial.ts <repo> <new-output>` passes all 15 actual Copilot cases at `e028664a9487fe832cb2d982273468974345f298`; native Codex/Claude installs and installed standalone/new-pin checks pass for that same plugin tree.
+  Evidence: actual Copilot Opus 5.5 trials 8/9/10 establish all 15 cases after focused recovery: 12 unaffected cases at `8de398e35f78f5b03964496c7589dbafd34d135f`, contracts at `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`, and both manual routes at `1786f48929f66b966bb8739e5c245ac1722f2191`. Failed original results and exact reference/request deltas remain retained. Native Codex/Claude candidate 7 and installed standalone/new-pin checks pass at `4f29be5`, whose plugin tree equals the integrated target.
 - [ ] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
 - [ ] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
 
@@ -503,7 +503,7 @@ at reviewed head `f7e4f87bbf2117dd30d64a4aa4fef21a02e60c69` after its exact-head
 check passed. The complete old/new pin diff also includes the owner-accepted
 five-line testing guidance. Rules and the existing feature matcher are unchanged.
 
-T7 evidence: Stackweaver migration `75519076246be4875515a8ac02bb0a2dd4d81100`
+T7 evidence: Stackweaver migration `7a1e905635192c84c177260df26e8df0b811af00`
 includes published main `041a8c83a847e5bb6382f1372c6faf2ef665a78b`. Sixteen actual
 Node checks pass: legacy stdin/quoting/exits, every retained invoking caller in a
 fresh shell with and without setup, owned overlays, mixed incomplete hook output,
@@ -513,23 +513,25 @@ and 3,336 source paths: zero lost candidates, zero unresolved meaning risks and
 3,625 conservative additions; committed-index drift is false. Rollback binds only
 migration fragments against current main and preserves its unrelated useEffect rule.
 
-T8 evidence: the actual Copilot Opus 5.5 trial at shared
-`e028664a9487fe832cb2d982273468974345f298` passes all 15 cases. It covers direct
-and integrated entry, task/completion gaps, an authorized local progress-PR draft,
-cold bootstrap ordering, minimal doc/mapping repairs, historical/intended contracts,
-wrong-system Unknown, missing docs and injected instructions. Only four permitted
-docs and the authorized PR draft change; every HEAD/index is preserved. Actual
-native views deliver all nonempty lines of 81 resolved/operation page copies,
-verified by exact content hashes. Per-candidate classifications and real citations
-are checked mechanically and remain subject to independent semantic review.
+T8 evidence: the latest actual Copilot Opus 5.5 observations cover all 15 cases,
+with original failed runs preserved. Trial 8 at `8de398e35f78f5b03964496c7589dbafd34d135f`
+passes the 12 unaffected cases. Trial 9 at `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`
+passes the mixed-contract case after the reference distinguishes known omissions
+from unavailable evidence; both setup/knowledge entry fixes also pass there.
+Trial 10 at `1786f48929f66b966bb8739e5c245ac1722f2191` passes the two manual
+assessments after their request explicitly asks for the review the grader checks.
+These are focused retries, not an all-green first run. Across the selected cases,
+only four permitted docs and the authorized PR draft change; every HEAD/index
+is preserved. Actual native views deliver every nonempty line of the resolved
+and required operation pages in each run, verified against exact content hashes.
+Independent review still checks narrative accuracy against the synthetic source.
 
-The exact candidate installs in Codex CLI 0.163.0 and Claude Code CLI 2.1.316 expose
-all 13 skills and run installed checking outside an agent session while preserving
-inputs/index. Existing triage/maintenance knowledge and unwarmed/explicitly prepared/
-warmed offline audit entry pass at the new pin. These are local-catalog checks;
-actual published-marketplace fresh/upgrade acceptance remains separate. Later
-changes to the trial evaluator are test-only; the entire plugin tree remains
-byte-identical to the exercised candidate and must be bound at final review.
+Candidate 7 at `4f29be5` installs in Codex CLI 0.163.0 and Claude Code CLI 2.1.316,
+exposes all 13 skills and runs installed checking outside an agent session while
+preserving inputs/index. Existing triage/maintenance knowledge and unwarmed,
+explicitly prepared and warmed offline audit entry pass at the new pin. These
+remain local-catalog checks. Integrated current main leaves that plugin tree
+unchanged; actual published-marketplace fresh/upgrade acceptance is still pending.
 
 The initial strict-reader blocker was cleared separately by consumer commit
 `3b655311558c69803528c1d9fbf9bf452a05494f`. Separate bounded review `syntax-fix-r2` executed
@@ -540,8 +542,9 @@ identical, and retained index/audit/drift parsing kept the same values. The actu
 strict reader changes from malformed to answered with the original description.
 The private report body was never sent for that syntax review.
 
-The complete corrected plugin suite passes 1,221 tests with zero failures; the two
-new citation-evaluator tests pass separately. Go tests/vet/lint/module checks,
+The frozen-source plugin suite at `8de398e` passes 1,225 tests with zero failures.
+The later reference/manual-request clarification passes 135 focused checks;
+current-main integration also passes the Go/workflow checks. Go tests/vet/lint/module checks,
 strict TypeScript, other-plugin tests and actionlint pass. Stackweaver's complete
 selected verification passes 18 checks with zero failures/skips. No live product,
 GUI, phone or actual Claude docs-impact execution is claimed by these checks.
@@ -551,18 +554,25 @@ the interrupted slow corpus pass, compiler dependencies inside the plugin tree,
 the 1,215-test run with one timeout and its 48-pass isolated retry, the later loaded
 host/unfinished-fixture run, and native adapter failures. Those include a missing
 editable PR draft and a citation grader rejecting valid case-directory prefixes.
-The corrected PR retry passes; the later full 15-case run passes independently.
+The corrected PR retry passes. Later runs 8/9 retain manual-route and mixed-contract
+failures; the targeted clarifications and successful retries are recorded above.
 The ordinary matcher retains measured Go-compatible reversed bracket ranges.
 
 Early public and paired reviews found real edge cases and missing tests, which
 were fixed with observed checks. The first formal diagnostic had partial requested
 file coverage and is not completion evidence. The corrected collector now also
 passes literal-BOM filename identity and actual feature-matcher/review-staleness
-cases. Exact-source preflight passes with an inherited invalid wrapper override
+cases, strict UTF-8 policy and NUL-input BOM identity cases. The wrapper preserves
+BOM-prefixed literal and Git-quoted names too. Exact-source preflight passes with an inherited invalid wrapper override
 removed, and observed negative probes reject dirty consumer state, an older
 installed payload and stale shared-commit parity, preserving the index. It still
 reports migration readiness false without published acceptance and fresh paired
-review. Final clean independent review, normal Linux/macOS CI/release, marketplace
+review. The installed roots command supplies every declared root, and successful
+TAP must include the named rollback rehearsal. Actual negative probes add a new
+malformed root and remove the rollback test; both are refused for those reasons.
+A quiet advisory HEAD-only no-match check discards excluded-doc notices on stderr;
+it never establishes verification of task-owned current metadata. Explicit overlays
+remain required for that obligation. Final clean independent review, normal Linux/macOS CI/release, marketplace
 acceptance and current-consumer cutover remain open.
 
 ## Open Questions
