@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Audit-plus-resolution draft passes lint. Claude Code review was refused by its spend limit; reviewer-provider choice and independent acceptance remain pending. No implementation or publication is authorized."
+status_description: "Audit-plus-resolution draft passes lint; the owner selected Copilot Opus 5.5 after Claude Code was unavailable. Independent review and spec acceptance remain; no implementation or publication is authorized."
 issue: null
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
 covers:
@@ -138,7 +138,7 @@ Fresh paired review binds the exact installed shared payload and consumer candid
 | AC-04 | Resolve synthetic overlapping PRs with identical, contradictory, already-fixed and stale hunks. Verify every disposition, exact selected subset, changed-approval invalidation and fresh-base reconstruction. Test narrow detector suppression versus interpretation correction, no feedback writes in report mode, repeated mistakes and incomplete-scan refusal to retire suppressions. |
 | AC-05 | Inspect actual model reports for concise summary, complete hidden/detail evidence, recommendations, unknowns and precise next decisions. Run fake remote/command collectors to prove no unauthorized commit/push/PR/issue/closure/branch action; exercise authorized scheduled preparation and publication failure without broad staging or clean-success fallback. |
 | AC-06 | Inventory all actual legacy callers and compare shared/local behavior with current Stackweaver scan and bounded source fixtures; verify scanner completeness and semantic parity separately from process success. Test forwarding, original command arguments, feedback history, generation/visual rules, scheduled-worker failure paths and narrow owned publication. Rehearse rollback/reapply with unrelated edits/conflicts/symlinks; retain exact shared/consumer refs. |
-| AC-07 | Run repository Go/vet/lint/module and Bun package checks plus portable macOS tests. Observe actual Codex/Claude marketplace fresh installs/upgrades and installed helper execution. Run bounded actual Copilot trials and requested Claude Code Opus 5.5 independent reviews with original inputs/returns and model/read provenance. Obtain exact-payload paired acceptance before migration, then post-merge routing checks. Keep GUI/phone/unattended-provider checks unclaimed until actually observed or explicitly deferred. |
+| AC-07 | Run repository Go/vet/lint/module and Bun package checks plus portable macOS tests. Observe actual Codex/Claude marketplace fresh installs/upgrades and installed helper execution. Run bounded actual Copilot trials and requested Copilot Opus 5.5 independent reviews with original inputs/returns and model/read provenance. Obtain exact-payload paired acceptance before migration, then post-merge routing checks. Keep GUI/phone/unattended-provider checks unclaimed until actually observed or explicitly deferred. |
 
 ## Tasks
 
@@ -148,8 +148,8 @@ The requested Claude Code Opus 5.5 spec review at
 `199977cce9b1a0da4d938c9222de9c9ac0b2d010` was refused by its monthly spend limit.
 The native process exits 1, reports is_error true and returns no valid reviewer
 records. No Review Log row is stored. Its original public-only packet and native
-transcript are retained locally. Switching to Copilot Opus 5.5 is an owner choice;
-no fallback, billing change, implementation or publication follows from this failure.
+transcript are retained locally. The owner subsequently selected Copilot Opus 5.5 for the review. No billing
+change, implementation or publication follows from that reviewer selection.
 
 ## Open Questions
 
