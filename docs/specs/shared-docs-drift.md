@@ -159,6 +159,52 @@ None. The owner continued the proposed audit-plus-resolution scope after the dra
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-05 | R-1 | spec | `09872e18edd77fed61336bc4d10a31eafd46021f` | claude-opus-5.5 | procedural | 2 blocking; 4 should-fix; 1 nit. Full requested read coverage. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Audit and preparation / Resolution and feedback / Authority and delivery; frontmatter covers
+EVIDENCE: The design needs "one exact owned assessment tree" (00081 line 9) and "a fresh owned branch" (line 21). It also lists superseded-PR closure and branch cleanup as effects (line 29). Shared authority currently says "Outside the maintenance and audit roles below, never create, remove, prune, reset or force-move a worktree" (references/authority.md:78). It defines scoped worktree/ref roles only for maintenance (lines 92-117) and audit (lines 119-139). Its action table (lines 10-32) has no docs-drift row and no superseded-PR closure action. references/authority.md is not in covers (00001 lines 6-25), and the spec never says whether the owned tree is a new worktree, a ref or the current checkout.
+PROPOSAL: Add references/authority.md and its guard test to covers. Define the docs-drift assessment and resolve location roles: creation, recorded owner/base/ref, non-forced cleanup and preservation. Add action-table rows for each docs-drift local and remote effect, including superseded-PR closure, together with the authority each one needs.
+FINDING: F-02
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design, Entry and consumer contract; Migration and rollback; AC-02, AC-06
+EVIDENCE: The scan result must distinguish "complete collection from findings and failures" (00081 line 3), and skipped inputs must leave the assessment incomplete (line 5). Context says the Stackweaver scanner skips a document on a read failure and has no completeness field (00001 lines 51, 57-58). The contract does not require the scanner to list the documents it examined. It also requires no independent comparison against the configured scope at the bound commit, so completeness still rests on the scanner reporting about itself. The spec keeps the scanner local, with its bytes preserved unless "a separately reviewed migration correction is necessary" (00081 line 35). It never says whether that correction, or an adapter, is part of this feature. Yet AC-06 needs scanner completeness verified (Test Plan AC-06).
+PROPOSAL: Define a versioned scan-result schema with an examined-document inventory. A shared helper should compare that inventory with the configured scope enumerated at the bound commit, so any skipped input becomes visible without relying on the scanner. State whether the Stackweaver completeness correction or adapter is in this migration's scope, and name its regression test.
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope; Design, Entry and consumer contract
+EVIDENCE: The parent child contract requires each child to identify "the existing shared behavior it reuses" (shared-workflow-migration.md 00081 lines 3-4). The spec names only docs-impact as something it must not duplicate (00001 line 63). Existing shared helpers already cover several of its needs. scripts/settings-file.ts reads `.vh-adlc/<name>.yaml` strictly through the verified binary. scripts/github-read.ts provides GET-only paginated reads with a `complete` flag (PageResult, line 64). scripts/audit/snapshot.ts provides commit/digest binding, and maintenance and audit both have an adoptionPreflight. The spec names no settings file path, no format and no helper reuse for "bounded verification helpers" (00001 line 67).
+PROPOSAL: Name the settings file and say whether it uses settings-file.ts. State whether PR discovery reuses github-read.ts and whether its completeness counts toward assessment completeness. Name the snapshot and adoption-preflight helpers it reuses or why it does not, and list the helpers the new scripts/docs-drift/ directory adds.
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Entry and consumer contract; AC-01
+EVIDENCE: The spec adds a content operation (00001 line 79) and covers lifecycle.md and loop.md (lines 12-13), but it defines no intake routing. Lifecycle already has rows for "Review documentation affected by a code change" and "Documentation or a convention" (lifecycle.md:56-57), plus a persistent-audit intent rule (lines 72-78). The spec gives no generic request that selects docs-drift, no rule for separating it from those rows or from "audit the docs", and no required knowledge pages. It also gives no unpinned onboarding behavior, which loop.md lists for each operation (the docs-impact integration test asserts the loop "add none" text). This repeats the gap an earlier review raised for docs impact (shared-docs-impact.md:982, 1156).
+PROPOSAL: Specify the lifecycle row and its example requests. Say which ambiguous requests need a scope question, which pinned pages the operation requests and its loop.md onboarding behavior. Give AC-01 test cases with the expected route for each.
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Resolution and feedback / Authority and delivery; AC-03, AC-04
+EVIDENCE: Prepare and resolve produce documentation and feedback changes meant for a PR (00081 lines 21-25). The only independent-verification text covers a harness that "cannot delegate independent nontrivial checks" (line 15). Unlike maintenance-review.md and audit-review.md, the spec defines no independent review of the consolidated candidate. It sets no reviewer instructions, record location, exact-commit binding or invalidation after changes before a commit, an advisory PR or a resolve PR.
+PROPOSAL: Define whether a consolidated prepare or resolve change needs an independent review before commit or publication. If it does, specify the reviewer reference, the stored record, binding to the exact candidate and the staleness rules. Add a Test Plan case for each.
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Authority and delivery / Migration and rollback; AC-06, AC-07
+EVIDENCE: AC-06 requires Stackweaver to use the shared workflow from its scheduled worker (00081 lines 31, 48). AC-07 leaves unattended provider execution unclaimed until it is observed or deferred (line 61), and static YAML is not a live run (line 39). The spec does not say how the scheduled runner obtains the exact plugin payload, or how that pin stays visible to the updater as delivery.md:55-66 requires. It also says nothing on serializing a scheduled advisory publication against a concurrent resolve run, while delivery.md:8-9 (00161) requires serializing publication where competing runs could conflict. So the scheduled worker could move to an unobserved route.
+PROPOSAL: Specify how the worker installs and pins the shared payload, and how scheduled and resolve publication are serialized. Present the owner trade-off: keep the scheduled worker on its local route until an unattended run is observed, or cut over now with an explicit deferral.
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks
+EVIDENCE: The Tasks section holds narrative about the refused Claude Code review (00081 lines 67-72). The status_description already repeats this content (00001 line 3). The standard reserves Tasks for task lines and keeps review history in the Review Log (feature-documents.md 00081 lines 27-36, 58-74).
+PROPOSAL: Leave Tasks as "None." and keep the refusal note in Context or status_description only.
 
 ## Sources
 
