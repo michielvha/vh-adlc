@@ -1,7 +1,7 @@
 ---
-status: in-progress
+status: complete
 branch: feat/remote-gui
-status_description: "All criteria independently verified; final completion gate pending."
+status_description: "Implemented and independently verified, including owner device checks; ready for separately authorized shipping."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
