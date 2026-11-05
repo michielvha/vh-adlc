@@ -61,6 +61,20 @@ Isolation: procedural
 NO FINDINGS
 ```
 
+### R-3
+
+Target: `22ee488fbbb0e576bbf35b0bce7a0ae56bae7474`
+
+Model: unknown (identity not attested by the host)
+
+Isolation: procedural
+
+```text
+NO FINDINGS
+```
+
+After #39 passed its hosted checks and merged as `1d05b7d541d3a1abd67cba08b10c15c6db2dffe7`, this branch integrated that main. The module conflicts retained the exact reviewed v4-only blobs. A comparison against `6083906` found no changes to Go source, module files, lint configuration or CI. The inherited #39 record was already reviewed separately. The #46 Definition is unchanged. All required Go checks passed again; log: `/tmp/vh-adlc-pr46-after-main.log`. R-3 independently checked the integration and returned no findings. Fresh exact-head hosted CI remains required after this push.
+
 ## State
 
 Locally complete. Required local checks and independent review passed. R-2 verified the comment correction and the unchanged executable Go tokens and Definition. Publication and exact-head hosted CI are next; merge remains conditional on passing CI.
