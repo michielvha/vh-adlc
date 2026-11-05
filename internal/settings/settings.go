@@ -13,7 +13,7 @@ import (
 	"strings"
 
 	"github.com/michielvha/vh-adlc/internal/report"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 const commandName = "settings read"
@@ -115,6 +115,9 @@ func value(n *yaml.Node) (any, *refusal) {
 	if ref := marked(n); ref != nil {
 		return nil, ref
 	}
+	resolved := *n
+	resolved.Tag = compatibleTag(n)
+	n = &resolved
 	switch n.Kind {
 	case yaml.MappingNode:
 		return mapping(n)
@@ -135,7 +138,7 @@ func value(n *yaml.Node) (any, *refusal) {
 
 // marked refuses what any node can carry, keys included. An alias always
 // follows its anchor, so a walk in document order meets the anchor first.
-// A bare `!` sets no TaggedStyle: the tree does not show it, so it passes.
+// A bare `!` sets no TaggedStyle and remains accepted.
 func marked(n *yaml.Node) *refusal {
 	switch {
 	case n.Anchor != "" || n.Kind == yaml.AliasNode:
@@ -169,6 +172,9 @@ func key(n *yaml.Node) *refusal {
 	if ref := marked(n); ref != nil {
 		return ref
 	}
+	resolved := *n
+	resolved.Tag = compatibleTag(n)
+	n = &resolved
 	switch {
 	case n.Tag == "!!merge":
 		return &refusal{reasonMerge, n.Line}
@@ -176,6 +182,29 @@ func key(n *yaml.Node) *refusal {
 		return &refusal{reasonKey, n.Line}
 	}
 	return nil
+}
+
+// compatibleTag preserves the v3 implicit resolution of a bare, non-specific !.
+// V4 retains that tag on scalar nodes instead of resolving it. Quoted and block
+// scalars stay strings; only an identical standalone scalar supplies a new tag.
+func compatibleTag(n *yaml.Node) string {
+	if n.Kind != yaml.ScalarNode || n.Tag != "!" {
+		return n.Tag
+	}
+	if n.Style != 0 {
+		return "!!str"
+	}
+	if n.Value == "" {
+		return "!!null"
+	}
+	var inferred yaml.Node
+	if err := yaml.Unmarshal([]byte(n.Value), &inferred); err == nil && len(inferred.Content) == 1 {
+		scalar := inferred.Content[0]
+		if scalar.Kind == yaml.ScalarNode && scalar.Value == n.Value {
+			return scalar.Tag
+		}
+	}
+	return "!!str"
 }
 
 func scalar(n *yaml.Node) (any, *refusal) {
@@ -204,7 +233,13 @@ func scalar(n *yaml.Node) (any, *refusal) {
 		return nil, &refusal{reasonNumber, n.Line}
 	case "!!merge":
 		return nil, &refusal{reasonMerge, n.Line}
-	default: // !!float, the only tag left for an untagged scalar
+	case "!!float":
+		// V4 resolves negative zero as a float; the settings contract accepts it.
+		if n.Value == "-0" {
+			return int64(0), nil
+		}
+		return nil, &refusal{reasonNumber, n.Line}
+	default: // Unsupported scalar tags are refused.
 		return nil, &refusal{reasonNumber, n.Line}
 	}
 }
