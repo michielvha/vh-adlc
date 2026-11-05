@@ -355,6 +355,7 @@ None.
 | 2026-11-05 | R-19 | spec | `7299aa4ea733fefd345748a78bce5687ca7bb5c9` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-05 | R-20 | spec | `b45f738e537a539630aa326b9e949f6634b55813` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-21 | spec | `7215b2fcb2c8147d599a7f58c3c0d4951cc78efb` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-22 | spec | `b6866cfb43389728acafa97b126ca56113266c60` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -904,6 +905,27 @@ SEVERITY: nit
 WHERE: Design, base freshness; Entry and consumer contract (consumer settings)
 EVIDENCE: The base-freshness rule binds the assessment to "the configured document, source and reference roots (including negative/absence searches)" (00161 line 55). Consumer settings define the scanner argv, documentation scope, detector units and selectors, feedback files, procedure, and verification/generation commands, but no source or reference roots (00081 line 37). The `scope_sha256` object also covers only documentation `roots`, `exclusions`, `suffixes`, `required_detectors` and `detector_inputs` (00081 line 51). So "configured" source and reference roots have no defined place in the settings. In practice the run may always fall back to "the whole tracked repository", and an implementer cannot tell which of the two the spec intends.
 PROPOSAL: Add optional source and reference read-set roots to the settings schema and its digest, or state that the read set is always the whole tracked repository unless a later setting bounds it.
+
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Common publisher and effect recovery; Independent candidate review and publication; Test Plan AC-05
+EVIDENCE: The common publisher says "IDs/hidden correlation markers are included in prepared PR/issue/comment payloads before review; no self-hash or native returned review record is appended to the reviewed payload afterward. Native review evidence stays in external/run artifacts" (00161 line 29). It also binds "exact payload hashes" in the lease plan, and recovery treats a PR as done only with "the operation marker, expected actor/target and exact payload" (00161 lines 29, 31). The candidate-review section says the opposite. It says to "include the evidence in the published artifact/PR through the authorized wrapper" and that "Review records and native evidence remain in the PR body and separately retained external artifacts" (00161 line 37). AC-05 requires "evidence only in PR/external artifacts" (00321 line 1). The returned review records exist only after the review. So if they go in the PR body, the published body is not the reviewed PR payload, which line 29 forbids. If they do not go in the body, line 37 and the AC-05 pass condition are wrong. The spec never says whether the advisory/resolve PR body is part of the independently reviewed payload. It also never says which body bytes the lease plan and the recovery exact-payload match bind.
+PROPOSAL: Choose one rule. Either the reviewed PR body is published unchanged and review records go only in external/run artifacts, which the body may link only through a pre-review locator. Or define a fixed post-review evidence section that is excluded from the reviewed payload and included in the lease-plan payload hash. State that rule in both sections and in AC-05.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Audit and preparation (feature-document protection and covered-path inventory); Context; frontmatter covers
+EVIDENCE: Prepare and resolve must "Reuse committed feature-format/root classification and strict metadata reading rather than guessing from filenames" (00081 line 65). They must also "inventory ordinary document paths covered by other features" and report affected features and their staleness (00081 line 67). That requires feature-root/local-format classification and matching of each feature's `covers` patterns against document paths. Context says "This feature must not add a second coverage matcher" (00001 line 80). The existing shared implementations are `scripts/docs-impact/collection.ts`, which provides `resolveRoots` with `feature_root`/`local_format` (lines 147-149, 180) and the `covers` list validation (lines 194-196), and `scripts/docs-impact/matching.ts`, which provides `compileCoverage` (line 12). The spec names neither module nor any other helper or binary command for this classification and matching. `plugins/vh-adlc/scripts/docs-impact/` is not in covers (00001 lines 6-42), although changes there would affect docs-drift protection. The parent contract requires each child to identify the shared behavior it reuses (shared-workflow-migration.md 00081 lines 3-4).
+PROPOSAL: Name the exact helper or binary command that supplies feature classification, strict feature metadata and `covers` pattern matching for docs-drift. For example, reuse `resolveRoots` and `compileCoverage` from `scripts/docs-impact/`. Add the reused paths to covers, or say why a different reused component makes that unnecessary.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Common publisher and effect recovery
+EVIDENCE: The Design cites "the audit journal's write-ahead intent/receipt and `recoverEffect` observe-before-replay pattern (`scripts/audit/journal.ts:10-18,98-110`, ...)". Lines 10-18 are the Intent/Receipt/Event types. Lines 98-110 are the end of `retainAbsence` and `createRun`, which publishes the run header and registers the run. The per-effect write-ahead functions are `intent` and `outcome` at journal.ts lines 288-298 (chunk 00241 lines 48-58).
+PROPOSAL: Cite `scripts/audit/journal.ts:10-18,288-298`, adding `createRun` at 100-110 only for the header-registration step.
 
 ## Sources
 
