@@ -23,9 +23,25 @@ The Tailscale owner defaults to the active host profile's user. If trusted task 
 4. App cookies remain isolated in per-share, per-client memory. The client binding is not an authentication credential: Tailscale verifies the owner independently on every HTTP request and WebSocket upgrade. If the app needs script-readable cookies, its own Authorization/HTTP authentication or workers, conflicts with `/__remote_gui`, rejects the remote origin or fails another required check, stop the share and preserve the app. Include literal `compatibility-blocked`, the observed failed check and cleanup result in the final reply, with no usable app link. Missing browser verification has the same outcome. Never weaken origin/TLS protections or rewrite OAuth callbacks to force a pass.
 5. After successful checks, give the human the verified direct tailnet URL and session expiry. Explain that their device must use the pinned Tailscale identity and a fresh isolated private viewer context with previous remote-gui private contexts closed. No viewer username/password/code is needed. State whether second-device access remains unconfirmed. Do not ask the human to run a terminal or SSH command for a Tailscale handoff.
 
+For any failed or unavailable required app check, use this final reply format after stopping the share:
+
+```text
+compatibility-blocked: <observed failed or unavailable check>. Cleanup: <actual stop result>. Original app: <observed state, or state not checked>.
+```
+
+Keep `compatibility-blocked` as the first word of the final user-facing reply. Do not paraphrase it or omit it after successful cleanup. Report the observed cleanup result; a cleanup-pending share stays explicitly pending. Claim the app is running only when checked. Include no usable app link or localhost fallback in this reply.
+
 ## Hand over a browser
 
 1. Route configured CLI/SSO work through canonical auth-refresh first. It owns credentials, account selection and browser lanes. Never read its credential/profile/state files, copy cookies, operate its lanes or stop its processes. An active challenge must finish or safely yield through that workflow; an unconfirmed yield blocks a competing challenge. Unknown-credential logins and non-login forms/inspection may use a fresh remote-gui browser. Never ask for a provider password in chat.
+
+   An owner's report of an active, unyielded challenge is enough to block a fresh handoff. Report that boundary immediately. Do not list, search or read the owning workflow's credential, profile or state directories to confirm it, and do not run remote-gui setup for a competing challenge. Any safe status or yield operation belongs to the canonical owning workflow.
+
+   Use this reply for that case, keeping the workflow name and reason explicit:
+
+   ```text
+   handoff-blocked: auth-refresh has an active, unyielded challenge. Finish or safely yield it through auth-refresh before starting a fresh remote-gui browser.
+   ```
 2. Run `doctor --kind browser --transport tailscale`, then `start --transport tailscale`, with an authorized owner override when needed. Existing GUI tools are required. Never install dependencies, invoke sudo, change the operator, enable Funnel or edit global MCP configuration automatically. Report a missing host permission/capability instead of selecting another transport.
 3. Attach locally with Playwright `chromium.connectOverCDP`. Find the returned marker title in the default context and prove control with a harmless automatic input check. If attachment fails, stop and explain the missing capability. Keep that marker page open and navigate a separate page in the same default context to the authorized task. Never substitute another browser or import/export a profile. Routine handoffs must not require the human to type random connection markers; those belong only to explicit acceptance tests.
 4. Read `access <id>` for the owner-restricted Tailscale URL and expiry. Give the human that direct link and the fresh-private-context instruction. `tailscale-identity` access, even with `--reveal`, issues no code. Do not ask for username `viewer`, a password, enrollment or SSH. The human's intended site may still need its own login/MFA; that is separate from the viewer.

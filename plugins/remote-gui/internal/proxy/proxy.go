@@ -30,16 +30,17 @@ const (
 )
 
 type Options struct {
-	OwnerLogin      string
-	ServePeer       state.Peer
-	ViewerAssets    string
-	ViewerPassword  string
-	ID              string
-	Origin          string
-	Target          string
-	Deadline        time.Time
-	UpstreamAlive   func() bool
-	OnCompatibility func(string)
+	OwnerLogin         string
+	ServePeer          state.Peer
+	ViewerAssets       string
+	ViewerPassword     string
+	ID                 string
+	Origin             string
+	Target             string
+	Deadline           time.Time
+	UpstreamAlive      func() bool
+	UpstreamConnection func(context.Context, net.Conn) bool
+	OnCompatibility    func(string)
 }
 type client struct {
 	probe   bool
@@ -50,28 +51,29 @@ type client struct {
 type (
 	clientKey struct{}
 	Proxy     struct {
-		ownerLogin      string
-		servePeer       state.Peer
-		assets          *os.Root
-		viewerPassword  string
-		landing         string
-		mu              sync.Mutex
-		id              string
-		origin          *url.URL
-		target          *url.URL
-		deadline        time.Time
-		code            [32]byte
-		codeExpiry      time.Time
-		hasCode         bool
-		revoked         bool
-		attempts        int
-		attemptsUntil   time.Time
-		clients         map[[32]byte]*client
-		connections     map[net.Conn]bool
-		reverse         *httputil.ReverseProxy
-		upstreamAlive   func() bool
-		onCompatibility func(string)
-		problem         string
+		ownerLogin         string
+		servePeer          state.Peer
+		assets             *os.Root
+		viewerPassword     string
+		landing            string
+		mu                 sync.Mutex
+		id                 string
+		origin             *url.URL
+		target             *url.URL
+		deadline           time.Time
+		code               [32]byte
+		codeExpiry         time.Time
+		hasCode            bool
+		revoked            bool
+		attempts           int
+		attemptsUntil      time.Time
+		clients            map[[32]byte]*client
+		connections        map[net.Conn]bool
+		reverse            *httputil.ReverseProxy
+		upstreamAlive      func() bool
+		upstreamConnection func(context.Context, net.Conn) bool
+		onCompatibility    func(string)
+		problem            string
 	}
 )
 
@@ -110,11 +112,11 @@ func New(o Options) (*Proxy, error) {
 			return nil, errors.New("viewer assets unavailable")
 		}
 	}
-	p := &Proxy{ownerLogin: o.OwnerLogin, servePeer: o.ServePeer, assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[[32]byte]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, onCompatibility: o.OnCompatibility}
+	p := &Proxy{ownerLogin: o.OwnerLogin, servePeer: o.ServePeer, assets: assets, viewerPassword: o.ViewerPassword, landing: landing, id: o.ID, origin: origin, target: target, deadline: o.Deadline, clients: make(map[[32]byte]*client), connections: make(map[net.Conn]bool), upstreamAlive: o.UpstreamAlive, upstreamConnection: o.UpstreamConnection, onCompatibility: o.OnCompatibility}
 	p.reverse = &httputil.ReverseProxy{Rewrite: p.rewrite, ModifyResponse: p.response, ErrorLog: log.New(io.Discard, "", 0), ErrorHandler: func(w http.ResponseWriter, _ *http.Request, _ error) {
 		p.fail("upstream-or-compatibility-failure")
 		http.Error(w, "application proxy unavailable", http.StatusBadGateway)
-	}, Transport: &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: 3 * time.Second, KeepAlive: 15 * time.Second}).DialContext, ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 30 * time.Second, MaxIdleConnsPerHost: 8, MaxResponseHeaderBytes: 1 << 20}}
+	}, Transport: &http.Transport{Proxy: nil, DialContext: p.checkedDial((&net.Dialer{Timeout: 3 * time.Second, KeepAlive: 15 * time.Second}).DialContext), ResponseHeaderTimeout: 5 * time.Second, IdleConnTimeout: 30 * time.Second, MaxIdleConnsPerHost: 8, MaxResponseHeaderBytes: 1 << 20}}
 	return p, nil
 }
 

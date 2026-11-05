@@ -132,7 +132,7 @@ func discover(address string) (state.Identity, string, error) {
 
 func bindingAlive(r state.Record) bool {
 	inodes, err := listenerInodes(r.Config.Target)
-	return err == nil && inodes[r.UpstreamSocket] && ownsSocket(r.Upstream, r.UpstreamSocket)
+	return err == nil && len(inodes) == 1 && inodes[r.UpstreamSocket] && ownsSocket(r.Upstream, r.UpstreamSocket)
 }
 
 func OwnsListener(address string, id state.Identity) bool {
