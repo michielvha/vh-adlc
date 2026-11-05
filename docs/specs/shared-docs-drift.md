@@ -250,6 +250,7 @@ None. The owner accepted the bounded completeness correction after its read/skip
 | 2026-11-05 | R-3 | spec | `0f4c691ca6e7c311f117c79d2be213c993e18c3a` | claude-opus-5.5 | procedural | 2 should-fix; 3 nit. Full requested read coverage. |
 | 2026-11-05 | R-4 | spec | `5f2b0236c9cd90356e01bae330f82cfa3cb4a753` | claude-opus-5.5 | procedural | 5 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-5 | spec | `21fbd73b9a1c80ef15f4765652bb11550705ba17` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-6 | spec | `32ee1e88b64f7fbee29b8d44fc90f36e0c5ffd19` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -417,6 +418,27 @@ SEVERITY: nit
 WHERE: Design, Entry and consumer contract; Scan-result protocol; Independent candidate review and publication (publication gate)
 EVIDENCE: The spec reads `.vh-adlc/docs-drift.yaml` "through `scripts/settings-file.ts`" (00081 line 20). It also requires the settings digest to be "SHA-256 of raw Git blob bytes" (line 42) and the gate to be read from committed configuration "at the freshly observed consumer default branch" (00161 line 12). `settingsFile` reads only working-tree files through `existsSync` and `readFileSync(file)` (settings-file.ts lines 19-29). It cannot read a blob at `source_commit` or at a remote default commit that is not checked out. The exported `readYAML` and `createYAMLReader` take bytes (lines 33-44).
 PROPOSAL: Say that committed and default-branch settings reads pass Git blob bytes to `readYAML` or `createYAMLReader`. Keep `settingsFile` only for locating the file and refusing leftover suffixes in an owned clean checkout.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scan-result protocol and local correction (per-detector execution accounting); Entry and consumer contract (consumer settings); Test Plan AC-02
+EVIDENCE: Each required detector unit records a "bound input digest", and the shared helper treats "differently bound required units" as incomplete (00081 line 40). That digest includes "`documents` is the sorted applicable `[path, content_sha256]` array" (00081 line 42). To recompute it, the helper must know which documents apply to each unit. Consumer settings name only "required detector-unit IDs and options" (00081 line 28). The scope object has `roots`, `exclusions`, `suffixes` and `required_detectors` (line 42), and none of these defines per-unit applicability. Two outcomes are possible. The helper might accept whatever applicable subset the scanner declares. In that case, a detector that skips or swallows an error on one document still reports `complete` with a self-consistent digest, even though every document read succeeded. That is the same silent-omission failure the owner's completeness decision was meant to expose. Otherwise the helper cannot recompute the digest at all. The AC-02 cases cover a unit that is absent or throws, but not a unit that runs over fewer documents than it should.
+PROPOSAL: Define where each required unit's applicable document set comes from. One option is a per-unit selector (roots/suffixes or "all inventory") in committed settings, which the helper evaluates against the independent inventory. The alternative is to state that per-unit applicability is scanner-attested and record that as a visible limitation. Add an AC-02 case where a unit completes over a strict subset of its applicable documents.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Resolution and feedback; Authority and delivery; Test Plan AC-04, AC-05
+EVIDENCE: Resolve classifies each hunk as "apply, apply-modified, already fixed, wrong or defer" and must "Preserve uncertain proposals in the decision report" (00081 line 64). Superseded-PR closure appears only as an authorized effect (00081 line 80; 00161 lines 2, 20, 22). The only eligibility rule is negative: incomplete proposals "cannot be closed" (00081 line 68). The spec never says when a complete proposal counts as superseded. It does not address a proposal that still has `defer` hunks or undecided owner decisions. It does not say whether closure must wait until the consolidated PR is actually published, or whether the closure must link to that PR and to each hunk's disposition. As written, a resolve run could close a stale audit PR whose deferred hunks exist only in a locally saved report. Those deferred hunks would then drop out of the visible backlog, which works against preserving uncertain proposals. The AC-04 and AC-05 proofs test that incomplete proposals cannot be closed, but they have no positive closure-eligibility case.
+PROPOSAL: Define superseded as follows. Every hunk in the proposal has a terminal disposition (applied, already fixed or wrong, with feedback recorded) or an explicitly carried deferral in the published consolidated PR's decision list. Closure happens only after that PR exists and posts a link to it. A proposal with uncarried deferred or undecided hunks stays open. Add AC-04 cases for a fully superseded proposal, a proposal with a deferred hunk, and a closure attempted before the consolidated PR publishes.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Authority and delivery (publication lease); Scheduled worker and staged adoption (trial definition)
+EVIDENCE: The cooperative publication lease is defined only "After scheduled cutover" (00161 line 22), and its ref namespace is named by the adoption procedure and the `publication` block (lines 14, 22). The pre-cutover trial nonetheless relies on "The trial publication lease and namespace are disjoint from legacy real-corpus proposals" (line 30). The committed trial definition binds "exact output-path and branch namespace, worker entry and allowed draft-only effects" (line 34), but it names no trial lease ref, and no acquire/release authority covers it. As a result, the "same publisher" trial either takes a lease the staged policy does not define or skips the lease step that production runs.
+PROPOSAL: Add the trial lease ref namespace and its acquire/release effect to the committed trial definition. State that the unchanged publisher's lease step uses that ref in trial mode. Add an AC-06 assertion that the trial lease cannot overlap the real-corpus lease ref.
 
 ## Sources
 
