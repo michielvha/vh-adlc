@@ -28,7 +28,7 @@ function reference(base:string,value:unknown):{entry:FileReference;path:string;b
 export function currentSecurityPolicy(config:Settings):PolicyBinding[]{
   const paths=[...(existsSync(join(config.root,"AGENTS.md"))?["AGENTS.md"]:[]),...(config.configured?[config.settings_path]:[]),
     config.security_policy,config.project_procedure,...config.source_references,...config.backlog_references,...config.repositories.map(r=>r.sync_workflow)].filter((p):p is string=>p!==undefined);
-  return [...new Set(paths)].sort().map(path=>({path,digest:digest(physicalFile(resolveInside(config.root,path)))}));
+  return [...new Set(paths)].sort((a,b)=>a.localeCompare(b)).map(path=>({path,digest:digest(physicalFile(resolveInside(config.root,path)))}));
 }
 export function inventorySecurityInput(config:Settings,id:string,inventory:Inventory,analysis:unknown):SecurityInput {
   const run=readRun(config,id),a=v.record(analysis,["evaluated_at","collection_revision","policy_assessment","decisions","evidence","groups","coverage_handoffs","required_surfaces"]);

@@ -14,8 +14,9 @@ import { record, text } from "../../../plugins/vh-adlc/scripts/maintenance/secur
 import { evidenceBinding } from "../../../plugins/vh-adlc/scripts/maintenance/security";
 function reportResult(value:unknown){const row=record(value);return{path:text(row.path),digest:text(row.digest)};}
 const projects:ReturnType<typeof fixture>[]=[];afterEach(()=>projects.splice(0).forEach(f=>f.dispose()));
-function setup(){
-  const f=fixture();projects.push(f);f.write("policy.md","Consumer rules.\n");f.settings({schema_version:1,security_policy:"policy.md"});
+function setup(policyPath="policy.md"){
+  const f=fixture();projects.push(f);f.write(policyPath,"Consumer rules.\n");f.write("CLAUDE.md","Consumer bridge.\n");
+  f.settings({schema_version:1,security_policy:policyPath,source_references:["CLAUDE.md"]});
   git(f.root,"update-ref","refs/remotes/origin/main","HEAD");
   const config=loadSettings(f.root),run=createRun(config),now=new Date().toISOString();
   const coverage={status:"complete" as const,pages:1,count:0},raw={number:1,state:"open",dependency:{package:{ecosystem:"npm",name:"widget"},manifest_path:"package-lock.json",version_requirement:"1.0"},security_advisory:{ghsa_id:"GHSA-abcd-1234-abcd",severity:"high",summary:"$(touch forbidden)"}};
@@ -72,7 +73,10 @@ test("an OSV security PR without an alert cannot disappear from security account
 });
 
 test("append and resume preserve one legacy block, revalidate current inputs and recover typed retry",async()=>{
-  const f=setup(),args=["--repo",f.root,"--run-id",f.run.header.run_id],result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
+  const f=setup("agents/policy.md");
+  // Real consumers bind uppercase entry points alongside lowercase project policy paths.
+  f.write("AGENTS.md","Consumer instructions.\n");f.write("CLAUDE.md","Consumer bridge.\n");
+  const args=["--repo",f.root,"--run-id",f.run.header.run_id],result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
   f.write(".tools/security.json",JSON.stringify(result));f.write(".tools/request.json",JSON.stringify({authorized_sweep:true,read_only:true}));
   const saved=reportResult(await main(["report",...args,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json"),"--security",join(f.root,".tools/security.json")]));
   const first=readFileSync(saved.path,"utf8");f.write(".tools/prior.md",first);
@@ -90,5 +94,5 @@ test("append and resume preserve one legacy block, revalidate current inputs and
   const applied=record(await main(["append",...args,"--update",join(f.root,".tools/update.json")]));
   expect(record(await main(["append",...args,"--update",join(f.root,".tools/update.json")])).digest).toBe(applied.digest);
   const final=readFileSync(saved.path,"utf8");expect(final.match(/```maintenance-observation-v1/g)).toHaveLength(1);expect(final.match(/```maintenance-security-v1/g)).toHaveLength(2);
-  await main(["resume",...args]);f.write("policy.md","Changed policy.\n");await expect(main(["resume",...args])).rejects.toThrow();
+  await main(["resume",...args]);f.write("agents/policy.md","Changed policy.\n");await expect(main(["resume",...args])).rejects.toThrow();
 });
