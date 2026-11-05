@@ -113,6 +113,16 @@ test("reads selected new metadata directly while leaving a stale generated index
   expect(readFileSync(join(root, "docs-coverage.json"), "utf8")).toBe('{"wrong/**":["invented.md"]}\n');
   expect(collectImpact({ repo: root, paths: ["other/new.ts"] }).outcome).toBe("none");
 });
+test('a missing selected overlay is a gap, while a real tracked-doc deletion remains explicit', () => {
+  const root = fixture({ 'docs/other.md': guide() });
+  const missing = collectImpact({ repo: root, paths: ['src/app.ts'], metadataPaths: ['docs/never-created.md'] });
+  expect(missing.outcome).toBe('incomplete'); expect(missing.diagnostics.some(item => item.code === 'metadata-path' && item.path === 'docs/never-created.md')).toBe(true);
+  expect(paths(missing)).toContain('docs/guide.md');
+  unlinkSync(join(root, 'docs/guide.md'));
+  const deleted = collectImpact({ repo: root, paths: ['src/app.ts'], metadataPaths: ['docs/guide.md'] });
+  expect(deleted.outcome).toBe('candidates'); expect(deleted.metadata.bindings.find(item => item.path === 'docs/guide.md')?.sha256).toBeNull();
+  expect(deleted.diagnostics).toEqual([]);
+});
 
 test("policy and classification use committed HEAD and feature candidates never trigger on themselves", () => {
   const root = fixture({ "docs/specs/change.md": guide("docs/**") }, declaration + "Feature documents: docs/specs/\n");

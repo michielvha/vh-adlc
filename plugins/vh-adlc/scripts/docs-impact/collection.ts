@@ -242,6 +242,7 @@ export function collectImpact(options: CheckOptions): ImpactReport {
     try {
       const overlay = metadata.includes(path), bytes = overlay ? snapshot.overlay(path) : snapshot.headBytes(path);
       report.metadata.bindings.push({ path, view: overlay ? "working-tree" : "HEAD", sha256: bytes === null ? null : hash(bytes) });
+      if (bytes === null && !snapshot.tree.has(path)) snapshot.gap('metadata-path', 'selected metadata exists in neither HEAD nor the working tree', path);
       if (bytes === null || snapshot.reader === null) continue;
       const declarations = patterns(snapshot, bytes);
       if (!declarations.length) { report.metadata.uncovered_docs.push(path); continue; }
