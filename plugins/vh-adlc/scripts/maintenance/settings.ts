@@ -68,7 +68,7 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
   const configured = file.configured, input = object(file.value, "settings object");
   keys(input, ["schema_version", "repository", "hostname", "repositories", "discovery_organizations", "excluded_repositories",
     "bot_authors", "bot_inventory_terms", "dashboards", "generated_mirrors", "source_references", "backlog_references",
-    "report_dir", "history_dir", "project_procedure", "surface_expectations"], "settings");
+    "report_dir", "history_dir", "project_procedure", "security_policy", "surface_expectations"], "settings");
   if (configured && input.schema_version !== 1) fail("schema_version must be 1");
   if (input.repository !== undefined && repository(input.repository, "repository") !== identity.repository) fail("repository conflicts with origin");
   if (input.hostname !== undefined && hostname(input.hostname) !== identity.hostname) fail("hostname conflicts with origin");
@@ -122,5 +122,6 @@ export function loadSettings(root: string, options: { settingsPath?: string } = 
     backlog_references: strings(input.backlog_references, "backlog_references").map(value => path(root, value, "backlog reference", "file")),
     report_dir, history_dir,
     ...(input.project_procedure === undefined ? {} : { project_procedure: path(root, input.project_procedure, "project_procedure", "file") }),
+    ...(input.security_policy === undefined ? {} : { security_policy: path(root, input.security_policy, "security_policy", "file") }),
     surface_expectations };
 }

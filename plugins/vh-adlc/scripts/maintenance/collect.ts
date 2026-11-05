@@ -2,9 +2,48 @@ import { createGitHubReader, GitHubReadError, type GitHubReader, type PageResult
 import { git } from "../triage/settings";
 import { classifyAuthor } from "./settings";
 import type { Settings } from "./types";
+import { canonicalJSON, digest } from "./journal";
 
 export type Coverage = { status: "complete" | "complete-unavailable" | "incomplete"; pages: number; count: number | null; reason?: string; http_status?: number | null };
-export type Alert = { number: number; state: "open"; package: string | null; manifest: string | null; severity: string; rule?: string; description: string };
+export type AlertContext = { identity: string; advisory_ids: string[]; ecosystem: string | null; installed_version: string | null;
+  affected_range: string | null; fixed_versions: string[]; scope: string | null; relationship: string | null;
+  raw_digest: string; raw: Record<string, unknown> };
+export type Alert = { number: number; state: "open"; package: string | null; manifest: string | null; severity: string; rule?: string; description: string; context?: AlertContext };
+export type AlertReference = { hostname: string; repository: string; surface: "dependabot" | "code_scanning"; number: number };
+export type TerminalObservation = AlertReference & { state: string; reason: string | null; status: "complete" | "incomplete"; observed_at: string; raw_digest: string | null; raw: Record<string, unknown> | null };
+
+function optionalText(value: unknown): string | null { return value === undefined || value === null ? null : text(value); }
+function alertContext(row: Record<string, unknown>, hostname: string, repository: string, surface: string): AlertContext {
+  const dependency = row.dependency === undefined ? {} : object(row.dependency), pkg = dependency.package === undefined ? {} : object(dependency.package);
+  const advisory = row.security_advisory === undefined ? {} : object(row.security_advisory);
+  const vulnerability = row.security_vulnerability === undefined ? {} : object(row.security_vulnerability);
+  const patched = vulnerability.first_patched_version === undefined || vulnerability.first_patched_version === null ? null : optionalText(object(vulnerability.first_patched_version).identifier);
+  return { identity: `${hostname}/${repository}/${surface}:${number(row.number)}`, advisory_ids: [...new Set([optionalText(advisory.cve_id), optionalText(advisory.ghsa_id)].filter((v): v is string => v !== null))].sort(),
+    ecosystem: optionalText(pkg.ecosystem), installed_version: optionalText(dependency.version_requirement), affected_range: optionalText(vulnerability.vulnerable_version_range),
+    fixed_versions: patched ? [patched] : [], scope: optionalText(dependency.scope), relationship: optionalText(dependency.relationship), raw_digest: digest(canonicalJSON(row)), raw: row };
+}
+
+/** Exact known identities only. These reads classify absence; they never dismiss or resolve alerts. */
+export function collectTerminal(config: Settings, prior: AlertReference[], options: { reader?: GitHubReader } = {}): TerminalObservation[] {
+  const allowed = new Set([config.repository, ...config.repositories.map(row => row.repository)]), seen = new Set<string>();
+  for (const ref of prior) {
+    if (ref.hostname !== config.hostname || !allowed.has(ref.repository) || !["dependabot", "code_scanning"].includes(ref.surface)) throw Error("terminal identity outside maintenance scope");
+    number(ref.number); const key = `${ref.repository}/${ref.surface}:${ref.number}`;
+    if (seen.has(key)) throw Error("duplicate terminal identity"); seen.add(key);
+  }
+  const reader = options.reader ?? createGitHubReader(config.hostname);
+  return prior.map(ref => {
+    const observed_at = new Date().toISOString();
+    try {
+      const endpoint = ref.surface === "dependabot" ? "dependabot" : "code-scanning";
+      const raw = object(reader.get(`repos/${ref.repository}/${endpoint}/alerts/${ref.number}`));
+      if (number(raw.number) !== ref.number || !["open", "fixed", "dismissed", "auto_dismissed"].includes(String(raw.state))) throw Error("unsupported or changed terminal identity/state");
+      return { ...ref, state: text(raw.state), reason: optionalText(raw.dismissed_reason), status: "complete" as const, observed_at, raw_digest: digest(canonicalJSON(raw)), raw };
+    } catch (error) {
+      return { ...ref, state: "unknown", reason: error instanceof GitHubReadError ? error.apiMessage : error instanceof Error ? error.message : "terminal unavailable", status: "incomplete" as const, observed_at, raw_digest: null, raw: null };
+    }
+  });
+}
 export type Pull = {
   repository: string; number: number; title: string; body: string; state: string; draft: boolean;
   author: { login: string; type: string }; author_class: "configured" | "gap" | "other";
@@ -74,12 +113,14 @@ function alertSurface(config: Settings, reader: GitHubReader, repository: string
     if (kind === "dependabot") {
       const dependency = object(row.dependency), pkg = object(dependency.package), advisory = object(row.security_advisory);
       return { number: number(row.number), state: "open", package: text(pkg.name), manifest: filename(dependency.manifest_path),
+        context: alertContext(row, config.hostname, repository, kind),
         severity: text(advisory.severity), description: advisory.summary === undefined ? "" : text(advisory.summary) };
     }
     const rule = object(row.rule);
     const instance = row.most_recent_instance ? object(row.most_recent_instance) : {};
     const location = instance.location ? object(instance.location) : {};
     return { number: number(row.number), state: "open", package: null, manifest: location.path === undefined ? null : filename(location.path),
+      context: alertContext(row, config.hostname, repository, kind),
       severity: typeof rule.security_severity_level === "string" ? rule.security_severity_level : typeof rule.severity === "string" ? rule.severity : "unknown",
       rule: text(rule.id), description: rule.description === undefined ? "" : text(rule.description) };
   }, row => String(row.number));
