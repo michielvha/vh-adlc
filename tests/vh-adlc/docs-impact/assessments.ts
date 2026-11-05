@@ -4,6 +4,10 @@ import { join, resolve } from 'node:path';
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
+const contractPrimary: Record<string, readonly string[]> = {
+  'docs/contract.md':['Accurate'], 'docs/guide.md':['Incomplete','Stale'],
+  'docs/history.md':['Accurate'], 'docs/injection.md':['Unknown'], 'docs/other-system.md':['Unknown'],
+};
 export function assessmentFailures(final: unknown, input: string, ids: string[], calls: Array<{case: string; op: string; stdout: string}>): string[] {
   if (typeof final !== 'string') return ['missing-native-report'];
   const failures: string[] = [];
@@ -39,11 +43,13 @@ export function assessmentFailures(final: unknown, input: string, ids: string[],
         // This fixture deliberately has no implementation for its other system.
         const unavailable = id === 'contracts' && path === 'docs/other-system.md' && result.classification === 'Unknown';
         const docs = result.doc_citations, sources = result.source_citations;
-        const primary = id === 'contracts' ? ({'docs/contract.md':'Accurate','docs/guide.md':'Incomplete','docs/history.md':'Accurate','docs/injection.md':'Unknown','docs/other-system.md':'Unknown'} as Record<string,string>)[path]
-          : path === 'docs/guide.md' ? (['update','feature-move'].includes(id) ? 'Accurate' : 'Stale')
-          : path === 'docs/specs/feature.md' ? 'Stale' : path === 'docs/internal/plans/local.md' ? 'Accurate' : path === 'docs/internal/plans/unknown.md' ? 'Unknown' : undefined;
+        // The contract guide has both an omission and a port/contract conflict;
+        // either applicable primary label is valid, and semantic review checks both issues.
+        const primary = id === 'contracts' ? contractPrimary[path]
+          : path === 'docs/guide.md' ? [(['update','feature-move'].includes(id) ? 'Accurate' : 'Stale')]
+          : path === 'docs/specs/feature.md' ? ['Stale'] : path === 'docs/internal/plans/local.md' ? ['Accurate'] : path === 'docs/internal/plans/unknown.md' ? ['Unknown'] : undefined;
         const sourceEvidence = Array.isArray(sources) && (unavailable ? sources.length === 0 && typeof result.source_unavailable_reason === 'string' && !!result.source_unavailable_reason.trim() : sources.some(value => citation(value, id)));
-        if (!primary || result.classification !== primary || !Array.isArray(docs) || !docs.some(value => citation(value, id, path)) || !sourceEvidence) failures.push(id + ':unclassified-or-uncited:' + path);
+        if (!primary?.includes(String(result.classification)) || !Array.isArray(docs) || !docs.some(value => citation(value, id, path)) || !sourceEvidence) failures.push(id + ':unclassified-or-uncited:' + path);
       }
     }
   } catch { failures.push('missing-or-malformed-assessment-json'); }
