@@ -16,6 +16,26 @@ Input: a feature document, its issue, or its slug. Follow `references/loop.md` f
 and `references/authority.md` for what you may do without asking. Accepted scope is your authority to edit,
 test and commit on the feature branch; it is not authority to push that branch, open a PR or merge.
 
+## Documentation impact
+
+Before Start's first knowledge request and before any repository write, commit
+or remote action, follow the entry preflight in `references/docs-impact.md`.
+Acquire the verified binary through the ordinary installer, then inspect root
+`AGENTS.md` at committed HEAD for the raw adoption marker. Clearly absent keeps
+the existing manual path; unreadable policy or a roots gap stops this invocation.
+Use `scripts/docs-impact/cli.ts roots --repo <repo>` for any marker, including
+fenced/indented examples; never parse caller YAML. Declared roots add
+`conventions/documentation-impact.md` to every knowledge request, including
+Start's initial request. On missing-page stop with a pin-update handoff before
+the first write; never silently take the manual path or change a pin.
+
+At each task's existing verification stage, before ticking or committing it,
+run `references/docs-impact.md` with that task's explicit source scope and each
+owned doc overlay as `--metadata-path`. Preserve all other dirty work. Authorized
+minimal doc corrections join that task's checks and commit. An incomplete
+assessment stops before ticking/committing; preserve edits and resolve its gap
+within scope or hand it off. Undeclared repositories retain their existing flow.
+
 ## Start
 
 1. Get the binary and run `vh-adlc knowledge` with `conventions/feature-documents.md`,

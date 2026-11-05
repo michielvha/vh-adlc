@@ -95,7 +95,7 @@ func TestCIWorkflow(t *testing.T) {
 	if len(verify.Steps) != 2 || !strings.HasPrefix(verify.Steps[1].Uses, "michielvha/go-ci-action@") {
 		t.Error("CI-only verification is checkout plus the Go CI action, nothing else")
 	}
-	if !slices.Contains(runs(w), "bun test tests/vh-adlc") {
+	if !slices.Contains(runs(w), "bun test tests/vh-adlc --timeout 60000") {
 		t.Error("CI must retain the existing plugin checker")
 	}
 	if _, ok := w.Jobs["release-gate"]; ok {

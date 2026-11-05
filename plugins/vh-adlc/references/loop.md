@@ -56,7 +56,7 @@ Stop and report when the result is `invalid-pin`, `missing-page` (recommend the 
 fewer pages to see which ones resolve, and do not read any page from that revision.
 
 When `source` is `plugin`, the repository has no pin yet. `vh-adlc-investigate`, `vh-adlc-resume` and
-`vh-adlc-review` add none: they work with the plugin pin and report the missing pin, and onboarding waits
+`vh-adlc-review` and `vh-adlc-docs-impact` add none: they work with the plugin pin and report the missing pin, and onboarding waits
 for the next operation that writes. A review that committed onboarding first would move its own target.
 `vh-adlc-spec`, `vh-adlc-tasks`, `vh-adlc-implement` and `vh-adlc-ship` call `knowledge` again with the
 same pages plus `guides/onboard-a-repository.md`, and read it. Their first change then adds the pinned

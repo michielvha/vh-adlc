@@ -23,6 +23,13 @@ invoking investigation never becomes permission to implement a repair.
    and resolve that scope first. Configuration alone does not choose audit. Clear non-audit requests
    use the ordinary installer and knowledge procedure. Read all resolved pinned pages and report the
    revision; local instructions still apply. A cached page is not a framework task record.
+   For a documentation-impact request, or a feature request continuing through implement/ship,
+   apply the entry preflight in `references/docs-impact.md` before the first knowledge request or
+   repository write. Inspect root `AGENTS.md` at committed HEAD for the raw marker first. Clearly
+   absent keeps the existing manual path; otherwise ordinary binary setup precedes the offline
+   central roots parser. Declared roots add the documentation-impact convention to the full page
+   list, including the first call; roots gaps and missing-page stop with the prescribed handoff.
+   Plain documentation editing keeps its artifact-editing route.
 3. Select the procedure below. State it briefly, then do the authorized work.
    Do not ask the owner to choose a skill name. Ask only a missing scope or
    authority question that changes the result, continuing independent reads.
@@ -46,6 +53,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Persistent codebase audit or selected audit-finding repair | Use `skills/vh-adlc-audit/SKILL.md` for the named mode/ledger/source scope; status reads history, reverify/full proposes before selection, and selected fixes use `audit-record.md` and independent audit review. |
 | Diagnosis or findings | Use `skills/vh-adlc-investigate/SKILL.md` with the selected investigation intent. Reproduce the issue and respect report-only limits. |
 | Article authoring, revision or promotion drafts | Use `skills/vh-adlc-blog/SKILL.md`; promotion mode prepares article-linked social copy only on request. Writing an article needs no software feature document. A request for implementing a blog or changing application behavior stays in the feature procedure. |
+| Review documentation affected by a code change | Use `skills/vh-adlc-docs-impact/SKILL.md`, for example “which docs need updating for this patch?”. A mixed feature-code request retains its underlying feature procedure and integrated docs check. |
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
 | Dependency or security sweep | Use `skills/vh-adlc-maintenance/SKILL.md` for inventory, evidence, durable reporting and selected follow-up; publish reports only through its exact current/adopted authority. |
 | Bounded maintenance | Follow the maintenance procedure below if the public contract is preserved and local instructions allow it. |

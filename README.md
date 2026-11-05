@@ -25,6 +25,7 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 
 ## Why use it?
 
+- Find docs affected by selected code changes with [shared documentation impact](plugins/vh-adlc/examples/docs-impact/README.md).
 - Keep a feature's requirements, tasks, and evidence together in Git.
 - Check review freshness and completion with deterministic commands.
 - Get independent spec and implementation reviews before completing a feature.

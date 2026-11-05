@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-docs-impact
-status_description: "Implementation claimed after owner acceptance; first task authors the common convention, then the portable checker and verified Stackweaver adoption."
+status_description: "Shared source and the local Stackweaver migration are reviewed; ordered CI, publication, installed marketplace acceptance, cutover and final completion review remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -72,7 +72,11 @@ when the index is missing. The shared checker removes that index dependency for 
 Existing site generation, frontend visual refresh/check and public/internal rules remain local
 (`agents/docs-impact.md:57-102`).
 
-No new checker, convention, consumer adapter or external publication has been implemented.
+Implementation is underway on the claimed feature branch. The common convention is published
+and independently reviewed. Local reader/matcher/collector/CLI and native trial checks pass;
+shared publication, installed marketplace acceptance, final review and consumer cutover remain
+open. The initial strict-reader refusal was resolved locally by a separately reviewed syntax-only
+correction; its exact commit, bounded review and retained-reader equivalence are recorded below.
 
 ## Scope
 
@@ -450,13 +454,20 @@ unclaimed; a future UI change still owes its existing local visual checks.
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
-- [ ] AC-02: The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
-- [ ] AC-03: No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
-- [ ] AC-04: Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+- [x] AC-01: Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+  Evidence: R-13 at `957597d` returned met; exact criterion records and observed limits are retained below.
+- [x] AC-02: The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+  Evidence: R-13 at `957597d` returned met; exact criterion records and observed limits are retained below.
+- [x] AC-03: No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+  Evidence: R-13 at `957597d` returned met; exact criterion records and observed limits are retained below.
+- [x] AC-04: Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+  Evidence: R-13 at `957597d` returned met; exact criterion records and observed limits are retained below.
 - [ ] AC-05: Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+  Evidence: R-13 at `957597d` returned not verified; exact criterion records and observed limits are retained below.
 - [ ] AC-06: Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+  Evidence: R-13 at `957597d` returned not verified; exact criterion records and observed limits are retained below.
 - [ ] AC-07: Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+  Evidence: R-13 at `957597d` returned not met; exact criterion records and observed limits are retained below.
 
 ## Test Plan
 
@@ -472,16 +483,152 @@ unclaimed; a future UI change still owes its existing local visual checks.
 
 ## Tasks
 
-- [ ] T1 `vhco-pro/docs:conventions/documentation-impact.md`, `conventions/documentation.md` - author and independently review the common contract against the accepted design; the docs check passes, and the reviewed dependency is ready for its separate publication (AC-01).
-- [ ] T2 `tests/vh-adlc/settings-file.test.ts`, `plugins/vh-adlc/scripts/settings-file.ts` - observe a failing offline reader-session test, extract the verified strict reader for reuse without repeated bootstrap, then prove existing settings callers and missing-binary/no-download behavior pass (AC-02, AC-03).
-- [ ] T3 `tests/vh-adlc/docs-impact/matching.test.ts`, `plugins/vh-adlc/scripts/docs-impact/matching.ts` - observe failed real pattern cases, implement the declared exact/prefix/globstar/escape/bracket contract, then pass malformed-pattern and legacy-preservation cases (AC-01, AC-02, AC-03).
-- [ ] T4 `tests/vh-adlc/docs-impact/collection.test.ts`, `plugins/vh-adlc/scripts/docs-impact/collection.ts` - observe failed synthetic Git corpus/scope cases, then pass HEAD/selected overlays, roots/classification, deletions/renames, uncovered/malformed metadata, symlink refusals and dirty/index preservation using the actual collector (AC-02, AC-03).
-- [ ] T5 `tests/vh-adlc/docs-impact/cli.test.ts`, `plugins/vh-adlc/scripts/docs-impact/cli.ts` - observe failed process-level CLI cases, implement central roots resolution and source/metadata selection, then prove JSON/text/protocol/exits, stdin/unusual filenames and incomplete-with-known-candidates outcomes with no network or repository/cache writes (AC-02, AC-03).
-- [ ] T6 `plugins/vh-adlc/skills/vh-adlc-docs-impact/SKILL.md`, `plugins/vh-adlc/references/docs-impact.md`, lifecycle/loop/implement/ship references, package/discovery guards, examples, public guides and `.github/workflows/ci.yml` - observe failed routing/contract checks, add the portable operation and scoped integration, and pass existing protected-body and complete-example checks; both installed entry points remain testable (AC-04, AC-06).
-- [ ] T7 `Stackweaver:agents/docs-impact.md`, `agents/docs-impact-project.md`, `scripts/check-doc-coverage.js`, `AGENTS.md`, retained callers and `tests/agent-docs-impact/` - use an isolated current-main migration branch, record the full caller inventory, observe failed compatibility/parity tests, then pass the real wrapper protocol/no-op/error/quoting/overlay cases and scoped rollback while preserving local policy. Rebuild the legacy index from the exact HEAD in disposable scratch; report committed-index drift separately. Keep the plan mapping-upkeep/review-staleness rule explicitly in the companion and rollback set (AC-05).
-- [ ] T8 `plugins/vh-adlc/knowledge.md`, lock/manifests as required by the published dependency, `tests/vh-adlc/docs-impact/` - record and independently review the entire old-to-new convention diff before moving the pin; surface unrelated normative drift for owner acceptance. Execute actual bounded model trials and isolated native Codex/Claude candidate discovery/standalone checks, retaining exact payloads, returned evidence and unclaimed surfaces (AC-01, AC-04, AC-06).
+- [x] T1 `vhco-pro/docs:conventions/documentation-impact.md`, `conventions/documentation.md` - author and independently review the common contract against the accepted design; the docs check passes, and the reviewed dependency is ready for its separate publication (AC-01).
+  - Evidence: `vhco-pro/docs` branch `docs/documentation-impact`; `npm run check` passed on 28 Markdown files and the rules block. Native Claude Code Opus 5.5 dependency review C-10 at `2d55a50aeaa8d859d3e5d80159d2d1fb69b7ae28` returned no blocking or should-fix findings; its one wording nit is corrected in the following docs commit. Raw review, trace and all-required-file validation remain in `convention-r10` in the operator archive. This is dependency-document review, not feature implementation review or publication proof. Full old-to-new pin diff includes an unrelated five-line testing policy; owner accepted that testing guidance on 2026-11-05. Convention PR publication/merge was separately authorized.
+- [x] T2 `tests/vh-adlc/settings-file.test.ts`, `plugins/vh-adlc/scripts/settings-file.ts` - observe a failing offline reader-session test, extract the verified strict reader for reuse without repeated bootstrap, then prove existing settings callers and missing-binary/no-download behavior pass (AC-02, AC-03).
+  - Evidence: missing `createYAMLReader` export observed red in `t2-red.log`; `bun test tests/vh-adlc/settings-file.test.ts tests/vh-adlc/direct-operation-compatibility.test.ts` now passes 28 tests, with the actual verified Go reader reused after one installer invocation. Existing triage/maintenance/audit settings regressions pass 130 tests; unavailable offline reader refuses without downloads. Logs retain the red and green results in the operator archive.
+- [x] T3 `tests/vh-adlc/docs-impact/matching.test.ts`, `plugins/vh-adlc/scripts/docs-impact/matching.ts` - observe failed real pattern cases, implement the declared exact/prefix/globstar/escape/bracket contract, then pass malformed-pattern and legacy-preservation cases (AC-01, AC-02, AC-03).
+  - Evidence: `t3-red.log` records the missing matcher module; `bun test tests/vh-adlc/docs-impact/matching.test.ts` now passes 41 cases, including zero-directory and mid-segment globstar, Unicode, escaped literals, classes/negation, malformed patterns and bounded repetitive wildcard matching. `bun run --cwd plugins/vh-adlc/scripts/docs-impact typecheck` checks the actual component and tests; the existing Go feature matcher is unchanged.
+- [x] T4 `tests/vh-adlc/docs-impact/collection.test.ts`, `plugins/vh-adlc/scripts/docs-impact/collection.ts` - observe failed synthetic Git corpus/scope cases, then pass HEAD/selected overlays, roots/classification, deletions/renames, uncovered/malformed metadata, symlink refusals and dirty/index preservation using the actual collector (AC-02, AC-03).
+  - Evidence: `t4-red.log` observed the missing collection module; real synthetic Git cases now pass 19 tests in `t4-green.log`. Follow-up red cases caught last-declaration classification and missing-root preflight; their fixes preserve the existing first feature-root declaration and exact local-format syntax. HEAD/selected overlays, merge-base rename/deletion scope, known matches with failures, symlink refusal and source/index preservation pass. Repository subtree inputs are refused rather than silently changing the scan root.
+- [x] T5 `tests/vh-adlc/docs-impact/cli.test.ts`, `plugins/vh-adlc/scripts/docs-impact/cli.ts` - observe failed process-level CLI cases, implement central roots resolution and source/metadata selection, then prove JSON/text/protocol/exits, stdin/unusual filenames and incomplete-with-known-candidates outcomes with no network or repository/cache writes (AC-02, AC-03).
+  - Evidence: process-level CLI cases failed before `cli.ts` existed (`t5-red.log`). `t5-final.log` passes 15 tests for JSON/text, protocol 1, no-match/candidates/incomplete exits, explicit scope, NUL/UTF-8/unusual names, roots and offline missing-reader refusal. The latter uses the actual checker with an unavailable synthetic lock and network/cache sentinels; no download or binary-cache write occurs. Cache-free invocation disables Bun's own transpilation cache separately; runtime setup documents that setting.
+- [x] T6 `plugins/vh-adlc/skills/vh-adlc-docs-impact/SKILL.md`, `plugins/vh-adlc/references/docs-impact.md`, lifecycle/loop/implement/ship references, package/discovery guards, examples, public guides and `.github/workflows/ci.yml` - observe failed routing/contract checks, add the portable operation and scoped integration, and pass existing protected-body and complete-example checks; both installed entry points remain testable (AC-04, AC-06).
+  - Evidence: new routing/procedure checks failed before the skill/reference existed (`t6-red.log`). The package/integration/discovery/example/protected-body selection now passes 76 tests in `t6-package.log`. Implement/ship retain the original approved body after removing only the named Documentation impact section; source/classification preflight uses committed HEAD. Strict typechecking passes with locked compiler dependencies in owned temporary scratch, so compiler symlinks never enter the installed payload or confinement export. Linux and macOS CI select the portable tests and that typecheck; macOS execution remains CI evidence to obtain, not a local-host claim. Package candidate is 0.9.0 with 13 skills and the same 10 engineering operations. The new canary and pin use published convention `f8ccacbedf057159ea24136ba115cd9857bb22ac` from merged vhco-pro/docs#21; its complete three-file diff was reviewed and the only unrelated coding guidance was owner-accepted before the move.
+- [x] T7 `Stackweaver:agents/docs-impact.md`, `agents/docs-impact-project.md`, `scripts/check-doc-coverage.js`, `AGENTS.md`, retained callers and `tests/agent-docs-impact/` - use an isolated current-main migration branch, record the full caller inventory, observe failed compatibility/parity tests, then pass the real wrapper protocol/no-op/error/quoting/overlay cases and scoped rollback while preserving local policy. Rebuild the legacy index from the exact HEAD in disposable scratch; report committed-index drift separately. Keep the plan mapping-upkeep/review-staleness rule explicitly in the companion and rollback set (AC-05).
+  Evidence: `DOCS_IMPACT_TEST_PLUGIN=<exact shared payload> node --test tests/agent-docs-impact/*.test.cjs` passes 16 tests at consumer `7a1e905635192c84c177260df26e8df0b811af00`; rebuilt-HEAD parity and scoped rollback results are recorded below.
+- [x] T8 `plugins/vh-adlc/knowledge.md`, lock/manifests as required by the published dependency, `tests/vh-adlc/docs-impact/` - record and independently review the entire old-to-new convention diff before moving the pin; surface unrelated normative drift for owner acceptance. Execute actual bounded model trials and isolated native Codex/Claude candidate discovery/standalone checks, retaining exact payloads, returned evidence and unclaimed surfaces (AC-01, AC-04, AC-06).
+  Evidence: actual Copilot Opus 5.5 trials 8/9/10 record successful observations for all 15 cases after focused recovery: 12 unaffected cases at `8de398e35f78f5b03964496c7589dbafd34d135f`, contracts at `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`, and both manual routes at `1786f48929f66b966bb8739e5c245ac1722f2191`. The 12 run-8 classifications predate the target reference's general classification rule; their behavior under that revised text is unclaimed. Failed original results and exact reference/request deltas remain retained. Native Codex/Claude candidate 7 and installed standalone/new-pin checks pass at `4f29be5`, whose plugin tree equals the integrated target.
 - [ ] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
+  Evidence: R-11 independently executes source-candidate parity/preflight at shared `7a3c613` and consumer `7a1e905`: 790 docs, 3,336 source paths, zero losses/gaps, 16 contracts including named rollback. R-12 reads the whole auxiliary preflight and confirms the unchanged source. Root-addition and missing-rollback negative probes are retained. Migration readiness remains false until published acceptance; current consumer will be refreshed again for cutover.
+
 - [ ] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
+
+### Implementation progress
+
+The common convention is published at
+`vhco-pro/docs@f8ccacbedf057159ea24136ba115cd9857bb22ac`, merged through PR #21
+at reviewed head `f7e4f87bbf2117dd30d64a4aa4fef21a02e60c69` after its exact-head
+check passed. The complete old/new pin diff also includes the owner-accepted
+five-line testing guidance. Rules and the existing feature matcher are unchanged.
+
+T7 evidence: Stackweaver migration `7a1e905635192c84c177260df26e8df0b811af00`
+includes published main `041a8c83a847e5bb6382f1372c6faf2ef665a78b`. Sixteen actual
+Node checks pass: legacy stdin/quoting/exits, every retained invoking caller in a
+fresh shell with and without setup, owned overlays, mixed incomplete hook output,
+quiet no-match warnings, current reference bindings and exact rollback/reapply.
+The rebuilt legacy index and shared collector compare 790 documents, 754 patterns
+and 3,336 source paths: zero lost candidates, zero unresolved meaning risks and
+3,625 conservative additions; committed-index drift is false. Rollback binds only
+migration fragments against current main and preserves its unrelated useEffect rule.
+
+T8 evidence: the latest actual Copilot Opus 5.5 observations cover all 15 cases,
+with original failed runs preserved. Trial 8 at `8de398e35f78f5b03964496c7589dbafd34d135f`
+passes the 12 unaffected cases. Trial 9 at `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`
+passes the mixed-contract case after the reference distinguishes known omissions
+from unavailable evidence; both setup/knowledge entry fixes also pass there.
+Trial 10 at `1786f48929f66b966bb8739e5c245ac1722f2191` passes the two manual
+assessments after their request explicitly asks for the review the grader checks.
+The 12 run-8 classifications predate the target reference's general classification
+rule; their behavior under that revised text is unclaimed. These are focused
+retries, not an all-green first run. Across the selected cases,
+only four permitted docs and the authorized PR draft change; every HEAD/index
+is preserved. Actual native views deliver every nonempty line of the resolved
+and required operation pages in each run, verified against exact content hashes.
+Independent review still checks narrative accuracy against the synthetic source.
+
+Candidate 7 at `4f29be5` installs in Codex CLI 0.163.0 and Claude Code CLI 2.1.316,
+exposes all 13 skills and runs installed checking outside an agent session while
+preserving inputs/index. Existing triage/maintenance knowledge and unwarmed,
+explicitly prepared and warmed offline audit entry pass at the new pin. These
+remain local-catalog checks. Integrated default `26c00e698860c88c3e2382ca9db5dd4b126c4cc1` leaves that plugin tree
+unchanged; actual published-marketplace fresh/upgrade acceptance is still pending.
+
+The initial strict-reader blocker was cleared separately by consumer commit
+`3b655311558c69803528c1d9fbf9bf452a05494f`. Separate bounded review `syntax-fix-r2` executed
+Claude Code Opus 5.5 and returned NO FINDINGS; its packet contained only the
+original/proposed description line and actual parser excerpts. Local full-file
+checks prove that only two quote bytes changed, every other body byte remained
+identical, and retained index/audit/drift parsing kept the same values. The actual
+strict reader changes from malformed to answered with the original description.
+The private report body was never sent for that syntax review.
+
+The frozen-source plugin suite at `8de398e` passes 1,225 tests with zero failures.
+The later reference/manual-request clarification passes 135 focused checks;
+integration with default `26c00e698860c88c3e2382ca9db5dd4b126c4cc1` passes the
+root Go tests and actionlint. The newly required remote-gui job also passes its
+local build, Go race/vet/lint/module checks. Its ordinary package check passes six
+tests with 24 opt-in live tests skipped; actual CI remains a separate observation. Go tests/vet/lint/module checks,
+strict TypeScript, other-plugin tests and actionlint pass. Stackweaver's complete
+selected verification passes 18 checks with zero failures/skips. No live product,
+GUI, phone or actual Claude docs-impact execution is claimed by these checks.
+
+Original failed artifacts remain retained: early confined network/cache failures,
+the interrupted slow corpus pass, compiler dependencies inside the plugin tree,
+the 1,215-test run with one timeout and its 48-pass isolated retry, the later loaded
+host/unfinished-fixture run, and native adapter failures. Those include a missing
+editable PR draft and a citation grader rejecting valid case-directory prefixes.
+The corrected PR retry passes. Later runs 8/9 retain manual-route and mixed-contract
+failures; the targeted clarifications and successful retries are recorded above.
+The ordinary matcher retains measured Go-compatible reversed bracket ranges.
+
+Early public and paired reviews found real edge cases and missing tests, which
+were fixed with observed checks. The first formal diagnostic had partial requested
+file coverage and is not completion evidence. The corrected collector now also
+passes literal-BOM filename identity and actual feature-matcher/review-staleness
+cases, strict UTF-8 policy and NUL-input BOM identity cases. The wrapper preserves
+BOM-prefixed literal and Git-quoted names too. Exact-source preflight passes with an inherited invalid wrapper override
+removed, and observed negative probes reject dirty consumer state, an older
+installed payload and stale shared-commit parity, preserving the index. It still
+reports migration readiness false without published acceptance and fresh paired
+review. The installed roots command supplies every declared root, and successful
+TAP must include the named rollback rehearsal. Actual negative probes add a new
+malformed root and remove the rollback test; both are refused for those reasons.
+A quiet advisory HEAD-only no-match check discards excluded-doc notices on stderr;
+it never establishes verification of task-owned current metadata. Explicit overlays
+remain required for that obligation. R-11 reads every required source/procedure file and observes 224 focused tests,
+34 other-component tests and the exact-source consumer checks passing. It returns
+no blocking or should-fix findings and one wording nit, now clarified above. Its
+requested coverage was 27/28 files: it read only part of an older auxiliary
+preflight JSON while independently executing the fresh preflight. Its one extra
+shell call was a read-only line count of its own native check-output file, which
+the reviewer disclosed. Isolation is procedural. No claim of complete requested
+artifact coverage or completed delivery follows. Normal Linux/macOS CI/release,
+marketplace acceptance, current-consumer cutover and final completion review
+remain open. R-12 completes every requested follow-up read, returns no blocking
+or should-fix findings and confirms the unchanged source behavior; its two
+wording nits are corrected by naming observed default `26c00e6` in compatibility
+and explicitly naming Copilot CLI Opus 5.5 in the parent roadmap.
+The fresh R-10 spec review has no blocking or should-fix findings;
+it confirms R-8 acceptance survives the unchanged normative baseline.
+
+R-13 confirms the source behavior and explicit limits with full requested
+follow-up coverage and no blocking or should-fix findings. Its two nits are
+corrected in this feature document: T9 stays unchecked until the published
+paired verification, and status_description retains the final completion review.
+No other covered file changes after the reviewed commit.
+
+
+### Publication verification
+
+The owner authorized shared publication, normal release, actual marketplace
+fresh/upgrade acceptance, the separate syntax prerequisite and gated Stackweaver
+migration on 2026-11-05. Shared PR #51 first ran at `0c0f4facff7e53ce4b522add06ad1b349228eefe`,
+after merging published default `7e67296` and its AppArmor CI repair. The plugin
+payload remains unchanged. Linux CI passed 1,223 tests and failed two feature-
+freshness fixture cases: their branch was main but Git's inherited default was
+master. Both failures were reproduced with an isolated global Git configuration,
+without changing host settings. Setting the fixture's local init.defaultBranch
+makes all 30 collection checks pass under that master-default configuration and
+this host's ordinary configuration. The original CI log and red/green artifacts
+remain retained; the corrected exact-head Linux/macOS run is still required.
+
+The corrected Linux CI at `60bb413` passes all 1,225 tests. Its macOS selection
+passes 1,067 tests and fails only the invalid-byte filename fixture: the filesystem
+returns EILSEQ before the checker runs. That Linux raw-byte filesystem case is
+explicitly unsupported on macOS; valid UTF-8/BOM and all other portable cases
+remain selected. The original failure stays retained. Claude Code Opus 5.5
+independently reviewed the Git-default fixture correction and returned NO FINDINGS.
 
 ## Open Questions
 
@@ -500,6 +647,11 @@ None. The owner approved all six review refinements.
 | 2026-11-04 | R-7 | spec | `0b1ed20d39c2165a0828ba39e30f62264fd7da99` | claude-opus-5-5 | procedural | No blockers; two should-fix findings and two nits on local-plan upkeep, corpus collection, policy view and intake routing. |
 | 2026-11-04 | R-8 | spec | `372bd41b8cc56b470e0679b2bb2a8490f52c3969` | claude-opus-5-5 | procedural | No blocking or should-fix findings; four nits retained as implementation proof obligations. |
 | 2026-11-05 | R-8 | spec | `372bd41b8cc56b470e0679b2bb2a8490f52c3969` | n/a | n/a | accepted by owner |
+| 2026-11-05 | R-9 | implementation | `7d7b16673032459c89d9aefb3acba16767f748a0` | claude-opus-5-5 | procedural | AC-01 through AC-04 met; two should-fix findings and three nits, addressed in later commits. Delivery criteria remain open. |
+| 2026-11-05 | R-10 | spec | `7a3c613f64e352084c6bc5730c09cf899fee2843` | claude-opus-5-5 | procedural | No blocking or should-fix findings; one progress-evidence nit addressed. Refreshes default-branch drift; unchanged R-8 acceptance retained. |
+| 2026-11-05 | R-11 | implementation | `7a3c613f64e352084c6bc5730c09cf899fee2843` | claude-opus-5-5 | procedural | AC-01 through AC-04 met; AC-05/06 not verified, AC-07 not met; one wording nit addressed. Source review only; final delivery review remains open. |
+| 2026-11-05 | R-12 | implementation | `abb576b068ae62ffe057a4692a314ed0601f0681` | claude-opus-5-5 | procedural | Full requested follow-up coverage; AC-01 through AC-04 met, delivery criteria open; two wording nits addressed. |
+| 2026-11-05 | R-13 | implementation | `957597d23607146e3ac218d2ec96250d0f2f8f97` | claude-opus-5-5 | procedural | Full requested follow-up coverage; AC-01 through AC-04 met, delivery criteria open; two feature-document nits corrected. |
 
 ### R-1
 
@@ -877,6 +1029,167 @@ SEVERITY: nit
 WHERE: Design, 2. One reusable, read-only checker; 3. Shared review procedure and existing gates
 EVIDENCE: The R-7 F-03 fix says that roots resolution, feature-root classification and the callers' presence check all read root `AGENTS.md` from committed HEAD, and that dirty edits are excluded (shared-docs-impact.md:150-151). The entry preflight still tells callers to check whether the declaration is absent from "the current root instructions" (line 249). Read alone, that sentence suggests the working tree, while AC-04 requires HEAD for all three reads (line 467).
 PROPOSAL: Replace "the current root instructions" at line 249 with root `AGENTS.md` at committed HEAD, so the preflight text uses the same view as the policy rule.
+
+### R-9
+CRITERION: AC-01 Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+VERDICT: met
+EVIDENCE: bash /home/m/code/.docs-impact-review-archive/implementation-review-2/../implementation-review-checks-2.sh, shared 7d7b16673032459c89d9aefb3acba16767f748a0 with pin f8ccacbedf057159ea24136ba115cd9857bb22ac, observed published-ancestry check "ahead", docs check over 28 Markdown files and the unchanged rules block (9 statuses, 12 conditions, 17 next rules), 222 focused docs-impact/package tests passing with 0 failures, and unchanged Go internal/doc and gate packages passing with vet/lint at 0 issues. I read published/conventions/documentation-impact.md:69-78 and confirmed it keeps feature matching separate. collection.ts:146-149 and 249-253 classify feature roots offline from HEAD AGENTS.md, and matching.ts implements the published table. Limitation: the check printed only aggregate test counts, not per-case names for the second-repository example.
+CRITERION: AC-02 The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+VERDICT: met
+EVIDENCE: The fixed check script at target 7d7b166 ran the focused matching, collection and CLI suites: 222 pass, 0 fail, with source/consumer indexes and refs preserved. Inspection agrees. collection.ts:115-131 and 241-246 read HEAD blobs by tree mode and use working-tree bytes only for --metadata-path overlays. collection.ts:216-225 compares against one merge-base and includes rename/delete names, with dirty paths excluded unless selected. No generated index is read. The rebuilt-index parity run shows 790 documents, 3336 sources, 0 losses and no committed-index drift. Limitation: individual test names were not printed.
+CRITERION: AC-03 No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+VERDICT: met
+EVIDENCE: The fixed check script at 7d7b166 ran the focused CLI/collection tests and the settings-reader regressions: 222 pass, 0 fail. The consumer wrapper tests confirm mixed known matches plus a malformed overlay give exit 2, with both shown on stdout. Inspection agrees. cli.ts:64-65 maps incomplete to exit 2. collection.ts:186-197 marks no frontmatter, no covers or an empty list as uncovered, while null/invalid covers, unterminated headers, symlinks and reader failures become gaps. collection.ts:258 makes a root with no usable coverage incomplete, and collection.ts:265 lists unmatched sources. Limitation: macOS was not exercised.
+CRITERION: AC-04 Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+VERDICT: met
+EVIDENCE: The fixed check script ran the package, discovery, protected-body and example tests at 7d7b166 (222 pass). I inspected the retained actual Copilot claude-opus-5.5 fifteen-case run at e028664a9487fe832cb2d982273468974345f298. exact-component-binding.json shows its component tree 35d1c8ea equals the target's. Per-case operations in copilot-result.json show setup before roots, a malformed-roots stop before knowledge, old-pin knowledge exit 5, incomplete blocking implement/ship with a progress-PR draft only, and HEAD/index preserved. The only edits were the allowed doc, plan and draft files, and returned.txt cites real fixture lines. Limitations: I did not re-execute the model run here, and one contracts classification is understated (see F-03). Actual Claude docs-impact execution, GUI and live surfaces remain unclaimed.
+CRITERION: AC-05 Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+VERDICT: not met
+EVIDENCE: The fixed check script ran the consumer rebuilt-index parity at baseline 75519076246be4875515a8ac02bb0a2dd4d81100: 754 patterns, 790 documents, 0 losses, 0 meaning risks, 3625 additions. It also ran the wrapper, caller and rollback tests and the preflight, which reported source_ready true and migration_ready false ("published convention, marketplace and paired-review evidence absent"). The migration exists only on an unmerged consumer branch commit. Caller checks ran against a source payload, not a published installed one. Limitation: the consumer merge and the installed-marketplace caller checks remain pending, so Stackweaver does not yet use the shared checker.
+CRITERION: AC-06 Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+VERDICT: not verified
+EVIDENCE: The fixed check script at 7d7b166 observed local Linux tests, Go vet/lint/module checks, strict typecheck and workflow registration checks passing. The retained Copilot run is bound to the identical component tree. Actual macOS CI and normal shared CI were not observed. Native Codex/Claude installed/standalone results come from local catalogs, are recorded only as candidate proof, and were not executed in this review. Limitation: a passing Linux and Copilot subset does not upgrade this composite criterion.
+CRITERION: AC-07 Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+VERDICT: not met
+EVIDENCE: The executed preflight at shared 7d7b166 and consumer 75519076 returned migration_ready false with the failure "published convention, marketplace and paired-review evidence absent". The convention is published at f8ccacb, but shared tool publication, real marketplace fresh/upgrade acceptance, paired current-consumer review and post-merge checks do not exist yet. Scoped rollback/reapply passed in the disposable rehearsal. Limitation: only source readiness is established, not delivery.
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: consumer/after/tests/agent-docs-impact/preflight.cjs:39
+EVIDENCE: The full-corpus completeness probe runs `check --repo <root> --docs-root docs --path __migration_probe__` with a hard-coded root. It never uses the roots the consumer declares in committed AGENTS.md. Design (shared-docs-impact.md:412-413) and AC-07 require complete collection of "the exact cutover HEAD corpus under every declared root". Stackweaver's declaration is ["docs/"] today, so it passes now. But a later added or changed declared root would go unchecked while corpus.gaps stays 0 and source_ready stays true.
+PROPOSAL: Resolve roots first with the installed `roots --repo` command and require a `declared` outcome. Then pass each returned root as --docs-root to the corpus check, and bind the roots report head to the corpus head.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context; Tasks T9; Implementation progress
+EVIDENCE: shared-docs-impact.md:78-79 says the checker found one strict-reader refusal in the consumer HEAD corpus and calls it "a migration blocker until its separate syntax correction is reviewed and verified". T9 (line 495) repeats that it must be resolved only through a separate reviewed correction. The executed preflight at consumer 75519076 now reports the corpus complete (source_ready true, zero gaps). The progress section (lines 506-514) does not say which commit made the correction, which review approved it, or whether it agrees with the retained index, audit and drift readers. AC-07 says only such a reviewed correction can clear the block.
+PROPOSAL: Record the correction commit, its separate review and its retained-reader equivalence result in T9 or the progress evidence. Otherwise update Context so it no longer describes an open blocker that the executed preflight no longer shows.
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: observations/copilot-returned.txt:26-27,46; shared/tests/vh-adlc/docs-impact/assessments.ts:41
+EVIDENCE: In the contracts case, docs/guide.md:6 says port 8080 and contracts/src/app.ts:1 sets 9090, which is a changed default. The model classified guide.md only as Incomplete, for the missing NEW_SERVICE_FEATURE, and its prose for that case does not mention the stale port. It also cited src/app.ts:1 for other-system.md, although it says that system's implementation is unavailable. The evaluator accepts any of the four labels and any existing src line, so result.json pass cannot detect either issue. The other cases do catch the 8080/9090 mismatch as Stale.
+PROPOSAL: Record that semantic review corrected the label in the retained trial notes. For deterministic fixture cases, add expected classifications, and accept an empty source citation with a stated reason where no implementation exists.
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: consumer/after/scripts/check-doc-coverage.js:111-112
+EVIDENCE: When the outcome is `none` and no overlay is selected, the excluded dirty docs are written only to stderr. The retained hook runs `2>/dev/null` (consumer/after/.githooks/pre-commit:73), and wrapper.test.cjs:67 and 120 assert the quiet behavior. During pre-commit, a staged covers edit counts as dirty against HEAD. So a commit that moves both code and its mapping gets a silent no-match based on HEAD metadata. Design line 362-364 asks that the metadata view and excluded dirty docs be reported, so that HEAD-only checking cannot stand in for the current-metadata assessment.
+PROPOSAL: Print a one-line HEAD-metadata notice on stdout whenever excluded dirty docs exist, or record the silent advisory no-match as an accepted limitation in the companion and the compatibility docs.
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: consumer/after/tests/agent-docs-impact/preflight.cjs:42,47
+EVIDENCE: All four rollback properties (preserved_unrelated, preserved_index, refused_conflicts, refused_symlinks) are set from one value, `contracts.exit === 0`. That value is the aggregate exit of every *.test.cjs file in the directory. If rollback.test.cjs were removed or renamed, the remaining tests would still exit 0 and the preflight would report every rollback property as verified.
+PROPOSAL: Require the rollback test to be present and to have passed by name, for example by checking the node --test report for that test, before setting the rollback fields.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, Implementation progress
+EVIDENCE: shared/docs/specs/shared-docs-impact.md:546-547 says "current-main integration also passes the Go/workflow checks", and line 533 says "Integrated current main leaves that plugin tree unchanged". Neither line names the integrated default revision. default-branch-covered-drift.patch:9-38 shows that main at 26c00e6 adds a `remote-gui` job, running Go build/test/vet/golangci-lint/tidy and `bun test tests/remote-gui`, and makes `version` need it (shared/.github/workflows/ci.yml:89-117). After that merge, the earlier "current-main" Go/workflow observation does not show that the merged head passes the newly required job. The plan itself stays consistent with current main. The docs-impact typecheck and test selections are unchanged at ci.yml:48-52 and 72-87. The README and marketplace changes only add a `remote-gui` row (README.md:85, docs/reference/marketplace.md:14), and the docs-impact setup section and example link are still in place (marketplace.md:104-112, README.md:28). Line 533's plugin-tree claim still holds, because the patch does not touch `plugins/vh-adlc/`. Scope, Design, Acceptance Criteria, Test Plan and `covers` are not changed by this drift, so the R-8 acceptance can stand under engineering/conventions/feature-documents.md:196-198.
+PROPOSAL: Name the integrated default revision (26c00e6) in the progress observation. Mark the earlier Go/workflow result as bound to the previous main, not to the merged head. That lets T10's run at the committed feature head cover the added `remote-gui` CI job, as AC-07 requires ("record actual observed default revisions").
+
+### R-11
+CRITERION: AC-01 Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+VERDICT: met
+EVIDENCE: Ran bash /home/m/code/.docs-impact-review-archive/implementation-review-checks-3.sh against target 7a3c613f64e352084c6bc5730c09cf899fee2843, then read published/conventions/documentation-impact.md and shared/plugins/vh-adlc/scripts/docs-impact/matching.ts and collection.ts. The script exited 0. The docs check passed ("Checked 28 Markdown files", rules block with 9 statuses, 12 conditions and 17 next rules). The published ancestry step printed "ahead". The focused public suite passed 224 tests with 0 failures. Go tests passed, including internal/doc and internal/gate, and lint reported 0 issues. The convention is self-contained: the matching table is at lines 55-67, coverage-only feature labelling at 69-78 and the HEAD view at 80-102. The collector reads Markdown directly and uses no index. The feature resolver regex and the self-trigger exclusion are at collection.ts:147 and collection.ts:254. Limitations: the script prints a bare "ahead" for ancestry, and I could not inspect the script to say exactly what it compared. I did not list the individual test names behind the 224 passes. I also ran one shell command that was not authorized: a read-only `wc -l` on the script's output file. It changed nothing.
+CRITERION: AC-02 The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+VERDICT: met
+EVIDENCE: Same fixed script run at 7a3c613: 224 focused tests and 34 typechecked component tests passed with 0 failures, and the script reported that source, consumer, indexes and refs were preserved. I inspected collection.ts myself. HEAD tree reads use ls-tree and cat-file (lines 68-73 and 115-119). Overlays come only from --metadata-path and use no-follow lstat (lines 120-131 and 243). Base scope uses one unique merge-base plus rename and delete names (lines 216-223 and 93-100). Dirty and untracked paths are excluded unless selected (line 225). Unselected dirty docs are listed but not parsed (line 228). The CLI accepts NUL input with BOM preserved (cli.ts:46-53). The consumer full-corpus run compared 790 documents, 754 patterns and 3336 sources with 0 losses. Limitation: I did not execute individual synthetic cases outside the fixed script.
+CRITERION: AC-03 No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+VERDICT: met
+EVIDENCE: Same fixed script run at 7a3c613, with focused CLI and collection tests passing. In code, the outcome is set at collection.ts:267, the exit mapping is at cli.ts:65, and the text output carries a coverage-only disclaimer and the full report (cli.ts:69 and 78). A doc absent from both views fails (line 245). An unavailable reader is a gap (lines 111-113 and 239). A root with no usable coverage is a gap (line 259). Uncovered docs are listed (line 248) and unmatched sources reported (line 266). The consumer wrapper tests in the same run cover incomplete with known candidates, exit 2 on stdout, and malformed reports that cannot pass as a clean no-match (wrapper.test.cjs:62-68 and 93-101). Limitation: I did not separately run the offline missing-binary case outside the suite.
+CRITERION: AC-04 Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+VERDICT: met
+EVIDENCE: The fixed script run at 7a3c613 passed the package, discovery, protected-body and example checks in the focused suite. I read the retained Copilot claude-opus-5.5 transcripts in observations/trial-8, trial-9 and trial-10 returned.txt and copilot-result.json, and checked them against the synthetic fixtures in native-trial.ts:19-35. Cases checked: report, update, intake, entry gaps, old-pin missing-page, the implement and ship incomplete blocks, the progress draft, feature-move (spec proposal without an edit), local and unmarked plan upkeep, and unknown-plan (Unknown, no edit). Run 9 contracts at 4f29be5 keeps the 8080 contract as Accurate and calls 9090 a software bug. It reports the missing NEW_SERVICE_FEATURE guide with a suggested home. It treats injection.md as untrusted and classifies other-system.md as Unknown, with no source citation and a stated reason. Run 10 manual and fenced classify the guide as Stale, citing docs/guide.md:6 against src/app.ts:1. Only the permitted files changed, and HEAD and index were preserved. Limitations: these are retained trial artifacts that I did not execute. The 12 run-8 cases ran at 8de398e, before the classification guidance in exact-component-binding.json was added. Run 10 passed after the request text was changed. The covered-path review-refresh rule is checked as text only.
+CRITERION: AC-05 Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+VERDICT: not verified
+EVIDENCE: The fixed script run at consumer 7a1e905635192c84c177260df26e8df0b811af00 rebuilt the legacy index from HEAD: 0 losses, 3625 additions, 0 meaning risks, committed index unchanged. Preflight returned source_ready true with the full corpus collected (outcome none, 0 gaps) and a complete inventory. That run included every retained caller and the named rollback test (preflight.cjs:46-47). I inspected the wrapper, hook, companion and rollback test. Local policy, visuals, index rebuild and plan upkeep remain in docs-impact-project.md. Limitations: preflight reported migration_ready false with "published convention, marketplace and paired-review evidence absent". The independently reviewed parity, installed-payload caller checks and the consumer merge have not been executed, so Stackweaver does not yet use the shared checker on its main line.
+CRITERION: AC-06 Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+VERDICT: not verified
+EVIDENCE: The fixed script run at 7a3c613 passed the local Linux tests, Go vet and lint, strict typecheck and the workflow checks. I inspected the Copilot trials retained under AC-04. Limitations: no Linux or macOS CI run for the target was observed. Native Codex and Claude installed and standalone results are local-catalog candidate evidence at 4f29be5, and I did not execute them here.
+CRITERION: AC-07 Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+VERDICT: not met
+EVIDENCE: The fixed script's preflight at shared 7a3c613 and consumer 7a1e905 printed migration_ready false, failing on "published convention, marketplace and paired-review evidence absent". Spec lines 575-576 still list shared publication, normal CI and release, marketplace acceptance and consumer cutover as open, and T9 and T10 are unticked. The convention was observed as published and the source-candidate guards pass, but tool publication, marketplace fresh and upgrade acceptance, paired review and post-merge checks do not exist yet.
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Tasks, T8 evidence; Implementation progress, T8 evidence
+EVIDENCE: shared-docs-impact.md:494 says trials 8, 9 and 10 "establish all 15 cases after focused recovery". observations/exact-component-binding.json shows that the reference diff from run 8 (8de398e) to the target adds a general classification rule: "Use Incomplete for an observed omission and Stale for an observed inaccurate current claim; reserve Unknown for missing applicability or evidence". That rule governs every classifying case, not just contracts. The 12 run-8 cases therefore never ran under the target reference's classification text. Only contracts (run 9) and manual and fenced (run 10, with a changed request) ran at a component equal to the target.
+PROPOSAL: Say in the T8 evidence that the 12 run-8 classifications predate the target's classification rule, or rerun those 12 cases at the target component before using them as target evidence.
+
+### R-12
+CRITERION: AC-01 Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+VERDICT: met
+EVIDENCE: This is carried-forward execution evidence plus a source comparison at target abb576b068ae62ffe057a4692a314ed0601f0681. The R-11 reviewer ran its fixed check script at 7a3c613f64e352084c6bc5730c09cf899fee2843 and observed exit 0, the docs check over 28 Markdown files with the unchanged rules block, published ancestry "ahead", 224 focused tests passing with 0 failures, and Go internal/doc and internal/gate tests and lint passing (observations/previous-implementation-review.txt:4). I read observations/review-followup-diff.patch in full. From 7a3c613 to the target it changes only docs/reference/compatibility.md, docs/specs/shared-docs-impact.md and docs/specs/shared-workflow-migration.md. It touches no plugin, script, test or convention file, so the checked behavior is unchanged. I rechecked the source: the feature-root resolver regex at shared/plugins/vh-adlc/scripts/docs-impact/collection.ts:147 matches the pinned rule at engineering/conventions/feature-documents.md:219. Limitations: I executed nothing in this review. The execution evidence is R-11's at 7a3c613 with its own limits: bare "ahead" output and no per-test names. Carrying it to abb576b depends on the diff showing that no code or tests changed.
+CRITERION: AC-02 The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+VERDICT: met
+EVIDENCE: This is carried-forward evidence at target abb576b. R-11's fixed script at 7a3c613 observed 224 focused tests and 34 typechecked component tests passing, with source, consumer, index and refs preserved (previous-implementation-review.txt:7). I read all of observations/preflight-current-source.json, including its 89k-token corpus line 73. The corpus command ran check with --repo, --docs-root docs and --path __migration_probe__ against consumer HEAD 7a1e905635192c84c177260df26e8df0b811af00. Its result has outcome none, policy view HEAD, excluded_dirty false, empty excluded_dirty_paths, excluded_dirty_docs and selected_paths, and per-document HEAD bindings with sha256 hashes. It reports the probe as an unmatched source and returns no diagnostics. The roots command at line 57 returned declared ["docs"] at the same head. The follow-up diff changes no checker source or test. Limitations: I executed nothing. The checks ran at 7a3c613, with the consumer at 7a1e905 and shared source 4f29be5 for the preflight. I did not run the individual synthetic overlay, rename or merge-base cases myself.
+CRITERION: AC-03 No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+VERDICT: met
+EVIDENCE: This is carried-forward evidence at target abb576b. R-11's run at 7a3c613 passed the focused CLI and collection tests and the consumer wrapper tests for incomplete-with-candidates and malformed reports (previous-implementation-review.txt:10). I rechecked collection.ts:267: the outcome is incomplete when there are diagnostics, otherwise candidates or none. The retained preflight's line 73 lists uncovered documents and an unmatched source separately from candidates, and contract_command TAP at line 87 passes subtests 12, 15 and 16: known matches retained on gaps, malformed reports never becoming a no-match, and hook exits 0, 1 and 2. That TAP shows 16 pass, 0 fail. The follow-up diff changes no code. Limitations: I executed nothing. The evidence is bound to 7a3c613 and to consumer 7a1e905. The offline missing-binary case was observed only inside R-11's suite.
+CRITERION: AC-04 Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+VERDICT: met
+EVIDENCE: This is carried-forward evidence at target abb576b. R-11 observed the package, discovery, protected-body and example checks passing at 7a3c613. It also inspected the retained Copilot Opus 5.5 trials 8, 9 and 10 (previous-implementation-review.txt:13). exact-component-binding.json shows an empty component diff from run 9 to the target. From run 8 the diff adds the general classification rule, which I confirmed at shared/plugins/vh-adlc/references/docs-impact.md:91. The R-11 F-01 nit is addressed. shared-docs-impact.md:501 and 530-531 now say the 12 run-8 classifications predate that rule and that their behavior under it is unclaimed. compatibility.md:144 states the same limit. Limitations: I executed nothing, and the model trials are retained artifacts at 8de398e, 4f29be5 and 1786f48. Run 10 passed only after its request text changed. The 12 run-8 classifications are not evidence under the current reference text. Actual Claude docs-impact execution remains unclaimed.
+CRITERION: AC-05 Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+VERDICT: not verified
+EVIDENCE: I read the whole retained preflight: observations/preflight-current-source.json at shared 4f29be5 and consumer 7a1e905. It shows source_ready true, corpus outcome none with 0 gaps, a complete inventory with no unresolved callers, and parity rebuilt from HEAD with 0 lost candidates. The rollback fields are all true. The contract TAP passes 16 of 16, including subtest 7, the named rollback rehearsal. It also shows migration.ready false with the failure "published convention, marketplace and paired-review evidence absent", and published_observations is null. R-11 independently re-ran the same predicates at 7a3c613 (previous-implementation-review.txt:16). Limitations: the independently reviewed parity, the installed-marketplace caller checks and the consumer merge exist as required checks but have not run. The current docs say consumer cutover is pending (shared-docs-impact.md:594-595). I executed nothing.
+CRITERION: AC-06 Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+VERDICT: not verified
+EVIDENCE: R-11's run at 7a3c613 observed local Linux tests, Go vet and lint, strict typecheck and workflow checks passing (previous-implementation-review.txt:19). The current docs keep the limits explicit. compatibility.md:145-146 labels the Codex and Claude rows as local-catalog candidate installs, not marketplace proof or Claude docs-impact model execution. compatibility.md:152-155 says actual Linux and macOS CI are pending. shared-docs-impact.md:559 says actual CI is a separate observation. Limitations: no Linux or macOS CI run at any reviewed commit was observed. The native installed and standalone results are local-catalog evidence at 4f29be5 that neither R-11 nor I executed. Some Copilot trial cases were not run against the current reference text (see AC-04). A passing subset does not upgrade this composite criterion.
+CRITERION: AC-07 Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+VERDICT: not met
+EVIDENCE: The retained preflight (preflight-current-source.json:41-46) and R-11's fresh run at shared 7a3c613 and consumer 7a1e905 (previous-implementation-review.txt:22) both report migration ready false, failing on "published convention, marketplace and paired-review evidence absent". published_observations is null. T9 and T10 remain unticked (shared-docs-impact.md:502-503). Lines 594-596 list normal CI and release, marketplace acceptance, consumer cutover and final completion review as open. The convention is published at f8ccacb (lines 507-511), and the rollback rehearsal passed in a disposable repository. Limitations: tool publication, marketplace fresh and upgrade acceptance, paired current-consumer review and post-merge checks do not exist yet. This is source readiness only. I executed nothing.
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: shared/docs/reference/compatibility.md, Shared documentation impact
+EVIDENCE: compatibility.md:139-140 says "Integration with current main preserves its exact plugin tree." The follow-up applied the R-10 F-01 fix only to the feature document, which now names default 26c00e698860c88c3e2382ca9db5dd4b126c4cc1 at shared-docs-impact.md:542 and 556 (review-followup-diff.patch:68 and 77). The covered public compatibility page still binds this claim to a moving "current main", which goes stale on the next default-branch change. AC-07 asks for actual observed default revisions to be recorded.
+PROPOSAL: Replace "current main" at compatibility.md:140 with the observed default revision 26c00e6, matching the feature document.
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: shared/docs/specs/shared-workflow-migration.md, D-03 row
+EVIDENCE: The new D-03 text says "Fifteen native cases have successful observed results across retained focused retries" (review-followup-diff.patch:221). The feature document uses "native" for the separate Codex and Claude installs ("isolated native Codex/Claude candidate", shared-docs-impact.md:500). The fifteen cases are Copilot CLI Opus 5.5 trials (shared-docs-impact.md:501; compatibility.md:144). compatibility.md:146 says the Claude row is not Claude docs-impact model execution. A roadmap reader could take "fifteen native cases" as native Codex or Claude model results, which would overstate the native proof.
+PROPOSAL: Say "Fifteen Copilot CLI Opus 5.5 trial cases" in the D-03 row and keep the existing pointer to the child's revision limits.
+
+### R-13
+CRITERION: AC-01 Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+VERDICT: met
+EVIDENCE: This is carried-forward evidence plus a diff inspection at target 957597d23607146e3ac218d2ec96250d0f2f8f97. I read observations/last-followup-diff.patch in full. From abb576b to the target it changes only docs/reference/compatibility.md (line 140), docs/specs/shared-docs-impact.md (status_description, the T9 tick and evidence, progress prose, the R-12 row and subsection) and docs/specs/shared-workflow-migration.md (the D-03 row). It touches no plugin, script, test or convention file. R-12 had already established that the step from 7a3c613 to abb576b was also docs-only (last-followup-review.txt:4). So the R-11 execution at 7a3c613 still applies to the unchanged behavior: the fixed check script exited 0, the docs check passed over 28 Markdown files with the unchanged rules block, published ancestry printed "ahead", 224 focused tests passed with 0 failures, and the Go internal/doc and internal/gate tests and lint passed (shared-docs-impact.md:1069). The convention is published at f8ccacb (shared-docs-impact.md:509-513), and the pinned feature-root rule is unchanged at engineering/conventions/feature-documents.md:217-219. Limitations: I executed nothing in this review. The execution evidence is R-11's at 7a3c613, with its own limits: bare "ahead" output and no per-test names. Carrying it to 957597d depends on two consecutive docs-only diffs.
+CRITERION: AC-02 The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+VERDICT: met
+EVIDENCE: This is carried-forward evidence at target 957597d. In R-11's fixed script run at 7a3c613, 224 focused tests and 34 typechecked component tests passed, and source, consumer, index and refs were preserved (shared-docs-impact.md:1072). R-12 read the whole retained preflight. It found a HEAD policy view, no excluded dirty input, per-document HEAD sha256 bindings, roots declared ["docs"] at consumer 7a1e905 and a complete corpus with no diagnostics (last-followup-review.txt:7). The latest diff changes no checker source, test or fixture (last-followup-diff.patch:1-114). Limitations: I executed nothing. The checks are bound to 7a3c613, to consumer 7a1e905 and to shared 4f29be5 for the preflight. I did not run the individual synthetic overlay, rename or merge-base cases.
+CRITERION: AC-03 No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+VERDICT: met
+EVIDENCE: This is carried-forward evidence at target 957597d. R-11's run at 7a3c613 passed the focused CLI and collection tests and the consumer wrapper tests. Those cover incomplete results with known candidates on stdout and malformed reports that cannot pass as a clean no-match (shared-docs-impact.md:1075). R-12 confirmed the retained contract TAP: 16 pass, 0 fail, including subtests 12, 15 and 16 (last-followup-review.txt:10). The latest diff changes no code or tests. Limitations: I executed nothing. The evidence is bound to 7a3c613 and consumer 7a1e905. The offline missing-binary case was observed only inside R-11's suite.
+CRITERION: AC-04 Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+VERDICT: met
+EVIDENCE: This is carried-forward evidence at target 957597d. At 7a3c613, R-11 observed the package, discovery, protected-body and example checks passing, and it inspected the retained Copilot Opus 5.5 trials 8, 9 and 10 (shared-docs-impact.md:1078). The latest diff makes the parent roadmap's D-03 row say "Fifteen Copilot CLI Opus 5.5 trial cases" (shared-workflow-migration.md:76). That matches the T8 evidence at shared-docs-impact.md:501 and the compatibility row at compatibility.md:144. The roadmap no longer suggests native Codex or Claude model results, which addresses R-12 F-02. shared-docs-impact.md:501 and 532-533 still say the 12 run-8 classifications predate the general classification rule and are unclaimed under it. Limitations: I executed nothing. The trials are retained artifacts at 8de398e, 4f29be5 and 1786f48. Run 10 passed only after its request text changed. The 12 run-8 classifications are not evidence under the current reference text, and actual Claude docs-impact execution remains unclaimed.
+CRITERION: AC-05 Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+VERDICT: not verified
+EVIDENCE: R-12 read the whole retained preflight at shared 4f29be5 and consumer 7a1e905. It shows source_ready true, a complete corpus, a complete inventory, rebuilt-HEAD parity with 0 losses and 16 of 16 contracts passing, including the named rollback rehearsal. It also shows migration ready false and published_observations null (last-followup-review.txt:16). R-11 ran the same predicates again at 7a3c613 (shared-docs-impact.md:1081). consumer/after/tests/agent-docs-impact/README.md:43-54 puts the current-HEAD reinspection, the fresh paired semantic review on the exact shipped payload and the merge after publication. Limitations: the installed-marketplace caller checks, independently reviewed paired parity and the consumer merge are required checks that have not run. Consumer cutover is pending (shared-docs-impact.md:596-597). I executed nothing.
+CRITERION: AC-06 Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+VERDICT: not verified
+EVIDENCE: R-11's run at 7a3c613 passed the local Linux tests, Go vet and lint, strict typecheck and workflow checks (shared-docs-impact.md:1084). The limits are still explicit. compatibility.md:145-146 labels the Codex and Claude rows as local-catalog candidate installs, not marketplace proof or Claude docs-impact model execution. compatibility.md:152-155 says actual Linux and macOS CI and published marketplace acceptance are pending. shared-docs-impact.md:561 says actual CI is a separate observation. Limitations: I observed no Linux or macOS CI run at any reviewed commit. The native installed and standalone results are local-catalog evidence at 4f29be5 that no reviewer executed. Some Copilot cases did not run under the current reference text (see AC-04). A passing subset does not upgrade this composite criterion.
+CRITERION: AC-07 Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+VERDICT: not met
+EVIDENCE: The retained preflight and R-11's run at shared 7a3c613 and consumer 7a1e905 both report migration ready false: "published convention, marketplace and paired-review evidence absent" (shared-docs-impact.md:1087; last-followup-review.txt:22). The T9 evidence line also says migration readiness stays false (shared-docs-impact.md:503). T10 is still unticked (line 505). Lines 596-598 list normal CI and release, marketplace acceptance, current-consumer cutover and final completion review as open. The latest diff fixes R-12 F-01. compatibility.md:140 now binds the plugin-tree claim to observed default 26c00e698860c88c3e2382ca9db5dd4b126c4cc1, which matches shared-docs-impact.md:544 and 558, as the criterion requires for observed default revisions. Limitations: tool publication, real marketplace fresh and upgrade acceptance, paired current-consumer review and post-merge checks do not exist yet. Only source readiness and a disposable rollback rehearsal are established. I executed nothing.
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Tasks, T9
+EVIDENCE: The latest diff ticks T9 (last-followup-diff.patch:31-33; shared-docs-impact.md:502). T9's done condition includes passing "paired semantic review". The consumer procedure puts "the fresh paired semantic review for the exact shared payload and consumer commit" after publication and marketplace acceptance (consumer/after/tests/agent-docs-impact/README.md:34-49). The preflight still fails with "paired-review evidence absent" (shared-docs-impact.md:1087), and R-12's AC-05 record says the independently reviewed parity has not run. The new T9 evidence names R-11 and R-12 source reviews but does not say they are the paired semantic review that T9 requires.
+PROPOSAL: Either untick T9 until the paired semantic review exists, or state in the T9 evidence that the source-candidate part is done and the paired semantic review moves to the delivery checks under T10.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: frontmatter status_description
+EVIDENCE: The new status_description lists only "ordered CI, publication, installed marketplace acceptance and cutover" as open (shared-docs-impact.md:4; last-followup-diff.patch:22-23). It dropped the earlier "final independent review". The progress text still lists "final completion review" as open (shared-docs-impact.md:596-598), and T10, which requires the completion implementation review, is unticked (line 505).
+PROPOSAL: Add the final completion review back to the open items in status_description.
 
 ## Sources
 

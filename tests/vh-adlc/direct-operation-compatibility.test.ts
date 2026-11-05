@@ -14,6 +14,15 @@ test.each(["investigate", "spec", "tasks", "implement", "review", "ship", "resum
   expect(old.exitCode).toBe(0);
   const body = (text: string) => text.slice(text.indexOf("The plugin directory is two levels"));
   let current = readFileSync(join(root, path), "utf8");
+  if (name === "implement" || name === "ship") {
+    const start = current.indexOf("## Documentation impact\n"), end = current.indexOf("## Start\n", start);
+    expect(start).toBeGreaterThan(0); expect(end).toBeGreaterThan(start);
+    const section = current.slice(start, end);
+    for (const phrase of ["committed HEAD", "roots --repo", "knowledge", "before", "first", "manual", "missing-page", "--metadata-path", "incomplete", "references/docs-impact.md"]) expect(section).toContain(phrase);
+    if (name === "implement") expect(section).toContain("before ticking/committing");
+    else for (const phrase of ["owner-authorized", "preflight succeeds", "no completion", "review-refresh"]) expect(section).toContain(phrase);
+    current = current.slice(0, start) + current.slice(end);
+  }
   if (name === "ship") {
     const promotionStart = current.indexOf("## Article and promotion handoff\n");
     const promotionEnd = current.indexOf("## After an authorized merge\n", promotionStart);

@@ -43,8 +43,13 @@ jobs:
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version: 1.4.4
+      - name: Prepare the locked YAML reader
+        run: bash plugins/vh-adlc/scripts/ensure-vh-adlc.sh
+      - name: Typecheck documentation impact
+        run: |
+          bun run --cwd plugins/vh-adlc/scripts/docs-impact typecheck
       - name: Check the vh-adlc package
-        run: bun test tests/vh-adlc
+        run: bun test tests/vh-adlc --timeout 60000
 
   checker-macos:
     runs-on: macos-latest
@@ -62,6 +67,11 @@ jobs:
           bun-version: 1.4.4
       # Managed verification and effect recovery require Linux/Bubblewrap/flock.
       # Ubuntu runs every test; macOS checks the portable feature and report inputs.
+      - name: Prepare the locked YAML reader
+        run: bash plugins/vh-adlc/scripts/ensure-vh-adlc.sh
+      - name: Typecheck portable documentation impact
+        run: |
+          bun run --cwd plugins/vh-adlc/scripts/docs-impact typecheck
       - name: Check portable vh-adlc behavior
         run: >-
           bun test tests/vh-adlc/*.test.ts
@@ -73,6 +83,7 @@ jobs:
           tests/vh-adlc/triage/settings.test.ts
           tests/vh-adlc/maintenance/*.test.ts
           tests/vh-adlc/audit/*.test.ts
+          tests/vh-adlc/docs-impact/*.test.ts
           --timeout 60000
 
   remote-gui:

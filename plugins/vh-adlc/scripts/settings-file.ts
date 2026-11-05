@@ -31,9 +31,20 @@ export function settingsFile(options: { root: string; name: string; settingsPath
 
 /** Returns the value `vh-adlc settings read` gives for `bytes`, or fails with its fixed reason. */
 export function readYAML(bytes: Uint8Array, fail: Fail, options: { offline?: boolean } = {}): unknown {
+  return createYAMLReader(fail, options)(bytes);
+}
+
+/** Resolve the verified reader once; every call still parses a separate document strictly. */
+export function createYAMLReader(fail: Fail, options: { offline?: boolean } = {}): (bytes: Uint8Array) => unknown {
   const installer = Bun.spawnSync(["bash", join(import.meta.dir, "ensure-vh-adlc.sh"), ...(options.offline ? ["--offline"] : [])], { stdout: "pipe", stderr: "pipe" });
   if (installer.exitCode !== 0) fail("binary unavailable: the verified vh-adlc binary could not be obtained");
-  const run = Bun.spawnSync([installer.stdout.toString().trim(), "settings", "read", "--stdin"], { stdin: bytes, stdout: "pipe", stderr: "pipe" });
+  const binary = installer.stdout.toString().trim();
+  if (!binary) fail("binary unavailable: the verified vh-adlc binary could not be obtained");
+  return bytes => readVerifiedYAML(binary, bytes, fail);
+}
+
+function readVerifiedYAML(binary: string, bytes: Uint8Array, fail: Fail): unknown {
+  const run = Bun.spawnSync([binary, "settings", "read", "--stdin"], { stdin: bytes, stdout: "pipe", stderr: "pipe" });
   let parsed: unknown;
   try { parsed = JSON.parse(run.stdout.toString()); } catch { fail("the settings reader returned no report"); }
   const report = record(parsed);

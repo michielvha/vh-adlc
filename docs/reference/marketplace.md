@@ -100,3 +100,13 @@ existing one.
 
 Read the [registration workflow](../../plugins/github-app-registration/skills/github-app-registration/SKILL.md)
 for configuration, credential storage, and export options.
+
+## Documentation impact setup after installation
+
+The portable docs-impact checker uses the installed vh-adlc payload, Bun, Git,
+Bash and its locked verified binary. Follow [standalone setup](../get-started/installation.md#standalone-documentation-checking)
+after a fresh install or upgrade; checking never downloads missing prerequisites.
+A consumer compatibility wrapper can use `VH_ADLC_PLUGIN_ROOT` exported before
+sessions start. Point it to the actual installed plugin directory and refresh it
+when the installer changes the location. A local source copy is not marketplace
+installation evidence.

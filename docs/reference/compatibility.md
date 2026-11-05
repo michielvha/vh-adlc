@@ -133,3 +133,23 @@ prose guide when the humanizer skill is unavailable.
 
 Continue with [your first feature](../get-started/first-feature.md) or
 [review requirements](../user-guides/workflows.md#reviews).
+
+## Shared documentation impact
+
+The current local candidate is `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`
+(plugin 0.9.0). Integration with observed default `26c00e698860c88c3e2382ca9db5dd4b126c4cc1` preserves its exact plugin tree.
+
+| Surface | Observed result | Limit |
+| --- | --- | --- |
+| Copilot CLI, Opus 5.5 | All 15 synthetic cases have successful observed results across trials 8/9/10, including manual entry, contract/omission handling, task/completion gaps and an authorized progress-PR draft. | Focused retries after retained failures; 12 classifications predate the revised general classification guidance. Exact source/reference/request changes are recorded in the feature document. No remote write. |
+| Codex CLI 0.163.0 local catalog | Candidate 7 discovers all 13 skills; installed roots/check preserve inputs/index outside an agent session. | Candidate install, not published marketplace proof. |
+| Claude Code CLI 2.1.316 local catalog | Candidate 7 discovers all 13 skills; installed standalone checking preserves inputs/index. | Native install/helper check, not Claude docs-impact model execution. |
+
+Stackweaver's unchanged advisory hook checks HEAD metadata and suppresses stderr
+on quiet no-match results. It does not verify current task-owned doc metadata;
+explicit `--metadata-path` overlays are required for that assessment.
+
+Source Git/metadata/CLI checks run on Linux. Actual Linux/macOS CI and published
+marketplace fresh/upgrade acceptance remain pending. Other operations' compatibility
+rows do not establish docs-impact execution. Claude docs-impact execution, GUI/phone
+entry and live Stackweaver screenshot capture remain unverified.

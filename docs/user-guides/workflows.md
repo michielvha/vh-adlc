@@ -12,8 +12,8 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has twelve skills: this entry,
-ten engineering operations and one article-writing operation. Check
+repository and selects a procedure. The package has thirteen skills: this entry,
+ten engineering operations and two content operations. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -50,6 +50,7 @@ see [installation](../get-started/installation.md).
 | Review | `vh-adlc-review` | Dispatch an independent implementation review of an exact commit. |
 | Ship | `vh-adlc-ship` | On an explicit request, push the branch, open or update the PR, and update the issue. Never merges. |
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
+| Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
 
 Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
@@ -200,3 +201,19 @@ usable independently of vh-adlc.
 The [lifecycle procedure](../../plugins/vh-adlc/references/lifecycle.md) and
 [feature loop](../../plugins/vh-adlc/references/loop.md) contain the agent-facing
 execution rules.
+
+## Documentation impact
+
+Ask which docs a patch affects, or invoke `vh-adlc-docs-impact` with the repository
+and source/base scope. It reads `covers` metadata directly, then reviews candidate
+docs against source and searches for missing references. Report-only requests
+make no corrections. Authorized updates make minimal doc edits under local rules.
+
+Adopt integrated implement/ship checking by committing
+`Documentation impact roots: ["docs/"]` in root `AGENTS.md`. An absent declaration
+keeps manual review; malformed setup or incomplete checking is reported and stops
+the applicable task/completion gate. Metadata overlays must be selected separately
+from source paths. Ordinary mapping upkeep stays here; standard feature-spec
+coverage revisions go through the spec operation. Project generators and visual
+checks remain local. See the [procedure](../../plugins/vh-adlc/references/docs-impact.md)
+and [complete runnable example](../../plugins/vh-adlc/examples/docs-impact/README.md).
