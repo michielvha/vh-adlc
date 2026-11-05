@@ -338,6 +338,7 @@ None.
 | 2026-11-05 | R-16 | spec | `2249cee19e85832605c0f035a0b9c2d070b8e4c2` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 | 2026-11-05 | R-17 | spec | `191fc46516b07a5f66f133d005d35d1ec09501aa` | claude-opus-5.5 | procedural | 3 should-fix; 2 nit. Full requested read coverage. |
 | 2026-11-05 | R-18 | spec | `9f356ebd560c44972e6e433fd36d101ed7e2091e` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-19 | spec | `7299aa4ea733fefd345748a78bce5687ca7bb5c9` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -830,6 +831,15 @@ SEVERITY: nit
 WHERE: Scheduled worker and staged adoption (upgrade signal); Upgrades after adoption (trial route, rollback)
 EVIDENCE: The only file the updater matches is the non-executing `.vh-adlc/docs-drift-upgrade-signal.yaml` (shared-docs-drift.md:229). A compatible pin bump "refreshes the non-executing upgrade signal to the verified new source/release" (line 269). The trial-route upgrade and rollback paths say nothing about the signal: "Rollback selects the prior approved pin, record and matching migration-owned inputs together" (line 273). After a trial-route upgrade, the signal could stay at the old release, so the updater keeps proposing a version that is already adopted. After a rollback, it is unclear whether the signal reverts and the rolled-back version gets proposed again, or stays ahead of the active pin.
 PROPOSAL: State that every adopted upgrade route refreshes the signal in its C change. Also state whether rollback restores the signal or leaves it, and add both cases to the AC-06 updater proof.
+
+### R-19
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Owner decisions; Upgrades after adoption (compatible definition, compatible pin bump, trial route); Protected adoption bindings; Test Plan AC-06
+EVIDENCE: The settled owner policy sends "changed execution/provider/reviewer/permissions/publication" to another live trial. The draft repeats this rule in three places: "execution/provider/reviewer/permission/publication changes still require a new trial. Static YAML validation and a local interactive model call cannot satisfy this condition" (00241 line 1), and the trial route covers changes to "execution" (00241 line 35). The protected manifest separately binds the "reusable-worker blob and effective caller contract", the "install/worker/reviewer/publisher invocations" and the "runner, execution environment, job permissions and secret-name mappings" (00241 line 17). That reusable worker "owns the install, scanner/worker, independent reviewer and publisher steps, runner, environment and permission requirements" (00241 line 1). The compatible route, however, also allows "A component/worker refactor ... only when independent review and the affected regression/installed checks demonstrate preserved execution", and says "raw byte changes are not automatically behavior changes" (00241 line 31). The gate then accepts "changed component/worker hashes" that have a compatibility mapping and installed/regression evidence (00241 line 33). The only installed checks the draft defines are "actual fresh/upgrade installed-payload checks for the new exact version" (00241 line 33), meaning Codex/Claude marketplace installs (00241 line 39; AC-07). None of these checks runs the hosted reusable GitHub workflow. The draft never says whether "worker" here means the shared docs-drift procedure inside the component or the bound reusable-worker workflow blob. Under the second reading, a refactor of the unattended workflow's install, invocation or publisher steps could start real-corpus publication on the compatible route without being executed even once. That is the same static-only evidence the first-adoption rule rejects, and it contradicts the settled rule that execution changes take the trial route. AC-06 tests "a behavior-preserving worker/component refactor" on the compatible route (00241 line 68) without separating these two cases.
+PROPOSAL: Define the boundary. A change to the reusable-worker workflow blob or to any protected caller/execution field (install, runner, environment, permissions, secret mapping, or the worker/reviewer/publisher invocation and steps) is an execution change and takes the trial route. The compatible "worker refactor" exception covers only the shared component's procedure and helper code, which installed checks can actually exercise. Add an AC-06 case where a behavior-preserving edit to the reusable-worker workflow is denied on the compatible route, and a separate case where a component-internal worker-procedure refactor passes.
 
 ## Sources
 
