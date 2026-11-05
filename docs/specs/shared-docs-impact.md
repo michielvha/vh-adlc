@@ -469,7 +469,6 @@ unclaimed; a future UI change still owes its existing local visual checks.
 - [x] AC-07: Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
   Evidence: R-16 at `2dd76e7` returned met; executed and carried-forward observations with their limits are preserved verbatim below.
 
-
 ## Test Plan
 
 | Criterion | Proof |
