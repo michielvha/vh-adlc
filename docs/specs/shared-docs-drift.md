@@ -356,6 +356,7 @@ None.
 | 2026-11-05 | R-21 | spec | `7215b2fcb2c8147d599a7f58c3c0d4951cc78efb` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-22 | spec | `b6866cfb43389728acafa97b126ca56113266c60` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-23 | spec | `d4fc7f9ecce11da2348119ecae855f66f7249a46` | claude-opus-5.5 | procedural | 1 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-24 | spec | `336ace6d4a974b0a0467481a73d6890e990c160a` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -941,6 +942,27 @@ SEVERITY: nit
 WHERE: Design, Owner decisions
 EVIDENCE: The Owner decisions trial-route sentence covers "accepted assessment/classification/scan/publication rules, protected role identity, hosted reusable-worker blob or execution fields (install, runner, environment, invocation/steps), or permission/effect contract" (00081 line 27). The normative Upgrades text also sends "permission/secret, lease or publication/closure rules/behavior" and "resolve-classification/supersession" changes to the trial route. It requires the non-pin "secret" caller fields to stay exact (00241 lines 49, 53). The protected manifest lists "secret-name mappings" and "lease policy" as separate bindings (00241 line 35). The summary sentence that cites the owner therefore names neither secret-name mappings nor lease behavior. A reader could take a lease or secret-mapping change to be compatible, even though the Upgrades section and AC-06 route it to a trial.
 PROPOSAL: Add secret-name mappings, lease behavior and supersession/closure rules to the Owner decisions trial-route sentence, or have that sentence point to the Upgrades trial-route list without restating it.
+
+### R-24
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scan-result protocol and local correction; Scheduled worker and staged adoption (synthetic scanner invocation); Test Plan AC-02
+EVIDENCE: Each required detector unit's bound input digest covers `source_commit`, `settings_sha256`, `scope_sha256`, `feedback_sha256`, `detector_id`, `options` and `documents`. `scope_sha256` hashes the parsed settings object: `roots`, `exclusions`, `suffixes`, `required_detectors`, `detector_inputs` and `read_set` (00081 line 52). AC-02 checks this preimage "across scanner and shared helper" (00241 line 77). The Stackweaver correction must emit this execution accounting (00081 line 50). However, no second YAML parser may be added, and the protocol utility "contains no YAML parser" (00081 lines 28, 30). The scanner "uses only Node built-ins" (00241 line 6). The correction changes "collection accounting and error reporting only" (00081 line 22). The bound argv `node scripts/docs-audit.js --churn --prune --protocol-json <owned-output>` gives the scanner no settings, scope or binding input (00241 line 6). The scanner therefore cannot parse `.vh-adlc/docs-drift.yaml` to build `scope_sha256`, the feedback-file list or the per-unit options. Its only alternative is to duplicate the settings as constants, which "Trial settings match the scanner constants" implies, but the spec never defines that duplication or its equality check. The cross-implementation digest has no implementable source on the scanner side.
+PROPOSAL: Choose one channel and state it. One option is for the scanner to emit only per-unit examined inventories, outcomes and options, while the shared helper computes every bound digest from the verified-reader settings. The other is for the helper to pass an owned canonical binding file through a declared argv input, which the scanner echoes. Then update the golden-fixture and AC-02 wording to match.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (upgrade signal); Upgrades after adoption (rollback); Test Plan AC-06
+EVIDENCE: The updater matches only `.vh-adlc/docs-drift-upgrade-signal.yaml`. "The worker and runtime gate never read the signal as a pin", and "An updater PR is intake only and must never merge as-is or auto-merge" (00161 line 80). AC-06 requires "Reject ... merging an intake-only bump as-is" and says "repeated intake proposals cannot auto-merge" (00321 line 1). Rollback must "refuse mismatched combinations" of pin, record and signal (00241 line 48). No component reads the default-branch signal against the selected pin between upgrades. No consumer CI check or updater-configuration requirement is named either. If an intake PR is merged as-is, the active pin and gate stay unchanged and nothing denies or reports the merge. The signal then claims the newer release, so the updater stops proposing it. delivery.md says a dependency the updater cannot see "silently stops being updated" (00081 lines 59-66). The AC-06 rejection case has no defined subject or pass condition.
+PROPOSAL: Name the check that compares the default-branch signal with the selected pin's source and release. Examples are an adoption-helper consistency mode in consumer CI, or a visible runtime-gate diagnostic. Require the consumer updater rule for that manager to disable automerge. Add an AC-06 case where an as-is signal merge is detected and reported.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Audit and preparation (feature-document protection); Entry and consumer contract (docs-impact extraction)
+EVIDENCE: The spec says to "Factor/export its existing strict frontmatter reader as `readDocumentMetadata` ... including coverage declarations and branch/status validation" (00081 line 64). It also says to "Preserve docs-impact's public behavior" (00081 line 30). The existing reader, `patterns` in `scripts/docs-impact/collection.ts`, returns only `covers`. It returns an empty list when a document has no frontmatter and does no status or branch validation (collection.ts 00161 lines 26-37). Docs impact records any thrown error as a `metadata` gap (collection.ts 00241 line 17). If branch/status validation goes into the shared reader, a malformed `status` that docs impact accepts today becomes a new docs-impact gap.
+PROPOSAL: Say that `readDocumentMetadata` returns the strictly parsed mapping and that branch/status validation is a docs-drift-layer check. Add a docs-impact regression showing that its candidates and gaps do not change.
 
 ## Sources
 
