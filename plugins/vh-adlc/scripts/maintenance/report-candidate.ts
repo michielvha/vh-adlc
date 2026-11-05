@@ -7,6 +7,7 @@ import { commitID, gitBytes, parseObservation } from "./history";
 import { reportPermission, repositoryPath, resolveStanding, type ReportPermission } from "./authority";
 import { reserveReport } from "./report";
 import type { Settings } from "./types";
+import { validateReportSecurity } from "./artifacts";
 
 export type Candidate = { step_id: string; run_id: string; worktree: string; ref: string; base: string; report_path: string; report_digest: string;
   allowed_paths: string[]; permission_binding: string; archive_path: string; archive_digest: string; state: "intent" | "prepared" | "committed";
@@ -104,6 +105,7 @@ export function beginCandidate(config: Settings, id: string, authority: ReportPe
   const report = run.state.report;
   if (!report || typeof report.path !== "string" || typeof report.digest !== "string" || typeof report.inode !== "string") fail("saved report required");
   const source = file(report.path); if (source.digest !== report.digest || source.inode !== report.inode) fail("report changed; preserve original");
+  validateReportSecurity(config,id,source.bytes.toString());
   if (options.refresh_of) {
     const previous = candidate(run, options.refresh_of);
     if (previous.refresh_of !== null) fail("repeated default-branch advancement; publication pending");
@@ -165,6 +167,7 @@ function validateCommit(config: Settings, run: Run, value: Candidate, commit: st
   const changed = gitBytes(value.worktree, "diff", "--name-only", "-z", value.base, commit).toString().split("\0").filter(Boolean);
   if (!changed.includes(value.report_path) || changed.some(path => !value.allowed_paths.includes(path))) fail("outgoing candidate contains unrelated paths");
   const actual = gitBytes(value.worktree, "show", `${commit}:${value.report_path}`).toString();
+  validateReportSecurity(config,run.header.run_id,actual);
   assertDelta(readFileSync(value.archive_path, "utf8"), actual, run);
   if (command(value.worktree, "status", "--porcelain")) fail("hook or concurrent writer left candidate changes");
 }
@@ -188,6 +191,7 @@ export function commitCandidate(config: Settings, id: string, step: string, opti
       const provenance = options.generated_indexes;
       if (!provenance || provenance.base !== value.base || provenance.input !== "committed-base-plus-report" || !provenance.generator.length || canonicalJSON([...provenance.paths].sort()) !== canonicalJSON(indexes)) fail("generated index provenance missing");
     }
+    validateReportSecurity(config,id,file(join(value.worktree,value.report_path)).bytes.toString());
     assertDelta(readFileSync(value.archive_path, "utf8"), file(join(value.worktree, value.report_path)).bytes.toString(), run);
     command(value.worktree, "add", "--", ...changed);
     const staged = gitBytes(value.worktree, "diff", "--cached", "--name-only", "-z").toString().split("\0").filter(Boolean);
