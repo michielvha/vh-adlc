@@ -1,10 +1,10 @@
 // The shared settings loader: which file it reads, which it refuses, and when it
 // needs the verified vh-adlc binary.
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { settingsFile } from "../../plugins/vh-adlc/scripts/settings-file";
+import { delimiter, dirname, join, resolve } from "node:path";
+import { createYAMLReader, settingsFile } from "../../plugins/vh-adlc/scripts/settings-file";
 
 const LOADER = resolve(import.meta.dir, "../../plugins/vh-adlc/scripts/settings-file.ts");
 const made: string[] = [];
@@ -29,6 +29,57 @@ function refusal(run: () => unknown): string {
 }
 
 const yaml = "# Triage scope for this project.\nschema_version: 1\nsource_roots:\n  - src\nlabel_map:\n  bug: defect\n";
+
+describe("an offline reader session", () => {
+  test("verifies once and uses the real strict reader for several documents", () => {
+    const probe = checkout(), bin = join(probe, "bin"), counter = join(probe, "resolutions");
+    mkdirSync(bin);
+    const wrapper = join(bin, "bash");
+    writeFileSync(wrapper, '#!/bin/bash\nprintf "resolve\\n" >> "$VH_DOCS_READER_COUNTER"\nexec /bin/bash "$@"\n');
+    chmodSync(wrapper, 0o700);
+    const source = `import { createYAMLReader } from ${JSON.stringify(LOADER)};
+      const read = createYAMLReader(reason => { throw Error(reason); }, { offline: true });
+      console.log(JSON.stringify([read(new TextEncoder().encode("covers: [src/**]\\n")), read(new TextEncoder().encode("description: second\\n"))]));`;
+    const run = Bun.spawnSync([process.execPath, "-e", source], {
+      env: { ...process.env, PATH: `${bin}${delimiter}${process.env.PATH ?? ""}`, VH_DOCS_READER_COUNTER: counter },
+      stdout: "pipe", stderr: "pipe", timeout: 30_000,
+    });
+    expect(run.exitCode).toBe(0);
+    expect(JSON.parse(run.stdout.toString())).toEqual([{ covers: ["src/**"] }, { description: "second" }]);
+    expect(readFileSync(counter, "utf8")).toBe("resolve\n");
+  });
+
+  test("a refused document exposes no YAML values and does not poison the next read", () => {
+    const read = createYAMLReader(fail, { offline: true }), bytes = (text: string) => new TextEncoder().encode(text);
+    expect(refusal(() => read(bytes("private-value: 1\nprivate-value: 2\n")))).toContain("duplicate mapping key");
+    expect(refusal(() => read(bytes("private-value: 1\nprivate-value: 2\n")))).not.toContain("private-value");
+    expect(read(bytes("covers: [deploy/**]\n"))).toEqual({ covers: ["deploy/**"] });
+  });
+
+  test("an unavailable offline binary causes no download or cache installation", () => {
+    const probe = checkout(), scripts = join(probe, "plugin", "scripts"), bin = join(probe, "bin"), network = join(probe, "network-used");
+    mkdirSync(scripts, { recursive: true }); mkdirSync(bin);
+    writeFileSync(join(scripts, "settings-file.ts"), readFileSync(LOADER));
+    writeFileSync(join(scripts, "ensure-vh-adlc.sh"), readFileSync(resolve(dirname(LOADER), "ensure-vh-adlc.sh")));
+    const lock = JSON.parse(readFileSync(resolve(dirname(LOADER), "../vh-adlc.lock.json"), "utf8"));
+    // This unavailable version is a synthetic fixture, not a published dependency.
+    lock.version = `99999.${process.pid}.0`;
+    writeFileSync(join(probe, "plugin", "vh-adlc.lock.json"), JSON.stringify(lock, null, 2) + "\n");
+    writeFileSync(join(bin, "curl"), '#!/bin/bash\nprintf "unexpected download\\n" > "$VH_DOCS_NETWORK_SENTINEL"\nexit 90\n');
+    chmodSync(join(bin, "curl"), 0o700);
+    const source = `import { createYAMLReader } from ${JSON.stringify(join(scripts, "settings-file.ts"))};
+      try { createYAMLReader(reason => { throw Error(reason); }, { offline: true }); process.exit(3); }
+      catch (error) { console.error(String(error)); process.exit(2); }`;
+    const run = Bun.spawnSync([process.execPath, "-e", source], {
+      env: { ...process.env, XDG_CACHE_HOME: join(probe, "cache"), PATH: `${bin}${delimiter}/usr/bin${delimiter}/bin`, VH_DOCS_NETWORK_SENTINEL: network },
+      stdout: "pipe", stderr: "pipe", timeout: 30_000,
+    });
+    expect(run.exitCode).toBe(2);
+    expect(run.stderr.toString()).toContain("binary unavailable");
+    expect(existsSync(network)).toBe(false);
+    expect(existsSync(join(probe, "cache"))).toBe(false);
+  });
+});
 
 describe("the file the loader reads", () => {
   test("a block YAML file with a comment reads through the binary", () => {
