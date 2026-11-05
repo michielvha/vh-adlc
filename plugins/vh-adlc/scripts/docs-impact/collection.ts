@@ -32,7 +32,7 @@ function gitEnvironment(): Record<string, string | undefined> {
 }
 const sorted = (values: Iterable<string>) => [...new Set(values)].sort();
 const within = (path: string, root: string) => root === "." || path === root || path.startsWith(root + "/");
-const decode = (bytes: Uint8Array) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+const decode = (bytes: Uint8Array) => new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
 function nulFields(bytes: Buffer): Buffer[] {
   const result: Buffer[] = [];
   for (let start = 0; start < bytes.length;) {
@@ -75,7 +75,7 @@ class Snapshot {
     } catch { this.gap("repository", "could not collect the repository HEAD and working-tree scope"); }
   }
   path(bytes: Buffer, view: "HEAD" | "dirty" | "committed"): string | null {
-    try { return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { this.undecodable.push({ bytes, view }); return null; }
+    try { return decode(bytes); } catch { this.undecodable.push({ bytes, view }); return null; }
   }
   bytePathGaps(roots: string[], committed = false) {
     for (const item of this.undecodable) if ((item.view === "HEAD" && roots.some(root => root === "." || item.bytes.equals(Buffer.from(root)) || item.bytes.subarray(0, Buffer.byteLength(root + "/")).equals(Buffer.from(root + "/")))) || (committed && item.view === "committed")) {
@@ -142,7 +142,7 @@ function policy(snapshot: Snapshot): RootsReport {
     const bytes = snapshot.headBytes("AGENTS.md"); report.policy.sha256 = hash(bytes);
     let fence: string | undefined, featureDeclared = false;
     const declarations: string[] = [];
-    for (const line of bytes.toString().split(/\r?\n/u)) {
+    for (const line of decode(bytes).split(/\r?\n/u)) {
       // Match the existing feature resolver exactly; roots have their own fence-aware grammar.
       const feature = line.match(/^Feature documents: `?([^`\s]+)`?$/u);
       if (feature && !featureDeclared) { report.policy.feature_root = repositoryPath(feature[1]); featureDeclared = true; }

@@ -41,6 +41,11 @@ test('Git filenames retain a literal leading BOM and cannot alias another docume
   const result = collectImpact({ repo: root, paths: ['src/app.ts'] });
   expect(result.outcome).toBe('candidates'); expect(paths(result)).toEqual(['docs/guide.md']);
 });
+test('unreadable UTF-8 root instructions are a policy gap instead of replacement-character policy', () => {
+  const root = fixture();
+  writeFileSync(join(root, 'AGENTS.md'), Buffer.concat([Buffer.from(declaration + '# '), Buffer.from([255])])); commit(root);
+  const result = resolveRoots(root); expect(result.outcome).toBe('incomplete'); expect(result.diagnostics.some(item => item.code === 'policy')).toBe(true);
+});
 
 test("several roots retain staged scope, tracked generated docs and explicit ignored overlays", () => {
   const root = fixture({ "handbook/guide.md": guide(), "docs/generated.md": guide(), ".gitignore": "ignored/\ndocs/ignored.md\n" }, 'Documentation impact roots: ["docs", "handbook"]\n');

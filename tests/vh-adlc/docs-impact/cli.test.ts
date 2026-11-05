@@ -32,7 +32,7 @@ test("JSON and text expose the same candidates and coverage-only meaning", () =>
 });
 
 test("NUL input handles literal whitespace, quotes, backslashes, Unicode, option-like and newline paths", () => {
-  const names = ['src/a b.ts', 'src/"quote.ts', 'src/back\\slash.ts', 'src/é.ts', 'src/line\nnext.ts', '--option'];
+  const names = ['\uFEFFsrc/app.ts', 'src/a b.ts', 'src/"quote.ts', 'src/back\\slash.ts', 'src/é.ts', 'src/line\nnext.ts', '--option'];
   const result = run([...args, "--paths0-from", "-"], Buffer.from(names.join("\0") + "\0"));
   expect(result.exitCode).toBe(0); expect(JSON.parse(result.stdout.toString()).source.paths).toEqual(names.sort());
   const selected = run([...args, "--path=--option", "--path", "src/back\\slash.ts"]);

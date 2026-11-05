@@ -48,7 +48,7 @@ function main(argv: string[]): number {
       try { input = readFileSync(unique.get("--paths0-from") === "-" ? 0 : unique.get("--paths0-from")!); } catch { throw Error("could not read the selected NUL path input"); }
       if (input.length) {
         if (input[input.length - 1] !== 0) throw Error("NUL input must end in a NUL delimiter");
-        let decoded: string; try { decoded = new TextDecoder("utf-8", { fatal: true }).decode(input); } catch { throw Error("path input must be valid UTF-8"); }
+        let decoded: string; try { decoded = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(input); } catch { throw Error("path input must be valid UTF-8"); }
         for (const path of decoded.slice(0, -1).split("\0")) paths.push(repositoryPath(path));
       }
     }
