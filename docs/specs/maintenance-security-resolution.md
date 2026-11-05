@@ -217,6 +217,7 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | 2026-11-05 | R-2 | spec | `c2a80eed6e3723fa3cdbcec4168b56289708e57b` | unknown | procedural | No blocking findings; one should-fix rollback compatibility finding; model identity not attested. |
 | 2026-11-05 | R-3 | spec | `a31e4ec836aec1b4908ed74389065cefeee46029` | unknown | procedural | NO FINDINGS; model identity not attested. |
 | 2026-11-05 | R-3 | spec | `a31e4ec836aec1b4908ed74389065cefeee46029` | n/a | n/a | accepted by owner |
+| 2026-11-05 | R-4 | spec | `a98c5b81bc5d464639b5829a77c7f9efd068cf8a` | unknown | procedural | NO FINDINGS after default-branch documentation drift; accepted normative baseline unchanged; model identity not attested. |
 
 ### R-1
 
@@ -251,6 +252,10 @@ EVIDENCE: docs/specs/maintenance-security-resolution.md:72 adds security_policy 
 PROPOSAL: Define a rollback preflight and consumer-authorized settings restoration or explicit legacy-compatible settings projection that preserves the adopted policy and original configuration bytes. Add an actual prior-helper rollback case with security_policy present, ensuring it either resumes through that documented compatibility path or returns a concrete setup handoff instead of claiming legacy inventory remains usable.
 
 ### R-3
+
+NO FINDINGS
+
+### R-4
 
 NO FINDINGS
 
