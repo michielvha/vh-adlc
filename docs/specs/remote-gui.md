@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/remote-gui
-status_description: "Review repairs verified; awaiting independent implementation re-review."
+status_description: "Clarifying mandatory reuse of a healthy verified task share."
 issue: null
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
@@ -149,7 +149,7 @@ Add a Linux CI job for plugin build/test/vet/lint and package checks. The existi
 - [ ] AC-09: Required plugin and repository checks pass in their documented local commands, and the CI version/tagging job waits for the plugin checks to pass.
       Evidence: R-11 at a0088de returned not met: the independent root Bun run hit an existing audit fixture timeout; serial verification remains required.
 - [ ] AC-10: In a configured remote session, the agent gives the human a verified tailnet URL for a task-local app or preview on the first attempt without a forwarding reminder; unrelated external links and internal control endpoints keep their intended routing.
-      Evidence: R-11 at a0088de returned not met: the redirect-failure native reply omitted the required literal failure label.
+      Evidence: R-12 at 6b91ae8 returned not met: after verifying the existing ready task share, the native agent stopped it and created a replacement. The accepted reuse oracle remains unchanged.
 - [ ] AC-11: A human can use a shared local app's intended pages, assets, same-app redirects and required WebSocket features through authenticated tailnet access without starting a shared browser; ending the share preserves the original app and unrelated resources.
       Evidence: R-11 at a0088de returned not met: listener replacement during dial and an added ambiguous listener bypassed continued upstream ownership checks.
 - [ ] AC-12: Configured authentication work retains auth-refresh's account, credential and lane ownership, while remote-gui supports authorized human browser interaction without competing login flows, reading its credentials or changing its state.
@@ -230,6 +230,7 @@ None.
 | 2026-11-03 | R-9 | spec | `2c6aeb22fb8846e3a897d866693fa28378f52b6c` | n/a | n/a | accepted by owner |
 | 2026-11-05 | R-10 | spec | `df4341feb7ee53a96571b88766f284615ea5ba53` | unknown | procedural | NO FINDINGS; refreshed after integrating current main. Model identity not attested; accepted normative baseline unchanged. |
 | 2026-11-05 | R-11 | implementation | `a0088de11e472099afcf850713900e329634c12c` | unknown | procedural | Blocking upstream ownership findings; AC-09, AC-10 and AC-11 not met. Model identity not attested. |
+| 2026-11-05 | R-12 | implementation | `6b91ae825b5d7777dd75dc8ebd6080f23c2f702e` | unknown | procedural | Eleven criteria met; AC-10 requires mandatory healthy-share reuse. CI-pinned Bun passes required checks. Model identity not attested. |
 
 ### R-1
 
@@ -384,6 +385,63 @@ WHERE: plugins/remote-gui/skills/remote-gui/SKILL.md; final reporting after an o
 EVIDENCE: At a0088de11e472099afcf850713900e329634c12c, REMOTE_GUI_ROUTING_E2E=1 bun test tests/remote-gui/native-routing.e2e.test.ts finished 16 pass and one fail. In redirect-failure, browser verification reached the intended redirect-cookie failure, returned compatibility-blocked, and the agent stopped the share without a usable link. The final reply omitted the accepted literal classification, causing the existing oracle to fail. Sanitized evidence is retained at /tmp/rg-r11-native-redirect-failure.json and /tmp/rg-r11-native-routing.log.
 PROPOSAL: Make the required failure reply format explicit in the installed skill, including the literal compatibility-blocked label, failed check and cleanup result. Rerun the unchanged native failure oracle and retain this failed attempt.
 
+### R-12
+
+CRITERION: AC-01 A user can install remote-gui independently from either vhco-tools catalog and build and run its CLI from the installed plugin without the repository checkout or vh-adlc runtime.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, independently executed the six package checks within the 13-case browser suite. Both catalogs select the same complete plugin, and the installed-copy test built and ran the CLI outside the checkout with downloads disabled. Inspected the helper and manifests; neither the root module nor vh-adlc is a runtime dependency.
+
+CRITERION: AC-02 A Linux user with the documented host tools can start a sandboxed headed Chromium session, and a human's harmless viewer input is visible to agent automation attached to that exact session before and after reattachment.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, independently executed actual noVNC canvas input and original-browser CDP reattachment successfully. Inspected sandbox construction, the original human confirmation and resume scripts, and the stopped synthetic session records under /tmp/rg-live-eojyzsty. They corroborate the owner confirmation in this conversation; physical device location relies on the owner report.
+
+CRITERION: AC-03 Tailscale HTTP and WebSocket access opens directly for the pinned owner identity without a viewer password or enrollment step, rejects other or forged identities, and stops at expiry/revocation; loopback retains native-code authentication, internal interfaces stay local, and secrets/browser contents stay out of ordinary outputs and logs.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, uncached plugin race tests passed the verified Unix-peer, owner identity, origin, forged-client, metadata, revocation and loopback-authentication matrix. Independently executed passwordless identity access in Chromium and Firefox. Inspected ingress context, private proofs, header stripping and output redaction; the repaired real-host receipt is separately labelled host verification.
+
+CRITERION: AC-04 A Tailscale session becomes ready only after trusted HTTPS and authenticated viewer WebSocket probes pass through its real hostname; a loopback session works through an explicitly selected SSH tunnel and reports readiness with its actual scope.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, uncached tailnet readiness tests passed hostname/TLS and authenticated upgrade checks. Independently executed the disposable authenticated OpenSSH viewer case: input and exact-browser reattachment passed, and closing the tunnel broke viewer access while its host listener remained alive. Inspected the real Tailscale verification scripts and earlier owner device confirmation without substituting host probes for that confirmation.
+
+CRITERION: AC-05 Missing dependencies, unsupported hosts, unavailable attachment capabilities and failed startup checks leave no usable partial session and give an actionable result without installing packages or changing global host configuration.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, uncached config/app/session/browser tests passed missing-tool, unsupported-platform, capability, startup failure and rollback cases. Installed-copy checks passed setup diagnostics. Inspected read-only doctor, argument-array process launches and offline builds; runtime code neither installs tools nor changes operator/global configuration.
+
+CRITERION: AC-06 Concurrent sessions use separate profiles, displays and ports; stopping, expiring or failing one preserves the other session and all pre-existing browser and Serve resources.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, independently executed session/state/tailnet race tests and the real GUI lifecycle matrix, covering concurrent resources and scoped cleanup. Inspected matching-source real-host receipts for isolated concurrent app jars, preservation of the other share and both apps, and the exact foreign Serve hash. Listener validation tests preserved both selected and added listeners.
+
+CRITERION: AC-07 Normal stop, expiry and a child or supervisor crash revoke viewer access and clean up verified owned resources; recovery after interrupted startup or restart preserves changed resources and reports any unresolved cleanup explicitly.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, independently executed the real GUI crash/expiry matrix successfully, plus uncached process, socket, daemon-replacement and recovery tests. Inspected pidfd/birth checks, denial-listener retention and conditional forward removal. Historical live records are stopped with no browser profile, and current repaired-source receipts retain scoped cleanup results and foreign-resource preservation.
+
+CRITERION: AC-08 An agent can follow the installed skill to hand control to the human and resume the authorized task in the verified original browser, with clear expiry and cleanup results and no global MCP reconfiguration.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, inspected the installed skill and human-handoff scripts/receipts: input paused until confirmation, then the original marker and confirmed task page were verified before resume. Independent rendered-viewer and reattachment checks passed. The demonstrated Tailscale flow requires no viewer password, SSH terminal work or global MCP change; no provider or CLI authentication success is inferred.
+
+CRITERION: AC-09 Required plugin and repository checks pass in their documented local commands, and the CI version/tagging job waits for the plugin checks to pass.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, independently executed plugin build, uncached race tests, vet, tidy and v2.15.0 config/lint successfully; root Go tests/vet/tidy/lint also passed. The exact bun test tests/vh-adlc command passed all 1094 cases with checksum-verified Bun 1.4.4, matching existing CI, scoped only to that process PATH. Six package and 34 registration checks passed. Earlier Bun 1.4.3 full runs had default-five-second timeout failures and remain retained, not relabelled. Inspected CI needs: version requires remote-gui; the release workflow is unchanged. Logs: /tmp/rg-r12-root-ci-bun.log and /tmp/rg-r12-root-bun*.log.
+
+CRITERION: AC-10 In a configured remote session, the agent gives the human a verified tailnet URL for a task-local app or preview on the first attempt without a forwarding reminder; unrelated external links and internal control endpoints keep their intended routing.
+VERDICT: not met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, the independent focused native run finished nine pass and one fail. First-link sharing and the repaired redirect/browser-unavailable failure labels passed, but reuse failed: the existing ready task share passed real browser verification, then the agent stopped it and created another verified share. This violates the accepted reuse oracle. Sanitized browser attempts record two passing session IDs; tool results show ready status, stop, then a new share. No unusable URL or credential leak was observed. Evidence: /tmp/rg-r12-native.log and /tmp/rg-r12-native-failure.json.
+
+CRITERION: AC-11 A human can use a shared local app's intended pages, assets, same-app redirects and required WebSocket features through authenticated tailnet access without starting a shared browser; ending the share preserves the original app and unrelated resources.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, independent app/browser checks passed supported pages, assets, redirects, cookies, origins and WebSockets. Both original R11 ownership regressions now pass, as do permanent zero-byte HTTP/WebSocket rejection tests and real selected-versus-child-process TCP ownership checks. An independent external overlay passed an actual IPv6 accepted connection, cancellation and invalid-connection rejection. Inspected transport wiring and matching-source real Tailscale receipts plus the earlier human direct-app confirmation and preservation after stop. Socket transfer to an unverifiable process remains an explicit compatibility limit.
+
+CRITERION: AC-12 Configured authentication work retains auth-refresh's account, credential and lane ownership, while remote-gui supports authorized human browser interaction without competing login flows, reading its credentials or changing its state.
+VERDICT: met
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, independently executed the bounded active-challenge case and configured-sso, owned-challenge, unknown-login and nonlogin routing scenarios successfully. Original sentinel and competing-challenge assertions are unchanged. Inspected explicit immediate-block instructions, fake owning-interface calls and synthetic-state boundaries, plus the separate real non-login handoff. These establish demonstrated routing and isolation, not a completed provider login, CLI refresh or all-host coverage.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/remote-gui/skills/remote-gui/SKILL.md:21-24; healthy task-share reuse after successful verification
+EVIDENCE: At 6b91ae825b5d7777dd75dc8ebd6080f23c2f702e, the independent native reuse case failed the unchanged existing-task-share oracle. /tmp/rg-r12-native-failure.json records a successful browser attempt for the original session, another ready status, a successful stop, creation of a new share, and a second successful browser attempt for a different session ID. The final link used the replacement. The existing share was healthy and verified when stopped; no observed compatibility failure justified replacing it. The source instruction restricts eligible reuse but does not explicitly prohibit rotating a healthy share after its check succeeds.
+PROPOSAL: Make reuse mandatory when the task record, current target, owner and ready session all match and required browser verification passes. Return that same session URL and expiry; do not stop or replace it without an observed mismatch/failure, expiry or owner request. Rerun the unchanged reuse case and retain this failed attempt.
+
 ## Sources
 
 - [S11: Tailscale Serve identity headers](https://tailscale.com/docs/features/tailscale-serve#identity-headers), read in this revision; authenticated user-login headers, stripping of spoofed identity headers and absent user identity for tagged devices.
@@ -408,3 +466,5 @@ PROPOSAL: Make the required failure reply format explicit in the installed skill
 - Disposable browser experiment on 2026-11-03: `bun /tmp/remote-gui-auth-probe/probe.cjs` and `PROBE_FIREFOX=1` with the existing Firefox binary. Root POST authentication primed HTTP and WebSocket requests in fresh Chromium/Firefox contexts; output reported `cachedHttpAuthWorks=true`, `websocketHasOriginCredential=true`, `foreignReceivedAuthorization=false` and `cookieOnlyReplayDenied=true`. This is prototype evidence, not a test of the final plugin.
 
 - A second disposable browser experiment, `bun /tmp/remote-gui-auth-probe/native.cjs`, used a synthetic native HTTP credential and a pre-existing fixture worker. It observed `nativeHttpAndWsWork=true`, `priorWorkerSawAuthorization=false`, `priorWorkerSawSecretBody=false`, `foreignReceivedAuthorization=false` and `bindingOnlyReplayDenied=true`. It does not establish safety of running arbitrary prior same-origin code; the supported viewer context is fresh and isolated.
+
+- [Bun 1.4.4 official release](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.4) and [release metadata](https://api.github.com/repos/oven-sh/bun/releases/tags/bun-v1.4.4), inspected 2026-11-05: the existing CI-pinned development runtime. The Linux x64 archive SHA-256 `bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c` matched the release API digest and verified published checksum manifest before isolated execution. The host installation and plugin runtime setup were unchanged.
