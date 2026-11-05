@@ -4,7 +4,7 @@ export type Target = { shared_commit: string; consumer_commit: string; conventio
 export type CandidateEvidence = Target & {
   kind: "local-source-candidate";
   corpus: { head: string; outcome: "candidates" | "none" | "incomplete"; gaps: number };
-  parity: { consumer_commit: string; payload_digest: string; rebuilt_from_HEAD: boolean; lost_candidates: number; unresolved_meaning_changes: number };
+  parity: { shared_commit: string; consumer_commit: string; payload_digest: string; rebuilt_from_HEAD: boolean; lost_candidates: number; unresolved_meaning_changes: number };
   inventory: { consumer_commit: string; complete: boolean; unresolved_callers: string[] };
   rollback: { preserved_unrelated: boolean; preserved_index: boolean; refused_conflicts: boolean; refused_symlinks: boolean };
 };
@@ -18,7 +18,7 @@ export function sourceCandidate(target: Target, input: unknown): string[] {
   if (evidence.kind !== "local-source-candidate") failures.push("candidate kind differs");
   const corpus = record(evidence.corpus), parity = record(evidence.parity), inventory = record(evidence.inventory), rollback = record(evidence.rollback);
   if (!corpus || corpus.head !== target.consumer_commit || !["candidates", "none"].includes(String(corpus.outcome)) || corpus.gaps !== 0) failures.push("full cutover corpus incomplete or stale");
-  if (!parity || parity.consumer_commit !== target.consumer_commit || parity.payload_digest !== target.payload_digest || parity.rebuilt_from_HEAD !== true || parity.lost_candidates !== 0 || parity.unresolved_meaning_changes !== 0) failures.push("legacy candidate parity incomplete or stale");
+  if (!parity || parity.shared_commit !== target.shared_commit || parity.consumer_commit !== target.consumer_commit || parity.payload_digest !== target.payload_digest || parity.rebuilt_from_HEAD !== true || parity.lost_candidates !== 0 || parity.unresolved_meaning_changes !== 0) failures.push("legacy candidate parity incomplete or stale");
   if (!inventory || inventory.consumer_commit !== target.consumer_commit || inventory.complete !== true || !Array.isArray(inventory.unresolved_callers) || inventory.unresolved_callers.length) failures.push("caller inventory incomplete or stale");
   if (!rollback || ["preserved_unrelated", "preserved_index", "refused_conflicts", "refused_symlinks"].some(key => rollback[key] !== true)) failures.push("scoped rollback not verified");
   return failures;

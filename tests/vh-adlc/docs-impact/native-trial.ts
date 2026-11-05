@@ -158,6 +158,14 @@ sys.exit(run.returncode)
   }
   const final = events.filter(event => event.type === "assistant.message" && typeof event.data?.content === "string").at(-1)?.data?.content;
   if (typeof final === "string") {
+    const citation = (value: unknown, item: Case, doc?: string): boolean => {
+      if (typeof value !== 'string') return false;
+      const matched = value.match(/^(.*):([1-9][0-9]*)$/u); if (!matched) return false;
+      const name = matched[1].startsWith(item.id + '/') ? matched[1].slice(item.id.length + 1) : matched[1];
+      if (doc ? name !== doc : !name.startsWith('src/')) return false;
+      const root = join(input, item.id), path = resolve(root, name);
+      return path.startsWith(root + '/') && existsSync(path) && statSync(path).isFile() && Number(matched[2]) <= readFileSync(path, 'utf8').split('\n').length;
+    };
     try {
       const raw = final.split("BEGIN_ASSESSMENTS_JSON")[1]?.split("END_ASSESSMENTS_JSON")[0];
       const decoded: unknown = JSON.parse(raw ?? "null");
@@ -170,7 +178,7 @@ sys.exit(run.returncode)
         const candidates = new Set(calls.filter(call => call.case === item.id && ["check", "verify"].includes(call.op)).flatMap(call => { const value = JSON.parse(call.stdout); return (value.candidates ?? []).map((candidate: {path: string}) => candidate.path); }));
         for (const path of candidates) {
           const result = row.candidates.find((value: {path?: unknown}) => value.path === path);
-          if (!result || !["Accurate", "Stale", "Incomplete", "Unknown"].includes(result.classification) || !Array.isArray(result.doc_citations) || !result.doc_citations.some((cite: unknown) => typeof cite === "string" && cite.startsWith(String(path) + ":")) || !Array.isArray(result.source_citations) || !result.source_citations.length) failures.push(item.id + ":unclassified-or-uncited:" + String(path));
+          if (!result || !["Accurate", "Stale", "Incomplete", "Unknown"].includes(result.classification) || !Array.isArray(result.doc_citations) || !result.doc_citations.some((cite: unknown) => citation(cite, item, String(path))) || !Array.isArray(result.source_citations) || !result.source_citations.some((cite: unknown) => citation(cite, item))) failures.push(item.id + ":unclassified-or-uncited:" + String(path));
         }
       }
     } catch { failures.push("missing-or-malformed-assessment-json"); }

@@ -4,7 +4,7 @@ import { migrationReady, sourceCandidate, type CandidateEvidence, type Published
 const target: Target = { shared_commit: "synthetic-shared", consumer_commit: "synthetic-consumer", convention_revision: "synthetic-convention", payload_digest: "synthetic-payload" };
 function evidence(): CandidateEvidence {
   return { ...target, kind: "local-source-candidate", corpus: { head: target.consumer_commit, outcome: "none", gaps: 0 },
-    parity: { consumer_commit: target.consumer_commit, payload_digest: target.payload_digest, rebuilt_from_HEAD: true, lost_candidates: 0, unresolved_meaning_changes: 0 },
+    parity: { shared_commit: target.shared_commit, consumer_commit: target.consumer_commit, payload_digest: target.payload_digest, rebuilt_from_HEAD: true, lost_candidates: 0, unresolved_meaning_changes: 0 },
     inventory: { consumer_commit: target.consumer_commit, complete: true, unresolved_callers: [] },
     rollback: { preserved_unrelated: true, preserved_index: true, refused_conflicts: true, refused_symlinks: true } };
 }
@@ -19,6 +19,10 @@ test("verified local source candidates cannot stand in for published marketplace
   expect(sourceCandidate(target, evidence())).toEqual([]);
   const result = migrationReady(target, evidence()); expect(result.ready).toBe(false); expect(result.limit).toContain("grants no");
   expect(migrationReady(target, evidence(), published()).ready).toBe(true);
+});
+test('parity cannot be rebound to a different shared commit', () => {
+  const item = evidence(); Object.assign(item.parity, { shared_commit: 'different' });
+  expect(sourceCandidate(target, item).length).toBeGreaterThan(0);
 });
 test.each(["shared", "consumer", "convention", "payload", "corpus", "strict-reader-gap", "loss", "meaning", "stale-index", "inventory", "rollback"])('%s blocks source readiness', change => {
   const item = evidence();
