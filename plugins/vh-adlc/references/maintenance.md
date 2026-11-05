@@ -294,6 +294,12 @@ The result separates accounting, coverage, open remediation, exceptions and pend
 it does not mean vulnerability-free. Orphan findings prevent reconciliation. No all-clear is possible
 with unknown required coverage, active open findings, proposed exceptions or required pending delivery.
 
+Authority receipts with result `approved` use `decisionAuthorityBinding(input, occurrenceId)` from
+`security.ts`. This binds the exact normalized decision and policy assessment as well as the source,
+policy files, scope and target. Changing exception kind, rationale, expiry or approved successor
+requires a new approval receipt. Other evidence uses `evidenceBinding`; a generic target approval
+cannot authorize changed exception terms. These receipts record consumer authority procedurally.
+
 For a disappeared provider alert, a fresh exact terminal read and a complete, nonsynthetic `source`
 receipt with result `observed` or `corrected` can re-observe its current target. Bind that receipt to
 the occurrence, current source/policy/scope and exact target, and retain its physical proof file.

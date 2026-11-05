@@ -1,5 +1,5 @@
 import { canonicalJSON, digest } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
-import { evidenceBinding } from "../../../plugins/vh-adlc/scripts/maintenance/security";
+import { evidenceBinding, decisionAuthorityBinding } from "../../../plugins/vh-adlc/scripts/maintenance/security";
 import type { SecurityInput, Decision, Evidence, Target } from "../../../plugins/vh-adlc/scripts/maintenance/security";
 export function securityInput(): SecurityInput {
   return { schema_version:1, run_id:"12345678-1234-4234-8234-123456789abc", hostname:"github.com", repository:"example/project", source_commit:"a".repeat(40),
@@ -15,5 +15,5 @@ export function decision(input:SecurityInput): Decision {
   return {id:input.observations[0].id,change:"unknown",outcome:"open",follow_up:{reference:"local:task",owner:null,assignment_handoff:"local:assignment",next_action:"investigate parent range"},delivery_required:false,delivery_evidence:[],exception:null,successor:null};
 }
 export function proof(input:SecurityInput,kind:Evidence["kind"],result:string,target:Target=input.observations[0].target): Evidence {
-  return {id:kind,kind,result,occurrence_id:input.observations[0].id,target:structuredClone(target),binding:evidenceBinding(input.source_commit,input.policy,input.scope,target),reference:"local:proof",digest:digest(canonicalJSON({kind,result})),observed_at:"2026-11-05T11:00:00Z",complete:true,synthetic:false};
+  return {id:kind,kind,result,occurrence_id:input.observations[0].id,target:structuredClone(target),binding:kind==="authority"&&result==="approved"?decisionAuthorityBinding(input,input.observations[0].id):evidenceBinding(input.source_commit,input.policy,input.scope,target),reference:"local:proof",digest:digest(canonicalJSON({kind,result})),observed_at:"2026-11-05T11:00:00Z",complete:true,synthetic:false};
 }

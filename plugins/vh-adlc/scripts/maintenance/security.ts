@@ -106,10 +106,17 @@ export function parseSecurityInput(value: unknown): SecurityInput {
     history_gaps:row.history_gaps===undefined?[]:v.strings(row.history_gaps),history_provenance:row.history_provenance===undefined?[]:v.strings(row.history_provenance) };
 }
 
+/** Approval covers the exact decision, including exception validity or successor scope. */
+export function decisionAuthorityBinding(value:SecurityInput,id:string):string {
+  const input=parseSecurityInput(value),decision=input.decisions.find(d=>d.id===id),o=input.observations.find(o=>o.id===id);
+  if(!decision||!o)throw Error("authority decision has no occurrence");
+  return digest(canonicalJSON({context:evidenceBinding(input.source_commit,input.policy,input.scope,o.target),decision,policy_assessment:input.policy_assessment}));
+}
+
 const routes: Record<Decision["change"],string> = { "compatible-bot":"bot-batch", "compatible-authored":"bounded-maintenance", major:"feature", behavior:"feature", unknown:"investigation", posture:"consumer-policy", audit:"audit-reference", exception:"consumer-policy" };
 function tracked(f: FollowUp | null): boolean { return !!f && !!(f.owner || f.assignment_handoff); }
 function matching(input: SecurityInput, occurrence: Occurrence, kind: Evidence["kind"], result: string, at = occurrence.target): Evidence[] {
-  const binding=evidenceBinding(input.source_commit,input.policy,input.scope,at);
+  const binding=kind==="authority"&&result==="approved"?decisionAuthorityBinding(input,occurrence.id):evidenceBinding(input.source_commit,input.policy,input.scope,at);
   const accountingProof=kind==="tracking"||kind==="ownership";
   return input.evidence.filter(e=>e.occurrence_id===occurrence.id && e.kind===kind && e.result===result && e.complete && !e.synthetic && !occurrence.synthetic && (occurrence.complete||accountingProof) &&
     (at.reference !== null||accountingProof) && canonicalJSON(e.target)===canonicalJSON(at) && e.binding===binding && Date.parse(e.observed_at)>=Date.parse(occurrence.observed_at) && Date.parse(e.observed_at)<=Date.parse(input.evaluated_at));

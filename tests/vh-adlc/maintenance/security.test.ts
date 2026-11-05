@@ -97,3 +97,17 @@ test("organization .github repositories remain valid scoped inventory",()=>{
   const input=securityInput();input.scope.repositories.push("example/.github");
   expect(()=>reconcileSecurity(input)).not.toThrow();
 });
+
+test("exception approval cannot be reused for changed terms or policy assessment",()=>{
+  for(const field of ["kind","rationale","expires_at","assessment"]){
+    const input=securityInput();input.decisions.push({...decision(input),outcome:"exception",exception:{kind:"mitigated",rationale:"temporary control",expires_at:"2026-11-06T00:00:00Z"}});
+    input.evidence.push(proof(input,"authority","approved"));expect(reconcileSecurity(input).exception_count).toBe(1);
+    const ex=input.decisions[0].exception!;
+    if(field==="kind")ex.kind="risk-accepted";
+    if(field==="rationale")ex.rationale="different scope and controls";
+    if(field==="expires_at")ex.expires_at=null;
+    if(field==="assessment")input.policy_assessment!.reference="local:different-assessment";
+    expect(reconcileSecurity(input).exception_count).toBe(0);
+    input.evidence=[proof(input,"authority","approved")];expect(reconcileSecurity(input).exception_count).toBe(1);
+  }
+});
