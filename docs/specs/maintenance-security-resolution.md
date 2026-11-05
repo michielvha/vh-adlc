@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Clean independent R-3 spec review after R-1/R-2 corrections; awaiting owner acceptance. No implementation or advisory remediation has started."
+status: planned
+status_description: "Owner accepted the clean R-3 spec and requested shared implementation plus a report-only Stackweaver trial; task planning follows."
 issue: null
 goal: "Every security finding in a maintenance scope retains its evidence, an explicit route through an existing loop, and an outcome that distinguishes verified fixes from outstanding work and exceptions."
 covers:
@@ -191,11 +191,11 @@ Run native installed-operation trials for a report-first sweep, selected compati
 
 ## Tasks
 
-None yet; written once the document is planned. This request performs no implementation or advisory remediation.
+None yet; task planning follows the owner's acceptance. Shared implementation and a report-only Stackweaver trial are authorized; advisory remediation remains excluded.
 
 ## Open Questions
 
-None. The owner selected packet-based scanner intake and complete accounting before reconciliation on 2026-11-05. Final spec acceptance remains separate.
+None. The owner selected packet-based scanner intake and complete accounting before reconciliation, accepted the spec and requested shared implementation plus a report-only Stackweaver trial on 2026-11-05.
 
 ## Review Log
 
@@ -204,6 +204,7 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | 2026-11-05 | R-1 | spec | `bfd28ae3561998dc930d6a0f5326964b5de99b07` | unknown | procedural | Two blocking findings and one should-fix finding; model identity not attested. |
 | 2026-11-05 | R-2 | spec | `c2a80eed6e3723fa3cdbcec4168b56289708e57b` | unknown | procedural | No blocking findings; one should-fix rollback compatibility finding; model identity not attested. |
 | 2026-11-05 | R-3 | spec | `a31e4ec836aec1b4908ed74389065cefeee46029` | unknown | procedural | NO FINDINGS; model identity not attested. |
+| 2026-11-05 | R-3 | spec | `a31e4ec836aec1b4908ed74389065cefeee46029` | n/a | n/a | accepted by owner |
 
 ### R-1
 
