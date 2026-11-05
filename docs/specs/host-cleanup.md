@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Implemented on feat/host-cleanup, local only at the owner's direction: the R-8 record, the tasks and the claim are commits on that branch, not on main, and reach main with the feature's PR. All 18 tasks are done. AC-03 and AC-08 wait on the real-engine test the owner runs, AC-11 and AC-12 on the owner's host runs, and AC-23 on Stackweaver's adoption branch. An implementation review is next."
+status_description: "Implemented on feat/host-cleanup, local only at the owner's direction: the R-8 record, the tasks and the claim are commits on that branch, not on main, and reach main with the feature's PR. All 18 tasks are done. The real-engine tests passed on 2026-11-06, which proves AC-03 and AC-08. AC-11 is partly run: steps 3 to 5 passed, and the rest waits on the binary in /usr/local/bin, which only the owner can install. AC-12 waits on the owner's host runs and AC-23 on Stackweaver's adoption branch. An implementation review is next."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -264,11 +264,12 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       it removed and kept, with reasons, the space freed, and the count and size of
       user-owned `/tmp` entries no rule matched.
       Evidence: `go test ./internal/clean` at `026b2d9`, passed: `TestPlanFiles` left a tree snapshot unchanged while listing every removal and keep with its reason, the Compose and kind dry runs listed the abandoned project and cluster with no engine change, without the flags they appeared under `needs_flag`, and `TestCleanAppliedRun` reported `removed`, `kept`, `freed_bytes` and `unmatched` with a count of 1 and its size; `TestCleanDryRunChangesNothing` held with both flags. A real `clean --dry-run` on this host answered with 626 unmatched entries counted and nothing removed. Limitation: the applied cases ran on fakes, as the build's safety rules require.
-- [ ] AC-03: `vh-adlc clean` removes those and keeps other users' entries, unmatched entries, symlinks, entries with
+- [x] AC-03: `vh-adlc clean` removes those and keeps other users' entries, unmatched entries, symlinks, entries with
       a mount point, entries in use and entries younger than their age. No Docker removal is forced, apart from
       `kind delete cluster` on stopped nodes, and an object in use, or whose usage cannot be listed, stays. With a
       denied or failed engine listing no file entry is removed, and with an absent or refused socket file
       entries still are.
+      Evidence: `go test -count=1 -tags engine ./internal/clean` at `cd91fd0` on host `fedora-43`, Docker 29.7.2, passed (`ok ... 126.641s`): the fake-filesystem and fake-engine cases T6 to T10 record (other owners, unmatched, symlinks, mount points, in use, younger entries, a fake engine failing on any `force`, a 409 keeping a volume, a denied or 500 listing removing no file entry, an absent or refused socket still removing them), and `TestRealEngineCompose` on the real engine removed a disposable abandoned project's container and volume, kept the live one as `live` and returned no failure. No `vhclean-*` container, volume or network was left. Limitation: the real engine covered one Compose case; forced-removal checks, the file cases and the socket cases ran on fakes, and on the real engine `force` absence rests on the code path the fakes check.
 - [x] AC-05: A dry run plans a changed working-tree manifest, and an applied run removes only what the default-branch
       manifest declares.
       Evidence: `TestManifestSources` in `internal/clean` at `026b2d9`, passed for a commit on a topic branch and for an uncommitted edit: the dry run reported `manifest-unmerged` and planned the extra entry only under `unmerged`, and the applied run removed only what `origin/main`'s manifest declares, leaving that entry. `TestPartialCloneDoesNotFetch` showed a missing manifest blob stayed missing.
@@ -278,10 +279,11 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 - [x] AC-07: Run as root, outside the initial PID namespace, outside Linux or with Git older than 2.45, `vh-adlc clean`
       removes nothing and reports why.
       Evidence: `TestCleanRefusals` in `internal/clean` at `026b2d9`, passed for root, a PID namespace (also unreadable), outside Linux and `git version 2.44.2`, applied and dry: each `error` with its code, no file changed and no engine call; and `TestCleanRefusesInAPIDNamespace` with `VH_ADLC_REQUIRE_BWRAP=1` ran the real binary under `bwrap --unshare-pid`: `error` with `pid-namespace` and `/tmp/go-build1` kept. Limitation: Git older than 2.45 and the other platforms were injected, not real.
-- [ ] AC-08: Compose projects change only with `--compose`, and a project stays unless the `working_dir` path of every
+- [x] AC-08: Compose projects change only with `--compose`, and a project stays unless the `working_dir` path of every
       one of its containers is gone. kind
       clusters change only with `--kind`. A cluster with no mark, or any live mark, stays, including one a run
       reused from a killed run and kept. A cluster whose marks have all ended is stopped and deleted.
+      Evidence: `VH_ADLC_ENGINE_KIND=1 go test -count=1 -tags engine ./internal/clean` at `cd91fd0` on host `fedora-43`, Docker 29.7.2 and kind v0.33.0, passed (`ok ... 100.073s`; with `-v -run TestRealEngine`, `TestRealEngineCompose` 23.67s and `TestRealEngineKind` 71.08s both `PASS`): on the real engine a disposable cluster with no mark was kept as `unmarked`, then with one ended mark its nodes and the mark were gone, and the Compose project whose directory remained stayed. The fake-engine cases T8 and T9 record passed in the same run: no change without `--compose` or `--kind`, a mixed-label project and one with a working directory present kept, a live mark, a mark from another host and a reused, kept cluster kept. Afterwards `kind get clusters` listed none and no `vhclean-*` object remained. Limitation: the flag gating, live marks and the reused cluster were shown on fakes, not on the real engine.
 - [ ] AC-11: With the candidate binary on `PATH`, the plugin from this branch and the one documented rule, a Claude
       Code session in auto mode and a default `workspace-write` Codex session run the operation with no prompt,
       and a direct `rm -rf` of a `/tmp` entry still goes to the classifier or approval. A session that is blocked
