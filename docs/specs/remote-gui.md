@@ -2,7 +2,7 @@
 status: complete
 branch: feat/remote-gui
 status_description: "Implemented and independently verified, including owner device checks; ready for separately authorized shipping."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/48
 goal: "A remote user can open the agent's local web services and interact with its browser through reachable tailnet links without repeated forwarding reminders."
 covers:
   - plugins/remote-gui/
@@ -21,6 +21,8 @@ covers:
 Install `remote-gui` independently from vhco-tools. In a configured remote session, the agent shares local apps and previews through verified tailnet URLs automatically. When the human needs to use the agent's browser, it also provides a temporary authenticated noVNC viewer and resumes automation in that same browser afterward.
 
 ## Context
+
+Publication verification on 2026-11-05 passed root Go checks, plugin build/race/vet/tidy/lint, six package checks and 34 registration checks. A fresh root Bun rerun under host load above 70 encountered default-five-second audit fixture timeouts and ended with exit 143 before the stop helper found a process; that helper signalled none. Its partial log remains `/tmp/remote-gui-ship-lifecycle.log` and is not a pass. The independently observed complete 1094-case Bun 1.4.4 pass on unchanged root sources remains in R-12/R-13. Normal GitHub CI will verify the published commit.
 
 The owner requested passwordless, identity-restricted Tailscale access in this session with "please reimplement with this new context". That explicit implementation request accepts the identity-restricted behavior described immediately before it; the reviewed Unix-peer wiring is a security-preserving implementation detail. The intended flow is a direct link opened by the authorized Tailscale user, with no viewer username, password or enrollment step. Earlier native-authentication reviews and implementation evidence remain history, not acceptance of this revision. The owner explicitly approved one-time host setup of local operator `m`; the command succeeded and the existing Serve configuration hash stayed unchanged. The runtime must still never change the operator automatically. Code pushes, PRs, merges and releases remain separately authorized. Existing unrelated worktrees and blog edits remain preserved.
 
