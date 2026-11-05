@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06: R-9 F-04 adds internal/settings/ to covers and R-9 F-03 is a stated limit. The revision also folds R-8 F-01 to F-03, and every criterion tick and evidence line is reset. The branch was rebuilt on origin/main 21bc3e4 first, at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites. Waits on a fresh spec review and the owner's acceptance."
+status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06: R-9 F-04 adds internal/settings/ to covers and R-9 F-03 is a stated limit; the revision also folds R-8 F-01 to F-03 and resets every criterion tick and evidence line. Spec review R-10 at 6d0c8af found 6 findings, none blocking; its factual F-01, F-02, F-04 and F-06 are folded, and its judgement F-03 and F-05 wait on the owner as Q1 and Q2. Then a fresh spec review and the owner's acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -47,8 +47,8 @@ before the reboot on host `fedora-43`:
   carried `sh.stackweaver.test-run=fedora-43/461166`. Stackweaver's dev stack is Compose project `deploy`, and
   its database has no backup (Stackweaver `CLAUDE.md:144`).
 
-Stackweaver's `sweepEndedRuns` (`backend/internal/launcher/driver/leftovers_integration_test.go:120` on the local
-`feat/runner-architecture` at `619dce9c`) does this for one test package only: it reads a `host/pid` mark and
+Stackweaver's `sweepEndedRuns` (`backend/internal/launcher/driver/leftovers_integration_test.go:120` on its
+`origin/main` at `cbf39566`) does this for one test package only: it reads a `host/pid` mark and
 forces no removal of a network, volume or image.
 
 The auto-mode classifier refuses to sweep shared `/tmp`, because it cannot tell projects apart. A narrow
@@ -56,7 +56,8 @@ allow rule resolves before it (see Sources), and `codex execpolicy check` on cod
 `allow` for a `prefix_rule` on `vh-adlc clean`.
 
 `dispatch` requires `--plugin-pin` unless a command sets `noPin`, as `settings read` does
-(`cmd/vh-adlc/main.go:66-70,108,176`), and `GOTMPDIR` covers the go command and `t.TempDir` (`go doc`, Go 1.27). The Bash tool's `PATH` here is `/usr/local/bin:/usr/bin`.
+(`cmd/vh-adlc/main.go:66-70,108,176` on `origin/main` at `21bc3e4`), and `GOTMPDIR` covers the go command
+and `t.TempDir` (`go doc`, Go 1.27). The Bash tool's `PATH` here is `/usr/local/bin:/usr/bin`.
 Disabling lazy fetch needs Git 2.45 (see Sources), while the stated floor is 2.35
 (`docs/get-started/installation.md:10`). In a PID namespace, `kill -0` on a live host pid returns "No such
 process" (a `bwrap --unshare-pid` probe, and `codex sandbox` the same).
@@ -65,7 +66,8 @@ process" (a `bwrap --unshare-pid` probe, and `codex sandbox` the same).
 
 In scope: `.vh-adlc/cleanup.yaml`, `vh-adlc env`, `vh-adlc clean` per repository, the `vh-adlc-clean`
 operation for Claude Code and Codex, one allow rule each, vh-adlc's own manifest, and a reviewed Stackweaver
-adoption branch based on `feat/runner-architecture`. The release, lock bump and first real run follow the merge, under [Order](#order).
+adoption branch based on Stackweaver's `main`. The release, lock bump and first real run follow the merge,
+under [Order](#order).
 
 Host firewall chains are out of scope: the owner's answer on 2026-11-02, replacing the earlier `--firewall`
 option. The owner accepted the cost: firewall objects of `stackweaver-jobs-slot-*` networks and of networks
@@ -145,8 +147,9 @@ project's own teardown.
 An age is measured from the newest modification time in the entry, and `temp_root` is optional. A manifest
 is refused with `manifest-invalid`, and its rules remove nothing, for unknown keys, a `schema_version` other
 than 1, a glob with fewer than four literal characters before its first wildcard or holding a path separator,
-an age under one hour, a `project` that is not one plain path segment, an unknown `liveness.kind`, or a
-`kind` rule without liveness. Globs match single top-level names.
+an age under one hour, a `project` that is not one plain path segment, an unknown `liveness.kind`, a
+`kind` rule without liveness, or anything the strict reader refuses, such as an anchor, an alias or a
+second document. Globs match single top-level names.
 
 The binary itself owns `go-build*` and `gopls-tempmod*`, with an age of 24 hours, so every `clean` run
 clears them under the same limits, including in a repository with no manifest.
@@ -224,7 +227,7 @@ vh-adlc adds its manifest for `vh-triage-*` and its other test prefixes. Stackwe
 - creates and removes the kind marks in `e2e/k8s/run.sh` and `e2e/k8s/driver-conformance.sh`.
 
 `clean` keeps to Stackweaver's `/tmp` entries, Compose slots and kind cluster. Everything a test run marks
-stays with `sweepEndedRuns` (at `cc2cbbed`), which removes a killed run's jobs network and firewall objects
+stays with `sweepEndedRuns` (at `cbf39566`), which removes a killed run's jobs network and firewall objects
 (`TestSweepRemovesAnEndedRunsJobsNetworkAndItsFirewall`). Its limits: it runs only when the driver integration
 tests next run; without an ended run's `sw-tools-*` image the network stays and it says so; and it does not
 reach the firewall objects of `stackweaver-jobs-slot-*` networks, unmarked `sw-test-jobs-*` networks or
@@ -257,7 +260,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 1. This PR lands with a `feat` commit, so `main` tags a stable minor release.
 2. The lock moves to that release in its own PR, after the release is tagged.
 3. The owner installs the binary and adds the rule for each harness.
-4. Stackweaver's adoption PR merges after its PR #1002, and a first real run follows.
+4. Stackweaver's adoption PR merges, and a first real run follows.
 
 ## Acceptance Criteria
 
@@ -311,7 +314,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 | AC-07 | A `cmd/vh-adlc` test runs the real binary under `bwrap --unshare-pid` and asserts `pid-namespace` with nothing removed. |
 | AC-02, AC-03, AC-08 | Fake-engine tests: an `httptest` server on a Unix socket records every call and fails on any `force` parameter, across Compose projects and clusters with ended and live marks, a mixed-label Compose project, a killed run's cluster reused and kept, a bind mount, failed listings, and an absent, refused and denied socket. |
 | AC-03, AC-08 | Integration test behind a build tag on the real engine, with disposable objects and clusters. |
-| AC-05, AC-06 | Table tests on fixture repositories: each refusal, a branch edit and an uncommitted edit. A missing object in a partial clone must not fetch. |
+| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit and an uncommitted edit. A missing object in a partial clone must not fetch. |
 | AC-11 | Written manual procedure in disposable sessions, recorded under `tests/vh-adlc/evidence/clean/`, with `codex execpolicy check` output, the default Codex session's outcome, and a session blocked on space with no request for cleanup. |
 | AC-12 | The real-host sequence in Adoption, with each row's outcome recorded. |
 | AC-14 | `bun test tests/vh-adlc`, a golden JSON report against the updated schema, and a read of the documentation against the flags. |
@@ -361,10 +364,34 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       Evidence: `go test -count=1 ./internal/clean -run TestCompose` failed first: `TestComposeKeepsANetworkWithActiveEndpoints` got one `removal-failed` for `DELETE /networks/net1: 403 Forbidden`, and `TestComposeStopsAtAContainerItCannotRemove` found `compose_project example-1:abandoned` under `removed` after a container answered 409. After the change both passed, for a container answering 409 (`in-use`) and 500 (`removal-failed`), and `go test ./...`, `go vet ./...`, `go vet -tags engine ./internal/clean`, `golangci-lint run` (2.14.0 here; CI pins 2.15.0), the engine-tag lint, `gofmt -l` and `go mod tidy -diff` were clean. On Docker 29.7.2, `DELETE /networks/<net>` on a disposable network with an attached container answered 403.
 - [x] T20 `plugins/vh-adlc/references/clean.md` - R-9 F-03, as the owner decided on 2026-11-06: state as a known limit that a container bind-mounting all of `/tmp` or `/` marks no entry as in use, with no new handling; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
       Evidence: A new "What counts as in use" section names the same-user process links and container bind mounts that keep an entry, the whole-`/tmp` or `/` bind mount as a limit that only age covers, and the limits Design already lists. `internal/clean/files.go` `usage.holds` and `mountedIn` call `within(p, entry)`, which holds only for the entry or a path inside it, so a bind source of `/tmp` or `/` holds no entry, as the section says. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61 on the tree rebuilt on `origin/main` `21bc3e4`. No code changed.
+- [x] T21 `plugins/vh-adlc/references/clean.md` - R-10 F-06: say that a stopped container's bind mount also keeps an entry, as the engine listing includes stopped containers; `bun test tests/vh-adlc/check.test.ts` passes and a read against `internal/clean/engine.go` agrees (AC-14)
+      Evidence: `listEngine` in `internal/clean/engine.go` requests `/containers/json?all=1`, and `engineState.binds` takes the bind sources of every listed container, so "a container, running or stopped" matches the code. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
 
 ## Open Questions
 
-None.
+### Q1: Should the stated bind-mount limit also name a bind of the temp root or the temp base?
+
+**Recommendation:** A. Name it, because a harness that mounts its own `TMPDIR` is more likely than a
+whole-`/tmp` mount, and the code already behaves this way.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Widen the stated limit** | Design and `references/clean.md` say that a container bind-mounting the temp base, the project's temp root, `/tmp` or `/` marks no entry below it as in use | Two sentences; still no new code |
+| **B. Keep it to `/tmp` and `/`** | The limit stays as decided on 2026-11-06 | A `-v "$TMPDIR:$TMPDIR"` harness loses in-use protection for temp-root entries with no written warning |
+
+**Why this is yours:** R-10 F-03 asks whether your 2026-11-06 decision on R-9 F-03 should cover the
+project's own temp root, which only you can widen.
+
+### Q2: Should the `host.yaml` sentence in Temp root be reworded?
+
+**Recommendation:** A. Reword it, so the sentence cannot be read as "from the working tree".
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Reword** | "`host.yaml` passes through the same strict reader and typed decode as the manifest." | One sentence |
+| **B. Keep it** | No change | A reader may take "the same way" to mean where the file is read from |
+
+**Why this is yours:** R-10 F-05 is a wording judgement on the normative Design text.
 
 ## Review Log
 
