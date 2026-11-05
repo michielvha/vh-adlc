@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { runOwnedClient } from "../../../plugins/vh-adlc/scripts/triage/owned-process";
+import { assessmentFailures } from "./assessments";
 const PIN = "f8ccacbedf057159ea24136ba115cd9857bb22ac", OLD = "0e52f51f01b84eda75a976763c42d8ec0a07b544";
 const pages = ["conventions/feature-documents.md", "conventions/coding.md", "conventions/delivery.md", "conventions/documentation.md", "conventions/documentation-impact.md", "guides/humanize-prose.md"];
 const hash = (bytes: Uint8Array | string) => createHash("sha256").update(bytes).digest("hex");
@@ -157,38 +158,27 @@ sys.exit(run.returncode)
     evidence.push({ id: item.id, changed, operations: observed.map(call => ({ op: call.op, exit: call.exit })), head_preserved: command(["git", "rev-parse", "HEAD"], root).trim() === before.head, index_preserved: hash(readFileSync(join(root, ".git/index"))) === before.index });
   }
   const final = events.filter(event => event.type === "assistant.message" && typeof event.data?.content === "string").at(-1)?.data?.content;
-  if (typeof final === "string") {
-    const citation = (value: unknown, item: Case, doc?: string): boolean => {
-      if (typeof value !== 'string') return false;
-      const matched = value.match(/^(.*):([1-9][0-9]*)$/u); if (!matched) return false;
-      const name = matched[1].startsWith(item.id + '/') ? matched[1].slice(item.id.length + 1) : matched[1];
-      if (doc ? name !== doc : !name.startsWith('src/')) return false;
-      const root = join(input, item.id), path = resolve(root, name);
-      return path.startsWith(root + '/') && existsSync(path) && statSync(path).isFile() && Number(matched[2]) <= readFileSync(path, 'utf8').split('\n').length;
-    };
-    try {
-      const raw = final.split("BEGIN_ASSESSMENTS_JSON")[1]?.split("END_ASSESSMENTS_JSON")[0];
-      const decoded: unknown = JSON.parse(raw ?? "null");
-      if (!decoded || typeof decoded !== "object" || !("cases" in decoded) || !Array.isArray(decoded.cases)) throw Error("missing case records");
-      for (const item of cases) {
-        const row = decoded.cases.find((value: unknown) => value && typeof value === "object" && "id" in value && value.id === item.id);
-        if (!row || typeof row !== "object" || !Array.isArray(row.candidates)) { failures.push(item.id + ":missing-assessment-record"); continue; }
-        if (["implement-gap", "ship-gap"].includes(item.id) && row.decision !== "blocked") failures.push(item.id + ":completion-not-blocked");
-        if (item.id === "ship-progress" && row.decision !== "progress-pr-draft") failures.push(item.id + ":progress-boundary");
-        const candidates = new Set(calls.filter(call => call.case === item.id && ["check", "verify"].includes(call.op)).flatMap(call => { const value = JSON.parse(call.stdout); return (value.candidates ?? []).map((candidate: {path: string}) => candidate.path); }));
-        for (const path of candidates) {
-          const result = row.candidates.find((value: {path?: unknown}) => value.path === path);
-          if (!result || !["Accurate", "Stale", "Incomplete", "Unknown"].includes(result.classification) || !Array.isArray(result.doc_citations) || !result.doc_citations.some((cite: unknown) => citation(cite, item, String(path))) || !Array.isArray(result.source_citations) || !result.source_citations.some((cite: unknown) => citation(cite, item))) failures.push(item.id + ":unclassified-or-uncited:" + String(path));
-        }
-      }
-    } catch { failures.push("missing-or-malformed-assessment-json"); }
-  } else failures.push("missing-native-report");
+  failures.push(...assessmentFailures(final, input, cases.map(item => item.id), calls));
   if (typeof final === "string") writeFileSync(join(output, "returned.txt"), final);
   json(join(output, "result.json"), { source_commit: commit, models, owned, pass: !failures.length, failures, evidence, limitation: "Synthetic native model trial only; not GUI/live-product or marketplace proof. Narrative accuracy/citations require independent trace review." });
   console.log(JSON.stringify({ output, models, pass: !failures.length, failures }));
   if (failures.length) process.exitCode = 1;
 }
 if (import.meta.main) {
-  const [repo, output, ...only] = process.argv.slice(2); if (!repo || !output) throw Error("usage: native-trial.ts repository new-output-directory [case-id ...]");
-  await nativeDocsTrial(repo, output, only.length ? only : undefined);
+  const [repo, output, ...only] = process.argv.slice(2);
+  if (repo === '--regrade-assessments') {
+    if (!output || only.length) throw Error('usage: native-trial.ts --regrade-assessments completed-output');
+    const prior = JSON.parse(readFileSync(join(output, 'result.json'), 'utf8'));
+    const events = readFileSync(join(output, 'native.jsonl'), 'utf8').split('\n').filter(Boolean).map(line => JSON.parse(line));
+    const final = events.filter(event => event.type === 'assistant.message' && typeof event.data?.content === 'string').at(-1)?.data?.content;
+    const calls = readFileSync(join(output, 'helper-trace.jsonl'), 'utf8').trim().split('\n').map(line => JSON.parse(line));
+    const other = prior.failures.filter((failure: string) => !failure.includes(':unclassified-or-uncited:') && !failure.includes(':missing-assessment-record') && !['missing-or-malformed-assessment-json','missing-native-report'].includes(failure));
+    const failures = [...other, ...assessmentFailures(final, join(output, 'input'), prior.evidence.map((row: {id: string}) => row.id), calls)];
+    const destination = join(output, 'assessment-recheck.json'); if (existsSync(destination)) throw Error('Retain the original recheck; use a new completed trial.');
+    json(destination, {kind:'assessment-evaluator-correction', original_result_sha256:hash(readFileSync(join(output,'result.json'))), evaluator_sha256:hash(readFileSync(join(import.meta.dir,'assessments.ts'))), source_commit:prior.source_commit, pass:!failures.length, failures, limitation:'Original native run/result remain unchanged. Only classification/citation grading is corrected; no action or process evidence is fabricated.'});
+    console.log(JSON.stringify({pass:!failures.length, failures, destination})); if(failures.length)process.exitCode=1;
+  } else {
+    if (!repo || !output) throw Error('usage: native-trial.ts repository new-output-directory [case-id ...]');
+    await nativeDocsTrial(repo, output, only.length ? only : undefined);
+  }
 }
