@@ -62,7 +62,6 @@ export function parseSecurityInput(value: unknown): SecurityInput {
   const row = v.record(value, ["schema_version", "run_id", "hostname", "repository", "source_commit", "evaluated_at", "collected_at", "collection_revision", "inventory_digest", "scope", "policy", "policy_assessment", "coverage", "observations", "evidence", "decisions", "groups", "history_gaps", "history_provenance"]);
   if (row.schema_version !== 1) throw Error("unsupported security input schema");
   const identity = v.identity(row.hostname, row.repository), selected = scope(row.scope);
-  if (!selected.repositories.includes(identity.repository)) throw Error("security primary repository outside scope");
   const assessment = row.policy_assessment === null ? null : v.record(row.policy_assessment, ["reviewer", "reference", "assessed_at"]);
   const observations = unique(row.observations, value => {
     const o = v.record(value, ["id", "hostname", "repository", "surface", "provider_id", "provider_state", "target", "package", "ecosystem", "version", "location", "severity", "advisory_ids", "affected_range", "fixed_versions", "relationship", "dependency_scope", "rule", "observed_at", "raw_digest", "raw_reference", "complete", "synthetic", "reactivated"]);
@@ -111,8 +110,9 @@ const routes: Record<Decision["change"],string> = { "compatible-bot":"bot-batch"
 function tracked(f: FollowUp | null): boolean { return !!f && !!(f.owner || f.assignment_handoff); }
 function matching(input: SecurityInput, occurrence: Occurrence, kind: Evidence["kind"], result: string, at = occurrence.target): Evidence[] {
   const binding=evidenceBinding(input.source_commit,input.policy,input.scope,at);
-  return input.evidence.filter(e=>e.occurrence_id===occurrence.id && e.kind===kind && e.result===result && e.complete && !e.synthetic && !occurrence.synthetic && occurrence.complete &&
-    at.reference !== null && canonicalJSON(e.target)===canonicalJSON(at) && e.binding===binding && Date.parse(e.observed_at)>=Date.parse(occurrence.observed_at) && Date.parse(e.observed_at)<=Date.parse(input.evaluated_at));
+  const accountingProof=kind==="tracking"||kind==="ownership";
+  return input.evidence.filter(e=>e.occurrence_id===occurrence.id && e.kind===kind && e.result===result && e.complete && !e.synthetic && !occurrence.synthetic && (occurrence.complete||accountingProof) &&
+    (at.reference !== null||accountingProof) && canonicalJSON(e.target)===canonicalJSON(at) && e.binding===binding && Date.parse(e.observed_at)>=Date.parse(occurrence.observed_at) && Date.parse(e.observed_at)<=Date.parse(input.evaluated_at));
 }
 function corrected(input:SecurityInput, o:Occurrence, at=o.target):boolean {
   return [matching(input,o,"source","corrected",at),matching(input,o,"check","pass",at),matching(input,o,"scan","absent",at)].every(rows=>rows.length>0);
@@ -134,7 +134,7 @@ export function reconcileSecurity(value: unknown): SecuritySnapshot {
     if (!input.coverage.some(c=>c.repository===repo && c.surface===surface)) gaps.push(`missing coverage: ${repo}/${surface}`);
   }
   for (const c of input.coverage) if (c.status==="incomplete" && !tracked(c.handoff)) gaps.push(`coverage handoff pending: ${c.repository}/${c.surface}`);
-  for (const c of input.coverage) if (c.status==="complete" && c.count!==input.observations.filter(o=>o.repository===c.repository && o.surface===c.surface && o.provider_state==="open" && o.observed_at===input.collected_at).length) gaps.push(`coverage observation mismatch: ${c.repository}/${c.surface}`);
+  for (const c of input.coverage) if (c.status==="complete" && c.count!==input.observations.filter(o=>o.repository===c.repository && o.surface===c.surface && o.provider_state==="open" && (o.observed_at===input.collected_at||o.surface.startsWith("scanner/")&&o.complete)).length) gaps.push(`coverage observation mismatch: ${c.repository}/${c.surface}`);
   const findings:FindingState[]=input.observations.map(o=>{
     const d=input.decisions.find(d=>d.id===o.id), group=grouped.get(o.id), reasons:string[]=[];
     let remediation:FindingState["remediation"]=o.provider_state==="open"?"open":"unknown";

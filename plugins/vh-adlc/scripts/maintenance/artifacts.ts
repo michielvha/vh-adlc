@@ -12,7 +12,10 @@ function inspect(path: string, expected: string) {
   catch { fail("corrupt artifact"); }
 }
 import type { Settings } from "./types";
-function persist(config: Settings, id: string, step: string, category: "collections" | "pending-outcomes", payload: JSONObject) {
+import { verifySecurityResult, type SecurityResult } from "./security-io";
+import { readSecurityRevisions, selectSecurityChain, validateSecurityRevision, type SecurityRevision } from "./security-history";
+import { parseObservation } from "./history";
+function persist(config: Settings, id: string, step: string, category: "collections" | "pending-outcomes" | "security", payload: JSONObject) {
   let run = readRun(config, id); step = runID(step);
   const directory = privateDirectory(run.run_dir, [category], true), path = join(directory, `${step}.json`);
   const value = { schema_version: 1, run_id: run.header.run_id, step_id: step, ...payload }, hash = digest(`${canonicalJSON(value)}\n`);
@@ -26,6 +29,29 @@ function persist(config: Settings, id: string, step: string, category: "collecti
   if (operation.state !== "receipt") run = appendRun(config, id, run, { ...run.state,
     operations: run.state.operations.map(op => op.kind === "artifact" && op.step_id === step ? { ...op, state: "receipt" } : op) }, "receipt");
   return { run, path, digest: hash, step_id: step, value };
+}
+export function storeSecurity(config:Settings,id:string,result:SecurityResult,applied:SecurityRevision){
+  verifySecurityResult(config,id,result);validateSecurityRevision(applied);
+  if(result.revision.snapshot.digest!==applied.snapshot.digest)throw Error("security applied snapshot differs from receipt");
+  const run=readRun(config,id),existing=run.state.operations.find(op=>op.kind==="artifact"&&op.category==="security"&&op.security_digest===applied.digest);
+  // The deterministic snapshot digest is a lookup key; ordinary journal steps remain UUIDs.
+  if(existing && typeof existing.path==="string" && typeof existing.digest==="string")return inspect(existing.path,existing.digest);
+  const step=crypto.randomUUID(),saved=persist(config,id,step,"security",{kind:"security",result:result as unknown as JSONObject,applied:applied as unknown as JSONObject});
+  const current=readRun(config,id);appendRun(config,id,current,{...current.state,operations:current.state.operations.map(op=>op.step_id===step?{...op,security_digest:applied.digest}:op)},"receipt");
+  return saved.value;
+}
+export function validateReportSecurity(config:Settings,id:string,text:string){
+  const revisions=readSecurityRevisions(text);if(!revisions.length)return;
+  if(revisions.some(r=>r.run_id!==id))throw Error("security report run changed");
+  const chain=selectSecurityChain(revisions);if(chain.gaps.length||!chain.latest)throw Error("security report chain incomplete");
+  const original=parseObservation(text);
+  if(!original||revisions[0].original_projection_digest!==digest(canonicalJSON(original)))throw Error("security report original projection changed");
+  const run=readRun(config,id),entry=run.state.operations.find(op=>op.kind==="artifact"&&op.category==="security"&&op.security_digest===chain.latest!.digest);
+  if(!entry||typeof entry.path!=="string"||typeof entry.digest!=="string")throw Error("security report validation receipt missing");
+  const payload=inspect(entry.path,entry.digest);
+  const saved=payload as {result:unknown;applied:unknown};
+  const result=verifySecurityResult(config,id,saved.result),applied=validateSecurityRevision(saved.applied);
+  if(applied.digest!==chain.latest.digest||result.revision.snapshot.digest!==chain.latest.snapshot.digest)throw Error("security report receipt changed");
 }
 export function storeCollection(config: Settings, id: string, inventory: Inventory, step: string) {
   let run = readRun(config, id);

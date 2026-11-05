@@ -88,3 +88,8 @@ test("a complete nonzero surface cannot silently lose its observations", () => {
   const input=securityInput(); input.observations=[];
   expect(reconcileSecurity(input)).toMatchObject({accounting_state:"pending",coverage_state:"incomplete",all_clear:false});
 });
+test("a partial observation with an unknown target can receive a tracked handoff without becoming fixed",()=>{
+  const input=securityInput();input.observations[0].target.reference=null;input.observations[0].complete=false;
+  input.decisions.push(decision(input));input.evidence.push(proof(input,"tracking","accessible"));
+  expect(reconcileSecurity(input).findings[0]).toMatchObject({accounted:true,remediation:"open"});
+});

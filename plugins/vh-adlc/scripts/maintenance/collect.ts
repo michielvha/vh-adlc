@@ -13,7 +13,7 @@ export type AlertReference = { hostname: string; repository: string; surface: "d
 export type TerminalObservation = AlertReference & { state: string; reason: string | null; status: "complete" | "incomplete"; observed_at: string; raw_digest: string | null; raw: Record<string, unknown> | null };
 
 function optionalText(value: unknown): string | null { return value === undefined || value === null ? null : text(value); }
-function alertContext(row: Record<string, unknown>, hostname: string, repository: string, surface: string): AlertContext {
+export function alertContext(row: Record<string, unknown>, hostname: string, repository: string, surface: string): AlertContext {
   const dependency = row.dependency === undefined ? {} : object(row.dependency), pkg = dependency.package === undefined ? {} : object(dependency.package);
   const advisory = row.security_advisory === undefined ? {} : object(row.security_advisory);
   const vulnerability = row.security_vulnerability === undefined ? {} : object(row.security_vulnerability);
@@ -62,6 +62,7 @@ export type Inventory = {
   requests: ReadObservation[];
   scope: { repositories: string[]; pull?: number }; repositories: RepositoryInventory[];
   discovery: { organization: string; coverage: Coverage; repositories: { repository: string; archived: boolean; excluded: boolean; inventory_gap: boolean }[] }[];
+  terminal?: TerminalObservation[];
 };
 
 function object(value: unknown): Record<string, unknown> {
@@ -258,12 +259,13 @@ function collectRepository(config: Settings, reader: GitHubReader, repository: s
   return result;
 }
 
-export function collect(config: Settings, options: { reader?: GitHubReader; scope?: { repository?: string; pull?: number } } = {}): Inventory {
+export function collect(config: Settings, options: { reader?: GitHubReader; scope?: { repository?: string; pull?: number }; terminal?:AlertReference[] } = {}): Inventory {
   const scope = options.scope ?? {}, allowed = [config.repository, ...config.repositories.map(item => item.repository)];
   const selected = scope.repository?.toLowerCase() ?? (scope.pull === undefined ? undefined : config.repository);
   if (selected && !allowed.includes(selected)) throw Error("Repository outside configured maintenance scope");
   if (scope.pull !== undefined) number(scope.pull);
   const repositories = selected ? [selected] : allowed;
+  if(options.terminal?.some(ref=>!repositories.includes(ref.repository)))throw Error("terminal identity outside requested collection scope");
   const reader = options.reader ?? createGitHubReader(config.hostname);
   const traceStart = reader.trace().length;
   const result: Inventory = { schema_version: 1, hostname: config.hostname, repository: config.repository,
@@ -271,6 +273,7 @@ export function collect(config: Settings, options: { reader?: GitHubReader; scop
     requests: [],
     scope: { repositories, ...(scope.pull === undefined ? {} : { pull: scope.pull }) },
     repositories: repositories.map(repo => collectRepository(config, reader, repo, scope.pull)), discovery: [] };
+  if(options.terminal)result.terminal=collectTerminal(config,options.terminal,{reader});
   if (!selected) for (const organization of config.discovery_organizations) {
     const pages = reader.pages(`orgs/${organization}/repos?type=all&per_page=100`);
     const parsed = uniqueRows(pages.items, value => {
