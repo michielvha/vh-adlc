@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implemented on feat/host-cleanup, local only at the owner's direction: the R-8 record, the tasks and the claim are commits on that branch, not on main, and reach main with the feature's PR. The real-engine tests passed on 2026-11-06, which proves AC-03 and AC-08. Implementation review R-9 at 1ad76f2 found 10 criteria met and AC-11, AC-12 and AC-23 not verified. T19 fixes its factual code findings F-01 and F-02; F-03 is a question for the owner, and F-04 and F-05 need a revision and a merge of main. AC-11 is partly run: steps 3 to 5 passed, and the rest waits on the binary in /usr/local/bin, which only the owner can install. AC-12 waits on the owner's host runs and AC-23 on Stackweaver's adoption branch."
+status: draft
+status_description: "Back in draft on feat/host-cleanup for a revision: the owner decided on 2026-11-06 that R-9 F-04 adds internal/settings/ to covers and that R-9 F-03 is a stated limit. The branch was rebuilt on origin/main 21bc3e4 first, at plugin 0.11.0; the pre-rebuild tip fd23dae, which the Review Log cites as 1ad76f2 and earlier, stays reachable locally as refs/archive/host-cleanup-pre-rebuild. Waits on the revision, a fresh spec review and the owner's acceptance."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
