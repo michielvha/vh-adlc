@@ -4,7 +4,7 @@ import { resolveInside, git } from "../triage/settings";
 import { canonicalJSON, digest, readRun } from "./journal";
 import { alertContext, isSecurityPull, type Inventory } from "./collect";
 import { parseObservation, readHistory } from "./history";
-import { reconcileSecurity, parseSecurityInput, type Occurrence, type PolicyBinding, type SecurityCoverage, type SecurityInput, type SecuritySnapshot } from "./security";
+import { reconcileSecurity, parseSecurityInput, evidenceBinding, type Occurrence, type PolicyBinding, type SecurityCoverage, type SecurityInput, type SecuritySnapshot } from "./security";
 import { createSecurityRevision, mergeSecurityHistory, readSecurityRevisions, selectSecurityChain, type SecurityRevision } from "./security-history";
 import { verifyScannerEvidence } from "./scanner-evidence";
 import type { Settings } from "./types";
@@ -130,9 +130,32 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
   for(const terminal of inventory.terminal??[]){
     const identity=`${terminal.hostname}/${terminal.repository}/${terminal.surface}:${terminal.number}`,observed=input.observations.find(o=>o.id===identity);
     if(!observed||terminal.hostname!==input.hostname||!input.scope.repositories.includes(terminal.repository))throw Error("terminal result has no in-scope prior occurrence");
+    observed.complete=false;
     if(terminal.status==="complete"){
       if(!terminal.raw||terminal.raw_digest!==digest(canonicalJSON(terminal.raw))||terminal.raw.number!==terminal.number||terminal.raw.state!==terminal.state)throw Error("terminal raw evidence changed");
       observed.provider_state=v.choice(terminal.state,["open","fixed","dismissed","auto_dismissed"]);observed.raw_digest=terminal.raw_digest;observed.raw_reference=`terminal:${terminal.raw_digest}`;
+      const at=v.timestamp(terminal.observed_at),context=alertContext(terminal.raw,input.hostname,terminal.repository,terminal.surface);
+      // A historical absence becomes current evidence only after a positive, fresh exact read
+      // and an explicit source observation. Unknown targets never inherit the primary's commit.
+      const sources=input.evidence.filter(e=>e.occurrence_id===identity&&e.kind==="source"&&["observed","corrected"].includes(e.result)&&e.complete&&!e.synthetic&&e.target.kind==="source"&&e.target.reference!==null&&
+        e.binding===evidenceBinding(input.source_commit,input.policy,input.scope,e.target)&&Date.parse(e.observed_at)>=Date.parse(at)&&Date.parse(e.observed_at)<=Date.parse(input.evaluated_at)&&
+        (terminal.repository!==input.repository||e.target.reference===input.source_commit));
+      const targets=new Map(sources.map(e=>[canonicalJSON(e.target),e.target])),current=[...targets.values()][0];
+      const raw=terminal.raw,dep=terminal.surface==="dependabot"?v.record(raw.dependency):null,pkg=dep?v.record(dep.package):null;
+      const rawPackage=pkg?v.text(pkg.name):null,rawLocation=dep?v.text(dep.manifest_path):null;
+      const instance=raw.most_recent_instance===undefined?null:v.record(raw.most_recent_instance),commit=instance?.commit_sha;
+      const rule=terminal.surface==="code_scanning"?v.text(v.record(raw.rule).id):null;
+      const metadataMatches=(!observed.rule||!rule||observed.rule===rule)&&(!observed.package||!rawPackage||observed.package===rawPackage)&&(!observed.location||!rawLocation||observed.location===rawLocation)&&
+        (!observed.advisory_ids.length||!context.advisory_ids.length||observed.advisory_ids.some(id=>context.advisory_ids.includes(id)));
+      if(metadataMatches&&targets.size===1&&current&&Date.parse(at)>=Date.parse(input.collected_at)&&Date.parse(at)>=Date.parse(observed.observed_at)&&Date.parse(at)<=Date.parse(input.evaluated_at)&&
+        (terminal.surface!=="code_scanning"||commit===current.reference)){
+        observed.target=current;observed.complete=true;observed.observed_at=at;
+        observed.package=rawPackage??observed.package;observed.location=rawLocation??observed.location;
+        observed.ecosystem=context.ecosystem??observed.ecosystem;observed.version=context.installed_version??observed.version;
+        observed.advisory_ids=context.advisory_ids.length?context.advisory_ids:observed.advisory_ids;
+        observed.affected_range=context.affected_range??observed.affected_range;observed.fixed_versions=context.fixed_versions.length?context.fixed_versions:observed.fixed_versions;
+        observed.relationship=context.relationship??observed.relationship;observed.dependency_scope=context.scope??observed.dependency_scope;
+      }
     }else observed.provider_state="unknown";
   }
   const files=new Map<string,string>();

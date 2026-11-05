@@ -294,6 +294,15 @@ The result separates accounting, coverage, open remediation, exceptions and pend
 it does not mean vulnerability-free. Orphan findings prevent reconciliation. No all-clear is possible
 with unknown required coverage, active open findings, proposed exceptions or required pending delivery.
 
+For a disappeared provider alert, a fresh exact terminal read and a complete, nonsynthetic `source`
+receipt with result `observed` or `corrected` can re-observe its current target. Bind that receipt to
+the occurrence, current source/policy/scope and exact target, and retain its physical proof file.
+The receipt must be observed at or after the terminal read. Primary source targets must match the
+inventory commit; code-scanning targets must also match the provider's analysis commit. Conflicting
+package/location/advisory/rule context, stale reads, denied reads and unknown targets remain incomplete.
+This does not establish a fix: current source correction, relevant passing checks and comparable
+absence evidence are still required separately. Provider dismissal creates no consumer exception.
+
 Pass the exact result file to `report --security <result.json>`. The report stores only its portable
 revision; validation paths and raw evidence remain private. For a later outcome, the append update's
 `security` field names the new verified result file. Preserve all earlier report bytes and exactly

@@ -12,6 +12,7 @@ import type { Inventory } from "../../../plugins/vh-adlc/scripts/maintenance/col
 import { verifySecurityResult } from "../../../plugins/vh-adlc/scripts/maintenance/security-io";
 import { record, text } from "../../../plugins/vh-adlc/scripts/maintenance/security-value";
 import { evidenceBinding } from "../../../plugins/vh-adlc/scripts/maintenance/security";
+import { createSecurityRevision } from "../../../plugins/vh-adlc/scripts/maintenance/security-history";
 function reportResult(value:unknown){const row=record(value);return{path:text(row.path),digest:text(row.digest)};}
 const projects:ReturnType<typeof fixture>[]=[];afterEach(()=>projects.splice(0).forEach(f=>f.dispose()));
 function setup(policyPath="policy.md"){
@@ -95,4 +96,24 @@ test("append and resume preserve one legacy block, revalidate current inputs and
   expect(record(await main(["append",...args,"--update",join(f.root,".tools/update.json")])).digest).toBe(applied.digest);
   const final=readFileSync(saved.path,"utf8");expect(final.match(/```maintenance-observation-v1/g)).toHaveLength(1);expect(final.match(/```maintenance-security-v1/g)).toHaveLength(2);
   await main(["resume",...args]);f.write("agents/policy.md","Changed policy.\n");await expect(main(["resume",...args])).rejects.toThrow();
+});
+
+test("actual packets positively reobserve disappeared alerts only with current terminal and source proof",async()=>{
+  for(const mode of ["fixed","dismissed","auto_dismissed","open","denied","stale","wrong-target"]){
+    const f=setup(),args=["--repo",f.root,"--run-id",f.run.header.run_id];
+    const first=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
+    const prior='```maintenance-security-v1\n'+JSON.stringify(createSecurityRevision(first.revision.snapshot,null))+'\n```\n';f.write(".tools/prior.md",prior);
+    const o=first.revision.snapshot.input.observations[0],now=new Date(Date.parse(f.inventory.collected_at)+1000).toISOString();
+    const state=["fixed","dismissed","auto_dismissed","open"].includes(mode)?mode:"fixed",raw={...f.inventory.repositories[0].dependabot.alerts![0].context!.raw,state};
+    const inventory={...f.inventory,collected_at:now,repositories:f.inventory.repositories.map(r=>({...r,dependabot:{coverage:{status:"complete",pages:1,count:0},alerts:[]}})),terminal:[{hostname:o.hostname,repository:o.repository,surface:o.surface,number:1,state,status:mode==="denied"?"incomplete":"complete",reason:mode==="denied"?"denied":null,observed_at:mode==="stale"?f.inventory.collected_at:now,raw_digest:digest(canonicalJSON(raw)),raw}]};
+    f.write(".tools/next-inventory.json",JSON.stringify(inventory));f.write(".tools/proof.json",JSON.stringify({target:o.target,checks:"observed"}));
+    const target=mode==="wrong-target"?{...o.target,reference:"b".repeat(40)}:o.target,original=first.revision.snapshot.input;
+    const evidence=[["source","corrected"],["check","pass"],["scan","absent"]].map(([kind,result])=>({id:kind,kind,result,occurrence_id:o.id,target,binding:evidenceBinding(original.source_commit,original.policy,original.scope,target),reference:"local:proof",digest:digest(readFileSync(join(f.root,".tools/proof.json"))),observed_at:now,complete:true,synthetic:false}));
+    const packet={...f.packet,inventory:{path:"next-inventory.json",sha256:digest(readFileSync(join(f.root,".tools/next-inventory.json")))},analysis:{...f.packet.analysis,evaluated_at:now,collection_revision:2,decisions:[{id:o.id,change:"compatible-authored",outcome:mode==="fixed"||["denied","stale","wrong-target"].includes(mode)?"fixed":"unknown",follow_up:null,delivery_required:false,delivery_evidence:[]}],evidence},history:[{path:"prior.md",sha256:digest(prior)}],evidence_files:[{reference:"local:proof",path:"proof.json",sha256:digest(readFileSync(join(f.root,".tools/proof.json")))}]};
+    f.write(".tools/next-packet.json",JSON.stringify(packet));
+    const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/next-packet.json")]));
+    expect(result.revision.snapshot.findings[0].remediation).toBe(mode==="fixed"?"fixed-verified":"unknown");
+    expect(result.revision.snapshot.findings[0].occurrence.complete).toBe(!["denied","stale","wrong-target"].includes(mode));
+    expect(result.revision.snapshot.findings[0].exception).toBeNull();
+  }
 });
