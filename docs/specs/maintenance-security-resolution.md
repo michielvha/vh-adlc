@@ -255,7 +255,6 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | 2026-11-05 | R-7 | implementation | `76e674705f361f0ef3de41c2d67a823639fe74cd` | unknown | procedural | AC-01 through AC-09 met; no new code finding. AC-10 not verified pending macOS execution. Model identity not attested. |
 | 2026-11-05 | R-8 | implementation | `da44309e5719c17a79889dba8badd739fd5fe6f1` | unknown | procedural | AC-01 through AC-09 met; AC-10 not met due to reproducible temporary-directory alias fixture failure. Native CI still running at review time. Model identity not attested. |
 | 2026-11-05 | R-9 | implementation | `d98b6c52ba17ded76cfc0efd080a509a01603ead` | unknown | procedural | All ten criteria met after exact-head Linux and macOS CI; no findings. Model identity not attested. |
-
 | 2026-11-05 | R-10 | implementation | `d74b27b3dccfdfc923e5d194f51e02358d6e978a` | unknown | procedural | All ten criteria met; upstream update preference preserves existing gates. Model identity not attested. |
 
 ### R-1
