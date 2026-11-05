@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Owner accepted the clean R-3 spec and requested shared implementation plus a report-only Stackweaver trial; task planning follows."
+status: in-progress
+branch: feat/maintenance-security-resolution
+status_description: "Implementing the accepted shared security accounting workflow; Stackweaver verification remains report-only and advisory remediation is excluded."
 issue: null
 goal: "Every security finding in a maintenance scope retains its evidence, an explicit route through an existing loop, and an outcome that distinguishes verified fixes from outstanding work and exceptions."
 covers:
