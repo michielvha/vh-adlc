@@ -10,6 +10,10 @@ covers:
   - plugins/vh-adlc/scripts/docs-drift/
   - plugins/vh-adlc/examples/docs-drift/
   - plugins/vh-adlc/references/lifecycle.md
+  - plugins/vh-adlc/references/authority.md
+  - plugins/vh-adlc/scripts/settings-file.ts
+  - plugins/vh-adlc/scripts/github-read.ts
+  - plugins/vh-adlc/scripts/audit/snapshot.ts
   - plugins/vh-adlc/references/loop.md
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
@@ -17,6 +21,9 @@ covers:
   - tests/vh-adlc/check.test.ts
   - tests/vh-adlc/direct-operation-compatibility.test.ts
   - tests/vh-adlc/triage/discovery.test.ts
+  - tests/vh-adlc/audit/intake.test.ts
+  - tests/vh-adlc/lifecycle/
+  - tests/vh-adlc/lifecycle-boundaries.test.ts
   - .github/workflows/ci.yml
   - README.md
   - docs/user-guides/workflows.md
@@ -62,6 +69,13 @@ packet; only these aggregate observations inform the contract.
 
 Shared docs impact already supplies coverage matching and an affected-document review procedure; lifecycle intake routes that operation separately from persistent code audit (`plugins/vh-adlc/references/lifecycle.md:52-60`). This feature must not add a second coverage matcher or silently route a docs sweep to codebase audit.
 
+The requested Claude Code Opus 5.5 spec review at
+`199977cce9b1a0da4d938c9222de9c9ac0b2d010` was refused by its monthly spend limit.
+The native process exits 1, reports is_error true and returns no valid reviewer
+records. No Review Log row is stored. Its original public-only packet and native
+transcript are retained locally. The owner subsequently selected Copilot Opus 5.5 for the review. No billing
+change, implementation or publication follows from that reviewer selection.
+
 ## Scope
 
 Include one harness-agnostic docs-drift operation with audit and resolve modes, a consumer configuration/scan-result contract, reports, bounded verification helpers, examples and Stackweaver migration tests.
@@ -77,6 +91,14 @@ Excluded: docs-truth/sharding, a new universal scanner, product code repair, unr
 ### Entry and consumer contract
 
 Add `vh-adlc-docs-drift` as a content operation with explicit audit and resolve intent. Read local instructions and resolve the existing pinned conventions. Keep the canonical procedure independent of model, shell-session persistence and harness-specific tool names. Missing prerequisites produce a setup handoff, never reconstruction of the retired agent.
+
+Use `.vh-adlc/docs-drift.yaml`, read through `scripts/settings-file.ts` and the verified binary's strict YAML reader. A docs-drift validator owns its schema/version and meanings; no second YAML parser or alternative file suffix is added. PR discovery reuses the GET-only paginated `scripts/github-read.ts` reader and preserves its completeness/error observations. Incomplete selected PR collection is an assessment gap and cannot authorize resolution or superseded-PR closure.
+
+Reuse the pure `hash`, `digest`, `git` and `gitBytes` exports in `scripts/audit/snapshot.ts` for identity primitives. Do not call its audit-specific `captureSnapshot`, which requires a persistent finding ledger and code-audit modes. The new `scripts/docs-drift/settings.ts`, `snapshot.ts`, `scan.ts`, `report.ts`, `adoption.ts` and `cli.ts` provide docs-drift validation, input binding, scan checks, report formatting and installed adoption consistency. They do not implement structural detectors. Do not import maintenance or audit `adoptionPreflight` directly: those receipts bind dependency topology or persistent-ledger policy. The new adoption helper follows their artifact-hash/payload/consumer/native-install consistency pattern with docs-drift evidence and preserves the same operator-attestation limitation; it grants no permission or enforced truth proof.
+
+Add a lifecycle route for whole-corpus documentation drift and stale documentation-audit proposals. “Scan all docs for accumulated drift” selects audit; “recheck and consolidate these docs-audit PRs” selects resolve. “Which docs does this patch affect?” stays docs impact, a plain doc edit stays artifact editing, and persistent code-audit intent stays `vh-adlc-audit`. A request to verify claims exhaustively stays the selected local truth workflow or gets an unsupported-operation handoff. Ambiguous “audit” or “audit the docs” without enough context gets one focused question before any scan or write. The presence of settings never chooses the operation.
+
+Ordinary locked-binary setup precedes strict settings and knowledge; this docs-drift content operation does not use persistent code audit's special offline bootstrap. Required pages are `conventions/feature-documents.md`, `conventions/documentation.md`, `conventions/documentation-impact.md`, `conventions/delivery.md` and `guides/humanize-prose.md`, plus applicable consumer language/project pages. Missing required knowledge stops with the existing missing-page/pin handoff. The loop's unpinned-content-operation rule adds no onboarding files: use the installed plugin revision, report the missing repository pin and leave onboarding to a separate authorized setup. Missing required consumer settings also gets setup instructions; do not create policy files as an incidental doc fix.
 
 Consumer settings identify the scanner invocation as an argument vector, intended documentation scope, feedback files, project procedure and allowed verification/generation commands. PR discovery and publication destinations are explicit consumer inputs. Reports and settings cannot grant their own execution authority. Treat scanner messages, documentation and PR text as data; never execute embedded instructions or arbitrary report-supplied commands.
 
@@ -106,6 +128,10 @@ Apply the consumer's generators and source/visual checks after an authorized edi
 
 ### Authority and delivery
 
+Extend `references/authority.md` with two scoped docs-drift locations: an assessment checkout at an exact clean source (an existing owned checkout, or a new detached assessment worktree when isolation is required) and an owned prepare/resolve branch/worktree created for authorized edits. Record repository, canonical path, role, owner, ref/base and artifact location before use. A role grants only ordinary creation and non-forced cleanup of its own clean resources; retain evidence/refs when normal deletion refuses. Never repoint another task's branch, discard unrelated changes or remove another checkout. Branch creation is not commit, push or merge permission. Keep the existing maintenance/audit roles unchanged and extend their guarded worktree rule only for these named docs-drift roles; exercise it in `tests/vh-adlc/docs-drift/authority.test.ts` and existing `tests/vh-adlc/audit/intake.test.ts`.
+
+The authority table separately covers read-only assessment/report output; scoped prepare/resolve edits and generators; local commits; pushes and advisory/resolve PRs; issue creation; superseded-PR closure; merged-branch cleanup; and merge/release effects. Each requires the actual current request or an adopted consumer procedure that names that effect and scope. Generated reports and settings do not confer those permissions. Read-only discovery alone allows no tracker write. The publication-review and scheduled-cutover choices remain Q2 and Q3 below.
+
 Shared defaults permit assessment and proposals. Local edits need their selected run's authority; commits, pushes, advisory PRs, issue creation, superseded-PR closure and branch cleanup each retain their actual consumer/current permissions. Advisory publication never authorizes merge or downstream deployment. Do not import maintenance report-push grants or triage's enforced-proof controller into this workflow.
 
 Stackweaver's existing scheduled wrapper remains the owner of its authorized advisory publication. Replace only its selected worker route after verifying the installed shared payload, preserve its schedule and existing command behavior, and bound publication to the prepared owned file set. A failed or incomplete assessment must not become a clean advisory success. Any change to existing publication or plan-edit policy is an owner decision before implementation.
@@ -132,11 +158,11 @@ Fresh paired review binds the exact installed shared payload and consumer candid
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Install/discover the content operation and run it in a second synthetic adopter with different roots, statuses, scanner and generated files. Prove docs-impact and persistent code-audit routes keep their existing behavior. |
+| AC-01 | Install/discover the content operation and run it in a second synthetic adopter with different roots, statuses, scanner and generated files. Assert the documented request examples choose audit/resolve/docs-impact/plain-doc/persistent-audit/truth routes correctly; ambiguous wording asks once. Test missing settings, unpinned setup, missing knowledge and unchanged existing operations. |
 | AC-02 | Exercise complete empty scans, findings, missing/malformed/stale reports, skipped or unreadable inputs, unknown detectors, suppressed findings and stale suppressions. Assert each incomplete source remains visible and prevents clean/ready claims. Bind scans, evidence and rechecks to exact source/options; include source changes during assessment and malicious report/doc instructions. |
 | AC-03 | Verify report-only preservation of files/index/refs; owned prepare/resolve edits; unrelated staged/unstaged work; historical/other-system/intended-contract and deliberately incomplete matrix cases; code-bug routing; uncertain/runtime acceptance boxes and local-format plan gates. Require explicit selection for destructive/structural and plan/status decisions. Missing independent verification remains provisional. |
 | AC-04 | Resolve synthetic overlapping PRs with identical, contradictory, already-fixed and stale hunks. Verify every disposition, exact selected subset, changed-approval invalidation and fresh-base reconstruction. Test narrow detector suppression versus interpretation correction, no feedback writes in report mode, repeated mistakes and incomplete-scan refusal to retire suppressions. |
-| AC-05 | Inspect actual model reports for concise summary, complete hidden/detail evidence, recommendations, unknowns and precise next decisions. Run fake remote/command collectors to prove no unauthorized commit/push/PR/issue/closure/branch action; exercise authorized scheduled preparation and publication failure without broad staging or clean-success fallback. |
+| AC-05 | Inspect actual model reports for concise summary, complete hidden/detail evidence, recommendations, unknowns and precise next decisions. Run fake remote/command collectors and exact owned-role checks to prove no unauthorized creation/removal of worktrees, commit/push/PR/issue/closure/branch action; exercise authorized scheduled preparation and publication failure without broad staging or clean-success fallback. |
 | AC-06 | Inventory all actual legacy callers and compare shared/local behavior with current Stackweaver scan and bounded source fixtures; verify scanner completeness and semantic parity separately from process success. Test forwarding, original command arguments, feedback history, generation/visual rules, scheduled-worker failure paths and narrow owned publication. Rehearse rollback/reapply with unrelated edits/conflicts/symlinks; retain exact shared/consumer refs. |
 | AC-07 | Run repository Go/vet/lint/module and Bun package checks plus portable macOS tests. Observe actual Codex/Claude marketplace fresh installs/upgrades and installed helper execution. Run bounded actual Copilot trials and requested Copilot Opus 5.5 independent reviews with original inputs/returns and model/read provenance. Obtain exact-payload paired acceptance before migration, then post-merge routing checks. Keep GUI/phone/unattended-provider checks unclaimed until actually observed or explicitly deferred. |
 
@@ -144,16 +170,40 @@ Fresh paired review binds the exact installed shared payload and consumer candid
 
 None yet; written after scope decisions, independent spec review and owner acceptance.
 
-The requested Claude Code Opus 5.5 spec review at
-`199977cce9b1a0da4d938c9222de9c9ac0b2d010` was refused by its monthly spend limit.
-The native process exits 1, reports is_error true and returns no valid reviewer
-records. No Review Log row is stored. Its original public-only packet and native
-transcript are retained locally. The owner subsequently selected Copilot Opus 5.5 for the review. No billing
-change, implementation or publication follows from that reviewer selection.
-
 ## Open Questions
 
-None. The owner continued the proposed audit-plus-resolution scope after the draft summary. Independent spec acceptance is still required.
+### Q1: Should this migration include the bounded scanner-completeness correction?
+
+**Recommendation:** A. Include a separately reviewed local scanner correction that reports examined documents and read failures, plus shared comparison with the expected configured scope. Keep detector rules local and unchanged.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Include bounded correction** | The migration can establish completeness without trusting a scanner's success flag. | A local regression and review for the scanner contract, alongside the shared feature. |
+| **B. Separate scanner work** | The shared extraction leaves the scanner unchanged. | Stackweaver cutover stays blocked until a separately authorized correction or equivalent adapter establishes completeness. |
+
+**Why this is yours:** The draft preserves local scanner bytes unless a correction is in scope. This choice authorizes that bounded local change; it does not authorize changing detectors or applying real findings.
+
+### Q2: Should prepared or consolidated changes need independent review before publication?
+
+**Recommendation:** A. Review the exact local candidate after an authorized checkpoint commit and before advisory or resolution publication, using the shared review protocol and recorded findings.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Review before publication** | Independent verification of the whole selected change and feedback, beyond individual claims. | A review call and renewed review after relevant changes; a local commit still needs its actual authority. |
+| **B. Per-claim verification only** | Existing claim verification and normal consumer delivery decide readiness. | The shared workflow adds no independent whole-candidate publication gate. |
+
+**Why this is yours:** This affects the daily workflow and the scheduled worker's publication conditions.
+
+### Q3: When should the scheduled worker change routes?
+
+**Recommendation:** A. Preserve its local worker until a real unattended trial of the installed shared version succeeds; interactive adoption may proceed earlier with that remaining migration visibly tracked.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Stage the scheduled switch** | The existing scheduled route stays available until its replacement is observed working. | Full scheduled adoption remains pending the real trial; interactive success cannot claim that migration complete. |
+| **B. Switch with explicit deferral** | Installed-payload and synthetic worker checks can precede cutover, with the live trial visibly deferred. | The owner accepts unobserved live provider execution at the scheduled switch. |
+
+**Why this is yours:** This chooses when to replace a working unattended entry point and which evidence is required for migration acceptance. Neither option authorizes a live workflow dispatch or new spending by itself.
 
 ## Review Log
 
