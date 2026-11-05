@@ -24,7 +24,7 @@ Main [run 41953109781](https://github.com/michielvha/vh-adlc/actions/runs/419531
 
 Ubuntu's [AppArmor package file list](https://packages.ubuntu.com/resolute/amd64/apparmor/filelist) includes `/etc/apparmor.d/bwrap-userns-restrict`. Its [apparmor-profiles file list](https://packages.ubuntu.com/resolute/all/apparmor-profiles/filelist) does not include the old path. This is a distribution packaging compatibility repair. The observed failed setup is the baseline; a new test duplicating the package manifest would not establish kernel compatibility.
 
-Actionlint, Bash syntax validation of the extracted setup step, root Go tests, vet, lint configuration, lint and module tidiness passed on the repair. The unchanged Bubblewrap probe passed as the unprivileged host user; this Fedora host does not verify Ubuntu AppArmor loading. A structured comparison of the before/after workflow confirmed that only the package owner and profile path changed. The full Bun checker is running; its logs and exit receipts are retained under `/tmp/vh-adlc-ci-apparmor-evidence-20261105/`.
+Actionlint, Bash syntax validation of the extracted setup step, root Go tests, vet, lint configuration, lint and module tidiness passed on the repair. The unchanged Bubblewrap probe passed as the unprivileged host user; this Fedora host does not verify Ubuntu AppArmor loading. A structured comparison of the before/after workflow confirmed that only the package owner and profile path changed. Check logs and exit receipts are retained under `/tmp/vh-adlc-ci-apparmor-evidence-20261105/`.
 
 The first complete `bun test tests/vh-adlc` run failed: 1011 passed and 66 failed across 1077 tests in 1140.67 seconds. It encountered fixture timeouts and cascading failures while observed host load exceeded 100. The failed log is retained as `checker.log`; it is not a pass. With host load lower, the unchanged first failing fixture passed all 25 tests in isolation, and the exact full-suite command then passed all 1094 tests across 93 files in 346.85 seconds. Test selection and time limits were unchanged. The fresh successful log is `checker-retry.log`, with its exit-zero receipt in `checker-retry.json`.
 
@@ -44,4 +44,4 @@ NO FINDINGS
 
 ## State
 
-Locally complete. Required local checks passed, and the current independent maintenance review has no findings. Source and Definition remain unchanged from the reviewed commit. The hosted Ubuntu result remains unverified. Publication and merge need separate owner authorization; no remote write has been made for this repair.
+Locally complete. Required local checks passed, and the current independent maintenance review has no findings. Source and Definition remain unchanged from the reviewed commit. The hosted Ubuntu result remains unverified. On 2026-11-05 the owner authorized publishing the repair and merging it after hosted checks pass. Publication is pending at this checkpoint.
