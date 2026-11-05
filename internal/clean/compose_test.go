@@ -158,13 +158,39 @@ func TestComposeInUseAndFailures(t *testing.T) {
 	}
 }
 
-func TestComposeStopsAtAContainerItCannotRemove(t *testing.T) {
+// Docker answers 403 when a network still has an attached container (R-9 F-01),
+// so that network is in use, not a failed removal.
+func TestComposeKeepsANetworkWithActiveEndpoints(t *testing.T) {
 	f, _ := composeEngine(t)
-	f.status["DELETE /containers/a1"] = 409
-	runCompose(t, f, composeRules, true, false)
-	for _, c := range f.changes() {
-		if c == "DELETE /networks/net1" || c == "DELETE /volumes/example-1_data" {
-			t.Fatalf("went on to %s after a container stayed", c)
+	f.status["DELETE /networks/net1"] = 403
+	res := runCompose(t, f, composeRules, true, false)
+	if len(res.Failures) != 0 {
+		t.Fatalf("failures %v; a network with active endpoints is in use", res.Failures)
+	}
+	if !slices.Contains(kindsAndNames(res.Kept), "compose_network example-1_default:in-use") {
+		t.Fatalf("kept %q, want the network kept as in-use", kindsAndNames(res.Kept))
+	}
+}
+
+// A project is listed as removed only once all its containers went (R-9 F-02).
+func TestComposeStopsAtAContainerItCannotRemove(t *testing.T) {
+	for _, tc := range []struct {
+		status int
+		reason string
+	}{{409, ReasonInUse}, {500, ReasonRemovalFailed}} {
+		f, _ := composeEngine(t)
+		f.status["DELETE /containers/a1"] = tc.status
+		res := runCompose(t, f, composeRules, true, false)
+		for _, c := range f.changes() {
+			if c == "DELETE /networks/net1" || c == "DELETE /volumes/example-1_data" {
+				t.Fatalf("status %d: went on to %s after a container stayed", tc.status, c)
+			}
+		}
+		if slices.Contains(kindsAndNames(res.Removed), "compose_project example-1:abandoned") {
+			t.Fatalf("status %d: removed %q lists the project although a container stayed", tc.status, kindsAndNames(res.Removed))
+		}
+		if want := "compose_project example-1:" + tc.reason; !slices.Contains(kindsAndNames(res.Kept), want) {
+			t.Fatalf("status %d: kept %q, want %q", tc.status, kindsAndNames(res.Kept), want)
 		}
 	}
 }

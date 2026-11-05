@@ -64,9 +64,13 @@ func doCompose(ctx context.Context, e *Engine, state engineState, rules []Compos
 			res.NeedsFlag = append(res.NeedsFlag, item)
 			continue
 		}
-		item.Reason = ReasonAbandoned
-		res.Removed = append(res.Removed, item)
-		res.removeProject(ctx, e, name, rule, projects[name], dry)
+		// The project is listed as removed only once all its containers went.
+		item.Reason = res.removeProject(ctx, e, name, rule, projects[name], dry)
+		if item.Reason == ReasonAbandoned {
+			res.Removed = append(res.Removed, item)
+		} else {
+			res.Kept = append(res.Kept, item)
+		}
 	}
 	return res
 }
@@ -96,9 +100,13 @@ func composeAbandoned(cs []container) bool {
 	return len(cs) > 0
 }
 
-func (res *engineResult) removeProject(ctx context.Context, e *Engine, name string, rule ComposeRule, cs []container, dry bool) {
+// removeProject removes, or in a dry run lists, a project's containers, then
+// its networks and volumes. It returns ReasonAbandoned once every container
+// went, otherwise the reason the first container that stayed was kept, and
+// then leaves the networks and volumes alone.
+func (res *engineResult) removeProject(ctx context.Context, e *Engine, name string, rule ComposeRule, cs []container, dry bool) string {
 	label := composeProjectLabel + "=" + name
-	stuck := false
+	stuck := ""
 	for _, c := range cs {
 		it := Item{Kind: KindComposeContainer, Name: c.ID, Rule: rule.Project}
 		if !res.change(it, dry, func() error {
@@ -108,17 +116,17 @@ func (res *engineResult) removeProject(ctx context.Context, e *Engine, name stri
 				}
 			}
 			return e.removeContainer(ctx, c.ID)
-		}) {
-			stuck = true
+		}) && stuck == "" {
+			stuck = res.Kept[len(res.Kept)-1].Reason
 		}
 	}
-	if stuck {
-		return
+	if stuck != "" {
+		return stuck
 	}
 	nets, err := e.networks(ctx, label)
 	if err != nil {
 		res.fail(Item{Kind: KindComposeNetwork, Name: name, Rule: rule.Project}, err)
-		return
+		return ReasonAbandoned
 	}
 	for _, n := range nets {
 		res.change(Item{Kind: KindComposeNetwork, Name: n.Name, Rule: rule.Project}, dry, func() error {
@@ -126,18 +134,19 @@ func (res *engineResult) removeProject(ctx context.Context, e *Engine, name stri
 		})
 	}
 	if !rule.Volumes {
-		return
+		return ReasonAbandoned
 	}
 	vols, err := e.volumes(ctx, label)
 	if err != nil {
 		res.fail(Item{Kind: KindComposeVolume, Name: name, Rule: rule.Project}, err)
-		return
+		return ReasonAbandoned
 	}
 	for _, v := range vols {
 		res.change(Item{Kind: KindComposeVolume, Name: v.Name, Rule: rule.Project}, dry, func() error {
 			return e.removeVolume(ctx, v.Name)
 		})
 	}
+	return ReasonAbandoned
 }
 
 // change runs one removal, or only records it in a dry run. It reports whether

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -174,8 +175,10 @@ func (e *Engine) removeContainer(ctx context.Context, id string) error {
 	return e.do(ctx, http.MethodDelete, "/containers/"+url.PathEscape(id))
 }
 
+// removeNetwork treats 403 as in use too: Docker answers 403 for a network
+// that still has an attached container.
 func (e *Engine) removeNetwork(ctx context.Context, id string) error {
-	return e.do(ctx, http.MethodDelete, "/networks/"+url.PathEscape(id))
+	return e.send(ctx, http.MethodDelete, "/networks/"+url.PathEscape(id), http.StatusConflict, http.StatusForbidden)
 }
 
 func (e *Engine) removeVolume(ctx context.Context, name string) error {
@@ -185,6 +188,12 @@ func (e *Engine) removeVolume(ctx context.Context, name string) error {
 // do sends a change. 304 (already stopped) and 404 (already gone) succeed;
 // 409 is errInUse.
 func (e *Engine) do(ctx context.Context, method, path string) error {
+	return e.send(ctx, method, path, http.StatusConflict)
+}
+
+// send sends a change. 304 (already stopped) and 404 (already gone) succeed,
+// and each status in inUse is errInUse.
+func (e *Engine) send(ctx context.Context, method, path string, inUse ...int) error {
 	resp, err := e.request(ctx, method, path)
 	if err != nil {
 		return err
@@ -194,7 +203,7 @@ func (e *Engine) do(ctx context.Context, method, path string) error {
 	switch {
 	case resp.StatusCode < 300, resp.StatusCode == http.StatusNotModified, resp.StatusCode == http.StatusNotFound:
 		return nil
-	case resp.StatusCode == http.StatusConflict:
+	case slices.Contains(inUse, resp.StatusCode):
 		return errInUse
 	default:
 		return fmt.Errorf("%s %s: %s", method, path, resp.Status)
