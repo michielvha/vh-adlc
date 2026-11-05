@@ -328,6 +328,7 @@ None. R-16 F-03 exposed an authoring error: the earlier accepted recommendation 
 | 2026-11-05 | R-14 | spec | `207023518dc437c49f5cca36fe209df12d917add` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-15 | spec | `3ea3df8ada7276fa7f678ed478075af1dd216d77` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 | 2026-11-05 | R-16 | spec | `2249cee19e85832605c0f035a0b9c2d070b8e4c2` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
+| 2026-11-05 | R-17 | spec | `191fc46516b07a5f66f133d005d35d1ec09501aa` | claude-opus-5.5 | procedural | 3 should-fix; 2 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -760,6 +761,39 @@ SEVERITY: should-fix
 WHERE: Design, Owner decisions; Upgrades after adoption; Test Plan AC-06
 EVIDENCE: The owner's recorded upgrade choice is: independent review and installed checks for compatible updates, and a new live trial for changed execution, provider/reviewer, permissions or publication, or for unknown compatibility. The spec defines a compatible change only as "a reviewed display-only change or unrelated vh-adlc change" (00241 line 7). Owner decisions then lists further trial triggers that were not in that choice: "known assessment, resolve-classification/supersession, scan-contract ... lease" (00081 line 23; 00241 line 13). Taken together, a behavior-preserving refactor or a narrow bug fix in docs-drift helpers is neither display-only nor unrelated. Every such change would need a separately authorized paid unattended trial, and some would also need the resolve/closure collector trial (00241 line 15). The risk-based compatible route then covers only changes that do not touch docs-drift. That may be the intended conservative reading, but the paragraph presents it as the owner's selection, and Open Questions says "None" (00241 line 53).
 PROPOSAL: Ask the owner to confirm the trade-off. Option A: the compatible route covers only display-only or unrelated changes, so almost every docs-drift code change pays for a trial. Option B: behavior-preserving docs-drift changes, shown by independent diff review plus regression and installed checks, also count as compatible. Under B, known decision or contract changes still take the trial route. Until the owner answers, keep the expanded trigger list out of the owner-attributed sentence.
+
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Owner decisions; Upgrades after adoption (compatible definition and trial route); Test Plan AC-06
+EVIDENCE: The restored compatible definition says it "includes behavior-preserving docs-drift refactors/fixes". It also says such a change "preserves assessment/scan contracts, selected inputs and decisions" (shared-docs-drift.md 00241 line 23). Every change that fails this definition, "including known assessment, resolve-classification/supersession, scan-contract" changes, takes the trial route (00081 line 23; 00241 line 29). A changed resolve decision also triggers the collector trial (00241 line 31). AC-06 says to "Test a decision-only procedure change" on the trial route, and says a "behavior-preserving docs-drift refactor/fix uses the compatible route ... a decision or contract change cannot" (00241 line 60). A bug fix changes some output by definition, for example a hunk the old code misclassified or a document it wrongly marked accurate. The spec never says what "preserved" is measured against: the accepted documented contract, or the previous bytes' observed decisions. Under the second reading, almost no real fix qualifies as compatible, and the owner's restored compatible route for fixes becomes nearly empty. Under the first reading, the AC-06 "decision-only procedure change" case and the collector-trial trigger need a rule that separates a fix restoring the contract from a change to the contract. The shared lifecycle already draws that line for bounded maintenance: a regression fix "restores" the published contract, while changed promised semantics use the feature route (lifecycle.md 00081 lines 26-33).
+PROPOSAL: Define behavior preservation against the accepted docs-drift contract. A fix whose independent review and failing-then-passing regression show that it restores documented assessment, classification or publication behavior is compatible. A change to the documented rules themselves takes the trial route, including the collector trial when resolve decisions change. Add AC-06 cases for a contract-restoring classification fix on the compatible route and a classification-rule change on the trial route.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Authority and delivery (issue creation); Capability evidence by host; Scheduled worker and staged adoption (first-adoption trials); Upgrades after adoption; Test Plan AC-06, AC-07
+EVIDENCE: Issue creation is a supported real-corpus publication. It uses the staged/adopted gate and the lease, and the gate denies it only before cutover (00161 lines 21, 29, 61, 63). After cutover it is therefore enabled. First adoption requires two trials: the unattended advisory trial, whose handoff is "a draft PR" (00161 line 71), and the collector trial, which observes "consolidation publication, denial before merge, verified post-merge explanation/closure, and abandonment/revert refusal" (00241 line 31). Neither trial exercises issue creation. The capability matrix has no issue column (00161 lines 41-47). The spec's own rule is that "A missing affected-surface trial leaves the upgrade unverified even when its other trial passes", and that first adoption "must exercise both supported surfaces" (00241 line 31). Yet a later change to issue publication, which counts as "publication ... behavior", maps to no trial that can observe it. That is the same gap R-10 F-02 fixed for resolve publication and closure.
+PROPOSAL: Choose one rule. Either add issue creation to the collector trial's synthetic scenarios and to the capability matrix, and require that observation for first adoption and for issue-affecting upgrades, or keep shared real-corpus issue creation unclaimed and denied after cutover until a separately trialed adoption enables it. Add the matching AC-06/AC-07 proof.
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Independent candidate review and publication (full-ID role binding); Capability evidence by host; Scheduled worker and staged adoption (trial record); Test Plan AC-05
+EVIDENCE: Before real-corpus effects, the scanning/preparing worker must have a "current native returned identity" equal to the adopted full ID. That includes a host that "performs the role itself" (00161 line 35). A host that cannot "select/attest the adopted full worker/reviewer identity" is limited to report/local preparation (00161 line 39). The trial records "provider/model identities" (00161 line 79). The only identity-return mechanism the spec reuses is the reviewer's `MODEL:` header, and the protocol forbids inferring identity "from the main session's model picker" (review-protocol.md lines 34-36). The spec never defines where a worker's native identity comes from: provider machine-readable result metadata, a required header in the worker's returned manifest, or a session self-report. It also does not say which of these counts as attestation for an interactive host that performs the worker role itself. Without that, the AC-05 tests for "absent/unknown scanning-worker identities" have no defined input, and a host cannot know whether it qualifies for real-corpus effects.
+PROPOSAL: Specify the accepted worker-identity sources for each role and route. Examples are a native provider result field for hosted runs and a required `MODEL:` line in a returned worker manifest for delegated runs. State that a self-performing interactive host without such a native source is limited to report/local preparation. Bind the chosen source in the trial definition and test each source and its absence in AC-05.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Scan-result protocol and local correction; Scheduled worker and staged adoption (three stages)
+EVIDENCE: The scanner correction is delivered "Before trial/interactive shared adoption ... while both legacy routes remain active", as the second stage before any trial (00081 line 55; 00161 line 69). The same paragraph then says "Independently review this bounded correction before consumer cutover" (00081 line 55). Cutover happens after the trial, so read literally this allows the correction to be delivered and used by the trial and by interactive adoption before its independent review.
+PROPOSAL: Change the last sentence to require independent review of the exact correction candidate before its delivery, which is before the trial and interactive adoption.
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Open Questions
+EVIDENCE: Open Questions says "None." and then adds narrative about R-16 F-03, the authoring error and the accepted policies (00241 line 69). The standard says "An answered question is folded into the document and removed" and that "None." means every question has been answered (feature-documents.md 00081 lines 55-56). These answers are already folded into Owner decisions and Upgrades (00081 line 23; 00241 line 23).
+PROPOSAL: Leave Open Questions as "None.". Keep the provenance of the R-16 F-03 correction in the Review Log or status_description only.
 
 ## Sources
 
