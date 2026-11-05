@@ -26,10 +26,22 @@ Ubuntu's [AppArmor package file list](https://packages.ubuntu.com/resolute/amd64
 
 Actionlint, Bash syntax validation of the extracted setup step, root Go tests, vet, lint configuration, lint and module tidiness passed on the repair. The unchanged Bubblewrap probe passed as the unprivileged host user; this Fedora host does not verify Ubuntu AppArmor loading. A structured comparison of the before/after workflow confirmed that only the package owner and profile path changed. The full Bun checker is running; its logs and exit receipts are retained under `/tmp/vh-adlc-ci-apparmor-evidence-20261105/`.
 
+The first complete `bun test tests/vh-adlc` run failed: 1011 passed and 66 failed across 1077 tests in 1140.67 seconds. It encountered fixture timeouts and cascading failures while observed host load exceeded 100. The failed log is retained as `checker.log`; it is not a pass. With host load lower, the unchanged first failing fixture passed all 25 tests in isolation, and the exact full-suite command then passed all 1094 tests across 93 files in 346.85 seconds. Test selection and time limits were unchanged. The fresh successful log is `checker-retry.log`, with its exit-zero receipt in `checker-retry.json`.
+
+All 34 github-app-registration tests passed. The root Go suite, vet, module tidiness, golangci-lint 2.15.0 configuration and lint, actionlint and actual setup Bash syntax checks passed. The independent reviewer separately ran actionlint, the workflow Go test, setup syntax and the unprivileged host probe, inspected the failed hosted setup and observed the successful final full-suite and registration receipts. Ubuntu AppArmor kernel loading has not run on this Fedora host; only a fresh hosted build can establish that CI is green.
+
 ## Reviews
 
-No review has run yet.
+### R-1
+
+Target: `a2445bfa544b12ee415549b3fdd34ed48251e498`.
+Model: unknown; the reviewer did not attest its model identity.
+Isolation: procedural.
+
+```text
+NO FINDINGS
+```
 
 ## State
 
-Active. The repair is local; verification and independent review remain pending. No push, PR, merge or release is authorized by this maintenance request.
+Locally complete. Required local checks passed, and the current independent maintenance review has no findings. Source and Definition remain unchanged from the reviewed commit. The hosted Ubuntu result remains unverified. Publication and merge need separate owner authorization; no remote write has been made for this repair.
