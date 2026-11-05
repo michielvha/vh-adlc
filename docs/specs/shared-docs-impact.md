@@ -608,6 +608,21 @@ corrected in this feature document: T9 stays unchecked until the published
 paired verification, and status_description retains the final completion review.
 No other covered file changes after the reviewed commit.
 
+
+### Publication verification
+
+The owner authorized shared publication, normal release, actual marketplace
+fresh/upgrade acceptance, the separate syntax prerequisite and gated Stackweaver
+migration on 2026-11-05. Shared PR #51 first ran at `0c0f4facff7e53ce4b522add06ad1b349228eefe`,
+after merging published default `7e67296` and its AppArmor CI repair. The plugin
+payload remains unchanged. Linux CI passed 1,223 tests and failed two feature-
+freshness fixture cases: their branch was main but Git's inherited default was
+master. Both failures were reproduced with an isolated global Git configuration,
+without changing host settings. Setting the fixture's local init.defaultBranch
+makes all 30 collection checks pass under that master-default configuration and
+this host's ordinary configuration. The original CI log and red/green artifacts
+remain retained; the corrected exact-head Linux/macOS run is still required.
+
 ## Open Questions
 
 None. The owner approved all six review refinements.

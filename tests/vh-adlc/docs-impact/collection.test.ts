@@ -19,7 +19,7 @@ function git(root: string, ...args: string[]): string {
 }
 function fixture(files: Record<string, string> = {}, agents: string | null = declaration): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-docs-impact-"))); made.push(root);
-  git(root, "init", "-q", "-b", "main"); git(root, "config", "user.email", "fixture@example.invalid"); git(root, "config", "user.name", "Fixture");
+  git(root, "init", "-q", "-b", "main"); git(root, "config", "init.defaultBranch", "main"); git(root, "config", "user.email", "fixture@example.invalid"); git(root, "config", "user.name", "Fixture");
   if (agents !== null) put(root, "AGENTS.md", agents);
   for (const [path, value] of Object.entries({ "src/app.ts": "export const port = 8080;\n", "docs/guide.md": guide(), ...files })) put(root, path, value);
   commit(root); return root;
