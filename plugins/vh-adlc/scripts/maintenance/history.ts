@@ -133,7 +133,8 @@ function legacy(report: HistoryReport, current: ObservationDocument): Legacy | n
   }
   return result;
 }
-export function compareHistory(input: ObservationDocument, reports: HistoryReport[]) {
+export function compareHistory(input: ObservationDocument, reports: HistoryReport[], schemaVersion = 2) {
+  if (schemaVersion !== 2) throw Error("unsupported maintenance history comparison schema");
   const current = validateObservation(input), warnings: { path: string; reason: string }[] = [], old: { report: HistoryReport; document: ObservationDocument }[] = [], legacyRows: Legacy[] = [];
   for (const report of reports) {
     if (digest(report.text) !== report.digest || report.provenance === "published" && !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(report.commit ?? "")) { warnings.push({ path: report.path, reason: "history provenance mismatch" }); continue; }
@@ -155,7 +156,8 @@ export function compareHistory(input: ObservationDocument, reports: HistoryRepor
     return { hostname: row.hostname, repository: row.repository, surface: row.surface, scope: row.scope, status: row.status,
       baseline: baseline ? provenance(baseline.report) : null, availability_previous: candidates[0]?.previous.status ?? null,
       appeared: comparableCurrent ? [...now].filter(id => !before.has(id)).sort() : null,
-      resolved: comparableCurrent ? [...before].filter(id => !now.has(id)).sort() : null };
+      no_longer_open: comparableCurrent ? [...before].filter(id => !now.has(id)).sort() : null,
+      terminal_outcomes: [] };
   });
-  return { surfaces, legacy: legacyRows, warnings };
+  return { schema_version: 2, surfaces, legacy: legacyRows, warnings };
 }

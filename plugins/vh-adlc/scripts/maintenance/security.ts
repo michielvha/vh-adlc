@@ -20,7 +20,7 @@ export type RemediationGroup = { id: string; source_repository: string; source_p
 export type SecurityInput = { schema_version: 1; run_id: string; hostname: string; repository: string; source_commit: string; evaluated_at: string; collected_at: string;
   collection_revision: number; inventory_digest: string; scope: SecurityScope; policy: PolicyBinding[];
   policy_assessment: { reviewer: string; reference: string; assessed_at: string } | null; coverage: SecurityCoverage[];
-  observations: Occurrence[]; evidence: Evidence[]; decisions: Decision[]; groups: RemediationGroup[] };
+  observations: Occurrence[]; evidence: Evidence[]; decisions: Decision[]; groups: RemediationGroup[]; history_gaps?: string[]; history_provenance?: string[] };
 export type FindingState = { occurrence: Occurrence; route: string | null; selected: false; group: string | null; canonical_source: { repository: string; path: string } | null;
   remediation: "open" | "fixed-verified" | "unknown"; target_lifecycle: "active" | "superseded-pending" | "retired-verified";
   exception: Decision["exception"]; follow_up: FollowUp | null; accounted: boolean; delivery_pending: boolean; reasons: string[] };
@@ -59,7 +59,7 @@ function unique<T>(values: unknown, parse: (value: unknown) => T, key: (value: T
   const seen = new Set<string>(); return v.list(values).map(value => { const row = parse(value), id = key(row); if (seen.has(id)) throw Error("duplicate security identity"); seen.add(id); return row; });
 }
 export function parseSecurityInput(value: unknown): SecurityInput {
-  const row = v.record(value, ["schema_version", "run_id", "hostname", "repository", "source_commit", "evaluated_at", "collected_at", "collection_revision", "inventory_digest", "scope", "policy", "policy_assessment", "coverage", "observations", "evidence", "decisions", "groups"]);
+  const row = v.record(value, ["schema_version", "run_id", "hostname", "repository", "source_commit", "evaluated_at", "collected_at", "collection_revision", "inventory_digest", "scope", "policy", "policy_assessment", "coverage", "observations", "evidence", "decisions", "groups", "history_gaps", "history_provenance"]);
   if (row.schema_version !== 1) throw Error("unsupported security input schema");
   const identity = v.identity(row.hostname, row.repository), selected = scope(row.scope);
   if (!selected.repositories.includes(identity.repository)) throw Error("security primary repository outside scope");
@@ -103,7 +103,8 @@ export function parseSecurityInput(value: unknown): SecurityInput {
   const evaluated_at=v.timestamp(row.evaluated_at), collected_at=v.timestamp(row.collected_at);
   if (Date.parse(collected_at)>Date.parse(evaluated_at) || observations.some(o=>Date.parse(o.observed_at)>Date.parse(evaluated_at))) throw Error("future security observation");
   return { schema_version:1, run_id:runID(row.run_id), ...identity, source_commit:v.commit(row.source_commit), evaluated_at, collected_at, collection_revision:v.integer(row.collection_revision,1), inventory_digest:v.hash(row.inventory_digest), scope:selected, policy:policy(row.policy),
-    policy_assessment:assessment?{reviewer:v.text(assessment.reviewer),reference:v.text(assessment.reference),assessed_at:v.timestamp(assessment.assessed_at)}:null, coverage, observations, evidence, decisions, groups };
+    policy_assessment:assessment?{reviewer:v.text(assessment.reviewer),reference:v.text(assessment.reference),assessed_at:v.timestamp(assessment.assessed_at)}:null, coverage, observations, evidence, decisions, groups,
+    history_gaps:row.history_gaps===undefined?[]:v.strings(row.history_gaps),history_provenance:row.history_provenance===undefined?[]:v.strings(row.history_provenance) };
 }
 
 const routes: Record<Decision["change"],string> = { "compatible-bot":"bot-batch", "compatible-authored":"bounded-maintenance", major:"feature", behavior:"feature", unknown:"investigation", posture:"consumer-policy", audit:"audit-reference", exception:"consumer-policy" };
@@ -117,7 +118,7 @@ function corrected(input:SecurityInput, o:Occurrence, at=o.target):boolean {
   return [matching(input,o,"source","corrected",at),matching(input,o,"check","pass",at),matching(input,o,"scan","absent",at)].every(rows=>rows.length>0);
 }
 export function reconcileSecurity(value: unknown): SecuritySnapshot {
-  const input=parseSecurityInput(value), gaps:string[]=[], grouped=new Map<string,RemediationGroup>();
+  const input=parseSecurityInput(value), gaps:string[]=[...(input.history_gaps??[])], grouped=new Map<string,RemediationGroup>();
   const policyValid=!!input.policy.length && !!input.policy_assessment && Date.parse(input.policy_assessment.assessed_at)<=Date.parse(input.evaluated_at);
   if (!policyValid) gaps.push("consumer policy assessment pending");
   for (const group of input.groups) {

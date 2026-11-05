@@ -143,7 +143,7 @@ test("fresh checkouts compare published per-surface history without a run journa
   const current = observation(randomUUID(), [2]); current.created_at = "2026-10-30T12:00:00.000Z";
   const comparison = compareHistory(current, reports);
   expect(comparison.surfaces[0].appeared).toEqual(["dependabot:2"]);
-  expect(comparison.surfaces[0].resolved).toEqual(["dependabot:1"]);
+  expect(comparison.surfaces[0].no_longer_open).toEqual(["dependabot:1"]);
   expect(comparison.surfaces[0].baseline?.provenance).toBe("published");
   expect(comparison.surfaces[0].baseline?.commit).toBe(git(f.root, "rev-parse", "HEAD"));
 });
@@ -153,7 +153,7 @@ test("incomplete, unavailable and differently scoped observations cannot prove r
   for (const change of [{ status: "incomplete", count: null, alerts: [], reason: "Denied" }, { status: "complete-unavailable", count: null, alerts: null, reason: "No GHAS" }, { scope: { state: "open", filters: ["severity:high"], exclusions: [] }, count: 0, alerts: [] }]) {
     const current = { ...observation(randomUUID(), []), created_at: "2026-10-30T00:00:00.000Z", observations: [{ ...before.observations[0], ...change }] };
     const comparison = compareHistory(current as ObservationDocument, reports);
-    expect(comparison.surfaces[0].resolved).toBeNull(); expect(comparison.surfaces[0].appeared).toBeNull();
+    expect(comparison.surfaces[0].no_longer_open).toBeNull(); expect(comparison.surfaces[0].appeared).toBeNull();
     expect(comparison.surfaces[0].availability_previous).toBe("complete");
   }
 });
@@ -163,7 +163,7 @@ test("newest comparable complete history is used while local-only baselines rema
   const reports = [good, bad].map((v, i) => ({ path: `prior${i}.md`, provenance: "local" as const, digest: digest(block(v)), text: block(v) }));
   const current = observation(randomUUID(), []); current.created_at = "2026-10-31T00:00:00.000Z";
   const comparison = compareHistory(current, reports);
-  expect(comparison.surfaces[0].resolved).toEqual(["dependabot:1"]);
+  expect(comparison.surfaces[0].no_longer_open).toEqual(["dependabot:1"]);
   expect(comparison.surfaces[0].baseline?.provenance).toBe("local");
   expect(comparison.surfaces[0].baseline?.digest).toBe(reports[0].digest);
   expect(comparison.surfaces[0].availability_previous).toBe("incomplete");
@@ -176,7 +176,7 @@ test("legacy counts and identifiable entries remain visible as an unverified com
   expect(result.legacy[0].rows[0].cells).toEqual(["example/project", "3", "n/a"]);
   expect(result.legacy[0].entries).toContain("- CodeQL #19 high in package.json");
   expect(result.legacy[0].counts[0]).toMatchObject({ repository: "example/project", surface: "dependabot", recorded_count: 3, current_count: 1, recorded_delta: -2 });
-  expect(result.surfaces[0].resolved).toBeNull();
+  expect(result.surfaces[0].no_longer_open).toBeNull();
 });
 
 test("unpublished evidence references contain no Markdown links or host paths", () => {
