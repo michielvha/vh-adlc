@@ -308,6 +308,7 @@ None. The owner accepted risk-based upgrade verification and closure only after 
 | 2026-11-05 | R-12 | spec | `0ef1a82c73177e9c888651e001af7c80039bf510` | claude-opus-5.5 | procedural | 1 should-fix; 2 nit. Full requested read coverage. |
 | 2026-11-05 | R-13 | spec | `ed2944ff8ffad64146318c5cce36c380ec44f277` | claude-opus-5.5 | procedural | 2 should-fix; 2 nit. Full requested read coverage. |
 | 2026-11-05 | R-14 | spec | `207023518dc437c49f5cca36fe209df12d917add` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-15 | spec | `3ea3df8ada7276fa7f678ed478075af1dd216d77` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -698,6 +699,27 @@ SEVERITY: nit
 WHERE: Design, Authority and delivery (authority table); Scheduled worker and staged adoption (trial, cutover quiescence)
 EVIDENCE: The authority table lists read-only output, edits, commits, pushes/PRs, the consolidation history rewrite, issue creation, the explanation comment, closure, lease acquire/release, merged-branch cleanup and merge/release (00161 line 15). The design also requires several other remote effects. The trial needs "Trial setup, paid/provider execution, draft-PR creation and exact owned cleanup" (00161 line 51). Cutover needs a control-plane disable of the legacy scheduled workflow, cancellation of identified runs and later enabling of the shared schedule (00161 line 61). Each of these is said to need separate explicit authority, but none has a table row. The shared authority table lists each remote write explicitly (authority.md 00001 lines 10-32).
 PROPOSAL: Add authority-table rows for workflow dispatch, workflow disable/enable, run cancellation, trial draft-PR creation and trial branch/PR cleanup, each with the exact grant it requires.
+
+### R-15
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Authority and delivery (authority table, shared defaults); Independent candidate review and publication (publication gate, staged interval); Test Plan AC-05
+EVIDENCE: The authority table lists "issue creation" as a docs-drift effect (00161 line 15). Shared defaults also say that "commits, pushes, advisory PRs, issue creation, superseded-PR closure and branch cleanup each retain their actual consumer/current permissions" (00161 line 19). No Design section says when audit or resolve creates an issue, what the issue contains, or which finding scope it covers. Independent review is required only for "every prepared advisory or consolidated resolve change" (00161 line 23). The staged gate denies only "shared real-corpus push, PR and closure effects" (00161 line 37), and the staged interval lists "push, advisory/resolve PR publication and superseded-proposal closure" (00161 line 43). The lease serializes "pushing or closing superseded proposals" (00161 line 45). Under these rules, a pre-cutover shared run with an issue grant could publish real-corpus findings as issues. That issue would bypass the staged denial, the exact-candidate review the owner chose and the lease, and could run alongside the legacy worker. AC-05 checks issue creation only as an unauthorized-action denial.
+PROPOSAL: Either remove issue creation from docs-drift's supported effects, or define the issue payload and its source finding scope. In the second case, require independent review of the exact payload and the adopted reviewer identity, put issue creation under the staged gate and the lease, and add AC-05 cases for a pre-cutover issue request and an issue request without review.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scan-result protocol and local correction; Scheduled worker and staged adoption (three stages); Migration and rollback; Test Plan AC-06
+EVIDENCE: The trial must use "the consumer scanner" (00161 line 53), and the shared helper accepts only protocol v1. So the Stackweaver scanner correction must land before the trial, while "the legacy scheduled worker remains active" (00081 line 23). The correction "emits the bound protocol directly or through its local adapter" (00081 line 55). The spec says only that "advisory/strict exit semantics and detector findings remain unchanged" and that findings and suppressions are compared before and after (00081 line 55). It never requires the existing report shape that the legacy worker and legacy resolver read to stay unchanged. It also adds no test that the unchanged legacy worker works on the corrected scanner's output. Rollback restores routing but "preserves scanner" bytes (00241 line 21), so the "old worker as the scoped rollback target" (00161 line 69) also runs on the corrected scanner. The three-stage order (00161 line 51) does not say when the correction is delivered.
+PROPOSAL: Place delivery of the scanner correction in the stage order before the trial. Require the legacy report fields the legacy worker reads to stay byte- or schema-compatible, for example by emitting protocol v1 only through the adapter or a separate output. Add AC-06 cases that run the legacy scheduled and interactive routes, and the rollback target, against the corrected scanner.
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (quiescence and cutover, thin callers); Test Plan AC-06
+EVIDENCE: Cutover disables the legacy scheduled workflow in the control plane. Then "Only after merge, current shared routing/gate verification and no legacy publishers may the selected shared schedule be enabled and the first shared publication proceed" (00161 line 63). AC-06 says "First shared publication and schedule enable must wait for that verified quiescence and delivered routing/gate" (00241 line 42). The spec never says whether D's scheduled caller is the existing legacy workflow file, whose disabled state persists, or a new caller file. A new workflow with a cron trigger is active as soon as D merges, and the runtime gate allows "the first adopted publication" without any post-cutover observation (00161 lines 39, 67). As written, the required post-merge verification before enabling the schedule has no mechanism and may never happen. The rollback text, "re-enabling legacy publication" (00161 line 63), also assumes a particular file identity.
+PROPOSAL: State that D changes the existing scheduled workflow in place, so the control-plane disable stays in effect until an authorized enable, or that D delivers the scheduled caller without a cron trigger and a later reviewed change adds it. Name the workflow identity that the pause, enable and rollback act on, and add an AC-06 case where D merges and no scheduled shared run starts before the authorized enable.
 
 ## Sources
 
