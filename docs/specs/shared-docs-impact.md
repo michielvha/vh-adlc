@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-docs-impact
-status_description: "Implementation claimed after owner acceptance; first task authors the common convention, then the portable checker and verified Stackweaver adoption."
+status_description: "Shared checking and the local Stackweaver migration are implemented; final independent review and ordered published-install acceptance remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -488,85 +488,71 @@ unclaimed; a future UI change still owes its existing local visual checks.
   - Evidence: process-level CLI cases failed before `cli.ts` existed (`t5-red.log`). `t5-final.log` passes 15 tests for JSON/text, protocol 1, no-match/candidates/incomplete exits, explicit scope, NUL/UTF-8/unusual names, roots and offline missing-reader refusal. The latter uses the actual checker with an unavailable synthetic lock and network/cache sentinels; no download or binary-cache write occurs. Cache-free invocation disables Bun's own transpilation cache separately; runtime setup documents that setting.
 - [x] T6 `plugins/vh-adlc/skills/vh-adlc-docs-impact/SKILL.md`, `plugins/vh-adlc/references/docs-impact.md`, lifecycle/loop/implement/ship references, package/discovery guards, examples, public guides and `.github/workflows/ci.yml` - observe failed routing/contract checks, add the portable operation and scoped integration, and pass existing protected-body and complete-example checks; both installed entry points remain testable (AC-04, AC-06).
   - Evidence: new routing/procedure checks failed before the skill/reference existed (`t6-red.log`). The package/integration/discovery/example/protected-body selection now passes 76 tests in `t6-package.log`. Implement/ship retain the original approved body after removing only the named Documentation impact section; source/classification preflight uses committed HEAD. Strict typechecking passes with locked compiler dependencies in owned temporary scratch, so compiler symlinks never enter the installed payload or confinement export. Linux and macOS CI select the portable tests and that typecheck; macOS execution remains CI evidence to obtain, not a local-host claim. Package candidate is 0.9.0 with 13 skills and the same 10 engineering operations. The new canary and pin use published convention `f8ccacbedf057159ea24136ba115cd9857bb22ac` from merged vhco-pro/docs#21; its complete three-file diff was reviewed and the only unrelated coding guidance was owner-accepted before the move.
-- [ ] T7 `Stackweaver:agents/docs-impact.md`, `agents/docs-impact-project.md`, `scripts/check-doc-coverage.js`, `AGENTS.md`, retained callers and `tests/agent-docs-impact/` - use an isolated current-main migration branch, record the full caller inventory, observe failed compatibility/parity tests, then pass the real wrapper protocol/no-op/error/quoting/overlay cases and scoped rollback while preserving local policy. Rebuild the legacy index from the exact HEAD in disposable scratch; report committed-index drift separately. Keep the plan mapping-upkeep/review-staleness rule explicitly in the companion and rollback set (AC-05).
-- [ ] T8 `plugins/vh-adlc/knowledge.md`, lock/manifests as required by the published dependency, `tests/vh-adlc/docs-impact/` - record and independently review the entire old-to-new convention diff before moving the pin; surface unrelated normative drift for owner acceptance. Execute actual bounded model trials and isolated native Codex/Claude candidate discovery/standalone checks, retaining exact payloads, returned evidence and unclaimed surfaces (AC-01, AC-04, AC-06).
+- [x] T7 `Stackweaver:agents/docs-impact.md`, `agents/docs-impact-project.md`, `scripts/check-doc-coverage.js`, `AGENTS.md`, retained callers and `tests/agent-docs-impact/` - use an isolated current-main migration branch, record the full caller inventory, observe failed compatibility/parity tests, then pass the real wrapper protocol/no-op/error/quoting/overlay cases and scoped rollback while preserving local policy. Rebuild the legacy index from the exact HEAD in disposable scratch; report committed-index drift separately. Keep the plan mapping-upkeep/review-staleness rule explicitly in the companion and rollback set (AC-05).
+- [x] T8 `plugins/vh-adlc/knowledge.md`, lock/manifests as required by the published dependency, `tests/vh-adlc/docs-impact/` - record and independently review the entire old-to-new convention diff before moving the pin; surface unrelated normative drift for owner acceptance. Execute actual bounded model trials and isolated native Codex/Claude candidate discovery/standalone checks, retaining exact payloads, returned evidence and unclaimed surfaces (AC-01, AC-04, AC-06).
 - [ ] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
 - [ ] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
 
 ### Implementation progress
 
-The convention is published at `vhco-pro/docs@f8ccacbedf057159ea24136ba115cd9857bb22ac`
-(PR #21, merged after its exact-head docs check passed). The complete diff from the old pin contains
-the new page, its documentation link and the owner-accepted five-line testing guidance; the rules
-block and feature matcher are unchanged. Local native Codex/Claude candidate installs at shared
-commit `3ca164784749deca02825270f747a9d53f543589` discovered all 13 skills and ran the installed docs
-checker outside an agent session with source/index preservation. This is local-catalog proof, not
-marketplace acceptance, and source changes still require final exact-payload revalidation.
+The common convention is published at
+`vhco-pro/docs@f8ccacbedf057159ea24136ba115cd9857bb22ac`, merged through PR #21
+at reviewed head `f7e4f87bbf2117dd30d64a4aa4fef21a02e60c69` after its exact-head
+check passed. The complete old/new pin diff also includes the owner-accepted
+five-line testing guidance. Rules and the existing feature matcher are unchanged.
 
-The first whole-corpus comparison was too slow and was interrupted by exact owned-process identity.
-A literal-prefix fast path preserves all 41 matcher tests. The optimized actual comparison rebuilt
-the legacy index from corrected Stackweaver HEAD `3b655311558c69803528c1d9fbf9bf452a05494f` in
-disposable scratch: 779 docs, 747 patterns and 3,322 source names, zero lost candidates, no valid
-pattern meaning risks, 3,623 conservative match additions and no committed-index drift. Raw evidence
-retains the interrupted run and optimized result; final preflight must bind the committed shared
-matcher and actual installed cutover payload again.
+T7 evidence: Stackweaver migration `75519076246be4875515a8ac02bb0a2dd4d81100`
+includes published main `041a8c83a847e5bb6382f1372c6faf2ef665a78b`. Sixteen actual
+Node checks pass: legacy stdin/quoting/exits, every retained invoking caller in a
+fresh shell with and without setup, owned overlays, mixed incomplete hook output,
+quiet no-match warnings, current reference bindings and exact rollback/reapply.
+The rebuilt legacy index and shared collector compare 790 documents, 754 patterns
+and 3,336 source paths: zero lost candidates, zero unresolved meaning risks and
+3,625 conservative additions; committed-index drift is false. Rollback binds only
+migration fragments against current main and preserves its unrelated useEffect rule.
 
-The separately authorized bounded Claude Code Opus 5.5 syntax review returned NO FINDINGS. Local
-actual-parser checks preserve every parsed field/body, and the real strict reader now answers for
-the original description value. Its one-line/two-quote correction is a separate local Stackweaver
-commit; no report body was sent to the reviewer. Hook/rollback checks pass in disposable fixtures.
+T8 evidence: the actual Copilot Opus 5.5 trial at shared
+`e028664a9487fe832cb2d982273468974345f298` passes all 15 cases. It covers direct
+and integrated entry, task/completion gaps, an authorized local progress-PR draft,
+cold bootstrap ordering, minimal doc/mapping repairs, historical/intended contracts,
+wrong-system Unknown, missing docs and injected instructions. Only four permitted
+docs and the authorized PR draft change; every HEAD/index is preserved. Actual
+native views deliver all nonempty lines of 81 resolved/operation page copies,
+verified by exact content hashes. Per-candidate classifications and real citations
+are checked mechanically and remain subject to independent semantic review.
 
-The broad host run recorded 1,145 passes and 31 failures: nine inherited recovery tests hit the
-five-second runner deadline, one skill-count guard needed the new total, and the remaining failures
-correctly rejected generated compiler symlinks in the plugin tree. Compiler dependencies now stay
-outside that tree; the count guard is corrected and the 49-test focused recovery/export selection
-passes with the portable 60-second deadline. The failed runs remain retained; the complete follow-up run passes 1,176 tests with zero failures (`full-suite-60s.log`). Further source fixes require their relevant checks and a fresh final gate. The first native Copilot Opus 5.5 trial correctly withheld edits when the test adapter could not
-expose knowledge pages: `--docs-source` intentionally bypasses the ordinary cache. That failed
-trial is retained, including its unexpected shell-reader attempt. The adapter now uses ordinary
-cache-populating knowledge, requests the full underlying operation page list, grades actual native
-helper exit codes and denies shell-reader shortcuts. No failed result is counted as acceptance.
-The actual installed-candidate knowledge regression passes at the published pin: triage/maintenance
-resolve their pages, and audit stops with an unwarmed cache then succeeds offline after explicit
-setup for all eight normalized pages. The corrected second Copilot trial at shared commit `94dce863ce734a394ad8d9469e01c05bfb90c21a`
-passes all 12 behavior cases and delivers every nonempty line of the required operation/policy and
-engineering inputs through actual native views (63 page copies, with identical content grouped by
-hash). Only the four permitted docs change; HEAD/index and report-only cases remain untouched.
-Its reported limitation is being removed from the final trial: the helper will expose actual
-committed root instructions, rather than rely on the fixture request's policy text. Final model
-revalidation, independent implementation/paired review, marketplace acceptance and consumer
-migration remain open.
+The exact candidate installs in Codex CLI 0.163.0 and Claude Code CLI 2.1.316 expose
+all 13 skills and run installed checking outside an agent session while preserving
+inputs/index. Existing triage/maintenance knowledge and unwarmed/explicitly prepared/
+warmed offline audit entry pass at the new pin. These are local-catalog checks;
+actual published-marketplace fresh/upgrade acceptance remains separate. Later
+changes to the trial evaluator are test-only; the entire plugin tree remains
+byte-identical to the exercised candidate and must be bound at final review.
 
-Early public component review C-1 at `955275be4ce1fc0bd917130c29f3c33779cc5636` is not a formal
-feature implementation review. It found four should-fix issues and four nits. Red regressions
-observe repeated unavailable-reader resolution, whitespace-opener candidate loss, nested directory
-symlink omission, inherited Git redirection, invalid UTF-8 replacement and error-rendering drift.
-Those fixes plus actual pinned Go feature-resolver parity pass the 117-test docs-impact selection.
-The reversed-range nit is intentionally resolved through measured compatibility: actual Go
-`path.Match` accepts reversed ranges without a syntax error, with empty positive classes and
-matching negated classes; the ordinary matcher retains that valid syntax and now tests it
-explicitly. The feature matcher is unchanged. Raw C-1 records and the Go comparison remain in the
-operator archive; final exact-commit review still has to establish the feature criteria.
+The complete corrected plugin suite passes 1,221 tests with zero failures; the two
+new citation-evaluator tests pass separately. Go tests/vet/lint/module checks,
+strict TypeScript, other-plugin tests and actionlint pass. Stackweaver's complete
+selected verification passes 18 checks with zero failures/skips. No live product,
+GUI, phone or actual Claude docs-impact execution is claimed by these checks.
 
-The later 1,215-test broad run recorded 1,214 passes and one existing audit batch
-timeout. Its isolated 48-test retry passed; that does not make the broad run clean.
-A second broad run under severe host load also timed out in audit recovery and
-encountered the newly added unfinished feature-parity fixture. Both failed runs
-remain retained. The host measured load above 60 and full swap; no other session
-was stopped or modified. Current Stackweaver verification passes 18 checks with
-zero failures/skips after locked frontend setup; no product source changed here.
+Original failed artifacts remain retained: early confined network/cache failures,
+the interrupted slow corpus pass, compiler dependencies inside the plugin tree,
+the 1,215-test run with one timeout and its 48-pass isolated retry, the later loaded
+host/unfinished-fixture run, and native adapter failures. Those include a missing
+editable PR draft and a citation grader rejecting valid case-directory prefixes.
+The corrected PR retry passes; the later full 15-case run passes independently.
+The ordinary matcher retains measured Go-compatible reversed bracket ranges.
 
-Current consumer source `cbdea74564d903d8e7a75b33867338f5bb1d53aa` includes newer
-published main, a 120-reference inventory with fresh-shell caller checks and exact
-rollback assertions. Its 790-document/3,336-source preflight is source-ready only,
-with zero lost candidates. Renewed paired review found rollback scope and inventory
-freshness gaps; those remain open until corrected and reviewed again. The first
-shared implementation diagnostic observed 202 focused checks plus Go/vet/lint,
-strict typechecking and other-plugin checks. Its requested file coverage was partial,
-so it is not completion evidence. Findings require byte-safe excluded names, actual
-feature-matcher/multi-root/staged/ignored/generated cases, remaining integrated model
-trial stages, exact payload bindings and truthful compatibility claims. New executed
-collection tests now pass 27 cases, including actual pinned-binary matching and
-covered-document review staleness. Final review and delivery remain open.
+Early public and paired reviews found real edge cases and missing tests, which
+were fixed with observed checks. The first formal diagnostic had partial requested
+file coverage and is not completion evidence. The corrected collector now also
+passes literal-BOM filename identity and actual feature-matcher/review-staleness
+cases. Exact-source preflight passes with an inherited invalid wrapper override
+removed, and observed negative probes reject dirty consumer state, an older
+installed payload and stale shared-commit parity, preserving the index. It still
+reports migration readiness false without published acceptance and fresh paired
+review. Final clean independent review, normal Linux/macOS CI/release, marketplace
+acceptance and current-consumer cutover remain open.
 
 ## Open Questions
 

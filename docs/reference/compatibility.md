@@ -137,14 +137,14 @@ Continue with [your first feature](../get-started/first-feature.md) or
 ## Shared documentation impact
 
 The following observations apply to candidate source
-`ecd8a41b45b8be9d092788ebb564b97563adbe2b`. Further payload changes require
-revalidation before delivery.
+`e028664a9487fe832cb2d982273468974345f298` (plugin 0.9.0). Test-only evaluator
+changes afterward preserve the exact plugin tree; final delivery still binds it.
 
 | Surface | Observed result | Limit |
 | --- | --- | --- |
-| Copilot CLI, Opus 5.5 | Twelve synthetic documentation-impact cases passed; only four permitted docs changed. | Entry and accuracy trial; remaining task/completion/progress cases are being added. |
-| Codex CLI 0.163.0 local catalog | All 13 skills discovered; installed roots/check ran outside an agent session and preserved inputs/index. | Candidate installation, not published marketplace proof. |
-| Claude Code CLI 2.1.316 local catalog | All 13 skills discovered; installed standalone checker preserved inputs/index. | Native install/helper check, not Claude docs-impact model execution. |
+| Copilot CLI, Opus 5.5 | All 15 synthetic cases passed, including accuracy, task/completion gaps and an authorized progress-PR draft. | Bounded workflow trial; the PR is a local draft with no remote write. |
+| Codex CLI 0.163.0 local catalog | All 13 skills discovered; installed roots/check preserve inputs/index outside an agent session. | Candidate install, not published marketplace proof. |
+| Claude Code CLI 2.1.316 local catalog | All 13 skills discovered; installed standalone checking preserves inputs/index. | Native install/helper check, not Claude docs-impact model execution. |
 
 Source Git/metadata/CLI checks run on Linux. Actual Linux/macOS CI and published
 marketplace fresh/upgrade acceptance remain pending. Other operations' compatibility
