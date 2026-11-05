@@ -10,7 +10,9 @@ instructions. Keep existing project scope, documentation and delivery rules.
 Acquire the locked verified binary explicitly through Bash on
 `scripts/ensure-vh-adlc.sh`. Checking itself is offline: `check` and `roots` use
 `ensure-vh-adlc.sh --offline` and never install dependencies. Bun, Git and Bash
-must already be available. Missing setup is a gap, never a manual pass.
+must already be available. Missing setup is a gap, never a manual pass. For
+integrated implement/ship, acquire the binary even when the adoption marker is
+absent; retain the normal initial knowledge request on the manual path.
 
 For integrated implement/ship entry, read root `AGENTS.md` at committed HEAD,
 not dirty policy edits, before any repository write. A missing file is absent;
@@ -84,7 +86,11 @@ other gate and make no completion, closure or migration claim.
 Read the source and document for each candidate. Record Accurate, Stale,
 Incomplete or Unknown with citations to the relevant document and implementation
 lines/symbols following local conventions. State missing evidence. Matches and
-unmatched paths prove neither accuracy nor missing documentation.
+unmatched paths prove neither accuracy nor missing documentation. Use Incomplete
+for an observed omission and Stale for an observed inaccurate current claim;
+reserve Unknown for missing applicability or evidence. A software bug can leave
+the intended behavior unresolved while a separate known documentation omission
+still needs an explicit finding. Record both when they apply.
 
 Search literal references that metadata misses and inspect new visible behavior
 for missing documentation. Propose a home and source evidence for missing docs.
