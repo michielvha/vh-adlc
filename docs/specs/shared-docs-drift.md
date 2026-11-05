@@ -391,6 +391,7 @@ None.
 | 2026-11-06 | R-29 | spec | `7e5ad81c49c94e3bf2420a288ecc2897e8fe4cfa` | claude-opus-5.5 | procedural | 2 should-fix. Full requested read coverage. |
 | 2026-11-06 | R-30 | spec | `7b0d2df697c24bcdebbc55742b8538ed8cc43376` | claude-opus-5.5 | procedural | 2 should-fix. Full requested read coverage. |
 | 2026-11-06 | R-31 | spec | `808c4f7d833892561cf8909754eecf4faa08d670` | claude-opus-5.5 | procedural | 1 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-06 | R-32 | spec | `fb1210a94a1e4ef2bd6cb2c166a5a0bdd8aa1b14` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -1108,6 +1109,15 @@ SEVERITY: nit
 WHERE: Design, Audit and preparation (feature-document protection)
 EVIDENCE: Line 147 has two consecutive sentences with the same subject: "Local-format consumers keep their project governance and documented matching dialect. Local-format consumers keep their actual plan rules and ownership gates, and mere source presence still cannot satisfy runtime acceptance checks." The pinned documentation convention asks for one main idea per sentence and one authoritative statement of each fact (documentation.md 00001 lines 10-11, 77).
 PROPOSAL: Merge them into one sentence: "Local-format consumers keep their project governance, matching dialect, plan rules and ownership gates; source presence alone still cannot satisfy runtime acceptance checks."
+
+### R-32
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Protected adoption bindings and ordinary scan inputs (settings leaf classification); Scheduled worker and staged adoption (committed trial block, first post-cutover gate); Upgrades after adoption (dormant candidate trial route); Test Plan AC-06
+EVIDENCE: The settings classification has only two classes. It says "The ordinary-settings allowlist is documentation roots/exclusions/suffixes, required detector IDs and declarative input selectors, typed detector-option values and feedback file/data selection. Every other recognized setting is protected" and "A schema test requires every field to have exactly one classification" (shared-docs-drift.md chunk 00241 line 43). Trial eligibility depends on "A committed `trial` block in current-default `.vh-adlc/docs-drift.yaml` [that] names the trial-definition path and raw-blob digest" (00241 line 23). That block is not on the ordinary allowlist, so it is protected. After adoption, "current protected publication/worker inputs must continue to match the adopted record" (00241 line 33). The upgrade design says something different. It says "Dormant upgrade-trial definitions and candidate worker files may be added through separately authorized trial setup without changing the active production manifest", that "additions to this trial setup are therefore not a reason to invalidate the approved production adoption record", and that "The active manifest excludes ... unselected dormant candidates" (00241 line 47). A trial-route upgrade needs "the current-default trial definition [to bind] their exact blobs" while "The active scheduled caller still references the old approved worker and record" (00241 line 75). Pointing the default-branch `trial` block at a successor definition changes a protected settings field. By the classification and the gate rule, that change denies every production real-corpus effect for as long as the upgrade trial runs. Removing or changing the first-adoption `trial` block after cutover has the same effect. The AC-06 proof "exercise a dormant candidate worker/trial definition ... without changing the approved worker gate" (00321 line 28) therefore has no consistent pass condition, and the settled rule that the approved pin stays active until a verified successor is approved does not hold during an upgrade trial.
+PROPOSAL: Give the `trial` block its own explicit classification, for example trial-setup: excluded from the active protected manifest and runtime gate, but strictly bound by each trial and by the trial eligibility check. Alternatively, move trial selection into a separate committed file outside the protected settings. Add an AC-06 case where adding, changing or removing the default-branch `trial` block leaves the approved production gate passing, while a change to any other protected setting still denies it.
 
 ## Sources
 
