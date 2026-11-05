@@ -380,6 +380,7 @@ None.
 | 2026-11-02 | R-7 | spec | `ffe9dd6e7f388e7cfd20918e7f85ddf67b9c54ec` | n/a | n/a | accepted by owner |
 | 2026-11-03 | R-8 | spec | `aa5c66e7fe2c62142e7cf330b6fc504a87ec0d6c` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 | 2026-11-06 | R-9 | implementation | `1ad76f2a3ff81c2f1c69ce0fe06ca8fac9e10c03` | claude-opus-5-5 | procedural | 10 criteria met, 3 not verified, 5 findings, 0 blocking |
+| 2026-11-06 | R-10 | spec | `6d0c8af90cdc036493479430e57b6f2c202cba48` | claude-opus-5-5 | procedural | 6 findings, 0 blocking |
 
 ### R-1
 
@@ -1227,6 +1228,50 @@ SEVERITY: should-fix
 WHERE: Branch state; AC-14 artifacts; docs/reference/compatibility.md
 EVIDENCE: `vh-adlc fresh` (0.9.0, docs 0e52f51) reports spec review R-8 stale with `covered-drift`, and `gate complete` fails on spec_review_fresh, all_met, impl_review_fresh and impl_review_clean. `git merge-tree --write-tree origin/main 1ad76f2` shows conflicts in README.md, docs/get-started/installation.md, docs/user-guides/workflows.md, both plugin.json files, tests/vh-adlc/check.test.ts and both discovery tests. The branch sets the plugin to 0.8.0, origin/main has 0.10.0 (tag v0.15.0), and compatibility.md:68 says "`vh-adlc-clean` needs plugin 0.8.0", which will be wrong after the merge.
 PROPOSAL: Merge origin/main into feat/host-cleanup and set the plugin version and the compatibility sentence to the release that will carry the operation. Then rerun the AC-14 checks on the merged tree and get a fresh spec review. The normative baseline is unchanged, so the acceptance stands.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Scope; Context; Design, Adoption and Order step 4
+EVIDENCE: Scope bases the adoption branch "on `feat/runner-architecture`", and Order step 4 says "Stackweaver's adoption PR merges after its PR #1002". In /home/m/code/stackweaver, `git log origin/main --grep='#1002'` returns `a5f811d1 Merge pull request #1002: launchers, drivers and executors for every run, job and sync`, dated 2026-11-05, and `git merge-base --is-ancestor feat/runner-architecture origin/main` succeeds. origin/main is now 116 commits past that merge. So the Order condition already holds, and a branch cut from `feat/runner-architecture` (a3ebafa3) starts behind main. The cited commits are also unheld: `git branch -a --contains 619dce9c` and `git branch -a --contains cc2cbbed` print nothing, so both can be pruned. The cited code is on origin/main: `sweepEndedRuns` at `backend/internal/launcher/driver/leftovers_integration_test.go:120`, `TestSweepRemovesAnEndedRunsJobsNetworkAndItsFirewall` at line 367, and `e2e/k8s/driver-conformance.sh` exists there.
+PROPOSAL: Base the adoption branch on Stackweaver's main, drop the PR #1002 condition from Order step 4, and cite `sweepEndedRuns` at a commit on origin/main, for example `cbf39566`. Scope is normative, so make the edit in this draft before the acceptance review.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-06; Test Plan, AC-05 and AC-06 row
+EVIDENCE: The revision folds R-8 F-01 into Design only: "It passes through the strict reader in `internal/settings` that `settings read` uses". R-8 F-01 also proposed "add an anchor and a two-document manifest to the AC-06 refusal cases", because a second document's rules were silently dropped by a plain typed decode. AC-06 still covers only "Each manifest refusal listed in Design", and Design's list (unknown keys, schema_version, glob floor or separator, age under an hour, project segment, unknown liveness.kind, kind rule without liveness) names no strict-reader refusal. The Test Plan row says only "each refusal". A build that skips `internal/settings` and drops a second document could tick AC-06 as written. Only checked task T3, which is not normative, names the anchor and second-document cases. AC-24 does not have this gap for `host.yaml`, because its "An invalid `host.yaml`, including ..." is open-ended.
+PROPOSAL: Add the strict reader's refusals (at least an anchor or alias and a second document) to the refusals Design lists, or name them in AC-06 and in its Test Plan row.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, What clean will and will not touch
+EVIDENCE: The new limit names only a container that bind-mounts "all of `/tmp` or `/`". `internal/clean/files.go` `usage.holds` calls `within(p, entry)`, and `planFiles` runs `decide` on each entry inside `<temp_base>/<project>`. So a bind source equal to the temp root or the temp base (for example a harness passing `-v "$TMPDIR:$TMPDIR"` once `env` sets `TMPDIR` to the root) also marks no temp-root entry as in use. The owner's reason, "Such a container should never run on these hosts", fits a whole-`/tmp` mount less well when the mount is a project's own `TMPDIR`. No current Stackweaver harness does this. `e2e/k8s/run.sh:384` on `feat/runner-architecture` mounts `$CERT_DIR/registry`, a path inside an entry, which `holds` covers.
+PROPOSAL: Widen the stated limit to a bind of any ancestor of the scanned directory, naming the temp base and the project's temp root, and make the same edit in `references/clean.md`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: Context cites "`cmd/vh-adlc/main.go:66-70,108,176`" without a ref. Those lines match origin/main 21bc3e4 (`type command struct` at 67, `noPin` at 70, `settings read` at 108, the `fullSHA` check at 176). At HEAD 6d0c8af the feature's commands have shifted them: `type command struct` is at 76, `noPin` at 79, `settings read` at 117, `env` at 125, `clean` at 131 and the check at 229.
+PROPOSAL: Say the citation is on origin/main 21bc3e4, or cite the HEAD lines. Context is not normative, so no revision is needed.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Temp root
+EVIDENCE: The new sentence "`host.yaml` is read the same way as the manifest below." comes right after "`env` deletes nothing, so it reads the manifest from the working tree." That can be read as "read from the working tree" or "from the default branch", not as "through the strict reader and typed decode". The code does the third: `internal/clean/host.go:64` calls `decodeStrict`, as `manifest.go:113` does.
+PROPOSAL: Write "`host.yaml` passes through the same strict reader and typed decode as the manifest."
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: plugins/vh-adlc/references/clean.md, What counts as in use (AC-14 artifact)
+EVIDENCE: `references/clean.md:51` says an entry is in use "when a running container bind-mounts the entry or a path inside it". `internal/clean/engine.go:110` lists `/containers/json?all=1`, and `engineState.binds` takes the bind sources of every listed container, stopped ones included. Design says only "a container bind mount". The page states less protection than the code gives.
+PROPOSAL: Drop "running" from that sentence, or say that stopped containers count too.
 
 ## Sources
 
