@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-docs-impact
-status_description: "Shared source and the local Stackweaver migration are reviewed; ordered CI, publication, installed marketplace acceptance, cutover and final completion review remain open."
+status_description: "Shared feature published and real marketplace acceptance passed; post-merge release, gated Stackweaver cutover and final completion review remain open."
 issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -629,6 +629,37 @@ returns EILSEQ before the checker runs. That Linux raw-byte filesystem case is
 explicitly unsupported on macOS; valid UTF-8/BOM and all other portable cases
 remain selected. The original failure stays retained. Claude Code Opus 5.5
 independently reviewed the Git-default fixture correction and returned NO FINDINGS.
+
+
+Shared PR #51 merged at `02096e780deea4d695c7352dca0bfd54808574b6` after every
+job passed at `32db579625dffb6675399475321c2a4cdd98c6ac`. A later upstream
+registration feature had already removed the obsolete guard against changing
+that unrelated plugin; merging its published changes resolved the moving-main
+failure without editing registration behavior. The actual published payload is
+plugin 0.9.0, canonical digest
+`2e0b09a6079e12f5a820853aaeb1a395ab971189872a2005ad8a5f0e754b5781`.
+
+Actual GitHub-marketplace fresh installs and 0.8.0-to-0.9.0 upgrades pass in both
+Codex and Claude CLI isolated profiles at that published commit. Each discovers
+13 skills, runs installed roots/candidate/no-match checks preserving inputs,
+HEAD and index, and passes uninstall/reinstall. Initial native install/discovery
+and runtime setup succeeded; the acceptance operator then used a source path in
+a log filename and hit ENOENT. The original transcripts and failure stay intact.
+A separate continuation finishes those same installs, retaining the original
+upgrade commands instead of relabelling an already upgraded profile as a fresh
+upgrade. Native inventory and canonical controller hashes are both recorded with
+their distinct algorithms; credentials were not copied and no model was invoked.
+
+Installed triage/maintenance knowledge and unwarmed, explicitly prepared and warmed
+offline audit setup pass at f8ccacb. Copilot Opus 5.5 trial 11 passes all twelve
+previously pre-clarification cases under the current plugin tree, with complete
+native read coverage. Together with the three earlier cases at that identical
+plugin tree this closes the former twelve-case guidance limit. The earlier failed
+runs and their original revision limits remain historical records above.
+Stackweaver integration passes 18 applicable checks with zero failures/skips;
+refreshed source-candidate wrapper/caller/rollback contracts pass 16 of 16.
+Post-merge normal CI/release and fresh installed-consumer paired acceptance are
+still required before migration or feature completion is claimed.
 
 ## Open Questions
 
