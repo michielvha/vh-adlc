@@ -137,7 +137,7 @@ Continue with [your first feature](../get-started/first-feature.md) or
 ## Shared documentation impact
 
 The current local candidate is `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`
-(plugin 0.9.0). Integration with current main preserves its exact plugin tree.
+(plugin 0.9.0). Integration with observed default `26c00e698860c88c3e2382ca9db5dd4b126c4cc1` preserves its exact plugin tree.
 
 | Surface | Observed result | Limit |
 | --- | --- | --- |
