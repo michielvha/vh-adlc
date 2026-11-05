@@ -297,6 +297,7 @@ None. The owner accepted risk-based upgrade verification and closure only after 
 | 2026-11-05 | R-10 | spec | `5d9197b2dd7500319399ca102c135e5edf6cf7a4` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-11 | spec | `0ab5263042caaf6b7dc6330aaa16f3a9ad80b4ac` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-12 | spec | `0ef1a82c73177e9c888651e001af7c80039bf510` | claude-opus-5.5 | procedural | 1 should-fix; 2 nit. Full requested read coverage. |
+| 2026-11-05 | R-13 | spec | `ed2944ff8ffad64146318c5cce36c380ec44f277` | claude-opus-5.5 | procedural | 2 should-fix; 2 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -639,6 +640,33 @@ SEVERITY: nit
 WHERE: Scope; Design, Independent candidate review and publication; Scheduled worker and staged adoption
 EVIDENCE: Scope says "Do not change schedules, provider/model selection, secrets or notification behavior as part of extraction" (00081 line 7). The Design requires unattended publication to have "a committed nonempty `candidate_reviewer.requested_model` in consumer policy, with the provider selecting that model without fallback" (00161 line 17). That adds a reviewer model invocation that the legacy worker does not have. The new reusable worker binds explicit "secret-name mappings (no implicit `secrets: inherit`)" (00161 line 45). Cutover disables the legacy scheduled workflow and later enables "the selected shared schedule" (00161 line 47). These are deliberate, owner-selected changes, but Scope states without qualification that none of them changes.
 PROPOSAL: Reword Scope to preserve the existing schedule cadence, the scanning provider and credential ownership. Name the explicit exceptions: the owner-selected reviewer model policy, the reusable-worker secret-name mapping and the cutover schedule switch.
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Independent candidate review and publication (update-merge constraint); Authority and delivery (authority table, publication lease); Test Plan AC-04, AC-05
+EVIDENCE: The spec does not support an update merge from default into a consolidation. It requires `git rev-list --merges <recorded-base>..<head>` to be empty. A branch refresh "needs a fresh clean preparation against the new default, updated resolve record, complete assessment and independent review, followed only by an authorized PR update". It also says "If the consumer requires an up-to-date branch, perform that refresh before merge" (00161 line 24). The new candidate is based on the new default, so the already-published PR head is not its ancestor. Updating the existing PR to it is therefore a non-fast-forward push that replaces published history. The other option is to open a new consolidation PR and close the old one. The authority table lists only "pushes and advisory/resolve PRs", "superseded-PR closure" (of original proposals) and lease effects (00161 line 12). Shared authority requires separate approval for "history rewrites" (authority.md 00001 line 30). The lease section bars force only for a foreign lease (00161 line 36). No row, lease recheck or test says whether the refresh force-updates the owned consolidation branch, what authority that needs or how the replaced head is checked, or whether the refresh opens a new PR and closes the old consolidation. Neither route is defined, and neither is in the original-proposal closure rules. AC-04 tests only "the supported fresh-clean-candidate/review route", not the remote effect that delivers it.
+PROPOSAL: Name the refresh delivery effect. Option one is an exact-owned force-with-lease update of the consolidation branch, conditioned on the previously published head, under the publication lease. Option two is a new PR followed by closing the replaced consolidation PR. Add an authority-table row with its required grant, and AC-04/AC-05 cases for an authorized refresh, a refused refresh when the branch head changed and a refusal without that grant.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Independent candidate review and publication (reviewer identity, runtime gate); Resolution and feedback (fresh closure review); Protected adoption bindings; Owner decisions; Test Plan AC-04, AC-05, AC-06
+EVIDENCE: The settled upgrade policy sends a changed "provider/reviewer" binding to a new live trial (00081 line 20). The protected manifest includes "provider/requested-reviewer identities" (00161 line 66). The runtime gate checks "exact current component/worker/reviewer/publisher bindings" (00161 line 30). Only unattended publication must match the committed `candidate_reviewer.requested_model`. Interactive candidate review allows "the configured host default and its honestly reported identity", which can be `MODEL: unknown` under review-protocol.md lines 31-38 (00161 line 22). After cutover, an interactive local resolve run can perform real-corpus resolve publication and superseded closure (00161 lines 32, 36). Each post-merge closure also requires "a fresh independent closure review" (00161 line 2), but the spec never says which reviewer identity that review must have, or whether the "unattended publication" model rule covers unattended closure. As written, a real-corpus publication or closure can rely on a reviewer model that is unbound, unattested or recently changed. That makes the settled "changed reviewer requires a trial" rule and the gate's reviewer binding meaningless for those routes. The AC-05 identity tests cover only unattended publication.
+PROPOSAL: State whether interactive real-corpus publication and every closure review (interactive and unattended) must match the committed expected reviewer model, or are intentionally excluded from the reviewer binding with that limit recorded. Add AC-05/AC-06 cases for interactive resolve publication and post-merge closure with matching, different and `unknown` reviewer identities.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter covers; Protected adoption bindings
+EVIDENCE: Covers adds the audit transitive helpers `scripts/audit/inventory.ts`, `settings.ts` and `types.ts` (00001 lines 19-21), and the protected manifest includes "transitive runtime dependencies" (00161 line 66). The reused module's import graph goes further. `scripts/audit/inventory.ts` line 1 imports `./runtime`, and `scripts/audit/settings.ts` line 3 imports `../triage/settings`, which imports `./types` (triage/settings.ts lines 3-4). `scripts/audit/runtime.ts`, `scripts/triage/settings.ts` and `scripts/triage/types.ts` exist in the shared tree but are not in covers.
+PROPOSAL: Add `plugins/vh-adlc/scripts/audit/runtime.ts`, `plugins/vh-adlc/scripts/triage/settings.ts` and `plugins/vh-adlc/scripts/triage/types.ts` to covers. Alternatively, move the reused Git/hash primitives into a neutral module so these imports no longer affect docs-drift.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Authority and delivery (scoped docs-drift locations); Resolution and feedback (owned assessment object store); Scheduled worker and staged adoption (scratch fixture repository)
+EVIDENCE: Authority adds exactly "two scoped docs-drift locations": an assessment checkout and an owned prepare/resolve branch or worktree (00161 line 10). Resolve also needs "a recorded owned assessment object store" into which it read-only-fetches selected PR head and base objects (00081 line 72). The trial creates "an isolated scratch Git repository" for the fixture (00161 line 44). The spec does not say whether these are the assessment role, which may be "an existing owned checkout" whose object store and FETCH_HEAD a fetch would write to, or separate resources. If they are separate, it does not give their creation, ownership recording or cleanup authority.
+PROPOSAL: State that the PR object store and the trial scratch repository either belong to a named docs-drift role or are separate temporary resources outside any caller checkout. Give their recording and non-forced cleanup rules, and require fetches that leave caller refs and FETCH_HEAD unchanged.
 
 ## Sources
 
