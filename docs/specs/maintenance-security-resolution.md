@@ -165,25 +165,25 @@ Run native installed-operation trials for a report-first sweep, selected compati
 ## Acceptance Criteria
 
 - [x] AC-01: Every imported security occurrence retains its provider identity, target, available advisory/dependency context and evidence provenance, and malformed or conflicting observations cannot become accepted complete evidence.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 - [x] AC-02: Proven equivalent occurrences can share canonical remediation without losing per-repository targets or outcomes, and unknown ownership or incomplete coverage remains an actionable handoff.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 - [x] AC-03: Versioned scanner evidence packets participate in the same finding accounting with verified bytes and explicit completion, while unsupported, tampered, synthetic or incomplete inputs cannot establish a live fix or a clean surface.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 - [x] AC-04: Each outstanding finding has a concrete route and next action through the existing batch, bounded-maintenance, investigation, feature, audit-reference or consumer-policy path without creating duplicate implementation loops or selecting work implicitly.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 - [x] AC-05: Disappeared alerts remain distinguishable from verified fixes, dismissals, exceptions, reopened findings and unavailable terminal evidence, and retiring a replaced immutable target never marks its historical vulnerable bytes patched.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 - [x] AC-06: Valid consumer-authorized exceptions retain their rationale and validity independently of fixed outcomes, and missing, changed or expired evidence returns the affected decision to pending assessment.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 - [x] AC-07: A security reconciliation result exposes complete finding accounting independently of coverage, open remediation and delivery, and cannot conceal an untracked occurrence or override missing evidence with report status text.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 - [x] AC-08: A resumed run or fresh sweep recovers pending findings, decisions and evidence from every relevant compatible history, preserves collection-bound snapshot revisions, and never drops work through a newer narrowed scope or rewrites earlier evidence.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 - [x] AC-09: Existing consumers retain readable settings, inventories and reports, while legacy disappearance comparisons cannot be presented as newly verified fixes and incompatible schemas produce an explicit handoff.
-      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
-- [ ] AC-10: Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
-      Evidence: R-8 returned not met after the scanner fixture failed under an owned temporary-directory alias. The native run remains unclaimed; T13 fixes the fixture and T14 retains exact-head macOS CI verification.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
+- [x] AC-10: Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
+      Evidence: R-9 returned met at exact commit d98b6c5 after independent probes and completed CI run 42089505099. Linux passes 1275 tests; macOS passes 1117 with one unrelated platform-specific skip. The installed consumer trial preserves source, settings, Git and report state.
 
 ## Test Plan
 
@@ -230,7 +230,9 @@ Run native installed-operation trials for a report-first sweep, selected compati
 
 - [x] T13 `tests/vh-adlc/maintenance/scanner-evidence.test.ts` - reproduce R-8 F-01 with an aliased temporary directory, normalize owned packet fixture roots, and retain positive and malicious-symlink cases; normal and aliased focused tests pass without changing production validation (AC-03, AC-10).
       Evidence: The independent and root aliased-TMPDIR runs first returned nine passes and two positive-case failures. The new alias regression then failed under ordinary TMPDIR before the fixture fix. Canonicalizing only owned test roots now passes all 12 scanner cases under both ordinary and aliased TMPDIR; scanner plus actual CLI suites pass 23 tests with 74 assertions, and strict TypeScript passes. Production evidence validation and symlink-negative cases are unchanged.
-- [ ] T14 `.github/workflows/ci.yml` - observe the configured portable macOS checker on the exact candidate after separately authorized feature publication; retain its actual result and rerun independent review for AC-10. No Mac host is available in this session. On 2026-11-05 the owner authorized the presented feature branch push solely for CI; no residual, PR, merge, release or advisory remediation is authorized.
+- [x] T14 `.github/workflows/ci.yml` - observe the configured portable macOS checker on the exact candidate after separately authorized feature publication; retain its actual result and rerun independent review for AC-10. No Mac host is available in this session. On 2026-11-05 the owner authorized the presented feature branch push solely for CI; no residual, PR, merge, release or advisory remediation is authorized.
+
+      Evidence: [CI run 42089505099](https://github.com/michielvha/vh-adlc/actions/runs/42089505099) succeeds at exact d98b6c52ba17ded76cfc0efd080a509a01603ead. Linux checker passes 1275 tests and 4622 assertions; macOS portable checker passes 1117 tests and 3693 assertions, with one unrelated byte-filename platform skip. Go verification, remote-gui and version calculation also pass; versioning uses dry-run mode. The earlier run 42088333743 is canceled and retained as such. R-9 independently verifies all ten criteria. No residual, PR, merge, release or advisory remediation is inferred. Review and completion records remain local until a separately authorized shipment.
 
 ## Open Questions
 
@@ -249,6 +251,7 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | 2026-11-05 | R-6 | implementation | `c1098997ac497d874b42ccf764c38ec973896db7` | unknown | procedural | Seven criteria met; AC-07 and AC-08 not met due to history approval replay; AC-10 not verified pending macOS CI. Model identity not attested. |
 | 2026-11-05 | R-7 | implementation | `76e674705f361f0ef3de41c2d67a823639fe74cd` | unknown | procedural | AC-01 through AC-09 met; no new code finding. AC-10 not verified pending macOS execution. Model identity not attested. |
 | 2026-11-05 | R-8 | implementation | `da44309e5719c17a79889dba8badd739fd5fe6f1` | unknown | procedural | AC-01 through AC-09 met; AC-10 not met due to reproducible temporary-directory alias fixture failure. Native CI still running at review time. Model identity not attested. |
+| 2026-11-05 | R-9 | implementation | `d98b6c52ba17ded76cfc0efd080a509a01603ead` | unknown | procedural | All ten criteria met after exact-head Linux and macOS CI; no findings. Model identity not attested. |
 
 ### R-1
 
@@ -492,6 +495,49 @@ SEVERITY: blocking
 WHERE: tests/vh-adlc/maintenance/scanner-evidence.test.ts:11
 EVIDENCE: At da44309e5719c17a79889dba8badd739fd5fe6f1, the packet fixture uses mkdtempSync(join(tmpdir(), ...)) without canonicalizing the resulting directory. verifyScannerEvidence intentionally rejects any symlink ancestor. Independently running the suite with TMPDIR set to an owned symlink to a physical directory produced nine passes and two failures in the positive packet cases; raw output is /tmp/vh-security-review-macos-dfmxun7_/scanner.log. macOS temporary-directory aliases can exercise this same fixture error. The actual macOS CI job is still running, so this finding does not assert its native outcome.
 PROPOSAL: Canonicalize the owned scanner packet fixture root with realpathSync, as the shared maintenance repository fixtures already do, while preserving production symlink rejection and deliberate symlink-negative cases. Add a temporary-alias fixture regression and rerun actual exact-head macOS CI before claiming portable verification.
+
+### R-9
+
+CRITERION: AC-01 Every imported security occurrence retains its provider identity, target, available advisory/dependency context and evidence provenance, and malformed or conflicting observations cannot become accepted complete evidence.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, verified production plugin bytes are unchanged from independently reviewed 76e6747. Earlier independent raw-context, identity and terminal metadata probes remain applicable. Independently inspected exact-head CI logs: Linux checker passes 1275 tests with zero failures, and macOS portable checker passes 1117 tests with zero failures and one explicit unrelated platform skip. Both logs identify the reviewed commit.
+
+CRITERION: AC-02 Proven equivalent occurrences can share canonical remediation without losing per-repository targets or outcomes, and unknown ownership or incomplete coverage remains an actionable handoff.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, grouping and coverage code remains unchanged from independent equivalent-source, divergent-outcome and unknown-coverage verification. Exact-head Linux and portable macOS suites pass. The inspected exact-payload Stackweaver report retains 82 occurrences, 69 groups, 13 canonical groups and eight coverage handoffs, with incomplete coverage and no all-clear; installed resume preserves consumer state.
+
+CRITERION: AC-03 Versioned scanner evidence packets participate in the same finding accounting with verified bytes and explicit completion, while unsupported, tampered, synthetic or incomplete inputs cannot establish a live fix or a clean surface.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, independently ran scanner and actual-helper CLI suites: 23 tests passed with 74 assertions. Repeated the owned TMPDIR-alias probe: all 12 scanner cases pass, including the new alias regression and deliberate symlink rejection. Production scanner validation is unchanged. Completed native macOS logs explicitly show the alias case passing; the former R8 fixture failure is corrected without weakening evidence validation.
+
+CRITERION: AC-04 Each outstanding finding has a concrete route and next action through the existing batch, bounded-maintenance, investigation, feature, audit-reference or consumer-policy path without creating duplicate implementation loops or selecting work implicitly.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, existing-loop routing and concrete follow-up code is unchanged from the independent six-route checks and native authored/feature handoff inspection. Authored preparation retains paired source/record targets and stops at missing independent review; Stackweaver migration work remains unselected. Exact-head Linux and macOS suites pass, including maintenance behavior. Earlier native model trials and final installed helper validation retain their separate payload evidence.
+
+CRITERION: AC-05 Disappeared alerts remain distinguishable from verified fixes, dismissals, exceptions, reopened findings and unavailable terminal evidence, and retiring a replaced immutable target never marks its historical vulnerable bytes patched.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, independently reran the actual-helper terminal re-observation scenarios within the passing 23-test run. Current terminal/source/check/scan evidence verifies closure; denied, stale or mismatched target evidence does not. Production terminal and immutable-retirement logic is unchanged from independent metadata, code-scanning commit and reactivation probes. Exact-head native suites pass; live provider-fixed historical alerts still retain unknown remediation where full target proof is absent.
+
+CRITERION: AC-06 Valid consumer-authorized exceptions retain their rationale and validity independently of fixed outcomes, and missing, changed or expired evidence returns the affected decision to pending assessment.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, exact-decision authority binding and exception validation are unchanged from independent payload-replay, expiry and policy-drift checks. Changed kind, rationale, expiry or assessment requires renewed bound approval. Completed exact-head Linux and portable macOS logs include the security suite without failures. No evidence converts provider dismissal into an automatically approved local exception.
+
+CRITERION: AC-07 A security reconciliation result exposes complete finding accounting independently of coverage, open remediation and delivery, and cannot conceal an untracked occurrence or override missing evidence with report status text.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, independently reran orphan, missing-surface, forged-result and typed report/resume scenarios through the actual CLI suite. History authority replay remains rejected for changed conflict sets or chosen decisions. Exact-head Linux and macOS suites pass. Retained consumer evidence distinguishes reconciled accounting from incomplete coverage and 82 open obligations, with zero selected repairs and no all-clear.
+
+CRITERION: AC-08 A resumed run or fresh sweep recovers pending findings, decisions and evidence from every relevant compatible history, preserves collection-bound snapshot revisions, and never drops work through a newer narrowed scope or rewrites earlier evidence.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, independently reran actual packet scope/identity/omission, exact conflict approval and append/resume/retry cases within the passing CLI run. Production chain and history code is unchanged from independent overlapping-run, fork and conflict-set probes. Completed exact-head Linux and macOS suites pass. Installed consumer resume preserves three security snapshots and one original compatibility block without dropping outstanding work.
+
+CRITERION: AC-09 Existing consumers retain readable settings, inventories and reports, while legacy disappearance comparisons cannot be presented as newly verified fixes and incompatible schemas produce an explicit handoff.
+VERDICT: met
+EVIDENCE: At d98b6c52ba17ded76cfc0efd080a509a01603ead, settings/history compatibility code is unchanged from independent baseline, prior-reader and legacy no_longer_open verification. The actual prior 0.9.0 reader accepts baseline settings and rejects security_policy settings without silently removing policy. Exact-head Linux and macOS suites pass. No real consumer rollback or settings restoration was performed, and legacy observations remain historical evidence rather than backfilled fixes.
+
+CRITERION: AC-10 Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
+VERDICT: met
+EVIDENCE: Independently verified completed push CI run 42089505099 at exact d98b6c52ba17ded76cfc0efd080a509a01603ead: verify, Linux checker, remote-gui, macOS checker and version calculation jobs all succeed. Direct Linux job logs show 1275 passes, zero failures and 4622 assertions; native macOS logs show 1117 passes, zero failures, 3693 assertions and one intentional unrelated byte-filename platform skip. The corrected scanner alias case passes natively. Production payload remains 3832a6c3ce40a431c2056e3e1147b74866b74e32837fadfb00c4698f7bb097b7, with inspected installed resume preserving consumer source/settings/report state. Earlier canceled macOS attempt 42088333743 is retained as canceled, not a pass or failure. This review grants no PR, merge, release or advisory-remediation authority.
+
 
 ## Sources
 
