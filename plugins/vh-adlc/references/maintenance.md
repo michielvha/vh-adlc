@@ -84,6 +84,17 @@ Never claim every vulnerability is fixed or that absence resolved an alert from 
 
 ## Analyze actual deltas
 
+For a dependency advisory, first look for a maintained upstream version that fixes it. Prefer the
+existing bot update or the smallest compatible manifest/lockfile bump when that fully addresses the
+finding. If no bot PR exists, an authored dependency bump still follows bounded maintenance and its
+review gates. Check the affected usage and required consumer checks before calling it ready.
+
+Do not add an application workaround, vendor or fork the dependency, or write a replacement
+implementation when a supported version bump is sufficient. Authored source changes need evidence
+that an available bump is insufficient, no supported fixed version exists, or the upgrade requires
+application adaptation. Record that reason and use the existing bounded-maintenance or feature loop.
+A major upgrade follows the feature loop; avoiding it is not a reason to invent a custom patch.
+
 For every PR, record old/new version or digest, actual upstream release notes/migration source,
 scoped call-site searches and the relevant observed code. Green CI alone is insufficient. Read the
 actual delta; resolve annotated action tags through their tag objects to commits before claiming a

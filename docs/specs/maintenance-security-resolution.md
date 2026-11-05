@@ -234,6 +234,9 @@ Run native installed-operation trials for a report-first sweep, selected compati
 
       Evidence: [CI run 42089505099](https://github.com/michielvha/vh-adlc/actions/runs/42089505099) succeeds at exact d98b6c52ba17ded76cfc0efd080a509a01603ead. Linux checker passes 1275 tests and 4622 assertions; macOS portable checker passes 1117 tests and 3693 assertions, with one unrelated byte-filename platform skip. Go verification, remote-gui and version calculation also pass; versioning uses dry-run mode. The earlier run 42088333743 is canceled and retained as such. R-9 independently verifies all ten criteria. No residual, PR, merge, release or advisory remediation is inferred. Review and completion records remain local until a separately authorized shipment.
 
+- [x] T15 `plugins/vh-adlc/{skills/vh-adlc-maintenance/SKILL.md,references/maintenance.md}` - clarify the accepted dependency route: prefer a sufficient supported upstream version bump and suitable bot update, with a recorded reason before authored source work; retain existing gates (AC-04, AC-10).
+      Evidence: The owner requested this priority explicitly on 2026-11-05 while authorizing full real-advisory validation and conditional rollout. The shared instructions now state it directly. No executable behavior or accepted criterion changes; a failing test is not meaningful for this instruction clarification. Focused routing/actual CLI/operation-compatibility suites pass 38 tests with 181 assertions. A fresh covered-path implementation review is required before shipment.
+
 ## Open Questions
 
 None. The owner selected packet-based scanner intake and complete accounting before reconciliation, accepted the spec and requested shared implementation plus a report-only Stackweaver trial on 2026-11-05.

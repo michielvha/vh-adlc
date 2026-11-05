@@ -22,6 +22,8 @@ are unavailable; missing inputs remain blockers. Normal runs follow these steps.
 3. Follow the canonical procedure for a sweep, supplied-packet `report-stage`, selected repair or
    continuation. A normal sweep reports first and asks for selection. Existing explicit selection
    or preauthorization remains valid within its unchanged scope. Current restrictions win.
+   For dependency advisories, prefer a sufficient supported upstream version bump over custom source
+   changes. Use an existing bot update when suitable; record evidence before choosing another repair.
 4. For an authored repair, use `references/maintenance-record.md` and
    `references/maintenance-review.md` with the lifecycle's bounded-maintenance procedure.
    Wider behavior, permission or delivery-policy changes use the feature loop.
