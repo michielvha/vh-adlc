@@ -165,25 +165,25 @@ Run native installed-operation trials for a report-first sweep, selected compati
 ## Acceptance Criteria
 
 - [x] AC-01: Every imported security occurrence retains its provider identity, target, available advisory/dependency context and evidence provenance, and malformed or conflicting observations cannot become accepted complete evidence.
-      Evidence: R-5 returned met after independent focused/native/publication checks at b69d61d; the observed focused suite passed 97 tests and the final Linux suite passed 1269 tests.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
 - [x] AC-02: Proven equivalent occurrences can share canonical remediation without losing per-repository targets or outcomes, and unknown ownership or incomplete coverage remains an actionable handoff.
-      Evidence: R-5 returned met after independent focused/native/publication checks at b69d61d; the observed focused suite passed 97 tests and the final Linux suite passed 1269 tests.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
 - [x] AC-03: Versioned scanner evidence packets participate in the same finding accounting with verified bytes and explicit completion, while unsupported, tampered, synthetic or incomplete inputs cannot establish a live fix or a clean surface.
-      Evidence: R-5 returned met after independent focused/native/publication checks at b69d61d; the observed focused suite passed 97 tests and the final Linux suite passed 1269 tests.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
 - [x] AC-04: Each outstanding finding has a concrete route and next action through the existing batch, bounded-maintenance, investigation, feature, audit-reference or consumer-policy path without creating duplicate implementation loops or selecting work implicitly.
-      Evidence: R-5 returned met after independent focused/native/publication checks at b69d61d; the observed focused suite passed 97 tests and the final Linux suite passed 1269 tests.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
 - [x] AC-05: Disappeared alerts remain distinguishable from verified fixes, dismissals, exceptions, reopened findings and unavailable terminal evidence, and retiring a replaced immutable target never marks its historical vulnerable bytes patched.
-      Evidence: R-6 returned met after independent actual packet and approval replay probes at c109899; focused checks and the 1272-test Linux suite pass.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
 - [x] AC-06: Valid consumer-authorized exceptions retain their rationale and validity independently of fixed outcomes, and missing, changed or expired evidence returns the affected decision to pending assessment.
-      Evidence: R-6 returned met after independent actual packet and approval replay probes at c109899; focused checks and the 1272-test Linux suite pass.
-- [ ] AC-07: A security reconciliation result exposes complete finding accounting independently of coverage, open remediation and delivery, and cannot conceal an untracked occurrence or override missing evidence with report status text.
-      Evidence: R-6 returned not met; history authority replay needs correction, and macOS CI remains unobserved.
-- [ ] AC-08: A resumed run or fresh sweep recovers pending findings, decisions and evidence from every relevant compatible history, preserves collection-bound snapshot revisions, and never drops work through a newer narrowed scope or rewrites earlier evidence.
-      Evidence: R-6 returned not met; history authority replay needs correction, and macOS CI remains unobserved.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+- [x] AC-07: A security reconciliation result exposes complete finding accounting independently of coverage, open remediation and delivery, and cannot conceal an untracked occurrence or override missing evidence with report status text.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
+- [x] AC-08: A resumed run or fresh sweep recovers pending findings, decisions and evidence from every relevant compatible history, preserves collection-bound snapshot revisions, and never drops work through a newer narrowed scope or rewrites earlier evidence.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
 - [x] AC-09: Existing consumers retain readable settings, inventories and reports, while legacy disappearance comparisons cannot be presented as newly verified fixes and incompatible schemas produce an explicit handoff.
-      Evidence: R-5 returned met after independent focused/native/publication checks at b69d61d; the observed focused suite passed 97 tests and the final Linux suite passed 1269 tests.
+      Evidence: R-7 returned met at exact commit 76e6747 after independent actual-helper probes and 164 focused/publication/recovery/compatibility tests with 609 assertions and zero failures. Exact final installed Stackweaver report/resume preserves consumer state.
 - [ ] AC-10: Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
-      Evidence: R-6 returned not verified; history authority replay needs correction, and macOS CI remains unobserved.
+      Evidence: R-7 returned not verified. Linux, native installation and consumer preservation evidence exists; configured portable macOS CI remains unobserved. T13 retains this verification work; no residual is approved.
 
 ## Test Plan
 
@@ -243,6 +243,7 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | 2026-11-05 | R-4 | spec | `a98c5b81bc5d464639b5829a77c7f9efd068cf8a` | unknown | procedural | NO FINDINGS after default-branch documentation drift; accepted normative baseline unchanged; model identity not attested. |
 | 2026-11-05 | R-5 | implementation | `b69d61de725ec5722bb2097863a6dcdf7d5eab7c` | unknown | procedural | Five criteria met; AC-05 through AC-08 not met; AC-10 not verified. Three blocking defects retained; model identity not attested. |
 | 2026-11-05 | R-6 | implementation | `c1098997ac497d874b42ccf764c38ec973896db7` | unknown | procedural | Seven criteria met; AC-07 and AC-08 not met due to history approval replay; AC-10 not verified pending macOS CI. Model identity not attested. |
+| 2026-11-05 | R-7 | implementation | `76e674705f361f0ef3de41c2d67a823639fe74cd` | unknown | procedural | AC-01 through AC-09 met; no new code finding. AC-10 not verified pending macOS execution. Model identity not attested. |
 
 ### R-1
 
@@ -395,6 +396,48 @@ SEVERITY: blocking
 WHERE: plugins/vh-adlc/scripts/maintenance/security-history.ts:82-90
 EVIDENCE: At c1098997ac497d874b42ccf764c38ec973896db7, bun /tmp/vh-security-history-authority-probe.ts first clears an open-versus-fixed historical conflict with an authority/supersedes-history receipt, then uses that identical receipt to clear a different open-versus-risk-acceptance conflict. Changing only the resolution's prior_digests to the new actual set removes all history gaps and produces reconciled accounting in both cases. The validator checks prior_digests against current history, but the authority binding covers only source, policy, scope and target; it does not bind the approved conflict set or chosen successor decision.
 PROPOSAL: Bind supersedes-history authority to the exact occurrence, sorted prior snapshot digests, chosen successor decision/outcome and policy assessment in addition to existing target/context bindings. A changed conflict set or selected outcome must remain pending until a matching new approval is supplied. Add direct and actual-packet replay tests using unchanged authority evidence with changed conflict digests and chosen decisions.
+
+### R-7
+
+CRITERION: AC-01 Every imported security occurrence retains its provider identity, target, available advisory/dependency context and evidence provenance, and malformed or conflicting observations cannot become accepted complete evidence.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently reran 164 tests across ten collection/settings/scanner/security/history/CLI/report/journal/publication/compatibility files: 609 assertions, zero failures. Raw-context reconstruction, namespaced identities, duplicate/conflict rejection and terminal metadata checks remain intact. Additional actual-packet probes reject changed terminal package/location, future receipts and wrong code-scanning commits while accepting matching current-target evidence.
+
+CRITERION: AC-02 Proven equivalent occurrences can share canonical remediation without losing per-repository targets or outcomes, and unknown ownership or incomplete coverage remains an actionable handoff.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently executed grouping, missing ownership, unavailable-surface and coverage-handoff scenarios in the passing 164-test run. Grouping preserves individual target/outcome records and requires equivalent-source evidence. The retained Stackweaver report has 82 occurrences, 69 groups, 13 canonical groups and eight coverage handoffs; exact-final installed resume revalidates it without changing consumer data or claiming an all-clear.
+
+CRITERION: AC-03 Versioned scanner evidence packets participate in the same finding accounting with verified bytes and explicit completion, while unsupported, tampered, synthetic or incomplete inputs cannot establish a live fix or a clean surface.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently reran all scanner packet cases and actual CLI synthetic/missing-surface scenarios. Finding exit status remains independent of completion. Altered, missing, extra, symlinked, traversing, duplicate, unsupported and wrongly targeted evidence is rejected. Synthetic inputs cannot establish a live all-clear; normalization receipts retain their accepted procedural limits.
+
+CRITERION: AC-04 Each outstanding finding has a concrete route and next action through the existing batch, bounded-maintenance, investigation, feature, audit-reference or consumer-policy path without creating duplicate implementation loops or selecting work implicitly.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently reran all six existing-loop route cases and tracked-follow-up scenarios. Native authored preparation retains paired source/record targets and stops at missing independent review; the Stackweaver feature handoff selects no migration. Earlier native model behavior used its explicitly identified earlier payload. Final exact-payload installation/helper revalidation is separate and preserves the existing unselected report state.
+
+CRITERION: AC-05 Disappeared alerts remain distinguishable from verified fixes, dismissals, exceptions, reopened findings and unavailable terminal evidence, and retiring a replaced immutable target never marks its historical vulnerable bytes patched.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, the independent actual-packet disappearance probe reaches fixed-verified only with current terminal and source/check/scan evidence. Changed package/location, future receipts and wrong code-scanning commits remain unverified; matching current code-scanning commit evidence verifies. Actual-helper fixed/dismissed/auto-dismissed/open/denied/stale/wrong-target cases and immutable successor retirement/reactivation tests pass. Provider-fixed live historical alerts remain remediation-unknown where full target proof is absent.
+
+CRITERION: AC-06 Valid consumer-authorized exceptions retain their rationale and validity independently of fixed outcomes, and missing, changed or expired evidence returns the affected decision to pending assessment.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently reran exception payload replay, expiry and policy-drift tests. Identical approval cannot authorize changed exception kind, rationale, expiry or assessment. The independent original probe rejects conversion of a temporary mitigation into indefinite accepted risk. Decision authority remains bound to the exact normalized decision and local context; renewed approval is required for changed terms.
+
+CRITERION: AC-07 A security reconciliation result exposes complete finding accounting independently of coverage, open remediation and delivery, and cannot conceal an untracked occurrence or override missing evidence with report status text.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, orphan, tracked handoff, missing scan, forged snapshot and typed append/resume tests pass. The malformed narrowing probe retains its finding and prevents an all-clear. The independent historical-authority probe now rejects changed conflict sets and chosen decisions with unchanged approval. Retained Stackweaver accounting remains reconciled alongside incomplete coverage and 82 open obligations, with no selected repairs.
+
+CRITERION: AC-08 A resumed run or fresh sweep recovers pending findings, decisions and evidence from every relevant compatible history, preserves collection-bound snapshot revisions, and never drops work through a newer narrowed scope or rewrites earlier evidence.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently executed overlapping-run, chained revision, fork, committed-history import and append/resume/retry tests. Actual-packet scope/identity/omission and conflict-replay cases pass. The independent production-helper probe accepts the approved exact conflict set, rejects a different set and changed successor, then accepts renewed bound approval. The final installed resume preserves the report's three security snapshots and single original compatibility block.
+
+CRITERION: AC-09 Existing consumers retain readable settings, inventories and reports, while legacy disappearance comparisons cannot be presented as newly verified fixes and incompatible schemas produce an explicit handoff.
+VERDICT: met
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently reran baseline report/journal/compatibility cases and the actual prior installed 0.9.0 settings-reader probe. Baseline settings exit zero; security_policy settings are explicitly rejected while original bytes are preserved/restored in the disposable probe. History schema 2 uses no_longer_open and legacy observations remain historical evidence. No real consumer rollback or settings restoration was performed.
+
+CRITERION: AC-10 Report publication, selected repairs and feature handoffs retain existing authority and independent-review gates, consumer security policy remains local, and specification or fixture execution makes no real advisory, repository-setting or live-service change.
+VERDICT: not verified
+EVIDENCE: At 76e674705f361f0ef3de41c2d67a823639fe74cd, independently observed 164 focused/publication/recovery/compatibility tests passing. Verified every current plugin file hash/mode against exact-final local-catalog payload 3832a6c3ce40a431c2056e3e1147b74866b74e32837fadfb00c4698f7bb097b7; Codex and Claude installation grades pass. Inspected final installed helper resume evidence, which preserves consumer source/settings/report state and selects no advisory work. The final full Linux run was still progressing at the last observed read, and required portable macOS execution remains unavailable and unobserved. No residual, publication, Mac execution or completed overall verification is inferred.
 
 ## Sources
 
