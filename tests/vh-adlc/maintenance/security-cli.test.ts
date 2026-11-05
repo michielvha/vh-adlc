@@ -11,8 +11,8 @@ import { parseObservation } from "../../../plugins/vh-adlc/scripts/maintenance/h
 import type { Inventory } from "../../../plugins/vh-adlc/scripts/maintenance/collect";
 import { verifySecurityResult } from "../../../plugins/vh-adlc/scripts/maintenance/security-io";
 import { record, text } from "../../../plugins/vh-adlc/scripts/maintenance/security-value";
-import { evidenceBinding } from "../../../plugins/vh-adlc/scripts/maintenance/security";
-import { createSecurityRevision } from "../../../plugins/vh-adlc/scripts/maintenance/security-history";
+import { evidenceBinding, reconcileSecurity } from "../../../plugins/vh-adlc/scripts/maintenance/security";
+import { createSecurityRevision, readSecurityRevisions, selectSecurityChain } from "../../../plugins/vh-adlc/scripts/maintenance/security-history";
 function reportResult(value:unknown){const row=record(value);return{path:text(row.path),digest:text(row.digest)};}
 const projects:ReturnType<typeof fixture>[]=[];afterEach(()=>projects.splice(0).forEach(f=>f.dispose()));
 function setup(policyPath="policy.md"){
@@ -115,5 +115,22 @@ test("actual packets positively reobserve disappeared alerts only with current t
     expect(result.revision.snapshot.findings[0].remediation).toBe(mode==="fixed"?"fixed-verified":"unknown");
     expect(result.revision.snapshot.findings[0].occurrence.complete).toBe(!["denied","stale","wrong-target"].includes(mode));
     expect(result.revision.snapshot.findings[0].exception).toBeNull();
+  }
+});
+
+test("imported digest-valid successors cannot narrow a run or erase its earlier occurrences",async()=>{
+  for(const mode of ["scope","identity","omission"]){
+    const f=setup(),args=["--repo",f.root,"--run-id",f.run.header.run_id];
+    const first=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")])).revision;
+    const changed=structuredClone(first.snapshot.input);changed.observations=[];changed.coverage=changed.coverage.map(c=>({...c,count:0}));
+    if(mode==="scope"){changed.scope.repositories=["example/satellite"];changed.coverage=changed.coverage.map(c=>({...c,repository:"example/satellite"}));}
+    if(mode==="identity")changed.repository="example/other";
+    const {digest:_,...row}=first,next={...row,snapshot_revision:2,previous_snapshot_digest:first.digest,snapshot:reconcileSecurity(changed)};
+    const forged={...next,digest:digest(canonicalJSON(next))},markdown=[first,forged].map(r=>'```maintenance-security-v1\n'+JSON.stringify(r)+'\n```\n').join('\n');
+    const chain=selectSecurityChain(readSecurityRevisions(markdown));expect(chain.gaps.length).toBeGreaterThan(0);expect(chain.latest!.digest).toBe(first.digest);
+    f.write(".tools/history.md",markdown);f.inventory.repositories[0].dependabot={coverage:{status:"complete",pages:1,count:0},alerts:[]};f.write(".tools/empty.json",JSON.stringify(f.inventory));
+    const packet={...f.packet,inventory:{path:"empty.json",sha256:digest(readFileSync(join(f.root,".tools/empty.json")))},analysis:{...f.packet.analysis,collection_revision:2},history:[{path:"history.md",sha256:digest(markdown)}]};f.write(".tools/import.json",JSON.stringify(packet));
+    const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/import.json")]));
+    expect(result.revision.snapshot.findings).toHaveLength(1);expect(result.revision.snapshot.accounting_state).toBe("pending");expect(result.revision.snapshot.all_clear).toBe(false);
   }
 });

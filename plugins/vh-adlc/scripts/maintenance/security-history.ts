@@ -4,6 +4,10 @@ import * as v from "./security-value";
 
 export type SecurityRevision = { schema_version:1; kind:"maintenance-security-revision-v1"; run_id:string; snapshot_revision:number;
   collection_revision:number; collection_digest:string; original_projection_digest:string|null; previous_snapshot_digest:string|null; snapshot:SecuritySnapshot; digest:string };
+function retainsRun(previous:SecuritySnapshot,next:SecuritySnapshot):boolean {
+  return previous.input.hostname===next.input.hostname&&previous.input.repository===next.input.repository&&canonicalJSON(previous.input.scope)===canonicalJSON(next.input.scope)&&
+    previous.input.observations.every(o=>next.input.observations.some(n=>n.id===o.id));
+}
 export function createSecurityRevision(value:SecuritySnapshot,previous:SecurityRevision|null,projection:string|null=null):SecurityRevision {
   const snapshot=validateSecuritySnapshot(value);
   if(previous) {
@@ -11,6 +15,7 @@ export function createSecurityRevision(value:SecuritySnapshot,previous:SecurityR
     if(previous.run_id!==snapshot.input.run_id || snapshot.input.collection_revision<previous.collection_revision) throw Error("snapshot run/collection revision changed");
     if(snapshot.input.collection_revision===previous.collection_revision && snapshot.input.inventory_digest!==previous.collection_digest) throw Error("collection revision has conflicting bytes");
     if(canonicalJSON(snapshot.input.scope)!==canonicalJSON(previous.snapshot.input.scope))throw Error("snapshot run scope changed; use a linked new run");
+    if(!retainsRun(previous.snapshot,snapshot))throw Error("snapshot run identity or prior occurrences changed");
   }
   const row={schema_version:1 as const,kind:"maintenance-security-revision-v1" as const,run_id:snapshot.input.run_id,snapshot_revision:previous?previous.snapshot_revision+1:1,
     collection_revision:snapshot.input.collection_revision,collection_digest:snapshot.input.inventory_digest,original_projection_digest:previous?previous.original_projection_digest:projection,
@@ -40,7 +45,7 @@ export function selectSecurityChain(values:SecurityRevision[]):{latest:SecurityR
   for(const row of rows) {
     if(versions.has(row.snapshot_revision)) {gaps.push("forked snapshot revision");continue;} versions.add(row.snapshot_revision);
     if((latest===null && row.snapshot_revision!==1)||(latest && (row.run_id!==latest.run_id||row.snapshot_revision!==latest.snapshot_revision+1||row.previous_snapshot_digest!==latest.digest||row.original_projection_digest!==latest.original_projection_digest||row.collection_revision<latest.collection_revision||
-      row.collection_revision===latest.collection_revision && row.collection_digest!==latest.collection_digest))) {gaps.push("missing or conflicting snapshot predecessor");continue;}
+      row.collection_revision===latest.collection_revision && row.collection_digest!==latest.collection_digest||!retainsRun(latest.snapshot,row.snapshot)))) {gaps.push("missing or conflicting snapshot predecessor");continue;}
     latest=row;
   }
   return {latest,gaps:[...new Set(gaps)]};
