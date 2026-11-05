@@ -1,7 +1,7 @@
 ---
 status: complete
 branch: feat/maintenance-security-resolution
-status_description: "Shared security maintenance is implemented and independently reviewed. Exact-head Linux and macOS CI pass, and the read-only Stackweaver trial preserves consumer state. Completion records are local; PR, merge, release and advisory remediation remain separate."
+status_description: "Shared security maintenance is implemented and independently reviewed, including the upstream update preference. Local verification passes. Full Stackweaver delivery validation is in progress; merge, rollout and advisory closure remain unconfirmed."
 issue: null
 goal: "Every security finding in a maintenance scope retains its evidence, an explicit route through an existing loop, and an outcome that distinguishes verified fixes from outstanding work and exceptions."
 covers:
