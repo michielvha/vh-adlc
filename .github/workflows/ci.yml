@@ -33,8 +33,8 @@ jobs:
       - name: Install and probe the Linux verification boundary
         run: |
           sudo apt-get update
-          sudo apt-get install -y bubblewrap util-linux apparmor-profiles
-          sudo apparmor_parser -r /usr/share/apparmor/extra-profiles/bwrap-userns-restrict
+          sudo apt-get install -y bubblewrap util-linux apparmor
+          sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
           bwrap --unshare-all --ro-bind / / -- /usr/bin/true
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
