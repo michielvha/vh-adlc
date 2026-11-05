@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Triage, maintenance, persistent audit and documentation impact are published and adopted. The next local draft covers shared documentation drift audit and resolution; independent review and acceptance remain. Docs truth and domain extensions remain deferred."
+status_description: "Triage, maintenance, persistent audit and documentation impact are published and adopted. The docs-drift audit/resolution draft has its first Copilot Opus 5.5 review; three owner policy choices, fresh review and acceptance remain. Docs truth and domain extensions remain deferred."
 issue: null
 goal: "Selected reusable Stackweaver workflows are delivered through vh-adlc, with a separate accepted spec and verified migration for each capability."
 covers:

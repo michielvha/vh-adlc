@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Audit-plus-resolution draft passes lint; the owner selected Copilot Opus 5.5 after Claude Code was unavailable. Independent review and spec acceptance remain; no implementation or publication is authorized."
+status_description: "First Copilot Opus 5.5 review is recorded. Factual gaps are corrected; three owner policy choices, fresh review and acceptance remain. No implementation or publication is authorized."
 issue: null
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
 covers:
