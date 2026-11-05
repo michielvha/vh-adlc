@@ -102,6 +102,7 @@ sys.exit(run.returncode)
   const environment: Record<string, string> = {};
   for (const [key, value] of Object.entries(process.env)) if (value !== undefined) environment[key] = value;
   const owned = await runOwnedClient(args, { cwd: input, env: environment, stdout: join(output, "native.jsonl"), stderr: join(output, "stderr.log") }, { timeout_ms: 1800000, grace_ms: 500, reap_ms: 2000 });
+  json(join(output, 'owned-outcome.json'), owned);
   const events: Array<{ type: string; data?: Record<string, unknown>; exitCode?: number }> = readFileSync(join(output, "native.jsonl"), "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line));
   const models = [...new Set(events.flatMap(event => typeof event.data?.model === "string" ? [event.data.model] : []))];
   const failures: string[] = [], evidence = [];
@@ -135,7 +136,7 @@ sys.exit(run.returncode)
     const root = join(input, item.id), before = states[item.id], after = snapshot(root), observed = calls.filter(call => call.case === item.id), changed = Object.keys({ ...before.files, ...after }).filter(path => before.files[path] !== after[path]);
     const allowed = Object.keys(item.expectedEdits ?? {});
     if (JSON.stringify([...changed].sort()) !== JSON.stringify([...allowed].sort())) failures.push(item.id + ":changed-scope");
-    for (const [path, bytes] of Object.entries(item.expectedEdits ?? {})) if (readFileSync(join(root, path), "utf8") !== bytes) failures.push(item.id + ":wrong-doc-result");
+    for (const [path, bytes] of Object.entries(item.expectedEdits ?? {})) if (!existsSync(join(root, path)) || readFileSync(join(root, path), "utf8") !== bytes) failures.push(item.id + ":wrong-doc-result");
     if (command(["git", "rev-parse", "HEAD"], root).trim() !== before.head || hash(readFileSync(join(root, ".git/index"))) !== before.index) failures.push(item.id + ":head-or-index");
     if (!before.cold_cache) failures.push(item.id + ":cache-not-cold");
     if (!observed.some(call => call.op === "setup" && call.exit === 0)) failures.push(item.id + ":missing-setup");
