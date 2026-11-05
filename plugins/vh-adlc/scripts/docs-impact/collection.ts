@@ -33,6 +33,15 @@ function gitEnvironment(): Record<string, string | undefined> {
 const sorted = (values: Iterable<string>) => [...new Set(values)].sort();
 const within = (path: string, root: string) => root === "." || path === root || path.startsWith(root + "/");
 const decode = (bytes: Uint8Array) => new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+function nulFields(bytes: Buffer): Buffer[] {
+  const result: Buffer[] = [];
+  for (let start = 0; start < bytes.length;) {
+    const end = bytes.indexOf(0, start);
+    if (end < 0) fail("unterminated Git field");
+    result.push(bytes.subarray(start, end)); start = end + 1;
+  }
+  return result;
+}
 const markdown = (path: string) => /\.(?:md|mdx|markdown)$/iu.test(path);
 
 /** Paths are repository-relative POSIX names, including deleted names. */
@@ -49,20 +58,30 @@ class Snapshot {
   head: string | null = null;
   tree = new Map<string, Entry>();
   dirty: string[] = [];
+  undecodable: Array<{ bytes: Buffer; view: "HEAD" | "dirty" | "committed" }> = [];
   reader: ((bytes: Uint8Array) => unknown) | null | undefined;
   constructor(readonly repo: string) {
     try {
       const top = this.git("rev-parse", "--show-toplevel").toString().trim();
       if (realpathSync(repo) !== realpathSync(top)) fail("the repository input must be its Git root");
       this.head = this.git("rev-parse", "--verify", "--end-of-options", "HEAD^{commit}").toString().trim();
-      for (const row of decode(this.git("ls-tree", "-r", "-z", this.head)).split("\0")) {
-        if (!row) continue;
-        const tab = row.indexOf("\t"), fields = row.slice(0, tab).split(" ");
+      for (const row of nulFields(this.git("ls-tree", "-r", "-z", this.head))) {
+        const tab = row.indexOf(9), fields = row.subarray(0, tab).toString("ascii").split(" ");
         if (tab < 0 || fields.length !== 3 || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(fields[2])) fail("unreadable Git tree");
-        this.tree.set(row.slice(tab + 1), { mode: fields[0], oid: fields[2] });
+        const name = this.path(row.subarray(tab + 1), "HEAD");
+        if (name !== null) this.tree.set(name, { mode: fields[0], oid: fields[2] });
       }
-      this.dirty = sorted([...this.changed(this.head), ...decode(this.git("ls-files", "--others", "--exclude-standard", "-z")).split("\0").filter(Boolean)]);
+      this.dirty = sorted([...this.changed(this.head), ...nulFields(this.git("ls-files", "--others", "--exclude-standard", "-z")).flatMap(bytes => this.path(bytes, "dirty") ?? [])]);
     } catch { this.gap("repository", "could not collect the repository HEAD and working-tree scope"); }
+  }
+  path(bytes: Buffer, view: "HEAD" | "dirty" | "committed"): string | null {
+    try { return decode(bytes); } catch { this.undecodable.push({ bytes, view }); return null; }
+  }
+  bytePathGaps(roots: string[], committed = false) {
+    for (const item of this.undecodable) if ((item.view === "HEAD" && roots.some(root => root === "." || item.bytes.equals(Buffer.from(root)) || item.bytes.subarray(0, Buffer.byteLength(root + "/")).equals(Buffer.from(root + "/")))) || (committed && item.view === "committed")) {
+      const path = "git-bytes:" + item.bytes.toString("hex");
+      if (!this.diagnostics.some(d => d.code === "filename" && d.path === path)) this.gap("filename", "selected Git scope contains a filename that cannot be represented as UTF-8", path);
+    }
   }
   git(...args: string[]): Buffer {
     const result = Bun.spawnSync(["git", "--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false", ...args], {
@@ -72,11 +91,11 @@ class Snapshot {
     return result.stdout;
   }
   changed(...revisions: string[]): string[] {
-    const fields = decode(this.git("diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", "--find-renames", ...revisions, "--")).split("\0");
+    const fields = nulFields(this.git("diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", "--find-renames", ...revisions, "--"));
     const paths: string[] = [];
-    for (let at = 0; at < fields.length && fields[at];) {
-      const status = fields[at++], count = /^[RC]/u.test(status) ? 2 : 1;
-      for (let i = 0; i < count; i++) { if (!fields[at]) fail("unreadable Git path list"); paths.push(fields[at++]); }
+    for (let at = 0; at < fields.length;) {
+      const status = fields[at++].toString("ascii"), count = /^[RC]/u.test(status) ? 2 : 1;
+      for (let i = 0; i < count; i++) { if (!fields[at]?.length) fail("unreadable Git path list"); const name = this.path(fields[at++], revisions.length > 1 ? "committed" : "dirty"); if (name !== null) paths.push(name); }
     }
     return paths;
   }
@@ -153,6 +172,7 @@ function policy(snapshot: Snapshot): RootsReport {
     else snapshot.gap("policy", "could not read the committed documentation roots or feature classification", "AGENTS.md");
     report.outcome = "incomplete";
   }
+  snapshot.bytePathGaps(report.roots);
   if (snapshot.diagnostics.length) report.outcome = "incomplete";
   return report;
 }
@@ -202,7 +222,8 @@ export function collectImpact(options: CheckOptions): ImpactReport {
     } catch { snapshot.gap("base", "could not resolve one merge-base for the requested base"); }
   }
   report.source.paths = sorted([...committed, ...explicit]);
-  report.source.excluded_dirty_paths = snapshot.dirty.filter(path => !explicit.includes(path));
+  report.source.excluded_dirty_paths = sorted([...snapshot.dirty.filter(path => !explicit.includes(path)), ...snapshot.undecodable.filter(item => item.view === "dirty").map(item => "git-bytes:" + item.bytes.toString("hex"))]);
+  snapshot.bytePathGaps(report.roots, true);
   const inRoots = (path: string) => report.roots.some(root => within(path, root));
   report.metadata.excluded_dirty_docs = snapshot.dirty.filter(path => inRoots(path) && markdown(path) && !metadata.includes(path));
   const docs = new Set([...snapshot.tree.keys()].filter(path => inRoots(path) && markdown(path)));

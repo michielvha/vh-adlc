@@ -136,8 +136,17 @@ Continue with [your first feature](../get-started/first-feature.md) or
 
 ## Shared documentation impact
 
-The new operation has source-level synthetic Git, metadata and portable CLI tests.
-Native installation, marketplace fresh/upgrade and bounded accuracy trials remain
-pending until separately recorded for the exact shipped payload. Other operations'
-compatibility rows do not establish docs-impact execution. Actual Claude docs-impact
-execution, GUI/phone entry and live Stackweaver screenshot capture remain unverified.
+The following observations apply to candidate source
+`ecd8a41b45b8be9d092788ebb564b97563adbe2b`. Further payload changes require
+revalidation before delivery.
+
+| Surface | Observed result | Limit |
+| --- | --- | --- |
+| Copilot CLI, Opus 5.5 | Twelve synthetic documentation-impact cases passed; only four permitted docs changed. | Entry and accuracy trial; remaining task/completion/progress cases are being added. |
+| Codex CLI 0.163.0 local catalog | All 13 skills discovered; installed roots/check ran outside an agent session and preserved inputs/index. | Candidate installation, not published marketplace proof. |
+| Claude Code CLI 2.1.316 local catalog | All 13 skills discovered; installed standalone checker preserved inputs/index. | Native install/helper check, not Claude docs-impact model execution. |
+
+Source Git/metadata/CLI checks run on Linux. Actual Linux/macOS CI and published
+marketplace fresh/upgrade acceptance remain pending. Other operations' compatibility
+rows do not establish docs-impact execution. Claude docs-impact execution, GUI/phone
+entry and live Stackweaver screenshot capture remain unverified.

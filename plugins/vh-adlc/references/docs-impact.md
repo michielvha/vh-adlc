@@ -30,6 +30,13 @@ checking. Direct one-off use may instead supply explicit roots. Do not use that
 to hide a malformed declaration. Report excluded dirty policy. Bind roots and
 checking to the same committed HEAD; re-resolve if it changes.
 
+Committed HEAD also decides feature classification and the repository's conventions
+pin. The existing knowledge binary can report classification or a pin from dirty
+root instructions. Report that input as excluded and use the roots report for
+classification. Check the resolved revision against the committed pin (or the
+installed plugin pin when HEAD is unpinned). A differing revision is a setup gap:
+stop before edits rather than adopting a dirty pin or changing the checkout.
+
 Request knowledge with `conventions/feature-documents.md`,
 `conventions/documentation.md` and `guides/humanize-prose.md`. For adopted or
 explicitly requested coverage checking, include `conventions/documentation-impact.md`

@@ -28,6 +28,65 @@ function commit(root: string) { git(root, "add", "."); git(root, "commit", "-qm"
 const paths = (report: ReturnType<typeof collectImpact>) => report.candidates.map(candidate => candidate.path);
 const fingerprint = (root: string) => createHash("sha256").update(readFileSync(join(root, ".git/index"))).digest("hex");
 
+test("unrelated byte filenames are excluded without blocking valid selected coverage", () => {
+  const root = fixture();
+  writeFileSync(Buffer.concat([Buffer.from(root + "/unrelated-"), Buffer.from([255])]), "other task\n");
+  expect(resolveRoots(root).outcome).toBe("declared");
+  const result = collectImpact({ repo: root, paths: ["src/app.ts"] });
+  expect(result.outcome).toBe("candidates");
+  expect(result.source.excluded_dirty_paths.some(name => name.startsWith("git-bytes:"))).toBe(true);
+});
+
+test("several roots retain staged scope, tracked generated docs and explicit ignored overlays", () => {
+  const root = fixture({ "handbook/guide.md": guide(), "docs/generated.md": guide(), ".gitignore": "ignored/\ndocs/ignored.md\n" }, 'Documentation impact roots: ["docs", "handbook"]\n');
+  put(root, "src/staged.ts", "staged\n"); git(root, "add", "src/staged.ts");
+  put(root, "ignored/source.ts", "ignored\n"); put(root, "docs/ignored.md", guide("ignored/**"));
+  const index = fingerprint(root), selected = collectImpact({ repo: root, paths: ["src/staged.ts"] });
+  expect(selected.outcome).toBe("candidates"); expect(paths(selected)).toEqual(["docs/generated.md", "docs/guide.md", "handbook/guide.md"]);
+  expect(selected.metadata.bindings.some(item => item.path === "docs/ignored.md")).toBe(false);
+  const ignored = collectImpact({ repo: root, paths: ["ignored/source.ts"], metadataPaths: ["docs/ignored.md"] });
+  expect(paths(ignored)).toEqual(["docs/ignored.md"]); expect(ignored.source.bindings[0].sha256).not.toBeNull();
+  const noCoverage = collectImpact({ repo: root, roots: ["docs", "empty"], paths: ["src/app.ts"] });
+  expect(noCoverage.outcome).toBe("incomplete"); expect(paths(noCoverage)).toContain("docs/generated.md");
+  expect(fingerprint(root)).toBe(index);
+});
+
+test("ordinary feature coverage and the actual pinned freshness matcher retain distinct semantics", () => {
+  const template = readFileSync(join(import.meta.dir, '../../../internal/testrepo/testdata/docs/conforming.md'), 'utf8');
+  const feature = template.replace('covers:\n  - src/\n  - config.yml', 'covers: ["src/**", "src/q?.ts", "src/[ab].ts", "area/", "docs/specs/**"]');
+  const root = fixture({ "docs/specs/feature.md": feature, "src/deep/a.ts": "old\n", "src/q1.ts": "old\n", "src/a.ts": "old\n", "area/sub/app.ts": "old\n" }, declaration + 'Feature documents: docs/specs/\n');
+  for (const name of ["src/deep/a.ts", "src/q1.ts", "src/a.ts", "area/sub/app.ts"]) put(root, name, "changed\n");
+  const plugin = join(import.meta.dir, '../../../plugins/vh-adlc');
+  const ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh'), '--offline'], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
+  const pin = readFileSync(join(plugin, 'knowledge.md'), 'utf8').match(/\b[a-f0-9]{40}\b/u)?.[0]; if (!pin) throw Error('missing plugin pin');
+  const args = [ensured.stdout.toString().trim(), 'fresh', 'docs/specs/feature.md', '--repo', root, '--plugin-pin', pin];
+  const before = Bun.spawnSync(args, { stdout: 'pipe', stderr: 'pipe' });
+  const report = collectImpact({ repo: root, paths: ['src/deep/a.ts', 'src/q1.ts', 'src/a.ts', 'area/sub/app.ts', 'docs/specs/feature.md'] });
+  const candidate = report.candidates.find(item => item.path === 'docs/specs/feature.md');
+  expect(candidate?.coverage_only).toBe(true); expect(candidate?.feature_attention).toBe(true);
+  expect(candidate?.matches.map(item => item.source)).not.toContain('docs/specs/feature.md');
+  expect(new Set(candidate?.matches.map(item => item.source))).toEqual(new Set(['src/deep/a.ts', 'src/q1.ts', 'src/a.ts', 'area/sub/app.ts']));
+  const after = Bun.spawnSync(args, { stdout: 'pipe', stderr: 'pipe' }); expect(after.exitCode).toBe(before.exitCode); expect(after.stdout).toEqual(before.stdout);
+  const fresh = JSON.parse(after.stdout.toString());
+  expect(fresh.data, after.stdout.toString()).not.toBeNull();
+  expect(fresh.data.feature_tree.paths).toEqual(['area/sub/app.ts', 'src/a.ts', 'src/q1.ts']);
+});
+
+test('an ordinary covered doc repair still makes the actual feature review stale', () => {
+  const template = readFileSync(join(import.meta.dir, '../../../internal/testrepo/testdata/docs/conforming.md'), 'utf8');
+  const feature = template.replace('covers:\n  - src/\n  - config.yml', 'covers: ["docs/guide.md"]');
+  const root = fixture({ 'docs/specs/feature.md': feature }, declaration + 'Feature documents: docs/specs/\n');
+  const reviewed = git(root, 'rev-parse', 'HEAD');
+  const row = `| 2026-11-05 | R-1 | implementation | \`${reviewed}\` | fixture | procedural | Fixture review. |\n`;
+  put(root, 'docs/specs/feature.md', feature + row + '\n### R-1\n\nCRITERION: AC-01 The first end state, wrapped onto a second line.\nVERDICT: met\nEVIDENCE: fixture\n\nCRITERION: AC-02 The second end state.\nVERDICT: met\nEVIDENCE: fixture\n'); commit(root);
+  const plugin = join(import.meta.dir, '../../../plugins/vh-adlc'), ensured = Bun.spawnSync(['bash', join(plugin, 'scripts/ensure-vh-adlc.sh'), '--offline'], { stdout: 'pipe', stderr: 'pipe' }); expect(ensured.exitCode).toBe(0);
+  const pin = readFileSync(join(plugin, 'knowledge.md'), 'utf8').match(/\b[a-f0-9]{40}\b/u)?.[0]; if (!pin) throw Error('missing pin');
+  const fresh = () => { const run = Bun.spawnSync([ensured.stdout.toString().trim(), 'fresh', 'docs/specs/feature.md', '--repo', root, '--plugin-pin', pin], { stdout: 'pipe', stderr: 'pipe' }); return JSON.parse(run.stdout.toString()); };
+  expect(fresh().data.implementation_review.stale).toBe(false);
+  put(root, 'docs/guide.md', guide() + 'A reviewed correction.\n'); commit(root);
+  expect(fresh().data.implementation_review.stale).toBe(true);
+});
+
 test("uses HEAD metadata, retains known matches with errors and overlays only selected docs", () => {
   const root = fixture({ "docs/other.md": guide(), "src/unrelated.ts": "unchanged\n" });
   put(root, "docs/guide.md", "---\ncovers: [unterminated\n---\n"); put(root, "src/unrelated.ts", "another task\n");

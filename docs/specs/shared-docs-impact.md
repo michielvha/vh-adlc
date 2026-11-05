@@ -547,6 +547,27 @@ matching negated classes; the ordinary matcher retains that valid syntax and now
 explicitly. The feature matcher is unchanged. Raw C-1 records and the Go comparison remain in the
 operator archive; final exact-commit review still has to establish the feature criteria.
 
+The later 1,215-test broad run recorded 1,214 passes and one existing audit batch
+timeout. Its isolated 48-test retry passed; that does not make the broad run clean.
+A second broad run under severe host load also timed out in audit recovery and
+encountered the newly added unfinished feature-parity fixture. Both failed runs
+remain retained. The host measured load above 60 and full swap; no other session
+was stopped or modified. Current Stackweaver verification passes 18 checks with
+zero failures/skips after locked frontend setup; no product source changed here.
+
+Current consumer source `cbdea74564d903d8e7a75b33867338f5bb1d53aa` includes newer
+published main, a 120-reference inventory with fresh-shell caller checks and exact
+rollback assertions. Its 790-document/3,336-source preflight is source-ready only,
+with zero lost candidates. Renewed paired review found rollback scope and inventory
+freshness gaps; those remain open until corrected and reviewed again. The first
+shared implementation diagnostic observed 202 focused checks plus Go/vet/lint,
+strict typechecking and other-plugin checks. Its requested file coverage was partial,
+so it is not completion evidence. Findings require byte-safe excluded names, actual
+feature-matcher/multi-root/staged/ignored/generated cases, remaining integrated model
+trial stages, exact payload bindings and truthful compatibility claims. New executed
+collection tests now pass 27 cases, including actual pinned-binary matching and
+covered-document review staleness. Final review and delivery remain open.
+
 ## Open Questions
 
 None. The owner approved all six review refinements.
