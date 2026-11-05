@@ -119,6 +119,13 @@ func TestAccepted(t *testing.T) {
 		{"document end marker", "a: 1\n...\n", object{"a": 1.0}},
 		{"bare tag on an integer", "a: ! 1\n", object{"a": 1.0}},
 		{"bare tag on a string", "a: ! text\n", object{"a": "text"}},
+		{"bare tag on a boolean", "a: ! true\n", object{"a": true}},
+		{"bare tag on null", "a: ! null\n", object{"a": nil}},
+		{"bare tag on an empty value", "a: !\n", object{"a": nil}},
+		{"bare tag on quoted integer", "a: ! \"1\"\n", object{"a": "1"}},
+		{"bare tag on a quoted boolean", "a: ! 'true'\n", object{"a": "true"}},
+		{"bare tag on a quoted string containing a comment", "a: ! 'text # literal'\n", object{"a": "text # literal"}},
+		{"bare tag on a key", "! name: text\n", object{"name": "text"}},
 		{"YAML 1.1 directive", "%YAML 1.1\n---\na: 1\n", object{"a": 1.0}},
 		{"byte order mark", "\ufeffa: 1\n", object{"a": 1.0}},
 	}
@@ -212,6 +219,10 @@ func TestRefused(t *testing.T) {
 		{"tag on a nested mapping", "a: !!map {" + canary + ": 1}\n", tag},
 		{"binary tag", "a: !!binary " + canary + "\n", tag},
 		{"float", canary + ": 1.5\n", number},
+		{"bare tag on a float", canary + ": ! 1.5\n", number},
+		{"bare tag on an unsafe integer", canary + ": ! 9007199254740992\n", number},
+		{"bare tag on a numeric key", "! 1: " + canary + "\n", key},
+		{"bare tag does not hide a duplicate", "! " + canary + ": 1\n" + canary + ": 2\n", duplicate},
 		{"exponent", canary + ": 1e3\n", number},
 		{"infinity", canary + ": .inf\n", number},
 		{"not a number", canary + ": .nan\n", number},
@@ -302,10 +313,10 @@ func TestRefusalLine(t *testing.T) {
 		// The number in a library `line N` error, as the library counts it.
 		{"library line", "x: 1\nb: *.md\n", 2},
 		{"library line for a tab", "a:\n\t- b\n", 2},
-		{"library line in a second document", "a: 1\n---\nb: [\nc\n", 2},
+		{"library line in a second document", "a: 1\n---\nb: [\nc\n", 5},
+		{"unknown anchor", "a: *x\n", 1},
+		{"unsupported directive", "%YAML 1.2\n---\na: 1\n", 1},
 		// Otherwise 0.
-		{"unknown anchor", "a: *x\n", 0},
-		{"unsupported directive", "%YAML 1.2\n---\na: 1\n", 0},
 		{"empty input", "", 0},
 	}
 	for _, tt := range tests {

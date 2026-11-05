@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/michielvha/vh-adlc/internal/report"
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // InfoString is the fenced-block info string that marks the rules block.

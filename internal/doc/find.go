@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // Find returns the feature documents under featureRoot whose frontmatter
