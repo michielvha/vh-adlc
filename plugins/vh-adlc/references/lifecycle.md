@@ -55,6 +55,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Article authoring, revision or promotion drafts | Use `skills/vh-adlc-blog/SKILL.md`; promotion mode prepares article-linked social copy only on request. Writing an article needs no software feature document. A request for implementing a blog or changing application behavior stays in the feature procedure. |
 | Review documentation affected by a code change | Use `skills/vh-adlc-docs-impact/SKILL.md`, for example “which docs need updating for this patch?”. A mixed feature-code request retains its underlying feature procedure and integrated docs check. |
 | Documentation or a convention | Edit the authoritative requested artifact using the resolved engineering rules, check the result and report it. No feature spec is needed solely to store prose. |
+| Host cleanup, or a session blocked by a full `/tmp` | Use `skills/vh-adlc-clean/SKILL.md`. It needs no feature document; `--compose` and `--kind` only on the user's request. |
 | Dependency or security sweep | Use `skills/vh-adlc-maintenance/SKILL.md` for inventory, evidence, durable reporting and selected follow-up; publish reports only through its exact current/adopted authority. |
 | Bounded maintenance | Follow the maintenance procedure below if the public contract is preserved and local instructions allow it. |
 | New capability or wider behavior change | Locate any existing feature and use the existing spec/tasks/implement/review procedures and binary gates. No unaccepted implementation. |
