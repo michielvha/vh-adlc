@@ -89,8 +89,8 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains twelve skills: the generic `vh-adlc` entry, ten engineering
-operations and `vh-adlc-blog` for article and promotion drafts. It includes
+The package contains thirteen skills: the generic `vh-adlc` entry, ten engineering
+operations, `vh-adlc-blog` for article and promotion drafts and `vh-adlc-docs-impact` for documentation review. It includes
 separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
@@ -135,3 +135,29 @@ or auth-refresh.
 
 Continue with [your first feature](first-feature.md). For an existing installation,
 see [updating and uninstalling](../user-guides/managing-plugins.md).
+
+## Standalone documentation checking
+
+Install Bun, Git and Bash first. Resolve your actual installed vh-adlc directory
+from the native installer; do not assume another machine's cache location.
+Prepare the locked binary explicitly with:
+
+```sh
+export BUN_RUNTIME_TRANSPILER_CACHE_PATH=0
+bash <installed-plugin>/scripts/ensure-vh-adlc.sh
+bun <installed-plugin>/scripts/docs-impact/cli.ts roots --repo <project>
+bun <installed-plugin>/scripts/docs-impact/cli.ts check --repo <project> --docs-root docs --path src/example.ts
+```
+
+The checker itself runs offline, writes no index and needs no active agent.
+Create leading Markdown frontmatter with a `covers` list for the code the doc
+describes; the [complete example](../../plugins/vh-adlc/examples/docs-impact/README.md)
+shows new files and expected outcomes. Select changed doc metadata separately with
+`--metadata-path`; otherwise committed HEAD is assessed. Missing binary/setup,
+roots or malformed metadata return `incomplete` and exit 2.
+
+For Stackweaver's compatibility wrapper, export `VH_ADLC_PLUGIN_ROOT` to that
+actual installed directory before starting terminal, hook or agent sessions.
+CI uses the same variable and verified installed payload. Refresh its value
+when a marketplace upgrade relocates the install. Missing setup reports exit 2;
+there is no cache-path guessing. Existing callers retain their path/stdin arguments.

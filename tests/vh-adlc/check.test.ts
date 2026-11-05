@@ -20,7 +20,7 @@ const SCHEDULE: Record<number, string[]> = {
   7: ["ship", "triage", "maintenance", "audit"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
-const CONTENT_OPERATIONS = ["blog"];
+const CONTENT_OPERATIONS = ["blog", "docs-impact"];
 
 function selectedPhase(): number {
   const raw = process.env.VH_ADLC_PHASE;
@@ -55,6 +55,7 @@ const CANARY_PAGES = [
   "conventions/coding.md",
   "conventions/delivery.md",
   "conventions/documentation.md",
+  "conventions/documentation-impact.md",
   "conventions/feature-documents.md",
   "conventions/go.md",
   "guides/feature-document-template.md",

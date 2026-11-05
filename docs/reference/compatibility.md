@@ -133,3 +133,11 @@ prose guide when the humanizer skill is unavailable.
 
 Continue with [your first feature](../get-started/first-feature.md) or
 [review requirements](../user-guides/workflows.md#reviews).
+
+## Shared documentation impact
+
+The new operation has source-level synthetic Git, metadata and portable CLI tests.
+Native installation, marketplace fresh/upgrade and bounded accuracy trials remain
+pending until separately recorded for the exact shipped payload. Other operations'
+compatibility rows do not establish docs-impact execution. Actual Claude docs-impact
+execution, GUI/phone entry and live Stackweaver screenshot capture remain unverified.
