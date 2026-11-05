@@ -673,6 +673,27 @@ while 1,248 tests passed. The focused file then passed both tests and the full
 normal hook retry passed 18 applicable checks with zero failures or skips; no
 product code was edited for that retry. Failure and retry artifacts are retained.
 
+### Final delivery observations
+
+Published main `02096e780deea4d695c7352dca0bfd54808574b6` passed all five jobs
+in run 41979677921: Linux 1,226 pass, macOS 1,068 pass with its one documented
+raw-byte-filename skip. All four actual Codex/Claude marketplace fresh/upgrade
+cases pass. Trial 11 re-executes the twelve earlier classifications under the
+current plugin component and passes all twelve; trials 9 and 10 supply the other
+three passing cases under that same component. Native read coverage is retained.
+This closes the earlier twelve-case guidance limitation without rewriting its
+historical failed attempts or claiming fifteen cases passed in one run.
+
+This host's user-scoped native plugins are also updated to 0.9.0: Codex from
+0.8.0, Claude from 0.7.0. Enabled state, Claude scope/project settings and every
+other installed plugin row are preserved. Desktop discovery refresh and Claude
+model execution are not claimed by these native cache updates.
+
+The final source checkout also incorporates published default
+`1f5ac3d5b2b91c03fdc13dd7c73de529d5935c8d` and its separate YAML v4 repair.
+The installed plugin tree remains byte-identical to source publication `02096e7`.
+Consumer cutover and final exact-commit reviews remain open.
+
 ## Open Questions
 
 None. The owner approved all six review refinements.

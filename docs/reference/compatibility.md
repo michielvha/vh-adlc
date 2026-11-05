@@ -136,20 +136,38 @@ Continue with [your first feature](../get-started/first-feature.md) or
 
 ## Shared documentation impact
 
-The current local candidate is `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`
-(plugin 0.9.0). Integration with observed default `26c00e698860c88c3e2382ca9db5dd4b126c4cc1` preserves its exact plugin tree.
+Plugin 0.9.0 is published through [PR #51](https://github.com/michielvha/vh-adlc/pull/51)
+at source `02096e780deea4d695c7352dca0bfd54808574b6`. Its canonical payload digest is
+`2e0b09a6079e12f5a820853aaeb1a395ab971189872a2005ad8a5f0e754b5781`.
 
 | Surface | Observed result | Limit |
 | --- | --- | --- |
-| Copilot CLI, Opus 5.5 | All 15 synthetic cases have successful observed results across trials 8/9/10, including manual entry, contract/omission handling, task/completion gaps and an authorized progress-PR draft. | Focused retries after retained failures; 12 classifications predate the revised general classification guidance. Exact source/reference/request changes are recorded in the feature document. No remote write. |
-| Codex CLI 0.163.0 local catalog | Candidate 7 discovers all 13 skills; installed roots/check preserve inputs/index outside an agent session. | Candidate install, not published marketplace proof. |
-| Claude Code CLI 2.1.316 local catalog | Candidate 7 discovers all 13 skills; installed standalone checking preserves inputs/index. | Native install/helper check, not Claude docs-impact model execution. |
+| Copilot CLI, Opus 5.5 | All 15 synthetic cases have successful observations under the current plugin component: 12 cases in trial 11, contracts in trial 9 and manual/fenced entry in trial 10. | Focused retries after retained failures, not one all-green initial run. Exact requests and source bindings remain in the feature evidence. No remote write. |
+| Codex CLI 0.163.0, GitHub marketplace | Actual fresh install and 0.8.0-to-0.9.0 upgrade discover 13 skills. Installed roots/candidate/no-match checking, uninstall/reinstall and input/index preservation pass. | Isolated native installation and helper checks outside an agent session. |
+| Claude Code CLI 2.1.316, GitHub marketplace | Actual fresh install and 0.8.0-to-0.9.0 upgrade discover 13 skills; the installed helper and uninstall/reinstall checks pass. | Native installation/helper evidence, not Claude docs-impact model execution. |
 
-Stackweaver's unchanged advisory hook checks HEAD metadata and suppresses stderr
-on quiet no-match results. It does not verify current task-owned doc metadata;
-explicit `--metadata-path` overlays are required for that assessment.
+The initial native setup succeeded before an acceptance-operator log-path error
+interrupted helper verification. Continuations used the same installed/upgraded
+profiles and retained the original transition transcripts. This was not a failed
+plugin install or a second upgrade presented as the first.
 
-Source Git/metadata/CLI checks run on Linux. Actual Linux/macOS CI and published
-marketplace fresh/upgrade acceptance remain pending. Other operations' compatibility
-rows do not establish docs-impact execution. Claude docs-impact execution, GUI/phone
-entry and live Stackweaver screenshot capture remain unverified.
+Published-source Linux CI passed 1,226 tests. macOS passed 1,068 with one explicit
+skip: its filesystem rejects the Linux invalid-byte filename fixture before the
+checker runs. Earlier failed CI attempts and their focused fixes remain recorded.
+All other published-source jobs passed. The configured signed runtime release
+[v0.14.0](https://github.com/michielvha/vh-adlc/releases/tag/v0.14.0) was verified
+against the repository public key and all four archive checksums; only Linux amd64
+was executed here. Plugin 0.9.0 deliberately retains its verified 0.9.0 runtime lock.
+
+Existing triage and maintenance knowledge resolve at convention `f8ccacb`.
+Audit's cold offline entry reports its knowledge gap; explicit setup then permits
+the warmed offline entry. These checks do not establish live tracker/audit effects.
+
+Stackweaver's advisory hook checks HEAD metadata and suppresses stderr on quiet
+no-match results. Current task-owned doc metadata needs explicit `--metadata-path`
+overlays. Consumer adoption requires fresh installed full-corpus parity, caller
+inventory, rollback and paired review before merge, plus post-merge route checks.
+
+Claude docs-impact model execution, GUI/phone entry and live Stackweaver screenshot
+capture remain unclaimed. Other operations' compatibility rows do not establish
+those capabilities.
