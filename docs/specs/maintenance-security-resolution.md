@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/maintenance-security-resolution
-status_description: "Shared implementation and read-only Stackweaver trial pass local verification and independent code review. AC-10 remains unverified pending configured macOS CI; feature publication and advisory remediation are not authorized."
+status_description: "Shared implementation and read-only Stackweaver trial pass local verification and independent code review. AC-10 remains unverified pending configured macOS CI. The owner authorized this feature branch push for CI; advisory remediation remains excluded."
 issue: null
 goal: "Every security finding in a maintenance scope retains its evidence, an explicit route through an existing loop, and an outcome that distinguishes verified fixes from outstanding work and exceptions."
 covers:
@@ -228,7 +228,7 @@ Run native installed-operation trials for a report-first sweep, selected compati
 
       Evidence: Exact reviewed source 76e6747 passes `bun test tests/vh-adlc --timeout 60000`: 1274 tests, 4621 assertions, zero failures. Strict TypeScript, all root Go tests/vet/tidy and golangci-lint 2.15.0 pass; the registration plugin passes 34 tests. Final frozen local-catalog Codex/Claude installs, helper execution and reinstall preservation pass. Synthetic native authored preparation stops at independent review pending; native real report/resume supplies an unselected feature handoff. Final installed helper validation preserves Stackweaver source/index/HEAD/refs/settings/report bytes, retaining 82 occurrences, 69 groups, eight coverage handoffs and three linked security snapshots. Accounting is reconciled, coverage incomplete, all-clear false, all 82 obligations remain tracked, and no advisory work is selected. R-7 independently verifies AC-01 through AC-09; AC-10 remains unverified solely for macOS CI. Earlier constrained-run infrastructure failures, the five-second audit timeout, and all red regression logs are retained as failed evidence.
 
-- [ ] T13 `.github/workflows/ci.yml` - observe the configured portable macOS checker on the exact candidate after separately authorized feature publication; retain its actual result and rerun independent review for AC-10. No Mac host is available in this session, and no residual or feature-code publication is authorized.
+- [ ] T13 `.github/workflows/ci.yml` - observe the configured portable macOS checker on the exact candidate after separately authorized feature publication; retain its actual result and rerun independent review for AC-10. No Mac host is available in this session. On 2026-11-05 the owner authorized the presented feature branch push solely for CI; no residual, PR, merge, release or advisory remediation is authorized.
 
 ## Open Questions
 
