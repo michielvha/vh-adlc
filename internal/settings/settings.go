@@ -239,7 +239,7 @@ func scalar(n *yaml.Node) (any, *refusal) {
 			return int64(0), nil
 		}
 		return nil, &refusal{reasonNumber, n.Line}
-	default: // !!float, the only tag left for an untagged scalar
+	default: // Unsupported scalar tags are refused.
 		return nil, &refusal{reasonNumber, n.Line}
 	}
 }

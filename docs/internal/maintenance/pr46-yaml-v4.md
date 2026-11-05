@@ -30,7 +30,24 @@ All final required local checks passed: `go test ./...`, `go vet ./...`, `go mod
 
 ## Reviews
 
-Pending.
+### R-1
+
+Target: `2d51d4cceace1c748d11d4561768d315567bd8ae`
+
+Model: unknown (identity not attested by the host)
+
+Isolation: procedural
+
+```text
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: internal/settings/settings.go:242
+EVIDENCE: At 2d51d4cceace1c748d11d4561768d315567bd8ae, the default branch comment says !!float is the only remaining tag, but the preceding case now handles !!float explicitly at lines 236-241.
+PROPOSAL: Remove the outdated comment or describe the default branch as refusing unsupported scalar tags.
+```
+
+R-1 independently ran all required checks and 26 additional bare-tag probes. The returned comment nit is corrected in the following source commit; a fresh focused review is required before publication.
 
 ## State
 
