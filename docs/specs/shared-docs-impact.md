@@ -74,7 +74,7 @@ Existing site generation, frontend visual refresh/check and public/internal rule
 
 Implementation is underway on the claimed feature branch. The common convention is published
 and independently reviewed. Local reader/matcher/collector/CLI and native trial checks pass;
-shared publication, installed marketplace acceptance, final review and consumer cutover remain
+publication and Stackweaver adoption are verified below; only final completion review remains
 open. The initial strict-reader refusal was resolved locally by a separately reviewed syntax-only
 correction; its exact commit, bounded review and retained-reader equivalence are recorded below.
 
@@ -692,7 +692,7 @@ model execution are not claimed by these native cache updates.
 The final source checkout also incorporates published default
 `1f5ac3d5b2b91c03fdc13dd7c73de529d5935c8d` and its separate YAML v4 repair.
 The installed plugin tree remains byte-identical to source publication `02096e7`.
-Consumer cutover and final exact-commit reviews remain open.
+The following adoption record establishes consumer cutover. Final completion review remains open.
 
 ### Published Stackweaver adoption
 
@@ -737,6 +737,19 @@ owner's R-8 acceptance because the normalized normative baseline is unchanged.
 Final criterion/completion review remains open. GUI/phone, actual Claude
 docs-impact model execution and live product screenshot capture stay unclaimed.
 
+The first final implementation review R-15 executes all 1,226 shared tests,
+Go tests/vet/lint/module checks, then ends with exit 143 during typecheck setup.
+The operator misread the quiet full-suite log as a stall and interrupted that
+owned process group. This is an incomplete review, not a complete delivery pass.
+Its two should-fix findings concern the wrapper: split the completed long suite
+from remaining checks, and accept only trial 9's passing contracts case while
+preserving its failed manual/fenced cases, which trial 10 separately fixes.
+The two wording nits are corrected: Context now points to actual delivery, and
+all review subsections precede the final Sources section. No product code or
+accepted criterion changes. A redundant bounded host diagnostic is retained as
+an additional partial attempt, not substituted for the independently observed
+1,226-test pass. Follow-up must observe the remaining delivery checks.
+
 ## Open Questions
 
 None. The owner approved all six review refinements.
@@ -760,6 +773,7 @@ None. The owner approved all six review refinements.
 | 2026-11-05 | R-12 | implementation | `abb576b068ae62ffe057a4692a314ed0601f0681` | claude-opus-5-5 | procedural | Full requested follow-up coverage; AC-01 through AC-04 met, delivery criteria open; two wording nits addressed. |
 | 2026-11-05 | R-13 | implementation | `957597d23607146e3ac218d2ec96250d0f2f8f97` | claude-opus-5-5 | procedural | Full requested follow-up coverage; AC-01 through AC-04 met, delivery criteria open; two feature-document nits corrected. |
 | 2026-11-05 | R-14 | spec | `3866058a54455e198dd569d0940f341b8aeb57a5` | claude-opus-5-5 | procedural | NO FINDINGS; full required coverage; refreshed default drift with unchanged R-8 normative acceptance. |
+| 2026-11-05 | R-15 | implementation | `6e7630f1f3c64070b97f5c3f072eb159d7d4ab63` | claude-opus-5-5 | procedural | AC-01 through AC-04 met; delivery criteria not verified. Full suite 1,226 pass; wrapper interrupted during typecheck. Two operator-check should-fixes and two wording nits addressed for follow-up. |
 
 ### R-1
 
@@ -1299,13 +1313,66 @@ WHERE: frontmatter status_description
 EVIDENCE: The new status_description lists only "ordered CI, publication, installed marketplace acceptance and cutover" as open (shared-docs-impact.md:4; last-followup-diff.patch:22-23). It dropped the earlier "final independent review". The progress text still lists "final completion review" as open (shared-docs-impact.md:596-598), and T10, which requires the completion implementation review, is unticked (line 505).
 PROPOSAL: Add the final completion review back to the open items in status_description.
 
+### R-14
+
+NO FINDINGS
+
+### R-15
+
+CRITERION: AC-01 Adopting repositories have one published coverage convention, without needing Stackweaver's generator or changing existing feature-review freshness semantics.
+VERDICT: met
+EVIDENCE: Ran bash /home/m/code/.docs-impact-review-archive/check-delivery-implementation.sh once, in the foreground, against shared 6e7630f1f3c64070b97f5c3f072eb159d7d4ab63. Before it stopped, these steps passed: the full Bun plugin suite (1226 pass, 0 fail, 100 files); go test ./... with internal/doc, internal/fresh and internal/gate ok; go vet; golangci-lint config verify and run ("0 issues"); and go mod tidy -diff. I read the published conventions/documentation-impact.md at f8ccacb in full. It is self-contained. Lines 69-78 keep ordinary coverage separate from the feature-review matcher and label feature candidates coverage-only. Lines 26-30 assign enforcement to vh-adlc, with no Stackweaver generator or index. The pinned feature-documents rules block at 0e52f51 is the one I read. Limitations: the script printed only aggregate counts, so I did not see which test covers the second-repository example. The run ended before typecheck finished (see F-01).
+CRITERION: AC-02 The shared checker reads committed HEAD Markdown coverage plus explicitly selected document overlays and returns the correct affected docs and source matches for a bounded Git/path scope without relying on a generated index or changing the repository.
+VERDICT: met
+EVIDENCE: Same fixed script run at 6e7630f. The whole tests/vh-adlc Bun suite passed: 1226 pass, 0 fail, 4473 expect() calls. It contains the matching, collection and CLI suites for HEAD and overlay views, merge-base scope, rename and delete, dirty exclusion, NUL input and source/index preservation. The published convention at lines 80-101 defines the same HEAD and overlay contract, and the trial 11 "update" and "feature-move" cases show --metadata-path overlays overriding HEAD with HEAD and index preserved. Limitations: no per-test names were printed. The script was terminated before its final clean-tree and index-hash assertions ran, so I did not observe preservation in this run.
+CRITERION: AC-03 No-match, affected-doc and incomplete-check results are distinguishable, with missing/unreadable/malformed coverage and unmatched source scope visible rather than reported as verified accuracy.
+VERDICT: met
+EVIDENCE: Same fixed script run at 6e7630f: the full plugin suite passed (1226 pass, 0 fail), including the CLI exit/outcome, collection gap, symlink, uncovered-document and settings-reader regression tests. The published convention lines 96-99 and 122-148 define candidates/none exit 0 and incomplete exit 2, with known candidates kept visible. Trial 11 shows incomplete results with exit 2 alongside known candidates in implement-gap, ship-gap and ship-progress, and roots exit 2 for malformed. Limitations: aggregate counts only. The script did not reach the consumer wrapper contracts, so I did not observe legacy exit mapping in this run.
+CRITERION: AC-04 Direct and integrated agent review use the same portable procedure, ground permitted updates in code and local rules, preserve historical/intended contracts and honor read-only and existing review/publication gates.
+VERDICT: met
+EVIDENCE: The fixed script run at 6e7630f passed the package, discovery, protected-body, lifecycle and example tests inside the 1226-test suite. I read the retained Copilot claude-opus-5.5 returns and results for trials 9, 10 and 11:
+- Trial 11 (12 cases, pass true, no failures): report and intake were report-only and classified Stale with guide.md:6 against src/app.ts:1. Update made a minimal edit. Malformed stopped at roots exit 2. Old-pin stopped at knowledge exit 5 with a handoff. Implement-gap and ship-gap were blocked. Ship-progress wrote only a local draft. In feature-move the feature doc was left unedited and routed to vh-adlc-spec. Local-plan and unmarked-plan followed the local procedure, and unknown-plan was classified Unknown with no edit.
+- Trial 9 contracts kept the 8080 contract and called 9090 a software bug. It treated injection.md as untrusted and gave other-system.md no source citation, with a stated reason.
+- Trial 10: manual and fenced kept manual review with no check, both classified Stale.
+- Every case preserved HEAD and index, and read-coverage shows no missing lines.
+Limitations: the trials are retained artifacts I did not re-execute. The script ended before its component-binding assertion, so I did not observe that the trials ran on the current plugin tree. Actual Claude docs-impact execution is unclaimed.
+CRITERION: AC-05 Stackweaver uses the shared checker/procedure with verified legacy-caller compatibility and scoped rollback, retaining site generation, visuals, local policy and unrelated workflows.
+VERDICT: not verified
+EVIDENCE: The fixed script includes installed parity.cjs, preflight.cjs and the 16 consumer contracts on merged Stackweaver 009a1c5f4d1761d28fb4bc896a9450823f3fc642. The run was terminated with exit 143 during the docs-impact typecheck step, before those steps ran, so I observed none of them. The supplied postmerge.json claims all of the following, but I could not confirm it independently: pass true, an identical merge tree, 794 documents, 0 lost candidates, contract TAP 16/16 including named rollback test 7, and 123 inventory entries with none unresolved. Limitations: a check exists, but I did not observe it executing in this review.
+CRITERION: AC-06 Automated Linux/macOS checks, native installed/standalone execution and actual bounded Copilot trials establish the promised behavior at reviewed commits, with capability limits explicit.
+VERDICT: not verified
+EVIDENCE: At 6e7630f I observed the local Linux Bun suite (1226 pass), Go tests, vet, lint and module tidy passing. The run then stopped with exit 143 before typecheck, actionlint, the gh check of CI run 41979677921, the marketplace transcript hash checks and the trial component-binding assertions. The supplied trial-9 result.json records pass false with failures for manual and fenced, which the fixed assertion would reject (see F-02). compatibility.md:63-93 states the limits explicitly. Limitations: macOS CI, native marketplace execution and trial-to-component binding were not observed. A passing subset does not upgrade this composite criterion.
+CRITERION: AC-07 Convention/tool publication, real marketplace acceptance and paired current-consumer verification precede migration, and exact revisions, post-merge checks and rollback evidence are retained.
+VERDICT: not verified
+EVIDENCE: The fixed script's publication, marketplace, release, premerge-gate, postmerge and paired-validation assertions sit after the step where the run was terminated (exit 143 during typecheck), so none were observed. Supplied artifacts claim the delivery: published-receipt.json, postmerge.json, paired-validation.json with pass true and 8/8 files read, and paired-review.txt NO FINDINGS. The spec records publication at 02096e7, release v0.14.0 and merge 009a1c5 at lines 654-695. I did not verify any of these by execution. Limitations: a check exists, but I did not observe it executing in this review.
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: delivery check script, check-delivery-implementation.sh
+EVIDENCE: The single foreground run of bash /home/m/code/.docs-impact-review-archive/check-delivery-implementation.sh ended with exit 143 ("Terminated") right after "bun install" inside "bash typecheck.sh". The Bun suite alone reported "[413.69s]", so the script cannot finish under the 600000 ms synchronous limit. Typecheck, actionlint, git diff --check, consumer parity/preflight, every publication/marketplace/trial/CI/release/postmerge assertion and the final cleanliness checks never ran.
+PROPOSAL: Run the gate as a background command with native-owned output, or split the long plugin suite from the delivery assertions. Then repeat the independent review so that AC-05 through AC-07 rest on an observed completed run.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: delivery/trial-9/result.json; fixed check trial assertion
+EVIDENCE: delivery/trial-9/result.json:17-21 records "pass": false with failures "manual:unclassified-or-uncited:docs/guide.md" and "fenced:unclassified-or-uncited:docs/guide.md". checks.sh:35 asserts v['pass'] and not v['failures'] for trial 9, the case it relies on for contracts. If the archive copy matches the packet copy, the gate fails at that assertion. If it does not match, the packet does not bind the evidence the gate checks. Only the contracts case is claimed from trial 9, and its per-case evidence is sound.
+PROPOSAL: Make the trial-9 assertion per case, requiring the contracts case to have no failures while keeping the overall failure as history, or bind a passing contracts-only artifact. Confirm that the packet copy and the archive copy are byte-identical.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context
+EVIDENCE: shared-docs-impact.md:75-78 still says "shared publication, installed marketplace acceptance, final review and consumer cutover remain open". Lines 654-695 record publication at 02096e7, marketplace acceptance and the Stackweaver merge at 009a1c5.
+PROPOSAL: Update the Context sentence so only the final completion review remains open, and point to the publication and adoption sections.
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Review Log; Sources
+EVIDENCE: The "### R-14" subsection with "NO FINDINGS" is at shared-docs-impact.md:1310-1312, after "## Sources" at line 1302. Structurally it therefore sits under Sources rather than Review Log, while engineering/conventions/feature-documents.md:66-67 makes Sources the last section.
+PROPOSAL: Move the R-14 subsection up to follow R-13 inside Review Log, so Sources stays last.
+
 ## Sources
 
 - [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/feature-documents.md) and [template](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/feature-document-template.md): scope, review and acceptance gates; the new convention must preserve feature metadata semantics.
 - [Pinned documentation conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md), [coding](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md), [delivery](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md) and [prose guide](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md): small reusable tooling, local policy and reviewed publication. [Go conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/go.md) were inspected for the existing reader; this draft does not propose Go runtime changes.
 - [Existing strict YAML reader](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/plugins/vh-adlc/scripts/settings-file.ts), [ship check](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md) and [feature matcher](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/internal/doc/covers.go): reuse current parsing and review gates without changing feature matching.
 - Stackweaver workflow sources inspected locally at `b88aa6d596249f1f7178d3fcdb7a5c9b8221fe2f`: `agents/docs-impact.md`, `scripts/check-doc-coverage.js` and `scripts/build-docs-index.js`, with line ranges cited in Context. Private source is not reproduced here.
-
-### R-14
-
-NO FINDINGS
