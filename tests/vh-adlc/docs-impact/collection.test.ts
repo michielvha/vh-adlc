@@ -36,6 +36,11 @@ test("unrelated byte filenames are excluded without blocking valid selected cove
   expect(result.outcome).toBe("candidates");
   expect(result.source.excluded_dirty_paths.some(name => name.startsWith("git-bytes:"))).toBe(true);
 });
+test('Git filenames retain a literal leading BOM and cannot alias another document', () => {
+  const root = fixture({ '\uFEFFdocs/guide.md': guide('unrelated/**') });
+  const result = collectImpact({ repo: root, paths: ['src/app.ts'] });
+  expect(result.outcome).toBe('candidates'); expect(paths(result)).toEqual(['docs/guide.md']);
+});
 
 test("several roots retain staged scope, tracked generated docs and explicit ignored overlays", () => {
   const root = fixture({ "handbook/guide.md": guide(), "docs/generated.md": guide(), ".gitignore": "ignored/\ndocs/ignored.md\n" }, 'Documentation impact roots: ["docs", "handbook"]\n');

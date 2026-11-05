@@ -75,7 +75,7 @@ class Snapshot {
     } catch { this.gap("repository", "could not collect the repository HEAD and working-tree scope"); }
   }
   path(bytes: Buffer, view: "HEAD" | "dirty" | "committed"): string | null {
-    try { return decode(bytes); } catch { this.undecodable.push({ bytes, view }); return null; }
+    try { return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { this.undecodable.push({ bytes, view }); return null; }
   }
   bytePathGaps(roots: string[], committed = false) {
     for (const item of this.undecodable) if ((item.view === "HEAD" && roots.some(root => root === "." || item.bytes.equals(Buffer.from(root)) || item.bytes.subarray(0, Buffer.byteLength(root + "/")).equals(Buffer.from(root + "/")))) || (committed && item.view === "committed")) {
