@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Local first draft; scan-plus-resolution scope awaits the owner, then independent review and acceptance. No implementation or publication is authorized."
+status_description: "The owner continued the proposed audit-plus-resolution scope. Independent spec review and acceptance remain; no implementation or publication is authorized."
 issue: null
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
 covers:
@@ -27,7 +27,7 @@ covers:
 
 # Shared documentation drift
 
-Find accumulated documentation problems across a repository, then turn verified proposals into one reviewable change. The proposed shared operation has audit and resolve modes; Q1 decides whether both belong in this feature.
+Find accumulated documentation problems across a repository, then turn verified proposals into one reviewable change. The shared operation has audit and resolve modes.
 
 For example, an old guide links to a moved source file. The local scanner flags the link; the shared workflow reads the guide and current source before proposing the correction. A stale audit PR gets checked again before its change is reused.
 
@@ -41,7 +41,7 @@ The scope excludes claim-by-claim docs-truth sweeps and their rolling ledger. Ex
 
 ## Context
 
-The owner requested the next extraction after completing shared docs impact on 2026-11-05. The parent roadmap records that delivery and leaves drift audit, resolution and truth as separate future work (`docs/specs/shared-workflow-migration.md:76`). The inspected shared source is `f8c991d65b68eecd1750a04127bb31ca67847224`.
+The owner requested the next extraction after completing shared docs impact on 2026-11-05. The parent roadmap records that delivery and selects this docs-drift child for the next scope decision (`docs/specs/shared-workflow-migration.md:76`). The owner's subsequent Continue directs this draft to proceed with its recommended audit-plus-resolution boundary; it does not accept an unreviewed spec. The inspected shared source is `f8c991d65b68eecd1750a04127bb31ca67847224`.
 
 Stackweaver source inspected for this draft is `d77259358c87aebc93ad76231ae245fd790c043a`:
 
@@ -56,7 +56,7 @@ Shared docs impact already supplies coverage matching and an affected-document r
 
 ## Scope
 
-Proposed inclusion, pending Q1: one harness-agnostic docs-drift operation with audit and resolve modes, a consumer configuration/scan-result contract, reports, bounded verification helpers, examples and Stackweaver migration tests.
+Include one harness-agnostic docs-drift operation with audit and resolve modes, a consumer configuration/scan-result contract, reports, bounded verification helpers, examples and Stackweaver migration tests.
 
 Audit consumes a local scan and feedback history, verifies candidates against current source and prepares a concise report. An explicitly authorized prepare run may also produce bounded safe edits for a consumer-owned advisory workflow. Resolve rechecks selected old proposals, deduplicates them and prepares their verified subset plus a ranked decision list.
 
@@ -138,16 +138,7 @@ None yet; written after scope decisions, independent spec review and owner accep
 
 ## Open Questions
 
-### Q1: Should this feature include both drift audit and resolution?
-
-**Recommendation:** A. Keep the proposed audit/resolve modes together so the shared workflow includes rechecking and resolving its own proposals.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Audit and resolution** | One complete workflow with current-source rechecking and feedback. | More acceptance cases in this child feature. |
-| **B. Audit only** | A smaller first extraction that prepares scan findings and advisory changes. | Resolution remains local and needs a separate migration/spec later. |
-
-**Why this is yours:** This selects the next feature's size and migration boundary. The owner has selected the next extraction, but has not answered this split. The two-mode design above is a proposal pending that decision.
+None. The owner continued the proposed audit-plus-resolution scope after the draft summary. Independent spec acceptance is still required.
 
 ## Review Log
 
