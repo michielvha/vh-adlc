@@ -289,6 +289,7 @@ None. The owner accepted risk-based upgrade verification and closure only after 
 | 2026-11-05 | R-9 | spec | `e787d453b07c095dbe83c6699c44d7b90e8b20f1` | claude-opus-5.5 | procedural | 4 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-10 | spec | `5d9197b2dd7500319399ca102c135e5edf6cf7a4` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-11 | spec | `0ab5263042caaf6b7dc6330aaa16f3a9ad80b4ac` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-12 | spec | `0ef1a82c73177e9c888651e001af7c80039bf510` | claude-opus-5.5 | procedural | 1 should-fix; 2 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -610,6 +611,27 @@ SEVERITY: nit
 WHERE: Design, Authority and delivery (authority table); Resolution and feedback
 EVIDENCE: The authority table lists "read-only assessment/report output; scoped prepare/resolve edits and generators; local commits; pushes and advisory/resolve PRs; issue creation; superseded-PR closure; merged-branch cleanup; and merge/release effects" (00161 line 7). Closure requires a separate tracker write: "Post an authorized explanation linking that merged PR and the per-hunk dispositions before closing" (00081 line 73). The lease acquire and release are remote ref writes (00161 line 29). Neither appears as a row. The existing authority table also lists each remote write explicitly (authority.md 00001 lines 10-32).
 PROPOSAL: Add rows for the PR explanation comment and for lease-ref acquire and release, each with the authority it requires. Alternatively, state that each one is included in the closure or publication grant it serves.
+
+### R-12
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Resolution and feedback (fresh post-merge closure review); Independent candidate review and publication (base freshness); Test Plan AC-04
+EVIDENCE: The publisher pushes the reviewed checkpoint on its assessed base. A disjoint default advance "does not invalidate the original reviewed checkpoint; do not rebase, regenerate or amend that checkpoint to follow it" (00161 line 19). The closure review "compares the complete Git diff from the recorded publication base to the actual merged head against the record's exact changed-path set plus the resolve-record path itself". It also says "Unlisted paths, extra hunks that change a declared postimage ... deny closure" and "A later commit added to the consolidation after publication cannot pass merely because it carries the old record" (00081 line 77). Suppose the consumer requires branches to be up to date before merge, or the owner uses GitHub "Update branch". The merged head then contains a merge from default. A two-point diff from the old publication base to that head includes every interim default change as unlisted paths. Closure is then always denied for a mechanical branch update, even though the spec explicitly allows unrelated default advances. The closure-only recovery path covers only changes after the merge result, so it does not help here. The spec says neither whether such update merges are allowed nor how they are excluded, and AC-04 has no case for them.
+PROPOSAL: Define the closure diff so that changes merged in from default are excluded, while conflict resolution and authored branch commits remain visible. For example, compare the declared changes with the diff from the merge base of the merged head and the merge-result parent on default, or reject such updates explicitly as a stated consumer constraint. Add an AC-04 case for a consolidation PR updated from an advanced default before merge.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter covers; Design, Entry and consumer contract (helper reuse)
+EVIDENCE: `covers` lists "every path whose change can affect the feature" (feature-documents.md 00001 lines 43-44). The spec reuses `scripts/audit/snapshot.ts` and `scripts/settings-file.ts`, and both are covered (00001 lines 16-18). It also acknowledges that "The existing module imports audit settings/inventory" (00081 line 23). In fact, snapshot.ts imports `./inventory`, `./settings` and `./types` at load time (snapshot.ts lines 4-6). `createYAMLReader` spawns `scripts/ensure-vh-adlc.sh` to obtain the verified reader (settings-file.ts line 39). `scripts/audit/inventory.ts`, `scripts/audit/settings.ts`, `scripts/audit/types.ts` and `scripts/ensure-vh-adlc.sh` exist in the shared tree but are not in covers.
+PROPOSAL: Add these transitive dependencies to covers, or move the reused Git and hash primitives into a neutral module so the audit imports stop affecting docs-drift.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Scope; Design, Independent candidate review and publication; Scheduled worker and staged adoption
+EVIDENCE: Scope says "Do not change schedules, provider/model selection, secrets or notification behavior as part of extraction" (00081 line 7). The Design requires unattended publication to have "a committed nonempty `candidate_reviewer.requested_model` in consumer policy, with the provider selecting that model without fallback" (00161 line 17). That adds a reviewer model invocation that the legacy worker does not have. The new reusable worker binds explicit "secret-name mappings (no implicit `secrets: inherit`)" (00161 line 45). Cutover disables the legacy scheduled workflow and later enables "the selected shared schedule" (00161 line 47). These are deliberate, owner-selected changes, but Scope states without qualification that none of them changes.
+PROPOSAL: Reword Scope to preserve the existing schedule cadence, the scanning provider and credential ownership. Name the explicit exceptions: the owner-selected reviewer model policy, the reusable-worker secret-name mapping and the cutover schedule switch.
 
 ## Sources
 
