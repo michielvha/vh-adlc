@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-1 findings addressed with collection-bound snapshots, immutable-target retirement and per-occurrence history merging; renewed spec review pending. No advisory remediation is authorized."
+status_description: "R-1 and R-2 findings addressed, including settings-aware rollback; renewed spec review pending. No advisory remediation is authorized."
 issue: null
 goal: "Every security finding in a maintenance scope retains its evidence, an explicit route through an existing loop, and an outcome that distinguishes verified fixes from outstanding work and exceptions."
 covers:
@@ -151,7 +151,9 @@ Do not upgrade an existing journal or overwrite a report on read. Write new snap
 
 Publish through the existing report declaration/current permission route. A security snapshot grants no extra report or task-record publication paths. Raw scanner outputs stay private unless separately authorized; portable reports contain only the consumer-approved finding metadata and evidence references, never credentials or sensitive snippets. Bump both plugin manifests together when implementation is released, and document the history output change. No Go runtime, binary gate or engineering pin change is planned for this feature.
 
-Rollback reinstalls the prior released plugin and preserves new artifacts/reports without rewriting them. An older helper cannot certify the new snapshot; use its legacy inventory behavior with an explicit limitation until a compatible reader is restored. Consumer policy changes, live rollout and advisory remediation require their own scope after this shared feature.
+Rollback first checks the exact prior released helper's settings reader against frozen copies of the adopted settings and required local references, without changing the consumer checkout. Preserve original settings bytes and all new artifacts/reports. The prior reader rejects the new `security_policy` key, so that case produces a concrete incompatible-settings setup handoff; do not claim legacy collection is usable or silently remove the policy reference.
+
+If the owner separately authorizes a consumer settings restoration, retain both configurations and the adopted policy file, bind the restoration to its reviewed change, and rerun the prior reader before using legacy inventory. Without that authority, rollback can reinstall the prior plugin but remains blocked for dependent consumer operations. Even with compatible settings, an older helper cannot certify the new security snapshot and must report that limitation. Consumer policy changes, live rollout and advisory remediation require their own scope after this shared feature.
 
 ### 8. Verification approach
 
@@ -184,7 +186,7 @@ Run native installed-operation trials for a report-first sweep, selected compati
 | AC-06 | `security.test.ts` covers proposed and authorized mitigation/non-affected/risk exceptions, missing authority, expiry, changed source/digest/policy and invalidated checks; assertions distinguish exception, provider dismissal and verified fix. No request may dismiss an alert or publish VEX. |
 | AC-07 | Invoke actual `security-reconcile`, report, append and candidate helpers with an orphan finding, concrete tracked handoff, missing owner assignment, inaccessible tracker, required missing scan and completed selected repair. Assert independent accounting/coverage/remediation/delivery states, refusal of a falsely reconciled snapshot and unchanged state after a free-text success assertion. |
 | AC-08 | Extend journal/recovery/report tests: interrupted write and retry, changed policy/input hashes, pending report publication, superseded scanner target, fresh checkout with published history and a later scan omitting a previous finding. Append verified closure after the original open snapshot, then reload locally and in a fresh checkout: latest state is selected without rewriting or duplicating the one legacy block. Merge A-only and B-only histories in a combined sweep; a newer narrowed scope cannot erase the other pending IDs. Conflicting/forked histories remain pending; source/ref and original evidence bytes are preserved. |
-| AC-09 | Round-trip baseline schema-1 settings/inventory/journal/report fixtures through the new reader without rewriting them. Test history schema 2, unverified legacy `resolved` values, same-collection projection/snapshot contradictions, valid changes across collection revisions, unknown versions and rollback to the prior installed plugin with preserved new artifacts. |
+| AC-09 | Round-trip baseline schema-1 settings/inventory/journal/report fixtures through the new reader without rewriting them. Test history schema 2, unverified legacy `resolved` values, same-collection projection/snapshot contradictions, valid changes across collection revisions and unknown versions. Invoke the actual prior installed helper with both baseline settings and adopted settings containing `security_policy`: the latter returns a concrete setup handoff, preserves both configuration/policy bytes and new artifacts, and performs no dependent collection until a separately authorized compatible restoration passes its settings reader. |
 | AC-10 | Extend publication and direct-operation compatibility tests plus native report/repair/handoff trials with read-only/no-commit/no-push/no-filesystem restrictions and malicious packet/alert text. Inspect full ref/index/settings deltas and fixed GET argv; no forbidden action occurs, no consumer identity/default policy enters shared source, and package manifests agree. Run `bun test tests/vh-adlc --timeout 60000` on Linux and the configured portable macOS checker; disclose unrun native hosts. |
 
 ## Tasks
@@ -200,6 +202,7 @@ None. The owner selected packet-based scanner intake and complete accounting bef
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-05 | R-1 | spec | `bfd28ae3561998dc930d6a0f5326964b5de99b07` | unknown | procedural | Two blocking findings and one should-fix finding; model identity not attested. |
+| 2026-11-05 | R-2 | spec | `c2a80eed6e3723fa3cdbcec4168b56289708e57b` | unknown | procedural | No blocking findings; one should-fix rollback compatibility finding; model identity not attested. |
 
 ### R-1
 
@@ -223,6 +226,15 @@ SEVERITY: should-fix
 WHERE: Design section 6; AC-08 Test Plan
 EVIDENCE: docs/specs/maintenance-security-resolution.md:132 says to import the newest compatible committed report snapshot first, but does not define compatibility or how multiple overlapping prior scopes contribute outstanding findings. The AC-08 scenario at :176 covers a fresh checkout and omission from a later scan, but not separate prior sweeps for repositories A and B followed by a combined sweep. Choosing only one newest report can lose the other report's unresolved occurrences.
 PROPOSAL: Define history selection and merging per occurrence and compatible repository/surface/target scope, retaining outstanding entries from every relevant prior snapshot and treating conflicts as pending. Add separate A-only and B-only histories followed by a combined sweep, including a newer narrowed-scope report that cannot erase older outstanding work.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design sections 2 and 7; AC-09 Test Plan
+EVIDENCE: docs/specs/maintenance-security-resolution.md:72 adds security_policy to settings schema 1, while :154 describes rollback by reinstalling the prior plugin and using its legacy inventory behavior. The baseline loader at plugins/vh-adlc/scripts/maintenance/settings.ts:12-13,69-72 rejects unknown settings keys and does not accept security_policy. A consumer that adopts the new optional field therefore cannot run the prior helper after the specified rollback. The AC-09 scenario covers baseline settings and preserved artifacts, but not settings containing the new field.
+PROPOSAL: Define a rollback preflight and consumer-authorized settings restoration or explicit legacy-compatible settings projection that preserves the adopted policy and original configuration bytes. Add an actual prior-helper rollback case with security_policy present, ensuring it either resumes through that documented compatibility path or returns a concrete setup handoff instead of claiming legacy inventory remains usable.
 
 ## Sources
 
