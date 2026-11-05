@@ -273,6 +273,7 @@ None. The owner accepted risk-based upgrade verification and closure only after 
 | 2026-11-05 | R-6 | spec | `32ee1e88b64f7fbee29b8d44fc90f36e0c5ffd19` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-7 | spec | `8d7d7182ac996ac8840dfebc95a2c08f6129efe6` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-8 | spec | `3066499a013d7861d533d895cecebfb9c21b4b20` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
+| 2026-11-05 | R-9 | spec | `e787d453b07c095dbe83c6699c44d7b90e8b20f1` | claude-opus-5.5 | procedural | 4 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -509,6 +510,43 @@ SEVERITY: should-fix
 WHERE: Design, Resolution and feedback (superseded closure); Test Plan AC-04
 EVIDENCE: Closure is allowed once every hunk is "applied/apply-modified in the published consolidated PR" or carried "in that published PR's decision list". It "happens only after the consolidated PR exists at the reviewed head" (00081 line 72). Publication opens an advisory or resolve PR and "never authorizes merge" (00161 line 4). If the owner later rejects, closes or reworks the consolidated PR without merging, the original proposals are already closed. Their applied and carried hunks then survive only in an unmerged PR, which defeats "Preserve uncertain proposals" (00081 line 64) and the requirement that incomplete members "cannot disappear from the selected scope" (00241 line 3). The spec does not say whether closure waits for merge, or how closed proposals are restored if the consolidation is abandoned. AC-04 tests closure before publication but not abandonment after publication.
 PROPOSAL: Present the owner trade-off. Either close superseded proposals only after the consolidated PR merges, or close them at publication and require the consolidated PR to list them and define how they are reopened if it closes unmerged. Add an AC-04 case for a consolidated PR that is closed without merging.
+
+### R-9
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Protected adoption bindings; Scheduled worker and staged adoption (worker pin, reusable worker); Upgrades after adoption; Test Plan AC-06
+EVIDENCE: The reusable worker "owns the install, scanner/worker, independent reviewer and publisher steps", and setup must "bind its exact blob" (00161 line 40). The worker obtains vh-adlc "at an exact full commit", and that source SHA stays visible to the updater (00161 line 28). The protected manifest contains the "reusable-worker blob and effective caller contract" (00161 line 50). A compatible upgrade prepares C "with the new component pin", and the gate accepts it "only when the preserved behavior/policy bindings match and the current component equals the newly reviewed/tested component" (00161 line 62). A "changed worker execution path" is a retrial trigger (00161 line 64). The spec never says where the pin lives. If the pin is inside the bound reusable-worker file, as the install ownership implies, every compatible bump changes a protected exact blob. Under the stated rules, that change either fails "preserved bindings" or counts as an execution change that needs a trial. The owner-selected compatible route then has no possible passing case.
+PROPOSAL: Name the pin location. Either keep the source SHA, version and payload digest in a separate committed pin file that the worker reads, or define a normalized worker comparison that excludes only the mechanically extracted pin fields. Add an AC-06 case where a compatible pin bump passes the gate while any other worker-blob change is classified as an execution change.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Independent candidate review and publication (publication gate); Scheduled worker and staged adoption (C/D assembly, first post-cutover gate); Entry and consumer contract (adoption helper)
+EVIDENCE: Before each remote effect, the gate's adoption helper "validates the referenced pre-cutover record's passing trial, exact component/worker/reviewer/publisher bindings, paired source-candidate acceptance" (00161 line 18). The first post-cutover gate requires "its `trial-passed` evidence, paired source-candidate acceptance" (00161 line 44). The trial and review evidence are "immutable artifacts" and "separately retained external artifacts" outside the tree (00161 lines 10, 42). The new helper follows the existing artifact-hash pattern (00081 line 22). That pattern rehashes files under a private, owner-only local `artifact_root` (`scripts/audit/adoption.ts` lines 27-36; `scripts/maintenance/migration.ts` lines 21-29). The scheduled publisher runs on a hosted runner. The spec never says whether that runner verifies artifact bytes, which it cannot reach, or only the committed record's claims and blob bindings. As written, the unattended gate either always denies publication or silently checks less than the text states.
+PROPOSAL: Split the checks. The operator-time adoption check before D merges verifies artifact bytes. The runtime gate verifies only committed record fields, blob digests at the current default and current protected bindings. State this attestation boundary, and add an AC-05/AC-06 case where the hosted gate passes without a private artifact root.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Resolution and feedback (superseded closure after merge); Test Plan AC-04
+EVIDENCE: Closure happens "only after the consolidated PR is observed merged from its reviewed head". The run must then "Verify that the merged result contains the reviewed selected hunks/feedback". "Unexpected source/proposal changes ... or conflicting later edits stop that closure plan" (00081 line 72). Base freshness has a mechanical read-set rule, but that rule covers publication (00161 line 14). Closure gets only the undefined word "unexpected". The spec does not say how "contains" is checked: ancestry of the reviewed head, the merged PR's head SHA, or applying the reviewed diff against the merge tree. It also does not say whether squash or rebase merges qualify; the consumer, not delivery.md, sets docs-PR merge policy. Finally, it does not say whether later in-scope default commits block closure. Depending on the reading, closure is impossible on an active or squash-merging repository, or it can close proposals after a later revert.
+PROPOSAL: Define the post-merge check mechanically. Name the GET-observed merged state and head SHA equality, the accepted merge methods, and per-hunk presence at the observed default tree. Apply the base-freshness read-set rule to changes after the merge, excluding the delivered consolidation diff. Add AC-04 cases for a squash merge, a later unrelated in-scope edit and a later revert of a carried hunk.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Upgrades after adoption; Scheduled worker and staged adoption (trial definition); Test Plan AC-06
+EVIDENCE: A change to "lease or publication/closure behavior requires another separately authorized live unattended trial at the proposed version" (00161 line 64). The defined trial is the scheduled advisory worker's draft-PR handoff with "allowed draft-only effects". Any "closure effect outside the definition" is refused (00161 lines 32, 36). Resolve publication and superseded closure are local resolve effects (00161 line 24) and are never exercised by the trial. A change to closure or resolve-publication behavior therefore triggers a mandatory paid trial that cannot observe the changed behavior. The trial can pass vacuously while the change goes unverified.
+PROPOSAL: For closure and resolve-publication changes, state what the required live verification must observe. One option is a synthetic resolve-and-closure scenario inside the trial namespace. The other is the bounded actual synthetic resolve trial, with the unattended trial required only for the scheduled worker, lease and advisory path. Keep the settled trigger list, and add a matching AC-06 case.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Entry and consumer contract (helper reuse)
+EVIDENCE: The spec says to "Reuse the pure `hash`, `git` and `gitBytes` exports in `scripts/audit/snapshot.ts`" (00081 line 22). `gitBytes` and `git` spawn Git subprocesses and throw "audit cannot read Git" (snapshot.ts lines 16-25). `git` applies `trimEnd()`, which changes output such as path names with trailing whitespace. The module also imports audit's `./inventory` and `./settings` at load time (lines 4-5). The protocol requires literal path preservation (00081 line 42).
+PROPOSAL: Describe these exports as side-effect-free Git helpers, not pure ones. Require byte-exact `-z` reads through `gitBytes` rather than the trimming `git` wrapper for paths and blobs. Note the audit-labelled error text, or move these primitives into a neutral shared module.
 
 ## Sources
 
