@@ -210,6 +210,7 @@ None. The owner accepted the bounded completeness correction after its read/skip
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-05 | R-1 | spec | `09872e18edd77fed61336bc4d10a31eafd46021f` | claude-opus-5.5 | procedural | 2 blocking; 4 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-2 | spec | `748ed4a32151b508fc490d3ae81becb4c62435c7` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -255,6 +256,27 @@ SEVERITY: nit
 WHERE: Tasks
 EVIDENCE: The Tasks section holds narrative about the refused Claude Code review (00081 lines 67-72). The status_description already repeats this content (00001 line 3). The standard reserves Tasks for task lines and keeps review history in the Review Log (feature-documents.md 00081 lines 27-36, 58-74).
 PROPOSAL: Leave Tasks as "None." and keep the refusal note in Context or status_description only.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Authority and delivery (publication lease); Scheduled worker and staged adoption; Test Plan AC-05, AC-06
+EVIDENCE: The lease serializes "the scheduled worker and a local resolve publisher for the same consumer" (00081 line 80). Under the owner's staged choice, "Interactive adoption may precede that trial" (00081 line 14). The local scheduled worker stays active until the trial passes, and the spec says to "Preserve the existing worker bytes as a rollback target" (00161 lines 6, 8). It also says to "Do not change schedules" (00081 line 6). So the scheduled publisher running during the whole staged interval is the unchanged legacy worker, which never acquires the new lease. During that interval a shared local resolve run can push and close superseded proposals while the legacy worker publishes a new advisory PR, with nothing serializing them. delivery.md 00161 lines 8-9 requires serializing publication "where competing runs could conflict". The AC-05 lease race test only covers the shared scheduled and local publishers.
+PROPOSAL: Define how the staged interval serializes publication. Options are: give the legacy worker a reviewed minimal lease acquisition as part of the routing migration; have shared resolve publication and closure detect an active or recent legacy run and refuse; or defer shared resolve publication until cutover. Add a race test for the legacy worker against a shared resolve publisher to AC-06.
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption; Migration and rollback; AC-06, AC-07
+EVIDENCE: The real unattended trial must have "completed assessment/preparation, obtained the required independent candidate review and exercised its bounded authorized advisory handoff" in Stackweaver (00161 line 6). Migration and rollback says "Use bounded synthetic source/docs/PR/feedback scenarios for actual model trials; do not resolve real drift PRs or publish real findings during acceptance" (00161 line 14). AC-06 requires the observed trial before the feature is accepted as complete. The spec never says whether the trial runs on the real corpus and publishes a real advisory PR (which contradicts line 14) or runs on a synthetic fixture or destination (which may not be a "real" trial of the consumer route). It also never says how the trial worker definition reaches a runnable unattended state, such as a dispatch-only workflow on the default branch, before the separate cutover change. Nor does it say how the adoption helper records interactive-adopted but scheduled-pending state.
+PROPOSAL: Name the trial's input corpus, publication destination and what counts as the advisory handoff, and state explicitly whether that is an exception to the no-real-findings rule. Specify the consumer change order (interactive adoption, then trial worker without schedule, then cutover) and make the adoption evidence record scheduled adoption as pending until the trial receipt exists.
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scan-result protocol and local correction; Entry and consumer contract; Test Plan AC-02
+EVIDENCE: The design states "Missing required detector execution is a gap even if all document reads succeeded" (00081 line 38), and AC-02 tests "missing requested detectors" (00161 line 33). The v1 schema lists only declared "detector options", the document inventory, collection failures, findings, suppressed findings and stale suppressions (00081 line 36). It has no per-detector execution or outcome record. The consumer settings list scanner argv, scope, feedback files, procedure and commands, but no required detector set (00081 line 28). So the shared helper has no defined source for which detectors are required, and no observation proving they ran. A scanner that aborts or skips a detector after reading every document would still produce a complete inventory with fewer findings, which is the "lower finding count" case the spec forbids treating as proof (00081 line 32).
+PROPOSAL: Add a required detector set to the committed settings, or derive it from the bound scanner options, and add a schema field recording each detector's execution outcome. Have the helper mark the result incomplete when a required detector is absent or failed, and require the Stackweaver correction to emit that field.
 
 ## Sources
 
