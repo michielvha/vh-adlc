@@ -1,0 +1,6 @@
+{
+  "name": "remote-gui",
+  "version": "0.1.0",
+  "description": "Share task-local apps over the tailnet and hand a fresh browser to the human, then resume in that same session.",
+  "author": { "name": "Michiel VH" }
+}

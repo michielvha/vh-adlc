@@ -12,8 +12,8 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has eleven skills: this entry,
-nine engineering operations and one article-writing operation. Check
+repository and selects a procedure. The package has twelve skills: this entry,
+ten engineering operations and one article-writing operation. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -23,6 +23,7 @@ on your host.
 | --- | --- |
 | A question | Inspect the source and answer. A saved artifact needs a request. |
 | Backlog triage | Verify issues against source and observed checks, rank ready work, and save a report. Approve an exact batch before any tracker change. |
+| Persistent codebase audit | Keep stable findings in a ledger, distinguish historical status from current verification, and select repairs under local policy. |
 | Diagnosis | Investigate and report. A report-only request does not authorize a fix. |
 | Documentation | Edit the requested document and check it. A prose edit does not need a feature spec. |
 | Article or social draft | Read the project's evidence and the site's voice rules, draft or revise the requested prose, and obtain a source-comparing editorial pass. Publication is separate. |
@@ -40,6 +41,7 @@ see [installation](../get-started/installation.md).
 | Operation | Invocation name | Purpose |
 | --- | --- | --- |
 | Maintenance | `vh-adlc-maintenance` | Sweep dependency/security work, save a report and resume selected repairs under local project rules. |
+| Audit | `vh-adlc-audit` | Inspect recorded findings, reverify them, run a full audit, or repair a selected workstream. |
 | Triage | `vh-adlc-triage` | Sweep a backlog, verify a shortlist, propose closures, or inspect stale/explicit issues; apply only approved exact actions. |
 | Investigate | `vh-adlc-investigate` | Measure an issue or failure and report; never fixes. |
 | Spec | `vh-adlc-spec` | Write or revise the feature document. Add `review <path>` for an independent spec review. |
@@ -59,6 +61,36 @@ and neutral vocabulary. Triage does not implement the selected issues.
 Repository settings are optional; see the [settings contract](../../plugins/vh-adlc/references/triage-settings.md).
 
 For a walkthrough, see [your first feature](../get-started/first-feature.md).
+
+## Persistent codebase audit
+
+Ask `Use vh-adlc-audit to reverify our persistent finding ledger; report only`, or use `status`,
+`full` and `fix <IDs or workstream>` for recorded inventory, wider discovery and selected repairs.
+The configured ledger keeps stable finding IDs and dated evidence. Recorded FIXED status is history;
+current verification needs the original scenario, current source, observed checks and independent
+challenge. Missing or stale evidence remains unknown or partial.
+
+Create `.vh-adlc/audit.yaml` and a project procedure using the
+[audit settings and complete example](../../plugins/vh-adlc/references/audit-settings.md).
+Keep domain knowledge, finding format, verification commands and operating policy in your repository.
+The shared operation requires plugin 0.8.0+, Bun 1.4+ with its Markdown renderer and Git. A missing operation is an installation blocker. Explicit setup must cache the locked verified binary and
+every normalized `knowledge_pages` page at the consumer’s pinned revision. Audit entry is offline;
+missing binary or pages gets a setup handoff without an automatic download.
+A dependency/security sweep still uses maintenance; diagnosis without a persistent ledger still uses
+investigation. Ambiguous audit requests need a scope question.
+
+Status writes nothing. Reports and candidates stay private outside the checkout. Reverify/full ledger
+updates and local commits require current authority and an owned worktree at the freshly assessed clean
+default. Selected compatible repairs need observed red/green and independent batch review. Generic
+repair authority covers local work only. Live tests, tracker writes, push/PR and conditional merge require
+an explicit current grant or a valid committed consumer policy, plus their actual verification gates.
+Receipts are operator attestations; audit does not use triage's enforced publication controller.
+See [audit compatibility and outstanding acceptance](../reference/compatibility.md#persistent-codebase-audit).
+
+Audit helpers require Bun 1.4+ with `Bun.markdown.render`, plus Git. An older or renderer-less
+runtime reports that prerequisite before the operation starts. Use the same verified Bun version
+when generating and reconstructing a candidate; renderer differences are not proof of equivalent
+ledger bytes. A changed rendering result requires reconciliation and renewed verification.
 
 ## Dependency and security maintenance
 

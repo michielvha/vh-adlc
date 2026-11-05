@@ -17,7 +17,7 @@ const SCHEDULE: Record<number, string[]> = {
   4: ["investigate", "spec", "resume"],
   5: ["tasks", "implement"],
   6: ["review"],
-  7: ["ship", "triage", "maintenance"],
+  7: ["ship", "triage", "maintenance", "audit"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
 const CONTENT_OPERATIONS = ["blog"];
@@ -196,7 +196,7 @@ describe("manifest and marketplace", () => {
     expect(existsSync(join(PKG, ".codex-plugin"))).toBe(false);
   });
 
-  test("the marketplace lists vh-adlc and leaves github-app-registration unchanged", () => {
+  test("the marketplace lists vh-adlc and leaves github-app-registration's entry unchanged", () => {
     const now = JSON.parse(read(join(ROOT, ".claude-plugin", "marketplace.json")));
     expect(now.name).toBe("vhco-tools");
     const entry = now.plugins.find((p: { name: string }) => p.name === "vh-adlc");
@@ -206,8 +206,15 @@ describe("manifest and marketplace", () => {
     const before = JSON.parse(base.out).plugins.find((p: { name: string }) => p.name === "github-app-registration");
     const after = now.plugins.find((p: { name: string }) => p.name === "github-app-registration");
     expect(after).toEqual(before);
-    const app = git("diff", "--quiet", "origin/main", "--", "plugins/github-app-registration");
-    expect(app.ok).toBe(true);
+  });
+
+  test("a github-app-registration change comes with a version change", () => {
+    const dir = "plugins/github-app-registration";
+    if (git("diff", "--quiet", "origin/main", "--", dir).ok) return;
+    const base = git("show", `origin/main:${dir}/.claude-plugin/plugin.json`);
+    expect(base.ok).toBe(true);
+    const now = JSON.parse(read(join(ROOT, dir, ".claude-plugin", "plugin.json")));
+    expect(now.version).not.toBe(JSON.parse(base.out).version);
   });
 
   test("a package change comes with a version change", () => {
