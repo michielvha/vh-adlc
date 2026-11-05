@@ -520,9 +520,15 @@ The broad host run recorded 1,145 passes and 31 failures: nine inherited recover
 five-second runner deadline, one skill-count guard needed the new total, and the remaining failures
 correctly rejected generated compiler symlinks in the plugin tree. Compiler dependencies now stay
 outside that tree; the count guard is corrected and the 49-test focused recovery/export selection
-passes with the portable 60-second deadline. The failed runs remain retained; the final full run
-is still required. Actual model trials, final independent implementation/paired review, marketplace
-acceptance and consumer migration remain open.
+passes with the portable 60-second deadline. The failed runs remain retained; the complete follow-up run passes 1,176 tests with zero failures (`full-suite-60s.log`). Further source fixes require their relevant checks and a fresh final gate. The first native Copilot Opus 5.5 trial correctly withheld edits when the test adapter could not
+expose knowledge pages: `--docs-source` intentionally bypasses the ordinary cache. That failed
+trial is retained, including its unexpected shell-reader attempt. The adapter now uses ordinary
+cache-populating knowledge, requests the full underlying operation page list, grades actual native
+helper exit codes and denies shell-reader shortcuts. No failed result is counted as acceptance.
+The actual installed-candidate knowledge regression passes at the published pin: triage/maintenance
+resolve their pages, and audit stops with an unwarmed cache then succeeds offline after explicit
+setup for all eight normalized pages. Final model trials, independent implementation/paired review,
+marketplace acceptance and consumer migration remain open.
 
 ## Open Questions
 
