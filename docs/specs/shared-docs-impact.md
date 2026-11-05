@@ -1,7 +1,7 @@
 ---
 status: in-progress
 branch: feat/shared-docs-impact
-status_description: "Shared feature published and real marketplace acceptance passed; gated Stackweaver cutover and final completion review remain open."
+status_description: "Shared feature and Stackweaver migration published; actual marketplace and post-merge checks pass. Final exact-commit completion review remains open."
 issue: https://github.com/michielvha/vh-adlc/issues/47
 goal: "Give repositories one shared way to declare which code their documentation covers, find docs affected by a change and review the required updates without building their own checker."
 covers:
@@ -499,7 +499,7 @@ unclaimed; a future UI change still owes its existing local visual checks.
   Evidence: `DOCS_IMPACT_TEST_PLUGIN=<exact shared payload> node --test tests/agent-docs-impact/*.test.cjs` passes 16 tests at consumer `7a1e905635192c84c177260df26e8df0b811af00`; rebuilt-HEAD parity and scoped rollback results are recorded below.
 - [x] T8 `plugins/vh-adlc/knowledge.md`, lock/manifests as required by the published dependency, `tests/vh-adlc/docs-impact/` - record and independently review the entire old-to-new convention diff before moving the pin; surface unrelated normative drift for owner acceptance. Execute actual bounded model trials and isolated native Codex/Claude candidate discovery/standalone checks, retaining exact payloads, returned evidence and unclaimed surfaces (AC-01, AC-04, AC-06).
   Evidence: actual Copilot Opus 5.5 trials 8/9/10 record successful observations for all 15 cases after focused recovery: 12 unaffected cases at `8de398e35f78f5b03964496c7589dbafd34d135f`, contracts at `4f29be5af2a2c680d103dc5e00064dd91bcb4a26`, and both manual routes at `1786f48929f66b966bb8739e5c245ac1722f2191`. The 12 run-8 classifications predate the target reference's general classification rule; their behavior under that revised text is unclaimed. Failed original results and exact reference/request deltas remain retained. Native Codex/Claude candidate 7 and installed standalone/new-pin checks pass at `4f29be5`, whose plugin tree equals the integrated target.
-- [ ] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
+- [x] T9 `tests/vh-adlc/docs-impact/migration.test.ts`, `Stackweaver:tests/agent-docs-impact/` - observe failed cutover predicates, then pass exact-source candidate guards, full-corpus completeness, old-operation/new-pin offline setup, paired semantic review, fresh caller inventory and scoped rollback/reapply. Resolve the known one-line syntax prerequisite only through its separate reviewed correction; no source-ready result claims publication or consumer cutover (AC-05, AC-07).
   Evidence: R-11 independently executes source-candidate parity/preflight at shared `7a3c613` and consumer `7a1e905`: 790 docs, 3,336 source paths, zero losses/gaps, 16 contracts including named rollback. R-12 reads the whole auxiliary preflight and confirms the unchanged source. Root-addition and missing-rollback negative probes are retained. Migration readiness remains false until published acceptance; current consumer will be refreshed again for cutover.
 
 - [ ] T10 `docs/specs/shared-docs-impact.md` and touched source/tests - run all required checks at the committed feature head, obtain actual independent Claude Code Opus 5.5 implementation review, address remaining findings with observed checks, retain the four R-8 nit obligations in task evidence and pass the source-completion gate. Actual shared publication, marketplace acceptance and current-consumer adoption follow the ordered delivery checks before migration is claimed (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07).
@@ -694,6 +694,49 @@ The final source checkout also incorporates published default
 The installed plugin tree remains byte-identical to source publication `02096e7`.
 Consumer cutover and final exact-commit reviews remain open.
 
+### Published Stackweaver adoption
+
+Stackweaver [PR #1033](https://github.com/michielvha/stackweaver/pull/1033)
+merged at `009a1c5f4d1761d28fb4bc896a9450823f3fc642` after the actual installed
+migration preflight returned source_ready true, migration_ready true and no
+failures. The approved consumer head is
+`a85b41a3627d53c67f34b525a1fdfcc7e2498432`; the merge tree is byte-identical.
+The source checkout at that gate is `3866058a54455e198dd569d0940f341b8aeb57a5`,
+with the unchanged published plugin digest and convention recorded above.
+
+Fresh installed checking on the actual merged revision passes: 794 documents,
+756 patterns, 3,342 source paths, zero lost candidates or unresolved meaning
+changes, no committed-index drift, all 16 contracts and 123 reviewed reference
+entries with no unresolved caller. The contracts include the named scoped
+rollback/reapply test. The frozen rollback baseline is
+`1e0287936ace2e0910abcab8e770a5e312e8694b`; it preserves that published main's
+manual-only hosted CI policy and unrelated product/visual changes. The prior
+syntax prerequisite remains separately published through `57ff7884` and outside
+rollback. All 18 applicable final local verification checks pass without skips.
+An earlier integration hook had 24 passes and one explicit FAST=1 backend
+vulnerability-check skip; that run is retained separately, not promoted to a
+non-skipped pass. Product integration/E2E tests do not apply to the migration's
+27 workflow/checker/test/metadata files, which change no application source.
+
+Final paired Claude Code Opus 5.5 reviews are `paired-published-3` and its bounded
+follow-up `paired-published-4`. The first independently executes current installed
+checks and reads all 57 required files/chunks; its sole rollback-baseline wording
+nit is fixed. The follow-up reads all eight required chunks, independently reruns
+installed parity/contracts and publication proof checks at the exact consumer
+head, and returns NO FINDINGS. Isolation is procedural. The earlier ambiguous
+pin nit uses a companion clarification: engineering rules are `0e52f51`, installed
+documentation coverage is `f8ccacb`. The first full-coverage validator retained an
+operator-generated review-targets.json exception, checked explicitly against the
+launch target, consumer and both pins; all material prepared files remain bound.
+Earlier partial-read review artifacts and failed preparation attempts remain
+retained rather than relabelled as full initial successes.
+
+T9 is now complete with actual published acceptance, paired review, fresh corpus,
+caller inventory and scoped rollback. R-14 returns NO FINDINGS and retains the
+owner's R-8 acceptance because the normalized normative baseline is unchanged.
+Final criterion/completion review remains open. GUI/phone, actual Claude
+docs-impact model execution and live product screenshot capture stay unclaimed.
+
 ## Open Questions
 
 None. The owner approved all six review refinements.
@@ -716,6 +759,7 @@ None. The owner approved all six review refinements.
 | 2026-11-05 | R-11 | implementation | `7a3c613f64e352084c6bc5730c09cf899fee2843` | claude-opus-5-5 | procedural | AC-01 through AC-04 met; AC-05/06 not verified, AC-07 not met; one wording nit addressed. Source review only; final delivery review remains open. |
 | 2026-11-05 | R-12 | implementation | `abb576b068ae62ffe057a4692a314ed0601f0681` | claude-opus-5-5 | procedural | Full requested follow-up coverage; AC-01 through AC-04 met, delivery criteria open; two wording nits addressed. |
 | 2026-11-05 | R-13 | implementation | `957597d23607146e3ac218d2ec96250d0f2f8f97` | claude-opus-5-5 | procedural | Full requested follow-up coverage; AC-01 through AC-04 met, delivery criteria open; two feature-document nits corrected. |
+| 2026-11-05 | R-14 | spec | `3866058a54455e198dd569d0940f341b8aeb57a5` | claude-opus-5-5 | procedural | NO FINDINGS; full required coverage; refreshed default drift with unchanged R-8 normative acceptance. |
 
 ### R-1
 
@@ -1261,3 +1305,7 @@ PROPOSAL: Add the final completion review back to the open items in status_descr
 - [Pinned documentation conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/documentation.md), [coding](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/coding.md), [delivery](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/delivery.md) and [prose guide](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/guides/humanize-prose.md): small reusable tooling, local policy and reviewed publication. [Go conventions](https://github.com/vhco-pro/docs/blob/0e52f51f01b84eda75a976763c42d8ec0a07b544/conventions/go.md) were inspected for the existing reader; this draft does not propose Go runtime changes.
 - [Existing strict YAML reader](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/plugins/vh-adlc/scripts/settings-file.ts), [ship check](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/plugins/vh-adlc/skills/vh-adlc-ship/SKILL.md) and [feature matcher](https://github.com/michielvha/vh-adlc/blob/8c2fe7c0b5bfe6a7ea7c6910290b4fa70323dfc1/internal/doc/covers.go): reuse current parsing and review gates without changing feature matching.
 - Stackweaver workflow sources inspected locally at `b88aa6d596249f1f7178d3fcdb7a5c9b8221fe2f`: `agents/docs-impact.md`, `scripts/check-doc-coverage.js` and `scripts/build-docs-index.js`, with line ranges cited in Context. Private source is not reproduced here.
+
+### R-14
+
+NO FINDINGS
