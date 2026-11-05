@@ -72,7 +72,11 @@ when the index is missing. The shared checker removes that index dependency for 
 Existing site generation, frontend visual refresh/check and public/internal rules remain local
 (`agents/docs-impact.md:57-102`).
 
-No new checker, convention, consumer adapter or external publication has been implemented.
+Implementation is underway on the claimed feature branch. The common convention is authored in
+its own docs branch and reviewed with actual Claude Code Opus 5.5. Reader, matcher, collector and
+CLI tests pass locally; publication, installed acceptance, full review and consumer cutover remain
+open. The actual checker found one strict-reader refusal in the current consumer HEAD corpus;
+that finding is a migration blocker until its separate syntax correction is reviewed and verified.
 
 ## Scope
 
@@ -472,7 +476,8 @@ unclaimed; a future UI change still owes its existing local visual checks.
 
 ## Tasks
 
-- [ ] T1 `vhco-pro/docs:conventions/documentation-impact.md`, `conventions/documentation.md` - author and independently review the common contract against the accepted design; the docs check passes, and the reviewed dependency is ready for its separate publication (AC-01).
+- [x] T1 `vhco-pro/docs:conventions/documentation-impact.md`, `conventions/documentation.md` - author and independently review the common contract against the accepted design; the docs check passes, and the reviewed dependency is ready for its separate publication (AC-01).
+  - Evidence: `vhco-pro/docs` branch `docs/documentation-impact`; `npm run check` passed on 28 Markdown files and the rules block. Native Claude Code Opus 5.5 dependency review C-10 at `2d55a50aeaa8d859d3e5d80159d2d1fb69b7ae28` returned no blocking or should-fix findings; its one wording nit is corrected in the following docs commit. Raw review, trace and all-required-file validation remain in `convention-r10` in the operator archive. This is dependency-document review, not feature implementation review or publication proof. Full old-to-new pin diff includes an unrelated five-line testing policy; owner acceptance remains pending before a pin move.
 - [ ] T2 `tests/vh-adlc/settings-file.test.ts`, `plugins/vh-adlc/scripts/settings-file.ts` - observe a failing offline reader-session test, extract the verified strict reader for reuse without repeated bootstrap, then prove existing settings callers and missing-binary/no-download behavior pass (AC-02, AC-03).
 - [ ] T3 `tests/vh-adlc/docs-impact/matching.test.ts`, `plugins/vh-adlc/scripts/docs-impact/matching.ts` - observe failed real pattern cases, implement the declared exact/prefix/globstar/escape/bracket contract, then pass malformed-pattern and legacy-preservation cases (AC-01, AC-02, AC-03).
 - [ ] T4 `tests/vh-adlc/docs-impact/collection.test.ts`, `plugins/vh-adlc/scripts/docs-impact/collection.ts` - observe failed synthetic Git corpus/scope cases, then pass HEAD/selected overlays, roots/classification, deletions/renames, uncovered/malformed metadata, symlink refusals and dirty/index preservation using the actual collector (AC-02, AC-03).
