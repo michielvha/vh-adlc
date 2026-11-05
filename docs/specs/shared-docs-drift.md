@@ -361,6 +361,7 @@ None.
 | 2026-11-05 | R-22 | spec | `b6866cfb43389728acafa97b126ca56113266c60` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-23 | spec | `d4fc7f9ecce11da2348119ecae855f66f7249a46` | claude-opus-5.5 | procedural | 1 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-05 | R-24 | spec | `336ace6d4a974b0a0467481a73d6890e990c160a` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-05 | R-25 | spec | `85f6f885a36f7a50825cd8d4c0b352e59f1f3c89` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -967,6 +968,15 @@ SEVERITY: nit
 WHERE: Design, Audit and preparation (feature-document protection); Entry and consumer contract (docs-impact extraction)
 EVIDENCE: The spec says to "Factor/export its existing strict frontmatter reader as `readDocumentMetadata` ... including coverage declarations and branch/status validation" (00081 line 64). It also says to "Preserve docs-impact's public behavior" (00081 line 30). The existing reader, `patterns` in `scripts/docs-impact/collection.ts`, returns only `covers`. It returns an empty list when a document has no frontmatter and does no status or branch validation (collection.ts 00161 lines 26-37). Docs impact records any thrown error as a `metadata` gap (collection.ts 00241 line 17). If branch/status validation goes into the shared reader, a malformed `status` that docs impact accepts today becomes a new docs-impact gap.
 PROPOSAL: Say that `readDocumentMetadata` returns the strictly parsed mapping and that branch/status validation is a docs-drift-layer check. Add a docs-impact regression showing that its candidates and gaps do not change.
+
+### R-25
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Upgrades after adoption; Scheduled worker and staged adoption (component pin); Capability evidence by host (post-cutover interactive entries); Test Plan AC-06
+EVIDENCE: The settled policy keeps the current approved pin active until a verified successor is approved. The spec defines that pin only for the hosted worker. "Its future shared worker obtains the published vh-adlc source at an exact full commit" and "The active caller selects the approved pin" (00241 line 2). The required post-cutover interactive publishing entries are "the installed `vh-adlc-docs-drift` operation invoked through Copilot CLI, and Stackweaver's existing Claude Code `/docs-drift` command forwarding to that operation" (00161 line 62). Cutover "disables/replaces every legacy real-corpus publication and closure entry" (00161 line 74). The runtime gate checks the "exact current component/worker/reviewer/publisher bindings" (00161 line 72). The Upgrades section says "Interactive runs using an unadopted upgraded component may assess/prepare, but current-default binding checks deny their real-corpus publication. The approved pinned worker continues to operate during that review. No legacy fallback is silently re-enabled" (00241 line 42). The compatible definition includes "unrelated vh-adlc changes" (00241 line 46), so later vh-adlc releases are expected to change the installed payload. The pin records a "plugin version and component SHA-256" (00241 line 2), but the spec never says whether that digest covers only the docs-drift files and their transitive dependencies or the whole plugin payload and version. The spec also defines no way for an interactive Copilot or Claude host to install, load or verify the approved pinned component instead of the host's current marketplace install. Post-merge closure is interactive unless an unattended resume is separately adopted (00161 line 8). Once a host's installed plugin moves to any later release, including one unrelated to docs-drift, every interactive resolve publication and superseded closure is denied until a full C/D re-adoption completes, and no legacy route is available. For those entries, the approved pin is not actually "active", which conflicts with the settled policy. AC-06 tests only the hosted approved worker staying usable.
+PROPOSAL: Define what the component digest and version binding cover, and whether a release that does not touch docs-drift files changes them. Then specify how an interactive Copilot or Claude publishing entry runs or verifies the approved pinned component, for example by having the helper verify or load the pinned source in an isolated profile. If that is not supported, state as a visible limitation that interactive real-corpus publication and closure pause after a host upgrade until re-adoption. Add an AC-06 case where an interactive host is upgraded to a newer release while the approved pin is still selected.
 
 ## Sources
 
