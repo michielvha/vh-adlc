@@ -399,6 +399,7 @@ None.
 | 2026-11-06 | R-9 | implementation | `1ad76f2a3ff81c2f1c69ce0fe06ca8fac9e10c03` | claude-opus-5-5 | procedural | 10 criteria met, 3 not verified, 5 findings, 0 blocking |
 | 2026-11-06 | R-10 | spec | `6d0c8af90cdc036493479430e57b6f2c202cba48` | claude-opus-5-5 | procedural | 6 findings, 0 blocking |
 | 2026-11-06 | R-11 | spec | `1fdaced37fbcefc58a02328a71cc88eebfe83753` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
+| 2026-11-06 | R-12 | spec | `3507447e4a40945626f5281b945f045572531a7f` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
 
 ### R-1
 
@@ -1320,6 +1321,22 @@ SEVERITY: nit
 WHERE: Sources
 EVIDENCE: The first Sources entry is labelled "Pinned feature-document standard". It and the coding, Go and prose links point at `vhco-pro/docs` blob `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`. The repository pin is `0e52f51f01b84eda75a976763c42d8ec0a07b544` (`AGENTS.md:4`). `vh-adlc lint` and `gate` report `knowledge.revision` 0e52f51, and the R-8 records cite that pin.
 PROPOSAL: Point the four links at 0e52f51, or drop the word "Pinned".
+
+### R-12
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design, What clean will and will not touch; Tasks, T23
+EVIDENCE: Folding Q4 rewrote the stated limit as "A container that bind-mounts the project's temp root, the temp base or any directory above the base, such as `/tmp`, `/` or, for a custom base, `$HOME` ... marks no entry below that path as in use". At 1fdaced the text named "all of `/tmp` or `/`" on its own terms. `/tmp` is above the base only when the base is the default `/tmp/vh-adlc-<uid>`. Temp root allows any absolute base that is not `$HOME`, is outside a Git work tree and is not above the repository, so `/var/tmp/vh` and `~/.cache/vh-adlc` are both valid. With such a base, a container that bind-mounts `/tmp` is not covered by the sentence. The code still marks no top-level `/tmp` entry as in use for that container: `planFiles` scans `h.Tmp` (`internal/clean/files.go:126`), and `usage.holds` and `mountedIn` (`files.go:283`, `:292`) call `within(p, entry)` (`internal/clean/host.go:108`). That call holds only for the entry itself or a path below it, so a bind source of `/tmp` or `/` holds no `/tmp/<name>`, whatever the base is. The closing sentence ("A container mounting all of `/tmp` or `/` should never run on these hosts") is advice, not the limit. T23 copies the same narrower wording into `references/clean.md`.
+PROPOSAL: Make the limit cover both scanned directories: a bind of `/tmp` or any directory above it hides top-level entries, and a bind of the project's temp root or any directory above it, the temp base included, hides temp-root entries. Change T23 to match.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Where the rules come from
+EVIDENCE: Design says `clean` reads the manifest with "`git symbolic-ref refs/remotes/origin/HEAD`, then `git cat-file blob origin/<default>:.vh-adlc/cleanup.yaml`". `defaultBranchManifest` in `internal/clean/clean.go` runs three commands instead: `symbolic-ref -q refs/remotes/origin/HEAD` (line 209), then `ls-tree -z --format=%(objecttype) %(objectname) <branch> -- .vh-adlc/cleanup.yaml` (line 217), then `cat-file blob <sha>` (line 229). All three run with `GIT_NO_LAZY_FETCH=1`. The `ls-tree` step is what turns a missing path into `manifest-missing` and a non-blob into `manifest-invalid`. The behaviour matches Design, but the commands it names do not.
+PROPOSAL: Describe the read as `ls-tree` on `origin/<default>` and then `cat-file blob` of the object it names, or name no commands and say "reads the blob at `origin/<default>:.vh-adlc/cleanup.yaml` without fetching".
 
 ## Sources
 
