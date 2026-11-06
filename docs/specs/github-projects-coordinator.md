@@ -192,7 +192,8 @@ Document native auto-add as an optional complement, including rule limits and ex
       Evidence: `bun test tests/vh-adlc/projects/settings.test.ts` failed because the settings module does not exist; no production code written yet.
 - [x] T2 `plugins/vh-adlc/scripts/projects/settings.ts` - T1 passes using the shared strict YAML reader (AC-01)
       Evidence: `bun test tests/vh-adlc/projects/settings.test.ts` passes all three tests; shared settings reader is reused without new dependencies.
-- [ ] T3 `tests/vh-adlc/projects/inventory.test.ts`, `fake-gh.ts` - actual CLI fixture scenarios fail for absent inventory, incomplete pages and identity collisions (AC-02, AC-03)
+- [x] T3 `tests/vh-adlc/projects/inventory.test.ts`, `fixtures.ts`, `fake-gh.ts` - actual CLI fixture scenarios fail for absent inventory, incomplete pages and identity collisions (AC-02, AC-03)
+      Evidence: `bun test tests/vh-adlc/projects/inventory.test.ts` fails because the native transport module is absent.
 - [ ] T4 `plugins/vh-adlc/scripts/projects/github.ts`, `inventory.ts`, `cli.ts` - T3 passes with native gh calls, source-linked facts and versioned output (AC-02, AC-03)
 - [ ] T5 `tests/vh-adlc/projects/apply.test.ts` - approved-batch, conflict, retry and partial-failure scenarios fail against the absent updater (AC-04, AC-05)
 - [ ] T6 `plugins/vh-adlc/scripts/projects/apply.ts`, `cli.ts` - T5 passes with strict operation scope, fresh reads and verified receipts (AC-04, AC-05)
