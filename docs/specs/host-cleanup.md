@@ -406,6 +406,7 @@ None.
 | 2026-11-06 | R-11 | spec | `1fdaced37fbcefc58a02328a71cc88eebfe83753` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 | 2026-11-06 | R-12 | spec | `3507447e4a40945626f5281b945f045572531a7f` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
 | 2026-11-06 | R-13 | spec | `b68e46d87dd8bdfcd318b24b34eab987a8211f91` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
+| 2026-11-06 | R-14 | spec | `804c97b40c6d428e2e993abcece1593e0dbbb3de` | claude-opus-5-5 | procedural | 1 finding, 0 blocking |
 
 ### R-1
 
@@ -1359,6 +1360,15 @@ SEVERITY: nit
 WHERE: Frontmatter status_description
 EVIDENCE: status_description says "Waits on spec review R-12, then the owner's acceptance." The Review Log already has the R-12 row and subsection at 3507447, and b68e46d folds both of its findings. `vh-adlc fresh` reports R-12 stale with `baseline-changed`, and `vh-adlc next` returns `spec review`, so the document now waits on a new pass, not on R-12.
 PROPOSAL: Change the line to say R-12's findings are folded and the document waits on the next spec review, then the owner's acceptance. The field is not normative, so this edit needs no revision.
+
+### R-14
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-05 and AC-24; Test Plan, AC-05 and AC-06 row; Tasks, T25
+EVIDENCE: At 804c97b, Design ("Where the rules come from") now says an `origin/HEAD` that "names a remote-tracking branch that no longer exists" reports `default-branch-unknown` as a note and skips project rules. No criterion states that end state. AC-05 covers a changed or invalid working-tree manifest and the applied run's use of the default-branch manifest. AC-06 covers "Each manifest refusal listed in Design", and a pruned ref is not one of those refusals. AC-24 says only that "a repository with no manifest still gets the built-in globs". The current code already meets that clause in the pruned case: `defaultBranchManifest` in `internal/clean/clean.go` sends the `ls-tree` error to `invalid(...)` and returns a nil manifest, `plan` still applies `builtinRules()`, and `Clean` then reports `fail` because `manifest-invalid` is in `failing`. So a build without T25 meets AC-05, AC-06 and AC-24 as written, while the operation never applies in such a repository, which is the defect R-13 F-01 found. The proof is filed under the wrong criteria as well. The Test Plan puts "an `origin/HEAD` that names a pruned branch" in the AC-05, AC-06 row, and T25 cites AC-05 and AC-24, but the AC-24 row ("`internal/clean` table tests, and a `cmd/vh-adlc` test capturing stdout of a failing `env --sh`") does not mention the case. T24's fold set the pattern to follow: its invalid working-tree case went into the text of AC-05. `vh-adlc fresh` reports R-13 stale with `baseline-changed`, so this pass is the one an acceptance would name.
+PROPOSAL: Add to AC-05 or AC-24 that a missing `origin/HEAD`, or one whose target ref no longer exists, reports a `default-branch-unknown` note, skips project rules and does not fail the run, dry or applied. Then list that criterion in the Test Plan row that holds the pruned-branch case, and in T25.
 
 ## Sources
 
