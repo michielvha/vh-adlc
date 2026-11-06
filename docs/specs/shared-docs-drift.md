@@ -410,6 +410,7 @@ None.
 | 2026-11-06 | R-38 | spec | `03a97fab4efff2cfa1b872f96e77fed3a98700af` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-06 | R-39 | spec | `9c6e9c3bf3af619a82f3d3f4d47fcf1e822e5adc` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-06 | R-40 | spec | `46c0795d6b24eb5e84e9fc486ef8c18b1bf6c30e` | claude-opus-5.5 | procedural | 2 nit. Full requested read coverage. |
+| 2026-11-06 | R-41 | spec | `8df9e69ad5fec97fb20767be1ac990d943ec6ff4` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -1232,6 +1233,27 @@ SEVERITY: nit
 WHERE: Scope (explicit migration changes)
 EVIDENCE: Scope presents a complete list: "The explicit migration changes are the independent candidate-reviewer policy; consumer `scripts/docs-drift-entry.ts` launcher and `runtime_loader`; ... and authorized pause/drain/switch of the existing scheduled route. These are intentional execution/setup differences" (chunk 00081 line 17). The owner-selected Stackweaver scanner correction is missing from that list. It changes `scripts/docs-audit.js` and `scripts/docs-audit.test.js`, and it must be delivered under separate consumer publication authority before any trial or shared interactive adoption (chunk 00081 lines 25, 63; AC-06 at chunk 00321 line 26). The list also leaves out the new consumer reusable-worker and dispatch-only trial workflow files (chunk 00241 lines 21, 33) and the committed resolve records under `.vh-adlc/docs-drift/resolutions/` (chunk 00161 line 13). The parent child contract requires each child to record its intentional differences (shared-workflow-migration.md chunk 00081 lines 2-4). Scope also says to "Keep the scanner and detector semantics local", so an owner reading only Scope would not see that this feature changes the consumer scanner's code.
 PROPOSAL: Add the bounded scanner-completeness correction and its local regression, the reusable worker and dispatch-only trial workflows, and the committed resolve-record root to the Scope list of explicit migration changes. Keep the statement that detector rules and existing feedback contents stay unchanged.
+
+### R-41
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Upgrades after adoption (trial route); Scheduled worker and staged adoption (real unattended trial); Test Plan AC-06
+EVIDENCE: The trial route covers "changes to accepted assessment, resolve-classification/supersession, scan-contract, execution, provider/reviewer, permission/secret, lease or publication/closure rules/behavior" (chunk 00321 line 5). Some trial-route surfaces get a named scenario. The resolve/closure/issue collector trial lists the exact cases it must observe. The spec also says "Lease/advisory changes must likewise exercise the corresponding contention/publication path. A missing affected-surface trial leaves the upgrade unverified even when its other trial passes" (00321 line 7). Assessment-rule and scan-contract changes get no such scenario. The hosted trial input is "a committed bounded synthetic documentation/code/feedback fixture" (00241 line 23). An upgrade trial definition binds only "their exact blobs, proposed component/provider/permissions, allowed synthetic namespace and the intended prospective scheduled-caller contract" (00321 line 5). Nothing requires the fixture or its expected outcomes to exercise the changed assessment or protocol rule. AC-06 tests only that such a change is sent to the trial route (00321 line 38). An unchanged first-adoption fixture could pass a trial without ever observing the rule that made the trial necessary. That is the same vacuous-pass gap R-9 F-04 closed for closure and R-17 F-02 closed for issues.
+PROPOSAL: For an assessment or scan-contract change, require the trial definition to bind fixture scenarios and expected dispositions or protocol outcomes that differ between the old and new rule. Deny the trial when that coverage is missing, and add an AC-06 case where an unchanged fixture cannot verify such a change.
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (unattended non-publishing outcome); Scope; Audit and preparation (report); Test Plan AC-05, AC-06
+EVIDENCE: A run succeeds without publishing only when it has "no selected correction, unresolved owner decision or provisional/unknown verification". Otherwise "A non-publishing run still requiring owner attention ends non-success", and decisions or unknowns may be published only alongside "a reviewed advisory containing verified selected corrections" (chunk 00241 line 45). Inspecting a subset leaves the rest provisional (00081 line 77). The current Stackweaver baseline has 466 unverified candidates (00001 lines 74-76). In steady state, every scheduled run without a fresh safe correction therefore ends red. This holds even when its decisions and unknowns are already carried in an open advisory or consolidation PR or in an earlier report. No rule recognizes items that have already been surfaced. Scope says to "Preserve schedule cadence ... and notification behavior" (00081 line 17). A scheduled job that fails on most runs changes that signal and buries real failures such as incomplete scans or failed reviews.
+PROPOSAL: Ask the owner to choose between two options. A: a run succeeds with its bounded report when its remaining decisions and unknowns are already carried by an open advisory or consolidation PR, or match the digest of a prior report; it fails only for new attention items or for incomplete or blocked runs. B: keep the strict failure and record it in Scope as an intentional notification difference. Add an AC-05/AC-06 case for a repeated run whose surfaced decisions have not changed.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Scheduled worker and staged adoption (adoption check-signal); Test Plan AC-06
+EVIDENCE: `adoption check-signal` must join "the consumer's existing mandatory PR/default CI verification". For an adopted source it compares the selected pin with the signal, while "Staged/not-adopted state is explicit and grants nothing" (chunk 00241 line 19). Trial setup adds candidate pins while the consumer is still staged (00241 line 17). The spec never gives the check's exit status or comparison target in the staged state. A nonzero exit would fail every consumer PR until cutover. A zero exit would let an as-is signal intake merge go undetected before adoption.
+PROPOSAL: State the staged-state result. For example, compare the signal with the current-default trial candidate pin when a `trial` block exists, and otherwise exit zero with an explicit `staged` status. Add the matching AC-06 case.
 
 ## Sources
 
