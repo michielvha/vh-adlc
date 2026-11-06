@@ -44,7 +44,8 @@ A disposable source-procedure author trial now verifies summary maintenance and 
 conversation output. Its starting acceptance state is synthetic; native installed-plugin invocation and
 a real owner-acceptance transaction are not claimed. Docs PR26 is merged at `f781ee7b0404e80194aa568af3284888cc222017`, with the reviewed tree unchanged.
 This candidate updates the framework repository and fallback Docs pins to that revision. Other
-consumer pins stay unchanged. Final verification and independent review follow this adoption.
+consumer pins stay unchanged. All four criteria now have a passing independent implementation review.
+The 66 affected tests pass; the PR records the latest hosted CI and remains for owner merge review.
 Bulk rewrites, merges and unrelated feature work remain outside this change.
 
 ### Terminology and delivery
@@ -141,12 +142,14 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
 
 ## Acceptance Criteria
 
-- [ ] AC-01: New specs following the published shared template begin Context with a useful Owner summary that covers scope, approach, consequential trade-offs, validation state and owner decisions without adding a second normative contract.
+- [x] AC-01: New specs following the published shared template begin Context with a useful Owner summary that covers scope, approach, consequential trade-offs, validation state and owner decisions without adding a second normative contract.
+      Evidence: R-4 returned met at `6918c08`; published-template authoring, exact pin adoption, actual binary compatibility and source payload were independently inspected. Host-install and synthetic-state limits remain in the records.
 - [x] AC-02: The author refreshes the summary on a normative revision and before acceptance; planned validation and observed results remain distinct, and the owner still receives the existing conversation summary before deciding.
       Evidence: R-3 returned met at `4e1523b`; observed source-procedure author trial and independent semantic review, with the synthetic-state and host-invocation limits retained in the records.
 - [x] AC-03: Independent spec review identifies a materially stale, contradictory or unsupported summary through ordinary finding records while allowing an untouched historical spec without a summary.
       Evidence: R-3 returned met at `4e1523b`; observed source-procedure author trial and independent semantic review, with the synthetic-state and host-invocation limits retained in the records.
-- [ ] AC-04: The coordinated change uses the authoritative Docs template and a published exact framework pin; existing specs, baseline/status gates and verbatim review records remain compatible without a binary-format change or bulk migration.
+- [x] AC-04: The coordinated change uses the authoritative Docs template and a published exact framework pin; existing specs, baseline/status gates and verbatim review records remain compatible without a binary-format change or bulk migration.
+      Evidence: R-4 returned met at `6918c08`; published-template authoring, exact pin adoption, actual binary compatibility and source payload were independently inspected. Host-install and synthetic-state limits remain in the records.
 
 ## Test Plan
 
@@ -169,7 +172,8 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
       Evidence: two actual-binary tests pass (12 assertions), proving summary-only freshness, required draft/review after a normative change and byte-identical stored records. Nine summary/operation compatibility tests pass. Independent semantic trial at four exact scratch commits returns no findings for historical/honest drafts and blocking findings for unsupported proof and changed-default summaries. First trial retained an unrelated test-fixture task finding; corrected drafts were re-reviewed. Fixtures use explicit synthetic lifecycle rows, not real owner acceptance. Model identity is not attested.
 - [x] T6 `docs/specs/owner-readable-specifications.md` - preserve a disposable actual author-operation trial and its owner-facing pre-acceptance output; independent review verifies the observed behavior rather than inferring it from scripted fixtures (AC-02)
       Evidence: candidate author procedure used the actual Docs614bb27 template in a disposable checkout; gate draft passed, status-only commit96d0bfa preceded model-authored revision46c4203, and real conversation output linked the full draft and covered migration, recovery, proof and authority. Independent trial review returned NO FINDINGS and confirmed the delivered output closes the earlier gap. Starting acceptance rows remain synthetic; no installed-plugin or real acceptance transaction is claimed.
-- [ ] T4 `AGENTS.md`, `plugins/vh-adlc/knowledge.md` - after the companion Docs delivery lands, adopt its exact published pin, reconcile the candidate version with current main and pass affected package/lifecycle checks and independent review (AC-04)
+- [x] T4 `AGENTS.md`, `plugins/vh-adlc/knowledge.md` - after the companion Docs delivery lands, adopt its exact published pin, reconcile the candidate version with current main and pass affected package/lifecycle checks and independent review (AC-04)
+      Evidence: authorized DocsPR26 merge f781ee7 has the reviewed tree; both framework pins adopt it and both candidate manifests remain0.11.0 against current main0.10.0. Affected66tests pass, new-spec template trial lint passes, source Git export validates110plugin files and R4 independently returns all four criteria met. No binary, other consumer pin or framework merge was changed.
 
 ## Open Questions
 
@@ -183,6 +187,7 @@ None. The owner selected summary inside Context, preserving the existing format.
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | n/a | n/a | accepted by owner |
 | 2026-11-06 | R-2 | implementation | `557cf2a6f492405f326a3d35ba5833d72c8bfe89` | unknown | procedural | AC03 met; AC01/04 not met pending adoption; AC02 not verified pending native author trial. Model identity not attested. |
 | 2026-11-06 | R-3 | implementation | `4e1523bdcd5d1d0dac4916df490d789abdb2f11e` | unknown | procedural | AC02/03 met; AC01/04 await upstream template and pin adoption. Model identity not attested. |
+| 2026-11-06 | R-4 | implementation | `6918c0892950fdbe6af9c5195a616a3676bf619a` | unknown | procedural | All four criteria met; no findings. Model identity not attested. |
 
 ### R-1
 
@@ -230,6 +235,24 @@ EVIDENCE: The implementation and semantic fixtures are unchanged from independen
 CRITERION: AC-04 The coordinated change uses the authoritative Docs template and a published exact framework pin; existing specs, baseline/status gates and verbatim review records remain compatible without a binary-format change or bulk migration.
 VERDICT: not met
 EVIDENCE: At clean framework commit 4e1523bdcd5d1d0dac4916df490d789abdb2f11e, the repository still resolves Docs 0e52f51f01b84eda75a976763c42d8ec0a07b544 and plugin knowledge retains f8ccacbedf057159ea24136ba115cd9857bb22ac. Adoption of companion candidate 614bb27a7c1809f4a6e3ab86040329a82466efe0 remains pending. Only the feature document changed since the previously observed focused suite passed 66 tests with 262 assertions. Previously verified rules-block identity and binary compatibility therefore remain applicable. Current framework lint passes, freshness reports both recorded reviews fresh, and feature_tree.clean is true. These checks establish compatibility preparation while the required published exact pin remains incomplete.
+
+### R-4
+
+CRITERION: AC-01 New specs following the published shared template begin Context with a useful Owner summary that covers scope, approach, consequential trade-offs, validation state and owner decisions without adding a second normative contract.
+VERDICT: met
+EVIDENCE: At clean framework commit 6918c0892950fdbe6af9c5195a616a3676bf619a, knowledge resolves published Docs f781ee7b0404e80194aa568af3284888cc222017. GitHub confirms PR26 merged at that commit. Inspected new-spec trial ea90818f3b74b4bd3a4b44a1ed8d3e0b726d1b28 and verified template-copied.md exactly matches the published template's fenced block. Context begins with Owner summary covering scope, approach, default, trade-off, migration, recovery, planned validation and acceptance authority. Its wording agrees with Scope, Design and AC-01. Actual trial lint passes at the published pin. Node24 documentation checks pass on the identical published tree.
+
+CRITERION: AC-02 The author refreshes the summary on a normative revision and before acceptance; planned validation and observed results remain distinct, and the owner still receives the existing conversation summary before deciding.
+VERDICT: met
+EVIDENCE: The author procedure and previously inspected trial remain unchanged. Trial history shows a passing draft gate and status-only commit 96d0bfac6cd847d4d013baa92ce8b4904fde311a before model-authored revision 46c42032fbdd476f1c94bb47762b3f4aa1afe400. That revision reconciles the summary with the changed contract and distinguishes planned implementation checks from observed specification checks. The delivered conversation artifact covers behavior, migration, recovery, proof, acceptance authority and the full-spec link before a decision. Previously reran trial lint and freshness, confirming valid format and the earlier review's stale baseline. Durable copies and stored records match the inspected originals. F-01 remains resolved. Evidence covers the source procedure with synthetic starting acceptance. Native installed-plugin invocation and a real owner-acceptance transaction remain unverified.
+
+CRITERION: AC-03 Independent spec review identifies a materially stale, contradictory or unsupported summary through ordinary finding records while allowing an untouched historical spec without a summary.
+VERDICT: met
+EVIDENCE: The canonical reviewer and semantic fixture implementation remain unchanged from the earlier independent inspections. Historical and honest fixture commits retain NO FINDINGS records. Unsupported-proof and changed-default fixtures retain ordinary blocking factual findings supported by their exact source. Independent inspection confirmed the unsupported test and CI claims and the contradictory default. The reviewer explicitly checks summary consistency and allows historical absence. The focused suite again passes both actual-binary fixture tests. Semantic trial isolation is procedural and model identity is not attested.
+
+CRITERION: AC-04 The coordinated change uses the authoritative Docs template and a published exact framework pin; existing specs, baseline/status gates and verbatim review records remain compatible without a binary-format change or bulk migration.
+VERDICT: met
+EVIDENCE: At clean framework commit 6918c0892950fdbe6af9c5195a616a3676bf619a, AGENTS.md and plugin knowledge.md both adopt published Docs f781ee7b0404e80194aa568af3284888cc222017. Live GitHub metadata confirms that exact PR26 merge. Published and reviewed candidate trees share hash f47ca0834379d2d9939844a7a39a3d0741a2e11f. The published machine-readable rules block is byte-identical to the former effective standard. Independently executed the requested focused suite with 66 passes and 262 assertions. Framework lint passes, spec review remains fresh and feature_tree.clean is true. Existing records remain verbatim. Source archive inspection confirms 110 plugin files, matching 0.11.0 manifests, the published pin and required helper. The binary and its format remain unchanged. Framework publication remains a later delivery step.
 
 ## Sources
 
