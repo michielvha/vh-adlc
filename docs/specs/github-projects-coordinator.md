@@ -244,6 +244,8 @@ None. The owner selected approved add/update batches and accepted the documented
 | 2026-11-06 | R-6 | spec | `258735c1e8810210a5dac05f06ee718b8cd95208` | n/a | n/a | accepted by owner |
 | 2026-11-06 | R-7 | implementation | `f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a` | unknown | procedural | All seven criteria met; factual summary refresh remains. Model identity not attested. |
 | 2026-11-06 | R-8 | implementation | `387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a` | unknown | procedural | All seven criteria met; no findings. Model identity not attested. |
+| 2026-11-06 | R-9 | implementation | `c98c5d602c84f5924ee034a83ca7bd97a3b1c578` | unknown | procedural | All seven criteria met; correct the stale compatibility statement. Model identity not attested. |
+| 2026-11-06 | R-10 | spec | `c98c5d602c84f5924ee034a83ca7bd97a3b1c578` | unknown | procedural | Record the source-package publication path. Model identity not attested. |
 
 ### R-1
 
@@ -415,6 +417,51 @@ VERDICT: met
 EVIDENCE: The live trial remains bound to 9a535ea4ef6778143b440b0bdfc422b46249a3f6, whose runtime is retained at 387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a. Previously inspected bounded owner authorization and author-run add/update/repeat/conflict receipts, then independently executed live inventory, direct GraphQL observation and final REST comparisons. All 26 pre-existing docs entries and 55 pre-existing vh-adlc entries matched saved metadata after excluding the two owned tests. Independently confirmed the private test board and both owned issues were closed. Mutations were author-executed. The initial failed attempt remains recorded, and the additional archival regression step was not separately named in the approval question. R8 performed document and retained-evidence inspection.
 
 NO FINDINGS
+
+### R-9
+
+CRITERION: AC-01 An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
+VERDICT: met
+EVIDENCE: At clean c98c5d602c84f5924ee034a83ca7bd97a3b1c578, independently executed the Projects, package, owner-summary and discovery tests. All 87 tests passed with 429 assertions, including configuration, identity resolution, refusal paths and fresh-process CLI invocation. Binary knowledge resolved repository Docs f781ee7b0404e80194aa568af3284888cc222017, and document lint passed.
+
+CRITERION: AC-02 Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
+VERDICT: met
+EVIDENCE: At c98c5d602c84f5924ee034a83ca7bd97a3b1c578, independently observed passing pagination, identity, incomplete-collection and archived-membership tests. Confirmed Projects runtime and tests are byte-identical to live-reviewed 9a535ea. Earlier independent scratch execution covered every nested cursor path and denied noninitial pages. Independent live inventory at 9a535ea returned complete=true, no gaps, 19 repository issues and both owned cards with archival state preserved.
+
+CRITERION: AC-03 Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
+VERDICT: met
+EVIDENCE: At c98c5d602c84f5924ee034a83ca7bd97a3b1c578, independently executed passing recommendation and discovery checks and confirmed retention of the inspected Projects implementation and skill. Issue state, closure reason, PR head, review and checks remain separate and source-linked. Uninspected repository lifecycle remains unknown, and selected implementation follows the owning checkout's existing procedure.
+
+CRITERION: AC-04 Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
+VERDICT: met
+EVIDENCE: At c98c5d602c84f5924ee034a83ca7bd97a3b1c578, independently executed passing approval-binding, configured-scope, preflight, reconciliation and retry tests. Archived-member retries issue zero mutations. Earlier live observations and author-run receipts remain attributed to 9a535ea. The owner granted bounded disposable-resource testing. Manual inspection of generated JSON was not observed, and obtaining human approval remains the documented procedural responsibility.
+
+CRITERION: AC-05 Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
+VERDICT: met
+EVIDENCE: At c98c5d602c84f5924ee034a83ca7bd97a3b1c578, independently observed passing conflict, partial-failure, timeout, incomplete-preflight and untrusted-input checks. Earlier independent scratch execution established foreign identity refusal and unknown read-back stopping subsequent writes. At 9a535ea, inspected the author-run live conflict receipt and independently read back the preserved intervening field value. Field documentation and receipts retain the read/write-race disclosure. Rate-limit and mutation-failure coverage remains fixture evidence.
+
+CRITERION: AC-06 Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
+VERDICT: met
+EVIDENCE: At c98c5d602c84f5924ee034a83ca7bd97a3b1c578, independently executed 87 passing affected tests, including strict TypeScript, package registration and configuration/JSON reuse. Both manifests consistently declare 0.12.0. An additional independent source-export test passed 15 assertions, verifying fourteen packaged skills, both marketplace files, adopted Docs pin, manifest versions and CLI execution from extracted source. Setup retains scope and cross-owner limits. The compatibility evidence statement needs correction in F-01.
+
+CRITERION: AC-07 A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
+VERDICT: met
+EVIDENCE: The live trial remains bound to 9a535ea4ef6778143b440b0bdfc422b46249a3f6. Independently confirmed identical Projects runtime at c98c5d602c84f5924ee034a83ca7bd97a3b1c578. Previously inspected bounded owner authorization and author-run add/update/repeat/conflict receipts, then independently executed live inventory, GraphQL read-back and final REST comparisons. All 26 pre-existing docs entries and 55 pre-existing vh-adlc entries matched saved metadata after excluding the two owned tests. Independently confirmed the private board and both owned issues were closed. Mutations were author-executed. The initial failed attempt remains recorded, and the additional archival step was not separately named in the approval question. R9 performed local checks and read-only CI verification.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/reference/compatibility.md:13
+EVIDENCE: At c98c5d602c84f5924ee034a83ca7bd97a3b1c578, the Projects compatibility paragraph says actual GitHub board acceptance remains unverified. The controlled trial at 9a535ea exercised actual board inventory, additions, field update, repeats and conflict refusal, with independent live read-back and cleanup verification. The Projects runtime remains byte-identical.
+PROPOSAL: Record the bounded Linux CLI trial and its exact runtime commit in the compatibility paragraph. Preserve the separate unverified status of installed-agent invocation and other host platforms.
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/specs/github-projects-coordinator.md / Context and delivery evidence
+EVIDENCE: At c98c5d602c84f5924ee034a83ca7bd97a3b1c578, the feature document names manifests and package checks but omits the affected artifact's publication path. The adopted Docs f781ee7 delivery convention requires naming affected artifacts and their build/publication paths. Installation documentation identifies marketplace consumption of the Git source package under plugins/vh-adlc. Independently exported the exact commit and executed its extracted Projects CLI through inventory and plan, with unapproved apply refused. That scratch check passed 15 assertions, including fourteen skills, both marketplace files, both 0.12.0 manifests and the adopted Docs pin. Historical hosted CI was independently verified successful at 9af06c6 through Actions run 42152219690. Integrated-head hosted CI remains outstanding.
+PROPOSAL: Add a short factual Context paragraph naming the marketplace Git source package, both manifests and publication through the main-branch merge, with the source-export verification evidence. Distinguish this source-package path from the unaffected binary-release workflows and retain the installed-agent proof limits.
 
 ## Sources
 
