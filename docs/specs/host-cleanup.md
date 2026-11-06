@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. The factual findings of R-10 to R-14 are folded, and the owner answered Q1 to Q4 on 2026-11-06. The owner's advance acceptance was conditional on R-12, which went stale when its factual nits were folded; R-13 and R-14 then added the pruned origin/HEAD end state to Design and AC-05 (task T25). R-15 at 28c830a returned two judgement findings, now Q5 and Q6. Waits on the owner's answers, a fresh spec review and an acceptance naming it; tasks T23 to T25 follow acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. The factual findings of R-10 to R-14 are folded, and the owner answered Q1 to Q6 on 2026-11-06. The owner accepts in advance on the condition that a narrow confirmation pass over the changes since R-15 (28c830a) has no blocking or judgement finding. Tasks T23 to T25 follow acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -163,8 +163,10 @@ clears them under the same limits, including in a repository with no manifest.
 `.vh-adlc/cleanup.yaml` on `origin/<default>` with `git ls-tree`, then reads that object with
 `git cat-file blob`, each with `GIT_NO_LAZY_FETCH=1`. With no such ref, or one that names a remote-tracking
 branch that no longer exists, as after a renamed default branch and a pruning fetch, it reports
-`default-branch-unknown`; with no manifest there it reports `manifest-missing`. Both are notes and skip
-project rules.
+`default-branch-unknown`; with no manifest there it reports `manifest-missing`. A manifest object a partial
+clone has not fetched is also `manifest-missing`, with a message naming `git fetch origin` as the fix: the
+owner's answer on 2026-11-06. All three are notes: they skip project rules, the built-in globs still apply,
+and the run does not fail on them.
 
 A dry run also plans a working-tree copy that differs, marked `manifest-unmerged`. A differing copy that
 is invalid is reported as a `manifest-unmerged` note naming the refusal: it plans nothing and does not fail
@@ -289,8 +291,11 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 - [ ] AC-05: A dry run plans a changed working-tree manifest, and an applied run removes only what the default-branch
       manifest declares. A dry run with an invalid working-tree manifest reports it as a `manifest-unmerged` note,
       plans nothing from it and does not fail on it. A missing `origin/HEAD`, or one whose target ref no longer
-      exists, reports a `default-branch-unknown` note, skips project rules and does not fail the run, dry or
-      applied.
+      exists, reports a `default-branch-unknown` note, removes nothing under project rules and does not fail on
+      it, dry or applied; a dry run still plans a working-tree manifest under `manifest-unmerged`. A
+      default-branch manifest object missing from a partial clone reports a `manifest-missing` note naming
+      `git fetch origin`, removes nothing under project rules, still applies the built-in globs and does not fail
+      on it, dry or applied.
 - [ ] AC-06: Each manifest refusal listed in Design, in the default-branch manifest `clean` applies or the working-tree
       manifest `env` reads, reports `manifest-invalid`, that manifest's rules remove nothing, and `env` creates
       nothing for it.
@@ -328,7 +333,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 | AC-07 | A `cmd/vh-adlc` test runs the real binary under `bwrap --unshare-pid` and asserts `pid-namespace` with nothing removed. |
 | AC-02, AC-03, AC-08 | Fake-engine tests: an `httptest` server on a Unix socket records every call and fails on any `force` parameter, across Compose projects and clusters with ended and live marks, a mixed-label Compose project, a killed run's cluster reused and kept, a bind mount, failed listings, and an absent, refused and denied socket. |
 | AC-03, AC-08 | Integration test behind a build tag on the real engine, with disposable objects and clusters. |
-| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit, an uncommitted edit, an invalid uncommitted edit on a dry run, and a missing `origin/HEAD` and one that names a pruned branch, dry and applied. A missing object in a partial clone must not fetch. |
+| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit, an uncommitted edit, an invalid uncommitted edit on a dry run, and a missing `origin/HEAD` and one that names a pruned branch, dry and applied. A missing object in a partial clone must not fetch, and reports the `manifest-missing` note naming `git fetch origin` while the built-in globs still apply, dry and applied. |
 | AC-11 | Written manual procedure in disposable sessions, recorded under `tests/vh-adlc/evidence/clean/`, with `codex execpolicy check` output, the default Codex session's outcome, and a session blocked on space with no request for cleanup. |
 | AC-12 | The real-host sequence in Adoption, with each row's outcome recorded. |
 | AC-14 | `bun test tests/vh-adlc`, a golden JSON report against the updated schema, and a read of the documentation against the flags. |
@@ -384,35 +389,11 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       Evidence: "What counts as in use" now names a bind of all of `/tmp` or `/`, the temp base or the project's temp root, with `-v "$TMPDIR:$TMPDIR"` as the example. `usage.holds` and `mountedIn` in `internal/clean/files.go` call `within(p, entry)`, which holds only for the entry or a path inside it, so a bind source that is an ancestor of the scanned directory holds no entry below it. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
 - [ ] T23 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q4 (R-11 F-03) on 2026-11-06, with R-12 F-01: the stated limit names a bind of `/tmp` or any directory above it for top-level entries, and a bind of the project's temp root or any directory above it, the temp base included, for temp-root entries, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
 - [ ] T24 `internal/clean/clean_test.go`, `internal/clean/clean.go`, `plugins/vh-adlc/references/clean.md` - the owner's answer to Q3 (R-11 F-02) on 2026-11-06: a dry run reports an invalid working-tree manifest as a `manifest-unmerged` note naming the refusal, plans nothing from it and does not fail on it, while an invalid default-branch manifest still fails; `references/clean.md` says so; a `TestResults` row and a `TestManifestSources` case for the invalid uncommitted edit fail first, then pass (AC-05, AC-06, AC-14)
-- [ ] T25 `internal/clean/clean_test.go`, `internal/clean/clean.go` - R-13 F-01: an `origin/HEAD` that names a remote-tracking branch which no longer exists reports `default-branch-unknown`, a note with the `git remote set-head origin --auto` hint, and skips project rules while the built-in globs still apply, instead of failing with `manifest-invalid`; a fixture-repository case with a renamed default branch and a pruning fetch fails first, then passes (AC-05)
+- [ ] T25 `internal/clean/clean_test.go`, `internal/clean/clean.go` - R-13 F-01: an `origin/HEAD` that names a remote-tracking branch which no longer exists reports `default-branch-unknown`, a note with the `git remote set-head origin --auto` hint, and skips project rules while the built-in globs still apply, instead of failing with `manifest-invalid`; and, for the owner's answer to Q5 (R-15 F-01) on 2026-11-06, a manifest object a partial clone has not fetched reports a `manifest-missing` note naming `git fetch origin`, skips project rules while the built-in globs still apply, and does not fail, replacing the `manifest-invalid` that `TestPartialCloneDoesNotFetch` expects (T10's choice), and never fetches; a fixture-repository case with a renamed default branch and a pruning fetch, and the partial-clone cases dry and applied, fail first, then pass (AC-05)
 
 ## Open Questions
 
-### Q5: What should `clean` report when the default-branch manifest blob is missing from a partial clone?
-
-**Recommendation:** A. Make it a note that skips project rules and names `git fetch origin` as the fix,
-because the manifest is valid and only unfetched, and a failing dry run stops the operation from clearing
-even the built-in globs.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. A note** | Like `default-branch-unknown`: project rules are skipped, the built-in globs still apply, the run does not fail on it, and the note names a command that fetches the blob | A code change in `internal/clean/clean.go` and a test after acceptance, folded into T25; AC-05 and the Test Plan name the outcome |
-| **B. Keep it failing, with a hint** | `manifest-invalid` stays, now with a hint naming the fetch; the operation sends the user to fetch first | Until something fetches the blob, the operation clears nothing in that clone |
-
-**Why this is yours:** R-15 F-01 asks whether an unfetched manifest should be treated as unknown or as
-broken, which trades a visible failure against unblocking a session that is out of space.
-
-### Q6: Should AC-05's `origin/HEAD` clause be reworded?
-
-**Recommendation:** A. Reword it, so it does not read as forbidding the dry-run plan of a working-tree
-manifest or as a claim about the whole run's result.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Reword** | "...reports a `default-branch-unknown` note, removes nothing under project rules and does not fail on it, dry or applied; a dry run still plans a working-tree manifest under `manifest-unmerged`." | One sentence |
-| **B. Keep it** | No change | A reviewer may read "skips project rules ... dry" as forbidding the `unmerged` plan the code makes |
-
-**Why this is yours:** R-15 F-02 is a wording judgement on a criterion's text.
+None.
 
 ## Review Log
 
