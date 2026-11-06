@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementing the accepted shared docs-drift feature for issue59. Local tests and independent review precede separately authorized feature publication and consumer adoption."
+status: draft
+status_description: "Refreshing review coverage after the integrated Copilot review. The branch and completed local task history are retained while the revised spec is reviewed for owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
