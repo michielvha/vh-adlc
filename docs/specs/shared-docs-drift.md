@@ -544,6 +544,7 @@ None.
 | 2026-11-06 | R-45 | spec | `4a27a4b574202234335fd42f91d6ba59f0cd8731` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 | 2026-11-06 | R-46 | spec | `49e070dbf0434542b0c11fbac42dc5132c4a77f6` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
 | 2026-11-06 | R-46 | spec | `49e070dbf0434542b0c11fbac42dc5132c4a77f6` | n/a | n/a | accepted by owner |
+| 2026-11-06 | R-47 | spec | `c24f55371ca5bd98ed3e833c8bd3926404ff77ef` | claude-opus-5.5 | procedural | 1 should-fix; 2 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -1475,6 +1476,27 @@ PROPOSAL: Define how pre-cutover legacy advisory PRs are identified (for example
 ### R-46
 
 NO FINDINGS
+
+### R-47
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary (paragraphs at shared-docs-drift.md:73 and :75); Design, Upgrades after adoption; Scheduled worker and staged adoption
+EVIDENCE: The pinned standard says the summary covers "important defaults, permissions, trade-offs, validation state and owner decisions" and that "The reviewer checks for contradictions, consequential omissions" (feature-documents.md 00061 lines 25-34). The summary gives the settled upgrade decision only as "Protected execution changes follow the reviewed upgrade and trial policy" (line 73). It leaves out what the owner accepted. Compatible updates, including contract-preserving refactors and fixes, need independent review plus installed checks (line 386: "a fix is compatible when independent review identifies the unchanged documented rule and a failing-then-passing regression demonstrates restoration..."). Execution, provider, reviewer, permission or publication changes, and any uncertainty, take the trial route ("ambiguity about the contract or scope also takes it"). The current approved pin stays active until a verified successor is approved. The summary also says legacy publication retires "after the actual installed-command checks, hosted advisory trial and hosted history read succeed" (line 73). The Design requires more before first cutover. It needs "both the actual unattended advisory trial and the installed-model synthetic resolve/closure/issue collector trial ...; neither substitutes for the other" (line 304). It needs the paired source-candidate review at C, the Claude forwarded-entry result and the Copilot entry collector result (line 320 area, 00320 line 1). It also needs the Copilot marketplace install and discovery (00266 line 11). An owner reading only the summary would not see the compatible upgrade route or the collector-trial and paired-review gates on retirement.
+PROPOSAL: Add one sentence on the accepted upgrade route. Compatible changes, including contract-preserving fixes with an old-fail/new-pass regression, go through independent review and installed checks. Execution, provider, reviewer, permission, publication or uncertain changes take the affected-surface trial. The approved pin stays active until a verified successor is approved. Extend the retirement sentence to name the installed-model resolve/closure/issue collector trial, the Claude and Copilot entry results and the paired candidate review.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context, provenance paragraph (shared-docs-drift.md:92); Sources (shared-docs-drift.md:1480-1483)
+EVIDENCE: Context still says "Before the next review, this draft integrates upstream `21bc3e4` (maintenance security resolution) ... Plugin manifests and workflow/compatibility guides are reviewed at that integrated source." T40 records a later preserving merge of "published upstream `837ebc4`" that "resolves its two version-only conflicts to candidate plugin 0.13.0 in both actual manifests" and moves to repository pin `f781ee7b...` (00463 line 1). So the manifests and guides are now at the 837ebc4 integration, which Context never mentions. The words "Before the next review" are also outdated. Sources still label the 0e52f51f links "Pinned feature-document standard", "Pinned documentation conventions" and "Pinned agent entry point", although the current pin is f781ee7b. The final Sources bullet cites f781ee7b as current. The documentation convention asks to "Keep current version readings in configuration or a dated measurement, not normative prose that goes stale" (documentation.md 00061 lines 34-35).
+PROPOSAL: Rewrite the Context sentence as dated history. Name 21bc3e4 as the earlier integration, and name the T40 integration of 837ebc4 (candidate plugin 0.13.0, pin f781ee7b) as the source the manifests and guides are now reviewed at. Relabel the 0e52f51f Sources entries as the earlier pinned revision.
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter covers (shared-docs-drift.md:8-47); Tasks T39 (shared-docs-drift.md:452)
+EVIDENCE: The standard says "`covers` lists every path whose change can affect the feature" (feature-documents.md 00001 lines 45-46), and `feature_tree_clean` and freshness are judged against it (00301 lines 4, 17). T39 changes `tests/vh-adlc/settings-file.test.ts` to hold the failing-first regression for this feature's explicit YAML-reader environment, with no inherited credential or trace side effects. It also changes `plugins/vh-adlc/scripts/settings-file.ts`, and covers does list that file. Covers lists the analogous neutral-helper regression `tests/vh-adlc/git-read.test.ts` (line 22) but not `tests/vh-adlc/settings-file.test.ts`. A later edit that weakens that regression would therefore not make the feature's reviews stale or its tree dirty.
+PROPOSAL: Add `tests/vh-adlc/settings-file.test.ts` to covers. This changes the normative frontmatter, so handle it through the normal revision and re-acceptance boundary. If the owner prefers not to revise now, record the gap and its accepted risk in the Context instead.
 
 ## Sources
 
