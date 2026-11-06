@@ -7,7 +7,8 @@ import { canonicalDigest, decodeUTF8, protocolPath, sha256, withinPrefix } from 
 import type { Snapshot } from "./snapshot";
 
 type Range = { start: number; end: number };
-export type ProtectedEdit = Range & { path: string; replacement: Uint8Array; before_sha256: string };
+export type ProtectedEdit = Range & { path: string; replacement: Uint8Array; before_sha256: string | null;
+  action?: "replace" | "create" | "delete" | "chmod"; after_mode?: "100644" | "100755" | null };
 type Quote = Range & { sha256: string };
 type LocalRange = {
   document: string; document_sha256: string; procedure_sha256: string; procedure_quote: Quote; ranges: Range[];
@@ -148,10 +149,27 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
     try {
       protocolPath(edit.path);
       const blob = snapshot.blobs.find(blob => blob.path === edit.path);
-      if (!blob || !inventory.has(edit.path) || edit.before_sha256 !== sha256(blob.bytes) || !validRange(edit, blob.bytes.length)) throw new Error("edit source mismatch");
-      decodeUTF8(blob.bytes.subarray(0, edit.start));
-      decodeUTF8(blob.bytes.subarray(edit.end));
-      decodeUTF8(edit.replacement);
+      const action = edit.action ?? "replace", bytes = blob ? Buffer.from(blob.bytes) : Buffer.alloc(0);
+      const inScope = (snapshot.settings.roots.some(root => withinPrefix(edit.path, root))
+        && !snapshot.settings.exclusions.some(root => withinPrefix(edit.path, root))) || snapshot.settings.feedback_files.includes(edit.path);
+      if (!inScope || !["replace", "create", "delete", "chmod"].includes(action)
+        || edit.before_sha256 !== (blob ? sha256(bytes) : null) || !validRange(edit, bytes.length)
+        || (action === "create" ? blob !== undefined || edit.start !== 0 || edit.end !== 0 : blob === undefined)
+        || (edit.after_mode !== undefined && edit.after_mode !== null && !["100644", "100755"].includes(edit.after_mode))) throw new Error("edit source mismatch");
+      if (action === "delete" && (edit.start !== 0 || edit.end !== bytes.length || edit.replacement.length !== 0 || edit.after_mode !== null)) throw new Error("delete scope");
+      if (action !== "delete" && edit.after_mode === null) throw new Error("missing file mode");
+      if (action === "chmod" && (edit.start !== 0 || edit.end !== 0 || edit.replacement.length !== 0 || edit.after_mode === undefined)) throw new Error("mode scope");
+      if (!blob && edit.after_mode === undefined) throw new Error("create mode required");
+      let prose = true;
+      try { decodeUTF8(bytes); if (bytes.includes(0)) prose = false; } catch { prose = false; }
+      if (!inventory.has(edit.path) && !snapshot.settings.suffixes.some(suffix => edit.path.endsWith(suffix))) {
+        try { decodeUTF8(edit.replacement); if (Buffer.from(edit.replacement).includes(0)) prose = false; } catch { prose = false; }
+      }
+      if (!prose && (inventory.has(edit.path) || snapshot.settings.suffixes.some(suffix => edit.path.endsWith(suffix)))) throw new Error("declared prose cannot become a binary asset");
+      if (prose && action !== "chmod") {
+        decodeUTF8(bytes.subarray(0, edit.start)); decodeUTF8(bytes.subarray(edit.end)); decodeUTF8(edit.replacement);
+      } else if (!prose && action !== "chmod" && (edit.start !== 0 || edit.end !== bytes.length)) throw new Error("binary needs full-file selection");
+      if (!blob && withinPrefix(edit.path, roots.policy.feature_root)) { decision.reason = "feature-creation-requires-lifecycle"; continue; }
       const ownFeature = features.find(feature => feature.path === edit.path);
       decision.affected_features = features.filter(feature => feature.path !== edit.path && feature.patterns.some(pattern => pattern(edit.path)))
         .map(feature => ({ path: feature.path, historical: feature.historical, claimed: feature.branch !== null }));
@@ -161,27 +179,40 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
           selection.source_commit === snapshot.source_commit && /^[a-f0-9]{64}$/u.test(selection.selection_sha256)));
       if (conflict) { decision.reason = "active-feature-overlap"; continue; }
       const writers = context.other_writers?.filter(writer => writer.document === edit.path) ?? [];
-      if (writers.some(writer => writer.document_sha256 !== sha256(blob.bytes) ||
+      if (writers.some(writer => writer.document_sha256 !== sha256(bytes) ||
           !context.coordinated?.some(selection => selection.writer === writer.writer && selection.document === edit.path &&
             selection.source_commit === snapshot.source_commit && /^[a-f0-9]{64}$/u.test(selection.selection_sha256)))) {
         decision.reason = "other-current-writer";
         continue;
       }
-      const metadata = readDocumentMetadata(blob.bytes, readers.yaml);
-      const declaredKind = context.document_kinds?.find(item => item.document === edit.path && item.document_sha256 === sha256(blob.bytes))?.kind;
+      const metadata = prose ? readDocumentMetadata(bytes, readers.yaml) : null;
+      const declaredKind = context.document_kinds?.find(item => item.document === edit.path && item.document_sha256 === sha256(bytes))?.kind;
       const historyKind = ownFeature !== undefined || ["plan", "review", "evidence", "report"].includes(String(metadata?.type)) ||
         ["plan", "review", "evidence", "unknown"].includes(declaredKind ?? "");
       const unclassifiedLocal = roots.policy.local_format && (historyKind || (declaredKind !== "ordinary" &&
         !["guide", "guideline", "architecture", "principle", "standard", "decision"].includes(String(metadata?.type))));
+      if ((ownFeature || historyKind || unclassifiedLocal) && action !== "replace") { decision.reason = "governed-file-transition"; continue; }
       if (unclassifiedLocal || (!ownFeature && historyKind)) {
-        if (!localEditable(blob.bytes, edit.path, snapshot, edit, context)) { decision.reason = "unclassified-local-range"; continue; }
+        if (!localEditable(bytes, edit.path, snapshot, edit, context)) { decision.reason = "unclassified-local-range"; continue; }
       } else if (ownFeature) {
-        if (standardLayout(blob.bytes).protected.some(range => overlaps(edit, range))) { decision.reason = "protected-feature-range"; continue; }
+        if (standardLayout(bytes).protected.some(range => overlaps(edit, range))) { decision.reason = "protected-feature-range"; continue; }
       }
-      const after = Buffer.concat([blob.bytes.subarray(0, edit.start), Buffer.from(edit.replacement), blob.bytes.subarray(edit.end)]);
-      decodeUTF8(after);
+      const selected = edits.filter(item => item.path === edit.path);
+      if (selected.length > 1 && selected.some(item => ["create", "delete"].includes(item.action ?? "replace"))) throw new Error("conflicting file transitions");
+      const modes = new Set(selected.map(item => item.after_mode ?? blob?.mode ?? null));
+      if (modes.size !== 1) throw new Error("conflicting file modes");
+      const replacements = selected.filter(item => (item.action ?? "replace") !== "chmod");
+      for (const [position, item] of replacements.entries()) if (replacements.slice(position + 1).some(other => overlaps(item, other)
+        || overlaps(other, item))) throw new Error("conflicting edit ranges");
+      let after: Buffer | null = action === "delete" ? null : Buffer.from(bytes);
+      for (const item of [...replacements].sort((left, right) => right.start - left.start || right.end - left.end)) {
+        if (after === null) break;
+        after = Buffer.concat([after.subarray(0, item.start), Buffer.from(item.replacement), after.subarray(item.end)]);
+      }
+      if (prose && after !== null && action !== "chmod") decodeUTF8(after);
       if (ownFeature || historyKind || unclassifiedLocal) {
-        const prior = standardLayout(blob.bytes);
+        const prior = standardLayout(bytes);
+        if (after === null) throw new Error("governed deletion");
         const next = standardLayout(after);
         if (canonicalDigest([next.shape, next.fence_state]) !== canonicalDigest([prior.shape, prior.fence_state])) {
           decision.reason = "governed-document-structure-change";

@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureRepositoryState, captureSnapshot } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -192,4 +192,95 @@ test("freshness refuses excluded dirty root policy before invoking its working-t
   commitAll(root);
   put(root, "AGENTS.md", "Feature documents: plans/\n# Another writer's uncommitted policy\n");
   expect(() => observeFeatureFreshness(root, "plans/feature.md")).toThrow();
+});
+
+
+test("explicit ordinary file creation deletion and mode changes retain their exact eligibility", () => {
+  const root = fixture(), snapshot = captureSnapshot(root, commitAll(root));
+  const blob = snapshot.blobs.find(blob => blob.path === "docs/guide.md");
+  if (!blob) throw Error("missing guide fixture");
+  const edits = [
+    { action: "create" as const, path: "docs/new-guide.md", start: 0, end: 0,
+      before_sha256: null, replacement: Buffer.from("# New guide\n"), after_mode: "100644" as const },
+    { action: "delete" as const, path: blob.path, start: 0, end: blob.bytes.length,
+      before_sha256: sha256(blob.bytes), replacement: Buffer.alloc(0), after_mode: null },
+  ];
+  const result = evaluateProtection(root, snapshot, edits);
+  expect(result.complete).toBe(true);
+  expect(result.edits.every(edit => edit.allowed)).toBe(true);
+  expect(result.edits[0].bytes).toEqual(Buffer.from("# New guide\n"));
+  expect(result.edits[1].bytes).toBeNull();
+  const mode = evaluateProtection(root, snapshot, [{ action: "chmod", path: blob.path, start: 0, end: 0,
+    before_sha256: sha256(blob.bytes), replacement: Buffer.alloc(0), after_mode: "100755" }]);
+  expect(mode.edits[0].allowed).toBe(true);
+});
+
+
+test("whole binary asset corrections can be assessed without decoding them as prose", () => {
+  const root = fixture();
+  writeFileSync(join(root, "docs/asset.bin"), Buffer.from([0, 255, 1]));
+  const snapshot = captureSnapshot(root, commitAll(root));
+  const asset = snapshot.blobs.find(blob => blob.path === "docs/asset.bin");
+  if (!asset) throw Error("missing asset fixture");
+  const result = evaluateProtection(root, snapshot, [{ path: asset.path, start: 0, end: asset.bytes.length,
+    before_sha256: sha256(asset.bytes), replacement: Buffer.from([0, 255, 2]), after_mode: "100644" }]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(true);
+  expect(result.edits[0].bytes).toEqual(Buffer.from([0, 255, 2]));
+});
+
+
+test("combined edits cannot introduce a governed heading that no individual edit contains", () => {
+  const root = fixture(), text = feature(root).replace("A fixture feature document.", "xx Heading\n");
+  put(root, "plans/feature.md", text);
+  const snapshot = captureSnapshot(root, commitAll(root)), bytes = Buffer.from(text), start = bytes.indexOf("xx Heading");
+  const edits = [
+    { path: "plans/feature.md", start, end: start + 1, before_sha256: sha256(bytes), replacement: Buffer.from("#") },
+    { path: "plans/feature.md", start: start + 1, end: start + 2, before_sha256: sha256(bytes), replacement: Buffer.from("#") },
+  ];
+  const result = evaluateProtection(root, snapshot, edits);
+  expect(result.edits.every(edit => !edit.allowed)).toBe(true);
+});
+
+
+test("new binary assets need full-file scope and creation cannot bypass feature coverage", () => {
+  const root = fixture();
+  feature(root, "in-progress", "feat/claimed");
+  const snapshot = captureSnapshot(root, commitAll(root));
+  const create = { action: "create" as const, path: "docs/new-asset.bin", start: 0, end: 0,
+    before_sha256: null, replacement: Buffer.from([0, 255, 1]), after_mode: "100644" as const };
+  const result = evaluateProtection(root, snapshot, [create]);
+  expect(result.complete).toBe(true);
+  expect(result.edits[0].allowed).toBe(true);
+  const blocked = evaluateProtection(root, snapshot, [{ ...create, path: "plans/new-feature.md", replacement: Buffer.from("# Fake feature\n") }]);
+  expect(blocked.edits[0].allowed).toBe(false);
+  expect(blocked.edits[0].reason).toBe("feature-creation-requires-lifecycle");
+  const source = snapshot.blobs.find(blob => blob.path === "plans/feature.md");
+  if (!source) throw Error("missing feature fixture");
+  const deleted = evaluateProtection(root, snapshot, [{ action: "delete", path: source.path, start: 0, end: source.bytes.length,
+    before_sha256: sha256(source.bytes), replacement: Buffer.alloc(0), after_mode: null }]);
+  expect(deleted.edits[0].allowed).toBe(false);
+  expect(deleted.edits[0].reason).toBe("claimed-feature");
+});
+
+
+test("new files still respect active feature coverage and binary partial ranges stay denied", () => {
+  const root = fixture();
+  put(root, "plans/feature.md", feature(root, "in-progress", "feat/claimed").replace("docs/guide.md", "docs/new-asset.bin"));
+  writeFileSync(join(root, "docs/old-asset.bin"), Buffer.from([0, 255, 1]));
+  const snapshot = captureSnapshot(root, commitAll(root));
+  const edit = { action: "create" as const, path: "docs/new-asset.bin", start: 0, end: 0,
+    before_sha256: null, replacement: Buffer.from([0, 255]), after_mode: "100644" as const };
+  const blocked = evaluateProtection(root, snapshot, [edit]);
+  expect(blocked.edits[0].allowed).toBe(false);
+  expect(blocked.edits[0].reason).toBe("active-feature-overlap");
+  const coordinated = evaluateProtection(root, snapshot, [edit], { coordinated: [{ feature: "plans/feature.md", document: edit.path,
+    source_commit: snapshot.source_commit, selection_sha256: "a".repeat(64) }] });
+  expect(coordinated.edits[0].allowed).toBe(true);
+  const blob = snapshot.blobs.find(blob => blob.path === "docs/old-asset.bin");
+  if (!blob) throw Error("missing asset fixture");
+  const partial = evaluateProtection(root, snapshot, [{ path: blob.path, start: 1, end: 2,
+    before_sha256: sha256(blob.bytes), replacement: Buffer.from([1]) }]);
+  expect(partial.complete).toBe(false);
+  expect(partial.edits[0].allowed).toBe(false);
 });
