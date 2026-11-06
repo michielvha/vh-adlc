@@ -415,6 +415,7 @@ None.
 | 2026-11-06 | R-13 | spec | `b68e46d87dd8bdfcd318b24b34eab987a8211f91` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
 | 2026-11-06 | R-14 | spec | `804c97b40c6d428e2e993abcece1593e0dbbb3de` | claude-opus-5-5 | procedural | 1 finding, 0 blocking |
 | 2026-11-06 | R-15 | spec | `28c830a6e28536359d01350e6786073d37a432a5` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
+| 2026-11-06 | R-16 | spec | `0b9962be2f9d6fc586d4ad80fb1b46c151984970` | claude-opus-5-5 | procedural | Narrow scope, the diff since R-15 at 28c830a: 1 finding, 0 blocking |
 
 ### R-1
 
@@ -1393,6 +1394,15 @@ SEVERITY: nit
 WHERE: Acceptance Criteria, AC-05
 EVIDENCE: The new sentence says a missing or pruned `origin/HEAD` "reports a `default-branch-unknown` note, skips project rules and does not fail the run, dry or applied". The first sentence of AC-05, and Design's "A dry run also plans a working-tree copy that differs", keep planning a working-tree manifest on a dry run. With no default branch, every working-tree manifest differs. The `TestResults` row "no default branch" in `internal/clean/clean_test.go` expects that dry run to report `default-branch-unknown` and `manifest-unmerged`, with the copy planned under `unmerged`. Read alone, "skips project rules ... dry" can be taken to forbid that plan. "does not fail the run" also reads as a claim about the whole result, which another finding such as `removal-failed` can still turn into `fail`. The sentence before it says "does not fail on it".
 PROPOSAL: Reword the clause to something like "removes nothing under project rules and does not fail on it, dry or applied; a dry run still plans a working-tree manifest under `manifest-unmerged`".
+
+### R-16
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Where the rules come from; Acceptance Criteria, AC-05; Test Plan, AC-05 and AC-06 row; Tasks, T25
+EVIDENCE: The diff says that a manifest object a partial clone has not fetched is `manifest-missing` "with a message naming `git fetch origin` as the fix". AC-05, the Test Plan row and T25 repeat that hint. `git fetch origin` does not fetch that object. I tested this with git 2.55.0 in a scratch directory outside the repository. I made an upstream with `.vh-adlc/cleanup.yaml` at commit A and `uploadpack.allowFilter true`, cloned it with `git clone --filter=blob:none`, changed the manifest upstream at commit B, then ran `git fetch -q origin` in the clone. `GIT_NO_LAZY_FETCH=1 git cat-file -e <origin/main:.vh-adlc/cleanup.yaml blob>` then failed, which is the state the note covers. A further `git fetch origin` exited 0 and the blob was still missing. `git fetch --refetch origin` left it missing too. The clone keeps `remote.origin.partialclonefilter` set to `blob:none`, so every fetch applies the same filter and skips blobs. `git show origin/main:.vh-adlc/cleanup.yaml` then printed the new manifest, and afterwards the same `cat-file -e` succeeded. The lazy fetch on a plain read is what retrieves the blob. A user who follows the specified hint gets the same note on the next run, and project rules never apply. An implementation that prints exactly this hint would meet AC-05 as written while the fix it names does nothing.
+PROPOSAL: Replace `git fetch origin` in Design, AC-05, the Test Plan row and T25 with a command that does retrieve the object, such as `git show origin/<default>:.vh-adlc/cleanup.yaml` (a read that lazily fetches it), and have the owner confirm the changed hint, since their Q5 answer named `git fetch origin`. Better still, have the partial-clone test run the hint and assert that the next run no longer reports the note.
 
 ## Sources
 
