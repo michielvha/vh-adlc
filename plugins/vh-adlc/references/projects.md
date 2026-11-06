@@ -113,7 +113,7 @@ bun "$plugin_dir/scripts/projects/cli.ts" apply --repo "$checkout" \
 Each write re-collects current inventory, verifies scope and expected values, then reads back actual
 results. This favors a clear bounded implementation over a second cache or synchronization service;
 large batches may reach their request budget and need a new observation and approval for the remainder.
-An existing issue card is reused. A request that fails or times out is reconciled before any retry.
+Archived and active membership are both collected. An existing issue card is reused without unarchiving it. A request that fails or times out is reconciled before any retry.
 Receipts distinguish succeeded, already satisfied, reconciled, conflict, refused, failed, unknown and
 not attempted. Reconciled means the desired state was observed after a request error; it does not prove
 which actor changed it. Earlier successes remain reported when later operations fail.

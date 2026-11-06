@@ -4,7 +4,7 @@ import { list, object, resolveFields, string, type Field, type Settings } from "
 export type IssueRef = { id: string; repository: string; number: number; url: string; title: string; state: string; stateReason: string | null };
 export type PullRequest = { url: string; state: string; head: string; review: string | null; checks: string | null };
 export type Issue = IssueRef & { prs: PullRequest[]; blockedBy: IssueRef[]; lifecycle: null };
-export type Item = { id: string; issue: IssueRef; values: Record<string, string> };
+export type Item = { id: string; archived: boolean; issue: IssueRef; values: Record<string, string> };
 export type Operation = { kind: "add"; issue: IssueRef } | { kind: "set"; issue: IssueRef; item: string; field: string; before: string | null; value: string };
 export type Inventory = { schema_version: 1; project: { id: string; url: string } | null; repositories: string[]; observed_at: string; complete: boolean; gaps: string[]; fields: Field[]; items: Item[]; issues: Issue[]; proposed: Operation[] };
 export const issueFields = "id number url title state stateReason repository { nameWithOwner }";
@@ -38,7 +38,7 @@ export function projectFields(settings: Settings, gh: GitHub): { project: { id: 
   return { project: identity, fields: resolveFields(settings, available) };
 }
 export function projectItems(id: string, gh: GitHub): Item[] {
-  const rows = pages(cursor => object(gh.query(`query ProjectItems($id:ID!,$cursor:String) { node(id:$id) { ... on ProjectV2 { id items(first:100,after:$cursor) { nodes { id content { __typename ... on Issue { ${issueFields} } } } ${pageInfo} } } } }`, { id, cursor }).node).items);
+  const rows = pages(cursor => object(gh.query(`query ProjectItems($id:ID!,$cursor:String) { node(id:$id) { ... on ProjectV2 { id items(first:100,after:$cursor,archivedStates:[ARCHIVED,NOT_ARCHIVED]) { nodes { id isArchived content { __typename ... on Issue { ${issueFields} } } } ${pageInfo} } } } }`, { id, cursor }).node).items);
   const items: Item[] = [], seen = new Set<string>();
   for (const row of rows) {
     const content = object(row.content);
@@ -49,7 +49,8 @@ export function projectItems(id: string, gh: GitHub): Item[] {
     const item = string(row.id), values: Record<string, string> = {};
     const fields = pages(cursor => object(gh.query(`query ItemFields($id:ID!,$cursor:String) { node(id:$id) { ... on ProjectV2Item { fieldValues(first:100,after:$cursor) { nodes { ${valueFields} } ${pageInfo} } } } }`, { id: item, cursor }).node).fieldValues);
     for (const field of fields) if (field.optionId !== undefined) values[string(object(field.field).id)] = string(field.optionId);
-    items.push({ id: item, issue, values });
+    if (typeof row.isArchived !== "boolean") throw new Error("missing archival state");
+    items.push({ id: item, archived: row.isArchived, issue, values });
   }
   return items;
 }

@@ -29,3 +29,13 @@ test("missing fields and cursor cycles are refused, not guessed", () => {
   const cycle = fixture([boardStep(), itemsStep(), repoStep("example/one", [], true, "again"), repoStep("example/one", [], true, "again")]);
   expect(collect(settings(), cycle.gh).complete).toBe(false);
 });
+
+test("inventory includes archived membership without proposing another add", () => {
+  const member = { id: "ITEM_1", isArchived: true, content: { __typename: "Issue", ...issue() } };
+  const f = fixture([boardStep(), itemsStep([member]), { operation: "ItemFields", response: { data: { node: { fieldValues: page([]) } } } }, repoStep("example/one", [issue()]), relationsStep(), repoStep("other/two", [])]);
+  const result = collect(settings(), f.gh);
+  expect(result.complete).toBe(true); expect(result.items[0]).toMatchObject({ archived: true });
+  expect(result.proposed).toEqual([]);
+  const request = f.calls().find(call => call.query.includes("query ProjectItems"));
+  expect(request.query).toContain("archivedStates:[ARCHIVED,NOT_ARCHIVED]");
+});

@@ -202,6 +202,8 @@ Document native auto-add as an optional complement, including rule limits and ex
       Evidence: `bun test tests/vh-adlc/projects` passes twelve settings/inventory/update tests using subprocess fixtures. API-race limits are retained in field-update receipts; live board checks are not performed.
 - [x] T7 `plugins/vh-adlc/skills/vh-adlc-projects/SKILL.md`, `plugins/vh-adlc/references/projects.md`, `plugins/vh-adlc/references/lifecycle.md`, both plugin manifests, `tests/vh-adlc/check.test.ts`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - registered operation and setup guide pass package checks, with reusable config/output and explicit host limits (AC-01, AC-03, AC-06)
       Evidence: `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000` passes 74 tests, including strict typecheck and a fresh CLI process using reusable YAML/JSON. No real-board acceptance or installed-agent invocation is claimed.
+- [x] T9 `plugins/vh-adlc/scripts/projects/inventory.ts`, `tests/vh-adlc/projects/inventory.test.ts`, `apply.test.ts`, `plugins/vh-adlc/references/projects.md` - archived membership is included and repeat additions leave it archived; regression fails before the fix and passes after it (AC-02, AC-04)
+      Evidence: archived-inventory regression failed before the fix; `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000` passes 76 tests after requesting both archived states and retaining isArchived. R4 remains unchanged; follow-up review pending.
 - [ ] T8 `docs/specs/github-projects-coordinator.md` - after separate live permission and access, record the disposable-board trial and independent implementation review; production resources match baseline (AC-07)
 
 ## Open Questions
@@ -216,6 +218,7 @@ None. The owner selected approved add/update batches and accepted the documented
 | 2026-11-06 | R-2 | spec | `11a4bc2b53476a9a6e26a12541c9a74cfd38ffaf` | unknown | procedural | No findings on corrected proposal; owner write-scope decision pending, model identity not attested. |
 | 2026-11-06 | R-3 | spec | `bdb69f3ae3c84f0a4b5df0312fb2f877b072088e` | unknown | procedural | No findings after folding owner decision; model identity not attested. |
 | 2026-11-06 | R-3 | spec | `bdb69f3ae3c84f0a4b5df0312fb2f877b072088e` | n/a | n/a | accepted by owner |
+| 2026-11-06 | R-4 | implementation | `020b6b2ff8b598fb3a988aa378668a75134f04dc` | unknown | procedural | AC01/03/05/06 met; AC02/04 not met due to archived membership; AC07 not verified. Model identity not attested. |
 
 ### R-1
 
@@ -240,6 +243,43 @@ NO FINDINGS
 ### R-3
 
 NO FINDINGS
+
+### R-4
+
+CRITERION: AC-01 An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
+VERDICT: met
+EVIDENCE: At 020b6b2ff8b598fb3a988aa378668a75134f04dc, independently ran `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000`: 74 passed, including strict YAML loading, user/org identities, ambiguous fields, unsupported options, fresh-process invocation and package registration. Inspected settings.ts and the mutation allowlist. These are local subprocess checks, not installed-agent or live-board proof.
+
+CRITERION: AC-02 Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
+VERDICT: not met
+EVIDENCE: At 020b6b2ff8b598fb3a988aa378668a75134f04dc, the focused suite and five additional scratch tests passed pagination, colliding issue numbers, denied pages and incomplete-result checks. However, `bun test /tmp/projects-archived-review.test.ts --timeout 60000` produced two passes and one failing contract assertion: the actual ProjectItems subprocess query omits archivedStates, yet collection returns complete=true and proposes an archived existing issue for addition. GitHub documents that omitted archivedStates selects only NOT_ARCHIVED. See F-01.
+
+CRITERION: AC-03 Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
+VERDICT: met
+EVIDENCE: At 020b6b2ff8b598fb3a988aa378668a75134f04dc, independently executed inventory tests and inspected inventory.ts:64-110 and skills/vh-adlc-projects/SKILL.md:18-23. Output preserves issue, PR head, review and check facts separately, links source URLs and leaves uninspected repository lifecycle unknown. The skill requires the owning checkout's existing lifecycle before implementation. No board-state acceptance or shipping mutation is present.
+
+CRITERION: AC-04 Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
+VERDICT: not met
+EVIDENCE: At 020b6b2ff8b598fb3a988aa378668a75134f04dc, focused tests established read-only inventory, exact-byte approval binding, configured write scope, ordinary repeat-add handling and read-back receipts. Scratch archived-member checks exposed incomplete fresh membership reads. With the server returning the existing archived item ID, two attempts each issue AddIssue and report failed instead of already satisfied. This is a subprocess fixture informed by the documented API contract, not an observed live mutation. See F-01.
+
+CRITERION: AC-05 Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
+VERDICT: met
+EVIDENCE: At 020b6b2ff8b598fb3a988aa378668a75134f04dc, independently executed the focused suite and `bun test /tmp/projects-independent-review.test.ts --timeout 60000`, with five additional tests passing. Observed conflict refusal, timeout reconciliation, retained partial successes, unknown read-back stopping subsequent writes, and foreign field/item refusal. Inspected argument-array transport and procedural approval restrictions. Successful field receipts disclose that a concurrent edit may have been overwritten; documentation states the same limitation. Fixture execution does not establish live concurrency behavior.
+
+CRITERION: AC-06 Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
+VERDICT: met
+EVIDENCE: At 020b6b2ff8b598fb3a988aa378668a75134f04dc, independently executed the fresh-process YAML/JSON reuse test, package checker and strict TypeScript check within the 74 passing focused tests. Inspected references/projects.md, the skill, compatibility documentation and package changes: they explain owner-completed CLI authorization, broader credential scopes, private cross-owner access and separate future automation authority. No scheduler, credential store or automatic credential refresh was added. Live authorization was not exercised.
+
+CRITERION: AC-07 A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
+VERDICT: not verified
+EVIDENCE: At 020b6b2ff8b598fb3a988aa378668a75134f04dc, inspected the explicit live-trial procedure and outstanding T8. No owner-authorized disposable-board trial, production baseline comparison or live read-back was executed in this review. All executed mutation scenarios used subprocess fixtures. Separate live-resource permission and sufficient Projects access remain prerequisites.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: plugins/vh-adlc/scripts/projects/inventory.ts:41; inventory.ts:94; apply.ts:42-43
+EVIDENCE: ProjectItems requests items(first:100,after:$cursor) without archivedStates. GitHub's [ProjectV2 schema](https://docs.github.com/en/graphql/reference/projects#projectv2) specifies a default of NOT_ARCHIVED. Consequently an open issue already archived on the configured board is omitted while inventory declares completeness and proposes its addition. The scratch reproduction returned two passes and one failing archived-membership assertion. A repeated-add fixture returning the existing archived ID produced failed receipts and repeated AddIssue requests. GitHub's [API guide](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects#adding-an-item-to-a-project) confirms that adding existing content returns its existing item ID. No live archived-item behavior was exercised.
+PROPOSAL: Collect both ARCHIVED and NOT_ARCHIVED membership across all pages and preserve archival state in inventory. Use that complete membership for proposals, preflight and reconciliation, with regression tests showing that archived existing members require no add mutation and retain their archival state.
 
 ## Sources
 

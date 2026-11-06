@@ -3,9 +3,9 @@ import { existsSync } from "node:fs";
 import { apply, digest, parsePlan } from "../../../plugins/vh-adlc/scripts/projects/apply";
 import { fixture, settings, page, issue, boardStep, itemsStep, repoStep, relationsStep } from "./fixtures";
 
-const item = (value = "todo") => ({ id: "ITEM_1", content: { __typename: "Issue", ...issue() } });
+const item = (archived = false) => ({ id: "ITEM_1", isArchived: archived, content: { __typename: "Issue", ...issue() } });
 const values = (value: string) => ({ operation: "ItemFields", response: { data: { node: { fieldValues: page([{ optionId: value, field: { id: "F_1" } }]) } } } });
-const snapshot = (member = false, value = "todo") => [boardStep(), itemsStep(member ? [item(value)] : []), ...(member ? [values(value)] : []), repoStep("example/one", [issue()]), relationsStep(), repoStep("other/two", [])];
+const snapshot = (member = false, value = "todo", archived = false) => [boardStep(), itemsStep(member ? [item(archived)] : []), ...(member ? [values(value)] : []), repoStep("example/one", [issue()]), relationsStep(), repoStep("other/two", [])];
 const plan = (operations: unknown[] = [{ kind: "add", issue: issue() }]) => JSON.stringify({ schema_version: 1, complete: true, project: { id: "P_1", url: settings().project }, repositories: settings().repositories, operations });
 const update = () => ({ kind: "set", issue: issue(), item: "ITEM_1", field: "F_1", before: "todo", value: "done" });
 
@@ -45,4 +45,11 @@ test("changed project identity and incomplete preflight refuse writes", () => {
     expect(apply(settings(), f.gh, text, digest(text)).complete).toBe(false);
     expect(f.calls().every(call => call.query.startsWith("query "))).toBe(true);
   }
+});
+
+
+test("an archived existing member is already satisfied and stays archived", () => {
+  const text = plan(), f = fixture([...snapshot(true, "todo", true), ...snapshot(true, "todo", true)]);
+  for (let attempt = 0; attempt < 2; attempt++) expect(apply(settings(), f.gh, text, digest(text))).toMatchObject({ complete: true, outcomes: [{ status: "already_satisfied" }] });
+  expect(f.calls().every(call => call.query.startsWith("query "))).toBe(true);
 });
