@@ -226,6 +226,8 @@ None. The owner selected approved add/update batches and accepted the documented
 | 2026-11-06 | R-3 | spec | `bdb69f3ae3c84f0a4b5df0312fb2f877b072088e` | unknown | procedural | No findings after folding owner decision; model identity not attested. |
 | 2026-11-06 | R-3 | spec | `bdb69f3ae3c84f0a4b5df0312fb2f877b072088e` | n/a | n/a | accepted by owner |
 | 2026-11-06 | R-4 | implementation | `020b6b2ff8b598fb3a988aa378668a75134f04dc` | unknown | procedural | AC01/03/05/06 met; AC02/04 not met due to archived membership; AC07 not verified. Model identity not attested. |
+| 2026-11-06 | R-5 | implementation | `9a535ea4ef6778143b440b0bdfc422b46249a3f6` | unknown | procedural | Six criteria met including independent live observations; AC06 not met due to discovery integration. Model identity not attested. |
+| 2026-11-06 | R-6 | spec | `258735c1e8810210a5dac05f06ee718b8cd95208` | unknown | procedural | No findings on the coverage-only revision; model identity not attested. |
 
 ### R-1
 
@@ -287,6 +289,47 @@ SEVERITY: blocking
 WHERE: plugins/vh-adlc/scripts/projects/inventory.ts:41; inventory.ts:94; apply.ts:42-43
 EVIDENCE: ProjectItems requests items(first:100,after:$cursor) without archivedStates. GitHub's [ProjectV2 schema](https://docs.github.com/en/graphql/reference/projects#projectv2) specifies a default of NOT_ARCHIVED. Consequently an open issue already archived on the configured board is omitted while inventory declares completeness and proposes its addition. The scratch reproduction returned two passes and one failing archived-membership assertion. A repeated-add fixture returning the existing archived ID produced failed receipts and repeated AddIssue requests. GitHub's [API guide](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/using-the-api-to-manage-projects#adding-an-item-to-a-project) confirms that adding existing content returns its existing item ID. No live archived-item behavior was exercised.
 PROPOSAL: Collect both ARCHIVED and NOT_ARCHIVED membership across all pages and preserve archival state in inventory. Use that complete membership for proposals, preflight and reconciliation, with regression tests showing that archived existing members require no add mutation and retain their archival state.
+
+### R-5
+
+CRITERION: AC-01 An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
+VERDICT: met
+EVIDENCE: At clean 9a535ea4ef6778143b440b0bdfc422b46249a3f6, independently ran `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000`: 76 passed, including strict TypeScript, YAML configuration, user/org identities, ambiguous fields, unsupported options, fresh-process invocation and package registration. Independently invoked the product CLI against the authorized disposable board and observed complete inventory.
+
+CRITERION: AC-02 Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
+VERDICT: met
+EVIDENCE: At 9a535ea4ef6778143b440b0bdfc422b46249a3f6, independently observed the focused suite pass and ran five additional scratch tests covering every nested cursor path and denied noninitial relation pages. Inspected the corrected ProjectItems query requesting ARCHIVED and NOT_ARCHIVED with explicit archival-state validation. Independent live CLI inventory returned complete=true, no gaps, 19 repository issues and both owned test cards, including the archived card without another addition proposal. R4's archived-membership defect is resolved.
+
+CRITERION: AC-03 Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
+VERDICT: met
+EVIDENCE: At 9a535ea4ef6778143b440b0bdfc422b46249a3f6, independently executed inventory tests and inspected inventory.ts and the Projects skill. Issue state, closure reason, PR head, review and check facts remain separate and source-linked. Uninspected repository lifecycle remains unknown. Selected implementation requires the owning checkout's existing procedure; board state grants no acceptance or shipping authority.
+
+CRITERION: AC-04 Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
+VERDICT: met
+EVIDENCE: At 9a535ea4ef6778143b440b0bdfc422b46249a3f6, independently executed approval-binding, scope, conflict, read-back and repeat-add tests, including two archived-member retries issuing zero mutations. Independently executed live inventory and direct GraphQL read-back. Inspected author-run add/update/repeat receipts and their exact batch digests. The owner authorized bounded disposable-resource testing; this does not establish that the owner manually inspected the generated JSON. Digest binding verifies exact bytes, while obtaining human approval remains the documented procedural responsibility.
+
+CRITERION: AC-05 Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
+VERDICT: met
+EVIDENCE: At 9a535ea4ef6778143b440b0bdfc422b46249a3f6, the focused suite and five independently executed scratch tests passed. Observed local checks for partial successes, timeout reconciliation, unknown read-back stopping later writes, foreign identity refusal and untrusted text handling. The author-run live conflict receipt reports conflict with complete=false; independent live read-back confirmed the intervening field value remained preserved. Documentation and field receipts disclose the non-atomic read/write race. Mutation-failure and rate-limit scenarios remain fixture evidence.
+
+CRITERION: AC-06 Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
+VERDICT: not met
+EVIDENCE: At 9a535ea4ef6778143b440b0bdfc422b46249a3f6, configuration reuse, strict TypeScript and the focused package checker passed; live CLI access also worked after owner-completed authorization. However, independently running `bun test tests/vh-adlc/triage/discovery.test.ts tests/vh-adlc/maintenance/discovery.test.ts --timeout 60000` returned five passes and four failures. Existing discovery guards still require 13 skills and 10 engineering operations, while the package now has 14 and 11. Installation documentation also retains the old counts. The accepted existing-suite verification therefore fails. See F-01.
+
+CRITERION: AC-07 A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
+VERDICT: met
+EVIDENCE: For runtime commit 9a535ea4ef6778143b440b0bdfc422b46249a3f6, inspected the owner's explicit bounded trial authorization and the author-run controller, batches and receipts under /tmp/homelab-projects-live-20261106. The successful retry demonstrates actual inventory, two issue additions, field update, repeat no-ops and conflict refusal. The initial failed attempt remains recorded in controller.log. Independently executed live product inventory and direct GraphQL observation, then fresh REST baseline comparisons: all 26 pre-existing docs entries and 55 pre-existing vh-adlc entries matched their saved metadata after excluding the exact two owned test IDs. Independently confirmed the board remained private and was closed, and both owned issues were closed. Mutations were author-executed, not reviewer-executed. The additional reversible archival regression step was not separately named in the owner's approval question.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: tests/vh-adlc/maintenance/discovery.test.ts:12; tests/vh-adlc/triage/discovery.test.ts:13,23,50-52; docs/get-started/installation.md:92
+EVIDENCE: At 9a535ea4ef6778143b440b0bdfc422b46249a3f6, independently ran both discovery files: five tests passed and four failed. Both skill-count assertions expect 13 and receive 14; the triage engineering-operation assertion expects 10 and receives 11; the guide assertion expects thirteen/ten while workflows.md correctly says fourteen/eleven. Installation documentation still advertises thirteen skills and ten engineering operations. These failures prevent the repository-required Bun suite from passing despite the 76 passing focused checks.
+PROPOSAL: Update the existing discovery contracts and installation description for the added Projects operation, preserving meaningful registration checks. Include the affected paths in feature coverage through the accepted revision procedure, then rerun these discovery tests and the required verification before claiming completion.
+
+### R-6
+
+NO FINDINGS
 
 ## Sources
 
