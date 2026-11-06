@@ -24,6 +24,7 @@ export interface PublicationTransport {
   object_store: string;
   identity(): Promise<PublicationIdentity>;
   ref(ref: string): Promise<RefObservation>;
+  readPlanObject(object: string): Promise<{ bytes: Uint8Array; objects: PlanObjects }>;
   observe(plan: SealedPlan, effect: Effect, objects: PlanObjects): Promise<EffectObservation>;
   execute(plan: SealedPlan, effect: Effect, objects: PlanObjects): Promise<void>;
 }
@@ -193,10 +194,23 @@ export function createNativeTransport(options: {
       // A visible immutable source commit establishes contents-read capability before ref absence.
       repository.commit(store.source_commit);
       contentsObserved = true;
-      const user = actor(reader.get("user"));
-      return { repository: repo.full_name.toLowerCase(), repository_id: repo.id, default_branch: text(repo.default_branch), ...user };
+      const response = Bun.spawnSync(["gh", "api", "--hostname", settings.hostname, "--method", "POST", "graphql", "-f",
+        "query=query { viewer { login databaseId } }"], { env: environment, stdout: "pipe", stderr: "pipe", timeout: options.timeout_ms ?? 30000 });
+      if (response.exitCode !== 0) throw Error("native authenticated viewer unavailable");
+      const envelope = record(JSON.parse(response.stdout.toString()) as unknown);
+      if (Object.hasOwn(envelope, "errors") && (!Array.isArray(envelope.errors) || envelope.errors.length !== 0)) throw Error("native viewer query incomplete");
+      const viewer = record(record(envelope.data).viewer);
+      return { repository: repo.full_name.toLowerCase(), repository_id: repo.id, default_branch: text(repo.default_branch),
+        actor: text(viewer.login), actor_id: positive(viewer.databaseId) };
     },
     async ref(ref) { return getRef(ref); },
+    async readPlanObject(object) {
+      const commit = repository.commit(object), tree = repository.tree(commit.tree_sha, 2);
+      if (commit.parents.length !== 0 || tree.entries.length !== 1 || tree.entries[0].path !== "plan.json"
+        || tree.entries[0].mode !== "100644" || tree.entries[0].type !== "blob") throw Error("invalid retained operation metadata object");
+      const blob = tree.entries[0].sha, bytes = repository.blob(blob, settings.reports.max_entry_bytes);
+      return { bytes, objects: { object, tree: commit.tree_sha, blob, plan_sha256: sha256(bytes) } };
+    },
     async observe(plan, effect, objects) {
       const p = effect.payload;
       try {

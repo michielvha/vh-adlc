@@ -28,7 +28,7 @@ type Event = {
 };
 type Header = {
   schema_version: 1; kind: "docs-drift-journal"; operation_id: string; repository: string;
-  source_repo: string; directory: string; plan_sha256: string;
+  source_repo: string; directory: string; plan_sha256: string; owner_uid: number; run_id: string;
 };
 export type Journal = {
   directory: string; source_repo: string; header: Header; plan: SealedPlan;
@@ -141,7 +141,7 @@ function syncDirectory(directory: string): void {
   const fd = openSync(directory, "r");
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
-function publishBytes(path: string, bytes: Uint8Array): void {
+export function publishArtifact(path: string, bytes: Uint8Array): void {
   const temporary = join(dirname(path), ".tmp-" + randomUUID());
   const fd = openSync(temporary, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
   try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
@@ -193,7 +193,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
     }
   } else {
     if (!prior.some(item => item.kind === "intent")) fail("outcome or handoff without intent");
-    if (prior.some(item => item.kind === "outcome")) fail("effect already terminal");
+    if (event.kind === "outcome" && prior.some(item => item.kind === "outcome")) fail("effect already terminal");
     if (event.kind === "outcome") outcome(event.payload);
     else if (event.kind === "handoff") identifier(exact(event.payload, ["reason"]).reason);
     else fail("unknown event kind");
@@ -205,14 +205,16 @@ export function createJournal(options: { source_repo: string; artifact_root: str
   const root = externalArtifactDirectory(options.artifact_root, source);
   const plan = parsePlan(options.plan), planBytes = canonicalJSON(plan);
   const directory = join(root, "docs-drift-" + plan.manifest.operation_id);
-  const header: Header = { schema_version: 1, kind: "docs-drift-journal", operation_id: plan.manifest.operation_id,
+  const owner = process.getuid?.();
+  if (owner === undefined) fail("POSIX owner identity required");
+  const header: Header = { owner_uid: owner, run_id: plan.manifest.operation_id, schema_version: 1, kind: "docs-drift-journal", operation_id: plan.manifest.operation_id,
     repository: plan.manifest.repository, source_repo: source, directory, plan_sha256: sha256(planBytes) };
   // The resource record precedes directory creation. Failed/partial resources remain for inspection.
-  publishBytes(join(root, plan.manifest.operation_id + ".journal-owner.json"), canonicalJSON(header));
+  publishArtifact(join(root, plan.manifest.operation_id + ".journal-owner.json"), canonicalJSON(header));
   mkdirSync(directory, { mode: 0o700 }); syncDirectory(root);
   mkdirSync(join(directory, "events"), { mode: 0o700 });
-  publishBytes(join(directory, "plan.json"), planBytes);
-  publishBytes(join(directory, "header.json"), canonicalJSON(header));
+  publishArtifact(join(directory, "plan.json"), planBytes);
+  publishArtifact(join(directory, "header.json"), canonicalJSON(header));
   syncDirectory(directory);
   return readJournal(directory, source);
 }
@@ -223,8 +225,8 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
   externalArtifactDirectory(directory, source);
   privateDirectory(dirname(directory));
   const headerBytes = privateBytes(join(directory, "header.json"));
-  const header = exact(parseCanonical(headerBytes), ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256"]) as Header;
-  if (header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source) fail("changed journal ownership");
+  const header = exact(parseCanonical(headerBytes), ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id"]) as Header;
+  if (header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.() || header.run_id !== header.operation_id) fail("changed journal ownership");
   const planBytes = privateBytes(join(directory, "plan.json"));
   if (sha256(planBytes) !== hash(header.plan_sha256)) fail("changed local plan");
   const plan = parsePlan(parseCanonical(planBytes));
@@ -251,7 +253,7 @@ function append(journal: Journal, kind: Event["kind"], effectId: string, payload
   if (current.revision >= 9999999999) fail("revision limit");
   const event: Event = { schema_version: 1, revision: current.revision + 1, previous_sha256: current.digest, kind, effect_id: effectId, payload };
   validateEvent(event, current.plan, current.events);
-  publishBytes(join(current.directory, "events", String(event.revision).padStart(10, "0") + ".json"), canonicalJSON(event));
+  publishArtifact(join(current.directory, "events", String(event.revision).padStart(10, "0") + ".json"), canonicalJSON(event));
   return readJournal(current.directory, current.source_repo);
 }
 export function appendIntent(journal: Journal, effectId: string): Journal {

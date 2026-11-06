@@ -1,0 +1,224 @@
+import { afterAll, expect, test } from "bun:test";
+import { mkdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
+import { inspectRetainedOperation, restoreRetainedOperation, resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
+import { readJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
+import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
+import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { fixture, hash } from "./manifest-fixture";
+import { publicationFixture, publicationOptions as options } from "./publication-fixture";
+
+const roots: string[] = [];
+afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
+const setup = () => publicationFixture(roots);
+
+async function interruptedPR() {
+  const f = setup();
+  const execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    await execute(plan, effect, objects);
+    if (effect.kind === "pr-create") throw Error("lost response");
+  };
+  const interrupted = await publish(options(f));
+  f.transport.execute = execute;
+  return { f, interrupted };
+}
+
+test("fresh-context recovery observes a created PR before any replay and releases only its own lease", async () => {
+  const { f, interrupted } = await interruptedPR();
+  const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(result.state).toBe("complete");
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+  expect(f.observed.filter(id => id === "pr").length).toBeGreaterThan(1);
+  expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(true);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+});
+
+test("missing current write authority permits observations but no remaining remote action", async () => {
+  const { f, interrupted } = await interruptedPR();
+  f.input.grants = [];
+  const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(result.state).toBe("pending");
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+  const journal = readJournal(interrupted.journal.directory, f.repo);
+  expect(journal.events.some(event => event.kind === "outcome" && event.effect_id === "pr")).toBe(true);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+});
+
+test("unknown or changed native matches stop recovery without retrying or releasing", async () => {
+  for (const state of ["unknown", "conflict"] as const) {
+    const { f, interrupted } = await interruptedPR();
+    const observe = f.transport.observe;
+    f.transport.observe = async (plan, effect, objects) => effect.id === "pr" ? { state, reason: "native-match-unavailable" } : observe(plan, effect, objects);
+    const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+    expect(result.state).toBe("pending");
+    expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  }
+});
+
+test("definitive absence retries the unchanged original action under fresh current proof", async () => {
+  const f = setup(); const execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-create") throw Error("request never sent");
+    await execute(plan, effect, objects);
+  };
+  const interrupted = await publish(options(f)); f.transport.execute = execute;
+  const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(result.state).toBe("complete");
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+});
+
+test("changed source, original native artifacts or actor prevents absent-action replay", async () => {
+  for (const change of [
+    (f: ReturnType<typeof setup>) => { f.input.current.bindings.feedback_sha256 = hash("changed"); },
+    (f: ReturnType<typeof setup>) => { f.input.reviewer.native = Buffer.from("lost original native result"); },
+    (f: ReturnType<typeof setup>) => { f.transport.identity = async () => ({ repository: "fixture/docs", repository_id: 10, default_branch: "main", actor: "other", actor_id: 99 }); },
+  ]) {
+    const f = setup(); const execute = f.transport.execute;
+    f.transport.execute = async (plan, effect, objects) => {
+      if (effect.kind === "pr-create") throw Error("request never sent");
+      await execute(plan, effect, objects);
+    };
+    const interrupted = await publish(options(f)); f.transport.execute = execute; change(f);
+    const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+    expect(result.state).toBe("pending");
+    expect(f.executed).toEqual(["lease", "receipt", "push"]);
+  }
+});
+
+test("a replacement or lost lease never authorizes reacquisition or foreign cleanup", async () => {
+  for (const foreign of [null, "f".repeat(40)]) {
+    const { f, interrupted } = await interruptedPR();
+    if (foreign === null) f.refs.delete(f.settings.publication.lease_ref);
+    else f.refs.set(f.settings.publication.lease_ref, foreign);
+    const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+    expect(result.state).toBe("pending");
+    expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+    expect(f.refs.get(f.settings.publication.lease_ref)).toBe(foreign ?? undefined);
+  }
+});
+
+test("interruption after explanation never duplicates it, while edited explanations block closure", async () => {
+  for (const changed of [false, true]) {
+    const f = setup();
+    const effects: Effect[] = [f.input.manifest.effects[0], f.input.manifest.effects[1],
+      { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [], body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } },
+      { id: "close", kind: "pr-close", payload: { number: 77, expected_head: "e".repeat(40) } }, f.input.manifest.effects[4]];
+    f.input = fixture(f.input.manifest.bindings, effects);
+    f.gate = async () => ({ review: f.input, policy: f.policy });
+    f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
+    const execute = f.transport.execute;
+    f.transport.execute = async (plan, effect, objects) => {
+      await execute(plan, effect, objects);
+      if (effect.kind === "comment-create") throw Error("interrupted after explanation");
+    };
+    const interrupted = await publish(options(f)); f.transport.execute = execute;
+    if (changed) {
+      const observe = f.transport.observe;
+      f.transport.observe = async (plan, effect, objects) => effect.id === "explain" ? { state: "conflict", reason: "native-comment-payload-changed" } : observe(plan, effect, objects);
+    }
+    const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+    expect(f.executed.filter(id => id === "explain")).toHaveLength(1);
+    expect(f.executed.includes("close")).toBe(!changed);
+    expect(result.state).toBe(changed ? "pending" : "complete");
+  }
+});
+
+test("lost lease-release acknowledgement is observed without repeating deletion", async () => {
+  const f = setup(); const execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    await execute(plan, effect, objects);
+    if (effect.kind === "lease-release") throw Error("release response lost");
+  };
+  const interrupted = await publish(options(f)); f.transport.execute = execute;
+  const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(result.state).toBe("complete");
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+});
+
+test("lost issue acknowledgement is reconciled without creating another issue", async () => {
+  const f = setup();
+  const effects: Effect[] = [f.input.manifest.effects[0], f.input.manifest.effects[1],
+    { id: "issue", kind: "issue-create", payload: { title: "Selected issue", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue"), labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.input.manifest.bindings.source_commit, evidence_sha256: hash("synthetic published analysis") } }, f.input.manifest.effects[4]];
+  f.input = fixture(f.input.manifest.bindings, effects); f.gate = async () => ({ review: f.input, policy: f.policy });
+  f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
+  const execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => { await execute(plan, effect, objects); if (effect.kind === "issue-create") throw Error("issue response lost"); };
+  const interrupted = await publish(options(f)); f.transport.execute = execute;
+  const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(result.state).toBe("complete"); expect(f.executed.filter(id => id === "issue")).toHaveLength(1);
+});
+
+test("an already-recorded explanation must still match before a pending closure", async () => {
+  const f = setup();
+  const effects: Effect[] = [f.input.manifest.effects[0], f.input.manifest.effects[1],
+    { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [], body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } },
+    { id: "close", kind: "pr-close", payload: { number: 77, expected_head: "e".repeat(40) } }, f.input.manifest.effects[4]];
+  f.input = fixture(f.input.manifest.bindings, effects); f.gate = async () => ({ review: f.input, policy: f.policy });
+  f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
+  const execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => { if (effect.kind === "pr-close") throw Error("interrupted before closure"); await execute(plan, effect, objects); };
+  const interrupted = await publish(options(f)); f.transport.execute = execute;
+  expect(interrupted.journal.events.some(event => event.effect_id === "explain" && event.kind === "outcome")).toBe(true);
+  const observe = f.transport.observe;
+  f.transport.observe = async (plan, effect, objects) => effect.id === "explain" ? { state: "conflict", reason: "native-comment-payload-changed" } : observe(plan, effect, objects);
+  const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(result.state).toBe("pending"); expect(f.executed).toEqual(["lease", "receipt", "explain"]);
+});
+
+test("lost local artifacts permit fixed-ref inspection without manufacturing original proof", async () => {
+  const { f, interrupted } = await interruptedPR();
+  rmSync(interrupted.journal.directory, { recursive: true });
+  f.input.reviewer.native = Buffer.from("original proof unavailable");
+  const artifactRoot = join(f.root, "recovered"); mkdirSync(artifactRoot, { mode: 0o700 });
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifactRoot, settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  expect(inspection.state).toBe("inspection");
+  expect(inspection.observations.find(item => item.effect_id === "pr")?.observation.state).toBe("done");
+  expect(readFileSync(join(inspection.directory, "plan.json"), "utf8")).toContain("Exact reviewed body");
+  await expect(restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifactRoot } })).rejects.toThrow();
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+});
+
+test("retained-plan restoration requires actual original proof and never duplicates an existing PR", async () => {
+  const { f, interrupted } = await interruptedPR();
+  rmSync(interrupted.journal.directory, { recursive: true });
+  const artifactRoot = join(f.root, "restored"); mkdirSync(artifactRoot, { mode: 0o700 });
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifactRoot, settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  await expect(restoreRetainedOperation({ inspection: structuredClone(inspection), publication: { ...options(f), artifact_root: artifactRoot } })).rejects.toThrow("inspection");
+  const result = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifactRoot } });
+  expect(result.state).toBe("complete");
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+  expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(true);
+});
+
+test("retained inspection refuses a foreign operation or modified metadata bytes", async () => {
+  const { f } = await interruptedPR();
+  await expect(inspectRetainedOperation({ source_repo: f.repo, artifact_root: f.artifacts, settings: f.settings, transport: f.transport, operation_id: "other-operation", verify_policy: () => f.policy })).rejects.toThrow("scope");
+  const read = f.transport.readPlanObject;
+  f.transport.readPlanObject = async object => ({ ...await read(object), bytes: Buffer.from("{}") });
+  await expect(inspectRetainedOperation({ source_repo: f.repo, artifact_root: f.artifacts, settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy })).rejects.toThrow();
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+});
+
+test("retained byte buffers cannot change while independent outcomes are inspected", async () => {
+  const { f } = await interruptedPR();
+  const read = f.transport.readPlanObject, observe = f.transport.observe;
+  let raw: Uint8Array | null = null;
+  f.transport.readPlanObject = async object => { const result = await read(object); raw = result.bytes; return result; };
+  f.transport.observe = async (plan, effect, objects) => { raw?.fill(32); return observe(plan, effect, objects); };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: f.artifacts, settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  expect(sha256(readFileSync(join(inspection.directory, "plan.json")))).toBe(inspection.objects.plan_sha256);
+});
+
+
+test("missing local payload bytes stop ordinary resume before every remote action", async () => {
+  const { f, interrupted } = await interruptedPR();
+  unlinkSync(join(interrupted.journal.directory, "plan.json"));
+  await expect(resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory })).rejects.toThrow();
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+});

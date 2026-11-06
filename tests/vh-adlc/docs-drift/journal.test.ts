@@ -160,3 +160,11 @@ test("policy inspection cannot mutate the retained publication bytes", () => {
   });
   expect(parsed.manifest.effects[1].payload.body).toBe("Exact reviewed body\n");
 });
+
+test("resource ownership is recorded explicitly before the journal directory exists", () => {
+  const { repo, artifacts, plan } = setup();
+  const journal = createJournal({ source_repo: repo, artifact_root: artifacts, plan });
+  const owner = JSON.parse(readFileSync(join(artifacts, plan.manifest.operation_id + ".journal-owner.json"), "utf8"));
+  expect(owner.owner_uid).toBe(process.getuid?.());
+  expect(owner.run_id).toBe(plan.manifest.operation_id);
+});

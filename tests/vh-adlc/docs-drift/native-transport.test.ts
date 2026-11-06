@@ -33,65 +33,133 @@ function setup() {
   const objects = writePlanObject(store, plan);
   const statePath = join(root, "state.json"), calls = join(root, "calls.jsonl");
   const readme = readGit(repo, "show", "HEAD:README.md"), blobSha = readGit(repo, "rev-parse", "HEAD:README.md").toString().trim();
-  const state = { commit, tree, blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
+  const planBytes = canonicalJSON(plan);
+  const state = { commit, tree,
+    metadata_commit: { sha: objects.object, tree: { sha: objects.tree }, parents: [] as Array<{ sha: string }>, message: "retained metadata" },
+    metadata_tree: { sha: objects.tree, truncated: false, tree: [{ path: "plan.json", mode: "100644", type: "blob", sha: objects.blob }] },
+    metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
+    blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
-const statePath=${JSON.stringify(statePath)}, log=${JSON.stringify(calls)};
-const state=JSON.parse(readFileSync(statePath,'utf8')), args=process.argv.slice(2);
-appendFileSync(log,JSON.stringify({program:process.argv[1].split('/').at(-1),args})+'\\n');
-const save=()=>writeFileSync(statePath,JSON.stringify(state));
-const option=name=>args[args.indexOf(name)+1];
-if(process.argv[1].endsWith('/git')){
- const lease=args.find(a=>a.startsWith('--force-with-lease=')).slice(19), split=lease.lastIndexOf(':');
- const ref=lease.slice(0,split), expected=lease.slice(split+1), target=args.at(-1), head=target.slice(0,target.indexOf(':'));
- if(state.race){state.refs[ref]='f'.repeat(40);state.race=false;save();}
- if((state.refs[ref]??'')!==expected)process.exit(1);
- if(head){state.refs[ref]=head;for(const pr of state.prs)if('refs/heads/'+pr.head.ref===ref)pr.head.sha=head;}
- else delete state.refs[ref];save();process.exit(0);
+const statePath = ${JSON.stringify(statePath)}, log = ${JSON.stringify(calls)};
+const state = JSON.parse(readFileSync(statePath, 'utf8')), args = process.argv.slice(2);
+appendFileSync(log, JSON.stringify({ program: process.argv[1].split('/').at(-1), args }) + '\\n');
+const save = () => writeFileSync(statePath, JSON.stringify(state));
+const option = name => args[args.indexOf(name) + 1];
+if (process.argv[1].endsWith('/git')) {
+    const lease = args.find(a => a.startsWith('--force-with-lease=')).slice(19), split = lease.lastIndexOf(':');
+    const ref = lease.slice(0, split), expected = lease.slice(split + 1), target = args.at(-1), head = target.slice(0, target.indexOf(':'));
+    if (state.race) {
+        state.refs[ref] = 'f'.repeat(40);
+        state.race = false;
+        save();
+    }
+    if ((state.refs[ref] ?? '') !== expected)
+        process.exit(1);
+    if (head) {
+        state.refs[ref] = head;
+        for (const pr of state.prs)
+            if ('refs/heads/' + pr.head.ref === ref)
+                pr.head.sha = head;
+    }
+    else
+        delete state.refs[ref];
+    save();
+    process.exit(0);
 }
-if(args[0]==='pr'&&args[1]==='create'){
- const branch=option('--head'), body=readFileSync(option('--body-file'),'utf8');
- state.prs.push({number:501,state:'open',title:args.find(a=>a.startsWith('--title=')).slice(8),body,draft:args.includes('--draft'),
- labels:args.filter(a=>a.startsWith('--label=')).map(a=>({name:a.slice(8)})),user:{login:'fixture-bot',id:20},
- base:{ref:'main',repo:{id:10}},head:{ref:branch,sha:state.refs['refs/heads/'+branch],repo:{id:10}}});save();process.exit(0);
+if (args[0] === 'pr' && args[1] === 'create') {
+    const branch = option('--head'), body = readFileSync(option('--body-file'), 'utf8');
+    state.prs.push({ number: 501, state: 'open', title: args.find(a => a.startsWith('--title=')).slice(8), body, draft: args.includes('--draft'),
+        labels: args.filter(a => a.startsWith('--label=')).map(a => ({ name: a.slice(8) })), user: { login: 'fixture-bot', id: 20 },
+        base: { ref: 'main', repo: { id: 10 } }, head: { ref: branch, sha: state.refs['refs/heads/' + branch], repo: { id: 10 } } });
+    save();
+    process.exit(0);
 }
-if(args[0]==='pr'&&args[1]==='ready'){
- state.prs.find(pr=>pr.number===Number(args[2])).draft=args.includes('--undo');save();process.exit(0);
+if (args.includes('graphql')) {
+    const response = { data: { viewer: { login: 'fixture-bot', databaseId: 20 } } };
+    if (state.graphql_errors)
+        response.errors = [{ message: 'denied' }];
+    process.stdout.write(JSON.stringify(response));
+    process.exit(0);
 }
-const endpoint=args.find(a=>a==='user'||a.startsWith('repos/'));
-const method=option('--method');
-if(method!=='GET'){
- const payload=JSON.parse(readFileSync(option('--input'),'utf8'));
- if(method==='POST'&&endpoint==='repos/fixture/docs/issues')state.issues.push({...payload,id:801,number:601,user:{login:'fixture-bot',id:20},labels:payload.labels.map(name=>({name}))});
- else if(method==='POST'&&endpoint.endsWith('/comments')){
-  const number=endpoint.split('/').at(-2);(state.comments[number]??=[]).push({id:701,body:payload.body,user:{login:'fixture-bot',id:20}});
- }
- else if(method==='PATCH'&&endpoint.includes('/pulls/'))Object.assign(state.prs.find(pr=>pr.number===Number(endpoint.split('/').at(-1))),payload);
- else if(method==='PUT'&&endpoint.endsWith('/labels'))state.prs.find(pr=>pr.number===Number(endpoint.split('/').at(-2))).labels=payload.labels.map(name=>({name}));
- else process.exit(1);
- save();process.stdout.write('{}');process.exit(0);
+if (args[0] === 'pr' && args[1] === 'ready') {
+    state.prs.find(pr => pr.number === Number(args[2])).draft = args.includes('--undo');
+    save();
+    process.exit(0);
 }
-let status=200,value;
-if(endpoint==='user')value={login:'fixture-bot',id:20};
-else if(endpoint==='repos/fixture/docs')value={id:10,full_name:'fixture/docs',default_branch:'main'};
-else if(endpoint==='repos/fixture/docs/git/commits/'+state.commit)value={sha:state.commit,tree:{sha:state.tree},parents:[],message:'fixture'};
-else if(endpoint==='repos/fixture/docs/git/trees/'+state.tree)value=state.tree_response;
-else if(endpoint==='repos/fixture/docs/git/blobs/'+state.blob.sha)value=state.blob;
-else if(endpoint?.startsWith('repos/fixture/docs/git/ref/')){
- const ref='refs/'+decodeURIComponent(endpoint.slice('repos/fixture/docs/git/ref/'.length));
- if(state.forbidden){status=403;value={message:'denied'};}
- else if(state.refs[ref])value={ref,object:{type:'commit',sha:state.refs[ref]}};
- else{status=404;value={message:'Not Found'};}
+const endpoint = args.find(a => a === 'user' || a.startsWith('repos/'));
+const method = option('--method');
+if (method !== 'GET') {
+    const payload = JSON.parse(readFileSync(option('--input'), 'utf8'));
+    if (method === 'POST' && endpoint === 'repos/fixture/docs/issues')
+        state.issues.push({ ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: 20 }, labels: payload.labels.map(name => ({ name })) });
+    else if (method === 'POST' && endpoint.endsWith('/comments')) {
+        const number = endpoint.split('/').at(-2);
+        (state.comments[number] ??= []).push({ id: 701, body: payload.body, user: { login: 'fixture-bot', id: 20 } });
+    }
+    else if (method === 'PATCH' && endpoint.includes('/pulls/'))
+        Object.assign(state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-1))), payload);
+    else if (method === 'PUT' && endpoint.endsWith('/labels'))
+        state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-2))).labels = payload.labels.map(name => ({ name }));
+    else
+        process.exit(1);
+    save();
+    process.stdout.write('{}');
+    process.exit(0);
 }
-else if(endpoint?.startsWith('repos/fixture/docs/pulls?'))value=state.prs;
-else if(endpoint?.startsWith('repos/fixture/docs/pulls/'))value=state.prs.find(pr=>pr.number===Number(endpoint.split('/').at(-1)));
-else if(endpoint?.includes('/comments?'))value=state.comments[endpoint.split('/').at(-2)]??[];
-else if(endpoint?.startsWith('repos/fixture/docs/issues?'))value=state.issues;
-else{status=500;value={message:'unexpected fixture endpoint'};}
-process.stdout.write('HTTP/2.0 '+status+' fixture\\r\\n\\r\\n'+JSON.stringify(value??null));process.exit(status===200?0:1);
+let status = 200, value;
+if (endpoint === 'user') {
+    if (state.app_token) {
+        status = 403;
+        value = { message: 'Resource not accessible by integration' };
+    }
+    else
+        value = { login: 'fixture-bot', id: 20 };
+}
+else if (endpoint === 'repos/fixture/docs')
+    value = { id: 10, full_name: 'fixture/docs', default_branch: 'main' };
+else if (endpoint === 'repos/fixture/docs/git/commits/' + state.commit)
+    value = { sha: state.commit, tree: { sha: state.tree }, parents: [], message: 'fixture' };
+else if (endpoint === 'repos/fixture/docs/git/commits/' + state.metadata_commit.sha)
+    value = state.metadata_commit;
+else if (endpoint === 'repos/fixture/docs/git/trees/' + state.metadata_tree.sha)
+    value = state.metadata_tree;
+else if (endpoint === 'repos/fixture/docs/git/blobs/' + state.metadata_blob.sha)
+    value = state.metadata_blob;
+else if (endpoint === 'repos/fixture/docs/git/trees/' + state.tree)
+    value = state.tree_response;
+else if (endpoint === 'repos/fixture/docs/git/blobs/' + state.blob.sha)
+    value = state.blob;
+else if (endpoint?.startsWith('repos/fixture/docs/git/ref/')) {
+    const ref = 'refs/' + decodeURIComponent(endpoint.slice('repos/fixture/docs/git/ref/'.length));
+    if (state.forbidden) {
+        status = 403;
+        value = { message: 'denied' };
+    }
+    else if (state.refs[ref])
+        value = { ref, object: { type: 'commit', sha: state.refs[ref] } };
+    else {
+        status = 404;
+        value = { message: 'Not Found' };
+    }
+}
+else if (endpoint?.startsWith('repos/fixture/docs/pulls?'))
+    value = state.prs;
+else if (endpoint?.startsWith('repos/fixture/docs/pulls/'))
+    value = state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-1)));
+else if (endpoint?.includes('/comments?'))
+    value = state.comments[endpoint.split('/').at(-2)] ?? [];
+else if (endpoint?.startsWith('repos/fixture/docs/issues?'))
+    value = state.issues;
+else {
+    status = 500;
+    value = { message: 'unexpected fixture endpoint' };
+}
+process.stdout.write('HTTP/2.0 ' + status + ' fixture\\r\\n\\r\\n' + JSON.stringify(value ?? null));
+process.exit(status === 200 ? 0 : 1);
 `;
   for (const name of ["gh", "git"]) writeFileSync(join(bin, name), program, { mode: 0o700 });
   const transport = createNativeTransport({ settings, object_store: store, artifact_root: artifacts, source_repo: repo, credential: "synthetic-credential", path: bin + ":" + process.env.PATH });
@@ -248,4 +316,26 @@ test("removed explanation markers block a duplicate comment attempt", async () =
   f.update(state => { state.comments["77"][0].body = "marker removed"; });
   expect((await f.transport.observe(f.plan, comment, f.objects)).state).toBe("conflict");
   expect(f.inspect().comments["77"]).toHaveLength(1);
+});
+
+
+test("native retained-plan reads require parentless metadata-only Git objects and exact raw bytes", async () => {
+  const f = setup(); await f.transport.identity();
+  const retained = await f.transport.readPlanObject(f.objects.object);
+  expect(retained.objects).toEqual(f.objects);
+  expect(Buffer.from(retained.bytes).equals(canonicalJSON(f.plan))).toBe(true);
+  await expect(f.transport.readPlanObject(f.commit)).rejects.toThrow("metadata");
+  f.update(state => { state.metadata_commit.parents.push({ sha: "f".repeat(40) }); });
+  await expect(f.transport.readPlanObject(f.objects.object)).rejects.toThrow("metadata");
+});
+
+
+test("installation-token identity uses native authenticated viewer metadata", async () => {
+  const f = setup(); f.update(state => { state.app_token = true; });
+  expect((await f.transport.identity()).actor_id).toBe(20);
+});
+
+test("partial native viewer errors deny identity even when viewer fields are present", async () => {
+  const f = setup(); f.update(state => { state.graphql_errors = true; });
+  await expect(f.transport.identity()).rejects.toThrow();
 });
