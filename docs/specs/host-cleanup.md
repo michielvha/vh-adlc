@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Accepted by the owner on 2026-11-06, given in advance on the condition that the narrow confirmation pass of the changes since R-15 had no blocking or judgement finding, which it met: R-17 at cb4deba, scoped to the diff since R-16, returned no findings. The acceptance was relayed by the coordinating session. Tasks T23 to T25 remain. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status: in-progress
+status_description: "Back in progress on feat/host-cleanup after the owner's acceptance of 2026-11-06 at R-17 (given in advance on the condition that the narrow confirmation pass of the changes since R-15 had no blocking or judgement finding, which it met). Tasks T23 to T25 are next, then the implementation review. Local only at the owner's direction. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
