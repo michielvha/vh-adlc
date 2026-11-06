@@ -1,7 +1,8 @@
 ---
-status: planned
-status_description: "Accepted by the owner after fresh Copilot Opus5.5 R-46. Documentation publication, tracking issue, task planning and the implementation claim are authorized."
+status: in-progress
+status_description: "Implementing the accepted shared docs-drift feature for issue59. Local tests and independent review precede separately authorized feature publication and consumer adoption."
 issue: https://github.com/michielvha/vh-adlc/issues/59
+branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-docs-drift/
