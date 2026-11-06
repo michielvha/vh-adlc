@@ -6,6 +6,16 @@ Check the plugin version as well as the host: a successful run on an older versi
 does not establish support for a newer workflow. Installation instructions are in
 [Install vh-adlc](../get-started/installation.md).
 
+## Projects coordinator candidate
+
+The candidate operation requires Git, authenticated `gh`, Bun and explicit project configuration.
+Its Linux checks use native subprocess fixtures for pagination, identity, approvals and partial writes.
+A bounded Linux CLI trial at `9a535ea4ef6778143b440b0bdfc422b46249a3f6` passed actual board inventory,
+issue additions, field updates, repeated operations and conflict refusal. Independent read-back verified
+the results and cleanup. Installed-agent invocation and other host platforms remain unverified.
+See the [Projects reference](../../plugins/vh-adlc/references/projects.md) and
+[feature status](../specs/github-projects-coordinator.md). No unattended authority is included.
+
 ## Shared triage
 
 Shared triage is available from plugin 0.4.0. Both Codex CLI and
