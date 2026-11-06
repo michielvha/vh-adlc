@@ -188,3 +188,16 @@ test("lost original proof still permits read-only restoration and separately app
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
   expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(true);
 });
+
+
+test("a new original journal cannot execute an operation retired in another root", async () => {
+  const { f, interrupted } = await abandoned();
+  const cleanup = await reconcileAbsent(input(f, interrupted.journal.directory));
+  expect(cleanup.state).toBe("retired");
+  const otherRoot = join(f.root, "other-original");
+  mkdirSync(otherRoot, { mode: 0o700 });
+  const second = await publish({ ...options(f), artifact_root: otherRoot, transport: { ...f.transport, artifact_root: otherRoot } });
+  expect(second.state).toBe("pending");
+  expect(second.reason).toBe("operation-started-elsewhere");
+  expect(f.executed.includes("pr")).toBe(false);
+});

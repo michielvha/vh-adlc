@@ -375,3 +375,14 @@ test("retained lookup evidence excludes repository credential fields", async () 
   if (result.state !== "absent" || !result.evidence) throw Error("missing native lookup evidence");
   expect(readFileSync(result.evidence.path, "utf8")).not.toContain("fixture-sensitive-token");
 });
+
+
+test("an exact created PR awaiting its approved labels stays unknown without material conflict", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const pr: Effect = { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/one", title: "Reviewed title",
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } };
+  await f.transport.execute(f.plan, pr, f.objects);
+  f.update(state => { state.prs[0].labels = []; });
+  expect(await f.transport.observe(f.plan, pr, f.objects)).toEqual({ state: "unknown", reason: "native-PR-labels-incomplete" });
+});

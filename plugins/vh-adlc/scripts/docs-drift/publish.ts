@@ -1,5 +1,5 @@
 import { executeAttempt } from "./attempts";
-import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRecoveryOnly, createJournal, readJournal, readVerifiedPlan, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { effectMarker, manifestDigest, parseActionManifest, validateReviewedManifest, type Effect } from "./manifests";
 import { canonicalJSON } from "./protocol";
 import { publicationMarker } from "./report-history";
@@ -76,8 +76,9 @@ export async function verifyPublicationGate(options: PublishOptions, journal: Jo
     || identity.default_branch !== options.settings.default_branch) throw new PublicationScopeChanged("current-native-repository-or-actor-changed");
 }
 
-function pending(journal: Journal, effect: Effect, reason: string, objects: PlanObjects, invalidate = false): PublishResult {
+function pending(journal: Journal, effect: Effect, reason: string, objects: PlanObjects, invalidate = false, recoveryOnly = false): PublishResult {
   if (!journal.events.some(event => event.effect_id === effect.id && event.kind === "intent")) journal = appendIntent(journal, effect.id);
+  if (recoveryOnly) journal = appendRecoveryOnly(journal, effect.id, reason);
   if (invalidate) journal = appendInvalidation(journal, effect.id, reason);
   journal = appendHandoff(journal, effect.id, reason);
   return { state: "pending", reason, journal, objects };
@@ -90,9 +91,15 @@ export async function publish(options: PublishOptions): Promise<PublishResult> {
   for (const [index, effect] of journal.plan.manifest.effects.entries()) {
     try {
       await verifyPublicationGate(options, journal);
+      if (index <= 1) {
+        const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
+        journal = readJournal(journal.directory, options.source_repo);
+        const attempted = journal.events.some(event => event.kind === "attempt" && event.effect_id === journal.plan.manifest.effects[1].id);
+        if (receipt.state === "present" && !attempted) return pending(journal, effect, "operation-started-elsewhere", objects, false, true);
+      }
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
       if (index === 0) {
-        if (lease.state !== "absent") return pending(journal, effect, "publication-lease-occupied", objects, true);
+        if (lease.state !== "absent") return pending(journal, effect, "publication-lease-occupied", objects);
       } else if (lease.state === "present" ? lease.object !== objects.lease_object : effect.kind !== "lease-release") {
         return pending(journal, effect, "publication-lease-lost", objects, true);
       }

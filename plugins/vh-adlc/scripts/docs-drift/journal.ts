@@ -25,7 +25,7 @@ export type Outcome = { state: "observed"; observation_sha256: string; resource_
 export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string } };
 type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean };
 type Event = {
-  schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended";
+  schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended" | "recovery-only";
   effect_id: string; payload: { effect_sha256: string } | Outcome | { reason: string } | Retirement | { attempt_id: string } | AttemptEnd;
 };
 type Header = {
@@ -179,7 +179,7 @@ function outcome(value: unknown): Outcome {
   const receipt = exact(value, ["state", "observation_sha256", "resource_id", "object"]);
   if (receipt.state !== "observed") fail("outcome state");
   hash(receipt.observation_sha256);
-  if (receipt.resource_id !== null && (typeof receipt.resource_id !== "string" || !/^[A-Za-z0-9_.:/-]+$/u.test(receipt.resource_id))) fail("outcome resource");
+  if (receipt.resource_id !== null && (typeof receipt.resource_id !== "string" || receipt.resource_id.length === 0 || /[\u0000-\u0020\u007f]/u.test(receipt.resource_id))) fail("outcome resource");
   if (receipt.object !== null && (typeof receipt.object !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(receipt.object))) fail("outcome object");
   return receipt as Outcome;
 }
@@ -200,7 +200,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
       identifier(exact(event.payload, ["attempt_id"]).attempt_id);
       const latest = prior.findLast(item => item.kind === "attempt");
       if (prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")
-        || (effect.kind !== "lease-release" && previous.some(item => item.kind === "invalidation"))
+        || (effect.kind !== "lease-release" && previous.some(item => item.kind === "invalidation" || item.kind === "recovery-only"))
         || (latest && !prior.some(item => item.kind === "attempt-ended" && item.revision > latest.revision))) fail("attempt already pending or operation terminal");
       if (prior.some(item => item.kind === "attempt" && (item.payload as { attempt_id: string }).attempt_id === (event.payload as { attempt_id: string }).attempt_id)) fail("repeated attempt identity");
     }
@@ -220,7 +220,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
       hash(lookup.sha256);
       if (typeof lookup.path !== "string" || !lookup.path.startsWith("/") || lookup.path.includes("\0")) fail("retirement lookup path");
     }
-    else if (event.kind === "handoff" || event.kind === "invalidation") identifier(exact(event.payload, ["reason"]).reason);
+    else if (event.kind === "handoff" || event.kind === "invalidation" || event.kind === "recovery-only") identifier(exact(event.payload, ["reason"]).reason);
     else fail("unknown event kind");
   }
 }
@@ -325,4 +325,11 @@ export function writePublicationObjects(store: OwnedObjectStore, plan: SealedPla
   if (header.observed_lease_object !== null) return { ...objects, lease_object: header.observed_lease_object };
   const commit = Buffer.from(`tree ${objects.tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift lease ${plan.manifest.operation_id} ${header.run_id}\n`);
   return { ...objects, lease_object: writeMetadataObject(store.root, "commit", commit) };
+}
+
+export function appendRecoveryOnly(journal: Journal, effectId: string, reason: string): Journal {
+  return append(journal, "recovery-only", effectId, { reason: identifier(reason) });
+}
+export function isObservationOnly(journal: Journal): boolean {
+  return journal.header.recovery_mode === "observation-only" || journal.events.some(event => event.kind === "recovery-only");
 }

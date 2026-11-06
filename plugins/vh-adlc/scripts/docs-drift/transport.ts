@@ -255,7 +255,13 @@ export function createNativeTransport(options: {
           if (candidates.length === 0) return absent({ candidates });
           if (candidates.length !== 1) return { state: "conflict", reason: "ambiguous-native-PR" };
           const candidate = record(candidates[0]), pr = pull(positive(candidate.number), plan);
-          if (pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch || !same(submittedFields(pr.input), expectedFields(effect))) return { state: "conflict", reason: "native-PR-payload-changed" };
+          const actual = submittedFields(pr.input), expected = expectedFields(effect);
+          if (pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return { state: "conflict", reason: "native-PR-payload-changed" };
+          if (!same(actual, expected)) {
+            if (actual.labels.length === 0 && same({ ...actual, labels: expected.labels }, expected))
+              return { state: "unknown", reason: "native-PR-labels-incomplete" };
+            return { state: "conflict", reason: "native-PR-payload-changed" };
+          }
           return observed(pr.input, String(candidate.number), pr.head);
         }
         if (effect.kind === "pr-update" || effect.kind === "pr-close") {

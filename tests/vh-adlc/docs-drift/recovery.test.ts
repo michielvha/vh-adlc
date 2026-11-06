@@ -426,3 +426,75 @@ test("a foreign unreadable lease does not prevent read-only inspection of the re
   expect(inspection.observations.find(item => item.effect_id === "pr")?.observation.state).toBe("done");
   expect(f.executed.includes("release")).toBe(false);
 });
+
+
+test("normal contention can wait for an unrelated lease without invalidating the reviewed operation", async () => {
+  const f = setup();
+  f.refs.set(f.settings.publication.lease_ref, "f".repeat(40));
+  const waiting = await publish(options(f));
+  expect(waiting.state).toBe("pending");
+  expect(waiting.journal.events.some(event => event.kind === "invalidation")).toBe(false);
+  const stillWaiting = await resumeEffects({ ...options(f), journal_directory: waiting.journal.directory });
+  expect(stillWaiting.state).toBe("pending");
+  expect(stillWaiting.journal.events.some(event => event.kind === "invalidation")).toBe(false);
+  f.refs.delete(f.settings.publication.lease_ref);
+  expect((await resumeEffects({ ...options(f), journal_directory: waiting.journal.directory })).state).toBe("complete");
+});
+
+test("lease-fallback restoration records the actually observed nonce-bearing object", async () => {
+  const { f } = await interruptedPR();
+  f.refs.delete(f.settings.publication.receipt_ref_prefix + "operation-1");
+  const recovered = join(f.root, "fallback-root");
+  mkdirSync(recovered, { mode: 0o700 });
+  f.transport = { ...f.transport, artifact_root: recovered };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: recovered, settings: f.settings,
+    transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  const result = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: recovered } });
+  const origin = JSON.parse(readFileSync(join(result.journal.directory, "retained-origin.json"), "utf8"));
+  expect(inspection.ref).toBe(f.settings.publication.lease_ref);
+  expect(origin.object).toBe(inspection.objects.object);
+});
+
+test("a completed operation can be reconstructed read-only after its lease and original proof are gone", async () => {
+  const f = setup();
+  const original = await publish(options(f));
+  expect(original.state).toBe("complete");
+  f.input.grants = [];
+  f.input.reviewer.native = Buffer.from("lost original proof");
+  const recovered = join(f.root, "completed-mirror");
+  mkdirSync(recovered, { mode: 0o700 });
+  f.transport = { ...f.transport, artifact_root: recovered };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: recovered, settings: f.settings,
+    transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  const result = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: recovered } });
+  expect(result.state).toBe("complete");
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
+});
+
+test("a receipt appearing during acquisition cannot be adopted as this run's retention", async () => {
+  const f = setup(), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    await execute(plan, effect, objects);
+    if (effect.kind === "lease-acquire") {
+      f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.object);
+      f.done.add("receipt");
+    }
+  };
+  const result = await publish(options(f));
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("operation-started-elsewhere");
+  expect(f.executed).toEqual(["lease"]);
+});
+
+test("an operation observed elsewhere remains non-replaying even after receipt cleanup", async () => {
+  const f = setup();
+  const { writePlanObject } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const objects = writePlanObject(f.store, f.plan);
+  f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.object);
+  const waiting = await publish(options(f));
+  f.refs.delete(f.settings.publication.receipt_ref_prefix + "operation-1");
+  const resumed = await resumeEffects({ ...options(f), journal_directory: waiting.journal.directory });
+  expect(resumed.state).toBe("pending");
+  expect(f.executed).toEqual([]);
+  expect(resumed.journal.events.some(event => event.kind === "invalidation")).toBe(false);
+});

@@ -2,7 +2,7 @@ import { executeAttempt, pendingAttempt } from "./attempts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRetirement, readJournal, writePlanObject, writePublicationObjects, createJournal, publishArtifact, readArtifact, readVerifiedPlan, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRetirement, appendRecoveryOnly, isObservationOnly, readJournal, writePlanObject, writePublicationObjects, createJournal, publishArtifact, readArtifact, readVerifiedPlan, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { readAbsence } from "./observations";
 import { canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { publicationMarker } from "./report-history";
@@ -29,10 +29,11 @@ export async function resumeEffects(options: PublishOptions & { journal_director
   const retired = new Set(journal.events.filter(event => event.kind === "retired-absence").map(event => event.effect_id));
   const complete = () => journal.plan.manifest.effects.every(effect => terminal(journal, effect.id) || retired.has(effect.id));
   const invalidated = journal.events.some(event => event.kind === "invalidation");
-  const blocked = (effectId: string, reason: string, invalidate = false): PublishResult => {
+  const blocked = (effectId: string, reason: string, invalidate = false, recoveryOnly = false): PublishResult => {
     // An acknowledgement can be lost after a local event was published too. Never overwrite it.
     journal = readJournal(options.journal_directory, options.source_repo);
     if (!intended(journal, effectId)) journal = appendIntent(journal, effectId);
+    if (recoveryOnly) journal = appendRecoveryOnly(journal, effectId, reason);
     if (invalidate) journal = appendInvalidation(journal, effectId, reason);
     journal = appendHandoff(journal, effectId, reason);
     return { state: "pending", reason, journal, objects };
@@ -50,6 +51,31 @@ export async function resumeEffects(options: PublishOptions & { journal_director
     // Acquired leases are temporary. A recorded acquisition is checked again before replay below.
     if (effect.kind === "lease-acquire" && terminal(journal, effect.id)) continue;
     try {
+      if (!terminal(journal, effect.id) && effect.kind === "lease-acquire") {
+        if (isObservationOnly(journal)) {
+          const inferred = await restoredAcquisition(options, journal, objects);
+          if (inferred) {
+            if (!intended(journal, effect.id)) journal = appendIntent(journal, effect.id);
+            journal = appendOutcome(journal, effect.id, inferred);
+            continue;
+          }
+          const lease = await options.transport.ref(options.settings.publication.lease_ref);
+          if (lease.state === "present" && lease.object !== objects.lease_object) return blocked(effect.id, "foreign-publication-lease");
+        } else {
+          const lease = await options.transport.ref(options.settings.publication.lease_ref);
+          if (lease.state === "present" && lease.object !== objects.lease_object) {
+            const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
+            if (receipt.state === "present") return blocked(effect.id, "operation-started-elsewhere", false, true);
+            return blocked(effect.id, "publication-lease-occupied");
+          }
+        }
+      }
+      if (effect.kind === "receipt-retain" && !terminal(journal, effect.id) && !isObservationOnly(journal)) {
+        const receipt = await options.transport.ref(String(effect.payload.ref));
+        journal = readJournal(journal.directory, options.source_repo);
+        if (receipt.state === "present" && !journal.events.some(event => event.kind === "attempt" && event.effect_id === effect.id))
+          return blocked(effect.id, "operation-started-elsewhere", false, true);
+      }
       const observation = await options.transport.observe(journal.plan, effect, objects);
       journal = readJournal(journal.directory, options.source_repo);
       const active = pendingAttempt(journal, effect);
@@ -64,13 +90,15 @@ export async function resumeEffects(options: PublishOptions & { journal_director
         journal = appendOutcome(journal, effect.id, observation.outcome);
         continue;
       }
-      if (journal.header.recovery_mode === "observation-only") return blocked(effect.id, "retained-restore-no-replay");
+      if (isObservationOnly(journal)) return blocked(effect.id, "retained-restore-no-replay");
       const attempt = pendingAttempt(journal, effect);
       if (attempt) return blocked(effect.id, attempt);
       if (retired.size > 0 || invalidated) return blocked(effect.id, "reconciliation-only-no-replay");
       await verifyPublicationGate(options, journal);
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
       if (effect.kind === "lease-acquire") {
+        const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
+        if (receipt.state === "present") return blocked(effect.id, "operation-started-elsewhere", false, true);
         if (lease.state !== "absent") return blocked(effect.id, "publication-lease-occupied");
       } else if (lease.state !== "present" || lease.object !== objects.lease_object) {
         return blocked(effect.id, "publication-lease-lost");
@@ -83,6 +111,25 @@ export async function resumeEffects(options: PublishOptions & { journal_director
     } catch (error) { return blocked(effect.id, "current-proof-or-recovery-effect-unavailable", error instanceof PublicationScopeChanged); }
   }
   return { state: retired.size ? "retired" : invalidated ? "invalidated" : "complete", reason: null, journal, objects };
+}
+
+
+/** A retained receipt proves earlier acquisition, without inventing the lost acquiring nonce. */
+async function restoredAcquisition(options: PublishOptions, journal: Journal, objects: PlanObjects) {
+  const receipt = journal.plan.manifest.effects[1];
+  if (receipt?.kind !== "receipt-retain" || receipt.payload.ref !== options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id) return null;
+  const lease = await options.transport.ref(options.settings.publication.lease_ref);
+  if (lease.state === "present" && lease.object !== journal.header.observed_lease_object) return null;
+  const retained = await options.transport.observe(journal.plan, receipt, objects);
+  if (retained.state !== "done") return null;
+  const bytes = canonicalJSON({ schema_version: 1, kind: "receipt-proves-acquisition", operation_id: journal.plan.manifest.operation_id,
+    plan_sha256: objects.plan_sha256, receipt: retained.outcome, lease });
+  const digest = sha256(bytes), path = join(journal.directory, "derived-acquisition-" + digest + ".json");
+  try { publishArtifact(path, bytes); }
+  catch (error) {
+    if (!(error instanceof Error) || error.message !== "docs-drift journal revision conflict" || !readArtifact(path).equals(bytes)) throw error;
+  }
+  return { state: "observed" as const, observation_sha256: digest, resource_id: options.settings.publication.lease_ref, object: null };
 }
 
 
@@ -162,7 +209,7 @@ export async function restoreRetainedOperation(options: { inspection: RetainedIn
     || objects.plan_sha256 !== options.inspection.objects.plan_sha256) throw Error("restored operation object changed");
   const journal = createJournal({ source_repo: publication.source_repo, artifact_root: publication.artifact_root, plan: publication.plan, recovery_mode: "observation-only", observed_lease_object: options.inspection.lease_object });
   publishArtifact(join(journal.directory, "retained-origin.json"), canonicalJSON({ schema_version: 1,
-    source: "retained-ref", ref: options.inspection.ref, object: objects.object, plan_sha256: objects.plan_sha256 }));
+    source: "retained-ref", ref: options.inspection.ref, object: options.inspection.objects.object, plan_sha256: objects.plan_sha256 }));
   return resumeEffects({ ...publication, journal_directory: journal.directory });
 }
 

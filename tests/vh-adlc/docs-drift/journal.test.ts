@@ -190,3 +190,12 @@ test("same reviewed plan has stable receipt objects and distinct durable acquiri
   expect(readGit(store.root, "cat-file", "commit", a.lease_object).toString()).not.toContain("parent ");
   expect(readGit(store.root, "show", a.lease_object + ":plan.json")).toEqual(canonicalJSON(plan));
 });
+
+test("native outcome resources preserve valid Unicode ref identities", () => {
+  const { repo, artifacts, plan } = setup();
+  let journal = createJournal({ source_repo: repo, artifact_root: artifacts, plan });
+  journal = appendIntent(journal, "push");
+  journal = appendOutcome(journal, "push", { state: "observed", observation_sha256: hash("native Unicode ref"),
+    resource_id: "refs/heads/docs-drift/évidence-🧪", object: plan.manifest.bindings.candidate_commit });
+  expect(readJournal(journal.directory, repo).events.at(-1)?.kind).toBe("outcome");
+});
