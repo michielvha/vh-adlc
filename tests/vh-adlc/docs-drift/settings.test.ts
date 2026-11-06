@@ -86,6 +86,13 @@ test("omitted read bounds become explicit conservative nulls and remain protecte
   expect(settingsProjections(parsed).protected.read_set).toEqual(parsed.read_set);
 });
 
+test("configured Git path identities retain literal leading/trailing whitespace", () => {
+  const value = settingsFixture();
+  const parsed = parseSettings({ ...value, roots: [" docs "], feedback_files: ["docs/ feedback.yaml "] });
+  expect(parsed.roots).toEqual([" docs "]);
+  expect(parsed.feedback_files).toEqual(["docs/ feedback.yaml "]);
+});
+
 test("committed settings use exact selected Git bytes, reject suffix conflicts and preserve dirty caller state", () => {
   const repo = mkdtempSync(join(tmpdir(), "vh-drift-settings-"));
   repositories.push(repo);

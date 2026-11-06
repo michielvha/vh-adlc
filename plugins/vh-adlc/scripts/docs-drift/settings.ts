@@ -1,6 +1,6 @@
-import { createHash } from "node:crypto";
 import { readGit } from "../git-read";
 import { readYAML } from "../settings-file";
+import { protocolPath, sha256 } from "./protocol";
 
 export type SettingClassification = "ordinary" | "protected" | "trial-setup";
 export type JSONValue = null | boolean | number | string | JSONValue[] | { [key: string]: JSONValue };
@@ -57,15 +57,15 @@ function unique(values: string[], field: string): string[] {
 }
 
 function path(value: unknown, field: string, root = false): string {
-  const raw = text(value, field);
-  const normalized = root ? raw.replace(/\/$/u, "") : raw;
+  if (typeof value !== "string") invalid(field);
+  const normalized = root ? value.replace(/\/$/u, "") : value;
   if (root && normalized === ".") return normalized;
-  if (normalized.startsWith("/") || normalized.split("/").some(part => !part || part === "." || part === ".." || part.toLowerCase() === ".git")) invalid(field);
-  return normalized;
+  try { return protocolPath(normalized); } catch { invalid(field); }
 }
 
-function paths(value: unknown, field: string, nonempty = false): string[] {
-  return unique(strings(value, field, nonempty).map(value => path(value, field, true)), field);
+function paths(value: unknown, field: string, nonempty = false, root = true): string[] {
+  if (!Array.isArray(value) || (nonempty && value.length === 0)) invalid(field);
+  return unique(value.map(value => path(value, field, root)), field);
 }
 
 function yamlPath(value: unknown, field: string): string {
@@ -321,7 +321,7 @@ export function parseSettings(value: unknown) {
     required_detectors: required, detector_inputs: detectorSelectors(input.detector_inputs, required),
     detector_options: Object.fromEntries(required.map(id =>
       [id, jsonData(Object.hasOwn(options, id) ? options[id] : {}, "detector_options")] as const)),
-    feedback_files: unique(strings(input.feedback_files, "feedback_files").map(value => path(value, "feedback_files")), "feedback_files"),
+    feedback_files: paths(input.feedback_files, "feedback_files", false, false),
     scanner: scannerSettings(input.scanner), project_procedure: path(input.project_procedure, "project_procedure"),
     verification_commands: commands(input.verification_commands, "verification_commands"),
     generation_commands: commands(input.generation_commands, "generation_commands"),
@@ -424,5 +424,5 @@ export function loadCommittedSettings(repo: string, sourceCommit: string): { set
   if (!match) invalid("committed settings file");
   const bytes = readGit(repo, "cat-file", "blob", match[2]);
   const value = readYAML(bytes, reason => { throw new Error(reason); }, { offline: true });
-  return { settings: parseSettings(value), settings_sha256: createHash("sha256").update(bytes).digest("hex"), source_commit: sourceCommit };
+  return { settings: parseSettings(value), settings_sha256: sha256(bytes), source_commit: sourceCommit };
 }
