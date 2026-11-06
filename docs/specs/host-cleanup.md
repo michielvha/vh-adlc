@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. The factual findings of R-10 to R-13 are folded, and the owner answered Q1 to Q4 on 2026-11-06. The owner's advance acceptance was conditional on R-12, which went stale when its two factual nits were folded; R-13 then added a Design change (a pruned origin/HEAD target is default-branch-unknown, task T25). Waits on a fresh spec review and the owner's acceptance naming it. Tasks T23 to T25 follow acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. The factual findings of R-10 to R-14 are folded, and the owner answered Q1 to Q4 on 2026-11-06. The owner's advance acceptance was conditional on R-12, which went stale when its factual nits were folded; R-13 and R-14 then added the pruned origin/HEAD end state to Design and AC-05 (task T25). R-15 at 28c830a returned two judgement findings, now Q5 and Q6. Waits on the owner's answers, a fresh spec review and an acceptance naming it; tasks T23 to T25 follow acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -388,7 +388,31 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 
 ## Open Questions
 
-None.
+### Q5: What should `clean` report when the default-branch manifest blob is missing from a partial clone?
+
+**Recommendation:** A. Make it a note that skips project rules and names `git fetch origin` as the fix,
+because the manifest is valid and only unfetched, and a failing dry run stops the operation from clearing
+even the built-in globs.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. A note** | Like `default-branch-unknown`: project rules are skipped, the built-in globs still apply, the run does not fail on it, and the note names a command that fetches the blob | A code change in `internal/clean/clean.go` and a test after acceptance, folded into T25; AC-05 and the Test Plan name the outcome |
+| **B. Keep it failing, with a hint** | `manifest-invalid` stays, now with a hint naming the fetch; the operation sends the user to fetch first | Until something fetches the blob, the operation clears nothing in that clone |
+
+**Why this is yours:** R-15 F-01 asks whether an unfetched manifest should be treated as unknown or as
+broken, which trades a visible failure against unblocking a session that is out of space.
+
+### Q6: Should AC-05's `origin/HEAD` clause be reworded?
+
+**Recommendation:** A. Reword it, so it does not read as forbidding the dry-run plan of a working-tree
+manifest or as a claim about the whole run's result.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Reword** | "...reports a `default-branch-unknown` note, removes nothing under project rules and does not fail on it, dry or applied; a dry run still plans a working-tree manifest under `manifest-unmerged`." | One sentence |
+| **B. Keep it** | No change | A reviewer may read "skips project rules ... dry" as forbidding the `unmerged` plan the code makes |
+
+**Why this is yours:** R-15 F-02 is a wording judgement on a criterion's text.
 
 ## Review Log
 
