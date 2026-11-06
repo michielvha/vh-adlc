@@ -55,6 +55,19 @@ The branch now incorporates merged owner summaries and uses plugin version 0.12.
 The integrated commit needs fresh review and CI before merge.
 A production Homelab board and unattended cleanup remain separate work.
 
+### Artifact and publication path
+
+The affected artifact is the marketplace Git source package under `plugins/vh-adlc/`, selected by
+`.claude-plugin/marketplace.json` and declared by its two plugin manifests. The main-branch merge
+publishes that source for host marketplace installation or update. The 0.12.0 manifests identify the
+integrated plugin candidate. The binary release workflows and binary format are unchanged by this feature.
+
+An independent export of exact commit `c98c5d6` passed 15 source-package assertions. The extracted
+package contains fourteen skills, both manifests and the adopted Docs pin; its Projects CLI executes
+inventory and plan, while unapproved apply is refused. This verifies the source-package path. Native
+installed-agent invocation remains unverified. After merge, verify the published Git tree against the
+reviewed source and keep installation checks separate from binary release publication.
+
 ### Current evidence
 
 At framework main `21bc3e4299a227bf9431de2d6045afdff2342834`,
