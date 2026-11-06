@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Coverage amendment accepted; completing discovery integration and final review."
+status: complete
+status_description: "All seven criteria met, independently reviewed and complete; awaiting PR CI and owner merge review."
 branch: feat/github-projects-coordinator
 issue: https://github.com/michielvha/vh-adlc/issues/54
 goal: "Coordinate work across repositories from one GitHub Project while keeping each repository's feature lifecycle authoritative."
