@@ -40,7 +40,7 @@ The binary prints one JSON report. `knowledge` is `null`, because neither comman
 | `answered` | A dry run with no failing finding | Report the plan and apply it if step 2 allows. |
 | `pass` | An applied run that removed what it planned | Report what went. |
 | `fail` | `removal-failed`, `manifest-invalid`, `engine-unreachable`, `kind-unavailable`, `temp-base-refused` or `host-settings-invalid`; a dry run fails on them too | Report the finding and do not apply. |
-| `error` | `unsupported-platform`, `running-as-root`, `pid-namespace` or `git-too-old` | Report it; nothing was read or removed. |
+| `error` | `unsupported-platform`, `running-as-root`, `pid-namespace` or `git-too-old`, or the code `error` when Git cannot run in the repository, such as a missing directory | Report it; nothing was read or removed. |
 
 `manifest-missing`, `default-branch-unknown`, `manifest-unmerged` and `engine-absent` are notes. With
 `engine-absent`, no Docker engine answered, so container bind mounts were not checked. A working-tree

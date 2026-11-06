@@ -104,6 +104,8 @@ func TestCleanRefusals(t *testing.T) {
 			o.PIDNamespace = func() (string, error) { return "", errors.New("denied") }
 		}, report.CodePIDNamespace},
 		{"Git 2.44", func(o *Options) { o.GitVersion = func() string { return "git version 2.44.2" } }, report.CodeGitTooOld},
+		// R-18 F-01: a Git that cannot run in the repository is not an old Git.
+		{"missing repository", func(o *Options) { o.Repo = filepath.Join(o.Host.Tmp, "absent-repo") }, report.CodeError},
 	}
 	for _, tc := range cases {
 		for _, dry := range []bool{false, true} {
@@ -354,6 +356,10 @@ func TestPrunedDefaultBranch(t *testing.T) {
 		}
 		if !strings.Contains(rep.Findings[0].Message, "git remote set-head origin --auto") {
 			t.Fatalf("dry=%v: the note gives no fix: %q", dry, rep.Findings[0].Message)
+		}
+		// R-18 F-02: with no default branch there is nothing to differ from.
+		if dry && !strings.Contains(rep.Findings[1].Message, "no default branch") {
+			t.Fatalf("the manifest-unmerged note says it differs from a default branch it could not read: %q", rep.Findings[1].Message)
 		}
 		if got := names(data.Removed); !slices.Equal(got, []string{"go-build1"}) {
 			t.Fatalf("dry=%v: removed %q; want only the built-in go-build1", dry, got)

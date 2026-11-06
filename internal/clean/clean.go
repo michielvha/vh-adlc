@@ -123,7 +123,11 @@ func Clean(ctx context.Context, o Options) *report.Report {
 			note(report.CodeManifestUnmerged, "the working tree's %s differs from the default branch and is invalid, so a dry run plans nothing from it: %v", ManifestPath, err)
 		case m != nil:
 			unmerged = m
-			note(report.CodeManifestUnmerged, "the working tree's %s differs from the default branch; a dry run plans it separately and an applied run never uses it", ManifestPath)
+			if mf != nil && mf.Code == report.CodeDefaultBranchUnknown {
+				note(report.CodeManifestUnmerged, "no default branch could be read, so a dry run plans the working tree's %s separately; an applied run never uses it", ManifestPath)
+			} else {
+				note(report.CodeManifestUnmerged, "the working tree's %s differs from the default branch; a dry run plans it separately and an applied run never uses it", ManifestPath)
+			}
 		}
 	}
 
@@ -199,8 +203,14 @@ func refuse(ctx context.Context, o Options) *report.Finding {
 	} else {
 		verr = gitcmd.Git{Dir: o.Repo}.CheckMinVersion(ctx, gitMajor, gitMinor)
 	}
-	if verr != nil {
+	var old *gitcmd.TooOldError
+	if errors.As(verr, &old) {
 		return refusal(report.CodeGitTooOld, "%v", verr)
+	}
+	if verr != nil {
+		// A Git that cannot run here, as in a missing repository, is not an
+		// old Git.
+		return refusal(report.CodeError, "%v", verr)
 	}
 	return nil
 }
