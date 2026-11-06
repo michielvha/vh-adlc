@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Published template adopted; final checks and independent review are running."
+status: complete
+status_description: "All four criteria met and independently reviewed; awaiting current PR CI and owner merge review."
 branch: feat/owner-readable-specifications
 issue: https://github.com/michielvha/vh-adlc/issues/55
 goal: "Let an owner judge a feature's scope, trade-offs and proof from a short summary maintained inside its canonical spec."
