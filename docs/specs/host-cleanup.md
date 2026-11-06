@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06: R-9 F-04 adds internal/settings/ to covers and R-9 F-03 is a stated limit; the revision also folds R-8 F-01 to F-03 and resets every criterion tick and evidence line. Spec review R-10 at 6d0c8af found 6 findings, none blocking; its factual findings are folded, and the owner answered Q1 (the stated limit also names a bind of the temp base or the project's temp root) and Q2 (the host.yaml wording) on 2026-11-06. Waits on a fresh spec review and the owner's acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. R-10 at 6d0c8af: factual findings folded, Q1 and Q2 answered by the owner and folded at 1fdaced. R-11 at 1fdaced found 4 findings, none blocking; its factual F-01 and F-04 are folded, and its judgement F-02 and F-03 wait on the owner as Q3 and Q4. Then a fresh spec review and the owner's acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -102,9 +102,10 @@ engine socket.
   `--older-than` applies to `tmp` and `temp_root` ages, and can only raise them. A dry run without
   `--compose` or `--kind` also lists abandoned Compose projects and clusters, marked as needing their flag.
 
-Those refusals report `error`. A dry run reports `answered`. An applied run reports `pass`, or `fail` on
-`removal-failed`, `manifest-invalid`, `engine-unreachable` or `kind-unavailable`. `temp-base-refused` and
-`host-settings-invalid` also report `fail`, and stop the run before it removes anything.
+Those refusals report `error`. A dry run reports `answered` and an applied run `pass`; either reports
+`fail` instead on `removal-failed`, `manifest-invalid`, `engine-unreachable`, `kind-unavailable`,
+`temp-base-refused` or `host-settings-invalid`, so the operation never applies after a failed dry run.
+`temp-base-refused` and `host-settings-invalid` also stop the run before it removes anything.
 `manifest-missing`, `default-branch-unknown`, `manifest-unmerged` and `engine-absent` are notes. `env` fails
 on `manifest-missing`, `manifest-invalid`, `temp-root-undeclared`, `temp-base-refused` or
 `host-settings-invalid`, and creates nothing then. All but
@@ -372,7 +373,31 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 
 ## Open Questions
 
-None.
+### Q3: Should an invalid working-tree manifest fail a dry run?
+
+**Recommendation:** A. Make it a note, because an applied run never reads the working-tree copy, and a
+session blocked on space should not be stopped by an uncommitted edit.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. A note** | A dry run reports an invalid working-tree manifest beside `manifest-unmerged` without failing, so the operation can still apply what the default-branch manifest declares | A small code change in `internal/clean/clean.go` and a test, after acceptance |
+| **B. Keep it failing** | No code change; Design states that it fails the dry run and the operation sends the user to fix the manifest or run `vh-adlc clean` in a terminal | A broken local edit blocks cleanup through the operation until it is fixed |
+
+**Why this is yours:** R-11 F-02 asks how strict a dry run should be about a manifest the applied run
+ignores, which trades safety signalling against unblocking a full `/tmp`.
+
+### Q4: Should the stated bind-mount limit also name a bind of any directory above the temp base?
+
+**Recommendation:** A. Name it, because a custom `temp_base` such as `~/.cache/vh-adlc` sits under
+directories a dev container may mount, such as `$HOME`, and the code already behaves this way.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Widen to any directory above** | Design and `references/clean.md` say a bind of the temp base, the project's temp root or any directory above them marks no entry below it as in use | Two sentences; no code |
+| **B. Keep the Q1 wording** | The limit stays as you answered Q1 | A `$HOME` bind with a custom base loses in-use protection with no written warning |
+
+**Why this is yours:** R-11 F-03 asks whether your Q1 answer should extend past the temp base and temp
+root, which only you can widen.
 
 ## Review Log
 
@@ -1314,7 +1339,7 @@ PROPOSAL: Point the four links at 0e52f51, or drop the word "Pinned".
 
 ## Sources
 
-- [Pinned feature-document standard](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md), [coding](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/coding.md), [Go](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/go.md) and [prose](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md) pages: document format and writing rules.
+- [Feature-document standard](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/feature-documents.md), [coding](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/coding.md), [Go](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/conventions/go.md) and [prose](https://github.com/vhco-pro/docs/blob/e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a/guides/humanize-prose.md) pages at `e4d58d2`, read when this document was first written; the repository pin is now `0e52f51`: document format and writing rules.
 - [Claude Code: configure permissions](https://code.claude.com/docs/en/permissions): Bash rule wildcards and compound-command splitting.
 - [Claude Code: permission modes](https://code.claude.com/docs/en/permission-modes): narrow allow rules stay in auto mode and resolve before the classifier.
 - [Codex rules](https://learn.chatgpt.com/docs/agent-configuration/rules): `prefix_rule` syntax and `codex execpolicy check`.
