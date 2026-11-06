@@ -174,13 +174,20 @@ Document native auto-add as an optional complement, including rule limits and ex
 
 ## Acceptance Criteria
 
-- [ ] AC-01: An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
-- [ ] AC-02: Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
-- [ ] AC-03: Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
-- [ ] AC-04: Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
-- [ ] AC-05: Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
-- [ ] AC-06: Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
-- [ ] AC-07: A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
+- [x] AC-01: An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
+      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+- [x] AC-02: Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
+      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+- [x] AC-03: Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
+      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+- [x] AC-04: Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
+      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+- [x] AC-05: Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
+      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+- [x] AC-06: Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
+      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+- [x] AC-07: A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
+      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
 
 ## Test Plan
 
@@ -214,7 +221,8 @@ Document native auto-add as an optional complement, including rule limits and ex
       Evidence: archived-inventory regression failed before the fix; `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000` passes 76 tests after requesting both archived states and retaining isArchived. R4 remains unchanged; follow-up review pending.
 - [x] T10 `tests/vh-adlc/triage/discovery.test.ts`, `tests/vh-adlc/maintenance/discovery.test.ts`, `docs/get-started/installation.md` - existing discovery checks and setup docs agree on fourteen skills and eleven engineering operations; targeted discovery tests pass (AC-01, AC-06)
       Evidence: `bun test tests/vh-adlc/triage/discovery.test.ts tests/vh-adlc/maintenance/discovery.test.ts tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000` passes 85 tests. Earlier full run retained 1290 passes and four discovery failures; all four are covered by this passing rerun. No runtime source changed after the live trial at9a535ea.
-- [ ] T8 `docs/specs/github-projects-coordinator.md` - after separate live permission and access, record the disposable-board trial and independent implementation review; production resources match baseline (AC-07)
+- [x] T8 `docs/specs/github-projects-coordinator.md` - after separate live permission and access, record the disposable-board trial and independent implementation review; production resources match baseline (AC-07)
+      Evidence: authorized live trial at9a535ea passes add/update/repeat/conflict and archived-member checks; independent live read-back and REST comparison confirm cleanup and preservation. R8 returns all seven criteria met with no findings. No production board, VM, merge or unattended grant was changed.
 
 ## Open Questions
 
@@ -233,6 +241,7 @@ None. The owner selected approved add/update batches and accepted the documented
 | 2026-11-06 | R-6 | spec | `258735c1e8810210a5dac05f06ee718b8cd95208` | unknown | procedural | No findings on the coverage-only revision; model identity not attested. |
 | 2026-11-06 | R-6 | spec | `258735c1e8810210a5dac05f06ee718b8cd95208` | n/a | n/a | accepted by owner |
 | 2026-11-06 | R-7 | implementation | `f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a` | unknown | procedural | All seven criteria met; factual summary refresh remains. Model identity not attested. |
+| 2026-11-06 | R-8 | implementation | `387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a` | unknown | procedural | All seven criteria met; no findings. Model identity not attested. |
 
 ### R-1
 
@@ -372,6 +381,38 @@ SEVERITY: should-fix
 WHERE: docs/specs/github-projects-coordinator.md:51-53; docs/specs/github-projects-coordinator.md:67-68
 EVIDENCE: At f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a, the Owner summary says discovery assertions still expect thirteen skills and ten engineering operations and describes updating them as future work. The current assertions already expect fourteen and eleven, and the independently executed affected suite passes all 85 tests. Current evidence also concludes that board inventory is unknown from an earlier missing-scope failure, despite the subsequently authorized and independently observed live inventory.
 PROPOSAL: Refresh the summary to distinguish the retained failed run from the passing affected rerun. Label the missing-scope observation historical and record the later verified access and disposable-board trial without claiming a new full-suite pass.
+
+### R-8
+
+CRITERION: AC-01 An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
+VERDICT: met
+EVIDENCE: Verified clean target 387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a. Its only changes since reviewed f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a are feature-document evidence updates and verbatim review records. Previously independently executed the affected suite at f3e8f0e with 85 passes, 417 assertions and zero failures, covering configuration, identities, ambiguity refusal, CLI invocation and registration. That implementation evidence remains applicable.
+
+CRITERION: AC-02 Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
+VERDICT: met
+EVIDENCE: At 387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a, confirmed the runtime and normative baseline retain the reviewed behavior. Previously independently executed passing pagination, identity, incomplete-collection and archived-membership checks, including five scratch scenarios exercising nested cursors and denied noninitial pages. Independent live inventory at 9a535ea returned complete=true, no gaps, 19 repository issues and both owned cards with archival state preserved.
+
+CRITERION: AC-03 Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
+VERDICT: met
+EVIDENCE: At 387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a, verified that the inspected recommendation implementation and skill retain their prior contents. Previously observed passing affected checks and inspected separate issue, PR head, review and check facts with source links. Uninspected repository lifecycle remains unknown, and selected implementation follows the owning checkout's existing procedure.
+
+CRITERION: AC-04 Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
+VERDICT: met
+EVIDENCE: At 387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a, confirmed retention of the implementation independently tested at f3e8f0e for approval binding, scope, preflight, read-back and retries, including archived-member retries issuing zero mutations. Live observations and author-run receipts remain attributed to 9a535ea. The owner granted bounded disposable-resource testing. Manual owner inspection of generated JSON was not observed, and obtaining approval remains the documented procedural responsibility.
+
+CRITERION: AC-05 Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
+VERDICT: met
+EVIDENCE: At 387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a, confirmed retention of the previously tested conflict, partial-failure, reconciliation, scope and untrusted-input handling. Earlier independent scratch execution established that unknown read-back stops subsequent writes. At 9a535ea, inspected the author-run live conflict receipt and independently read back the preserved intervening value. Field documentation and receipts disclose the read/write race. Rate-limit and mutation-failure coverage remains fixture evidence.
+
+CRITERION: AC-06 Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
+VERDICT: met
+EVIDENCE: At 387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a, verified the corrected summary accurately separates the earlier full-run history from the passing affected rerun. Read the retained broader-run log showing 1290 passes and four discovery failures. Previously independently executed all 85 affected tests successfully at f3e8f0e, including those four discovery checks, strict TypeScript, package registration and fresh-process configuration/JSON reuse. Setup documentation retains scope, cross-owner and option-ID quoting guidance. Hosted CI remains pending. This narrow follow-up reused those observations.
+
+CRITERION: AC-07 A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
+VERDICT: met
+EVIDENCE: The live trial remains bound to 9a535ea4ef6778143b440b0bdfc422b46249a3f6, whose runtime is retained at 387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a. Previously inspected bounded owner authorization and author-run add/update/repeat/conflict receipts, then independently executed live inventory, direct GraphQL observation and final REST comparisons. All 26 pre-existing docs entries and 55 pre-existing vh-adlc entries matched saved metadata after excluding the two owned tests. Independently confirmed the private test board and both owned issues were closed. Mutations were author-executed. The initial failed attempt remains recorded, and the additional archival regression step was not separately named in the approval question. R8 performed document and retained-evidence inspection.
+
+NO FINDINGS
 
 ## Sources
 
