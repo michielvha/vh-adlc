@@ -40,7 +40,8 @@ Old specs stay valid, old review records stay unchanged, and no parser or gate c
 The owner accepted this scope. Actual binary checks now cover nested and historical specs, summary-only
 corrections and a normative revision without changing stored review records. An independent semantic
 trial caught unsupported proof and a changed default while accepting honest and historical drafts.
-The upstream template PR is open with passing CI and independent review; final framework pin adoption
+An actual author-operation trial remains unverified; the scripted compatibility checks do not establish
+that behavior. The upstream template PR is open with passing CI and independent review; final framework pin adoption
 waits for that PR to land. Candidate workflow code is prepared, with no consumer pin changed yet.
 Bulk rewrites, merges and unrelated feature work remain outside this change.
 
@@ -149,6 +150,7 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
       Evidence: the package checker first refused unchanged 0.10.0; after both candidate manifests advance together, `bun test tests/vh-adlc/check.test.ts --timeout 60000` passes all 57 checks. This is an unmerged candidate, not a release.
 - [x] T3 `tests/vh-adlc/owner-summary.test.ts` - real binary compatibility checks and observed author/reviewer fixtures distinguish planned proof, scope revisions and misleading summaries while historical specs remain valid (AC-02, AC-03, AC-04)
       Evidence: two actual-binary tests pass (12 assertions), proving summary-only freshness, required draft/review after a normative change and byte-identical stored records. Nine summary/operation compatibility tests pass. Independent semantic trial at four exact scratch commits returns no findings for historical/honest drafts and blocking findings for unsupported proof and changed-default summaries. First trial retained an unrelated test-fixture task finding; corrected drafts were re-reviewed. Fixtures use explicit synthetic lifecycle rows, not real owner acceptance. Model identity is not attested.
+- [ ] T6 `docs/specs/owner-readable-specifications.md` - preserve a disposable actual author-operation trial and its owner-facing pre-acceptance output; independent review verifies the observed behavior rather than inferring it from scripted fixtures (AC-02)
 - [ ] T4 `AGENTS.md`, `plugins/vh-adlc/knowledge.md` - after the companion Docs delivery lands, adopt its exact published pin, reconcile the candidate version with current main and pass affected package/lifecycle checks and independent review (AC-04)
 
 ## Open Questions
@@ -161,10 +163,36 @@ None. The owner selected summary inside Context, preserving the existing format.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | unknown | procedural | No findings; model identity not attested. |
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | n/a | n/a | accepted by owner |
+| 2026-11-06 | R-2 | implementation | `557cf2a6f492405f326a3d35ba5833d72c8bfe89` | unknown | procedural | AC03 met; AC01/04 not met pending adoption; AC02 not verified pending native author trial. Model identity not attested. |
 
 ### R-1
 
 NO FINDINGS
+
+### R-2
+
+CRITERION: AC-01 New specs following the published shared template begin Context with a useful Owner summary that covers scope, approach, consequential trade-offs, validation state and owner decisions without adding a second normative contract.
+VERDICT: not met
+EVIDENCE: At framework commit 557cf2a6f492405f326a3d35ba5833d72c8bfe89, vh-adlc knowledge resolves repository Docs revision 0e52f51f01b84eda75a976763c42d8ec0a07b544. Its actual cached template begins Context with the background placeholder and contains no Owner summary. Companion Docs candidate 614bb27a7c1809f4a6e3ab86040329a82466efe0 contains the intended summary guidance and passes npm run check under Node v24.19.0, but that candidate is not the effective published framework standard. Candidate preparation is established; adoption remains incomplete.
+
+CRITERION: AC-02 The author refreshes the summary on a normative revision and before acceptance; planned validation and observed results remain distinct, and the owner still receives the existing conversation summary before deciding.
+VERDICT: not verified
+EVIDENCE: At framework commit 557cf2a6f492405f326a3d35ba5833d72c8bfe89, plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md:10-16 requires revision and pre-acceptance reconciliation while retaining the conversation summary. The focused Bun suite passes, including actual binary freshness and draft-gate checks. However, tests/vh-adlc/owner-summary.test.ts:99-114 inserts synthetic review and acceptance rows and directly replaces summary text; it does not execute the author operation or capture its pre-acceptance conversation summary. The accepted Test Plan names that author trial, but its execution was not observed. Synthetic lifecycle records establish binary compatibility, not actual owner acceptance or author behavior.
+
+CRITERION: AC-03 Independent spec review identifies a materially stale, contradictory or unsupported summary through ordinary finding records while allowing an untouched historical spec without a summary.
+VERDICT: met
+EVIDENCE: Independently inspected all four exact fixture commits named in /tmp/homelab-owner-summary-trial-20261106-3/review-cases.json and their returned records in reviewer-results.json. Historical commit 8a716e577e5fbe55a9ea3e5750d207eb375d3862 and honest commit 7fb82ed9500fa9c0a67fc9e01007e18954407049 have NO FINDINGS records. Commit c4bcf102349571db630dd8bbed11d9308f83fba0 claims passed tests and CI despite README.md:3 stating neither exists; executing its command with --json still prints text. Commit 3abbb2831b1f4e716b6d25aa2e56db4bf6cd42d0 contradicts its normative default. Both have ordinary blocking factual finding records supported by the inspected source. The canonical reviewer explicitly checks these contradictions and allows historical absence. Trial isolation is procedural and model identity is not attested.
+
+CRITERION: AC-04 The coordinated change uses the authoritative Docs template and a published exact framework pin; existing specs, baseline/status gates and verbatim review records remain compatible without a binary-format change or bulk migration.
+VERDICT: not met
+EVIDENCE: At clean framework commit 557cf2a6f492405f326a3d35ba5833d72c8bfe89, AGENTS.md still selects Docs 0e52f51f01b84eda75a976763c42d8ec0a07b544 and plugin knowledge.md retains f8ccacbedf057159ea24136ba115cd9857bb22ac. Neither adopts companion candidate 614bb27a7c1809f4a6e3ab86040329a82466efe0. Compatibility preparation passes: the focused Bun command reports 66 passing tests and 262 assertions; the actual binary preserves stored records and distinguishes summary-only edits from normative revisions; the candidate machine-readable rules block is byte-identical to the effective standard. Both candidate manifests agree on 0.11.0, and no binary-format implementation changes occur. These passing subsets do not establish the required published pin adoption.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan / AC-02; tests/vh-adlc/owner-summary.test.ts:99-114
+EVIDENCE: The accepted proof requires an observed author trial with a revised summary and owner-facing message. The implemented test constructs those summary changes directly, inserts synthetic lifecycle rows and stops after confirming renewed acceptance is required. The supplied semantic trial artifacts contain reviewer cases and results, with no author-operation transcript establishing the conversation-summary requirement.
+PROPOSAL: Before marking AC-02 met, execute and preserve a disposable author-operation trial covering normative revision and the pre-acceptance conversation summary. Keep any simulated acceptance explicitly labelled synthetic and retain the distinction between planned validation and observed results.
 
 ## Sources
 
