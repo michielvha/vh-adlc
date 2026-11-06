@@ -9,9 +9,11 @@ covers:
   - plugins/vh-adlc/references/projects.md
   - plugins/vh-adlc/references/lifecycle.md
   - plugins/vh-adlc/plugin.json
+  - plugins/vh-adlc/.claude-plugin/plugin.json
   - docs/user-guides/workflows.md
   - docs/reference/compatibility.md
   - tests/vh-adlc/projects/
+  - tests/vh-adlc/check.test.ts
 ---
 
 # Plan: GitHub Projects coordinator
@@ -28,8 +30,8 @@ should show what is ready, waiting for review or blocked across those repositori
 repository spec keeps its existing authority; moving a card does not accept a feature or ship it.
 
 The proposed first version runs when asked in an agent session, using the existing GitHub CLI login.
-It collects current facts, recommends next work and shows a precise batch before changing board
-membership or configured fields. It will not close issues, merge PRs, change infrastructure or start
+It collects current facts, recommends next work and proposes a precise batch before changing board
+membership or configured single-select fields. The owner has not yet chosen the final write scope. It will not close issues, merge PRs, change infrastructure or start
 implementation from a card. Those actions still use their owning repository's procedure and authority.
 
 GitHub's built-in workflows can handle routine board updates where the account's plan permits them.
@@ -37,8 +39,9 @@ A small Bun helper supplies pagination, stable identities and checked updates ar
 no new GitHub SDK, task database, service or scheduler. Reusable configuration and JSON results leave
 room for a later unattended cleanup agent. Such an agent needs a separate design and permission grant.
 
-Tests will cover incomplete inventories, duplicate issue numbers, manual field changes and partial
-failures, plus a controlled trial on a separately authorized test board. No coordinator code, board or
+Fresh reads catch detected field conflicts, but GitHub cannot prevent an edit racing with a write.
+The owner must accept that limit or narrow the write scope. Tests will cover incomplete inventories,
+duplicate issue numbers, detected field conflicts and partial failures, plus a controlled trial on a separately authorized test board. No coordinator code, board or
 credential change exists yet. Acceptance approves this scope for implementation, not a live Homelab
 board setup or repository cleanup.
 
@@ -83,9 +86,9 @@ automating it. Repository work selected from the report resumes through the exis
 
 ### Entry, configuration and transport
 
-Add the skill and a lifecycle route. Put project-specific configuration in an adopter-owned
+Add the skill and a lifecycle route; register the new operation in the existing package checker and bump both plugin manifests together. Put project-specific configuration in an adopter-owned
 `.vh-adlc/projects.yaml`, using the existing strict YAML reader. It names one board by canonical URL,
-allowlisted `owner/repo` names, and the project fields/allowed option IDs the coordinator may update.
+allowlisted `owner/repo` names, and the project single-select fields/allowed option IDs the coordinator may update. Other field types are unsupported in v1.
 Reject unknown keys, invalid URLs, duplicate repositories and conflicting field identities. A name is
 resolved to one ID before planning; a missing or ambiguous field/option blocks the affected operation.
 Never silently create a field or choose the first name match.
@@ -133,9 +136,14 @@ configured fields are supported. The owner approves that exact batch in the curr
 configuration, issue text, board text and prior unrelated approvals cannot authorize it.
 
 Before each write, re-read target identity, membership and affected field value. Refuse a mismatch
-rather than overwriting a person's intervening edit. A repeated add reuses an existing content ID.
-After each request, re-read the actual value and record success, already satisfied, conflict, refused
-or failed. A timeout with unknown outcome must be reconciled before retry. Stop after a conflict or
+so a change observed before the write is not overwritten. A repeated add reuses an existing content ID.
+GitHub's field-update mutation has no expected-value or revision condition. There is an unavoidable
+race between the read and write: a human edit in that interval can be overwritten, and read-back cannot
+prove it did not happen. Do not claim atomic protection, lock the board or add a coordination service.
+Field writes remain a proposal until the owner accepts this limitation or chooses narrower scope.
+
+After each request, re-read the actual value and record success, already satisfied, detected conflict,
+refused or failed. A timeout with unknown outcome must be reconciled before retry. Stop after a conflict or
 failure; report earlier successful writes and remaining operations. Do not claim transactionality or
 blindly roll back a human's edits. A second run proposes only remaining differences.
 
@@ -157,7 +165,7 @@ Document native auto-add as an optional complement, including rule limits and ex
 - [ ] AC-02: Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
 - [ ] AC-03: Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
 - [ ] AC-04: Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
-- [ ] AC-05: Conflicts, rate limits, partial failures, unknown outcomes and untrusted card instructions cannot silently overwrite human edits, duplicate issues, broaden repository scope or produce a false all-success result.
+- [ ] AC-05: Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
 - [ ] AC-06: Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
 - [ ] AC-07: A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
 
@@ -169,8 +177,8 @@ Document native auto-add as an optional complement, including rule limits and ex
 | AC-02 | Paginated GraphQL/CLI response fixtures with repeated issue numbers in different repos, private redactions, missing scopes and rate/budget failures; assert complete vs partial output and no writes from incomplete data. |
 | AC-03 | Scenario fixtures for complete spec plus unmerged PR, stale review, closed-not-planned issue and inaccessible checkout; inspect source-linked recommendations and existing lifecycle handoff. |
 | AC-04 | Fake `gh` executable records actual subprocess argument/input/output flow; default emits zero writes, unapproved/modified batch is refused, approved exact batch updates configured fields, repeat add is a no-op. |
-| AC-05 | Inject concurrent edits, add timeout with server-side success, write failure after one success, hostile issue text and foreign repository IDs; assert reconciliation, stop, accurate receipts and no forbidden mutation requests. |
-| AC-06 | CLI setup walkthrough and JSON/config reuse from a second clean process without chat state; existing Bun suite and plugin checks; inspect package for absent hosted workflow/secrets. |
+| AC-05 | Inject a change before the preflight read and assert refusal; inject a change between read and mutation and assert the documented limitation is reported rather than claiming atomic protection. Also inject add timeout with server-side success, failure after one success, hostile issue text and foreign IDs; assert reconciliation, stop and accurate receipts. |
+| AC-06 | CLI setup walkthrough and JSON/config reuse from a second clean process without chat state; existing Bun suite and package checker with the new operation registered; inspect package for absent hosted workflow/secrets. |
 | AC-07 | After separate live-test permission and access, create/use a disposable board and test issues, record baseline, perform the four scenarios, verify actual read-back and compare untouched production resources. Cleanup requires its own exact approved test-resource list. |
 
 ## Tasks
@@ -179,21 +187,42 @@ None yet; written after design review and owner acceptance.
 
 ## Open Questions
 
-### Q1: Should v1 apply explicitly approved board updates or provide inventory only?
+### Q1: What write scope should v1 have given GitHub's field-update race?
 
-**Recommendation:** A. Support approved membership and field updates so the coordinator can maintain the board.
+**Recommendation:** A. Permit explicitly approved add/update batches with fresh reads and read-back,
+and document that an edit between those requests can still be overwritten.
 
 | Option | You get | It costs |
 | --- | --- | --- |
-| **A. Approved board updates** | Useful interactive board maintenance with a reviewed batch | Write scope and tests for conflicts and partial writes |
-| **B. Read-only first** | Inventory and recommendations with read-only Projects access | Manual board maintenance; a later feature for updates |
+| **A. Approved adds and field updates** | Useful interactive board maintenance | Owner accepts the documented API race; no atomic protection |
+| **B. Add existing issues only** | Backfill membership without writing existing field values | Fields stay manual; field updates require a later feature |
+| **C. Read-only first** | Inventory and recommendations with read-only access | All board maintenance stays manual |
 
-**Why this is yours:** It determines the first version's live effects and required credential scope.
+**Why this is yours:** It determines live effects and whether the remaining API limitation is acceptable.
+This question replaces the earlier broad choice between updates and inventory only. The design above
+states option A as a proposal; implementation must follow the answered scope and receive a clean review.
 
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | unknown | procedural | Blocking concurrency promise and missing checker coverage; model identity not attested. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design / Approved board updates; AC-05; Test Plan / AC-05
+EVIDENCE: At 9aac9eeff9e20d30816b0ab8a43f313c30ee2e65, docs/specs/github-projects-coordinator.md:135-140 specifies a separate read before each write, while AC-05 promises that conflicts cannot silently overwrite human edits. GitHub's [UpdateProjectV2ItemFieldValueInput](https://docs.github.com/en/graphql/reference/projects#updateprojectv2itemfieldvalueinput) accepts clientMutationId, fieldId, itemId, projectId and value, with no expected previous value or revision condition. A human can change the field after the preflight read; the unconditional mutation can overwrite that change, and the subsequent read can still match the requested value.
+PROPOSAL: State the remaining concurrency race and obtain the owner's decision on accepting that limitation or reducing write scope. Make the design, AC-05 and its tests distinguish detectable preflight conflicts from edits between the read and mutation; do not promise atomic overwrite protection from separate requests.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter / covers
+EVIDENCE: At 9aac9eeff9e20d30816b0ab8a43f313c30ee2e65, tests/vh-adlc/check.test.ts:16-23 defines the accepted operation lists, and its skills test at lines 232-238 rejects every skill directory absent from those lists. Adding vh-adlc-projects therefore requires changing this existing checker, but covers includes only tests/vh-adlc/projects/. The pinned feature-document standard requires covers to list every path whose change can affect the feature.
+PROPOSAL: Add tests/vh-adlc/check.test.ts to covers and include registration of the new operation in the existing package checker as part of implementation verification.
 
 ## Sources
 
@@ -204,3 +233,4 @@ None yet; written after design review and owner acceptance.
 - [Agentic Workflows safe outputs](https://github.github.io/gh-aw/reference/safe-outputs/#project-board-updates-update-project): bounded hosted project updates.
 - [Projects authentication in Agentic Workflows](https://github.github.io/gh-aw/reference/auth-projects/): separate credentials for hosted automation.
 - [Automating Projects with Actions](https://docs.github.com/en/issues/planning-and-tracking-with-projects/automating-your-project/automating-projects-using-actions): App permissions and repository-token limits.
+- [Projects field-update input](https://docs.github.com/en/graphql/reference/projects#updateprojectv2itemfieldvalueinput): no expected prior value or revision argument, leaving a read/write race.

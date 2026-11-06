@@ -148,6 +148,11 @@ None. The owner selected summary inside Context, preserving the existing format.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | unknown | procedural | No findings; model identity not attested. |
+
+### R-1
+
+NO FINDINGS
 
 ## Sources
 
