@@ -409,6 +409,7 @@ None.
 | 2026-11-06 | R-12 | spec | `3507447e4a40945626f5281b945f045572531a7f` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
 | 2026-11-06 | R-13 | spec | `b68e46d87dd8bdfcd318b24b34eab987a8211f91` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
 | 2026-11-06 | R-14 | spec | `804c97b40c6d428e2e993abcece1593e0dbbb3de` | claude-opus-5-5 | procedural | 1 finding, 0 blocking |
+| 2026-11-06 | R-15 | spec | `28c830a6e28536359d01350e6786073d37a432a5` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
 
 ### R-1
 
@@ -1371,6 +1372,22 @@ SEVERITY: should-fix
 WHERE: Acceptance Criteria, AC-05 and AC-24; Test Plan, AC-05 and AC-06 row; Tasks, T25
 EVIDENCE: At 804c97b, Design ("Where the rules come from") now says an `origin/HEAD` that "names a remote-tracking branch that no longer exists" reports `default-branch-unknown` as a note and skips project rules. No criterion states that end state. AC-05 covers a changed or invalid working-tree manifest and the applied run's use of the default-branch manifest. AC-06 covers "Each manifest refusal listed in Design", and a pruned ref is not one of those refusals. AC-24 says only that "a repository with no manifest still gets the built-in globs". The current code already meets that clause in the pruned case: `defaultBranchManifest` in `internal/clean/clean.go` sends the `ls-tree` error to `invalid(...)` and returns a nil manifest, `plan` still applies `builtinRules()`, and `Clean` then reports `fail` because `manifest-invalid` is in `failing`. So a build without T25 meets AC-05, AC-06 and AC-24 as written, while the operation never applies in such a repository, which is the defect R-13 F-01 found. The proof is filed under the wrong criteria as well. The Test Plan puts "an `origin/HEAD` that names a pruned branch" in the AC-05, AC-06 row, and T25 cites AC-05 and AC-24, but the AC-24 row ("`internal/clean` table tests, and a `cmd/vh-adlc` test capturing stdout of a failing `env --sh`") does not mention the case. T24's fold set the pattern to follow: its invalid working-tree case went into the text of AC-05. `vh-adlc fresh` reports R-13 stale with `baseline-changed`, so this pass is the one an acceptance would name.
 PROPOSAL: Add to AC-05 or AC-24 that a missing `origin/HEAD`, or one whose target ref no longer exists, reports a `default-branch-unknown` note, skips project rules and does not fail the run, dry or applied. Then list that criterion in the Test Plan row that holds the pruned-branch case, and in T25.
+
+### R-15
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Where the rules come from; Acceptance Criteria, AC-05 and AC-06; Test Plan, AC-05 and AC-06 row
+EVIDENCE: Design says `clean` reads the manifest object "with `GIT_NO_LAZY_FETCH=1`", but it never says what a run reports when that object is missing from a partial clone. The Test Plan row says only "A missing object in a partial clone must not fetch", and no criterion states an end state for that case. AC-06 covers "Each manifest refusal listed in Design", and an absent blob is not on that list. In the code, `defaultBranchManifest` in `internal/clean/clean.go` sends the `cat-file` error to `invalid(...)`, so the run reports `manifest-invalid`, which is in `failing`. I reproduced this in scratch repositories. An upstream had a valid manifest at commit A. I made a `--filter=blob:none` clone, changed the manifest upstream at commit B, then ran `git fetch` in the clone, which left A checked out. A binary built from 28c830a ran `clean --dry-run --repo <clone>` and `clean --repo <clone>`, both with `--older-than 100000h`. Both exited 1 with `fail` and a single failing finding, `manifest-invalid`: "reading .vh-adlc/cleanup.yaml on origin/main without a fetch: git cat-file blob 2d4de04...: fatal: ... bad file". The blob was still absent afterwards. The manifest is valid and only unfetched. This has the consequence R-13 F-01 found: `SKILL.md` and `references/clean.md` step 2 apply only after a dry run with no failing finding, so in such a clone the operation clears nothing, not even the built-in globs, until something fetches the blob. The message names no fix. Only checked task T10 records the choice ("a manifest blob that would need a fetch is `manifest-invalid`"), and Tasks are not normative.
+PROPOSAL: Decide the outcome in Design and state it in AC-05 or AC-06. One option: an unfetched default-branch blob is a note that skips project rules, like `default-branch-unknown`, with a hint naming a command that fetches it. The other: it stays a failure with that hint, and the operation sends the user to fix it. Either way, name the outcome in the Test Plan's partial-clone case.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-05
+EVIDENCE: The new sentence says a missing or pruned `origin/HEAD` "reports a `default-branch-unknown` note, skips project rules and does not fail the run, dry or applied". The first sentence of AC-05, and Design's "A dry run also plans a working-tree copy that differs", keep planning a working-tree manifest on a dry run. With no default branch, every working-tree manifest differs. The `TestResults` row "no default branch" in `internal/clean/clean_test.go` expects that dry run to report `default-branch-unknown` and `manifest-unmerged`, with the copy planned under `unmerged`. Read alone, "skips project rules ... dry" can be taken to forbid that plan. "does not fail the run" also reads as a claim about the whole result, which another finding such as `removal-failed` can still turn into `fail`. The sentence before it says "does not fail on it".
+PROPOSAL: Reword the clause to something like "removes nothing under project rules and does not fail on it, dry or applied; a dry run still plans a working-tree manifest under `manifest-unmerged`".
 
 ## Sources
 
