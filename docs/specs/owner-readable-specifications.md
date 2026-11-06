@@ -143,8 +143,10 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
       Evidence: Docs PR https://github.com/vhco-pro/docs/pull/26 at `614bb27a7c1809f4a6e3ab86040329a82466efe0` passes Node24 `npm run check`, independent documentation review and hosted CI42145106147. Rules and top-level headings compare unchanged. PR is open/unmerged; adoption is pending.
 - [x] T2 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `docs/get-started/first-feature.md` - author/reviewer guidance keeps the saved summary consistent and preserves conversation acceptance (AC-01, AC-02, AC-03)
       Evidence: source guidance is updated conditionally on the resolved template, preserving existing conversation acceptance and historical records. This prose change has no meaningful failing unit test; real binary compatibility and independent semantic trials follow in T3.
+- [x] T5 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - advance the candidate package version together so the existing version-change check passes; no release is published (AC-04)
+      Evidence: the package checker first refused unchanged 0.10.0; after both candidate manifests advance together, `bun test tests/vh-adlc/check.test.ts --timeout 60000` passes all 60 checks. This is an unmerged candidate, not a release.
 - [ ] T3 `tests/vh-adlc/owner-summary.test.ts` - real binary compatibility checks and observed author/reviewer fixtures distinguish planned proof, scope revisions and misleading summaries while historical specs remain valid (AC-02, AC-03, AC-04)
-- [ ] T4 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, both plugin manifests - after the companion Docs delivery lands, adopt its exact published pin and pass affected package/lifecycle checks and independent review (AC-04)
+- [ ] T4 `AGENTS.md`, `plugins/vh-adlc/knowledge.md` - after the companion Docs delivery lands, adopt its exact published pin, reconcile the candidate version with current main and pass affected package/lifecycle checks and independent review (AC-04)
 
 ## Open Questions
 
