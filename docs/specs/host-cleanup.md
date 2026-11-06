@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. The factual findings of R-10 to R-14 are folded, and the owner answered Q1 to Q7 on 2026-11-06. The owner accepts in advance on the condition that a narrow confirmation pass over the changes since the full review R-15 has no blocking or judgement finding; R-16 led to Q7, and the next narrow pass covers the diff since 0b9962b. Tasks T23 to T25 follow acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status: planned
+status_description: "Accepted by the owner on 2026-11-06, given in advance on the condition that the narrow confirmation pass of the changes since R-15 had no blocking or judgement finding, which it met: R-17 at cb4deba, scoped to the diff since R-16, returned no findings. The acceptance was relayed by the coordinating session. Tasks T23 to T25 remain. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -419,6 +419,7 @@ None.
 | 2026-11-06 | R-15 | spec | `28c830a6e28536359d01350e6786073d37a432a5` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
 | 2026-11-06 | R-16 | spec | `0b9962be2f9d6fc586d4ad80fb1b46c151984970` | claude-opus-5-5 | procedural | Narrow scope, the diff since R-15 at 28c830a: 1 finding, 0 blocking |
 | 2026-11-06 | R-17 | spec | `cb4deba40e0b6e7874eb5bac4256d44ab66cd20f` | claude-opus-5-5 | procedural | Narrow scope, the diff since R-16 at 0b9962b: no findings |
+| 2026-11-06 | R-17 | spec | `cb4deba40e0b6e7874eb5bac4256d44ab66cd20f` | n/a | n/a | accepted by owner |
 
 ### R-1
 
