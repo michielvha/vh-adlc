@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by owner; ready for tasks and implementation."
+status: in-progress
+status_description: "Preparing summary workflow; final adoption waits for shared Docs PR26 to land."
+branch: feat/owner-readable-specifications
 issue: https://github.com/michielvha/vh-adlc/issues/55
 goal: "Let an owner judge a feature's scope, trade-offs and proof from a short summary maintained inside its canonical spec."
 covers:
