@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readGit } from "../../plugins/vh-adlc/scripts/git-read";
@@ -18,7 +18,7 @@ function git(repo: string, ...args: string[]): Buffer {
 }
 
 function fixture(): string {
-  const repo = mkdtempSync(join(tmpdir(), "vh-git-read-"));
+  const repo = realpathSync(mkdtempSync(join(tmpdir(), "vh-git-read-")));
   repositories.push(repo);
   git(repo, "init", "-q", "-b", "main");
   git(repo, "config", "user.name", "Fixture");

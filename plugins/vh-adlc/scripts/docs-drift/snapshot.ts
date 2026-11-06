@@ -262,6 +262,19 @@ function outside(path: string, protectedPaths: string[]): void {
   }
 }
 
+/** Scanner artifacts belong to a private, explicitly selected location outside caller checkouts. */
+export function externalArtifactDirectory(directory: string, sourceRepo: string): string {
+  const canonical = realpathSync(directory);
+  const stat = lstatSync(directory);
+  if (!stat.isDirectory() || stat.isSymbolicLink() || canonical !== directory ||
+      (process.getuid && stat.uid !== process.getuid()) || (stat.mode & 0o077) !== 0) incomplete("private artifact directory required");
+  const worktrees = nulFields(readGit(sourceRepo, "worktree", "list", "--porcelain", "-z"))
+    .filter(field => field.subarray(0, 9).equals(Buffer.from("worktree ")))
+    .map(field => realpathSync(decodeUTF8(field.subarray(9))));
+  outside(canonical, [...worktrees, realpathSync(gitPath(sourceRepo, "--git-common-dir")), realpathSync(gitPath(sourceRepo, "--git-path", "objects"))]);
+  return canonical;
+}
+
 /** Record the exact assessment resource before creating or fetching into its new bare store. */
 export function createOwnedObjectStore(options: ObjectStoreOptions): OwnedObjectStore {
   const source = repositoryRoot(options.source_repo);

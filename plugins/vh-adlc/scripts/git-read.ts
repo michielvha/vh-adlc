@@ -1,8 +1,13 @@
 /** Run Git byte reads against the selected checkout, independent of inherited hook state. */
 export function readGit(repo: string, ...args: string[]): Buffer {
+  return readGitWithEnvironment(repo, args, process.env);
+}
+
+/** Collection subprocesses can supply an allowlisted environment through the same runner. */
+export function readGitWithEnvironment(repo: string, args: string[], environment: Readonly<Record<string, string | undefined>>): Buffer {
   const result = Bun.spawnSync(["git", "--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false", ...args], {
     cwd: repo,
-    env: gitEnvironment(),
+    env: gitEnvironment(environment),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -10,9 +15,9 @@ export function readGit(repo: string, ...args: string[]): Buffer {
   return result.stdout;
 }
 
-function gitEnvironment(): Record<string, string | undefined> {
+export function gitEnvironment(base: Readonly<Record<string, string | undefined>> = process.env): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = {
-    ...process.env,
+    ...base,
     GIT_OPTIONAL_LOCKS: "0",
     GIT_TERMINAL_PROMPT: "0",
     GIT_NO_LAZY_FETCH: "1",
