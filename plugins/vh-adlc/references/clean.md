@@ -49,9 +49,10 @@ The binary prints one JSON report. `knowledge` is `null`, because neither comman
 
 An entry is in use when a process of the same user holds the entry or a path inside it, through its
 `cwd`, `exe`, an open file, a mapping or a bound socket, or when a container, running or stopped,
-bind-mounts the entry or a path inside it. A container that bind-mounts all of `/tmp` or `/` marks no
-entry as in use, so only age protects what it uses; such a container should never run on a host that
-uses `clean`. Age is also the only protection against other users' processes, same-user processes whose
+bind-mounts the entry or a path inside it. A container that bind-mounts all of `/tmp` or `/`, the temp
+base, or the project's temp root, as `-v "$TMPDIR:$TMPDIR"` does once `env` has set `TMPDIR`, marks no
+entry below that path as in use, so only age protects what it uses. A container mounting all of `/tmp`
+or `/` should never run on a host that uses `clean`. Age is also the only protection against other users' processes, same-user processes whose
 `/proc` entries cannot be read, and Podman bind mounts.
 
 ## When the binary cannot run

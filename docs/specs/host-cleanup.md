@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06: R-9 F-04 adds internal/settings/ to covers and R-9 F-03 is a stated limit; the revision also folds R-8 F-01 to F-03 and resets every criterion tick and evidence line. Spec review R-10 at 6d0c8af found 6 findings, none blocking; its factual F-01, F-02, F-04 and F-06 are folded, and its judgement F-03 and F-05 wait on the owner as Q1 and Q2. Then a fresh spec review and the owner's acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06: R-9 F-04 adds internal/settings/ to covers and R-9 F-03 is a stated limit; the revision also folds R-8 F-01 to F-03 and resets every criterion tick and evidence line. Spec review R-10 at 6d0c8af found 6 findings, none blocking; its factual findings are folded, and the owner answered Q1 (the stated limit also names a bind of the temp base or the project's temp root) and Q2 (the host.yaml wording) on 2026-11-06. Waits on a fresh spec review and the owner's acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -117,7 +117,7 @@ Each project gets `<temp_base>/<project>`, mode 0700. `temp_base` is an optional
 not `$HOME`, and is neither inside a Git work tree nor a parent of the repository in use; otherwise the run
 reports `host-settings-invalid`. `env` refuses a symlinked or foreign base and recreates a missing one, and
 `tmp` globs skip the base silently. `env` deletes nothing, so it reads the manifest from the working tree.
-`host.yaml` is read the same way as the manifest below.
+`host.yaml` passes through the same strict reader and typed decode as the manifest.
 
 ### Manifest
 
@@ -173,9 +173,10 @@ branch" means pushed; it does not mean reviewed.
   socket in `/proc/net/unix`, or a container bind mount, each holding the entry or a path inside it. Age is
   the only protection against other users' processes, same-uid processes with unreadable `/proc` entries,
   and Podman's bind mounts. A pid that exits during the scan is not a failed check.
-- A container that bind-mounts all of `/tmp` or `/` marks no entry as in use, so age alone protects what it
-  uses. Such a container should never run on these hosts, so this is a stated limit with no handling of
-  its own: the owner's answer on 2026-11-06.
+- A container that bind-mounts all of `/tmp` or `/`, the temp base, or the project's temp root (as
+  `-v "$TMPDIR:$TMPDIR"` does once `env` has set `TMPDIR`) marks no entry below that path as in use, so
+  age alone protects what it uses. This is a stated limit with no handling of its own: the owner's answers
+  on 2026-11-06. A container mounting all of `/tmp` or `/` should never run on these hosts.
 - With `--compose`, it stops an abandoned project's containers and removes them, then its networks, then
   its volumes when the rule says so, and keeps anything in use. It never forces a Docker removal, with one
   exception: `kind delete cluster` on nodes already stopped.
@@ -366,32 +367,12 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       Evidence: A new "What counts as in use" section names the same-user process links and container bind mounts that keep an entry, the whole-`/tmp` or `/` bind mount as a limit that only age covers, and the limits Design already lists. `internal/clean/files.go` `usage.holds` and `mountedIn` call `within(p, entry)`, which holds only for the entry or a path inside it, so a bind source of `/tmp` or `/` holds no entry, as the section says. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61 on the tree rebuilt on `origin/main` `21bc3e4`. No code changed.
 - [x] T21 `plugins/vh-adlc/references/clean.md` - R-10 F-06: say that a stopped container's bind mount also keeps an entry, as the engine listing includes stopped containers; `bun test tests/vh-adlc/check.test.ts` passes and a read against `internal/clean/engine.go` agrees (AC-14)
       Evidence: `listEngine` in `internal/clean/engine.go` requests `/containers/json?all=1`, and `engineState.binds` takes the bind sources of every listed container, so "a container, running or stopped" matches the code. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
+- [x] T22 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q1 (R-10 F-03) on 2026-11-06: the stated limit also names a container that bind-mounts the temp base or the project's temp root, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
+      Evidence: "What counts as in use" now names a bind of all of `/tmp` or `/`, the temp base or the project's temp root, with `-v "$TMPDIR:$TMPDIR"` as the example. `usage.holds` and `mountedIn` in `internal/clean/files.go` call `within(p, entry)`, which holds only for the entry or a path inside it, so a bind source that is an ancestor of the scanned directory holds no entry below it. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
 
 ## Open Questions
 
-### Q1: Should the stated bind-mount limit also name a bind of the temp root or the temp base?
-
-**Recommendation:** A. Name it, because a harness that mounts its own `TMPDIR` is more likely than a
-whole-`/tmp` mount, and the code already behaves this way.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Widen the stated limit** | Design and `references/clean.md` say that a container bind-mounting the temp base, the project's temp root, `/tmp` or `/` marks no entry below it as in use | Two sentences; still no new code |
-| **B. Keep it to `/tmp` and `/`** | The limit stays as decided on 2026-11-06 | A `-v "$TMPDIR:$TMPDIR"` harness loses in-use protection for temp-root entries with no written warning |
-
-**Why this is yours:** R-10 F-03 asks whether your 2026-11-06 decision on R-9 F-03 should cover the
-project's own temp root, which only you can widen.
-
-### Q2: Should the `host.yaml` sentence in Temp root be reworded?
-
-**Recommendation:** A. Reword it, so the sentence cannot be read as "from the working tree".
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Reword** | "`host.yaml` passes through the same strict reader and typed decode as the manifest." | One sentence |
-| **B. Keep it** | No change | A reader may take "the same way" to mean where the file is read from |
-
-**Why this is yours:** R-10 F-05 is a wording judgement on the normative Design text.
+None.
 
 ## Review Log
 
