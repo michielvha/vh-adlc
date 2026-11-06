@@ -23,13 +23,14 @@ export type PlanPolicy = {
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
 export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string } };
+type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean };
 type Event = {
-  schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation";
-  effect_id: string; payload: { effect_sha256: string } | Outcome | { reason: string } | Retirement;
+  schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended";
+  effect_id: string; payload: { effect_sha256: string } | Outcome | { reason: string } | Retirement | { attempt_id: string } | AttemptEnd;
 };
 type Header = {
   schema_version: 1; kind: "docs-drift-journal"; operation_id: string; repository: string;
-  source_repo: string; directory: string; plan_sha256: string; owner_uid: number; run_id: string;
+  source_repo: string; directory: string; plan_sha256: string; owner_uid: number; run_id: string; recovery_mode: "original" | "observation-only";
 };
 export type Journal = {
   directory: string; source_repo: string; header: Header; plan: SealedPlan;
@@ -195,7 +196,23 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
   } else {
     if (!prior.some(item => item.kind === "intent")) fail("outcome or handoff without intent");
     if (["outcome", "retired-absence"].includes(event.kind) && prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")) fail("effect already terminal");
-    if (event.kind === "outcome") outcome(event.payload);
+    if (event.kind === "attempt") {
+      identifier(exact(event.payload, ["attempt_id"]).attempt_id);
+      const latest = prior.findLast(item => item.kind === "attempt");
+      if (prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")
+        || (effect.kind !== "lease-release" && previous.some(item => item.kind === "invalidation"))
+        || (latest && !prior.some(item => item.kind === "attempt-ended" && item.revision > latest.revision))) fail("attempt already pending or operation terminal");
+      if (prior.some(item => item.kind === "attempt" && (item.payload as { attempt_id: string }).attempt_id === (event.payload as { attempt_id: string }).attempt_id)) fail("repeated attempt identity");
+    }
+    else if (event.kind === "attempt-ended") {
+      const payload = exact(event.payload, ["attempt_id", "sent", "reaped"]);
+      identifier(payload.attempt_id);
+      const attempt = prior.findLast(item => item.kind === "attempt");
+      if (!attempt || (attempt.payload as { attempt_id: string }).attempt_id !== payload.attempt_id
+        || prior.some(item => item.kind === "attempt-ended" && item.revision > attempt.revision)
+        || typeof payload.sent !== "boolean" || typeof payload.reaped !== "boolean") fail("invalid attempt ending");
+    }
+    else if (event.kind === "outcome") outcome(event.payload);
     else if (event.kind === "retired-absence") {
       const payload = exact(event.payload, ["scope_sha256", "request_sha256", "lookup"]);
       hash(payload.scope_sha256); hash(payload.request_sha256);
@@ -208,14 +225,14 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
   }
 }
 
-export function createJournal(options: { source_repo: string; artifact_root: string; plan: SealedPlan }): Journal {
+export function createJournal(options: { source_repo: string; artifact_root: string; plan: SealedPlan; recovery_mode?: "observation-only" }): Journal {
   const source = realpathSync(options.source_repo);
   const root = externalArtifactDirectory(options.artifact_root, source);
   const plan = parsePlan(options.plan), planBytes = canonicalJSON(plan);
   const directory = join(root, "docs-drift-" + plan.manifest.operation_id);
   const owner = process.getuid?.();
   if (owner === undefined) fail("POSIX owner identity required");
-  const header: Header = { owner_uid: owner, run_id: plan.manifest.operation_id, schema_version: 1, kind: "docs-drift-journal", operation_id: plan.manifest.operation_id,
+  const header: Header = { recovery_mode: options.recovery_mode ?? "original", owner_uid: owner, run_id: plan.manifest.operation_id, schema_version: 1, kind: "docs-drift-journal", operation_id: plan.manifest.operation_id,
     repository: plan.manifest.repository, source_repo: source, directory, plan_sha256: sha256(planBytes) };
   // The resource record precedes directory creation. Failed/partial resources remain for inspection.
   publishArtifact(join(root, plan.manifest.operation_id + ".journal-owner.json"), canonicalJSON(header));
@@ -233,8 +250,8 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
   externalArtifactDirectory(directory, source);
   privateDirectory(dirname(directory));
   const headerBytes = readArtifact(join(directory, "header.json"));
-  const header = exact(parseCanonical(headerBytes), ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id"]) as Header;
-  if (header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.() || header.run_id !== header.operation_id) fail("changed journal ownership");
+  const header = exact(parseCanonical(headerBytes), ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id", "recovery_mode"]) as Header;
+  if (!["original", "observation-only"].includes(header.recovery_mode) || header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.() || header.run_id !== header.operation_id) fail("changed journal ownership");
   const planBytes = readArtifact(join(directory, "plan.json"));
   if (sha256(planBytes) !== hash(header.plan_sha256)) fail("changed local plan");
   const plan = parsePlan(parseCanonical(planBytes));
@@ -289,4 +306,11 @@ export function writePlanObject(store: OwnedObjectStore, value: SealedPlan) {
 
 export function appendRetirement(journal: Journal, effectId: string, retirement: Retirement): Journal {
   return append(journal, "retired-absence", effectId, retirement);
+}
+
+export function appendAttempt(journal: Journal, effectId: string, attemptId: string): Journal {
+  return append(journal, "attempt", effectId, { attempt_id: identifier(attemptId) });
+}
+export function appendAttemptEnd(journal: Journal, effectId: string, status: AttemptEnd): Journal {
+  return append(journal, "attempt-ended", effectId, status);
 }

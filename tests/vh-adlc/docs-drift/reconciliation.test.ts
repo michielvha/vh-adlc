@@ -1,3 +1,4 @@
+import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
 import { rmSync, writeFileSync } from "node:fs";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
@@ -11,7 +12,7 @@ afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force
 
 async function abandoned() {
   const f = publicationFixture(roots), execute = f.transport.execute;
-  f.transport.execute = async (plan, effect, objects) => { if (effect.id === "pr") throw Error("request never sent"); await execute(plan, effect, objects); };
+  f.transport.execute = async (plan, effect, objects) => { if (effect.id === "pr") throw new PublicationExecutionError(false, true); await execute(plan, effect, objects); };
   const interrupted = await publish(options(f)); f.transport.execute = execute;
   return { f, interrupted };
 }
@@ -134,4 +135,27 @@ test("the final lease compare-and-swap preserves a replacement after approval", 
   expect(f.refs.get(f.settings.publication.lease_ref)).toBe("f".repeat(40));
   expect(f.executed.filter(id => id === "pr")).toHaveLength(0);
   expect(result.journal.events.some(event => event.kind === "retired-absence")).toBe(true);
+});
+
+
+test("cleanup cannot retire or release while the original attempt is in flight", async () => {
+  const { f, interrupted } = await abandoned();
+  const execute = f.transport.execute;
+  let entered!: () => void, release!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const finish = new Promise<void>(resolve => { release = resolve; });
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.id === "pr") { entered(); await finish; }
+    await execute(plan, effect, objects);
+  };
+  const running = resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  await started;
+  try {
+    const cleanup = await reconcileAbsent(input(f, interrupted.journal.directory));
+    expect(cleanup.state).toBe("pending");
+    expect(cleanup.reason).toBe("attempt-in-flight");
+    expect(cleanup.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
+    expect(f.executed.includes("release")).toBe(false);
+  } finally { release(); }
+  expect((await running).state).toBe("complete");
 });

@@ -1,4 +1,5 @@
-import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, createJournal, readVerifiedPlan, sealPlan, writePlanObject, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { executeAttempt } from "./attempts";
+import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { effectMarker, manifestDigest, parseActionManifest, validateReviewedManifest, type Effect } from "./manifests";
 import { canonicalJSON } from "./protocol";
 import { publicationMarker } from "./report-history";
@@ -102,11 +103,12 @@ export async function publish(options: PublishOptions): Promise<PublishResult> {
         journal = appendOutcome(journal, effect.id, before.outcome);
         continue;
       }
-      await options.transport.execute(journal.plan, effect, objects);
+      journal = await executeAttempt({ journal, effect, objects, transport: options.transport });
       const after = await options.transport.observe(journal.plan, effect, objects);
       if (after.state !== "done") return pending(journal, effect, "effect-outcome-unconfirmed", objects, after.state === "conflict");
       journal = appendOutcome(journal, effect.id, after.outcome);
     } catch (error) {
+      journal = readJournal(journal.directory, options.source_repo);
       return pending(journal, effect, "current-proof-or-effect-unavailable", objects, error instanceof PublicationScopeChanged);
     }
   }

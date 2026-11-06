@@ -1,3 +1,4 @@
+import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
@@ -50,12 +51,18 @@ test("missing current write authority permits observations but no remaining remo
 
 test("unknown or changed native matches stop recovery without retrying or releasing", async () => {
   for (const state of ["unknown", "conflict"] as const) {
-    const { f, interrupted } = await interruptedPR();
+    const f = setup(), execute = f.transport.execute;
+    f.transport.execute = async (plan, effect, objects) => {
+      if (effect.kind === "pr-create") throw new PublicationExecutionError(false, true);
+      await execute(plan, effect, objects);
+    };
+    const interrupted = await publish(options(f));
+    f.transport.execute = execute;
     const observe = f.transport.observe;
     f.transport.observe = async (plan, effect, objects) => effect.id === "pr" ? { state, reason: "native-match-unavailable" } : observe(plan, effect, objects);
     const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
     expect(result.state).toBe("pending");
-    expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+    expect(f.executed).toEqual(["lease", "receipt", "push"]);
     expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
   }
 });
@@ -63,7 +70,7 @@ test("unknown or changed native matches stop recovery without retrying or releas
 test("definitive absence retries the unchanged original action under fresh current proof", async () => {
   const f = setup(); const execute = f.transport.execute;
   f.transport.execute = async (plan, effect, objects) => {
-    if (effect.kind === "pr-create") throw Error("request never sent");
+    if (effect.kind === "pr-create") throw new PublicationExecutionError(false, true);
     await execute(plan, effect, objects);
   };
   const interrupted = await publish(options(f)); f.transport.execute = execute;
@@ -80,7 +87,7 @@ test("changed source, original native artifacts or actor prevents absent-action 
   ]) {
     const f = setup(); const execute = f.transport.execute;
     f.transport.execute = async (plan, effect, objects) => {
-      if (effect.kind === "pr-create") throw Error("request never sent");
+      if (effect.kind === "pr-create") throw new PublicationExecutionError(false, true);
       await execute(plan, effect, objects);
     };
     const interrupted = await publish(options(f)); f.transport.execute = execute; change(f);
@@ -174,7 +181,7 @@ test("lost local artifacts permit fixed-ref inspection without manufacturing ori
   const { f, interrupted } = await interruptedPR();
   rmSync(interrupted.journal.directory, { recursive: true });
   f.input.reviewer.native = Buffer.from("original proof unavailable");
-  const artifactRoot = join(f.root, "recovered"); mkdirSync(artifactRoot, { mode: 0o700 });
+  const artifactRoot = f.artifacts;
   const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifactRoot, settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
   expect(inspection.state).toBe("inspection");
   expect(inspection.observations.find(item => item.effect_id === "pr")?.observation.state).toBe("done");
@@ -183,14 +190,17 @@ test("lost local artifacts permit fixed-ref inspection without manufacturing ori
   expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
 });
 
-test("retained-plan restoration requires actual original proof and never duplicates an existing PR", async () => {
+test("retained-plan restoration remains observation-only and never duplicates an existing PR", async () => {
   const { f, interrupted } = await interruptedPR();
   rmSync(interrupted.journal.directory, { recursive: true });
   const artifactRoot = join(f.root, "restored"); mkdirSync(artifactRoot, { mode: 0o700 });
+  f.transport = { ...f.transport, artifact_root: artifactRoot };
   const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifactRoot, settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
   await expect(restoreRetainedOperation({ inspection: structuredClone(inspection), publication: { ...options(f), artifact_root: artifactRoot } })).rejects.toThrow("inspection");
   const result = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifactRoot } });
-  expect(result.state).toBe("complete");
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("retained-restore-no-replay");
+  expect(result.journal.header.recovery_mode).toBe("observation-only");
   expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
   expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(true);
 });
@@ -255,7 +265,7 @@ test("observed source or actor changes cannot revive old approval when restored"
   for (const changed of ["source", "actor"] as const) {
     const f = setup(), execute = f.transport.execute, identity = f.transport.identity;
     f.transport.execute = async (plan, effect, objects) => {
-      if (effect.kind === "pr-create") throw Error("request never sent");
+      if (effect.kind === "pr-create") throw new PublicationExecutionError(false, true);
       await execute(plan, effect, objects);
     };
     const interrupted = await publish(options(f));
@@ -269,4 +279,109 @@ test("observed source or actor changes cannot revive old approval when restored"
     expect((await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory })).state).toBe("pending");
     expect(f.executed).toEqual(["lease", "receipt", "push"]);
   }
+});
+
+test("concurrent recovery cannot dispatch the same pending creation twice", async () => {
+  const f = setup(), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-create") throw new PublicationExecutionError(false, true);
+    await execute(plan, effect, objects);
+  };
+  const interrupted = await publish(options(f));
+  let entered!: () => void;
+  const firstDispatch = new Promise<void>(resolve => { entered = resolve; });
+  let creates = 0;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-create") {
+      creates += 1;
+      entered();
+      await Bun.sleep(1000);
+    }
+    await execute(plan, effect, objects);
+  };
+  const first = resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  await firstDispatch;
+  const second = resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  await Promise.allSettled([first, second]);
+  expect(creates).toBe(1);
+});
+
+
+test("independent mirrors cannot dispatch an already claimed creation", async () => {
+  const f = setup(), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-create") throw new PublicationExecutionError(false, true);
+    await execute(plan, effect, objects);
+  };
+  const interrupted = await publish(options(f));
+  const secondRoot = join(f.root, "second-mirror");
+  mkdirSync(secondRoot, { mode: 0o700 });
+  const secondTransport = { ...f.transport, artifact_root: secondRoot };
+  let entered!: () => void;
+  const firstDispatch = new Promise<void>(resolve => { entered = resolve; });
+  let creates = 0;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-create") { creates += 1; entered(); await Bun.sleep(1000); }
+    await execute(plan, effect, objects);
+  };
+  secondTransport.execute = f.transport.execute;
+  const first = resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  await firstDispatch;
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: secondRoot, settings: f.settings,
+    transport: secondTransport, operation_id: "operation-1", verify_policy: () => f.policy });
+  const second = restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: secondRoot, transport: secondTransport } });
+  const results = await Promise.allSettled([first, second]);
+  expect(results.every(result => result.status === "fulfilled")).toBe(true);
+  expect(creates).toBe(1);
+});
+
+
+test("an unconfirmed started creation is never replayed from an empty later listing", async () => {
+  const f = setup(), execute = f.transport.execute;
+  let attempts = 0;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-create") { attempts += 1; throw new PublicationExecutionError(true, true); }
+    await execute(plan, effect, objects);
+  };
+  const interrupted = await publish(options(f));
+  const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("dispatch-outcome-unknown");
+  expect(attempts).toBe(1);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+});
+
+test("only a pending lease release needs no new review of completed mutable resources", async () => {
+  const f = setup(), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "lease-release") throw new PublicationExecutionError(false, true);
+    await execute(plan, effect, objects);
+  };
+  const interrupted = await publish(options(f));
+  f.transport.execute = execute;
+  const observe = f.transport.observe;
+  f.observed.length = 0;
+  f.transport.observe = async (plan, effect, objects) => effect.id === "push" || effect.id === "pr"
+    ? { state: "conflict", reason: "later-resource-change" } : observe(plan, effect, objects);
+  const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(result.state).toBe("complete");
+  expect(f.observed).toEqual(["release", "release"]);
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+});
+
+test("a different artifact argument cannot bypass the selected controller root", async () => {
+  const { f } = await interruptedPR();
+  const other = join(f.root, "unselected");
+  mkdirSync(other, { mode: 0o700 });
+  await expect(inspectRetainedOperation({ source_repo: f.repo, artifact_root: other, settings: f.settings,
+    transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy })).rejects.toThrow("root changed");
+});
+
+test("an existing owner record prevents restoration over a lost local journal", async () => {
+  const { f, interrupted } = await interruptedPR();
+  rmSync(interrupted.journal.directory, { recursive: true });
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: f.artifacts, settings: f.settings,
+    transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  await expect(restoreRetainedOperation({ inspection, publication: options(f) })).rejects.toThrow("conflict");
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
 });

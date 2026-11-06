@@ -1,3 +1,4 @@
+import { PublicationExecutionError } from "./attempts";
 import type { Effect } from "./manifests";
 import type { Outcome, SealedPlan, writePlanObject } from "./journal";
 import { randomUUID } from "node:crypto";
@@ -168,7 +169,7 @@ export function createNativeTransport(options: {
     const permalink = `https://${settings.hostname}/${name}/blob/${commit}/${parts.map(encodeURIComponent).join("/")}`;
     if (!text(p.body).includes(permalink)) throw Error("reviewed issue body omits bound evidence permalink");
   }
-  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null = null): Promise<void> {
+  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: { sent: boolean; reaped: boolean }): Promise<void> {
     const id = randomUUID(), directory = join(root, "native-command-" + id);
     writeFileSync(join(root, id + ".native-command.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-native-command", operation_id: plan.manifest.operation_id,
       root: directory, argv_sha256: sha256(canonicalJSON(argv)) }), { flag: "wx", mode: 0o600 });
@@ -183,20 +184,21 @@ export function createNativeTransport(options: {
     }
     const result = await executeOwnedProcess({ argv: command, cwd: store.root, env: Object.fromEntries(Object.entries(gitEnvironment(environment)).filter((entry): entry is [string, string] => entry[1] !== undefined)),
       watched_outputs: [], stdout, stderr, timeout_ms: options.timeout_ms ?? 30000,
-      started: pid => { writeFileSync(join(directory, "started.json"), canonicalJSON({ pid }), { flag: "wx", mode: 0o600 }); } });
+      started: pid => { delivery.sent = true; delivery.reaped = false; writeFileSync(join(directory, "started.json"), canonicalJSON({ pid }), { flag: "wx", mode: 0o600 }); } });
+    delivery.reaped = result.reaped;
     writeFileSync(join(directory, "process.json"), canonicalJSON(result), { flag: "wx", mode: 0o600 });
     if (result.exit_code !== 0 || !result.reaped || result.timed_out || result.cancelled !== null || result.output_limit) throw Error("native publication command incomplete; inspect owned artifacts");
   }
-  async function mutation(plan: SealedPlan, method: string, endpoint: string, input: unknown): Promise<void> {
+  async function mutation(plan: SealedPlan, method: string, endpoint: string, input: unknown, delivery: { sent: boolean; reaped: boolean }): Promise<void> {
     if (!endpoint.startsWith(prefix + "/")) throw Error("foreign mutation destination");
-    await run(plan, ["gh", "api", "--hostname", settings.hostname, "--method", method, "--silent", endpoint], canonicalJSON(input));
+    await run(plan, ["gh", "api", "--hostname", settings.hostname, "--method", method, "--silent", endpoint], canonicalJSON(input), delivery);
   }
-  async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string): Promise<void> {
+  async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string, delivery: { sent: boolean; reaped: boolean }): Promise<void> {
     requireOwnedStore(store, settings.repository);
     const argv = gitReadArguments(["--no-lazy-fetch", "--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=",
       "-c", "credential.helper=!gh auth git-credential", "-c", "http.extraHeader=", "push", "--porcelain", `--force-with-lease=${ref}:${expected}`,
       "--", `https://${settings.hostname}/${settings.repository}.git`, `${head ?? ""}:${ref}`]);
-    await run(plan, argv);
+    await run(plan, argv, null, delivery);
   }
 
   return {
@@ -287,40 +289,43 @@ export function createNativeTransport(options: {
       } catch { return { state: "unknown", reason: "native-publication-observation-unavailable" }; }
     },
     async execute(plan, effect, objects) {
-      const p = effect.payload;
-      if (effect.kind === "lease-acquire" || effect.kind === "receipt-retain") { await pushRef(plan, text(p.ref), objects.object, ""); return; }
-      if (effect.kind === "lease-release") { await pushRef(plan, text(p.ref), null, objects.object); return; }
-      if (effect.kind === "push" || effect.kind === "branch-refresh") {
-        const tree = readGit(store.root, "rev-parse", "--verify", "--end-of-options", text(p.head) + "^{tree}").toString().trim();
-        if (tree !== plan.manifest.bindings.candidate_tree) throw Error("native candidate tree changed");
-        await pushRef(plan, text(p.ref), text(p.head), effect.kind === "branch-refresh" ? text(p.expected_head) : ""); return;
-      }
-      if (effect.kind === "pr-create") {
-        const branch = getRef("refs/heads/" + text(p.branch));
-        if (branch.state !== "present" || branch.object !== plan.manifest.bindings.candidate_commit
-          || repository.commit(branch.object).tree_sha !== plan.manifest.bindings.candidate_tree) throw Error("native candidate branch changed");
-        const body = join(root, "body-" + randomUUID() + ".md");
-        writeFileSync(body, text(p.body), { flag: "wx", mode: 0o600 });
-        const argv = ["gh", "pr", "create", "--repo", settings.repository, "--base", text(p.base), "--head", text(p.branch), `--title=${text(p.title)}`, "--body-file", body];
-        if (p.draft === true) argv.push("--draft");
-        for (const label of p.labels as string[]) argv.push("--label=" + label);
-        await run(plan, argv); return;
-      }
-      if (effect.kind === "pr-update") {
-        await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { title: p.title, body: p.body });
-        await mutation(plan, "PUT", `${prefix}/issues/${p.number}/labels`, { labels: p.labels });
-        const pr = pull(positive(p.number), plan);
-        if (pr.input.draft !== p.draft) {
-          const argv = ["gh", "pr", "ready", String(p.number), "--repo", settings.repository];
-          if (p.draft === true) argv.push("--undo");
-          await run(plan, argv);
+      const delivery = { sent: false, reaped: true };
+      try {
+        const p = effect.payload;
+        if (effect.kind === "lease-acquire" || effect.kind === "receipt-retain") { await pushRef(plan, text(p.ref), objects.object, "", delivery); return; }
+        if (effect.kind === "lease-release") { await pushRef(plan, text(p.ref), null, objects.object, delivery); return; }
+        if (effect.kind === "push" || effect.kind === "branch-refresh") {
+          const tree = readGit(store.root, "rev-parse", "--verify", "--end-of-options", text(p.head) + "^{tree}").toString().trim();
+          if (tree !== plan.manifest.bindings.candidate_tree) throw Error("native candidate tree changed");
+          await pushRef(plan, text(p.ref), text(p.head), effect.kind === "branch-refresh" ? text(p.expected_head) : "", delivery); return;
         }
-        return;
-      }
-      if (effect.kind === "issue-create") { checkIssueEvidence(effect); await mutation(plan, "POST", `${prefix}/issues`, { title: p.title, body: p.body, labels: p.labels }); return; }
-      if (effect.kind === "comment-create") { await mutation(plan, "POST", `${prefix}/issues/${positive(p.number)}/comments`, { body: p.body }); return; }
-      if (effect.kind === "pr-close") { await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { state: "closed" }); return; }
-      throw Error("unsupported native publication effect");
+        if (effect.kind === "pr-create") {
+          const branch = getRef("refs/heads/" + text(p.branch));
+          if (branch.state !== "present" || branch.object !== plan.manifest.bindings.candidate_commit
+            || repository.commit(branch.object).tree_sha !== plan.manifest.bindings.candidate_tree) throw Error("native candidate branch changed");
+          const body = join(root, "body-" + randomUUID() + ".md");
+          writeFileSync(body, text(p.body), { flag: "wx", mode: 0o600 });
+          const argv = ["gh", "pr", "create", "--repo", settings.repository, "--base", text(p.base), "--head", text(p.branch), `--title=${text(p.title)}`, "--body-file", body];
+          if (p.draft === true) argv.push("--draft");
+          for (const label of p.labels as string[]) argv.push("--label=" + label);
+          await run(plan, argv, null, delivery); return;
+        }
+        if (effect.kind === "pr-update") {
+          await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { title: p.title, body: p.body }, delivery);
+          await mutation(plan, "PUT", `${prefix}/issues/${p.number}/labels`, { labels: p.labels }, delivery);
+          const pr = pull(positive(p.number), plan);
+          if (pr.input.draft !== p.draft) {
+            const argv = ["gh", "pr", "ready", String(p.number), "--repo", settings.repository];
+            if (p.draft === true) argv.push("--undo");
+            await run(plan, argv, null, delivery);
+          }
+          return;
+        }
+        if (effect.kind === "issue-create") { checkIssueEvidence(effect); await mutation(plan, "POST", `${prefix}/issues`, { title: p.title, body: p.body, labels: p.labels }, delivery); return; }
+        if (effect.kind === "comment-create") { await mutation(plan, "POST", `${prefix}/issues/${positive(p.number)}/comments`, { body: p.body }, delivery); return; }
+        if (effect.kind === "pr-close") { await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { state: "closed" }, delivery); return; }
+        throw Error("unsupported native publication effect");
+      } catch { throw new PublicationExecutionError(delivery.sent, delivery.reaped); }
     },
   };
 }

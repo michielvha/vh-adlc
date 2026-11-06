@@ -60,7 +60,7 @@ test("a lost effect response retains intent and lease without blind replay or ea
   };
   const result = await publish(options(f));
   expect(result.state).toBe("pending"); expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
-  expect(result.journal.events.filter(event => event.effect_id === "pr").map(event => event.kind)).toEqual(["intent", "handoff"]);
+  expect(result.journal.events.filter(event => event.effect_id === "pr").map(event => event.kind)).toEqual(["intent", "attempt", "attempt-ended", "handoff"]);
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
 });
 

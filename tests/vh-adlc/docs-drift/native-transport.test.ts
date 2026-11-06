@@ -1,3 +1,4 @@
+import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -184,7 +185,10 @@ test("native transport pins observed identities and uses absence-bound Git ref c
 test("native atomic leases refuse a changed remote ref without replacing it", async () => {
   const f = setup(); await f.transport.identity(); f.update(state => { state.race = true; });
   const lease: Effect = { id: "lease", kind: "lease-acquire", payload: { ref: f.settings.publication.lease_ref } };
-  await expect(f.transport.execute(f.plan, lease, f.objects)).rejects.toThrow("incomplete");
+  const error = await f.transport.execute(f.plan, lease, f.objects).then(() => null, error => error);
+  expect(error).toBeInstanceOf(PublicationExecutionError);
+  expect(error.sent).toBe(true);
+  expect(error.reaped).toBe(true);
   expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe("f".repeat(40));
 });
 
@@ -216,7 +220,10 @@ test("native PR creation refuses a branch that no longer names the reviewed cand
   const f = setup(); await f.transport.identity();
   f.update(state => { state.refs["refs/heads/docs-drift/one"] = "f".repeat(40); });
   const pr: Effect = { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/one", title: "Exact title", body: "Exact body", labels: [], draft: true } };
-  await expect(f.transport.execute(f.plan, pr, f.objects)).rejects.toThrow("candidate");
+  const error = await f.transport.execute(f.plan, pr, f.objects).then(() => null, error => error);
+  expect(error).toBeInstanceOf(PublicationExecutionError);
+  expect(error.sent).toBe(false);
+  expect(error.reaped).toBe(true);
   expect(f.inspect().prs).toHaveLength(0);
 });
 
@@ -246,7 +253,7 @@ test("native issue evidence is read from bound Git objects before exact issue cr
   f.update(state => { state.issues[0].body = "edited"; });
   expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("conflict");
   const changed = { ...issue, payload: { ...issue.payload, evidence_sha256: hash("wrong bytes") } };
-  await expect(f.transport.execute(f.plan, changed, f.objects)).rejects.toThrow("evidence");
+  await expect(f.transport.execute(f.plan, changed, f.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
   expect(f.inspect().issues).toHaveLength(1);
 });
 
@@ -304,7 +311,7 @@ test("native refresh uses the exact old head and preserves competing heads", asy
   const callLog = readFileSync(f.calls, "utf8");
   expect(callLog).toContain('--force-with-lease=refs/heads/docs-drift/one:' + "e".repeat(40));
   f.update(state => { state.refs["refs/heads/docs-drift/one"] = "f".repeat(40); });
-  await expect(f.transport.execute(f.plan, refresh, f.objects)).rejects.toThrow("incomplete");
+  await expect(f.transport.execute(f.plan, refresh, f.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
   expect(f.inspect().refs["refs/heads/docs-drift/one"]).toBe("f".repeat(40));
 });
 
