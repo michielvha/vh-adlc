@@ -173,15 +173,22 @@ function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;
 }
 
-function patterns(snapshot: Snapshot, bytes: Buffer): string[] {
+/** Parse metadata strictly without assigning operation-specific meaning to its fields. */
+export function readDocumentMetadata(bytes: Uint8Array, reader?: (bytes: Uint8Array) => unknown): Record<string, unknown> | null {
   const text = decode(bytes).replace(/^\uFEFF/u, "");
-  if (!/^---[ \t]*(?:\r?\n|$)/u.test(text)) return [];
+  if (!/^---[ \t]*(?:\r?\n|$)/u.test(text)) return null;
   const close = /^---[ \t]*\r?$/gmu; close.lastIndex = text.indexOf("\n") + 1;
   const end = close.exec(text);
   if (!end) fail("unterminated frontmatter");
-  const value = snapshot.yaml(Buffer.from(text.slice(text.indexOf("\n") + 1, end.index))), object = record(value);
+  const parse = reader ?? createYAMLReader(fail, { offline: true });
+  const object = record(parse(Buffer.from(text.slice(text.indexOf("\n") + 1, end.index))));
   if (!object) fail("frontmatter must be a mapping");
-  if (!Object.hasOwn(object, "covers")) return [];
+  return object;
+}
+
+function patterns(snapshot: Snapshot, bytes: Buffer): string[] {
+  const object = readDocumentMetadata(bytes, value => snapshot.yaml(value));
+  if (!object || !Object.hasOwn(object, "covers")) return [];
   if (!Array.isArray(object.covers) || object.covers.some(pattern => typeof pattern !== "string")) fail("covers must be a list of patterns");
   return object.covers.map(pattern => { compileCoverage(pattern); return pattern; });
 }
