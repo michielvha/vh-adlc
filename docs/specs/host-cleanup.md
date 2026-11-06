@@ -288,7 +288,9 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       entries still are.
 - [ ] AC-05: A dry run plans a changed working-tree manifest, and an applied run removes only what the default-branch
       manifest declares. A dry run with an invalid working-tree manifest reports it as a `manifest-unmerged` note,
-      plans nothing from it and does not fail on it.
+      plans nothing from it and does not fail on it. A missing `origin/HEAD`, or one whose target ref no longer
+      exists, reports a `default-branch-unknown` note, skips project rules and does not fail the run, dry or
+      applied.
 - [ ] AC-06: Each manifest refusal listed in Design, in the default-branch manifest `clean` applies or the working-tree
       manifest `env` reads, reports `manifest-invalid`, that manifest's rules remove nothing, and `env` creates
       nothing for it.
@@ -326,7 +328,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 | AC-07 | A `cmd/vh-adlc` test runs the real binary under `bwrap --unshare-pid` and asserts `pid-namespace` with nothing removed. |
 | AC-02, AC-03, AC-08 | Fake-engine tests: an `httptest` server on a Unix socket records every call and fails on any `force` parameter, across Compose projects and clusters with ended and live marks, a mixed-label Compose project, a killed run's cluster reused and kept, a bind mount, failed listings, and an absent, refused and denied socket. |
 | AC-03, AC-08 | Integration test behind a build tag on the real engine, with disposable objects and clusters. |
-| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit, an uncommitted edit, an invalid uncommitted edit on a dry run, and an `origin/HEAD` that names a pruned branch. A missing object in a partial clone must not fetch. |
+| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit, an uncommitted edit, an invalid uncommitted edit on a dry run, and a missing `origin/HEAD` and one that names a pruned branch, dry and applied. A missing object in a partial clone must not fetch. |
 | AC-11 | Written manual procedure in disposable sessions, recorded under `tests/vh-adlc/evidence/clean/`, with `codex execpolicy check` output, the default Codex session's outcome, and a session blocked on space with no request for cleanup. |
 | AC-12 | The real-host sequence in Adoption, with each row's outcome recorded. |
 | AC-14 | `bun test tests/vh-adlc`, a golden JSON report against the updated schema, and a read of the documentation against the flags. |
@@ -382,7 +384,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       Evidence: "What counts as in use" now names a bind of all of `/tmp` or `/`, the temp base or the project's temp root, with `-v "$TMPDIR:$TMPDIR"` as the example. `usage.holds` and `mountedIn` in `internal/clean/files.go` call `within(p, entry)`, which holds only for the entry or a path inside it, so a bind source that is an ancestor of the scanned directory holds no entry below it. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
 - [ ] T23 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q4 (R-11 F-03) on 2026-11-06, with R-12 F-01: the stated limit names a bind of `/tmp` or any directory above it for top-level entries, and a bind of the project's temp root or any directory above it, the temp base included, for temp-root entries, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
 - [ ] T24 `internal/clean/clean_test.go`, `internal/clean/clean.go`, `plugins/vh-adlc/references/clean.md` - the owner's answer to Q3 (R-11 F-02) on 2026-11-06: a dry run reports an invalid working-tree manifest as a `manifest-unmerged` note naming the refusal, plans nothing from it and does not fail on it, while an invalid default-branch manifest still fails; `references/clean.md` says so; a `TestResults` row and a `TestManifestSources` case for the invalid uncommitted edit fail first, then pass (AC-05, AC-06, AC-14)
-- [ ] T25 `internal/clean/clean_test.go`, `internal/clean/clean.go` - R-13 F-01: an `origin/HEAD` that names a remote-tracking branch which no longer exists reports `default-branch-unknown`, a note with the `git remote set-head origin --auto` hint, and skips project rules while the built-in globs still apply, instead of failing with `manifest-invalid`; a fixture-repository case with a renamed default branch and a pruning fetch fails first, then passes (AC-05, AC-24)
+- [ ] T25 `internal/clean/clean_test.go`, `internal/clean/clean.go` - R-13 F-01: an `origin/HEAD` that names a remote-tracking branch which no longer exists reports `default-branch-unknown`, a note with the `git remote set-head origin --auto` hint, and skips project rules while the built-in globs still apply, instead of failing with `manifest-invalid`; a fixture-repository case with a renamed default branch and a pruning fetch fails first, then passes (AC-05)
 
 ## Open Questions
 
