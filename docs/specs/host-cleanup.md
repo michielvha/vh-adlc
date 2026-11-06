@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. R-10 and R-11 factual findings are folded, and the owner answered Q1 to Q4 on 2026-11-06; Q3 adds task T24, a code change after acceptance. Waits on spec review R-12, then the owner's acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. The factual findings of R-10 to R-13 are folded, and the owner answered Q1 to Q4 on 2026-11-06. The owner's advance acceptance was conditional on R-12, which went stale when its two factual nits were folded; R-13 then added a Design change (a pruned origin/HEAD target is default-branch-unknown, task T25). Waits on a fresh spec review and the owner's acceptance naming it. Tasks T23 to T25 follow acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -161,8 +161,10 @@ clears them under the same limits, including in a repository with no manifest.
 
 `clean` finds the default branch with `git symbolic-ref refs/remotes/origin/HEAD`, finds
 `.vh-adlc/cleanup.yaml` on `origin/<default>` with `git ls-tree`, then reads that object with
-`git cat-file blob`, each with `GIT_NO_LAZY_FETCH=1`. With no such ref
-it reports `default-branch-unknown`, and with no manifest there `manifest-missing`, and skips project rules.
+`git cat-file blob`, each with `GIT_NO_LAZY_FETCH=1`. With no such ref, or one that names a remote-tracking
+branch that no longer exists, as after a renamed default branch and a pruning fetch, it reports
+`default-branch-unknown`; with no manifest there it reports `manifest-missing`. Both are notes and skip
+project rules.
 
 A dry run also plans a working-tree copy that differs, marked `manifest-unmerged`. A differing copy that
 is invalid is reported as a `manifest-unmerged` note naming the refusal: it plans nothing and does not fail
@@ -324,7 +326,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 | AC-07 | A `cmd/vh-adlc` test runs the real binary under `bwrap --unshare-pid` and asserts `pid-namespace` with nothing removed. |
 | AC-02, AC-03, AC-08 | Fake-engine tests: an `httptest` server on a Unix socket records every call and fails on any `force` parameter, across Compose projects and clusters with ended and live marks, a mixed-label Compose project, a killed run's cluster reused and kept, a bind mount, failed listings, and an absent, refused and denied socket. |
 | AC-03, AC-08 | Integration test behind a build tag on the real engine, with disposable objects and clusters. |
-| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit, an uncommitted edit, and an invalid uncommitted edit on a dry run. A missing object in a partial clone must not fetch. |
+| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit, an uncommitted edit, an invalid uncommitted edit on a dry run, and an `origin/HEAD` that names a pruned branch. A missing object in a partial clone must not fetch. |
 | AC-11 | Written manual procedure in disposable sessions, recorded under `tests/vh-adlc/evidence/clean/`, with `codex execpolicy check` output, the default Codex session's outcome, and a session blocked on space with no request for cleanup. |
 | AC-12 | The real-host sequence in Adoption, with each row's outcome recorded. |
 | AC-14 | `bun test tests/vh-adlc`, a golden JSON report against the updated schema, and a read of the documentation against the flags. |
@@ -380,6 +382,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       Evidence: "What counts as in use" now names a bind of all of `/tmp` or `/`, the temp base or the project's temp root, with `-v "$TMPDIR:$TMPDIR"` as the example. `usage.holds` and `mountedIn` in `internal/clean/files.go` call `within(p, entry)`, which holds only for the entry or a path inside it, so a bind source that is an ancestor of the scanned directory holds no entry below it. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
 - [ ] T23 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q4 (R-11 F-03) on 2026-11-06, with R-12 F-01: the stated limit names a bind of `/tmp` or any directory above it for top-level entries, and a bind of the project's temp root or any directory above it, the temp base included, for temp-root entries, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
 - [ ] T24 `internal/clean/clean_test.go`, `internal/clean/clean.go`, `plugins/vh-adlc/references/clean.md` - the owner's answer to Q3 (R-11 F-02) on 2026-11-06: a dry run reports an invalid working-tree manifest as a `manifest-unmerged` note naming the refusal, plans nothing from it and does not fail on it, while an invalid default-branch manifest still fails; `references/clean.md` says so; a `TestResults` row and a `TestManifestSources` case for the invalid uncommitted edit fail first, then pass (AC-05, AC-06, AC-14)
+- [ ] T25 `internal/clean/clean_test.go`, `internal/clean/clean.go` - R-13 F-01: an `origin/HEAD` that names a remote-tracking branch which no longer exists reports `default-branch-unknown`, a note with the `git remote set-head origin --auto` hint, and skips project rules while the built-in globs still apply, instead of failing with `manifest-invalid`; a fixture-repository case with a renamed default branch and a pruning fetch fails first, then passes (AC-05, AC-24)
 
 ## Open Questions
 
