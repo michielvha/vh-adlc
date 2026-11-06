@@ -199,6 +199,7 @@ None. The owner selected approved add/update batches and accepted the documented
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | unknown | procedural | Blocking concurrency promise and missing checker coverage; model identity not attested. |
 | 2026-11-06 | R-2 | spec | `11a4bc2b53476a9a6e26a12541c9a74cfd38ffaf` | unknown | procedural | No findings on corrected proposal; owner write-scope decision pending, model identity not attested. |
+| 2026-11-06 | R-3 | spec | `bdb69f3ae3c84f0a4b5df0312fb2f877b072088e` | unknown | procedural | No findings after folding owner decision; model identity not attested. |
 
 ### R-1
 
@@ -217,6 +218,10 @@ EVIDENCE: At 9aac9eeff9e20d30816b0ab8a43f313c30ee2e65, tests/vh-adlc/check.test.
 PROPOSAL: Add tests/vh-adlc/check.test.ts to covers and include registration of the new operation in the existing package checker as part of implementation verification.
 
 ### R-2
+
+NO FINDINGS
+
+### R-3
 
 NO FINDINGS
 
