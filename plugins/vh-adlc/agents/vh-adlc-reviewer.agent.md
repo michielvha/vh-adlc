@@ -35,7 +35,10 @@ plugin pin. If any of these is missing, return a single finding saying which, an
 ## A spec review
 
 Verify every factual claim in the document against the tree, the cited sources and the pinned
-conventions. Then attack the design and the criteria: what does the artifact look like when every box is
+conventions. Check any Owner summary against the detailed scope, defaults, permission limits, decisions and proof.
+Return a finding for a material contradiction, omission or unsupported result. A historical document
+without that subsection stays eligible; its absence alone is not a format failure.
+Then attack the design and the criteria: what does the artifact look like when every box is
 ticked, and does the original problem survive? Look for contradictions, unobservable criteria, missing
 Test Plan rows and anything the binary would read differently from the author. Return complete finding
 records, or exactly the single line the standard gives for a review with no findings.

@@ -24,6 +24,21 @@ The agent checks for an existing feature document before creating one. That
 document holds the requirements, acceptance criteria, test plan, and later tasks.
 The agent asks you to resolve choices that affect the feature's scope.
 
+When your resolved shared template includes an Owner summary, it appears first inside Context.
+The saved summary gives you the outcome, scope, approach, meaningful trade-offs and proof status.
+For the example above, a short draft could say:
+
+> Add `status --json` for scripts while keeping text as the default. The change covers output formatting;
+> it does not change how status is calculated or add a background service.
+>
+> JSON needs stable fields for callers. Tests will cover valid JSON, unchanged text output and failures.
+> Those checks and independent review are still planned. Acceptance permits implementation; publication
+> and merge retain their existing authority requirements.
+
+That is an illustration, not evidence that the example feature exists. The author refreshes the summary
+when scope, proof or decisions change. The detailed sections remain authoritative, and old specs stay
+valid without a bulk rewrite.
+
 Run `vh-adlc-spec review <path>` for an independent spec review. Resolve the
 findings. Before asking you to accept, the agent summarizes the proposed behavior,
 scope, significant permissions and side effects, migration, and validation status

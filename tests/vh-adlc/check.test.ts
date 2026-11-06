@@ -17,7 +17,7 @@ const SCHEDULE: Record<number, string[]> = {
   4: ["investigate", "spec", "resume"],
   5: ["tasks", "implement"],
   6: ["review"],
-  7: ["ship", "triage", "maintenance", "audit"],
+  7: ["ship", "triage", "maintenance", "audit", "projects"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
 const CONTENT_OPERATIONS = ["blog", "docs-impact"];
