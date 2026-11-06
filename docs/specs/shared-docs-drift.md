@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Awaiting owner acceptance after the clean review of corrected test-coverage metadata. Local implementation resumes on the existing branch after its gates pass."
+status: planned
+status_description: "The owner accepted R-48 and continued the existing feature. Local implementation resumes after the in-progress gate."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -551,6 +551,7 @@ None.
 | 2026-11-06 | R-46 | spec | `49e070dbf0434542b0c11fbac42dc5132c4a77f6` | n/a | n/a | accepted by owner |
 | 2026-11-06 | R-47 | spec | `c24f55371ca5bd98ed3e833c8bd3926404ff77ef` | claude-opus-5.5 | procedural | 1 should-fix; 2 nit. Full requested read coverage. |
 | 2026-11-06 | R-48 | spec | `48ecc4eaf068472913a2a609ebd8a67834d887d5` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
+| 2026-11-06 | R-48 | spec | `48ecc4eaf068472913a2a609ebd8a67834d887d5` | n/a | n/a | accepted by owner |
 
 ### R-1
 
