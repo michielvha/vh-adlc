@@ -1,8 +1,9 @@
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
-import { rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
-import { reconcileAbsent, resumeEffects, type ReconciliationScope } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
+import { reconcileAbsent, resumeEffects, inspectRetainedOperation, restoreRetainedOperation, type ReconciliationScope } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationFixture, publicationOptions as options } from "./publication-fixture";
 import { hash } from "./manifest-fixture";
@@ -158,4 +159,32 @@ test("cleanup cannot retire or release while the original attempt is in flight",
     expect(f.executed.includes("release")).toBe(false);
   } finally { release(); }
   expect((await running).state).toBe("complete");
+});
+
+
+test("lost original proof still permits read-only restoration and separately approved terminal lease cleanup", async () => {
+  const f = publicationFixture(roots), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    await execute(plan, effect, objects);
+    if (effect.kind === "pr-create") throw Error("lost response and runner");
+  };
+  const interrupted = await publish(options(f));
+  f.transport.execute = execute;
+  rmSync(interrupted.journal.directory, { recursive: true });
+  f.input.grants = [];
+  f.input.reviewer.native = Buffer.from("original native proof lost");
+  const recoveredRoot = join(f.root, "new-host-artifacts");
+  mkdirSync(recoveredRoot, { mode: 0o700 });
+  f.transport = { ...f.transport, artifact_root: recoveredRoot };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: recoveredRoot,
+    settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: recoveredRoot } });
+  expect(restored.state).toBe("pending");
+  expect(restored.reason).toBe("retained-restore-no-replay");
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+  const cleanup = await reconcileAbsent({ ...input(f, restored.journal.directory), retire_effect_ids: [] });
+  expect(cleanup.state).toBe("complete");
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(true);
 });

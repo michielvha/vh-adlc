@@ -30,7 +30,7 @@ type Event = {
 };
 type Header = {
   schema_version: 1; kind: "docs-drift-journal"; operation_id: string; repository: string;
-  source_repo: string; directory: string; plan_sha256: string; owner_uid: number; run_id: string; recovery_mode: "original" | "observation-only";
+  source_repo: string; directory: string; plan_sha256: string; owner_uid: number; run_id: string; observed_lease_object: string | null; recovery_mode: "original" | "observation-only";
 };
 export type Journal = {
   directory: string; source_repo: string; header: Header; plan: SealedPlan;
@@ -225,14 +225,16 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
   }
 }
 
-export function createJournal(options: { source_repo: string; artifact_root: string; plan: SealedPlan; recovery_mode?: "observation-only" }): Journal {
+export function createJournal(options: { source_repo: string; artifact_root: string; plan: SealedPlan; recovery_mode?: "observation-only"; observed_lease_object?: string | null }): Journal {
   const source = realpathSync(options.source_repo);
   const root = externalArtifactDirectory(options.artifact_root, source);
   const plan = parsePlan(options.plan), planBytes = canonicalJSON(plan);
   const directory = join(root, "docs-drift-" + plan.manifest.operation_id);
   const owner = process.getuid?.();
   if (owner === undefined) fail("POSIX owner identity required");
-  const header: Header = { recovery_mode: options.recovery_mode ?? "original", owner_uid: owner, run_id: plan.manifest.operation_id, schema_version: 1, kind: "docs-drift-journal", operation_id: plan.manifest.operation_id,
+  if (options.observed_lease_object !== undefined && options.observed_lease_object !== null
+    && (options.recovery_mode !== "observation-only" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(options.observed_lease_object))) fail("invalid observed recovery lease");
+  const header: Header = { observed_lease_object: options.observed_lease_object ?? null, recovery_mode: options.recovery_mode ?? "original", owner_uid: owner, run_id: randomUUID(), schema_version: 1, kind: "docs-drift-journal", operation_id: plan.manifest.operation_id,
     repository: plan.manifest.repository, source_repo: source, directory, plan_sha256: sha256(planBytes) };
   // The resource record precedes directory creation. Failed/partial resources remain for inspection.
   publishArtifact(join(root, plan.manifest.operation_id + ".journal-owner.json"), canonicalJSON(header));
@@ -250,8 +252,10 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
   externalArtifactDirectory(directory, source);
   privateDirectory(dirname(directory));
   const headerBytes = readArtifact(join(directory, "header.json"));
-  const header = exact(parseCanonical(headerBytes), ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id", "recovery_mode"]) as Header;
-  if (!["original", "observation-only"].includes(header.recovery_mode) || header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.() || header.run_id !== header.operation_id) fail("changed journal ownership");
+  const header = exact(parseCanonical(headerBytes), ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id", "recovery_mode", "observed_lease_object"]) as Header;
+  if (!["original", "observation-only"].includes(header.recovery_mode) || header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.() || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(header.run_id)
+    || (header.observed_lease_object !== null && (header.recovery_mode !== "observation-only"
+      || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(header.observed_lease_object)))) fail("changed journal ownership");
   const planBytes = readArtifact(join(directory, "plan.json"));
   if (sha256(planBytes) !== hash(header.plan_sha256)) fail("changed local plan");
   const plan = parsePlan(parseCanonical(planBytes));
@@ -313,4 +317,12 @@ export function appendAttempt(journal: Journal, effectId: string, attemptId: str
 }
 export function appendAttemptEnd(journal: Journal, effectId: string, status: AttemptEnd): Journal {
   return append(journal, "attempt-ended", effectId, status);
+}
+
+/** The immutable plan receipt is shared, while the acquiring journal owns a distinct lease commit. */
+export function writePublicationObjects(store: OwnedObjectStore, plan: SealedPlan, header: Header) {
+  const objects = writePlanObject(store, plan);
+  if (header.observed_lease_object !== null) return { ...objects, lease_object: header.observed_lease_object };
+  const commit = Buffer.from(`tree ${objects.tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift lease ${plan.manifest.operation_id} ${header.run_id}\n`);
+  return { ...objects, lease_object: writeMetadataObject(store.root, "commit", commit) };
 }

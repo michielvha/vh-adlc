@@ -385,3 +385,44 @@ test("an existing owner record prevents restoration over a lost local journal", 
   await expect(restoreRetainedOperation({ inspection, publication: options(f) })).rejects.toThrow("conflict");
   expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
 });
+
+test("a second original journal cannot adopt the first run's matching-plan lease", async () => {
+  const f = setup();
+  const effects: Effect[] = [f.input.manifest.effects[0], f.input.manifest.effects[1],
+    { id: "issue", kind: "issue-create", payload: { title: "Selected issue", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue"),
+      labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md",
+      evidence_commit: f.input.manifest.bindings.source_commit, evidence_sha256: hash("selected analysis") } }, f.input.manifest.effects[4]];
+  f.input = fixture(f.input.manifest.bindings, effects);
+  f.gate = async () => ({ review: f.input, policy: f.policy });
+  f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
+  const execute = f.transport.execute;
+  let entered!: () => void, release!: () => void, creates = 0;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const finish = new Promise<void>(resolve => { release = resolve; });
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "issue-create") { creates += 1; entered(); await finish; }
+    await execute(plan, effect, objects);
+  };
+  const first = publish(options(f));
+  await started;
+  const secondRoot = join(f.root, "second-original");
+  mkdirSync(secondRoot, { mode: 0o700 });
+  const secondOptions = { ...options(f), artifact_root: secondRoot, transport: { ...f.transport, artifact_root: secondRoot } };
+  const second = await publish(secondOptions);
+  expect(second.state).toBe("pending");
+  const resumed = resumeEffects({ ...secondOptions, journal_directory: second.journal.directory });
+  try { await Bun.sleep(200); expect(creates).toBe(1); }
+  finally { release(); await Promise.allSettled([first, resumed]); }
+});
+
+
+test("a foreign unreadable lease does not prevent read-only inspection of the retained plan", async () => {
+  const { f } = await interruptedPR();
+  f.refs.set(f.settings.publication.lease_ref, "f".repeat(40));
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: f.artifacts,
+    settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  expect(inspection.state).toBe("inspection");
+  expect(inspection.lease_object).toBeNull();
+  expect(inspection.observations.find(item => item.effect_id === "pr")?.observation.state).toBe("done");
+  expect(f.executed.includes("release")).toBe(false);
+});

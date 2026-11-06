@@ -53,15 +53,21 @@ export function publicationFixture(roots: string[]) {
     },
     async observe(plan, effect, objects) {
       observed.push(effect.id);
+      const leaseObject = objects.lease_object ?? objects.object;
+      if (effect.kind === "lease-acquire" && refs.has(String(effect.payload.ref)) && refs.get(String(effect.payload.ref)) !== leaseObject)
+        return { state: "conflict", reason: "foreign-lease-object" };
       if (!done.has(effect.id)) return { state: "absent", evidence: retainAbsence({ artifact_root: artifacts, source_repo: repo,
         plan, effect, transport: "collector", lookup: { fixture_effect: effect.id, state: "absent" } }) };
       return { state: "done", outcome: { state: "observed", observation_sha256: hash(effect.id), resource_id: effect.id, object: effect.kind === "lease-release" ? null : objects.object } };
     },
     async execute(plan, effect, objects) {
       executed.push(effect.id);
-      if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== objects.object) throw Error("changed fixture lease");
+      if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== (objects.lease_object ?? objects.object)) throw Error("changed fixture lease");
       done.add(effect.id);
-      if (effect.kind === "lease-acquire") { refs.set(String(effect.payload.ref), objects.object); }
+      if (effect.kind === "lease-acquire") {
+        if (refs.has(String(effect.payload.ref))) throw Error("fixture lease acquisition conflict");
+        refs.set(String(effect.payload.ref), objects.lease_object ?? objects.object);
+      }
       if (effect.kind === "receipt-retain") refs.set(String(effect.payload.ref), objects.object);
       if (effect.kind === "lease-release") refs.delete(String(effect.payload.ref));
     },

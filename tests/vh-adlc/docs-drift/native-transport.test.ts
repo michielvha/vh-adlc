@@ -1,6 +1,6 @@
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createNativeTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
@@ -174,7 +174,13 @@ test("native transport pins observed identities and uses absence-bound Git ref c
   expect(await f.transport.identity()).toEqual({ repository: "fixture/docs", repository_id: 10, default_branch: "main", actor: "fixture-bot", actor_id: 20 });
   const lease: Effect = { id: "lease", kind: "lease-acquire", payload: { ref: f.settings.publication.lease_ref } };
   expect(await f.transport.ref(String(lease.payload.ref))).toEqual({ state: "absent" });
-  await f.transport.execute(f.plan, lease, f.objects);
+  await f.transport.execute(f.plan, lease, f.objects, "attempt-native-lease");
+  const artifacts = join(f.root, "artifacts");
+  const ownerPath = readdirSync(artifacts).find(path => path.endsWith(".native-command.json"));
+  if (!ownerPath) throw Error("missing native command owner record");
+  const owner = JSON.parse(readFileSync(join(artifacts, ownerPath), "utf8"));
+  expect(owner.effect_id).toBe("lease");
+  expect(owner.attempt_id).toBe("attempt-native-lease");
   expect((await f.transport.observe(f.plan, lease, f.objects)).state).toBe("done");
   const calls = readFileSync(f.calls, "utf8");
   expect(calls).toContain('--force-with-lease=' + f.settings.publication.lease_ref + ':');
@@ -273,7 +279,11 @@ test("native PR updates distinguish the approved old payload, partial changes an
   const f = setup(); await f.transport.identity();
   const original = { title: "Old title", body: "Old body", labels: ["old"], draft: false };
   f.update(state => { state.prs.push({ ...original, labels: [{ name: "old" }], number: 501, state: "open", user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
-  const update: Effect = { id: "update", kind: "pr-update", payload: { number: 501, expected_head: f.commit, expected_payload_sha256: sha256(canonicalJSON(original)), title: "New title", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("update"), labels: ["documentation"], draft: true } };
+  const update: Effect = { id: "update", kind: "pr-update", payload: { number: 501, expected_head: f.commit, expected_payload_sha256: sha256(canonicalJSON(original)), expected_payload: original, title: "New title", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("update"), labels: ["documentation"], draft: true } };
+  expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("absent");
+  f.update(state => { state.prs[0].title = update.payload.title; state.prs[0].body = update.payload.body; });
+  expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("absent");
+  f.update(state => { state.prs[0].labels = [{ name: "documentation" }]; });
   expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("absent");
   await f.transport.execute(f.plan, update, f.objects);
   expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("done");

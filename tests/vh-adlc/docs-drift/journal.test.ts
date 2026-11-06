@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { appendIntent, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendIntent, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore, captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -166,5 +166,27 @@ test("resource ownership is recorded explicitly before the journal directory exi
   const journal = createJournal({ source_repo: repo, artifact_root: artifacts, plan });
   const owner = JSON.parse(readFileSync(join(artifacts, plan.manifest.operation_id + ".journal-owner.json"), "utf8"));
   expect(owner.owner_uid).toBe(process.getuid?.());
-  expect(owner.run_id).toBe(plan.manifest.operation_id);
+  expect(owner.run_id).toMatch(/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u);
+  expect(owner.run_id).not.toBe(plan.manifest.operation_id);
+});
+
+
+test("same reviewed plan has stable receipt objects and distinct durable acquiring leases", () => {
+  const { repo, artifacts, plan, commit } = setup();
+  const parent = join(artifacts, "objects"), evidence = join(artifacts, "evidence"), second = join(artifacts, "second-root");
+  for (const directory of [parent, evidence, second]) mkdirSync(directory, { mode: 0o700 });
+  const store = createOwnedObjectStore({ parent, evidence_directory: evidence, source_repo: repo, source_commit: commit,
+    repository: "fixture/docs", owner: "fixture", run: "lease-nonce" });
+  const first = createJournal({ source_repo: repo, artifact_root: artifacts, plan });
+  const other = createJournal({ source_repo: repo, artifact_root: second, plan });
+  const a = writePublicationObjects(store, plan, first.header), b = writePublicationObjects(store, plan, other.header);
+  expect(a.object).toBe(b.object);
+  expect(a.tree).toBe(b.tree);
+  expect(a.blob).toBe(b.blob);
+  expect(a.lease_object).not.toBe(b.lease_object);
+  expect(a.lease_object).not.toBe(a.object);
+  expect(writePublicationObjects(store, plan, readJournal(first.directory, repo).header).lease_object).toBe(a.lease_object);
+  expect(readGit(store.root, "rev-parse", a.lease_object + "^{tree}").toString().trim()).toBe(a.tree);
+  expect(readGit(store.root, "cat-file", "commit", a.lease_object).toString()).not.toContain("parent ");
+  expect(readGit(store.root, "show", a.lease_object + ":plan.json")).toEqual(canonicalJSON(plan));
 });

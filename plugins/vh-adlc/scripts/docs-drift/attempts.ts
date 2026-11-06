@@ -16,7 +16,7 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
   if (!ended || ended.revision < attempt.revision) return "attempt-in-flight";
   const status = ended.payload as { sent: boolean; reaped: boolean };
   if (!status.reaped) return "attempt-not-reaped";
-  if (status.sent && (retirement || ["pr-create", "issue-create", "comment-create"].includes(effect.kind))) return "dispatch-outcome-unknown";
+  if (status.sent && (retirement || ["lease-acquire", "pr-create", "issue-create", "comment-create"].includes(effect.kind))) return "dispatch-outcome-unknown";
   return null;
 }
 
@@ -33,7 +33,7 @@ export async function executeAttempt(options: {
   let status = { sent: true, reaped: true };
   try {
     readJournal(journal.directory, journal.source_repo, journal);
-    await options.transport.execute(journal.plan, options.effect, options.objects);
+    await options.transport.execute(journal.plan, options.effect, options.objects, id);
   } catch (error) {
     failure = error;
     status = error instanceof PublicationExecutionError ? { sent: error.sent, reaped: error.reaped } : { sent: true, reaped: false };

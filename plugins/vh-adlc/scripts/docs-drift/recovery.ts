@@ -2,7 +2,7 @@ import { executeAttempt, pendingAttempt } from "./attempts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRetirement, readJournal, writePlanObject, createJournal, publishArtifact, readArtifact, readVerifiedPlan, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRetirement, readJournal, writePlanObject, writePublicationObjects, createJournal, publishArtifact, readArtifact, readVerifiedPlan, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { readAbsence } from "./observations";
 import { canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { publicationMarker } from "./report-history";
@@ -25,7 +25,7 @@ export async function resumeEffects(options: PublishOptions & { journal_director
     || options.artifact_root !== options.transport.artifact_root) throw Error("selected recovery artifact root changed");
   if (!canonicalJSON(journal.plan).equals(canonicalJSON(options.plan)) || options.transport.kind !== journal.plan.transport
     || options.transport.object_store !== options.object_store.root) throw Error("recovery payload or transport changed; inspect the original operation");
-  const objects = writePlanObject(options.object_store, journal.plan);
+  const objects = writePublicationObjects(options.object_store, journal.plan, journal.header);
   const retired = new Set(journal.events.filter(event => event.kind === "retired-absence").map(event => event.effect_id));
   const complete = () => journal.plan.manifest.effects.every(effect => terminal(journal, effect.id) || retired.has(effect.id));
   const invalidated = journal.events.some(event => event.kind === "invalidation");
@@ -51,6 +51,9 @@ export async function resumeEffects(options: PublishOptions & { journal_director
     if (effect.kind === "lease-acquire" && terminal(journal, effect.id)) continue;
     try {
       const observation = await options.transport.observe(journal.plan, effect, objects);
+      journal = readJournal(journal.directory, options.source_repo);
+      const active = pendingAttempt(journal, effect);
+      if (observation.state !== "done" && (active === "attempt-in-flight" || active === "attempt-not-reaped")) return blocked(effect.id, active);
       if (observation.state === "conflict" || observation.state === "unknown") return blocked(effect.id, observation.reason, observation.state === "conflict");
       if (terminal(journal, effect.id)) {
         if (observation.state !== "done") return blocked(effect.id, "completed-effect-materially-changed", true);
@@ -69,7 +72,7 @@ export async function resumeEffects(options: PublishOptions & { journal_director
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
       if (effect.kind === "lease-acquire") {
         if (lease.state !== "absent") return blocked(effect.id, "publication-lease-occupied");
-      } else if (lease.state !== "present" || lease.object !== objects.object) {
+      } else if (lease.state !== "present" || lease.object !== objects.lease_object) {
         return blocked(effect.id, "publication-lease-lost");
       }
       // A complete, unchanged absence plus current original proof/authority permits this one replay.
@@ -88,10 +91,10 @@ type RetainedOptions = {
   verify_policy: (plan: SealedPlan) => PlanPolicy | null;
 };
 export type RetainedInspection = {
-  state: "inspection"; directory: string; plan: SealedPlan; ref: string; objects: PlanObjects;
+  state: "inspection"; directory: string; plan: SealedPlan; ref: string; objects: PlanObjects; lease_object: string | null;
   observations: Array<{ effect_id: string; observation: EffectObservation }>;
 };
-const inspected = new WeakMap<object, { transport: PublicationTransport; source_repo: string }>();
+const inspected = new WeakMap<object, { transport: PublicationTransport; source_repo: string; verify_policy: RetainedOptions["verify_policy"] }>();
 
 /** Inspect the fixed retained payload. Replay requires the original native proof and current authority. */
 export async function inspectRetainedOperation(options: RetainedOptions): Promise<RetainedInspection> {
@@ -115,10 +118,20 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
   if (plan.manifest.repository !== options.settings.repository || plan.manifest.repository_id !== identity.repository_id
     || plan.manifest.actor !== options.settings.publication.actor || plan.manifest.operation_id !== options.operation_id
     || plan.transport !== options.transport.kind) throw Error("retained operation scope changed");
+  let lease_object: string | null = null;
+  const lease = await options.transport.ref(options.settings.publication.lease_ref);
+  if (lease.state === "present") {
+    try {
+      const retainedLease = await options.transport.readPlanObject(lease.object);
+      if (Buffer.from(retainedLease.bytes).equals(bytes) && retainedLease.objects.tree === objects.tree
+        && retainedLease.objects.blob === objects.blob && retainedLease.objects.plan_sha256 === objects.plan_sha256) lease_object = lease.object;
+    } catch { /* An unavailable or foreign lease establishes no cleanup ownership. */ }
+  }
+  const observationObjects = { ...objects, ...(lease_object === null ? {} : { lease_object }) };
   const observations: RetainedInspection["observations"] = [];
   for (const effect of plan.manifest.effects) {
     let observation: EffectObservation;
-    try { observation = await options.transport.observe(plan, effect, objects); }
+    try { observation = await options.transport.observe(plan, effect, observationObjects); }
     catch { observation = { state: "unknown", reason: "native-inspection-unavailable" }; }
     observations.push({ effect_id: effect.id, observation });
   }
@@ -129,9 +142,9 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
     root: directory, owner: process.getuid?.() ?? null, run, repository: plan.manifest.repository, source_commit: plan.manifest.bindings.source_commit, ref, object: objects.object }));
   mkdirSync(directory, { mode: 0o700 });
   publishArtifact(join(directory, "plan.json"), bytes);
-  publishArtifact(join(directory, "observations.json"), canonicalJSON({ state: "inspection", reader_identity: identity, ref, objects, observations }));
-  const result: RetainedInspection = freezeJSON({ state: "inspection", directory, plan, ref, objects, observations });
-  inspected.set(result, { transport: options.transport, source_repo: source });
+  publishArtifact(join(directory, "observations.json"), canonicalJSON({ state: "inspection", reader_identity: identity, ref, objects, lease_object, observations }));
+  const result: RetainedInspection = freezeJSON({ state: "inspection", directory, plan, ref, objects, lease_object, observations });
+  inspected.set(result, { transport: options.transport, source_repo: source, verify_policy: options.verify_policy });
   return result;
 }
 
@@ -139,10 +152,15 @@ export async function restoreRetainedOperation(options: { inspection: RetainedIn
   const origin = inspected.get(options.inspection), publication = options.publication;
   if (!origin || origin.transport !== publication.transport || origin.source_repo !== realpathSync(publication.source_repo)
     || !canonicalJSON(options.inspection.plan).equals(canonicalJSON(publication.plan))) throw Error("missing actual retained inspection");
-  await verifyPublicationGate(publication, null);
+  readVerifiedPlan(canonicalJSON(publication.plan), origin.verify_policy);
+  if (publication.transport.kind !== publication.plan.transport || publication.transport.object_store !== publication.object_store.root
+    || publication.artifact_root !== publication.transport.artifact_root) throw Error("restored transport or artifact scope changed");
+  const identity = await publication.transport.identity();
+  if (identity.repository !== publication.plan.manifest.repository || identity.repository_id !== publication.plan.manifest.repository_id) throw Error("restored repository changed");
   const objects = writePlanObject(publication.object_store, publication.plan);
-  if (!canonicalJSON(objects).equals(canonicalJSON(options.inspection.objects))) throw Error("restored operation object changed");
-  const journal = createJournal({ source_repo: publication.source_repo, artifact_root: publication.artifact_root, plan: publication.plan, recovery_mode: "observation-only" });
+  if (objects.tree !== options.inspection.objects.tree || objects.blob !== options.inspection.objects.blob
+    || objects.plan_sha256 !== options.inspection.objects.plan_sha256) throw Error("restored operation object changed");
+  const journal = createJournal({ source_repo: publication.source_repo, artifact_root: publication.artifact_root, plan: publication.plan, recovery_mode: "observation-only", observed_lease_object: options.inspection.lease_object });
   publishArtifact(join(journal.directory, "retained-origin.json"), canonicalJSON({ schema_version: 1,
     source: "retained-ref", ref: options.inspection.ref, object: objects.object, plan_sha256: objects.plan_sha256 }));
   return resumeEffects({ ...publication, journal_directory: journal.directory });
@@ -165,7 +183,7 @@ export async function reconcileAbsent(options: {
   let journal = readJournal(options.journal_directory, options.source_repo);
   if (dirname(journal.directory) !== externalArtifactDirectory(options.transport.artifact_root, options.source_repo)) throw Error("selected reconciliation artifact root changed");
   const { plan } = journal;
-  const objects = writePlanObject(options.object_store, plan);
+  const objects = writePublicationObjects(options.object_store, plan, journal.header);
   const release = plan.manifest.effects.at(-1), acquire = plan.manifest.effects[0];
   if (!release || release.kind !== "lease-release" || acquire?.kind !== "lease-acquire" || release.payload.ref !== acquire.payload.ref
     || release.payload.ref !== options.settings.publication.lease_ref || plan.manifest.repository !== options.settings.repository
@@ -182,9 +200,9 @@ export async function reconcileAbsent(options: {
     const identity = await options.transport.identity();
     if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id) return blocked("reconciliation-repository-changed");
     const lease = await options.transport.ref(String(release.payload.ref));
-    if (lease.state === "present" && lease.object !== objects.object) return blocked("foreign-publication-lease");
+    if (lease.state === "present" && lease.object !== objects.lease_object) return blocked("foreign-publication-lease");
     const scope: ReconciliationScope = { repository: identity.repository, repository_id: identity.repository_id, operation_id: plan.manifest.operation_id,
-      plan_sha256: sha256(canonicalJSON(plan)), lease_ref: String(release.payload.ref), lease_object: objects.object,
+      plan_sha256: sha256(canonicalJSON(plan)), lease_ref: String(release.payload.ref), lease_object: objects.lease_object,
       release_effect_id: release.id, retire_effect_ids: [...ids], actor: identity.actor, actor_id: identity.actor_id };
     const scopeHash = sha256(canonicalJSON(scope));
     const authorize = async (original?: ReconciliationAuthority): Promise<ReconciliationAuthority> => {
@@ -207,6 +225,9 @@ export async function reconcileAbsent(options: {
     for (const effect of plan.manifest.effects.slice(0, -1)) {
       if (terminal(journal, effect.id) || isRetired(effect.id)) continue;
       const observation = await options.transport.observe(plan, effect, objects);
+      journal = readJournal(journal.directory, options.source_repo);
+      const active = pendingAttempt(journal, effect);
+      if (observation.state !== "done" && (active === "attempt-in-flight" || active === "attempt-not-reaped")) return blocked(active);
       if (observation.state === "unknown" || observation.state === "conflict") return blocked(observation.reason);
       if (!intended(journal, effect.id)) journal = appendIntent(journal, effect.id);
       if (observation.state === "done") { journal = appendOutcome(journal, effect.id, observation.outcome); continue; }
@@ -229,7 +250,7 @@ export async function reconcileAbsent(options: {
       if (currentIdentity.actor_id !== identity.actor_id || currentIdentity.actor !== identity.actor
         || currentIdentity.repository_id !== identity.repository_id || currentIdentity.repository !== identity.repository) return blocked("cleanup-actor-changed");
       const currentLease = await options.transport.ref(scope.lease_ref);
-      if (currentLease.state !== "present" || currentLease.object !== objects.object) return blocked("owned-cleanup-lease-changed");
+      if (currentLease.state !== "present" || currentLease.object !== objects.lease_object) return blocked("owned-cleanup-lease-changed");
       const attempt = pendingAttempt(journal, release);
       if (attempt) return blocked(attempt);
       journal = await executeAttempt({ journal, effect: release, objects, transport: options.transport });

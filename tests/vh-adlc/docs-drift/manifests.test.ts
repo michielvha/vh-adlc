@@ -4,7 +4,7 @@ import {
   validateReviewedManifest, verifyRoleIdentity,
   type ActionManifest, type NativeRoleEvidence,
 } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
-import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { parseSettings, settingsProjections } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { settingsFixture } from "./settings-fixture";
 import { hash, source, role, bindings, evidence, fixture } from "./manifest-fixture";
@@ -203,4 +203,15 @@ test("native single-result JSON and JSONL retain the same strict identity checks
   input.worker.native = Buffer.from(JSON.stringify({ type: "assistant.message", data: { model: "claude-opus-5.5" } }, null, 2));
   input.worker.native_sha256 = sha256(input.worker.native);
   expect(verifyRoleIdentity(input.worker, role).model).toBe("claude-opus-5.5");
+});
+
+
+test("a refreshed PR binds the exact original payload used for partial-update recovery", () => {
+  const original = { title: "Old title", body: "", labels: ["documentation"], draft: false };
+  const update = { id: "update", kind: "pr-update" as const, payload: { number: 7, expected_head: bindings.candidate_commit,
+    expected_payload_sha256: sha256(canonicalJSON(original)), expected_payload: original,
+    title: "New title", body: "Reviewed new body", labels: ["documentation"], draft: true } };
+  expect(validateReviewedManifest(fixture(bindings, [update])).manifest.effects[0].kind).toBe("pr-update");
+  update.payload.expected_payload.body = "Unreviewed source";
+  expect(() => validateReviewedManifest(fixture(bindings, [update]))).toThrow("digest");
 });

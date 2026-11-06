@@ -78,7 +78,7 @@ const effectFields = {
   push: ["ref", "head"],
   "branch-refresh": ["ref", "number", "expected_head", "head"],
   "pr-create": ["base", "branch", "title", "body", "labels", "draft"],
-  "pr-update": ["number", "expected_head", "expected_payload_sha256", "title", "body", "labels", "draft"],
+  "pr-update": ["number", "expected_head", "expected_payload_sha256", "expected_payload", "title", "body", "labels", "draft"],
   "issue-create": ["title", "body", "labels", "prior_ids", "evidence_repository", "evidence_path", "evidence_commit", "evidence_sha256"],
   "comment-create": ["number", "body", "prior_ids"],
   "pr-close": ["number", "expected_head"],
@@ -114,6 +114,14 @@ function parseEffect(value: unknown): Effect {
       case "number": case "workflow_id": case "run_id": case "max_bytes": positive(value); break;
       case "draft": case "prerelease": if (typeof value !== "boolean") invalid("boolean"); break;
       case "labels": strings(value); break;
+      case "expected_payload": {
+        const source = object(value, ["title", "body", "labels", "draft"], "expected PR payload");
+        text(source.title);
+        if (typeof source.body !== "string" || typeof source.draft !== "boolean") invalid("expected PR payload types");
+        const normalized = { ...source, labels: strings(source.labels).sort() };
+        if (sha256(canonicalJSON(normalized)) !== payload.expected_payload_sha256) invalid("expected PR payload digest");
+        break;
+      }
       case "prior_ids": {
         if (!Array.isArray(value)) invalid("prior native IDs");
         const ids = value.map(positive);

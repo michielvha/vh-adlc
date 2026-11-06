@@ -1,5 +1,5 @@
 import { executeAttempt } from "./attempts";
-import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { effectMarker, manifestDigest, parseActionManifest, validateReviewedManifest, type Effect } from "./manifests";
 import { canonicalJSON } from "./protocol";
 import { publicationMarker } from "./report-history";
@@ -85,16 +85,16 @@ function pending(journal: Journal, effect: Effect, reason: string, objects: Plan
 
 export async function publish(options: PublishOptions): Promise<PublishResult> {
   await verifyPublicationGate(options, null);
-  const objects = writePlanObject(options.object_store, options.plan);
   let journal = createJournal({ source_repo: options.source_repo, artifact_root: options.artifact_root, plan: options.plan });
+  const objects = writePublicationObjects(options.object_store, options.plan, journal.header);
   for (const [index, effect] of journal.plan.manifest.effects.entries()) {
     try {
       await verifyPublicationGate(options, journal);
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
       if (index === 0) {
-        if (lease.state !== "absent") return pending(journal, effect, "publication-lease-occupied", objects);
-      } else if (lease.state === "present" ? lease.object !== objects.object : effect.kind !== "lease-release") {
-        return pending(journal, effect, "publication-lease-lost", objects);
+        if (lease.state !== "absent") return pending(journal, effect, "publication-lease-occupied", objects, true);
+      } else if (lease.state === "present" ? lease.object !== objects.lease_object : effect.kind !== "lease-release") {
+        return pending(journal, effect, "publication-lease-lost", objects, true);
       }
       journal = appendIntent(journal, effect.id);
       const before = index === 0 ? { state: "absent" as const } : await options.transport.observe(journal.plan, effect, objects);
