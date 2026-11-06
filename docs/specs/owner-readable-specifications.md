@@ -128,8 +128,10 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
 ## Acceptance Criteria
 
 - [ ] AC-01: New specs following the published shared template begin Context with a useful Owner summary that covers scope, approach, consequential trade-offs, validation state and owner decisions without adding a second normative contract.
-- [ ] AC-02: The author refreshes the summary on a normative revision and before acceptance; planned validation and observed results remain distinct, and the owner still receives the existing conversation summary before deciding.
-- [ ] AC-03: Independent spec review identifies a materially stale, contradictory or unsupported summary through ordinary finding records while allowing an untouched historical spec without a summary.
+- [x] AC-02: The author refreshes the summary on a normative revision and before acceptance; planned validation and observed results remain distinct, and the owner still receives the existing conversation summary before deciding.
+      Evidence: R-3 returned met at `4e1523b`; observed source-procedure author trial and independent semantic review, with the synthetic-state and host-invocation limits retained in the records.
+- [x] AC-03: Independent spec review identifies a materially stale, contradictory or unsupported summary through ordinary finding records while allowing an untouched historical spec without a summary.
+      Evidence: R-3 returned met at `4e1523b`; observed source-procedure author trial and independent semantic review, with the synthetic-state and host-invocation limits retained in the records.
 - [ ] AC-04: The coordinated change uses the authoritative Docs template and a published exact framework pin; existing specs, baseline/status gates and verbatim review records remain compatible without a binary-format change or bulk migration.
 
 ## Test Plan
@@ -166,6 +168,7 @@ None. The owner selected summary inside Context, preserving the existing format.
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | unknown | procedural | No findings; model identity not attested. |
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | n/a | n/a | accepted by owner |
 | 2026-11-06 | R-2 | implementation | `557cf2a6f492405f326a3d35ba5833d72c8bfe89` | unknown | procedural | AC03 met; AC01/04 not met pending adoption; AC02 not verified pending native author trial. Model identity not attested. |
+| 2026-11-06 | R-3 | implementation | `4e1523bdcd5d1d0dac4916df490d789abdb2f11e` | unknown | procedural | AC02/03 met; AC01/04 await upstream template and pin adoption. Model identity not attested. |
 
 ### R-1
 
@@ -195,6 +198,24 @@ SEVERITY: should-fix
 WHERE: Test Plan / AC-02; tests/vh-adlc/owner-summary.test.ts:99-114
 EVIDENCE: The accepted proof requires an observed author trial with a revised summary and owner-facing message. The implemented test constructs those summary changes directly, inserts synthetic lifecycle rows and stops after confirming renewed acceptance is required. The supplied semantic trial artifacts contain reviewer cases and results, with no author-operation transcript establishing the conversation-summary requirement.
 PROPOSAL: Before marking AC-02 met, execute and preserve a disposable author-operation trial covering normative revision and the pre-acceptance conversation summary. Keep any simulated acceptance explicitly labelled synthetic and retain the distinction between planned validation and observed results.
+
+### R-3
+
+CRITERION: AC-01 New specs following the published shared template begin Context with a useful Owner summary that covers scope, approach, consequential trade-offs, validation state and owner decisions without adding a second normative contract.
+VERDICT: not met
+EVIDENCE: At clean framework commit 4e1523bdcd5d1d0dac4916df490d789abdb2f11e, vh-adlc knowledge resolves repository Docs revision 0e52f51f01b84eda75a976763c42d8ec0a07b544. Its cached template lacks Owner summary. Companion candidate 614bb27a7c1809f4a6e3ab86040329a82466efe0 supplies the intended template and passed the previously observed Node24 documentation check. The candidate remains outside the effective framework pin, so published-template adoption is incomplete.
+
+CRITERION: AC-02 The author refreshes the summary on a normative revision and before acceptance; planned validation and observed results remain distinct, and the owner still receives the existing conversation summary before deciding.
+VERDICT: met
+EVIDENCE: Inspected the disposable author trial at exact commit 46c42032fbdd476f1c94bb47762b3f4aa1afe400. Its preserved binary output records a passing draft gate, followed by status-only commit 96d0bfac6cd847d4d013baa92ce8b4904fde311a before the normative revision. The model-authored revision updates the saved summary and detailed contract consistently, explains the changed default and caller migration, and labels implementation tests and CI planned. The delivered conversation artifact includes revised behavior, migration, proof limits, recovery, acceptance authority and the full-spec link before a decision. Independently reran trial lint successfully and observed freshness report baseline-changed for the earlier review. Stored review records remain byte-identical. Durable evidence copies match the inspected originals. This establishes the accepted source-procedure author trial and closes F-01. The starting acceptance state is synthetic, and native installed-plugin invocation and a real owner-acceptance transaction remain unverified.
+
+CRITERION: AC-03 Independent spec review identifies a materially stale, contradictory or unsupported summary through ordinary finding records while allowing an untouched historical spec without a summary.
+VERDICT: met
+EVIDENCE: The implementation and semantic fixtures are unchanged from independently reviewed commit 557cf2a6f492405f326a3d35ba5833d72c8bfe89. Previously inspected exact historical and honest fixture commits retain NO FINDINGS records. The unsupported-proof and changed-default fixtures retain ordinary blocking factual finding records supported by their source. Independent inspection confirmed the claimed passing tests contradict README.md and the proposed changed default contradicts Scope and AC-01. The canonical reviewer explicitly checks those contradictions and allows historical absence. Trial isolation is procedural and model identity is not attested.
+
+CRITERION: AC-04 The coordinated change uses the authoritative Docs template and a published exact framework pin; existing specs, baseline/status gates and verbatim review records remain compatible without a binary-format change or bulk migration.
+VERDICT: not met
+EVIDENCE: At clean framework commit 4e1523bdcd5d1d0dac4916df490d789abdb2f11e, the repository still resolves Docs 0e52f51f01b84eda75a976763c42d8ec0a07b544 and plugin knowledge retains f8ccacbedf057159ea24136ba115cd9857bb22ac. Adoption of companion candidate 614bb27a7c1809f4a6e3ab86040329a82466efe0 remains pending. Only the feature document changed since the previously observed focused suite passed 66 tests with 262 assertions. Previously verified rules-block identity and binary compatibility therefore remain applicable. Current framework lint passes, freshness reports both recorded reviews fresh, and feature_tree.clean is true. These checks establish compatibility preparation while the required published exact pin remains incomplete.
 
 ## Sources
 
