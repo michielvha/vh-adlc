@@ -12,9 +12,12 @@ covers:
   - plugins/vh-adlc/plugin.json
   - plugins/vh-adlc/.claude-plugin/plugin.json
   - docs/user-guides/workflows.md
+  - docs/get-started/installation.md
   - docs/reference/compatibility.md
   - tests/vh-adlc/projects/
   - tests/vh-adlc/check.test.ts
+  - tests/vh-adlc/triage/discovery.test.ts
+  - tests/vh-adlc/maintenance/discovery.test.ts
 ---
 
 # Plan: GitHub Projects coordinator
@@ -43,9 +46,12 @@ room for a later unattended cleanup agent. Such an agent needs a separate design
 Fresh reads catch detected field conflicts, but GitHub cannot prevent an edit racing with a write.
 The owner accepted that API limit on 2026-11-06. Local subprocess tests cover incomplete inventories, duplicate issue numbers, detected field conflicts,
 partial failures and reuse from a fresh CLI process. Strict TypeScript and the package checker pass.
-A controlled trial on a separately authorized test board and independent implementation review remain
-pending. No live board or credential change has been made. Acceptance covers implementation, not a
-live Homelab board setup or repository cleanup.
+The authorized trial at `9a535ea` passed real add/update/repeat/conflict and archived-member checks.
+The private test board and its two owned issues were closed; independent read-back confirms existing
+issue metadata is unchanged. Broader checks found four failures in discovery assertions that still
+expect thirteen skills and ten engineering operations. This revision adds those existing test paths
+and the installation guide to coverage so they can be updated together. It changes no behavior,
+criteria or permissions. A production Homelab board and unattended cleanup remain separate work.
 
 ### Current evidence
 
@@ -204,6 +210,7 @@ Document native auto-add as an optional complement, including rule limits and ex
       Evidence: `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000` passes 74 tests, including strict typecheck and a fresh CLI process using reusable YAML/JSON. No real-board acceptance or installed-agent invocation is claimed.
 - [x] T9 `plugins/vh-adlc/scripts/projects/inventory.ts`, `tests/vh-adlc/projects/inventory.test.ts`, `apply.test.ts`, `plugins/vh-adlc/references/projects.md` - archived membership is included and repeat additions leave it archived; regression fails before the fix and passes after it (AC-02, AC-04)
       Evidence: archived-inventory regression failed before the fix; `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000` passes 76 tests after requesting both archived states and retaining isArchived. R4 remains unchanged; follow-up review pending.
+- [ ] T10 `tests/vh-adlc/triage/discovery.test.ts`, `tests/vh-adlc/maintenance/discovery.test.ts`, `docs/get-started/installation.md` - existing discovery checks and setup docs agree on fourteen skills and eleven engineering operations; targeted discovery tests pass (AC-01, AC-06)
 - [ ] T8 `docs/specs/github-projects-coordinator.md` - after separate live permission and access, record the disposable-board trial and independent implementation review; production resources match baseline (AC-07)
 
 ## Open Questions
