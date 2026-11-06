@@ -190,7 +190,8 @@ Document native auto-add as an optional complement, including rule limits and ex
 
 - [x] T1 `tests/vh-adlc/projects/settings.test.ts` - invalid board/repository/field settings and ambiguous identities fail against the absent reader (AC-01)
       Evidence: `bun test tests/vh-adlc/projects/settings.test.ts` failed because the settings module does not exist; no production code written yet.
-- [ ] T2 `plugins/vh-adlc/scripts/projects/settings.ts`, `types.ts` - T1 passes using the shared strict YAML reader (AC-01)
+- [x] T2 `plugins/vh-adlc/scripts/projects/settings.ts` - T1 passes using the shared strict YAML reader (AC-01)
+      Evidence: `bun test tests/vh-adlc/projects/settings.test.ts` passes all three tests; shared settings reader is reused without new dependencies.
 - [ ] T3 `tests/vh-adlc/projects/inventory.test.ts`, `fake-gh.ts` - actual CLI fixture scenarios fail for absent inventory, incomplete pages and identity collisions (AC-02, AC-03)
 - [ ] T4 `plugins/vh-adlc/scripts/projects/github.ts`, `inventory.ts`, `cli.ts` - T3 passes with native gh calls, source-linked facts and versioned output (AC-02, AC-03)
 - [ ] T5 `tests/vh-adlc/projects/apply.test.ts` - approved-batch, conflict, retry and partial-failure scenarios fail against the absent updater (AC-04, AC-05)
