@@ -402,6 +402,7 @@ None.
 | 2026-11-06 | R-10 | spec | `6d0c8af90cdc036493479430e57b6f2c202cba48` | claude-opus-5-5 | procedural | 6 findings, 0 blocking |
 | 2026-11-06 | R-11 | spec | `1fdaced37fbcefc58a02328a71cc88eebfe83753` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 | 2026-11-06 | R-12 | spec | `3507447e4a40945626f5281b945f045572531a7f` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
+| 2026-11-06 | R-13 | spec | `b68e46d87dd8bdfcd318b24b34eab987a8211f91` | claude-opus-5-5 | procedural | 2 findings, 0 blocking |
 
 ### R-1
 
@@ -1339,6 +1340,22 @@ SEVERITY: nit
 WHERE: Design, Where the rules come from
 EVIDENCE: Design says `clean` reads the manifest with "`git symbolic-ref refs/remotes/origin/HEAD`, then `git cat-file blob origin/<default>:.vh-adlc/cleanup.yaml`". `defaultBranchManifest` in `internal/clean/clean.go` runs three commands instead: `symbolic-ref -q refs/remotes/origin/HEAD` (line 209), then `ls-tree -z --format=%(objecttype) %(objectname) <branch> -- .vh-adlc/cleanup.yaml` (line 217), then `cat-file blob <sha>` (line 229). All three run with `GIT_NO_LAZY_FETCH=1`. The `ls-tree` step is what turns a missing path into `manifest-missing` and a non-blob into `manifest-invalid`. The behaviour matches Design, but the commands it names do not.
 PROPOSAL: Describe the read as `ls-tree` on `origin/<default>` and then `cat-file blob` of the object it names, or name no commands and say "reads the blob at `origin/<default>:.vh-adlc/cleanup.yaml` without fetching".
+
+### R-13
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Where the rules come from
+EVIDENCE: Design says "With no such ref it reports `default-branch-unknown`, and with no manifest there `manifest-missing`, and skips project rules." `defaultBranchManifest` in `internal/clean/clean.go` only treats a failed `symbolic-ref -q refs/remotes/origin/HEAD` that way. When that ref names a branch that no longer exists, the `ls-tree` error goes to `invalid(...)`, which reports `manifest-invalid`. That is a failing code on dry runs too. This happens when a remote renames its default branch and a pruning fetch then deletes the old remote-tracking ref. I tested it in scratch repositories: upstream on `master`, a clone, upstream renamed to `main`, then `git fetch --prune` in the clone. Afterwards `git symbolic-ref -q refs/remotes/origin/HEAD` printed `refs/remotes/origin/master` with rc=0, and `git ls-tree ... origin/master` failed with "fatal: Not a valid object name origin/master". A binary built from b68e46d ran `clean --dry-run --repo <clone>` and exited 1 with result `fail` and a single finding: `manifest-invalid`, "reading .vh-adlc/cleanup.yaml on origin/master without a fetch: ... Not a valid object name origin/master". Neither the default branch nor the working tree has any manifest in that clone. `SKILL.md` and `references/clean.md` step 2 apply only after a dry run with no failing finding, so in such a repository the operation never applies, and even the built-in `go-build*` globs are not cleared through it. The message also leaves out the fix that the `default-branch-unknown` message gives (`git remote set-head origin --auto`). No Test Plan row covers this case.
+PROPOSAL: State in Design that an `origin/HEAD` whose target ref is missing reports `default-branch-unknown`, a note, and skips project rules. Add that case to the AC-05, AC-06 fixture-repository row. The open T24 already touches `clean.go`, so the code change can go there.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter status_description
+EVIDENCE: status_description says "Waits on spec review R-12, then the owner's acceptance." The Review Log already has the R-12 row and subsection at 3507447, and b68e46d folds both of its findings. `vh-adlc fresh` reports R-12 stale with `baseline-changed`, and `vh-adlc next` returns `spec review`, so the document now waits on a new pass, not on R-12.
+PROPOSAL: Change the line to say R-12's findings are folded and the document waits on the next spec review, then the owner's acceptance. The field is not normative, so this edit needs no revision.
 
 ## Sources
 
