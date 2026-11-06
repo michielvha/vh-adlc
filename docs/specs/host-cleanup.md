@@ -159,8 +159,9 @@ clears them under the same limits, including in a repository with no manifest.
 
 ### Where the rules come from
 
-`clean` reads the manifest with `git symbolic-ref refs/remotes/origin/HEAD`, then
-`git cat-file blob origin/<default>:.vh-adlc/cleanup.yaml`, each with `GIT_NO_LAZY_FETCH=1`. With no such ref
+`clean` finds the default branch with `git symbolic-ref refs/remotes/origin/HEAD`, finds
+`.vh-adlc/cleanup.yaml` on `origin/<default>` with `git ls-tree`, then reads that object with
+`git cat-file blob`, each with `GIT_NO_LAZY_FETCH=1`. With no such ref
 it reports `default-branch-unknown`, and with no manifest there `manifest-missing`, and skips project rules.
 
 A dry run also plans a working-tree copy that differs, marked `manifest-unmerged`. A differing copy that
@@ -177,11 +178,12 @@ branch" means pushed; it does not mean reviewed.
   socket in `/proc/net/unix`, or a container bind mount, each holding the entry or a path inside it. Age is
   the only protection against other users' processes, same-uid processes with unreadable `/proc` entries,
   and Podman's bind mounts. A pid that exits during the scan is not a failed check.
-- A container that bind-mounts the project's temp root, the temp base or any directory above the base,
-  such as `/tmp`, `/` or, for a custom base, `$HOME` (or that runs with `-v "$TMPDIR:$TMPDIR"` once `env` has
-  set `TMPDIR`), marks no entry below that path as in use, so age alone protects what it uses. This is a
-  stated limit with no handling of its own: the owner's answers on 2026-11-06. A container mounting all of
-  `/tmp` or `/` should never run on these hosts.
+- A container that bind-mounts `/tmp` or any directory above it marks no top-level `/tmp` entry as in use.
+  One that bind-mounts the project's temp root or any directory above it, the temp base included, marks no
+  temp-root entry as in use; `-v "$TMPDIR:$TMPDIR"` once `env` has set `TMPDIR` is one, and so is a `$HOME`
+  mount with a base under `$HOME`. Age alone then protects what the container uses. This is a stated limit
+  with no handling of its own: the owner's answers on 2026-11-06. A container mounting all of `/tmp` or `/`
+  should never run on these hosts.
 - With `--compose`, it stops an abandoned project's containers and removes them, then its networks, then
   its volumes when the rule says so, and keeps anything in use. It never forces a Docker removal, with one
   exception: `kind delete cluster` on nodes already stopped.
@@ -376,7 +378,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       Evidence: `listEngine` in `internal/clean/engine.go` requests `/containers/json?all=1`, and `engineState.binds` takes the bind sources of every listed container, so "a container, running or stopped" matches the code. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
 - [x] T22 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q1 (R-10 F-03) on 2026-11-06: the stated limit also names a container that bind-mounts the temp base or the project's temp root, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
       Evidence: "What counts as in use" now names a bind of all of `/tmp` or `/`, the temp base or the project's temp root, with `-v "$TMPDIR:$TMPDIR"` as the example. `usage.holds` and `mountedIn` in `internal/clean/files.go` call `within(p, entry)`, which holds only for the entry or a path inside it, so a bind source that is an ancestor of the scanned directory holds no entry below it. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
-- [ ] T23 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q4 (R-11 F-03) on 2026-11-06: the stated limit names a bind of the temp base, the project's temp root or any directory above the base, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
+- [ ] T23 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q4 (R-11 F-03) on 2026-11-06, with R-12 F-01: the stated limit names a bind of `/tmp` or any directory above it for top-level entries, and a bind of the project's temp root or any directory above it, the temp base included, for temp-root entries, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
 - [ ] T24 `internal/clean/clean_test.go`, `internal/clean/clean.go`, `plugins/vh-adlc/references/clean.md` - the owner's answer to Q3 (R-11 F-02) on 2026-11-06: a dry run reports an invalid working-tree manifest as a `manifest-unmerged` note naming the refusal, plans nothing from it and does not fail on it, while an invalid default-branch manifest still fails; `references/clean.md` says so; a `TestResults` row and a `TestManifestSources` case for the invalid uncommitted edit fail first, then pass (AC-05, AC-06, AC-14)
 
 ## Open Questions
