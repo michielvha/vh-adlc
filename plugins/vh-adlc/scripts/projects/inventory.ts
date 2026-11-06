@@ -13,7 +13,7 @@ const valueFields = "... on ProjectV2ItemFieldSingleSelectValue { optionId field
 const prFields = "url state headRefOid reviewDecision commits(last:1) { nodes { commit { statusCheckRollup { state } } } }";
 
 export function issueRef(value: unknown): IssueRef {
-  const row = object(value), repository = string(object(row.repository).nameWithOwner), number = row.number;
+  const row = object(value), repository = typeof row.repository === "string" ? string(row.repository) : string(object(row.repository).nameWithOwner), number = row.number;
   if (typeof number !== "number" || !Number.isSafeInteger(number) || number < 1) throw new Error("invalid issue number");
   const url = string(row.url);
   if (url !== `https://github.com/${repository}/issues/${number}`) throw new Error("issue URL does not match identity");

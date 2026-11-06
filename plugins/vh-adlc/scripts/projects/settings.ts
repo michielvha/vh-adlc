@@ -35,7 +35,7 @@ export function parseSettings(value: unknown): Settings {
   if (!match || !Number.isSafeInteger(Number(match[3]))) throw new Error("expected a canonical GitHub Projects URL");
   const repositories = strings(input.repositories);
   if (repositories.some(repo => !/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/.test(repo) || [".", ".."].includes(repo.split("/")[1])) || new Set(repositories.map(repo => repo.toLowerCase())).size !== repositories.length) throw new Error("invalid or duplicate repository");
-  const fields = list(input.fields ?? []).map(value => {
+  const fields: FieldSelection[] = list(input.fields ?? []).map(value => {
     const field = object(value);
     keys(field, ["id", "name", "options"]);
     if ((field.id === undefined) === (field.name === undefined)) throw new Error("field needs exactly one id or name");

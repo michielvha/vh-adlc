@@ -30,7 +30,7 @@ Homelab now spans Builders, PDS, Stackweaver, edgectl and the technical guides. 
 should show what is ready, waiting for review or blocked across those repositories. Each issue and
 repository spec keeps its existing authority; moving a card does not accept a feature or ship it.
 
-The proposed first version runs when asked in an agent session, using the existing GitHub CLI login.
+The candidate first version runs when asked in an agent session, using the existing GitHub CLI login.
 It collects current facts, recommends next work and shows a precise batch for approval before changing
 board membership or configured single-select fields. It will not close issues, merge PRs, change
 infrastructure or start implementation from a card. Those actions still use their owning repository's procedure and authority.
@@ -41,11 +41,11 @@ no new GitHub SDK, task database, service or scheduler. Reusable configuration a
 room for a later unattended cleanup agent. Such an agent needs a separate design and permission grant.
 
 Fresh reads catch detected field conflicts, but GitHub cannot prevent an edit racing with a write.
-The owner accepted that API limit on 2026-11-06. Tests will cover incomplete inventories, duplicate
-issue numbers, detected field conflicts and partial failures, plus a controlled trial on a separately
-authorized test board. No coordinator code, board or
-credential change exists yet. Acceptance approves this scope for implementation, not a live Homelab
-board setup or repository cleanup.
+The owner accepted that API limit on 2026-11-06. Local subprocess tests cover incomplete inventories, duplicate issue numbers, detected field conflicts,
+partial failures and reuse from a fresh CLI process. Strict TypeScript and the package checker pass.
+A controlled trial on a separately authorized test board and independent implementation review remain
+pending. No live board or credential change has been made. Acceptance covers implementation, not a
+live Homelab board setup or repository cleanup.
 
 ### Current evidence
 
@@ -200,7 +200,8 @@ Document native auto-add as an optional complement, including rule limits and ex
       Evidence: `bun test tests/vh-adlc/projects/apply.test.ts` fails because the updater module is absent.
 - [x] T6 `plugins/vh-adlc/scripts/projects/apply.ts`, `cli.ts` - T5 passes with strict operation scope, fresh reads and verified receipts (AC-04, AC-05)
       Evidence: `bun test tests/vh-adlc/projects` passes twelve settings/inventory/update tests using subprocess fixtures. API-race limits are retained in field-update receipts; live board checks are not performed.
-- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-projects/SKILL.md`, `plugins/vh-adlc/references/projects.md`, `plugins/vh-adlc/references/lifecycle.md`, both plugin manifests, `tests/vh-adlc/check.test.ts`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - registered operation and setup guide pass package checks, with reusable config/output and explicit host limits (AC-01, AC-03, AC-06)
+- [x] T7 `plugins/vh-adlc/skills/vh-adlc-projects/SKILL.md`, `plugins/vh-adlc/references/projects.md`, `plugins/vh-adlc/references/lifecycle.md`, both plugin manifests, `tests/vh-adlc/check.test.ts`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - registered operation and setup guide pass package checks, with reusable config/output and explicit host limits (AC-01, AC-03, AC-06)
+      Evidence: `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts --timeout 60000` passes 74 tests, including strict typecheck and a fresh CLI process using reusable YAML/JSON. No real-board acceptance or installed-agent invocation is claimed.
 - [ ] T8 `docs/specs/github-projects-coordinator.md` - after separate live permission and access, record the disposable-board trial and independent implementation review; production resources match baseline (AC-07)
 
 ## Open Questions
