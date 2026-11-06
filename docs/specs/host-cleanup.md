@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Back in progress on feat/host-cleanup after the owner's acceptance of 2026-11-06 at R-17 (given in advance on the condition that the narrow confirmation pass of the changes since R-15 had no blocking or judgement finding, which it met). Tasks T23 to T25 are next, then the implementation review. Local only at the owner's direction. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "In progress on feat/host-cleanup, local only at the owner's direction. The owner accepted on 2026-11-06 at R-17, given in advance on the condition that the narrow confirmation pass of the changes since R-15 had no blocking or judgement finding, which it met. T23 to T25 are done at 8b7f720, and every criterion but AC-11, AC-12 and AC-23 has evidence there. Waits on the implementation review; AC-11 and AC-12 then need the owner's host runs and AC-23 Stackweaver's adoption branch. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -277,19 +277,22 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 
 ## Acceptance Criteria
 
-- [ ] AC-01: `vh-adlc env` points a `go test` run at the project's temp root, mode 0700, and it leaves temp files only
+- [x] AC-01: `vh-adlc env` points a `go test` run at the project's temp root, mode 0700, and it leaves temp files only
       there. `temp_base` moves every root, defaulting to `/tmp/vh-adlc-<uid>`, a symlinked or foreign base is refused,
       and a missing one is recreated.
-- [ ] AC-02: `vh-adlc clean --dry-run` reports every declared, abandoned resource with its reason and changes nothing,
+      Evidence: `go test -count=1 ./internal/clean ./cmd/vh-adlc` at `8b7f720`, Go 1.27.2, `TMPDIR` outside `/tmp`, passed: `TestEnvPointsGoTestAtTheRoot` ran a fixture module's `go test -work` under `env --sh` and found `WORK`, `t.TempDir()`, `os.CreateTemp` and `os.TempDir()` under `<base>/fixture` at mode 0700; `TestEnvCreatesTheRoot`, `TestCheckBase`, `TestTempBaseDefault` and `TestEnvFailuresCreateNothing` covered the 0700 root, a recreated base, a symlinked, foreign or world-writable base and the `<tmp>/vh-adlc-<uid>` default. Limitation: the default base was checked against a stand-in `/tmp`, and "only there" rests on those four paths.
+- [x] AC-02: `vh-adlc clean --dry-run` reports every declared, abandoned resource with its reason and changes nothing,
       lists abandoned Compose projects and clusters marked as needing their flag, and an applied run reports what
       it removed and kept, with reasons, the space freed, and the count and size of
       user-owned `/tmp` entries no rule matched.
-- [ ] AC-03: `vh-adlc clean` removes those and keeps other users' entries, unmatched entries, symlinks, entries with
+      Evidence: Same run at `8b7f720`: `TestPlanFiles`, `TestCleanDryRunChangesNothing`, `TestCleanAppliedRun`, `TestComposeNeedsItsFlag`, `TestComposeDryRun`, `TestKindNeedsItsFlag` and `TestKindDryRun` passed (an unchanged tree snapshot, every removal and keep with its reason, `needs_flag`, `removed`, `kept`, `freed_bytes` and `unmatched`). A real `clean --dry-run` with a binary built at `8b7f720` answered with `manifest-unmerged` and `manifest-missing`, 2151 unmatched entries counted and nothing removed. Limitation: applied runs ran on fakes.
+- [x] AC-03: `vh-adlc clean` removes those and keeps other users' entries, unmatched entries, symlinks, entries with
       a mount point, entries in use and entries younger than their age. No Docker removal is forced, apart from
       `kind delete cluster` on stopped nodes, and an object in use, or whose usage cannot be listed, stays. With a
       denied or failed engine listing no file entry is removed, and with an absent or refused socket file
       entries still are.
-- [ ] AC-05: A dry run plans a changed working-tree manifest, and an applied run removes only what the default-branch
+      Evidence: Same run at `8b7f720`: the fake-filesystem and fake-engine cases passed (`TestPlanFiles`, `TestApplyFiles`, `TestBindMountKeepsEntry`, `TestEngineListingGatesFileRemoval`, `TestComposeInUseAndFailures`, `TestComposeKeepsANetworkWithActiveEndpoints`, `TestUnreadableProcStopsRemoval`), with a fake engine that fails on any `force`. `VH_ADLC_ENGINE_KIND=1 go test -count=1 -tags engine -v ./internal/clean -run TestRealEngine` at `8b7f720` on Docker 29.7.2 and kind v0.33.0 passed `TestRealEngineCompose` (13.71s), and no `vhclean` container, volume, network or cluster was left. Limitation: the file and socket cases ran on fakes.
+- [x] AC-05: A dry run plans a changed working-tree manifest, and an applied run removes only what the default-branch
       manifest declares. A dry run with an invalid working-tree manifest reports it as a `manifest-unmerged` note,
       plans nothing from it and does not fail on it. A missing `origin/HEAD`, or one whose target ref no longer
       exists, reports a `default-branch-unknown` note, removes nothing under project rules and does not fail on
@@ -298,15 +301,19 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       `git show origin/<default>:.vh-adlc/cleanup.yaml`, removes nothing under project rules, still applies the
       built-in globs and does not fail on it, dry or applied; after that command, the next run applies the
       project rules.
-- [ ] AC-06: Each manifest refusal listed in Design, in the default-branch manifest `clean` applies or the working-tree
+      Evidence: `go test ./internal/clean` at `8b7f720`: `TestManifestSources` (a branch commit and an uncommitted edit planned only under `unmerged`, never applied), `TestInvalidWorkingTreeManifestIsANote` (one `manifest-unmerged` note naming the refusal, nothing planned from it, `answered`, then an applied `pass`), `TestPrunedDefaultBranch` and the `TestResults` rows `no default branch` and `pruned default branch` (a `default-branch-unknown` note, only the built-in globs, no failure, dry and applied, the dry run still planning the working-tree copy), and `TestPartialCloneDoesNotFetch` (a `manifest-missing` note naming `git show origin/main:.vh-adlc/cleanup.yaml`, only `go-build1` removed, the blob never fetched, and after the test ran that command the next run applied the project rule) passed. T24 and T25 record each failing first.
+- [x] AC-06: Each manifest refusal listed in Design, in the default-branch manifest `clean` applies or the working-tree
       manifest `env` reads, reports `manifest-invalid`, that manifest's rules remove nothing, and `env` creates
       nothing for it.
-- [ ] AC-07: Run as root, outside the initial PID namespace, outside Linux or with Git older than 2.45, `vh-adlc clean`
+      Evidence: `go test ./internal/clean` at `8b7f720`: `TestManifestRefusals` (49 rows, every refusal in Design plus anchors, aliases, second documents, merge keys, tags and loose booleans), `TestHostSettingsInvalid`, `TestEnvFailuresCreateNothing` and the `TestResults` row `invalid manifest` (an invalid default-branch manifest fails dry and applied, and only the built-in globs apply) passed.
+- [x] AC-07: Run as root, outside the initial PID namespace, outside Linux or with Git older than 2.45, `vh-adlc clean`
       removes nothing and reports why.
-- [ ] AC-08: Compose projects change only with `--compose`, and a project stays unless the `working_dir` path of every
+      Evidence: `TestCleanRefusals` at `8b7f720` passed for root, a PID namespace (also unreadable), outside Linux and `git version 2.44.2`, applied and dry: each `error` with its code, no file changed and no engine call. `VH_ADLC_REQUIRE_BWRAP=1 go test ./cmd/vh-adlc -run PIDNamespace` passed: the real binary under `bwrap --unshare-pid` reported `pid-namespace` and kept `/tmp/go-build1`. Limitation: root, the platform and the Git version were injected.
+- [x] AC-08: Compose projects change only with `--compose`, and a project stays unless the `working_dir` path of every
       one of its containers is gone. kind
       clusters change only with `--kind`. A cluster with no mark, or any live mark, stays, including one a run
       reused from a killed run and kept. A cluster whose marks have all ended is stopped and deleted.
+      Evidence: `VH_ADLC_ENGINE_KIND=1 go test -count=1 -tags engine -v ./internal/clean -run TestRealEngine` at `8b7f720` on Docker 29.7.2 and kind v0.33.0 passed: `TestRealEngineCompose` kept the project whose directory remained, and `TestRealEngineKind` (27.78s) kept a disposable cluster with no mark as `unmarked`, then deleted its nodes and its ended mark. The fake cases passed in the unit run: `TestComposeNeedsItsFlag`, `TestComposeRemovesAbandonedProject`, `TestKindNeedsItsFlag`, `TestKindDeletesOnlyAnEndedCluster` and `TestMarkEnded`. Another agent's `sw-e2e` cluster existed during the run and was untouched. Two earlier attempts that day failed inside `kind create cluster` while the host was loaded, before the test reached `clean`; a plain `kind create cluster` then succeeded and the rerun passed. Limitation: flag gating, live marks and the reused cluster were shown on fakes.
 - [ ] AC-11: With the candidate binary on `PATH`, the plugin from this branch and the one documented rule, a Claude
       Code session in auto mode and a default `workspace-write` Codex session run the operation with no prompt,
       and a direct `rm -rf` of a `/tmp` entry still goes to the classifier or approval. A session that is blocked
@@ -314,17 +321,20 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       in the Codex session, that is a stated limit recorded in the evidence, not a failure here.
 - [ ] AC-12: Run 1 of the real-host sequence reports every row that needs no flag as required, the owner accepts
       that report before run 2, and runs 2 to 4 leave every row as the table requires.
-- [ ] AC-14: The guides, the CLI reference, the compatibility table and `references/clean.md` document the commands,
+- [x] AC-14: The guides, the CLI reference, the compatibility table and `references/clean.md` document the commands,
       the manifest, the Git floor and both rules, `references/authority.md` has the new row, and the package
       checker accepts the operation.
-- [ ] AC-18: With the `/tmp` quota exhausted, an applied run frees space and writes nothing to `/tmp`.
+      Evidence: At `8b7f720`: `bun test tests/vh-adlc` gave 1273 pass and 7 fail, every failure a 5-second timeout in `audit/batch`, `audit/cli`, `audit/live-recovery` or `audit/recovery` at load average 19 to 24; on `origin/main` `21bc3e4` those four files failed 7 of 95 the same way, and on this commit they passed 95 of 95 with `--timeout 60000`. `check.test.ts` passed 61 of 61, and `TestSchema` and `TestGolden` passed. A read of `docs/reference/cli.md`, `compatibility.md` (plugin 0.11.0), `installation.md`, `workflows.md`, `references/clean.md` and `references/authority.md` against `cmd/vh-adlc/main.go` agreed on the commands, the manifest, the Git 2.45 floor and both rules.
+- [x] AC-18: With the `/tmp` quota exhausted, an applied run frees space and writes nothing to `/tmp`.
+      Evidence: `VH_ADLC_REQUIRE_BWRAP=1 go test -count=1 ./cmd/vh-adlc -run FullTmp` at `8b7f720` passed: under Bubblewrap with a filled, size-limited tmpfs at `/tmp`, an applied run reported `pass`, freed space and left only the unmatched entry. Limitation: a tmpfs size limit stands in for the user quota.
 - [ ] AC-23: On Stackweaver's reviewed branch, `make test`, `make test-integration`, `make verify`, `e2e/k8s/run.sh`
       and `e2e/k8s/driver-conformance.sh` keep their temp files under its temp root, and `e2e/k8s/run.sh` and
       `e2e/k8s/driver-conformance.sh` each mark the cluster and remove the mark on exit. Without the binary, or when `env` fails, those run unchanged.
-- [ ] AC-24: `--older-than` below a rule's age changes nothing, a repository with no manifest still gets the built-in
+- [x] AC-24: `--older-than` below a rule's age changes nothing, a repository with no manifest still gets the built-in
       globs, and a missing `kind` skips only the kind step. An invalid `host.yaml`, including a relative `temp_base`,
       `$HOME`, or one inside a Git work tree or above the repository, stops the run before it removes anything. A
       failing `env --sh` prints nothing to stdout, and a path with a space or quote is shell-quoted.
+      Evidence: `go test ./internal/clean ./cmd/vh-adlc` at `8b7f720` passed `TestOlderThan`, `TestBuiltinGlobsWithoutManifest`, `TestKindUnavailable`, `TestHostSettingsInvalid`, `TestResults`, `TestEnvShFailurePrintsNothing` (empty stdout, exit 1), `TestEnvShellLines` and `TestEnvPointsGoTestAtTheRoot` (a base holding a space and a quote, read back by `sh`).
 
 ## Test Plan
 
