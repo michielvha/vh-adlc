@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. The factual findings of R-10 to R-14 are folded, and the owner answered Q1 to Q6 on 2026-11-06. The owner accepts in advance on the condition that a narrow confirmation pass over the changes since R-15 (28c830a) has no blocking or judgement finding. Tasks T23 to T25 follow acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. The factual findings of R-10 to R-14 are folded, and the owner answered Q1 to Q6 on 2026-11-06. The narrow confirmation pass R-16 over the changes since R-15 found that the Q5 hint, git fetch origin, does not fetch the missing object in a partial clone; since that changes the owner's stated answer, it waits on the owner as Q7. The owner's advance acceptance is conditional on a narrow pass with no blocking or judgement finding, so it is not yet recorded. Tasks T23 to T25 follow acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -393,7 +393,19 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 
 ## Open Questions
 
-None.
+### Q7: Which fix should the partial-clone `manifest-missing` note name, given that `git fetch origin` does not fetch the object?
+
+**Recommendation:** A. Name `git show origin/<default>:.vh-adlc/cleanup.yaml`, because it is the command
+that retrieves the object, and have the partial-clone test run the hint and see the note gone on the next
+run.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Name the read that fetches it** | The note names `git show origin/<default>:.vh-adlc/cleanup.yaml`, whose lazy fetch retrieves the blob; T25's test runs that hint and asserts the next run applies the project rules | Your Q5 answer named `git fetch origin`; this replaces it |
+| **B. Keep `git fetch origin`** | Your Q5 wording unchanged | R-16 F-01 and a rerun here on Git 2.55.0 show the blob stays missing after `git fetch origin`, because the clone's `blob:none` filter applies to every fetch, so the note would repeat and project rules would never apply |
+
+**Why this is yours:** your Q5 answer named the exact hint, and R-16 F-01 found that hint does not fetch
+the object, so changing it changes your stated answer.
 
 ## Review Log
 
