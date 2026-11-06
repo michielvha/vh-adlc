@@ -11,4 +11,4 @@ if (!step || !request.query.includes(step.operation)) {
   process.stderr.write("unexpected fixture request"); process.exit(1);
 }
 if (step.fail) { process.stderr.write("fixture API refusal"); process.exit(1); }
-process.stdout.write(JSON.stringify(step.response));
+writeFileSync(1, JSON.stringify(step.response));

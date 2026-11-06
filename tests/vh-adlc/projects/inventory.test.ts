@@ -5,6 +5,7 @@ import { fixture, settings, page, issue, field, boardStep, itemsStep, repoStep, 
 test("native gh collection paginates repositories, preserves issue identity and separates PR facts", () => {
   const f = fixture([boardStep(), itemsStep(), repoStep("example/one", [issue()], true, "more"), repoStep("example/one", [], false), relationsStep([{ url: "https://github.com/example/one/pull/2", state: "OPEN", headRefOid: "abc", reviewDecision: "APPROVED", commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] } }]), repoStep("other/two", [issue("I_2", "other/two")]), relationsStep()]);
   const result = collect(settings(), f.gh);
+  expect(result.gaps, JSON.stringify(f.calls().map(call => ({ query: call.query, variables: call.variables })))).toEqual([]);
   expect(result.complete).toBe(true);
   expect(result.issues.map(i => i.id)).toEqual(["I_1", "I_2"]);
   expect(result.issues[0]).toMatchObject({ lifecycle: null, prs: [{ state: "OPEN", checks: "SUCCESS" }] });
