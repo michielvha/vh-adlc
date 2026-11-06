@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. R-10 at 6d0c8af: factual findings folded, Q1 and Q2 answered by the owner and folded at 1fdaced. R-11 at 1fdaced found 4 findings, none blocking; its factual F-01 and F-04 are folded, and its judgement F-02 and F-03 wait on the owner as Q3 and Q4. Then a fresh spec review and the owner's acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "Draft on feat/host-cleanup, revised for the owner's decisions of 2026-11-06 (R-9 F-04 covers internal/settings/, R-9 F-03 a stated limit), with R-8 F-01 to F-03 folded and every criterion tick and evidence line reset. R-10 and R-11 factual findings are folded, and the owner answered Q1 to Q4 on 2026-11-06; Q3 adds task T24, a code change after acceptance. Waits on spec review R-12, then the owner's acceptance. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -105,6 +105,8 @@ engine socket.
 Those refusals report `error`. A dry run reports `answered` and an applied run `pass`; either reports
 `fail` instead on `removal-failed`, `manifest-invalid`, `engine-unreachable`, `kind-unavailable`,
 `temp-base-refused` or `host-settings-invalid`, so the operation never applies after a failed dry run.
+The one exception is an invalid working-tree manifest on a dry run, a note under
+[Where the rules come from](#where-the-rules-come-from).
 `temp-base-refused` and `host-settings-invalid` also stop the run before it removes anything.
 `manifest-missing`, `default-branch-unknown`, `manifest-unmerged` and `engine-absent` are notes. `env` fails
 on `manifest-missing`, `manifest-invalid`, `temp-root-undeclared`, `temp-base-refused` or
@@ -161,8 +163,9 @@ clears them under the same limits, including in a repository with no manifest.
 `git cat-file blob origin/<default>:.vh-adlc/cleanup.yaml`, each with `GIT_NO_LAZY_FETCH=1`. With no such ref
 it reports `default-branch-unknown`, and with no manifest there `manifest-missing`, and skips project rules.
 
-A dry run also plans a working-tree copy that differs, marked `manifest-unmerged`. An applied run uses only
-the default-branch manifest. This prevents accidental edits and is not a security boundary. "On the default
+A dry run also plans a working-tree copy that differs, marked `manifest-unmerged`. A differing copy that
+is invalid is reported as a `manifest-unmerged` note naming the refusal: it plans nothing and does not fail
+the run, the owner's answer on 2026-11-06. An applied run uses only the default-branch manifest. This prevents accidental edits and is not a security boundary. "On the default
 branch" means pushed; it does not mean reviewed.
 
 ### What clean will and will not touch
@@ -174,10 +177,11 @@ branch" means pushed; it does not mean reviewed.
   socket in `/proc/net/unix`, or a container bind mount, each holding the entry or a path inside it. Age is
   the only protection against other users' processes, same-uid processes with unreadable `/proc` entries,
   and Podman's bind mounts. A pid that exits during the scan is not a failed check.
-- A container that bind-mounts all of `/tmp` or `/`, the temp base, or the project's temp root (as
-  `-v "$TMPDIR:$TMPDIR"` does once `env` has set `TMPDIR`) marks no entry below that path as in use, so
-  age alone protects what it uses. This is a stated limit with no handling of its own: the owner's answers
-  on 2026-11-06. A container mounting all of `/tmp` or `/` should never run on these hosts.
+- A container that bind-mounts the project's temp root, the temp base or any directory above the base,
+  such as `/tmp`, `/` or, for a custom base, `$HOME` (or that runs with `-v "$TMPDIR:$TMPDIR"` once `env` has
+  set `TMPDIR`), marks no entry below that path as in use, so age alone protects what it uses. This is a
+  stated limit with no handling of its own: the owner's answers on 2026-11-06. A container mounting all of
+  `/tmp` or `/` should never run on these hosts.
 - With `--compose`, it stops an abandoned project's containers and removes them, then its networks, then
   its volumes when the rule says so, and keeps anything in use. It never forces a Docker removal, with one
   exception: `kind delete cluster` on nodes already stopped.
@@ -279,9 +283,11 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       denied or failed engine listing no file entry is removed, and with an absent or refused socket file
       entries still are.
 - [ ] AC-05: A dry run plans a changed working-tree manifest, and an applied run removes only what the default-branch
-      manifest declares.
-- [ ] AC-06: Each manifest refusal listed in Design reports `manifest-invalid`, that manifest's rules remove nothing,
-      and `env` creates nothing for it.
+      manifest declares. A dry run with an invalid working-tree manifest reports it as a `manifest-unmerged` note,
+      plans nothing from it and does not fail on it.
+- [ ] AC-06: Each manifest refusal listed in Design, in the default-branch manifest `clean` applies or the working-tree
+      manifest `env` reads, reports `manifest-invalid`, that manifest's rules remove nothing, and `env` creates
+      nothing for it.
 - [ ] AC-07: Run as root, outside the initial PID namespace, outside Linux or with Git older than 2.45, `vh-adlc clean`
       removes nothing and reports why.
 - [ ] AC-08: Compose projects change only with `--compose`, and a project stays unless the `working_dir` path of every
@@ -316,7 +322,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 | AC-07 | A `cmd/vh-adlc` test runs the real binary under `bwrap --unshare-pid` and asserts `pid-namespace` with nothing removed. |
 | AC-02, AC-03, AC-08 | Fake-engine tests: an `httptest` server on a Unix socket records every call and fails on any `force` parameter, across Compose projects and clusters with ended and live marks, a mixed-label Compose project, a killed run's cluster reused and kept, a bind mount, failed listings, and an absent, refused and denied socket. |
 | AC-03, AC-08 | Integration test behind a build tag on the real engine, with disposable objects and clusters. |
-| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit and an uncommitted edit. A missing object in a partial clone must not fetch. |
+| AC-05, AC-06 | Table tests on fixture repositories: each refusal, an anchor and a second document among them, a branch edit, an uncommitted edit, and an invalid uncommitted edit on a dry run. A missing object in a partial clone must not fetch. |
 | AC-11 | Written manual procedure in disposable sessions, recorded under `tests/vh-adlc/evidence/clean/`, with `codex execpolicy check` output, the default Codex session's outcome, and a session blocked on space with no request for cleanup. |
 | AC-12 | The real-host sequence in Adoption, with each row's outcome recorded. |
 | AC-14 | `bun test tests/vh-adlc`, a golden JSON report against the updated schema, and a read of the documentation against the flags. |
@@ -370,34 +376,12 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       Evidence: `listEngine` in `internal/clean/engine.go` requests `/containers/json?all=1`, and `engineState.binds` takes the bind sources of every listed container, so "a container, running or stopped" matches the code. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
 - [x] T22 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q1 (R-10 F-03) on 2026-11-06: the stated limit also names a container that bind-mounts the temp base or the project's temp root, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
       Evidence: "What counts as in use" now names a bind of all of `/tmp` or `/`, the temp base or the project's temp root, with `-v "$TMPDIR:$TMPDIR"` as the example. `usage.holds` and `mountedIn` in `internal/clean/files.go` call `within(p, entry)`, which holds only for the entry or a path inside it, so a bind source that is an ancestor of the scanned directory holds no entry below it. `bun test tests/vh-adlc/check.test.ts` passed 61 of 61. No code changed.
+- [ ] T23 `plugins/vh-adlc/references/clean.md` - the owner's answer to Q4 (R-11 F-03) on 2026-11-06: the stated limit names a bind of the temp base, the project's temp root or any directory above the base, docs only; `bun test tests/vh-adlc/check.test.ts` passes and a read against `usage.holds` agrees (AC-14)
+- [ ] T24 `internal/clean/clean_test.go`, `internal/clean/clean.go`, `plugins/vh-adlc/references/clean.md` - the owner's answer to Q3 (R-11 F-02) on 2026-11-06: a dry run reports an invalid working-tree manifest as a `manifest-unmerged` note naming the refusal, plans nothing from it and does not fail on it, while an invalid default-branch manifest still fails; `references/clean.md` says so; a `TestResults` row and a `TestManifestSources` case for the invalid uncommitted edit fail first, then pass (AC-05, AC-06, AC-14)
 
 ## Open Questions
 
-### Q3: Should an invalid working-tree manifest fail a dry run?
-
-**Recommendation:** A. Make it a note, because an applied run never reads the working-tree copy, and a
-session blocked on space should not be stopped by an uncommitted edit.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. A note** | A dry run reports an invalid working-tree manifest beside `manifest-unmerged` without failing, so the operation can still apply what the default-branch manifest declares | A small code change in `internal/clean/clean.go` and a test, after acceptance |
-| **B. Keep it failing** | No code change; Design states that it fails the dry run and the operation sends the user to fix the manifest or run `vh-adlc clean` in a terminal | A broken local edit blocks cleanup through the operation until it is fixed |
-
-**Why this is yours:** R-11 F-02 asks how strict a dry run should be about a manifest the applied run
-ignores, which trades safety signalling against unblocking a full `/tmp`.
-
-### Q4: Should the stated bind-mount limit also name a bind of any directory above the temp base?
-
-**Recommendation:** A. Name it, because a custom `temp_base` such as `~/.cache/vh-adlc` sits under
-directories a dev container may mount, such as `$HOME`, and the code already behaves this way.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Widen to any directory above** | Design and `references/clean.md` say a bind of the temp base, the project's temp root or any directory above them marks no entry below it as in use | Two sentences; no code |
-| **B. Keep the Q1 wording** | The limit stays as you answered Q1 | A `$HOME` bind with a custom base loses in-use protection with no written warning |
-
-**Why this is yours:** R-11 F-03 asks whether your Q1 answer should extend past the temp base and temp
-root, which only you can widen.
+None.
 
 ## Review Log
 
