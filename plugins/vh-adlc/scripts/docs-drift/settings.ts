@@ -170,6 +170,18 @@ function clientSettings(value: unknown) {
   }));
 }
 
+export type IdentitySource = { provider: "copilot" | "claude" | "codex"; event_type: string; field_path: string[] };
+
+export function parseIdentitySource(value: unknown, provider: string): IdentitySource | null {
+  if (value === undefined || value === null) return null;
+  const input = object(value, ["provider", "event_type", "field_path"], "identity_source");
+  const selected = choice(input.provider, ["copilot", "claude", "codex"], "identity_source provider");
+  if (selected !== provider) invalid("identity_source provider");
+  const fieldPath = strings(input.field_path, "identity_source field_path", true);
+  if (fieldPath.some(key => !/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key) || ["__proto__", "prototype", "constructor"].includes(key))) invalid("identity_source field_path");
+  return { provider: selected, event_type: text(input.event_type, "identity_source event_type"), field_path: fieldPath };
+}
+
 function executionSettings(value: unknown, clients: ReturnType<typeof clientSettings>) {
   const input = object(value, ["worker_workflow", "scheduled_workflow", "claude_command", "runner", "permissions", "secret_mappings", "entries"], "execution");
   const permissions = object(input.permissions, [
@@ -186,10 +198,13 @@ function executionSettings(value: unknown, clients: ReturnType<typeof clientSett
   }));
   const entries = object(input.entries, ["hosted", "copilot", "claude"], "execution entries");
   const role = (value: unknown) => {
-    const input = object(value, ["client", "model", "argv"], "execution role");
+    const input = object(value, ["client", "model", "argv", "identity_source"], "execution role");
     const client = text(input.client, "execution role client");
     if (!Object.hasOwn(clients, client)) invalid("execution role client");
-    return { client, model: text(input.model, "execution role model"), argv: argv(input.argv, "execution role argv") };
+    return {
+      client, model: text(input.model, "execution role model"), argv: argv(input.argv, "execution role argv"),
+      identity_source: parseIdentitySource(input.identity_source, clients[client].provider),
+    };
   };
   const parsedEntries = Object.fromEntries(["hosted", "copilot", "claude"].map(name => {
     const entry = object(entries[name], ["worker", "reviewer", "publisher"], "execution entry");
