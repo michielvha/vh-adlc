@@ -319,8 +319,10 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       and a direct `rm -rf` of a `/tmp` entry still goes to the classifier or approval. A session that is blocked
       on space and was not asked passes neither `--compose` nor `--kind`. If `clean` refuses with `pid-namespace`
       in the Codex session, that is a stated limit recorded in the evidence, not a failure here.
+      Evidence: R-18 at `44699d0` returned `not verified`.
 - [ ] AC-12: Run 1 of the real-host sequence reports every row that needs no flag as required, the owner accepts
       that report before run 2, and runs 2 to 4 leave every row as the table requires.
+      Evidence: R-18 at `44699d0` returned `not verified`.
 - [x] AC-14: The guides, the CLI reference, the compatibility table and `references/clean.md` document the commands,
       the manifest, the Git floor and both rules, `references/authority.md` has the new row, and the package
       checker accepts the operation.
@@ -330,6 +332,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 - [ ] AC-23: On Stackweaver's reviewed branch, `make test`, `make test-integration`, `make verify`, `e2e/k8s/run.sh`
       and `e2e/k8s/driver-conformance.sh` keep their temp files under its temp root, and `e2e/k8s/run.sh` and
       `e2e/k8s/driver-conformance.sh` each mark the cluster and remove the mark on exit. Without the binary, or when `env` fails, those run unchanged.
+      Evidence: R-18 at `44699d0` returned `not verified`.
 - [x] AC-24: `--older-than` below a rule's age changes nothing, a repository with no manifest still gets the built-in
       globs, and a missing `kind` skips only the kind step. An invalid `host.yaml`, including a relative `temp_base`,
       `$HOME`, or one inside a Git work tree or above the repository, stops the run before it removes anything. A
@@ -433,6 +436,7 @@ None.
 | 2026-11-06 | R-16 | spec | `0b9962be2f9d6fc586d4ad80fb1b46c151984970` | claude-opus-5-5 | procedural | Narrow scope, the diff since R-15 at 28c830a: 1 finding, 0 blocking |
 | 2026-11-06 | R-17 | spec | `cb4deba40e0b6e7874eb5bac4256d44ab66cd20f` | claude-opus-5-5 | procedural | Narrow scope, the diff since R-16 at 0b9962b: no findings |
 | 2026-11-06 | R-17 | spec | `cb4deba40e0b6e7874eb5bac4256d44ab66cd20f` | n/a | n/a | accepted by owner |
+| 2026-11-06 | R-18 | implementation | `44699d0a294bc1ba1203c49a3a5165f94d6ddbd5` | claude-opus-5-5 | procedural | 10 criteria met, 3 not verified, 3 findings, 0 blocking |
 
 ### R-1
 
@@ -1424,6 +1428,81 @@ PROPOSAL: Replace `git fetch origin` in Design, AC-05, the Test Plan row and T25
 ### R-17
 
 NO FINDINGS
+
+### R-18
+
+CRITERION: AC-01 `vh-adlc env` points a `go test` run at the project's temp root, mode 0700, and it leaves temp files only there. `temp_base` moves every root, defaulting to `/tmp/vh-adlc-<uid>`, a symlinked or foreign base is refused, and a missing one is recreated.
+VERDICT: met
+EVIDENCE: `go test -count=1 -v ./internal/clean ./cmd/vh-adlc` at 44699d0 (Go 1.27.2, TMPDIR under ~/.cache), all passed, no SKIP: TestEnvPointsGoTestAtTheRoot ran a fixture module's `go test -work` under `env --sh` with a host.yaml base holding a space and a quote, and WORK, t.TempDir(), os.CreateTemp and os.TempDir() all fell under <base>/fixture at mode 0700; TestEnvCreatesTheRoot, TestCheckBase, TestTempBaseDefault and TestEnvFailuresCreateNothing passed. I also ran the 44699d0 binary under bwrap with a private tmpfs at /tmp and no host.yaml: `env` answered with temp_root /tmp/vh-adlc-1000/rvwproj, and both the base and the root were drwx------. Limitation: "only there" is shown for those four temp paths of one go test run.
+
+CRITERION: AC-02 `vh-adlc clean --dry-run` reports every declared, abandoned resource with its reason and changes nothing, lists abandoned Compose projects and clusters marked as needing their flag, and an applied run reports what it removed and kept, with reasons, the space freed, and the count and size of user-owned `/tmp` entries no rule matched.
+VERDICT: met
+EVIDENCE: Same unit run at 44699d0: TestPlanFiles, TestCleanDryRunChangesNothing (tree snapshot and engine calls unchanged, empty lists print as []), TestCleanAppliedRun, TestComposeNeedsItsFlag, TestComposeDryRun, TestKindNeedsItsFlag and TestKindDryRun passed. A real `clean --dry-run --repo .` with a binary built at 44699d0 on this host answered exit 0 with manifest-unmerged and manifest-missing notes: one go-build entry under removed with reason abandoned and its bytes, two kept as younger, 193 unmerged items from the working-tree manifest, freed_bytes 45154304, and unmatched count 2158. Under bwrap, applied runs listed removed, kept, freed_bytes and unmatched. Limitation: the applied Compose and kind reporting ran on fakes.
+
+CRITERION: AC-03 `vh-adlc clean` removes those and keeps other users' entries, unmatched entries, symlinks, entries with a mount point, entries in use and entries younger than their age. No Docker removal is forced, apart from `kind delete cluster` on stopped nodes, and an object in use, or whose usage cannot be listed, stays. With a denied or failed engine listing no file entry is removed, and with an absent or refused socket file entries still are.
+VERDICT: met
+EVIDENCE: Unit run at 44699d0 passed TestPlanFiles (eight removals; kept as in-use for cwd, exe, fd, map, socket and bind, plus other-owner, symlink, mount-point and younger), TestApplyFiles, TestBindMountKeepsEntry, TestEngineListingGatesFileRemoval (a 500 listing and a denied socket leave go-build1 and fail; an absent socket and tcp DOCKER_HOST remove it with engine-absent), TestEngineAbsentOrUnreachable (refused socket reads as absent), TestComposeInUseAndFailures, TestComposeKeepsANetworkWithActiveEndpoints and TestUnreadableProcStopsRemoval. The fake engine fails the test on any force parameter. A read of internal/clean/engine.go confirms no request carries force, and kind.go stops running nodes before `kind delete cluster`. `go test -count=1 -tags engine -v ./internal/clean -run TestRealEngineCompose` on Docker 29.7.2 passed (16.60s). No vhclean container, volume or network was left. Limitation: the file and socket cases ran on fakes.
+
+CRITERION: AC-05 A dry run plans a changed working-tree manifest, and an applied run removes only what the default-branch manifest declares. A dry run with an invalid working-tree manifest reports it as a `manifest-unmerged` note, plans nothing from it and does not fail on it. A missing `origin/HEAD`, or one whose target ref no longer exists, reports a `default-branch-unknown` note, removes nothing under project rules and does not fail on it, dry or applied; a dry run still plans a working-tree manifest under `manifest-unmerged`. A default-branch manifest object missing from a partial clone reports a `manifest-missing` note naming `git show origin/<default>:.vh-adlc/cleanup.yaml`, removes nothing under project rules, still applies the built-in globs and does not fail on it, dry or applied; after that command, the next run applies the project rules.
+VERDICT: met
+EVIDENCE: Unit run at 44699d0 passed TestManifestSources, TestInvalidWorkingTreeManifestIsANote, TestPrunedDefaultBranch, TestPartialCloneDoesNotFetch (blob still missing after dry and applied runs, only go-build1 removed, note names `git show origin/main:.vh-adlc/cleanup.yaml`, the project rule applies after that command) and the TestResults rows for no default branch, pruned default branch and invalid working-tree manifest. I also ran the 44699d0 binary under bwrap with a private /tmp on a scratch clone with origin/HEAD deleted and a changed working-tree manifest. The dry run answered with default-branch-unknown and manifest-unmerged, planned only go-build77 under removed and both project-glob entries under unmerged. The applied run passed, removed only go-build77 and left rvwglob-a and rvwmore-b. Limitation: none beyond fixture repositories.
+
+CRITERION: AC-06 Each manifest refusal listed in Design, in the default-branch manifest `clean` applies or the working-tree manifest `env` reads, reports `manifest-invalid`, that manifest's rules remove nothing, and `env` creates nothing for it.
+VERDICT: met
+EVIDENCE: Unit run at 44699d0 passed TestManifestRefusals: 49 rows covering every Design refusal (unknown keys, schema_version other than 1, short-literal and separator globs, ages under an hour, non-segment project, unknown liveness.kind, kind rule without liveness, anchor and alias, second document) plus extra forms. It also passed TestEnvFailuresCreateNothing (two manifest-invalid cases, home snapshot unchanged, data null) and the TestResults row for an invalid manifest (fail, dry and applied, built-in globs only). A read of clean.go defaultBranchManifest and env.go prepareRoot shows that every ParseManifest error maps to manifest-invalid with no rules used and nothing created. Limitation: only one refusal is driven end to end through Clean. The rest are proved at ParseManifest, which both callers share.
+
+CRITERION: AC-07 Run as root, outside the initial PID namespace, outside Linux or with Git older than 2.45, `vh-adlc clean` removes nothing and reports why.
+VERDICT: met
+EVIDENCE: Unit run at 44699d0 passed TestCleanRefusals for root, a foreign and an unreadable PID namespace, darwin and `git version 2.44.2`, applied and dry: each gave error with its code, an unchanged file snapshot and no engine call. `VH_ADLC_REQUIRE_BWRAP=1 go test -count=1 -v ./cmd/vh-adlc -run 'PIDNamespace|FullTmp'` passed TestCleanRefusesInAPIDNamespace: the real binary under `bwrap --unshare-pid` reported error with pid-namespace, and /tmp/go-build1 stayed. A read of main.go and RealOptions confirms GOOS comes from runtime.GOOS and EUID from os.Geteuid. Limitation: root, platform and Git version were injected.
+
+CRITERION: AC-08 Compose projects change only with `--compose`, and a project stays unless the `working_dir` path of every one of its containers is gone. kind clusters change only with `--kind`. A cluster with no mark, or any live mark, stays, including one a run reused from a killed run and kept. A cluster whose marks have all ended is stopped and deleted.
+VERDICT: met
+EVIDENCE: `VH_ADLC_ENGINE_KIND=1 go test -count=1 -tags engine -v ./internal/clean -run TestRealEngineKind` at 44699d0 on Docker 29.7.2 and kind v0.33.0 passed (46.63s). It kept a disposable unmarked cluster as unmarked, then deleted its nodes and its ended mark. TestRealEngineCompose kept the project whose directory remained. Afterwards `kind get clusters` showed only the other agent's sw-e2e, untouched, and no vhclean object remained. In the unit run, TestComposeNeedsItsFlag, TestComposeRemovesAbandonedProject, TestKindNeedsItsFlag, TestKindDeletesOnlyAnEndedCluster (live, other-host and reused-with-live-mark clusters kept, no-mark cluster kept as unmarked) and TestMarkEnded passed. Limitation: flag gating, live marks and the reused cluster were shown on fakes.
+
+CRITERION: AC-11 With the candidate binary on `PATH`, the plugin from this branch and the one documented rule, a Claude Code session in auto mode and a default `workspace-write` Codex session run the operation with no prompt, and a direct `rm -rf` of a `/tmp` entry still goes to the classifier or approval. A session that is blocked on space and was not asked passes neither `--compose` nor `--kind`. If `clean` refuses with `pid-namespace` in the Codex session, that is a stated limit recorded in the evidence, not a failure here.
+VERDICT: not verified
+EVIDENCE: The written procedure exists at tests/vh-adlc/evidence/clean/procedure.md at 44699d0, but no record of it being run exists, and I ran no Claude Code or Codex session. Limitation: this needs the owner's disposable sessions.
+
+CRITERION: AC-12 Run 1 of the real-host sequence reports every row that needs no flag as required, the owner accepts that report before run 2, and runs 2 to 4 leave every row as the table requires.
+VERDICT: not verified
+EVIDENCE: The sequence is written under Design, Adoption at 44699d0, but no run is recorded, and I ran none. The instructions for this review forbid an applied `clean` on the real host. Limitation: this needs the owner's host runs on disposable clones.
+
+CRITERION: AC-14 The guides, the CLI reference, the compatibility table and `references/clean.md` document the commands, the manifest, the Git floor and both rules, `references/authority.md` has the new row, and the package checker accepts the operation.
+VERDICT: met
+EVIDENCE: `bun test --timeout 60000 tests/vh-adlc` at 44699d0 gave 1280 pass and 0 fail across 105 files (914s). check.test.ts with both discovery tests and clean-bwrap.test.ts gave 71 of 71. TestSchema and TestGolden passed in the Go run. `golangci-lint run ./...` and `--build-tags engine ./internal/clean/...` reported 0 issues. I read the diffs of docs/reference/cli.md, docs/reference/compatibility.md, docs/get-started/installation.md, docs/user-guides/workflows.md, README.md, plugins/vh-adlc/references/clean.md, authority.md, lifecycle.md and loop.md against cmd/vh-adlc/main.go and internal/clean. The commands and flags, the manifest format and its limits, the Git 2.45 floor and both allow rules agree with the code, authority.md has the new row, and the skill count of fourteen matches plugins/vh-adlc/skills. Limitation: the compatibility page documents host cleanup in a prose section, not as a support matrix row (see F-03).
+
+CRITERION: AC-18 With the `/tmp` quota exhausted, an applied run frees space and writes nothing to `/tmp`.
+VERDICT: met
+EVIDENCE: `VH_ADLC_REQUIRE_BWRAP=1 go test -count=1 -v ./cmd/vh-adlc -run 'PIDNamespace|FullTmp'` at 44699d0 passed TestCleanFreesAFullTmp. Under Bubblewrap in the initial PID namespace, with a filled 4 MiB tmpfs at /tmp (a probe write failed), the applied run reported pass, freed_bytes was at least 1 MiB, available space rose by at least 1024 KiB, and only the unmatched entry remained. Limitation: a tmpfs size limit stands in for the user quota, and a write followed by deletion inside /tmp would not be visible to the final listing.
+
+CRITERION: AC-23 On Stackweaver's reviewed branch, `make test`, `make test-integration`, `make verify`, `e2e/k8s/run.sh` and `e2e/k8s/driver-conformance.sh` keep their temp files under its temp root, and `e2e/k8s/run.sh` and `e2e/k8s/driver-conformance.sh` each mark the cluster and remove the mark on exit. Without the binary, or when `env` fails, those run unchanged.
+VERDICT: not verified
+EVIDENCE: The Test Plan names the procedure, but no Stackweaver adoption branch exists in /home/m/code/stackweaver (`git branch -a` shows no matching branch), and I ran nothing. Limitation: this needs Stackweaver's reviewed adoption branch.
+
+CRITERION: AC-24 `--older-than` below a rule's age changes nothing, a repository with no manifest still gets the built-in globs, and a missing `kind` skips only the kind step. An invalid `host.yaml`, including a relative `temp_base`, `$HOME`, or one inside a Git work tree or above the repository, stops the run before it removes anything. A failing `env --sh` prints nothing to stdout, and a path with a space or quote is shell-quoted.
+VERDICT: met
+EVIDENCE: Unit run at 44699d0 passed TestOlderThan, TestBuiltinGlobsWithoutManifest, TestKindUnavailable, TestHostSettingsInvalid (15 rows), TestResults, TestEnvShFailurePrintsNothing (empty stdout, exit 1, no base created), TestEnvShellLines and TestEnvPointsGoTestAtTheRoot (a base with a space and a quote, read back by sh). I also ran the 44699d0 binary under bwrap with a private /tmp holding an old /tmp/go-build77, once each with temp_base set to a relative path, $HOME, a directory inside the repository's work tree and a parent of the repository. Each applied run reported fail with host-settings-invalid and data null, and go-build77 remained. Limitation: none observed.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Commands (internal/clean/clean.go refuse)
+EVIDENCE: `vh-adlc clean --dry-run --repo /nonexistent-rvw` with a binary built at 44699d0 printed result error with code git-too-old and message "running git --version: chdir /nonexistent-rvw: no such file or directory", exit 4. refuse() reports any CheckMinVersion error as git-too-old, so a missing repository directory, or presumably a missing git, is reported as an old Git.
+PROPOSAL: Report git-too-old only when the version was read and is below 2.45, and give a missing repository or an unrunnable git the generic error code with its own message.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Where the rules come from (internal/clean/clean.go Clean)
+EVIDENCE: In a bwrap run at 44699d0 with origin/HEAD deleted, the dry run's manifest-unmerged note read "the working tree's .vh-adlc/cleanup.yaml differs from the default branch; a dry run plans it separately", beside a default-branch-unknown note. With no default branch there is nothing to differ from, and the whole working-tree manifest is planned.
+PROPOSAL: When defaultBranchManifest returned default-branch-unknown, word the manifest-unmerged note as the working tree's manifest being planned because no default branch could be read.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-14, docs/reference/compatibility.md
+EVIDENCE: compatibility.md gains a "Host cleanup" prose section ending "No host run of the operation is recorded yet. Until one passes, it is unverified on every host." The Support matrix table, which the page says decides what is supported, has no row for vh-adlc-clean.
+PROPOSAL: Add a Support matrix row for the host-cleanup operation marked unverified until AC-11 and AC-12 are recorded, so the table and the prose agree.
 
 ## Sources
 
