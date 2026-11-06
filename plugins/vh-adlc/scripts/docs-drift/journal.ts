@@ -3,7 +3,7 @@ import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirS
 import { dirname, join } from "node:path";
 import { authorizeEffects, effectDigest, manifestDigest, modelMatches, parseActionManifest, requireReviewedManifest, workerInputDigest } from "./manifests";
 import type { ActionManifest, EffectGrant, ReviewedManifest, RolePolicy } from "./manifests";
-import { canonicalJSON, decodeUTF8, sha256 } from "./protocol";
+import { canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
 import { correctionProjection, type AttentionProjection, type CorrectionInput } from "./report";
 import { parseIdentitySource } from "./settings";
 import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
@@ -18,7 +18,7 @@ export type SealedPlan = {
   corrections: CorrectionInput[]; attention: AttentionProjection[];
 };
 export type PlanPolicy = {
-  adoption_sha256: string; context: SealedPlan["context"]; transport: SealedPlan["transport"];
+  adoption_sha256: string; context: SealedPlan["context"]; transport: SealedPlan["transport"]; pr_draft: boolean;
   worker: RolePolicy; reviewer: RolePolicy;
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
@@ -98,7 +98,7 @@ function parsePlan(value: unknown): SealedPlan {
     attentionIds.add(String(attention.sha256));
   }
   if (manifest.bindings.delivery_sha256 !== sha256(canonicalJSON({ corrections: input.corrections, attention: input.attention }))) fail("changed reviewed delivery bindings");
-  return JSON.parse(canonicalJSON(input).toString()) as SealedPlan;
+  return freezeJSON(JSON.parse(canonicalJSON(input).toString()) as SealedPlan);
 }
 
 /** Native records stay external. Only their exact reviewed digests and provenance enter the plan. */
@@ -125,6 +125,10 @@ export function readVerifiedPlan(bytes: Uint8Array, verifyPolicy: (plan: SealedP
   const plan = parsePlan(parseCanonical(bytes));
   const policy = verifyPolicy(structuredClone(plan));
   if (policy === null || policy.adoption_sha256 !== plan.adoption_sha256 || policy.context !== plan.context || policy.transport !== plan.transport) fail("current policy unavailable or changed");
+  if (typeof policy.pr_draft !== "boolean") fail("missing draft policy");
+  for (const effect of plan.manifest.effects) {
+    if (["pr-create", "pr-update"].includes(effect.kind) && effect.payload.draft !== policy.pr_draft) fail("current draft policy");
+  }
   for (const name of ["worker", "reviewer"] as const) {
     const role = plan.roles[name], expected = policy[name];
     if (role.model !== expected.adopted_model || role.requested_model !== expected.requested_model || !modelMatches(expected.requested_model, role.model)

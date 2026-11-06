@@ -1,4 +1,4 @@
-import { canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
+import { canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { parseIdentitySource, type IdentitySource } from "./settings";
 import type { OwnedProcess } from "./owned-process";
 
@@ -78,12 +78,12 @@ const effectFields = {
   push: ["ref", "head"],
   "branch-refresh": ["ref", "number", "expected_head", "head"],
   "pr-create": ["base", "branch", "title", "body", "labels", "draft"],
-  "pr-update": ["number", "expected_head", "title", "body", "labels", "draft"],
-  "issue-create": ["title", "body", "labels", "evidence_repository", "evidence_path", "evidence_commit", "evidence_sha256"],
-  "comment-create": ["number", "body"],
+  "pr-update": ["number", "expected_head", "expected_payload_sha256", "title", "body", "labels", "draft"],
+  "issue-create": ["title", "body", "labels", "prior_ids", "evidence_repository", "evidence_path", "evidence_commit", "evidence_sha256"],
+  "comment-create": ["number", "body", "prior_ids"],
   "pr-close": ["number", "expected_head"],
   "lease-acquire": ["ref"],
-  "lease-release": ["ref", "expected_object"],
+  "lease-release": ["ref"],
   "receipt-retain": ["ref"],
   "receipt-retire": ["ref", "expected_object"],
   "workflow-dispatch": ["workflow_id", "ref", "inputs"],
@@ -114,6 +114,12 @@ function parseEffect(value: unknown): Effect {
       case "number": case "workflow_id": case "run_id": case "max_bytes": positive(value); break;
       case "draft": case "prerelease": if (typeof value !== "boolean") invalid("boolean"); break;
       case "labels": strings(value); break;
+      case "prior_ids": {
+        if (!Array.isArray(value)) invalid("prior native IDs");
+        const ids = value.map(positive);
+        if (new Set(ids).size !== ids.length) invalid("duplicate prior native IDs");
+        break;
+      }
       case "argv": if (!Array.isArray(value) || value.length === 0) invalid("argv"); else value.forEach(text); break;
       case "path": case "evidence_path": protocolPath(value); break;
       case "ref":
@@ -274,14 +280,6 @@ function cleanReview(records: string): void {
   complete();
 }
 
-function freeze<T>(value: T): T {
-  if (value !== null && typeof value === "object") {
-    for (const item of Object.values(value)) freeze(item);
-    Object.freeze(value);
-  }
-  return value;
-}
-
 const reviewedInstances = new WeakSet<object>();
 export type ReviewedManifest = ReturnType<typeof validateReviewedManifest>;
 export function requireReviewedManifest(value: ReviewedManifest): void {
@@ -308,7 +306,12 @@ export function validateReviewedManifest(input: {
   // The wrapper validates/stages the bounded edit manifest. Its unchanged original bytes are bound
   // above and reviewed together with the resulting checkpoint and complete publication payload.
   cleanReview(reviewer.records);
-  const result = freeze({ manifest, manifest_sha256: hash, worker, reviewer });
+  const result = freezeJSON({ manifest, manifest_sha256: hash, worker, reviewer });
   reviewedInstances.add(result);
   return result;
+}
+
+/** Distinct effect IDs are finalized in payloads before candidate review. */
+export function effectMarker(effectId: string): string {
+  return `<!-- vh-adlc-docs-drift_effect id=${id(effectId)} -->`;
 }

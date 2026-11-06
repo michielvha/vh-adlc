@@ -25,7 +25,7 @@ function setup() {
   const input = fixture({ ...bindings, source_commit: commit });
   const checked = validateReviewedManifest(input);
   const plan = sealPlan({ reviewed: checked, grants: input.grants, adoption_sha256: hash("adoption"), context: "production", transport: "native", corrections: [], attention: [] });
-  const policy = () => ({ adoption_sha256: hash("adoption"), context: "production" as const, transport: "native" as const, worker: role, reviewer: role });
+  const policy = () => ({ adoption_sha256: hash("adoption"), context: "production" as const, transport: "native" as const, pr_draft: true, worker: role, reviewer: role });
   return { root, repo, artifacts, commit, input, checked, plan, policy };
 }
 

@@ -23,12 +23,12 @@ export function evidence(id: string, target: string, returned: string): NativeRo
   };
 }
 
-export function fixture(selectedBindings = bindings) {
-  const effects: Effect[] = [
+export function fixture(selectedBindings = bindings, selectedEffects?: Effect[]) {
+  const effects: Effect[] = selectedEffects ?? [
     { id: "push", kind: "push", payload: { ref: "refs/heads/docs-drift/one", head: selectedBindings.candidate_commit } },
     { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/one", title: "Repair docs", body: "Exact reviewed body\n", labels: ["documentation"], draft: true } },
   ];
-  const worker = evidence("worker", workerInputDigest(selectedBindings), canonicalJSON({ input_sha256: workerInputDigest(selectedBindings), edits: [], publication: effects[1].payload }).toString());
+  const worker = evidence("worker", workerInputDigest(selectedBindings), canonicalJSON({ input_sha256: workerInputDigest(selectedBindings), edits: [], publication: effects.find(effect => effect.kind === "pr-create")?.payload ?? null }).toString());
   const manifest: ActionManifest = {
     schema_version: 1, operation_id: "operation-1", repository: "fixture/docs", repository_id: 10,
     actor: "fixture-bot", actor_id: 20, bindings: selectedBindings, effects,

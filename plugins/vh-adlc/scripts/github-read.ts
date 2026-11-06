@@ -333,7 +333,7 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
       return result;
     },
     ref(ref: string) {
-      if (!/^refs\/heads\/[A-Za-z0-9][A-Za-z0-9_./-]*$/u.test(ref) || ref.includes("..") || ref.includes("//")
+      if (!ref.startsWith("refs/heads/") || /[\u0000-\u0020\u007f~^:?*\[\\]/u.test(ref) || ref.includes("..") || ref.includes("@{")
         || ref.split("/").some(part => !part || part.startsWith(".") || part.endsWith(".") || part.endsWith(".lock"))) throw Error("invalid-github-git-ref");
       const object = readObject(reader.get(`${prefix}/git/ref/${ref.slice(5).split("/").map(encodeURIComponent).join("/")}`));
       const target = readObject(object.object);

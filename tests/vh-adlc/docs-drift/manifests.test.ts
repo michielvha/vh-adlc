@@ -46,7 +46,7 @@ test("missing, stale and broad authority never authorizes selected effects", () 
   manifest.effects = [{ id: "close", kind: "pr-close", payload: { number: 12, expected_head: "e".repeat(40) } }];
   const closeGrant = [{ manifest_sha256: manifestDigest(manifest), effect_id: "close", effect_sha256: effectDigest(manifest.effects) }];
   authorizeEffects(manifest, closeGrant);
-  manifest.effects.push({ id: "comment", kind: "comment-create", payload: { number: 12, body: "explanation" } });
+  manifest.effects.push({ id: "comment", kind: "comment-create", payload: { number: 12, body: "explanation", prior_ids: [] } });
   expect(() => authorizeEffects(manifest, closeGrant)).toThrow("grant");
 });
 
@@ -167,7 +167,7 @@ test("receipt retirement, lease release and branch cleanup never share a grant",
   const grants = [{ manifest_sha256: manifestDigest(manifest), effect_id: "cleanup", effect_sha256: effectDigest(manifest.effects) }];
   expect(authorizeEffects(manifest, grants)).toHaveLength(1);
   for (const kind of ["lease-release", "merged-branch-delete", "trial-branch-delete"] as const) {
-    manifest.effects = [{ id: "cleanup", kind, payload }];
+    manifest.effects = [{ id: "cleanup", kind, payload: kind === "lease-release" ? { ref: payload.ref } : payload }];
     expect(() => authorizeEffects(manifest, grants)).toThrow("grant");
   }
   manifest.effects = [{ id: "cleanup", kind: "receipt-retire", payload: { ...payload, expected_object: "b".repeat(40) } }];

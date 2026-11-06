@@ -181,3 +181,12 @@ export type BoundProtocol = ReturnType<typeof createProtocolBindings>;
 export function verifyProtocolBindings(bytes: Uint8Array, expected: BoundProtocol): void {
   if (sha256(bytes) !== expected.sha256 || !Buffer.from(bytes).equals(expected.bytes)) invalid("changed bindings file");
 }
+
+/** Freeze a value after its JSON boundary has been validated. */
+export function freezeJSON<T>(value: T): T {
+  if (value !== null && typeof value === "object") {
+    for (const item of Object.values(value)) freezeJSON(item);
+    Object.freeze(value);
+  }
+  return value;
+}
