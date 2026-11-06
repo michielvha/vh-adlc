@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by owner; ready for tasks and implementation."
+status: in-progress
+status_description: "Implementing the accepted coordinator; live board trial requires separate permission and Projects access."
+branch: feat/github-projects-coordinator
 issue: https://github.com/michielvha/vh-adlc/issues/54
 goal: "Coordinate work across repositories from one GitHub Project while keeping each repository's feature lifecycle authoritative."
 covers:
