@@ -415,6 +415,7 @@ None.
 | 2026-11-06 | R-39 | spec | `9c6e9c3bf3af619a82f3d3f4d47fcf1e822e5adc` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-06 | R-40 | spec | `46c0795d6b24eb5e84e9fc486ef8c18b1bf6c30e` | claude-opus-5.5 | procedural | 2 nit. Full requested read coverage. |
 | 2026-11-06 | R-41 | spec | `8df9e69ad5fec97fb20767be1ac990d943ec6ff4` | claude-opus-5.5 | procedural | 2 should-fix; 1 nit. Full requested read coverage. |
+| 2026-11-06 | R-42 | spec | `a6d699f6b189dc5947353307bb5f76034612e2c0` | claude-opus-5.5 | procedural | 1 should-fix; 1 nit. Full requested read coverage. |
 
 ### R-1
 
@@ -1258,6 +1259,21 @@ SEVERITY: nit
 WHERE: Design, Scheduled worker and staged adoption (adoption check-signal); Test Plan AC-06
 EVIDENCE: `adoption check-signal` must join "the consumer's existing mandatory PR/default CI verification". For an adopted source it compares the selected pin with the signal, while "Staged/not-adopted state is explicit and grants nothing" (chunk 00241 line 19). Trial setup adds candidate pins while the consumer is still staged (00241 line 17). The spec never gives the check's exit status or comparison target in the staged state. A nonzero exit would fail every consumer PR until cutover. A zero exit would let an as-is signal intake merge go undetected before adoption.
 PROPOSAL: State the staged-state result. For example, compare the signal with the current-default trial candidate pin when a `trial` block exists, and otherwise exit zero with an explicit `staged` status. Add the matching AC-06 case.
+
+### R-42
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Scheduled worker and staged adoption (unattended outcome and attention projection); Entry and consumer contract (consumer settings); Protected adoption bindings; Test Plan AC-05, AC-06
+EVIDENCE: Under the R-41 F-02 policy, a run can finish green with `carried-attention` only when each current item matches "a currently open owned advisory/consolidation PR, or ... a prior report whose complete bytes, repository/scope, schema and recorded digest/provenance can be verified". It also says "Resolve prior reports only through consumer-configured report roots or recorded owned run artifacts" (shared-docs-drift.md chunk 00241 line 47). A run with no verified correction publishes no advisory (00241 lines 45, 47), so in steady state the prior report is the main way to carry attention. The spec does not say where that report comes from or what makes it trustworthy. The consumer settings list (chunk 00081 line 41) and the ordinary-settings allowlist (00241 line 51) define no report-root field. The hosted worker keeps its report only as a run artifact with "repository-configured retention" (00241 line 47). Reading an earlier run's artifact needs an Actions read permission and an archive download. The protected caller comparison requires the job permissions to match exactly (00241 line 33). The only shared GitHub reader parses every response as JSON (github-read.ts chunk 00001 lines 76-78), and the spec names no artifact reader. Nothing says which record holds the "recorded digest/provenance". Nothing requires the earlier report to come from a run of the adopted scheduled worker rather than another workflow run that uploaded an artifact with the same name, such as a pull_request run. The PR path checks only that the "exact carried entry" is observed, not that it is still the independently reviewed body bound in the lease plan (00161 line 37). So the evidence that turns a run green can be missing, or can come from an unverified writer. The first-adoption trial is a single draft-PR run (00241 line 23), so the live hosted read of an earlier report under the real job permissions would first run in production.
+PROPOSAL: Name the source of earlier reports for the hosted and interactive routes. Examples are a committed report root in settings, classified like other settings, or earlier run artifacts of the recorded scheduled workflow ID on default-branch scheduled events. Name the reader and the job permission that source needs, and add them to the protected bindings. Bind the digest and provenance to the adopted worker run, and check PR-carried entries against the reviewed body recorded in the lease plan. Add AC-05/AC-06 cases where a planted artifact from another workflow or a pull_request run, or an edited PR body, cannot suppress new attention. Also require the hosted trial, or a recorded hermetic substitute, to read an earlier report.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan AC-05, AC-06
+EVIDENCE: The AC-05 and AC-06 proof cells both end with the same five sentences, starting "Test repeated complete scheduled runs with unchanged attention carried by an open owned PR and by a verified prior report" and ending "Record successful reviewed effects separately if the same run still ends new-attention" (shared-docs-drift.md chunk 00321 lines 41, 42). The pinned documentation convention says "A fact has one authoritative home" (documentation.md chunk 00001 line 77). If someone later edits only one copy, the two proofs will disagree.
+PROPOSAL: Keep the carried-attention scenarios in the AC-05 cell, which owns the run-status criterion. In AC-06, refer to that proof instead of repeating it.
 
 ## Sources
 
