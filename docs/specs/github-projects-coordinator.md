@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Design proposal; awaiting independent spec review and owner acceptance."
+status_description: "Owner selected approved board updates and accepted the API race; awaiting full spec acceptance."
 issue: null
 goal: "Coordinate work across repositories from one GitHub Project while keeping each repository's feature lifecycle authoritative."
 covers:
@@ -30,9 +30,9 @@ should show what is ready, waiting for review or blocked across those repositori
 repository spec keeps its existing authority; moving a card does not accept a feature or ship it.
 
 The proposed first version runs when asked in an agent session, using the existing GitHub CLI login.
-It collects current facts, recommends next work and proposes a precise batch before changing board
-membership or configured single-select fields. The owner has not yet chosen the final write scope. It will not close issues, merge PRs, change infrastructure or start
-implementation from a card. Those actions still use their owning repository's procedure and authority.
+It collects current facts, recommends next work and shows a precise batch for approval before changing
+board membership or configured single-select fields. It will not close issues, merge PRs, change
+infrastructure or start implementation from a card. Those actions still use their owning repository's procedure and authority.
 
 GitHub's built-in workflows can handle routine board updates where the account's plan permits them.
 A small Bun helper supplies pagination, stable identities and checked updates around `gh`; there is
@@ -40,8 +40,9 @@ no new GitHub SDK, task database, service or scheduler. Reusable configuration a
 room for a later unattended cleanup agent. Such an agent needs a separate design and permission grant.
 
 Fresh reads catch detected field conflicts, but GitHub cannot prevent an edit racing with a write.
-The owner must accept that limit or narrow the write scope. Tests will cover incomplete inventories,
-duplicate issue numbers, detected field conflicts and partial failures, plus a controlled trial on a separately authorized test board. No coordinator code, board or
+The owner accepted that API limit on 2026-11-06. Tests will cover incomplete inventories, duplicate
+issue numbers, detected field conflicts and partial failures, plus a controlled trial on a separately
+authorized test board. No coordinator code, board or
 credential change exists yet. Acceptance approves this scope for implementation, not a live Homelab
 board setup or repository cleanup.
 
@@ -54,6 +55,8 @@ an approved exact batch for tracker changes. `plugins/vh-adlc/scripts/settings-f
 the strict YAML settings reader; reuse it rather than adding another parser.
 
 The owner chose interactive use first on 2026-11-06, while preserving room for future cleanup agents.
+In the same session, the owner selected approved add/update batches and explicitly accepted the
+remaining field-update race. This resolves write scope, not full specification acceptance or a live batch grant.
 A live `gh project list --owner vhco-pro --format json --limit 10` failed with missing `read:project`.
 The board inventory is therefore unknown. No existing board's absence is inferred from that failure.
 
@@ -140,7 +143,8 @@ so a change observed before the write is not overwritten. A repeated add reuses 
 GitHub's field-update mutation has no expected-value or revision condition. There is an unavoidable
 race between the read and write: a human edit in that interval can be overwritten, and read-back cannot
 prove it did not happen. Do not claim atomic protection, lock the board or add a coordination service.
-Field writes remain a proposal until the owner accepts this limitation or chooses narrower scope.
+The owner explicitly accepted this limitation for approved field updates on 2026-11-06.
+Each actual batch still requires its own approval; the design decision grants no standing write authority.
 
 After each request, re-read the actual value and record success, already satisfied, detected conflict,
 refused or failed. A timeout with unknown outcome must be reconciled before retry. Stop after a conflict or
@@ -187,20 +191,7 @@ None yet; written after design review and owner acceptance.
 
 ## Open Questions
 
-### Q1: What write scope should v1 have given GitHub's field-update race?
-
-**Recommendation:** A. Permit explicitly approved add/update batches with fresh reads and read-back,
-and document that an edit between those requests can still be overwritten.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Approved adds and field updates** | Useful interactive board maintenance | Owner accepts the documented API race; no atomic protection |
-| **B. Add existing issues only** | Backfill membership without writing existing field values | Fields stay manual; field updates require a later feature |
-| **C. Read-only first** | Inventory and recommendations with read-only access | All board maintenance stays manual |
-
-**Why this is yours:** It determines live effects and whether the remaining API limitation is acceptable.
-This question replaces the earlier broad choice between updates and inventory only. The design above
-states option A as a proposal; implementation must follow the answered scope and receive a clean review.
+None. The owner selected approved add/update batches and accepted the documented API limit.
 
 ## Review Log
 
