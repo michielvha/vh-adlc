@@ -222,3 +222,51 @@ test("missing local payload bytes stop ordinary resume before every remote actio
   expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
 });
+
+test("an observed material explanation change invalidates the old batch even after restoration", async () => {
+  const f = setup();
+  const effects: Effect[] = [
+    f.input.manifest.effects[0], f.input.manifest.effects[1],
+    { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [], body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } },
+    { id: "close", kind: "pr-close", payload: { number: 77, expected_head: "e".repeat(40) } },
+    f.input.manifest.effects[4],
+  ];
+  f.input = fixture(f.input.manifest.bindings, effects);
+  f.gate = async () => ({ review: f.input, policy: f.policy });
+  f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
+  const execute = f.transport.execute, observe = f.transport.observe;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-close") throw Error("interrupted before closure");
+    await execute(plan, effect, objects);
+  };
+  const interrupted = await publish(options(f));
+  f.transport.execute = execute;
+  f.transport.observe = async (plan, effect, objects) => effect.id === "explain"
+    ? { state: "conflict", reason: "native-comment-payload-changed" } : observe(plan, effect, objects);
+  expect((await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory })).state).toBe("pending");
+  f.transport.observe = observe;
+  const restored = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(restored.state).toBe("pending");
+  expect(f.executed.includes("close")).toBe(false);
+  expect(f.executed.filter(id => id === "explain")).toHaveLength(1);
+});
+
+test("observed source or actor changes cannot revive old approval when restored", async () => {
+  for (const changed of ["source", "actor"] as const) {
+    const f = setup(), execute = f.transport.execute, identity = f.transport.identity;
+    f.transport.execute = async (plan, effect, objects) => {
+      if (effect.kind === "pr-create") throw Error("request never sent");
+      await execute(plan, effect, objects);
+    };
+    const interrupted = await publish(options(f));
+    f.transport.execute = execute;
+    const original = f.input.current.bindings.feedback_sha256;
+    if (changed === "source") f.input.current.bindings.feedback_sha256 = hash("changed feedback");
+    else f.transport.identity = async () => ({ repository: "fixture/docs", repository_id: 10, default_branch: "main", actor: "other", actor_id: 99 });
+    expect((await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory })).state).toBe("pending");
+    f.input.current.bindings.feedback_sha256 = original;
+    f.transport.identity = identity;
+    expect((await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory })).state).toBe("pending");
+    expect(f.executed).toEqual(["lease", "receipt", "push"]);
+  }
+});

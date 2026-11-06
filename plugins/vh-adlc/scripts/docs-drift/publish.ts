@@ -1,5 +1,5 @@
-import { appendHandoff, appendIntent, appendOutcome, createJournal, readVerifiedPlan, sealPlan, writePlanObject, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
-import { effectMarker, validateReviewedManifest, type Effect } from "./manifests";
+import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, createJournal, readVerifiedPlan, sealPlan, writePlanObject, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { effectMarker, manifestDigest, parseActionManifest, validateReviewedManifest, type Effect } from "./manifests";
 import { canonicalJSON } from "./protocol";
 import { publicationMarker } from "./report-history";
 import { loadCommittedSettings, type Settings } from "./settings";
@@ -12,8 +12,10 @@ export type PublishOptions = {
   plan: SealedPlan; transport: PublicationTransport;
   gate: (journal: Journal | null) => Promise<PublicationGate>;
 };
-export type PublishResult = { state: "complete" | "pending"; reason: string | null; journal: Journal; objects: PlanObjects };
+export type PublishResult = { state: "complete" | "pending" | "retired" | "invalidated"; reason: string | null; journal: Journal; objects: PlanObjects };
 function fail(reason: string): never { throw Error(`docs-drift publication ${reason}`); }
+
+export class PublicationScopeChanged extends Error {}
 
 export function validatePublicationShape(plan: SealedPlan, settings: Settings, draft: boolean): void {
   const { manifest } = plan;
@@ -59,6 +61,7 @@ export async function verifyPublicationGate(options: PublishOptions, journal: Jo
   if (options.transport.kind !== options.plan.transport || options.transport.object_store !== options.object_store.root) fail("transport or object store binding");
   const gate = await options.gate(journal === null ? null : structuredClone(journal));
   const plan = readVerifiedPlan(canonicalJSON(options.plan), () => gate.policy);
+  if (manifestDigest(parseActionManifest(gate.review.current)) !== plan.manifest_sha256) throw new PublicationScopeChanged("current-manifest-changed");
   const checked = validateReviewedManifest(gate.review);
   const current = sealPlan({ reviewed: checked, grants: gate.review.grants, adoption_sha256: gate.policy.adoption_sha256,
     context: gate.policy.context, transport: gate.policy.transport, corrections: plan.corrections, attention: plan.attention });
@@ -69,11 +72,12 @@ export async function verifyPublicationGate(options: PublishOptions, journal: Jo
   const identity = await options.transport.identity();
   if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
     || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id
-    || identity.default_branch !== options.settings.default_branch) fail("current native repository or actor");
+    || identity.default_branch !== options.settings.default_branch) throw new PublicationScopeChanged("current-native-repository-or-actor-changed");
 }
 
-function pending(journal: Journal, effect: Effect, reason: string, objects: PlanObjects): PublishResult {
+function pending(journal: Journal, effect: Effect, reason: string, objects: PlanObjects, invalidate = false): PublishResult {
   if (!journal.events.some(event => event.effect_id === effect.id && event.kind === "intent")) journal = appendIntent(journal, effect.id);
+  if (invalidate) journal = appendInvalidation(journal, effect.id, reason);
   journal = appendHandoff(journal, effect.id, reason);
   return { state: "pending", reason, journal, objects };
 }
@@ -93,17 +97,17 @@ export async function publish(options: PublishOptions): Promise<PublishResult> {
       }
       journal = appendIntent(journal, effect.id);
       const before = index === 0 ? { state: "absent" as const } : await options.transport.observe(journal.plan, effect, objects);
-      if (before.state === "conflict" || before.state === "unknown") return pending(journal, effect, before.reason, objects);
+      if (before.state === "conflict" || before.state === "unknown") return pending(journal, effect, before.reason, objects, before.state === "conflict");
       if (before.state === "done") {
         journal = appendOutcome(journal, effect.id, before.outcome);
         continue;
       }
       await options.transport.execute(journal.plan, effect, objects);
       const after = await options.transport.observe(journal.plan, effect, objects);
-      if (after.state !== "done") return pending(journal, effect, "effect-outcome-unconfirmed", objects);
+      if (after.state !== "done") return pending(journal, effect, "effect-outcome-unconfirmed", objects, after.state === "conflict");
       journal = appendOutcome(journal, effect.id, after.outcome);
-    } catch {
-      return pending(journal, effect, "current-proof-or-effect-unavailable", objects);
+    } catch (error) {
+      return pending(journal, effect, "current-proof-or-effect-unavailable", objects, error instanceof PublicationScopeChanged);
     }
   }
   return { state: "complete", reason: null, journal, objects };

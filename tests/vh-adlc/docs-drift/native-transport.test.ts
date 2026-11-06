@@ -339,3 +339,22 @@ test("partial native viewer errors deny identity even when viewer fields are pre
   const f = setup(); f.update(state => { state.graphql_errors = true; });
   await expect(f.transport.identity()).rejects.toThrow();
 });
+
+test("duplicate native inventory IDs cannot establish complete absence", async () => {
+  const f = setup(); await f.transport.identity();
+  const existing = { id: 801, number: 601, title: "Old issue", body: "Earlier item", labels: [], user: { login: "fixture-bot", id: 20 } };
+  f.update(state => { state.issues = [existing, structuredClone(existing)]; });
+  const issue: Effect = { id: "issue", kind: "issue-create", payload: { title: "Selected issue", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + `\nhttps://github.com/fixture/docs/blob/${f.commit}/README.md`, labels: [], prior_ids: [801], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
+  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("unknown");
+});
+
+
+test("retained lookup evidence excludes repository credential fields", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10, temp_clone_token: "fixture-sensitive-token" } }, base: { ref: "main", repo: { id: 10, temp_clone_token: "fixture-sensitive-token" } } }); });
+  const close: Effect = { id: "close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } };
+  const result = await f.transport.observe(f.plan, close, f.objects);
+  expect(result.state).toBe("absent");
+  if (result.state !== "absent" || !result.evidence) throw Error("missing native lookup evidence");
+  expect(readFileSync(result.evidence.path, "utf8")).not.toContain("fixture-sensitive-token");
+});

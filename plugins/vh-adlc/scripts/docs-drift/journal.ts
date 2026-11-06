@@ -22,9 +22,10 @@ export type PlanPolicy = {
   worker: RolePolicy; reviewer: RolePolicy;
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
+export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string } };
 type Event = {
-  schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff";
-  effect_id: string; payload: { effect_sha256: string } | Outcome | { reason: string };
+  schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation";
+  effect_id: string; payload: { effect_sha256: string } | Outcome | { reason: string } | Retirement;
 };
 type Header = {
   schema_version: 1; kind: "docs-drift-journal"; operation_id: string; repository: string;
@@ -156,7 +157,7 @@ function privateDirectory(directory: string): void {
   if (!stat.isDirectory() || stat.isSymbolicLink() || realpathSync(directory) !== directory || (stat.mode & 0o077) !== 0
     || (process.getuid && stat.uid !== process.getuid())) fail("unsafe private directory");
 }
-function privateBytes(path: string): Buffer {
+export function readArtifact(path: string): Buffer {
   const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
     const stat = fstatSync(fd);
@@ -168,7 +169,7 @@ function eventFiles(directory: string): string[] {
   privateDirectory(directory);
   const files = readdirSync(directory).sort();
   for (const file of files) {
-    if (/^\.tmp-[a-f0-9-]{36}$/u.test(file)) { privateBytes(join(directory, file)); continue; }
+    if (/^\.tmp-[a-f0-9-]{36}$/u.test(file)) { readArtifact(join(directory, file)); continue; }
     if (!/^\d{10}\.json$/u.test(file)) fail("unexpected event file");
   }
   return files.filter(file => !file.startsWith(".tmp-"));
@@ -189,13 +190,20 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
     const payload = exact(event.payload, ["effect_sha256"]);
     if (payload.effect_sha256 !== effectDigest([effect]) || prior.length !== 0) fail("changed or repeated intent");
     for (const earlier of plan.manifest.effects.slice(0, plan.manifest.effects.indexOf(effect))) {
-      if (!previous.some(item => item.effect_id === earlier.id && item.kind === "outcome")) fail("effect order has pending earlier effect");
+      if (!previous.some(item => item.effect_id === earlier.id && (item.kind === "outcome" || item.kind === "retired-absence"))) fail("effect order has pending earlier effect");
     }
   } else {
     if (!prior.some(item => item.kind === "intent")) fail("outcome or handoff without intent");
-    if (event.kind === "outcome" && prior.some(item => item.kind === "outcome")) fail("effect already terminal");
+    if (["outcome", "retired-absence"].includes(event.kind) && prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")) fail("effect already terminal");
     if (event.kind === "outcome") outcome(event.payload);
-    else if (event.kind === "handoff") identifier(exact(event.payload, ["reason"]).reason);
+    else if (event.kind === "retired-absence") {
+      const payload = exact(event.payload, ["scope_sha256", "request_sha256", "lookup"]);
+      hash(payload.scope_sha256); hash(payload.request_sha256);
+      const lookup = exact(payload.lookup, ["path", "sha256"]);
+      hash(lookup.sha256);
+      if (typeof lookup.path !== "string" || !lookup.path.startsWith("/") || lookup.path.includes("\0")) fail("retirement lookup path");
+    }
+    else if (event.kind === "handoff" || event.kind === "invalidation") identifier(exact(event.payload, ["reason"]).reason);
     else fail("unknown event kind");
   }
 }
@@ -224,21 +232,21 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
   const source = realpathSync(sourceRepo);
   externalArtifactDirectory(directory, source);
   privateDirectory(dirname(directory));
-  const headerBytes = privateBytes(join(directory, "header.json"));
+  const headerBytes = readArtifact(join(directory, "header.json"));
   const header = exact(parseCanonical(headerBytes), ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id"]) as Header;
   if (header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.() || header.run_id !== header.operation_id) fail("changed journal ownership");
-  const planBytes = privateBytes(join(directory, "plan.json"));
+  const planBytes = readArtifact(join(directory, "plan.json"));
   if (sha256(planBytes) !== hash(header.plan_sha256)) fail("changed local plan");
   const plan = parsePlan(parseCanonical(planBytes));
   if (header.operation_id !== plan.manifest.operation_id || header.repository !== plan.manifest.repository
     || directory !== join(dirname(directory), "docs-drift-" + header.operation_id)
-    || !privateBytes(join(dirname(directory), header.operation_id + ".journal-owner.json")).equals(headerBytes)) fail("changed resource record");
+    || !readArtifact(join(dirname(directory), header.operation_id + ".journal-owner.json")).equals(headerBytes)) fail("changed resource record");
   const eventDirectory = join(directory, "events");
   const files = eventFiles(eventDirectory), events: Event[] = [];
   let previous = sha256(headerBytes);
   for (const [index, file] of files.entries()) {
     if (file !== String(index + 1).padStart(10, "0") + ".json") fail("lost event revision");
-    const bytes = privateBytes(join(eventDirectory, file));
+    const bytes = readArtifact(join(eventDirectory, file));
     const event = exact(parseCanonical(bytes), ["schema_version", "revision", "previous_sha256", "kind", "effect_id", "payload"]) as Event;
     if (event.schema_version !== 1 || event.revision !== index + 1 || event.previous_sha256 !== previous) fail("changed event chain");
     validateEvent(event, plan, events);
@@ -264,6 +272,8 @@ export function appendIntent(journal: Journal, effectId: string): Journal {
 export function appendOutcome(journal: Journal, effectId: string, receipt: Outcome): Journal { return append(journal, "outcome", effectId, outcome(receipt)); }
 export function appendHandoff(journal: Journal, effectId: string, reason: string): Journal { return append(journal, "handoff", effectId, { reason: identifier(reason) }); }
 
+export function appendInvalidation(journal: Journal, effectId: string, reason: string): Journal { return append(journal, "invalidation", effectId, { reason: identifier(reason) }); }
+
 /** Content-addressed objects add no refs, parents, workflow files or application tree entries. */
 export function writePlanObject(store: OwnedObjectStore, value: SealedPlan) {
   const plan = parsePlan(value);
@@ -275,4 +285,8 @@ export function writePlanObject(store: OwnedObjectStore, value: SealedPlan) {
   const commit = Buffer.from(`tree ${tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift operation ${plan.manifest.operation_id}\n`);
   const object = writeMetadataObject(store.root, "commit", commit);
   return { object, tree, blob, plan_sha256: sha256(bytes) };
+}
+
+export function appendRetirement(journal: Journal, effectId: string, retirement: Retirement): Journal {
+  return append(journal, "retired-absence", effectId, retirement);
 }

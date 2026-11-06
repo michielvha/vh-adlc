@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import type { PublicationTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { retainAbsence } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -41,7 +42,7 @@ export function publicationFixture(roots: string[]) {
   const executed: string[] = [], observed: string[] = [];
   const refs = new Map<string, string>(), done = new Set<string>();
   const transport: PublicationTransport = {
-    kind: "collector", object_store: store.root,
+    kind: "collector", object_store: store.root, artifact_root: artifacts,
     async identity() { return { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20, default_branch: "main" }; },
     async ref(ref) { return refs.has(ref) ? { state: "present", object: refs.get(ref)! } : { state: "absent" }; },
     async readPlanObject(object) {
@@ -52,11 +53,14 @@ export function publicationFixture(roots: string[]) {
     },
     async observe(plan, effect, objects) {
       observed.push(effect.id);
-      if (!done.has(effect.id)) return { state: "absent" };
+      if (!done.has(effect.id)) return { state: "absent", evidence: retainAbsence({ artifact_root: artifacts, source_repo: repo,
+        plan, effect, transport: "collector", lookup: { fixture_effect: effect.id, state: "absent" } }) };
       return { state: "done", outcome: { state: "observed", observation_sha256: hash(effect.id), resource_id: effect.id, object: effect.kind === "lease-release" ? null : objects.object } };
     },
     async execute(plan, effect, objects) {
-      executed.push(effect.id); done.add(effect.id);
+      executed.push(effect.id);
+      if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== objects.object) throw Error("changed fixture lease");
+      done.add(effect.id);
       if (effect.kind === "lease-acquire") { refs.set(String(effect.payload.ref), objects.object); }
       if (effect.kind === "receipt-retain") refs.set(String(effect.payload.ref), objects.object);
       if (effect.kind === "lease-release") refs.delete(String(effect.payload.ref));
