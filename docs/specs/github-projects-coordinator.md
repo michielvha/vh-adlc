@@ -207,6 +207,7 @@ states option A as a proposal; implementation must follow the answered scope and
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | unknown | procedural | Blocking concurrency promise and missing checker coverage; model identity not attested. |
+| 2026-11-06 | R-2 | spec | `11a4bc2b53476a9a6e26a12541c9a74cfd38ffaf` | unknown | procedural | No findings on corrected proposal; owner write-scope decision pending, model identity not attested. |
 
 ### R-1
 
@@ -223,6 +224,10 @@ SEVERITY: should-fix
 WHERE: Frontmatter / covers
 EVIDENCE: At 9aac9eeff9e20d30816b0ab8a43f313c30ee2e65, tests/vh-adlc/check.test.ts:16-23 defines the accepted operation lists, and its skills test at lines 232-238 rejects every skill directory absent from those lists. Adding vh-adlc-projects therefore requires changing this existing checker, but covers includes only tests/vh-adlc/projects/. The pinned feature-document standard requires covers to list every path whose change can affect the feature.
 PROPOSAL: Add tests/vh-adlc/check.test.ts to covers and include registration of the new operation in the existing package checker as part of implementation verification.
+
+### R-2
+
+NO FINDINGS
 
 ## Sources
 
