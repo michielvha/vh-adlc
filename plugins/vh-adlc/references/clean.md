@@ -43,7 +43,10 @@ The binary prints one JSON report. `knowledge` is `null`, because neither comman
 | `error` | `unsupported-platform`, `running-as-root`, `pid-namespace` or `git-too-old` | Report it; nothing was read or removed. |
 
 `manifest-missing`, `default-branch-unknown`, `manifest-unmerged` and `engine-absent` are notes. With
-`engine-absent`, no Docker engine answered, so container bind mounts were not checked.
+`engine-absent`, no Docker engine answered, so container bind mounts were not checked. A working-tree
+manifest that differs from the default branch and is invalid is a `manifest-unmerged` note naming the
+refusal: a dry run plans nothing from it and does not fail, because an applied run never reads it. Only
+an invalid default-branch manifest is `manifest-invalid`.
 
 ## What counts as in use
 

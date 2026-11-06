@@ -219,6 +219,40 @@ func TestManifestSources(t *testing.T) {
 	}
 }
 
+// TestInvalidWorkingTreeManifestIsANote covers AC-05 and the owner's answer
+// to Q3: a dry run reports an invalid working-tree manifest as a
+// manifest-unmerged note naming the refusal, plans nothing from it and does
+// not fail, while the default-branch rules still apply.
+func TestInvalidWorkingTreeManifestIsANote(t *testing.T) {
+	c := newCleanFixture(t, repoManifest)
+	c.repo.Write(ManifestPath, "schema_version: 2\nproject: example\n")
+	c.host.entry("example-run-a", 30*time.Hour)
+
+	o := c.options()
+	o.DryRun = true
+	rep, data := runClean(t, o)
+	if rep.Result != report.Answered || !slices.Equal(codes(rep), []string{report.CodeManifestUnmerged}) {
+		t.Fatalf("dry run: %s %v; want answered with one manifest-unmerged note", rep.Result, rep.Findings)
+	}
+	if msg := rep.Findings[0].Message; !strings.Contains(msg, "schema_version") {
+		t.Fatalf("the note does not name the refusal: %q", msg)
+	}
+	if len(data.Unmerged) != 0 {
+		t.Fatalf("a dry run planned an invalid working-tree manifest: %v", names(data.Unmerged))
+	}
+	if got := names(data.Removed); !slices.Equal(got, []string{"example-run-a"}) {
+		t.Fatalf("dry run default-branch plan %q", got)
+	}
+
+	rep, _ = runClean(t, c.options())
+	if rep.Result != report.Pass || len(rep.Findings) != 0 {
+		t.Fatalf("applied: %s %v", rep.Result, rep.Findings)
+	}
+	if _, err := os.Lstat(filepath.Join(c.host.tmp, "example-run-a")); !os.IsNotExist(err) {
+		t.Fatalf("the applied run did not apply the default-branch rule: %v", err)
+	}
+}
+
 // TestPartialCloneDoesNotFetch has a manifest blob missing from a partial
 // clone. The run must not fetch it, so it reads the manifest as unusable.
 func TestPartialCloneDoesNotFetch(t *testing.T) {
@@ -322,6 +356,9 @@ func TestResults(t *testing.T) {
 			o.DockerHost = "unix://" + filepath.Join(c.host.outer, "absent.sock")
 		}, report.CodeEngineAbsent, report.Pass, report.Answered, nil},
 		{"invalid manifest", "schema_version: 2\nproject: example\n", nil, report.CodeManifestInvalid, report.Fail, report.Fail, nil},
+		{"invalid working-tree manifest", repoManifest, func(c *cleanFixture, _ *Options) {
+			c.repo.Write(ManifestPath, "schema_version: 2\nproject: example\n")
+		}, "", report.Pass, report.Answered, []string{report.CodeManifestUnmerged}},
 		{"invalid host.yaml", repoManifest, func(c *cleanFixture, _ *Options) {
 			c.dirs.writeHost(c.t, "temp_base: relative\n")
 		}, report.CodeHostSettingsInvalid, report.Fail, report.Fail, nil},

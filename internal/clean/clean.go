@@ -115,10 +115,12 @@ func Clean(ctx context.Context, o Options) *report.Report {
 	}
 	var unmerged *Manifest
 	if o.DryRun {
-		m, f := workingTreeManifest(o.Repo, mergedBytes)
+		m, err := workingTreeManifest(o.Repo, mergedBytes)
 		switch {
-		case f != nil:
-			findings = append(findings, *f)
+		case err != nil:
+			// An applied run never reads this copy, so its refusal is a note
+			// and does not fail the dry run.
+			note(report.CodeManifestUnmerged, "the working tree's %s differs from the default branch and is invalid, so a dry run plans nothing from it: %v", ManifestPath, err)
 		case m != nil:
 			unmerged = m
 			note(report.CodeManifestUnmerged, "the working tree's %s differs from the default branch; a dry run plans it separately and an applied run never uses it", ManifestPath)
@@ -239,17 +241,13 @@ func defaultBranchManifest(ctx context.Context, g gitcmd.Git) (*Manifest, []byte
 }
 
 // workingTreeManifest returns the working tree's manifest when it differs from
-// the default branch's bytes.
-func workingTreeManifest(repo string, merged []byte) (*Manifest, *report.Finding) {
+// the default branch's bytes, or the reason a differing copy is refused.
+func workingTreeManifest(repo string, merged []byte) (*Manifest, error) {
 	b, err := os.ReadFile(filepath.Join(repo, ManifestPath))
 	if err != nil || bytes.Equal(b, merged) {
 		return nil, nil
 	}
-	m, err := ParseManifest(b)
-	if err != nil {
-		return nil, &report.Finding{Code: report.CodeManifestInvalid, Message: fmt.Sprintf("the working tree's %v", err), Path: ManifestPath}
-	}
-	return m, nil
+	return ParseManifest(b)
 }
 
 type planResult struct {
