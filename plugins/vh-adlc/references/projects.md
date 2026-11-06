@@ -22,6 +22,7 @@ The operation never runs credential refresh itself.
 Create `.vh-adlc/projects.yaml` only on an explicit setup request. Use the actual board URL and option
 IDs from that board; the values below are examples. `fields` may be empty for issue additions only.
 Choose either `id` or `name` per field. Names must resolve uniquely; allowed options are IDs.
+Quote actual option IDs in YAML, including any ID made entirely of digits.
 
 ```yaml
 schema_version: 1

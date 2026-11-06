@@ -89,7 +89,7 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains thirteen skills: the generic `vh-adlc` entry, ten engineering
+The package contains fourteen skills: the generic `vh-adlc` entry, eleven engineering
 operations, `vh-adlc-blog` for article and promotion drafts and `vh-adlc-docs-impact` for documentation review. It includes
 separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
@@ -161,3 +161,6 @@ actual installed directory before starting terminal, hook or agent sessions.
 CI uses the same variable and verified installed payload. Refresh its value
 when a marketplace upgrade relocates the install. Missing setup reports exit 2;
 there is no cache-path guessing. Existing callers retain their path/stdin arguments.
+
+Projects coordination also uses Bun, Git and your authenticated GitHub CLI. It needs separate Projects
+scope and an explicit board/repository configuration; see the [Projects reference](../../plugins/vh-adlc/references/projects.md).
