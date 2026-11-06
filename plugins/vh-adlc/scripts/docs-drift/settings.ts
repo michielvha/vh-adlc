@@ -137,16 +137,16 @@ function detectorSelectors(value: unknown, required: string[]): Record<string, D
       return [id, { all_inventory: true }] as const;
     }
     return [id, {
-      roots: paths(selector.roots, "detector_inputs roots", true),
+      roots: paths(selector.roots, "detector_inputs roots"),
       exclusions: paths(selector.exclusions, "detector_inputs exclusions"),
-      suffixes: suffixes(selector.suffixes, "detector_inputs suffixes", true),
+      suffixes: suffixes(selector.suffixes, "detector_inputs suffixes"),
     }] as const;
   }));
 }
 
 function readSet(value: unknown): { source_roots: string[] | null; reference_roots: string[] | null } {
   const input = value === undefined ? {} : object(value, ["source_roots", "reference_roots"], "read_set");
-  const bound = (value: unknown, field: string) => value === undefined || value === null ? null : paths(value, field, true);
+  const bound = (value: unknown, field: string) => value === undefined || value === null ? null : paths(value, field);
   return { source_roots: bound(input.source_roots, "read_set source_roots"), reference_roots: bound(input.reference_roots, "read_set reference_roots") };
 }
 

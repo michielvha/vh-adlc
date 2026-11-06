@@ -93,6 +93,14 @@ test("configured Git path identities retain literal leading/trailing whitespace"
   expect(parsed.feedback_files).toEqual(["docs/ feedback.yaml "]);
 });
 
+test("explicit empty read bounds and detector selectors retain their zero-input meaning", () => {
+  const value = settingsFixture();
+  const parsed = parseSettings({ ...value, read_set: { source_roots: [], reference_roots: [] },
+    detector_inputs: { ...value.detector_inputs, claims: { roots: [], exclusions: [], suffixes: [] } } });
+  expect(parsed.read_set).toEqual({ source_roots: [], reference_roots: [] });
+  expect(parsed.detector_inputs.claims).toEqual({ roots: [], exclusions: [], suffixes: [] });
+});
+
 test("committed settings use exact selected Git bytes, reject suffix conflicts and preserve dirty caller state", () => {
   const repo = mkdtempSync(join(tmpdir(), "vh-drift-settings-"));
   repositories.push(repo);
