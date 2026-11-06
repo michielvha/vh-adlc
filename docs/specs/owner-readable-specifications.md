@@ -40,8 +40,9 @@ Old specs stay valid, old review records stay unchanged, and no parser or gate c
 The owner accepted this scope. Actual binary checks now cover nested and historical specs, summary-only
 corrections and a normative revision without changing stored review records. An independent semantic
 trial caught unsupported proof and a changed default while accepting honest and historical drafts.
-An actual author-operation trial remains unverified; the scripted compatibility checks do not establish
-that behavior. The upstream template PR is open with passing CI and independent review; final framework pin adoption
+A disposable source-procedure author trial now verifies summary maintenance and complete pre-decision
+conversation output. Its starting acceptance state is synthetic; native installed-plugin invocation and
+a real owner-acceptance transaction are not claimed. The upstream template PR is open with passing CI and independent review; final framework pin adoption
 waits for that PR to land. Candidate workflow code is prepared, with no consumer pin changed yet.
 Bulk rewrites, merges and unrelated feature work remain outside this change.
 
@@ -150,7 +151,8 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
       Evidence: the package checker first refused unchanged 0.10.0; after both candidate manifests advance together, `bun test tests/vh-adlc/check.test.ts --timeout 60000` passes all 57 checks. This is an unmerged candidate, not a release.
 - [x] T3 `tests/vh-adlc/owner-summary.test.ts` - real binary compatibility checks and observed author/reviewer fixtures distinguish planned proof, scope revisions and misleading summaries while historical specs remain valid (AC-02, AC-03, AC-04)
       Evidence: two actual-binary tests pass (12 assertions), proving summary-only freshness, required draft/review after a normative change and byte-identical stored records. Nine summary/operation compatibility tests pass. Independent semantic trial at four exact scratch commits returns no findings for historical/honest drafts and blocking findings for unsupported proof and changed-default summaries. First trial retained an unrelated test-fixture task finding; corrected drafts were re-reviewed. Fixtures use explicit synthetic lifecycle rows, not real owner acceptance. Model identity is not attested.
-- [ ] T6 `docs/specs/owner-readable-specifications.md` - preserve a disposable actual author-operation trial and its owner-facing pre-acceptance output; independent review verifies the observed behavior rather than inferring it from scripted fixtures (AC-02)
+- [x] T6 `docs/specs/owner-readable-specifications.md` - preserve a disposable actual author-operation trial and its owner-facing pre-acceptance output; independent review verifies the observed behavior rather than inferring it from scripted fixtures (AC-02)
+      Evidence: candidate author procedure used the actual Docs614bb27 template in a disposable checkout; gate draft passed, status-only commit96d0bfa preceded model-authored revision46c4203, and real conversation output linked the full draft and covered migration, recovery, proof and authority. Independent trial review returned NO FINDINGS and confirmed the delivered output closes the earlier gap. Starting acceptance rows remain synthetic; no installed-plugin or real acceptance transaction is claimed.
 - [ ] T4 `AGENTS.md`, `plugins/vh-adlc/knowledge.md` - after the companion Docs delivery lands, adopt its exact published pin, reconcile the candidate version with current main and pass affected package/lifecycle checks and independent review (AC-04)
 
 ## Open Questions
