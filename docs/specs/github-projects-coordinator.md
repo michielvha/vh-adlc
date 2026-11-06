@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "All seven criteria met, independently reviewed and complete; awaiting PR CI and owner merge review."
+status_description: "All seven criteria met after integration review; owner authorized merge, pending final CI."
 branch: feat/github-projects-coordinator
 issue: https://github.com/michielvha/vh-adlc/issues/54
 goal: "Coordinate work across repositories from one GitHub Project while keeping each repository's feature lifecycle authoritative."
@@ -52,7 +52,8 @@ issue metadata is unchanged. The earlier full suite recorded 1290 passes and fou
 Those discovery counts and the installation guide are now corrected; all 85 affected tests pass.
 Go test, vet, tidy and pinned golangci-lint checks also pass. Hosted CI passed at `9af06c6`.
 The branch now incorporates merged owner summaries and uses plugin version 0.12.0.
-The integrated commit needs fresh review and CI before merge.
+The integrated source passes independent implementation R-11 and spec R-12 reviews.
+The PR records the final hosted CI result before the owner-authorized merge.
 A production Homelab board and unattended cleanup remain separate work.
 
 ### Artifact and publication path
@@ -190,19 +191,19 @@ Document native auto-add as an optional complement, including rule limits and ex
 ## Acceptance Criteria
 
 - [x] AC-01: An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
-      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+      Evidence: R-11 returned met at `2be2ae1`; integration source equality preserves the independently observed 87 affected checks and bounded live observations at runtime `9a535ea`. Read R-11 for criterion-specific attribution and limits.
 - [x] AC-02: Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
-      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+      Evidence: R-11 returned met at `2be2ae1`; integration source equality preserves the independently observed 87 affected checks and bounded live observations at runtime `9a535ea`. Read R-11 for criterion-specific attribution and limits.
 - [x] AC-03: Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
-      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+      Evidence: R-11 returned met at `2be2ae1`; integration source equality preserves the independently observed 87 affected checks and bounded live observations at runtime `9a535ea`. Read R-11 for criterion-specific attribution and limits.
 - [x] AC-04: Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
-      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+      Evidence: R-11 returned met at `2be2ae1`; integration source equality preserves the independently observed 87 affected checks and bounded live observations at runtime `9a535ea`. Read R-11 for criterion-specific attribution and limits.
 - [x] AC-05: Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
-      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+      Evidence: R-11 returned met at `2be2ae1`; integration source equality preserves the independently observed 87 affected checks and bounded live observations at runtime `9a535ea`. Read R-11 for criterion-specific attribution and limits.
 - [x] AC-06: Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
-      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+      Evidence: R-11 returned met at `2be2ae1`; integration source equality preserves the independently observed 87 affected checks and bounded live observations at runtime `9a535ea`. Read R-11 for criterion-specific attribution and limits.
 - [x] AC-07: A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
-      Evidence: R-8 returned met at `387d56a`; independent affected checks pass, with bounded live observations retained at runtime `9a535ea`. Read R-8 for criterion-specific attribution and limits.
+      Evidence: R-11 returned met at `2be2ae1`; integration source equality preserves the independently observed 87 affected checks and bounded live observations at runtime `9a535ea`. Read R-11 for criterion-specific attribution and limits.
 
 ## Test Plan
 
@@ -259,6 +260,8 @@ None. The owner selected approved add/update batches and accepted the documented
 | 2026-11-06 | R-8 | implementation | `387d56a6d8c6eb4fc9e4b4ab80108fd2afd38d8a` | unknown | procedural | All seven criteria met; no findings. Model identity not attested. |
 | 2026-11-06 | R-9 | implementation | `c98c5d602c84f5924ee034a83ca7bd97a3b1c578` | unknown | procedural | All seven criteria met; correct the stale compatibility statement. Model identity not attested. |
 | 2026-11-06 | R-10 | spec | `c98c5d602c84f5924ee034a83ca7bd97a3b1c578` | unknown | procedural | Record the source-package publication path. Model identity not attested. |
+| 2026-11-06 | R-11 | implementation | `2be2ae18497a4bc71c8810f01b9ad0a7db727c5f` | unknown | procedural | All seven criteria met; no findings after integration documentation fixes. Model identity not attested. |
+| 2026-11-06 | R-12 | spec | `2be2ae18497a4bc71c8810f01b9ad0a7db727c5f` | unknown | procedural | No findings against the adopted Docs pin. Model identity not attested. |
 
 ### R-1
 
@@ -475,6 +478,41 @@ SEVERITY: should-fix
 WHERE: docs/specs/github-projects-coordinator.md / Context and delivery evidence
 EVIDENCE: At c98c5d602c84f5924ee034a83ca7bd97a3b1c578, the feature document names manifests and package checks but omits the affected artifact's publication path. The adopted Docs f781ee7 delivery convention requires naming affected artifacts and their build/publication paths. Installation documentation identifies marketplace consumption of the Git source package under plugins/vh-adlc. Independently exported the exact commit and executed its extracted Projects CLI through inventory and plan, with unapproved apply refused. That scratch check passed 15 assertions, including fourteen skills, both marketplace files, both 0.12.0 manifests and the adopted Docs pin. Historical hosted CI was independently verified successful at 9af06c6 through Actions run 42152219690. Integrated-head hosted CI remains outstanding.
 PROPOSAL: Add a short factual Context paragraph naming the marketplace Git source package, both manifests and publication through the main-branch merge, with the source-export verification evidence. Distinguish this source-package path from the unaffected binary-release workflows and retain the installed-agent proof limits.
+
+### R-11
+
+CRITERION: AC-01 An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
+VERDICT: met
+EVIDENCE: At clean 2be2ae18497a4bc71c8810f01b9ad0a7db727c5f, independently confirmed exact plugin, tests, marketplace and AGENTS source equality with c98c5d602c84f5924ee034a83ca7bd97a3b1c578. At that earlier target, independently executed 87 passing affected tests with 429 assertions covering configuration, identity resolution, refusal and fresh-process invocation. Current binary knowledge resolves adopted Docs f781ee7b0404e80194aa568af3284888cc222017, and document lint passes.
+
+CRITERION: AC-02 Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
+VERDICT: met
+EVIDENCE: At 2be2ae18497a4bc71c8810f01b9ad0a7db727c5f, exact runtime and test equality preserves the independently observed pagination, identity, incomplete-collection and archived-membership results at c98c5d6. Earlier independent scratch checks covered nested cursors and denied noninitial pages. Independent live inventory at 9a535ea returned complete=true, no gaps, 19 repository issues and both owned cards with archival state preserved.
+
+CRITERION: AC-03 Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
+VERDICT: met
+EVIDENCE: At 2be2ae18497a4bc71c8810f01b9ad0a7db727c5f, independently confirmed retention of the inspected recommendation implementation, skill and passing discovery tests from c98c5d6. Issue state, closure reason, PR head, review and check facts remain separate and source-linked. Uninspected repository lifecycle remains unknown, and selected implementation follows the owning checkout's existing procedure.
+
+CRITERION: AC-04 Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
+VERDICT: met
+EVIDENCE: At 2be2ae18497a4bc71c8810f01b9ad0a7db727c5f, exact source equality preserves independently executed passing approval-binding, configured-scope, preflight, reconciliation and retry tests at c98c5d6. Archived-member retries issued zero mutations. Live observations and author-run receipts remain attributed to 9a535ea. Bounded owner trial authorization was observed. Manual inspection of generated JSON was not observed, and obtaining human approval remains a procedural responsibility.
+
+CRITERION: AC-05 Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
+VERDICT: met
+EVIDENCE: At 2be2ae18497a4bc71c8810f01b9ad0a7db727c5f, confirmed unchanged conflict, partial-failure, timeout, incomplete-preflight and untrusted-input handling verified at c98c5d6. Earlier independent scratch execution established foreign identity refusal and unknown read-back stopping subsequent writes. At 9a535ea, inspected the author-run live conflict receipt and independently read back the preserved intervening value. Documentation and receipts retain the read/write-race disclosure. Rate-limit and mutation-failure coverage remains fixture evidence.
+
+CRITERION: AC-06 Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
+VERDICT: met
+EVIDENCE: At 2be2ae18497a4bc71c8810f01b9ad0a7db727c5f, independently inspected the corrected compatibility passage and artifact/publication description. They now identify the bounded live trial, marketplace Git source package, 0.12.0 manifests and publication through the main-branch merge, while preserving installed-agent and platform limits. Exact plugin/test equality retains the 87 passing affected tests and 15 source-export assertions independently executed at c98c5d6. The latter covered extracted CLI invocation, fourteen skills, both marketplaces, manifests and the adopted Docs pin. Historical CI success was independently verified at 9af06c6. Current-head hosted CI remains outstanding.
+
+CRITERION: AC-07 A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
+VERDICT: met
+EVIDENCE: The controlled live trial remains bound to 9a535ea4ef6778143b440b0bdfc422b46249a3f6. Independently confirmed identical Projects runtime at 2be2ae18497a4bc71c8810f01b9ad0a7db727c5f. Previously inspected bounded owner authorization and author-run add/update/repeat/conflict receipts, then independently executed live inventory, GraphQL read-back and final REST comparisons. All 26 pre-existing docs entries and 55 pre-existing vh-adlc entries matched saved metadata after excluding the two owned tests. Independently confirmed the private board and both owned issues were closed. Mutations were author-executed. The initial failure remains recorded, and the extra archival step was not separately named in the approval question. This follow-up inspected local changes and retained evidence.
+
+NO FINDINGS
+### R-12
+
+NO FINDINGS
 
 ## Sources
 
