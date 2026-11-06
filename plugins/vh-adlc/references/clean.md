@@ -45,8 +45,12 @@ The binary prints one JSON report. `knowledge` is `null`, because neither comman
 `manifest-missing`, `default-branch-unknown`, `manifest-unmerged` and `engine-absent` are notes. With
 `engine-absent`, no Docker engine answered, so container bind mounts were not checked. A working-tree
 manifest that differs from the default branch and is invalid is a `manifest-unmerged` note naming the
-refusal: a dry run plans nothing from it and does not fail, because an applied run never reads it. Only
-an invalid default-branch manifest is `manifest-invalid`.
+refusal: a dry run plans nothing from it and does not fail, because an applied run never reads it. For
+`clean`, only an invalid default-branch manifest is `manifest-invalid`. `default-branch-unknown` also
+covers an `origin/HEAD` that names a branch which no longer exists, and `manifest-missing` also covers a
+manifest a partial clone has not fetched; that note names the
+`git show origin/<branch>:.vh-adlc/cleanup.yaml` that fetches it, because `git fetch` keeps the clone's
+filter. Both skip only the project rules.
 
 ## What counts as in use
 

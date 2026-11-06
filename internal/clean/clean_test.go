@@ -254,7 +254,10 @@ func TestInvalidWorkingTreeManifestIsANote(t *testing.T) {
 }
 
 // TestPartialCloneDoesNotFetch has a manifest blob missing from a partial
-// clone. The run must not fetch it, so it reads the manifest as unusable.
+// clone. The run must not fetch it. It reports a manifest-missing note naming
+// the git show that fetches the blob, skips only the project rules and does
+// not fail; after that command the next run applies the project rules (AC-05,
+// the owner's answers to Q5 and Q7). This replaces T10's manifest-invalid.
 func TestPartialCloneDoesNotFetch(t *testing.T) {
 	c := newCleanFixture(t, repoManifest)
 	bare := strings.TrimSpace(c.repo.Git("remote", "get-url", "origin"))
@@ -285,14 +288,76 @@ func TestPartialCloneDoesNotFetch(t *testing.T) {
 	if !missing() {
 		t.Fatal("the fixture blob is already present")
 	}
-	o := c.options()
-	o.Repo, o.DryRun = clone, true
-	rep, _ := runClean(t, o)
-	if !slices.Contains(codes(rep), report.CodeManifestInvalid) {
-		t.Fatalf("codes %v; want manifest-invalid", codes(rep))
+	c.host.entry("go-build1", 30*time.Hour)
+	c.host.entry("example-run-a", 30*time.Hour)
+	hint := "git show origin/main:" + ManifestPath
+
+	for _, dry := range []bool{true, false} {
+		o := c.options()
+		o.Repo, o.DryRun = clone, dry
+		rep, data := runClean(t, o)
+		want := report.Pass
+		if dry {
+			want = report.Answered
+		}
+		if rep.Result != want || !slices.Equal(codes(rep), []string{report.CodeManifestMissing}) {
+			t.Fatalf("dry=%v: %s %v; want %s with one manifest-missing note", dry, rep.Result, rep.Findings, want)
+		}
+		if !strings.Contains(rep.Findings[0].Message, hint) {
+			t.Fatalf("dry=%v: the note does not name %q: %q", dry, hint, rep.Findings[0].Message)
+		}
+		if got := names(data.Removed); !slices.Equal(got, []string{"go-build1"}) {
+			t.Fatalf("dry=%v: removed %q; want only the built-in go-build1", dry, got)
+		}
+		if !missing() {
+			t.Fatalf("dry=%v: the run fetched the missing blob", dry)
+		}
 	}
-	if !missing() {
-		t.Fatal("the run fetched the missing blob")
+
+	fields := strings.Fields(hint)
+	if out, err := gitIn(clone, fields[1:]...); err != nil {
+		t.Fatalf("running the hint: %v: %s", err, out)
+	}
+	if missing() {
+		t.Fatal("the hint did not fetch the blob")
+	}
+	o := c.options()
+	o.Repo = clone
+	rep, data := runClean(t, o)
+	if rep.Result != report.Pass || len(rep.Findings) != 0 {
+		t.Fatalf("after the hint: %s %v", rep.Result, rep.Findings)
+	}
+	if got := names(data.Removed); !slices.Equal(got, []string{"example-run-a"}) {
+		t.Fatalf("after the hint removed %q; want the project rule's example-run-a", got)
+	}
+}
+
+// TestPrunedDefaultBranch has an origin/HEAD that names a remote-tracking
+// branch which no longer exists, as after a renamed default branch and a
+// pruning fetch. It is a default-branch-unknown note that skips only the
+// project rules and does not fail (AC-05, R-13 F-01).
+func TestPrunedDefaultBranch(t *testing.T) {
+	c := newCleanFixture(t, repoManifest)
+	c.repo.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/gone")
+	c.host.entry("go-build1", 30*time.Hour)
+	c.host.entry("example-run-a", 30*time.Hour)
+	for _, dry := range []bool{true, false} {
+		o := c.options()
+		o.DryRun = dry
+		rep, data := runClean(t, o)
+		want, wantCodes := report.Pass, []string{report.CodeDefaultBranchUnknown}
+		if dry {
+			want, wantCodes = report.Answered, []string{report.CodeDefaultBranchUnknown, report.CodeManifestUnmerged}
+		}
+		if rep.Result != want || !slices.Equal(codes(rep), wantCodes) {
+			t.Fatalf("dry=%v: %s %v; want %s %v", dry, rep.Result, rep.Findings, want, wantCodes)
+		}
+		if !strings.Contains(rep.Findings[0].Message, "git remote set-head origin --auto") {
+			t.Fatalf("dry=%v: the note gives no fix: %q", dry, rep.Findings[0].Message)
+		}
+		if got := names(data.Removed); !slices.Equal(got, []string{"go-build1"}) {
+			t.Fatalf("dry=%v: removed %q; want only the built-in go-build1", dry, got)
+		}
 	}
 }
 
@@ -351,6 +416,9 @@ func TestResults(t *testing.T) {
 		{"no manifest", "", nil, report.CodeManifestMissing, report.Pass, report.Answered, nil},
 		{"no default branch", repoManifest, func(c *cleanFixture, _ *Options) {
 			c.repo.Git("remote", "set-head", "origin", "--delete")
+		}, report.CodeDefaultBranchUnknown, report.Pass, report.Answered, []string{report.CodeDefaultBranchUnknown, report.CodeManifestUnmerged}},
+		{"pruned default branch", repoManifest, func(c *cleanFixture, _ *Options) {
+			c.repo.Git("symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/gone")
 		}, report.CodeDefaultBranchUnknown, report.Pass, report.Answered, []string{report.CodeDefaultBranchUnknown, report.CodeManifestUnmerged}},
 		{"no engine", repoManifest, func(c *cleanFixture, o *Options) {
 			o.DockerHost = "unix://" + filepath.Join(c.host.outer, "absent.sock")

@@ -206,19 +206,30 @@ func refuse(ctx context.Context, o Options) *report.Finding {
 }
 
 // defaultBranchManifest reads the manifest from origin's default branch,
-// never fetching. A missing ref or manifest is a note and gives no rules.
+// never fetching. A missing or dangling ref, a missing manifest and a manifest
+// object a partial clone has not fetched are notes and give no rules.
 func defaultBranchManifest(ctx context.Context, g gitcmd.Git) (*Manifest, []byte, *report.Finding) {
 	ref, err := g.Output(ctx, "symbolic-ref", "-q", "refs/remotes/origin/HEAD")
 	if err != nil || ref == "" {
 		return nil, nil, &report.Finding{Code: report.CodeDefaultBranchUnknown, Message: "no refs/remotes/origin/HEAD, so project rules were skipped; set it with git remote set-head origin --auto"}
 	}
 	branch := strings.TrimPrefix(ref, "refs/remotes/")
+	if _, err := g.Output(ctx, "rev-parse", "--verify", "-q", ref+"^{commit}"); err != nil {
+		// A renamed default branch and a pruning fetch leave origin/HEAD
+		// naming a ref that is gone.
+		return nil, nil, &report.Finding{Code: report.CodeDefaultBranchUnknown, Message: fmt.Sprintf("refs/remotes/origin/HEAD names %s, which no longer exists, so project rules were skipped; set it with git remote set-head origin --auto", branch)}
+	}
 	invalid := func(format string, a ...any) (*Manifest, []byte, *report.Finding) {
 		return nil, nil, &report.Finding{Code: report.CodeManifestInvalid, Message: fmt.Sprintf(format, a...), Path: ManifestPath}
 	}
+	// unfetched is a manifest object a partial clone has not fetched. A plain
+	// read fetches it lazily; git fetch applies the clone's filter and does not.
+	unfetched := func() (*Manifest, []byte, *report.Finding) {
+		return nil, nil, &report.Finding{Code: report.CodeManifestMissing, Message: fmt.Sprintf("%s on %s is not fetched in this partial clone, so project rules were skipped; fetch it with git show %s:%s", ManifestPath, branch, branch, ManifestPath), Path: ManifestPath}
+	}
 	tree, err := g.Output(ctx, "ls-tree", "-z", "--format=%(objecttype) %(objectname)", branch, "--", ManifestPath)
 	if err != nil {
-		return invalid("reading %s on %s without a fetch: %v", ManifestPath, branch, err)
+		return unfetched()
 	}
 	tree = strings.TrimRight(tree, "\x00")
 	if tree == "" {
@@ -230,6 +241,9 @@ func defaultBranchManifest(ctx context.Context, g gitcmd.Git) (*Manifest, []byte
 	}
 	b, err := g.Run(ctx, "cat-file", "blob", sha)
 	if err != nil {
+		if _, perr := g.Run(ctx, "cat-file", "-e", sha); perr != nil {
+			return unfetched()
+		}
 		return invalid("reading %s on %s without a fetch: %v", ManifestPath, branch, err)
 	}
 	m, err := ParseManifest(b)
