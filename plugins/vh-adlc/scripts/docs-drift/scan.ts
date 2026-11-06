@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
-import { gitEnvironment, readGitWithEnvironment } from "../git-read";
+import { gitEnvironment } from "../git-read";
+import { readGitWithEnvironment } from "./git";
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, protocolPath, sha256, verifyProtocolBindings } from "./protocol";
 import type { PathDigest } from "./protocol";
 import { captureRepositoryState, externalArtifactDirectory, readCommittedTree } from "./snapshot";
@@ -163,7 +164,7 @@ export function assessScan(value: unknown, snapshot: Snapshot): ScanAssessment {
 /** Ordinary collection inherits runtime paths and fixed Git controls, without ambient credentials. */
 export function scannerEnvironment(executable: string, git: string, temporary: string): Record<string, string> {
   const environment = gitEnvironment({
-    PATH: [...new Set([dirname(executable), dirname(git), "/usr/bin", "/bin"])].join(":"),
+    PATH: [...new Set([dirname(git), dirname(executable), "/usr/bin", "/bin"])].join(":"),
     LANG: "C", LC_ALL: "C", TMPDIR: temporary, BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
     GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
   });

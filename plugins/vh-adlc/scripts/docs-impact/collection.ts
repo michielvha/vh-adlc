@@ -22,6 +22,7 @@ export type ImpactReport = {
   candidates: Candidate[]; unmatched_sources: string[]; diagnostics: Diagnostic[];
 };
 export type CheckOptions = { repo: string; roots?: string[]; base?: string; paths?: string[]; metadataPaths?: string[] };
+export type CollectionReaders = { git?: typeof readGit; yaml?: (bytes: Uint8Array) => unknown };
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 function fail(message: string): never { throw new Error(message); }
 const sorted = (values: Iterable<string>) => [...new Set(values)].sort();
@@ -54,7 +55,7 @@ class Snapshot {
   dirty: string[] = [];
   undecodable: Array<{ bytes: Buffer; view: "HEAD" | "dirty" | "committed" }> = [];
   reader: ((bytes: Uint8Array) => unknown) | null | undefined;
-  constructor(readonly repo: string) {
+  constructor(readonly repo: string, readonly readers: CollectionReaders = {}) {
     try {
       const top = this.git("rev-parse", "--show-toplevel").toString().trim();
       if (realpathSync(repo) !== realpathSync(top)) fail("the repository input must be its Git root");
@@ -78,7 +79,7 @@ class Snapshot {
     }
   }
   git(...args: string[]): Buffer {
-    return readGit(this.repo, ...args);
+    return (this.readers.git ?? readGit)(this.repo, ...args);
   }
   changed(...revisions: string[]): string[] {
     const fields = nulFields(this.git("diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", "--find-renames", ...revisions, "--"));
@@ -93,7 +94,7 @@ class Snapshot {
   ensureReader(): (bytes: Uint8Array) => unknown {
     if (this.reader === null) throw new ReaderUnavailable();
     if (this.reader === undefined) {
-      try { this.reader = createYAMLReader(fail, { offline: true }); }
+      try { this.reader = this.readers.yaml ?? createYAMLReader(fail, { offline: true }); }
       catch { this.reader = null; throw new ReaderUnavailable(); }
     }
     return this.reader;
@@ -167,7 +168,7 @@ function policy(snapshot: Snapshot): RootsReport {
   return report;
 }
 
-export function resolveRoots(repo: string): RootsReport { return policy(new Snapshot(repo)); }
+export function resolveRoots(repo: string, readers: CollectionReaders = {}): RootsReport { return policy(new Snapshot(repo, readers)); }
 
 function record(value: unknown): Record<string, unknown> | undefined {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : undefined;

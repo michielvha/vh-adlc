@@ -1,4 +1,4 @@
-import { readGit } from "../git-read";
+import { readGit, verifiedHelperEnvironment } from "./git";
 import { readYAML } from "../settings-file";
 import { protocolPath, sha256 } from "./protocol";
 
@@ -423,6 +423,6 @@ export function loadCommittedSettings(repo: string, sourceCommit: string): { set
   const match = /^(100644|100755) blob ([a-f0-9]{40}(?:[a-f0-9]{24})?)\t\.vh-adlc\/docs-drift\.yaml\0$/u.exec(entry);
   if (!match) invalid("committed settings file");
   const bytes = readGit(repo, "cat-file", "blob", match[2]);
-  const value = readYAML(bytes, reason => { throw new Error(reason); }, { offline: true });
+  const value = readYAML(bytes, reason => { throw new Error(reason); }, { offline: true, environment: verifiedHelperEnvironment() });
   return { settings: parseSettings(value), settings_sha256: sha256(bytes), source_commit: sourceCommit };
 }

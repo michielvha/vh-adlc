@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readDocumentMetadata, resolveRoots } from "../docs-impact/collection";
 import { compileCoverage } from "../docs-impact/matching";
-import { gitEnvironment } from "../git-read";
+import { collectionReaders, verifiedHelperEnvironment } from "./git";
 import { canonicalDigest, decodeUTF8, protocolPath, sha256, withinPrefix } from "./protocol";
 import type { Snapshot } from "./snapshot";
 
@@ -109,7 +109,8 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
     complete: false, diagnostics: [], edits: edits.map(edit => ({ path: edit.path, allowed: false, reason: "incomplete-policy", bytes: null, affected_features: [] })),
   };
   const gap = (code: string, path: string | undefined, message: string) => result.diagnostics.push({ code, ...(path ? { path } : {}), message });
-  const roots = resolveRoots(repo);
+  const readers = collectionReaders();
+  const roots = resolveRoots(repo, readers);
   if (roots.head !== snapshot.source_commit || !["declared", "absent"].includes(roots.outcome) || roots.diagnostics.length > 0) {
     for (const diagnostic of roots.diagnostics) gap(diagnostic.code, diagnostic.path, diagnostic.message);
     if (result.diagnostics.length === 0) gap("assessment-source", undefined, "Protection requires the exact committed assessment and complete root classification.");
@@ -119,7 +120,7 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
   for (const blob of snapshot.blobs) {
     if (!withinPrefix(blob.path, roots.policy.feature_root) || !/\.(md|mdx|markdown)$/iu.test(blob.path)) continue;
     try {
-      const metadata = readDocumentMetadata(blob.bytes);
+      const metadata = readDocumentMetadata(blob.bytes, readers.yaml);
       if (!metadata) throw new Error("feature metadata absent");
       if (metadata.branch !== undefined && (typeof metadata.branch !== "string" || !metadata.branch.trim())) throw new Error("feature branch malformed");
       if (!roots.policy.local_format && (typeof metadata.status !== "string" || !statuses.includes(metadata.status))) throw new Error("feature status malformed");
@@ -166,7 +167,7 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
         decision.reason = "other-current-writer";
         continue;
       }
-      const metadata = readDocumentMetadata(blob.bytes);
+      const metadata = readDocumentMetadata(blob.bytes, readers.yaml);
       const declaredKind = context.document_kinds?.find(item => item.document === edit.path && item.document_sha256 === sha256(blob.bytes))?.kind;
       const historyKind = ownFeature !== undefined || ["plan", "review", "evidence", "report"].includes(String(metadata?.type)) ||
         ["plan", "review", "evidence", "unknown"].includes(declaredKind ?? "");
@@ -206,25 +207,18 @@ export type FeatureFreshness = {
 /** Ask the existing verified binary. Coverage matching never supplies a freshness verdict. */
 export function observeFeatureFreshness(repo: string, feature: string): FeatureFreshness {
   protocolPath(feature);
-  const roots = resolveRoots(repo);
+  const readers = collectionReaders();
+  const roots = resolveRoots(repo, readers);
   if (!roots.head || roots.outcome === "incomplete" || roots.diagnostics.length > 0 || roots.policy.excluded_dirty) {
     throw new Error("freshness requires complete committed root policy");
   }
-  const installer = Bun.spawnSync(["bash", join(import.meta.dir, "../ensure-vh-adlc.sh"), "--offline"], { stdout: "pipe", stderr: "pipe" });
+  const installer = Bun.spawnSync(["bash", join(import.meta.dir, "../ensure-vh-adlc.sh"), "--offline"], { env: verifiedHelperEnvironment(), stdout: "pipe", stderr: "pipe" });
   if (installer.exitCode !== 0) throw new Error("verified freshness binary unavailable");
   const binary = installer.stdout.toString().trim();
   const pin = readFileSync(join(import.meta.dir, "../../knowledge.md"), "utf8").match(/\b[a-f0-9]{40}\b/u)?.[0];
   if (!binary || !pin) throw new Error("verified freshness setup unavailable");
   const run = Bun.spawnSync([binary, "fresh", feature, "--repo", repo, "--plugin-pin", pin, "--offline"], {
-    env: {
-      ...gitEnvironment({
-        PATH: process.env.PATH, HOME: process.env.HOME, XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
-        LANG: "C", LC_ALL: "C", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
-      }),
-      GIT_CONFIG_COUNT: "3", GIT_CONFIG_KEY_0: "core.fsmonitor", GIT_CONFIG_VALUE_0: "false",
-      GIT_CONFIG_KEY_1: "credential.helper", GIT_CONFIG_VALUE_1: "",
-      GIT_CONFIG_KEY_2: "http.extraHeader", GIT_CONFIG_VALUE_2: "",
-    }, stdout: "pipe", stderr: "pipe",
+    env: verifiedHelperEnvironment(), stdout: "pipe", stderr: "pipe",
   });
   const value: unknown = JSON.parse(decodeUTF8(run.stdout));
   if (value === null || typeof value !== "object" || !("command" in value) || value.command !== "fresh" ||

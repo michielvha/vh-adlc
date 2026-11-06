@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
-import { readGit } from "../git-read";
+import { readGit } from "./git";
 import { loadCommittedSettings } from "./settings";
 import type { Settings } from "./settings";
 import { canonicalDigest, canonicalJSON, compareUTF8, createProtocolBindings, decodeUTF8, protocolPath, sha256, withinPrefix } from "./protocol";
