@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Refreshing coverage for existing discovery tests and installation docs; functional scope unchanged."
+status: planned
+status_description: "Coverage amendment accepted; completing discovery integration and final review."
 branch: feat/github-projects-coordinator
 issue: https://github.com/michielvha/vh-adlc/issues/54
 goal: "Coordinate work across repositories from one GitHub Project while keeping each repository's feature lifecycle authoritative."
@@ -228,6 +228,7 @@ None. The owner selected approved add/update batches and accepted the documented
 | 2026-11-06 | R-4 | implementation | `020b6b2ff8b598fb3a988aa378668a75134f04dc` | unknown | procedural | AC01/03/05/06 met; AC02/04 not met due to archived membership; AC07 not verified. Model identity not attested. |
 | 2026-11-06 | R-5 | implementation | `9a535ea4ef6778143b440b0bdfc422b46249a3f6` | unknown | procedural | Six criteria met including independent live observations; AC06 not met due to discovery integration. Model identity not attested. |
 | 2026-11-06 | R-6 | spec | `258735c1e8810210a5dac05f06ee718b8cd95208` | unknown | procedural | No findings on the coverage-only revision; model identity not attested. |
+| 2026-11-06 | R-6 | spec | `258735c1e8810210a5dac05f06ee718b8cd95208` | n/a | n/a | accepted by owner |
 
 ### R-1
 
