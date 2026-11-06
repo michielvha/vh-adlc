@@ -48,10 +48,10 @@ The owner accepted that API limit on 2026-11-06. Local subprocess tests cover in
 partial failures and reuse from a fresh CLI process. Strict TypeScript and the package checker pass.
 The authorized trial at `9a535ea` passed real add/update/repeat/conflict and archived-member checks.
 The private test board and its two owned issues were closed; independent read-back confirms existing
-issue metadata is unchanged. Broader checks found four failures in discovery assertions that still
-expect thirteen skills and ten engineering operations. This revision adds those existing test paths
-and the installation guide to coverage so they can be updated together. It changes no behavior,
-criteria or permissions. A production Homelab board and unattended cleanup remain separate work.
+issue metadata is unchanged. The earlier full suite recorded 1290 passes and four discovery failures.
+Those discovery counts and the installation guide are now corrected; all 85 affected tests pass.
+Go test, vet, tidy and pinned golangci-lint checks also pass. Final hosted CI is still pending.
+A production Homelab board and unattended cleanup remain separate work.
 
 ### Current evidence
 
@@ -64,8 +64,10 @@ the strict YAML settings reader; reuse it rather than adding another parser.
 The owner chose interactive use first on 2026-11-06, while preserving room for future cleanup agents.
 In the same session, the owner selected approved add/update batches and explicitly accepted the
 remaining field-update race. This resolves write scope, not full specification acceptance or a live batch grant.
-A live `gh project list --owner vhco-pro --format json --limit 10` failed with missing `read:project`.
-The board inventory is therefore unknown. No existing board's absence is inferred from that failure.
+Initially, `gh project list --owner vhco-pro --format json --limit 10` failed with missing
+`read:project`; no board absence was inferred. The owner later added `project` scope. Fresh live listing
+showed no existing organization boards, and the authorized disposable-board trial then passed.
+That test board and both owned issues are now closed. A production Homelab board has not been created.
 
 ### Options researched
 
@@ -230,6 +232,7 @@ None. The owner selected approved add/update batches and accepted the documented
 | 2026-11-06 | R-5 | implementation | `9a535ea4ef6778143b440b0bdfc422b46249a3f6` | unknown | procedural | Six criteria met including independent live observations; AC06 not met due to discovery integration. Model identity not attested. |
 | 2026-11-06 | R-6 | spec | `258735c1e8810210a5dac05f06ee718b8cd95208` | unknown | procedural | No findings on the coverage-only revision; model identity not attested. |
 | 2026-11-06 | R-6 | spec | `258735c1e8810210a5dac05f06ee718b8cd95208` | n/a | n/a | accepted by owner |
+| 2026-11-06 | R-7 | implementation | `f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a` | unknown | procedural | All seven criteria met; factual summary refresh remains. Model identity not attested. |
 
 ### R-1
 
@@ -332,6 +335,43 @@ PROPOSAL: Update the existing discovery contracts and installation description f
 ### R-6
 
 NO FINDINGS
+
+### R-7
+
+CRITERION: AC-01 An adopter can invoke the Projects operation with one configured board and repository allowlist; invalid or ambiguous identities stop affected operations without guessing or creating board schema.
+VERDICT: met
+EVIDENCE: At clean f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a, independently ran `bun test tests/vh-adlc/projects tests/vh-adlc/check.test.ts tests/vh-adlc/triage/discovery.test.ts tests/vh-adlc/maintenance/discovery.test.ts --timeout 60000`: 85 passed, 417 assertions, zero failures. Checks cover configuration, user/org identities, ambiguous fields, unsupported options, fresh-process invocation and package registration. Previously executed live CLI inventory at 9a535ea; independently confirmed the current Projects runtime is byte-identical.
+
+CRITERION: AC-02 Inventory covers the configured board and repositories across all pages, identifies issues without number collisions, and marks denied, partial or budget-limited collections incomplete without proposing writes from that incomplete inventory.
+VERDICT: met
+EVIDENCE: At f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a, independently observed passing pagination, identity, redaction, budget and archived-membership checks. Previously executed five additional scratch checks against the identical runtime at 9a535ea, including every nested cursor path and denied noninitial relation pages. Independent live inventory at 9a535ea returned complete=true, no gaps, 19 repository issues and both owned cards, including archived membership without another addition proposal.
+
+CRITERION: AC-03 Recommendations preserve separate repository lifecycle and GitHub delivery facts, link their sources and route selected repository work through the existing procedure without accepting or shipping it from a board state.
+VERDICT: met
+EVIDENCE: At f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a, independently executed the affected suite and confirmed runtime equality with the previously inspected implementation. Recommendations retain issue state, closure reason, PR head, review and checks separately, link sources and leave uninspected repository lifecycle unknown. The Projects skill requires the owning checkout's existing procedure before implementation and grants no acceptance or shipping authority from board state.
+
+CRITERION: AC-04 Default inventory changes no remote state; approved updates affect only existing issue membership and configured project fields, with exact-batch approval, fresh value checks, idempotent retries and verified per-operation outcomes.
+VERDICT: met
+EVIDENCE: At f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a, independently executed passing approval-binding, configured-scope, conflict, read-back and retry checks, including archived-member retries with zero mutations. Live observations and author-run add/update/repeat receipts remain labelled 9a535ea, whose runtime is unchanged. The owner authorized bounded disposable-resource testing; that authorization does not establish manual inspection of generated JSON. Digest binding checks exact bytes; obtaining human approval remains a documented procedural responsibility.
+
+CRITERION: AC-05 Detected preflight conflicts stop updates; rate limits, partial failures, unknown outcomes and untrusted card instructions do not duplicate issues, broaden repository scope or produce a false all-success result. Field-update documentation and receipts disclose the read/write race without claiming atomic protection.
+VERDICT: met
+EVIDENCE: At f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a, independently observed passing checks for conflicts, incomplete preflight, partial successes, timeout reconciliation and untrusted input. Earlier independently executed scratch checks against the identical runtime established foreign field/item refusal and unknown read-back stopping later writes. At 9a535ea, inspected the author-run live conflict receipt and independently read back the preserved intervening field value. Documentation and field receipts retain the non-atomic read/write limitation. Rate-limit and mutation-failure scenarios remain fixture evidence.
+
+CRITERION: AC-06 Setup documentation enables interactive access with the existing CLI, explains scope and cross-owner limits, and preserves reusable configuration/JSON results without adding a scheduler, credential store or unattended authority.
+VERDICT: met
+EVIDENCE: At f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a, independently executed 85 passing affected tests, including strict TypeScript, package checks, reusable configuration/JSON and both existing discovery files. All four discovery failures observed in R5 now pass. Installation and workflow documentation consistently enumerate fourteen skills and eleven engineering operations; setup explains Projects access, cross-owner limits and quoting numeric-looking option IDs. No scheduler, credential store or automatic credential refresh was added. The full legacy suite was not rerun in this review or represented as a fresh all-passing run.
+
+CRITERION: AC-07 A controlled trial demonstrates inventory, an approved add/update, a repeat run and a conflict refusal on an owner-authorized disposable board; existing production board items and repository issues remain untouched.
+VERDICT: met
+EVIDENCE: The controlled live trial remains bound to 9a535ea4ef6778143b440b0bdfc422b46249a3f6; independently confirmed its runtime is byte-identical to f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a. Inspected the explicit bounded owner authorization and author-run inventory/add/update/repeat/conflict receipts. Independently executed live product inventory, direct GraphQL observation and final REST comparisons: all 26 pre-existing docs entries and 55 pre-existing vh-adlc entries matched their saved metadata after excluding the exact two owned tests. Independently confirmed the private test board and both owned issues were closed. Mutations were author-executed. Initial trial failure remains recorded; the additional reversible archival regression step was not separately named in the approval question. No additional live operations were executed for R7.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/specs/github-projects-coordinator.md:51-53; docs/specs/github-projects-coordinator.md:67-68
+EVIDENCE: At f3e8f0eb6f60c575f8a0281b0cce7cfcea055d4a, the Owner summary says discovery assertions still expect thirteen skills and ten engineering operations and describes updating them as future work. The current assertions already expect fourteen and eleven, and the independently executed affected suite passes all 85 tests. Current evidence also concludes that board inventory is unknown from an earlier missing-scope failure, despite the subsequently authorized and independently observed live inventory.
+PROPOSAL: Refresh the summary to distinguish the retained failed run from the passing affected rerun. Label the missing-scope observation historical and record the later verified access and disposable-board trial without claiming a new full-suite pass.
 
 ## Sources
 
