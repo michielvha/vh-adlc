@@ -1,5 +1,5 @@
 ---
-status: planned
+status: in-progress
 status_description: "Coverage amendment accepted; completing discovery integration and final review."
 branch: feat/github-projects-coordinator
 issue: https://github.com/michielvha/vh-adlc/issues/54
