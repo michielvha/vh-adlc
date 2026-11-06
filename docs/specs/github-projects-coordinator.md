@@ -1,7 +1,7 @@
 ---
 status: planned
 status_description: "Accepted by owner; ready for tasks and implementation."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/54
 goal: "Coordinate work across repositories from one GitHub Project while keeping each repository's feature lifecycle authoritative."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-projects/
@@ -187,7 +187,14 @@ Document native auto-add as an optional complement, including rule limits and ex
 
 ## Tasks
 
-None yet; written after design review and owner acceptance.
+- [ ] T1 `tests/vh-adlc/projects/settings.test.ts` - invalid board/repository/field settings and ambiguous identities fail against the absent reader (AC-01)
+- [ ] T2 `plugins/vh-adlc/scripts/projects/settings.ts`, `types.ts` - T1 passes using the shared strict YAML reader (AC-01)
+- [ ] T3 `tests/vh-adlc/projects/inventory.test.ts`, `fake-gh.ts` - actual CLI fixture scenarios fail for absent inventory, incomplete pages and identity collisions (AC-02, AC-03)
+- [ ] T4 `plugins/vh-adlc/scripts/projects/github.ts`, `inventory.ts`, `cli.ts` - T3 passes with native gh calls, source-linked facts and versioned output (AC-02, AC-03)
+- [ ] T5 `tests/vh-adlc/projects/apply.test.ts` - approved-batch, conflict, retry and partial-failure scenarios fail against the absent updater (AC-04, AC-05)
+- [ ] T6 `plugins/vh-adlc/scripts/projects/apply.ts`, `cli.ts` - T5 passes with strict operation scope, fresh reads and verified receipts (AC-04, AC-05)
+- [ ] T7 `plugins/vh-adlc/skills/vh-adlc-projects/SKILL.md`, `plugins/vh-adlc/references/projects.md`, `plugins/vh-adlc/references/lifecycle.md`, both plugin manifests, `tests/vh-adlc/check.test.ts`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - registered operation and setup guide pass package checks, with reusable config/output and explicit host limits (AC-01, AC-03, AC-06)
+- [ ] T8 `docs/specs/github-projects-coordinator.md` - after separate live permission and access, record the disposable-board trial and independent implementation review; production resources match baseline (AC-07)
 
 ## Open Questions
 

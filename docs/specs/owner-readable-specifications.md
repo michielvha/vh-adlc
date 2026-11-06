@@ -1,7 +1,7 @@
 ---
 status: planned
 status_description: "Accepted by owner; ready for tasks and implementation."
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/55
 goal: "Let an owner judge a feature's scope, trade-offs and proof from a short summary maintained inside its canonical spec."
 covers:
   - plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md
@@ -138,7 +138,10 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
 
 ## Tasks
 
-None yet; written after design review and owner acceptance.
+- [ ] T1 `docs/specs/owner-readable-specifications.md` - companion vhco-pro/docs template and Context guidance pass its checker and independent review with the rules block unchanged; record its exact PR/commit (AC-01, AC-04)
+- [ ] T2 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `docs/get-started/first-feature.md` - author/reviewer guidance keeps the saved summary consistent and preserves conversation acceptance (AC-01, AC-02, AC-03)
+- [ ] T3 `tests/vh-adlc/owner-summary.test.ts` - real binary compatibility checks and observed author/reviewer fixtures distinguish planned proof, scope revisions and misleading summaries while historical specs remain valid (AC-02, AC-03, AC-04)
+- [ ] T4 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, both plugin manifests - after the companion Docs delivery lands, adopt its exact published pin and pass affected package/lifecycle checks and independent review (AC-04)
 
 ## Open Questions
 
