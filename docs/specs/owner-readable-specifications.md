@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Preparing summary workflow; final adoption waits for shared Docs PR26 to land."
+status_description: "Published template adopted; final checks and independent review are running."
 branch: feat/owner-readable-specifications
 issue: https://github.com/michielvha/vh-adlc/issues/55
 goal: "Let an owner judge a feature's scope, trade-offs and proof from a short summary maintained inside its canonical spec."
@@ -34,7 +34,7 @@ the proposal changes and before acceptance; the independent reviewer checks it f
 The existing conversation summary remains required so you can make the decision directly in chat.
 
 The shared template and format guidance live in `vhco-pro/docs`. Framework author/reviewer instructions
-live in vh-adlc. Land the upstream documentation change first, then adopt its exact published revision.
+live in vh-adlc. The upstream template change is merged; this candidate now adopts its exact published revision.
 Old specs stay valid, old review records stay unchanged, and no parser or gate change is needed.
 
 The owner accepted this scope. Actual binary checks now cover nested and historical specs, summary-only
@@ -42,9 +42,23 @@ corrections and a normative revision without changing stored review records. An 
 trial caught unsupported proof and a changed default while accepting honest and historical drafts.
 A disposable source-procedure author trial now verifies summary maintenance and complete pre-decision
 conversation output. Its starting acceptance state is synthetic; native installed-plugin invocation and
-a real owner-acceptance transaction are not claimed. The upstream template PR is open with passing CI and independent review; final framework pin adoption
-waits for that PR to land. Candidate workflow code is prepared, with no consumer pin changed yet.
+a real owner-acceptance transaction are not claimed. Docs PR26 is merged at `f781ee7b0404e80194aa568af3284888cc222017`, with the reviewed tree unchanged.
+This candidate updates the framework repository and fallback Docs pins to that revision. Other
+consumer pins stay unchanged. Final verification and independent review follow this adoption.
 Bulk rewrites, merges and unrelated feature work remain outside this change.
+
+### Terminology and delivery
+
+| Term | Meaning |
+| --- | --- |
+| Owner summary | The first subsection inside Context that explains the canonical feature scope, approach, trade-offs and proof to its owner; detailed normative sections retain authority (AC-01). |
+
+The changed artifact is the source-distributed vh-adlc plugin payload. The root catalogs (`.claude-plugin/marketplace.json:18-20` and
+`.agents/plugins/marketplace.json`) select `plugins/vh-adlc`; its two manifests carry the candidate version. Existing package/installation
+checks validate that payload and its helper paths. The pinned Go binary and its lock remain unchanged;
+this feature adds no new binary format or build. The existing tagged Go release workflow (`.github/workflows/release.yml:3-13`) remains separate
+from source plugin distribution; the lock still selects the verified existing binary. Native installed-plugin/model invocation is not
+claimed by the disposable source-procedure trial. Other consumer repositories keep their own Docs pins.
 
 ### Current evidence and research
 
@@ -146,7 +160,7 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
 ## Tasks
 
 - [x] T1 `docs/specs/owner-readable-specifications.md` - companion vhco-pro/docs template and Context guidance pass its checker and independent review with the rules block unchanged; record its exact PR/commit (AC-01, AC-04)
-      Evidence: Docs PR https://github.com/vhco-pro/docs/pull/26 at `614bb27a7c1809f4a6e3ab86040329a82466efe0` passes Node24 `npm run check`, independent documentation review and hosted CI42145106147. Rules and top-level headings compare unchanged. PR is open/unmerged; adoption is pending.
+      Evidence: Docs PR https://github.com/vhco-pro/docs/pull/26 at `614bb27a7c1809f4a6e3ab86040329a82466efe0` passes Node24 `npm run check`, independent documentation review and hosted CI42145106147. Rules and top-level headings compare unchanged. That was the pre-merge observation; PR26 is now merged at f781ee7 and this candidate adopts it.
 - [x] T2 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `docs/get-started/first-feature.md` - author/reviewer guidance keeps the saved summary consistent and preserves conversation acceptance (AC-01, AC-02, AC-03)
       Evidence: source guidance is updated conditionally on the resolved template, preserving existing conversation acceptance and historical records. This prose change has no meaningful failing unit test; real binary compatibility and independent semantic trials follow in T3.
 - [x] T5 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - advance the candidate package version together so the existing version-change check passes; no release is published (AC-04)
