@@ -16,7 +16,7 @@ export type Bindings = {
   source_commit: string; candidate_commit: string; candidate_tree: string;
   assessment_sha256: string; diff_sha256: string; settings_sha256: string; scanner_sha256: string;
   options_sha256: string; scope_sha256: string; feedback_sha256: string; proposals_sha256: string;
-  decisions_sha256: string; dependencies_sha256: string;
+  decisions_sha256: string; dependencies_sha256: string; delivery_sha256: string;
 };
 export type Effect = { id: string; kind: keyof typeof effectFields; payload: Record<string, unknown> };
 export type ActionManifest = {
@@ -137,7 +137,7 @@ function parseEffect(value: unknown): Effect {
 
 const bindingFields = [
   "source_commit", "candidate_commit", "candidate_tree", "assessment_sha256", "diff_sha256", "settings_sha256",
-  "scanner_sha256", "options_sha256", "scope_sha256", "feedback_sha256", "proposals_sha256", "decisions_sha256", "dependencies_sha256",
+  "scanner_sha256", "options_sha256", "scope_sha256", "feedback_sha256", "proposals_sha256", "decisions_sha256", "dependencies_sha256", "delivery_sha256",
 ] as const;
 
 export function bindingDigest(value: Bindings): string {
@@ -150,7 +150,7 @@ export function bindingDigest(value: Bindings): string {
 /** Worker inputs precede produced diff/tree/commit identities. The reviewer binds those outputs. */
 export function workerInputDigest(value: Bindings): string {
   bindingDigest(value);
-  const { candidate_commit, candidate_tree, diff_sha256, ...inputs } = value;
+  const { candidate_commit, candidate_tree, diff_sha256, delivery_sha256, ...inputs } = value;
   return sha256(canonicalJSON(inputs));
 }
 
@@ -160,7 +160,7 @@ export function effectDigest(value: Effect[]): string {
   if (new Set(effects.map(effect => effect.id)).size !== effects.length) invalid("duplicate effect IDs");
   return sha256(canonicalJSON(effects));
 }
-function parseManifest(value: unknown): ActionManifest {
+export function parseActionManifest(value: unknown): ActionManifest {
   const input = object(value, ["schema_version", "operation_id", "repository", "repository_id", "actor", "actor_id", "bindings", "effects", "worker"], "fields");
   if (input.schema_version !== 1) invalid("schema version");
   if (typeof input.operation_id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/u.test(input.operation_id)) invalid("operation ID");
@@ -173,11 +173,11 @@ function parseManifest(value: unknown): ActionManifest {
   // The closed schema has been validated. Copy through canonical bytes to detach all caller state.
   return JSON.parse(canonicalJSON(input).toString()) as ActionManifest;
 }
-export function manifestDigest(value: ActionManifest): string { return sha256(canonicalJSON(parseManifest(value))); }
+export function manifestDigest(value: ActionManifest): string { return sha256(canonicalJSON(parseActionManifest(value))); }
 
 /** This checks exact controller-materialized authority, without inferring any additional grant. */
 export function authorizeEffects(manifest: ActionManifest, grants: EffectGrant[]): Effect[] {
-  const parsed = parseManifest(manifest);
+  const parsed = parseActionManifest(manifest);
   const hash = manifestDigest(parsed);
   for (const effect of parsed.effects) {
     const matches = grants.filter(grant => grant.manifest_sha256 === hash && grant.effect_id === effect.id && grant.effect_sha256 === effectDigest([effect]));
@@ -239,7 +239,7 @@ export function verifyRoleIdentity(evidence: NativeRoleEvidence, policy: RolePol
   if (newline < 0 || returned.slice(0, newline) !== `MODEL: ${model}` || /^MODEL:/mu.test(returned.slice(newline + 1))) invalid("returned model identity");
   return {
     invocation_id: evidence.invocation_id, context_id: evidence.context_id, provider: evidence.provider,
-    model, identity_source: source, isolation: evidence.isolation, target_sha256: evidence.target_sha256,
+    model, requested_model: policy.requested_model, identity_source: source, isolation: evidence.isolation, target_sha256: evidence.target_sha256,
     native_sha256: evidence.native_sha256, returned_sha256: evidence.returned_sha256,
     records: returned.slice(newline + 1),
   };
@@ -282,11 +282,17 @@ function freeze<T>(value: T): T {
   return value;
 }
 
+const reviewedInstances = new WeakSet<object>();
+export type ReviewedManifest = ReturnType<typeof validateReviewedManifest>;
+export function requireReviewedManifest(value: ReviewedManifest): void {
+  if (!reviewedInstances.has(value)) invalid("missing owned review result");
+}
+
 export function validateReviewedManifest(input: {
   manifest: unknown; current: ActionManifest; grants: EffectGrant[];
   worker: NativeRoleEvidence; reviewer: NativeRoleEvidence; policy: { worker: RolePolicy; reviewer: RolePolicy };
 }) {
-  const manifest = parseManifest(input.manifest);
+  const manifest = parseActionManifest(input.manifest);
   const hash = manifestDigest(manifest);
   if (hash !== manifestDigest(input.current)) invalid("changed current bindings or payload");
   authorizeEffects(manifest, input.grants);
@@ -302,5 +308,7 @@ export function validateReviewedManifest(input: {
   // The wrapper validates/stages the bounded edit manifest. Its unchanged original bytes are bound
   // above and reviewed together with the resulting checkpoint and complete publication payload.
   cleanReview(reviewer.records);
-  return freeze({ manifest, manifest_sha256: hash, worker, reviewer });
+  const result = freeze({ manifest, manifest_sha256: hash, worker, reviewer });
+  reviewedInstances.add(result);
+  return result;
 }

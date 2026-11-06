@@ -45,3 +45,13 @@ export function collectionReaders() {
     },
   } satisfies CollectionReaders;
 }
+
+/** Write only content-addressed metadata objects in a previously verified owned bare store. */
+export function writeMetadataObject(repo: string, kind: "blob" | "tree" | "commit", bytes: Uint8Array): string {
+  const result = nativeGit(repo, [
+    "--no-lazy-fetch", "--no-replace-objects", "-c", "credential.helper=", "-c", "http.extraHeader=",
+    "-c", "core.hooksPath=/dev/null", "hash-object", "-t", kind, "-w", "--stdin",
+  ], ordinaryGitEnvironment({ PATH: process.env.PATH }), bytes).toString().trim();
+  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(result)) throw Error("invalid metadata Git object");
+  return result;
+}

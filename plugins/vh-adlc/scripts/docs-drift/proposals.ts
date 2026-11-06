@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import type { PullRequestInput, RepositoryReader } from "../github-read";
 import { readGit } from "./git";
 import { gitEnvironment, gitReadArguments } from "../git-read";
@@ -35,8 +35,12 @@ export function collectProposals(reader: RepositoryReader, settings: Settings) {
   return { complete: diagnostics.length === 0, proposals, diagnostics, observations: reader.trace() };
 }
 
-function ownedStore(store: OwnedObjectStore, repository: string): void {
+export function requireOwnedStore(store: OwnedObjectStore, repository: string): void {
   try {
+    const file = lstatSync(store.record_path), directory = lstatSync(store.root);
+    if (!file.isFile() || file.isSymbolicLink() || !directory.isDirectory() || directory.isSymbolicLink()
+      || (file.mode & 0o077) !== 0 || (directory.mode & 0o077) !== 0 || realpathSync(store.root) !== store.root
+      || (process.getuid && (file.uid !== process.getuid() || directory.uid !== process.getuid()))) throw Error("private owned store");
     const raw = readFileSync(store.record_path);
     const record: unknown = JSON.parse(decodeUTF8(raw));
     if (!record || typeof record !== "object" || Array.isArray(record)) throw Error("record");
@@ -55,7 +59,7 @@ export type ProposalDiff = {
 
 /** Read full immutable Git objects. REST patch fields never supply proposal content. */
 export function readProposalDiff(store: OwnedObjectStore, proposal: PullRequestInput): ProposalDiff {
-  ownedStore(store, proposal.base_repository.full_name);
+  requireOwnedStore(store, proposal.base_repository.full_name);
   const result: ProposalDiff = { complete: false, diagnostics: [], base_sha: proposal.base_sha, head_sha: proposal.head_sha,
     merge_base: null, patch_bytes: Buffer.alloc(0), patch_sha256: null, files: [], inputs_sha256: null };
   try {
@@ -101,7 +105,7 @@ export type ProposalFetchOptions = {
 
 /** Authenticated reads are confined to fixed PR/default refs in the already recorded owned store. */
 export async function fetchProposalObjects(store: OwnedObjectStore, proposal: PullRequestInput, options: ProposalFetchOptions): Promise<ProposalDiff> {
-  ownedStore(store, options.repository);
+  requireOwnedStore(store, options.repository);
   if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/iu.test(options.hostname)
     || !/^[a-z0-9-]+\/[a-z0-9_.-]+$/iu.test(options.repository)
     || proposal.base_repository.full_name.toLowerCase() !== options.repository.toLowerCase()

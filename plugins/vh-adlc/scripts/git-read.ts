@@ -4,10 +4,11 @@ export function readGit(repo: string, ...args: string[]): Buffer {
 }
 
 /** Collection subprocesses can supply an allowlisted environment through the same runner. */
-export function readGitWithEnvironment(repo: string, args: string[], environment: Readonly<Record<string, string | undefined>>): Buffer {
+export function readGitWithEnvironment(repo: string, args: string[], environment: Readonly<Record<string, string | undefined>>, input?: Uint8Array): Buffer {
   const result = Bun.spawnSync(gitReadArguments(args), {
     cwd: repo,
     env: gitEnvironment(environment),
+    ...(input === undefined ? {} : { stdin: input }),
     stdout: "pipe",
     stderr: "pipe",
   });
