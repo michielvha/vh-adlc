@@ -50,7 +50,9 @@ The authorized trial at `9a535ea` passed real add/update/repeat/conflict and arc
 The private test board and its two owned issues were closed; independent read-back confirms existing
 issue metadata is unchanged. The earlier full suite recorded 1290 passes and four discovery failures.
 Those discovery counts and the installation guide are now corrected; all 85 affected tests pass.
-Go test, vet, tidy and pinned golangci-lint checks also pass. Final hosted CI is still pending.
+Go test, vet, tidy and pinned golangci-lint checks also pass. Hosted CI passed at `9af06c6`.
+The branch now incorporates merged owner summaries and uses plugin version 0.12.0.
+The integrated commit needs fresh review and CI before merge.
 A production Homelab board and unattended cleanup remain separate work.
 
 ### Current evidence
