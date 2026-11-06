@@ -37,10 +37,12 @@ The shared template and format guidance live in `vhco-pro/docs`. Framework autho
 live in vh-adlc. Land the upstream documentation change first, then adopt its exact published revision.
 Old specs stay valid, old review records stay unchanged, and no parser or gate change is needed.
 
-Validation will exercise a new spec, a scope revision, a stale summary and historical specs with no
-summary, using the real lint/freshness commands and an observed author/reviewer trial. This is a draft
-workflow change, not implemented or accepted. Acceptance authorizes that change; bulk rewrites,
-publications and unrelated feature work remain outside it.
+The owner accepted this scope. Actual binary checks now cover nested and historical specs, summary-only
+corrections and a normative revision without changing stored review records. An independent semantic
+trial caught unsupported proof and a changed default while accepting honest and historical drafts.
+The upstream template PR is open with passing CI and independent review; final framework pin adoption
+waits for that PR to land. Candidate workflow code is prepared, with no consumer pin changed yet.
+Bulk rewrites, merges and unrelated feature work remain outside this change.
 
 ### Current evidence and research
 
@@ -144,8 +146,9 @@ summaries remain parseable before and after it. Do not rewrite stored reviewer o
 - [x] T2 `plugins/vh-adlc/skills/vh-adlc-spec/SKILL.md`, `plugins/vh-adlc/agents/vh-adlc-reviewer.agent.md`, `docs/get-started/first-feature.md` - author/reviewer guidance keeps the saved summary consistent and preserves conversation acceptance (AC-01, AC-02, AC-03)
       Evidence: source guidance is updated conditionally on the resolved template, preserving existing conversation acceptance and historical records. This prose change has no meaningful failing unit test; real binary compatibility and independent semantic trials follow in T3.
 - [x] T5 `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - advance the candidate package version together so the existing version-change check passes; no release is published (AC-04)
-      Evidence: the package checker first refused unchanged 0.10.0; after both candidate manifests advance together, `bun test tests/vh-adlc/check.test.ts --timeout 60000` passes all 60 checks. This is an unmerged candidate, not a release.
-- [ ] T3 `tests/vh-adlc/owner-summary.test.ts` - real binary compatibility checks and observed author/reviewer fixtures distinguish planned proof, scope revisions and misleading summaries while historical specs remain valid (AC-02, AC-03, AC-04)
+      Evidence: the package checker first refused unchanged 0.10.0; after both candidate manifests advance together, `bun test tests/vh-adlc/check.test.ts --timeout 60000` passes all 57 checks. This is an unmerged candidate, not a release.
+- [x] T3 `tests/vh-adlc/owner-summary.test.ts` - real binary compatibility checks and observed author/reviewer fixtures distinguish planned proof, scope revisions and misleading summaries while historical specs remain valid (AC-02, AC-03, AC-04)
+      Evidence: two actual-binary tests pass (12 assertions), proving summary-only freshness, required draft/review after a normative change and byte-identical stored records. Nine summary/operation compatibility tests pass. Independent semantic trial at four exact scratch commits returns no findings for historical/honest drafts and blocking findings for unsupported proof and changed-default summaries. First trial retained an unrelated test-fixture task finding; corrected drafts were re-reviewed. Fixtures use explicit synthetic lifecycle rows, not real owner acceptance. Model identity is not attested.
 - [ ] T4 `AGENTS.md`, `plugins/vh-adlc/knowledge.md` - after the companion Docs delivery lands, adopt its exact published pin, reconcile the candidate version with current main and pass affected package/lifecycle checks and independent review (AC-04)
 
 ## Open Questions
