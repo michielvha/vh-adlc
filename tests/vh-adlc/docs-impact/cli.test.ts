@@ -72,7 +72,7 @@ test("real checker refuses an unavailable locked reader offline without download
   try {
     const plugin = resolve(import.meta.dir, "../../../plugins/vh-adlc"), copied = join(isolated, "plugin");
     mkdirSync(join(copied, "scripts/docs-impact"), { recursive: true });
-    for (const file of ["scripts/docs-impact/cli.ts", "scripts/docs-impact/collection.ts", "scripts/docs-impact/matching.ts", "scripts/settings-file.ts", "scripts/ensure-vh-adlc.sh", "vh-adlc.lock.json"]) {
+    for (const file of ["scripts/docs-impact/cli.ts", "scripts/docs-impact/collection.ts", "scripts/docs-impact/matching.ts", "scripts/settings-file.ts", "scripts/git-read.ts", "scripts/ensure-vh-adlc.sh", "vh-adlc.lock.json"]) {
       writeFileSync(join(copied, file), readFileSync(join(plugin, file)));
     }
     const lock = JSON.parse(readFileSync(join(copied, "vh-adlc.lock.json"), "utf8")); lock.version = `99999.${process.pid}.0`;

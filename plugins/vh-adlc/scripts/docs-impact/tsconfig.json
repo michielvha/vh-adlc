@@ -11,6 +11,7 @@
     "./*.ts",
     "../settings-file.ts",
     "../../../../tests/vh-adlc/docs-impact/*.ts",
-    "../../../../tests/vh-adlc/settings-file.test.ts"
+    "../../../../tests/vh-adlc/settings-file.test.ts",
+    "../../../../tests/vh-adlc/git-read.test.ts"
   ]
 }

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { join } from "node:path";
 import { createYAMLReader } from "../settings-file";
+import { readGit } from "../git-read";
 import { compileCoverage } from "./matching";
 
 type Diagnostic = { code: string; path?: string; message: string };
@@ -23,13 +24,6 @@ export type ImpactReport = {
 export type CheckOptions = { repo: string; roots?: string[]; base?: string; paths?: string[]; metadataPaths?: string[] };
 const hash = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 function fail(message: string): never { throw new Error(message); }
-function gitEnvironment(): Record<string, string | undefined> {
-  const env: Record<string, string | undefined> = { ...process.env, GIT_OPTIONAL_LOCKS: "0", GIT_TERMINAL_PROMPT: "0", GIT_NO_LAZY_FETCH: "1", GIT_NO_REPLACE_OBJECTS: "1" };
-  // Git exports these when calling hooks; --repo always selects this command's own checkout.
-  for (const key of ["GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT", "GIT_OBJECT_DIRECTORY", "GIT_DIR", "GIT_WORK_TREE", "GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE", "GIT_INDEX_FILE", "GIT_REPLACE_REF_BASE", "GIT_PREFIX", "GIT_SHALLOW_FILE", "GIT_COMMON_DIR", "GIT_NAMESPACE"]) delete env[key];
-  for (const key of Object.keys(env)) if (/^GIT_CONFIG_(?:KEY|VALUE)_/u.test(key)) delete env[key];
-  return env;
-}
 const sorted = (values: Iterable<string>) => [...new Set(values)].sort();
 const within = (path: string, root: string) => root === "." || path === root || path.startsWith(root + "/");
 const decode = (bytes: Uint8Array) => new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
@@ -84,11 +78,7 @@ class Snapshot {
     }
   }
   git(...args: string[]): Buffer {
-    const result = Bun.spawnSync(["git", "--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false", ...args], {
-      cwd: this.repo, env: gitEnvironment(), stdout: "pipe", stderr: "pipe",
-    });
-    if (result.exitCode !== 0) fail("Git collection failed");
-    return result.stdout;
+    return readGit(this.repo, ...args);
   }
   changed(...revisions: string[]): string[] {
     const fields = nulFields(this.git("diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", "--find-renames", ...revisions, "--"));
