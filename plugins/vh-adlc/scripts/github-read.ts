@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 export function parsePage(raw: string, expected: { hostname: string; endpoint: string; page: number; repositoryId?: number; onNext?: (url: string) => void }): { items: unknown[]; next: number | null } {
   const split = raw.search(/\r?\n\r?\n/);
   if (split < 0) throw new Error("missing-response-headers");
@@ -40,7 +42,7 @@ export function parsePage(raw: string, expected: { hostname: string; endpoint: s
   return { items, next: expected.page + 1 };
 }
 
-export type ReadOptions = { env?: Record<string, string | undefined>; timeout_ms?: number; projection?: ".id" | ".login" };
+export type ReadOptions = { inherit_env?: boolean; env?: Record<string, string | undefined>; timeout_ms?: number; projection?: ".id" | ".login" };
 
 /** Fixed GET-only argv, shared without importing a mutation adapter or controller. */
 export function ghRead(hostname: string, endpoint: string, options: ReadOptions = {}) {
@@ -54,7 +56,7 @@ export function ghRead(hostname: string, endpoint: string, options: ReadOptions 
   const argv = ["gh", "api", "--hostname", hostname, "--method", "GET"];
   if (options.projection) argv.push(endpoint, "--jq", options.projection);
   else argv.push("--include", endpoint);
-  return Bun.spawnSync(argv, { env: { ...process.env, ...options.env, GH_PROMPT_DISABLED: "1" },
+  return Bun.spawnSync(argv, { env: { ...(options.inherit_env === false ? {} : process.env), ...options.env, GH_PROMPT_DISABLED: "1" },
     stdout: "pipe", stderr: "pipe", timeout: options.timeout_ms ?? 60_000 });
 }
 
@@ -121,3 +123,212 @@ export function createGitHubReader(hostname: string, options: Omit<ReadOptions, 
   };
 }
 
+
+export type RepositoryIdentity = { id: number; full_name: string; default_branch?: string };
+export type PullRequestInput = {
+  number: number; state: "open" | "closed"; merged_at: string | null; body: string; draft: boolean;
+  actor: string; actor_type: string; head_sha: string; head_ref: string; head_repository: RepositoryIdentity | null;
+  base_sha: string; base_ref: string; base_repository: RepositoryIdentity;
+};
+export type WorkflowRunInput = {
+  id: number; run_attempt: number; workflow_id: number; path: string; event: string; status: string;
+  conclusion: string | null; head_sha: string; head_branch: string | null; repository: RepositoryIdentity;
+  head_repository: RepositoryIdentity | null; created_at: string; updated_at: string;
+};
+export type ArtifactInput = {
+  id: number; name: string; size_in_bytes: number; digest: string; expired: boolean;
+  created_at: string; expires_at: string;
+  workflow_run: { id: number; repository_id: number; head_repository_id: number; head_branch: string; head_sha: string };
+};
+export type TypedPage<T> = { items: T[]; pages: number; complete: boolean; diagnostics: string[] };
+export type RepositoryReader = ReturnType<typeof createRepositoryReader>;
+
+function readObject(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error("invalid-github-read-object");
+  return value as Record<string, unknown>;
+}
+function readText(value: unknown): string {
+  if (typeof value !== "string" || !value || /[\x00-\x1f\x7f]/u.test(value)) throw Error("invalid-github-read-text");
+  return value;
+}
+function readID(value: unknown): number {
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) throw Error("invalid-github-read-id");
+  return value;
+}
+function readBoolean(value: unknown): boolean {
+  if (typeof value !== "boolean") throw Error("invalid-github-read-boolean");
+  return value;
+}
+function readSHA(value: unknown): string {
+  if (typeof value !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value)) throw Error("invalid-github-read-sha");
+  return value;
+}
+function readRepository(value: unknown): RepositoryIdentity {
+  const object = readObject(value);
+  const name = readText(object.full_name);
+  if (!/^[a-z0-9-]+\/[a-z0-9_.-]+$/iu.test(name) || name.split("/").some(part => part === "." || part === "..")) throw Error("invalid-github-read-repository");
+  return { id: readID(object.id), full_name: name, ...(object.default_branch === undefined ? {} : { default_branch: readText(object.default_branch) }) };
+}
+function nullableText(value: unknown): string | null { return value === null ? null : readText(value); }
+
+function gitObjectSHA(kind: "blob" | "tree", bytes: Buffer, expected: string): string {
+  return createHash(expected.length === 40 ? "sha1" : "sha256").update(Buffer.from(`${kind} ${bytes.length}\0`)).update(bytes).digest("hex");
+}
+export type GitTreeEntry = { path: string; mode: string; type: "blob" | "tree" | "commit"; sha: string };
+function readGitTree(value: unknown, expected: string, maxEntries: number): { sha: string; entries: GitTreeEntry[] } {
+  const object = readObject(value);
+  if (readSHA(object.sha) !== expected || object.truncated !== false || !Array.isArray(object.tree)
+    || !Number.isSafeInteger(maxEntries) || maxEntries < 1 || object.tree.length > maxEntries) throw Error("incomplete-github-git-tree");
+  const entries: GitTreeEntry[] = [], names = new Set<string>();
+  for (const item of object.tree) {
+    const entry = readObject(item);
+    const path = entry.path;
+    if (typeof path !== "string" || !path || /[\0/]/u.test(path) || [".", "..", ".git"].includes(path.toLowerCase())
+      || Buffer.from(path).toString() !== path || names.has(path)) throw Error("invalid-github-git-tree-path");
+    names.add(path);
+    const mode = readText(entry.mode);
+    const kind = mode === "040000" ? "tree" : mode === "160000" ? "commit" : "blob";
+    if (!["100644", "100755", "040000", "120000", "160000"].includes(mode) || entry.type !== kind) throw Error("invalid-github-git-tree-mode");
+    entries.push({ path, mode, type: kind, sha: readSHA(entry.sha) });
+  }
+  entries.sort((left, right) => Buffer.compare(Buffer.from(left.path + (left.type === "tree" ? "/" : "\0")), Buffer.from(right.path + (right.type === "tree" ? "/" : "\0"))));
+  const raw = Buffer.concat(entries.map(entry => Buffer.concat([Buffer.from(`${entry.mode.replace(/^0/u, "")} ${entry.path}\0`), Buffer.from(entry.sha, "hex")])));
+  if (gitObjectSHA("tree", raw, expected) !== expected) throw Error("github-git-tree-digest-mismatch");
+  return { sha: expected, entries };
+}
+
+
+/** Typed GET routes bind every request to one literal repository; transport and pagination remain shared. */
+export function createRepositoryReader(reader: GitHubReader, repository: string) {
+  if (!/^[a-z0-9-]+\/[a-z0-9_.-]+$/iu.test(repository) || repository.split("/").some(part => part === "." || part === "..")) throw Error("invalid-github-read-repository");
+  const prefix = `repos/${repository}`;
+  let identity: RepositoryIdentity | undefined;
+  function selectedRepository(value: unknown): RepositoryIdentity {
+    const selected = readRepository(value);
+    if (selected.full_name.toLowerCase() !== repository.toLowerCase() || (identity && selected.id !== identity.id)) throw Error("github-read-repository-changed");
+    return selected;
+  }
+  function pull(value: unknown): PullRequestInput {
+    const object = readObject(value), head = readObject(object.head), base = readObject(object.base), user = readObject(object.user);
+    if (object.state !== "open" && object.state !== "closed") throw Error("invalid-github-read-pr-state");
+    if (object.body !== null && typeof object.body !== "string") throw Error("invalid-github-read-pr-body");
+    return { number: readID(object.number), state: object.state, merged_at: nullableText(object.merged_at), body: object.body ?? "", draft: readBoolean(object.draft),
+      actor: readText(user.login), actor_type: readText(user.type), head_sha: readSHA(head.sha), head_ref: readText(head.ref),
+      head_repository: head.repo === null ? null : readRepository(head.repo), base_sha: readSHA(base.sha), base_ref: readText(base.ref), base_repository: selectedRepository(base.repo) };
+  }
+  function run(value: unknown): WorkflowRunInput {
+    const object = readObject(value);
+    return { id: readID(object.id), run_attempt: readID(object.run_attempt), workflow_id: readID(object.workflow_id),
+      path: readText(object.path), event: readText(object.event), status: readText(object.status), conclusion: nullableText(object.conclusion),
+      head_sha: readSHA(object.head_sha), head_branch: nullableText(object.head_branch), repository: selectedRepository(object.repository),
+      head_repository: object.head_repository === null ? null : readRepository(object.head_repository), created_at: readText(object.created_at), updated_at: readText(object.updated_at) };
+  }
+  function artifact(value: unknown): ArtifactInput {
+    const object = readObject(value), source = readObject(object.workflow_run);
+    if (typeof object.size_in_bytes !== "number" || !Number.isSafeInteger(object.size_in_bytes) || object.size_in_bytes < 0
+      || typeof object.digest !== "string" || !/^sha256:[a-f0-9]{64}$/u.test(object.digest)) throw Error("invalid-github-read-artifact-binding");
+    return { id: readID(object.id), name: readText(object.name), size_in_bytes: object.size_in_bytes, digest: object.digest, expired: readBoolean(object.expired),
+      created_at: readText(object.created_at), expires_at: readText(object.expires_at), workflow_run: { id: readID(source.id), repository_id: readID(source.repository_id),
+        head_repository_id: readID(source.head_repository_id), head_branch: readText(source.head_branch), head_sha: readSHA(source.head_sha) } };
+  }
+  function list<T extends { id: number } | { number: number }>(endpoint: string, parse: (value: unknown) => T, key?: string): TypedPage<T> {
+    const page = reader.pages(endpoint, { repositoryId: identity?.id, key });
+    const items: T[] = [], diagnostics: string[] = [];
+    const seen = new Set<number>();
+    if (!page.complete) diagnostics.push(page.error?.message ?? "Incomplete GitHub collection");
+    for (const value of page.items) {
+      try {
+        const item = parse(value);
+        const id = "number" in item ? item.number : item.id;
+        if (seen.has(id)) throw Error("repeated identity");
+        seen.add(id);
+        items.push(item);
+      } catch { diagnostics.push("Malformed, repeated or foreign GitHub collection entry"); }
+    }
+    return { items, pages: page.pages, complete: page.complete && diagnostics.length === 0, diagnostics };
+  }
+  return {
+    repository(): RepositoryIdentity & { default_branch: string } {
+      const selected = selectedRepository(reader.get(prefix));
+      if (!selected.default_branch) throw Error("missing-github-default-branch");
+      identity = selected;
+      return { ...selected, default_branch: selected.default_branch };
+    },
+    pull(number: number): PullRequestInput {
+      const result = pull(reader.get(`${prefix}/pulls/${readID(number)}`));
+      if (result.number !== number) throw Error("github-read-pr-number-changed");
+      return result;
+    },
+    pulls(base: string): TypedPage<PullRequestInput> {
+      readText(base);
+      return list(`${prefix}/pulls?state=open&base=${encodeURIComponent(base)}&per_page=100`, value => {
+        const result = pull(value);
+        if (result.state !== "open" || result.base_ref !== base) throw Error("github-read-pr-filter-changed");
+        return result;
+      });
+    },
+    workflow(id: number) {
+      const object = readObject(reader.get(`${prefix}/actions/workflows/${readID(id)}`));
+      if (readID(object.id) !== id) throw Error("github-read-workflow-changed");
+      return { id, path: readText(object.path), state: readText(object.state) };
+    },
+    run(id: number, attempt?: number): WorkflowRunInput {
+      const suffix = attempt === undefined ? "" : `/attempts/${readID(attempt)}`;
+      const result = run(reader.get(`${prefix}/actions/runs/${readID(id)}${suffix}`));
+      if (result.id !== id || (attempt !== undefined && result.run_attempt !== attempt)) throw Error("github-read-run-changed");
+      return result;
+    },
+    runs(workflow: number, branch: string): TypedPage<WorkflowRunInput> {
+      readText(branch);
+      return list(`${prefix}/actions/workflows/${readID(workflow)}/runs?event=schedule&branch=${encodeURIComponent(branch)}&per_page=100`, value => {
+        const result = run(value);
+        if (result.workflow_id !== workflow || result.event !== "schedule" || result.head_branch !== branch) throw Error("github-read-run-filter-changed");
+        return result;
+      }, "workflow_runs");
+    },
+    artifacts(runID: number): TypedPage<ArtifactInput> {
+      return list(`${prefix}/actions/runs/${readID(runID)}/artifacts?per_page=100`, value => {
+        const result = artifact(value);
+        if (result.workflow_run.id !== runID) throw Error("github-read-artifact-run-changed");
+        return result;
+      }, "artifacts");
+    },
+    artifact(id: number): ArtifactInput {
+      const result = artifact(reader.get(`${prefix}/actions/artifacts/${readID(id)}`));
+      if (result.id !== id) throw Error("github-read-artifact-changed");
+      return result;
+    },
+    ref(ref: string) {
+      if (!/^refs\/heads\/[A-Za-z0-9][A-Za-z0-9_./-]*$/u.test(ref) || ref.includes("..") || ref.includes("//")
+        || ref.split("/").some(part => !part || part.startsWith(".") || part.endsWith(".") || part.endsWith(".lock"))) throw Error("invalid-github-git-ref");
+      const object = readObject(reader.get(`${prefix}/git/ref/${ref.slice(5).split("/").map(encodeURIComponent).join("/")}`));
+      const target = readObject(object.object);
+      if (object.ref !== ref || target.type !== "commit") throw Error("github-git-ref-changed");
+      return { ref, sha: readSHA(target.sha) };
+    },
+    commit(sha: string) {
+      readSHA(sha);
+      const object = readObject(reader.get(`${prefix}/git/commits/${sha}`));
+      if (readSHA(object.sha) !== sha || !Array.isArray(object.parents) || typeof object.message !== "string") throw Error("invalid-github-git-commit");
+      return { sha, tree_sha: readSHA(readObject(object.tree).sha), parents: object.parents.map(parent => readSHA(readObject(parent).sha)), message: object.message };
+    },
+    tree(sha: string, maxEntries = 10000) {
+      readSHA(sha);
+      return readGitTree(reader.get(`${prefix}/git/trees/${sha}`), sha, maxEntries);
+    },
+    blob(sha: string, maxBytes = 16 * 1024 * 1024): Buffer {
+      readSHA(sha);
+      if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) throw Error("invalid-github-git-blob-bound");
+      const object = readObject(reader.get(`${prefix}/git/blobs/${sha}`));
+      if (readSHA(object.sha) !== sha || object.encoding !== "base64" || typeof object.content !== "string"
+        || typeof object.size !== "number" || !Number.isSafeInteger(object.size) || object.size < 0 || object.size > maxBytes
+        || object.content.length > Math.ceil(maxBytes / 3) * 4 * 2 + 2) throw Error("invalid-github-git-blob");
+      const encoded = object.content.replaceAll(/\r?\n/gu, "");
+      if (!/^[A-Za-z0-9+/]*={0,2}$/u.test(encoded) || encoded.length % 4 !== 0) throw Error("invalid-github-git-blob-base64");
+      const bytes = Buffer.from(encoded, "base64");
+      if (bytes.toString("base64") !== encoded || bytes.length !== object.size || gitObjectSHA("blob", bytes, sha) !== sha) throw Error("github-git-blob-digest-mismatch");
+      return bytes;
+    },
+    trace: reader.trace,
+  };
+}

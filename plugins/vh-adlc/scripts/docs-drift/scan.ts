@@ -1,5 +1,7 @@
+import { executeOwnedProcess, outputSize, OUTPUT_LIMIT } from "./owned-process";
+import type { OwnedProcess as ScanProcess } from "./owned-process";
 import { randomUUID } from "node:crypto";
-import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { gitEnvironment } from "../git-read";
 import { readGitWithEnvironment } from "./git";
@@ -177,79 +179,6 @@ export function scannerEnvironment(executable: string, git: string, temporary: s
   };
 }
 
-type ScanProcess = {
-  pid: number; exit_code: number | null; timed_out: boolean; cancelled: string | null; output_limit: boolean; reaped: boolean;
-};
-
-const OUTPUT_LIMIT = 16 * 1024 * 1024;
-
-function outputSize(path: string): number {
-  try {
-    const stat = lstatSync(path);
-    if (!stat.isFile() || stat.isSymbolicLink()) return OUTPUT_LIMIT + 1;
-    return stat.size;
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") return 0;
-    throw error;
-  }
-}
-
-/** Own one process group, including helpers left behind after the scanner parent exits. */
-async function executeScanner(
-  argv: string[], cwd: string, env: Record<string, string>, output: string,
-  stdout: string, stderr: string, timeout: number, started: (pid: number) => void,
-): Promise<ScanProcess> {
-  const child = Bun.spawn(argv, { cwd, env, stdin: "ignore", stdout: Bun.file(stdout), stderr: Bun.file(stderr), detached: true });
-  const result: ScanProcess = { pid: child.pid, exit_code: null, timed_out: false, cancelled: null, output_limit: false, reaped: false };
-  const signal = (value: "SIGTERM" | "SIGKILL") => {
-    try { process.kill(-child.pid, value); return true; } catch { return false; }
-  };
-  let escalation: ReturnType<typeof setTimeout> | undefined;
-  const stop = () => {
-    signal("SIGTERM");
-    escalation ??= setTimeout(() => signal("SIGKILL"), 200);
-  };
-  const interrupt = () => { result.cancelled = "SIGINT"; stop(); };
-  const terminate = () => { result.cancelled = "SIGTERM"; stop(); };
-  process.once("SIGINT", interrupt);
-  process.once("SIGTERM", terminate);
-  const timer = setTimeout(() => { result.timed_out = true; stop(); }, timeout);
-  const monitor = setInterval(() => {
-    try {
-      if ([output, stdout, stderr].some(path => outputSize(path) > OUTPUT_LIMIT)) { result.output_limit = true; stop(); }
-    } catch { result.output_limit = true; stop(); }
-  }, 50);
-  let reap: ReturnType<typeof setTimeout> | undefined;
-  try {
-    started(child.pid);
-    result.exit_code = await Promise.race([
-      child.exited,
-      new Promise<null>(resolve => { reap = setTimeout(() => resolve(null), timeout + 2500); }),
-    ]);
-    result.reaped = result.exit_code !== null;
-  } finally {
-    clearTimeout(timer);
-    clearTimeout(reap);
-    clearInterval(monitor);
-    clearTimeout(escalation);
-    if (signal("SIGTERM")) { await Bun.sleep(200); signal("SIGKILL"); }
-    if (!result.reaped) {
-      let finalTimer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        result.exit_code = await Promise.race([
-          child.exited,
-          new Promise<null>(resolve => { finalTimer = setTimeout(() => resolve(null), 2000); }),
-        ]);
-        result.reaped = result.exit_code !== null;
-      } finally { clearTimeout(finalTimer); }
-    }
-    try { result.output_limit ||= [output, stdout, stderr].some(path => outputSize(path) > OUTPUT_LIMIT); }
-    catch { result.output_limit = true; }
-    process.off("SIGINT", interrupt);
-    process.off("SIGTERM", terminate);
-  }
-  return result;
-}
 
 type ScanOptions = { artifact_root: string; owner: string; run: string; timeout_ms?: number };
 export type ScanRun = ScanAssessment & { checkout: string; output_path: string; record_path: string; process: ScanProcess | null };
@@ -320,9 +249,9 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
       "--protocol-bindings", bindingsPath, "--protocol-json", output,
     ];
     before = captureRepositoryState(checkout);
-    result.process = await executeScanner(args, checkout, env, output, stdout, stderr, timeout, pid => {
+    result.process = await executeOwnedProcess({ argv: args, cwd: checkout, env, watched_outputs: [output], stdout, stderr, timeout_ms: timeout, started: pid => {
       writeFileSync(join(root, "process-start.json"), canonicalJSON({ pid, argv: args, source_commit: snapshot.source_commit }), { flag: "wx", mode: 0o600 });
-    });
+    } });
     writeFileSync(join(root, "process-result.json"), canonicalJSON(result.process), { flag: "wx", mode: 0o600 });
     try {
       if (outputSize(bindingsPath) > OUTPUT_LIMIT) throw new Error("invalid bindings file");

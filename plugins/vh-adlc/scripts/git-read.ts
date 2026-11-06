@@ -5,7 +5,7 @@ export function readGit(repo: string, ...args: string[]): Buffer {
 
 /** Collection subprocesses can supply an allowlisted environment through the same runner. */
 export function readGitWithEnvironment(repo: string, args: string[], environment: Readonly<Record<string, string | undefined>>): Buffer {
-  const result = Bun.spawnSync(["git", "--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false", ...args], {
+  const result = Bun.spawnSync(gitReadArguments(args), {
     cwd: repo,
     env: gitEnvironment(environment),
     stdout: "pipe",
@@ -34,4 +34,9 @@ export function gitEnvironment(base: Readonly<Record<string, string | undefined>
     if (/^GIT_CONFIG_(?:KEY|VALUE)_/u.test(key)) delete env[key];
   }
   return env;
+}
+
+/** Shared fixed argv for synchronous reads and owned authenticated collection. */
+export function gitReadArguments(args: string[]): string[] {
+  return ["git", "--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false", ...args];
 }
