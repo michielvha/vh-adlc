@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Owner chose summary inside Context; awaiting independent review and design acceptance."
+status: planned
+status_description: "Accepted by owner; ready for tasks and implementation."
 issue: null
 goal: "Let an owner judge a feature's scope, trade-offs and proof from a short summary maintained inside its canonical spec."
 covers:
@@ -149,6 +149,7 @@ None. The owner selected summary inside Context, preserving the existing format.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | unknown | procedural | No findings; model identity not attested. |
+| 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | n/a | n/a | accepted by owner |
 
 ### R-1
 

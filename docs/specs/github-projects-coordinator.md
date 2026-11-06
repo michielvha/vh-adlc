@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Owner selected approved board updates and accepted the API race; awaiting full spec acceptance."
+status: planned
+status_description: "Accepted by owner; ready for tasks and implementation."
 issue: null
 goal: "Coordinate work across repositories from one GitHub Project while keeping each repository's feature lifecycle authoritative."
 covers:
@@ -200,6 +200,7 @@ None. The owner selected approved add/update batches and accepted the documented
 | 2026-11-06 | R-1 | spec | `9aac9eeff9e20d30816b0ab8a43f313c30ee2e65` | unknown | procedural | Blocking concurrency promise and missing checker coverage; model identity not attested. |
 | 2026-11-06 | R-2 | spec | `11a4bc2b53476a9a6e26a12541c9a74cfd38ffaf` | unknown | procedural | No findings on corrected proposal; owner write-scope decision pending, model identity not attested. |
 | 2026-11-06 | R-3 | spec | `bdb69f3ae3c84f0a4b5df0312fb2f877b072088e` | unknown | procedural | No findings after folding owner decision; model identity not attested. |
+| 2026-11-06 | R-3 | spec | `bdb69f3ae3c84f0a4b5df0312fb2f877b072088e` | n/a | n/a | accepted by owner |
 
 ### R-1
 
