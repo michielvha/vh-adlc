@@ -103,7 +103,7 @@ export async function publish(options: PublishOptions): Promise<PublishResult> {
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
       if (index === 0) {
         if (lease.state !== "absent") return pending(journal, effect, "publication-lease-occupied", objects);
-      } else if (lease.state === "present" ? lease.object !== objects.lease_object : effect.kind !== "lease-release") {
+      } else if (effect.kind !== "lease-release" && (lease.state !== "present" || lease.object !== objects.lease_object)) {
         return pending(journal, effect, "publication-lease-lost", objects, true);
       }
       journal = appendIntent(journal, effect.id);

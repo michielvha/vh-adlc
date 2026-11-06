@@ -255,6 +255,14 @@ export async function reconcileAbsent(options: {
   try {
     const identity = await options.transport.identity();
     if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id) return blocked("reconciliation-repository-changed");
+    if (plan.manifest.effects.slice(0, -1).every(effect => terminal(journal, effect.id) || isRetired(effect.id))) {
+      const released = await options.transport.observe(plan, release, objects);
+      if (released.state === "done") {
+        if (!intended(journal, release.id)) journal = appendIntent(journal, release.id);
+        journal = appendOutcome(journal, release.id, released.outcome);
+        return result(journal.events.some(event => event.kind === "retired-absence") ? "retired" : "complete", null);
+      }
+    }
     const lease = await options.transport.ref(String(release.payload.ref));
     if (lease.state === "present" && lease.object !== objects.lease_object) return blocked("foreign-publication-lease");
     const retained = await options.transport.ref(String(receipt.payload.ref));
@@ -310,7 +318,7 @@ export async function reconcileAbsent(options: {
         continue;
       }
       if (observation.state !== "absent" || !ids.includes(effect.id) || !observation.evidence) return blocked("known-absence-retirement-not-authorized");
-      if (journal.header.recovery_mode === "observation-only") return blocked("retained-absence-not-definitive");
+      if (isObservationOnly(journal)) return blocked("retained-absence-not-definitive");
       const pending = pendingAttempt(journal, effect, true);
       if (pending) return blocked(pending);
       const lookup = readAbsence({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,

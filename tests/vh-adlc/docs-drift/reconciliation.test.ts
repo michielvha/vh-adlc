@@ -1,4 +1,5 @@
 import { appendInvalidation, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { retainAbsence } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -316,4 +317,53 @@ test("separate cleanup authority can retain metadata after publication proof was
   const attempt = cleanup.journal.events.find(event => event.kind === "attempt" && event.effect_id === "receipt"
     && "reconciliation" in event.payload);
   expect(attempt).toBeDefined();
+});
+
+
+test("a recovery-only original cannot retire another holder's uncertain creation", async () => {
+  const f = publicationFixture(roots), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-create") throw new PublicationExecutionError(true, true);
+    await execute(plan, effect, objects);
+  };
+  await publish(options(f));
+  f.refs.delete(f.settings.publication.lease_ref);
+  f.transport.execute = execute;
+  const other = join(f.root, "recovery-only-owner");
+  mkdirSync(other, { mode: 0o700 });
+  const nativeRef = f.transport.ref;
+  let receiptReads = 0;
+  const transport: typeof f.transport = { ...f.transport, artifact_root: other, async observe(plan, effect, objects) {
+    const observed = await f.transport.observe(plan, effect, objects);
+    return observed.state === "absent" ? { state: "absent" as const, evidence: retainAbsence({
+      artifact_root: other, source_repo: f.repo, plan, effect, transport: "collector", lookup: { synthetic: effect.id, state: "absent" } }) } : observed;
+  }, async ref(ref: string) {
+    if (ref.startsWith(f.settings.publication.receipt_ref_prefix) && ++receiptReads === 1) return { state: "absent" as const };
+    return nativeRef(ref);
+  } };
+  const second = await publish({ ...options(f), artifact_root: other, transport });
+  expect(second.reason).toBe("operation-started-elsewhere");
+  const result = await reconcileAbsent({ ...input(f, second.journal.directory), transport });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("retained-absence-not-definitive");
+  expect(result.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+});
+
+
+test("cleanup can observe its completed release after a lost acknowledgement and new holder", async () => {
+  const f = publicationFixture(roots), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    await execute(plan, effect, objects);
+    if (effect.kind === "lease-release") {
+      f.refs.set(f.settings.publication.lease_ref, "f".repeat(40));
+      throw new PublicationExecutionError(true, true);
+    }
+  };
+  const stopped = await publish(options(f));
+  f.transport.execute = execute;
+  const result = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: [], authorize: async () => null });
+  expect(result.state).toBe("complete");
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe("f".repeat(40));
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
 });

@@ -123,25 +123,19 @@ export function createNativeTransport(options: {
     if (!Array.isArray(prior)) throw Error("missing pre-review native inventory");
     const baseline = new Set(prior.map(positive));
     const candidates: Record<string, unknown>[] = [];
-    const otherMatches = new Set<string>(), seen = new Set<number>();
+    const seen = new Set<number>();
     for (const value of items) {
-      const item = record(value), nativeId = positive(item.id), owner = actor(item.user);
+      const item = record(value), nativeId = positive(item.id);
       if (seen.has(nativeId)) throw Error("incomplete duplicate native inventory");
       seen.add(nativeId);
       if (markerMatches(item.body, plan, effect)) {
-        if (baseline.has(nativeId)) return { candidates, ambiguous: false, conflict: true };
-        candidates.push(item); continue;
+        if (baseline.has(nativeId)) return { candidates, conflict: true };
+        candidates.push(item);
       }
-      // PRs share the issues list but cannot be the result of an issue-create effect.
-      if (effect.kind === "issue-create" && Object.hasOwn(item, "pull_request")) continue;
-      if (baseline.has(nativeId) || owner.actor_id !== plan.manifest.actor_id) continue;
-      const other = plan.manifest.effects.find(other => other.id !== effect.id && other.kind === effect.kind
-        && other.payload.body === item.body && (effect.kind !== "comment-create" || other.payload.number === effect.payload.number));
-      if (!other || otherMatches.has(other.id)) return { candidates, ambiguous: true, conflict: false };
-      otherMatches.add(other.id);
     }
-    return { candidates, ambiguous: false, conflict: false };
+    return { candidates, conflict: false };
   }
+
   function inventoryEvidence(items: unknown[]) {
     return items.map(value => {
       const item = record(value);
@@ -244,7 +238,10 @@ export function createNativeTransport(options: {
             : effect.kind === "receipt-retain" ? objects.object : objects.lease_object ?? objects.object;
           if (effect.kind === "lease-release") {
             if (target.state === "absent") return observed({ ref: p.ref, state: "absent" }, text(p.ref), null);
-            return target.object === expected ? absent({ ref: p.ref, target }) : { state: "conflict", reason: "foreign-lease-object" };
+            if (target.object === expected) return absent({ ref: p.ref, target });
+            if (objects.lease_object && objects.lease_object !== objects.object)
+              return observed({ ref: p.ref, state: "not-owned", object: target.object }, text(p.ref), target.object);
+            return { state: "conflict", reason: "foreign-lease-object" };
           }
           if (target.state === "absent") return absent({ ref: p.ref, target });
           if (target.object === expected) return observed({ ref: p.ref, object: target.object }, text(p.ref), target.object);
@@ -286,9 +283,8 @@ export function createNativeTransport(options: {
         if (effect.kind === "issue-create") {
           checkIssueEvidence(effect);
           const inventory = list(`${prefix}/issues?state=all&per_page=100`);
-          const { candidates, ambiguous, conflict } = creationCandidates(inventory, plan, effect);
+          const { candidates, conflict } = creationCandidates(inventory, plan, effect);
           if (conflict) return { state: "conflict", reason: "native-issue-baseline-marker-changed" };
-          if (ambiguous) return { state: "unknown", reason: "native-issue-origin-ambiguous" };
           if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
           if (candidates.length !== 1) return { state: "conflict", reason: "ambiguous-native-issue" };
           const issue = candidates[0];
@@ -298,9 +294,8 @@ export function createNativeTransport(options: {
         if (effect.kind === "comment-create") {
           const pr = pull(positive(p.number), plan, false);
           const inventory = list(`${prefix}/issues/${p.number}/comments?per_page=100`);
-          const { candidates, ambiguous, conflict } = creationCandidates(inventory, plan, effect);
+          const { candidates, conflict } = creationCandidates(inventory, plan, effect);
           if (conflict) return { state: "conflict", reason: "native-comment-baseline-marker-changed" };
-          if (ambiguous) return { state: "unknown", reason: "native-comment-origin-ambiguous" };
           if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
           if (candidates.length !== 1 || !ownedActor(candidates[0].user, plan) || candidates[0].body !== p.body) return { state: "conflict", reason: "native-comment-payload-changed" };
           return observed(candidates[0], String(positive(candidates[0].id)), pr.head);

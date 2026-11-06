@@ -97,13 +97,13 @@ test("changed source, original native artifacts or actor prevents absent-action 
   }
 });
 
-test("a replacement or lost lease never authorizes reacquisition or foreign cleanup", async () => {
+test("completed business effects can finish observation after lease loss without foreign cleanup", async () => {
   for (const foreign of [null, "f".repeat(40)]) {
     const { f, interrupted } = await interruptedPR();
     if (foreign === null) f.refs.delete(f.settings.publication.lease_ref);
     else f.refs.set(f.settings.publication.lease_ref, foreign);
     const result = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
-    expect(result.state).toBe("pending");
+    expect(result.state).toBe("complete");
     expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
     expect(f.refs.get(f.settings.publication.lease_ref)).toBe(foreign ?? undefined);
   }
@@ -514,4 +514,60 @@ test("an original acquiring run can release only its owned completed recovery-on
   const result = await resumeEffects({ ...options(f), journal_directory: stopped.journal.directory });
   expect(result.state).toBe("complete");
   expect(f.executed).toEqual(["lease", "release"]);
+});
+
+
+test("a delayed nonce acquisition can outlive a replayed run's release", async () => {
+  const f = setup(), execute = f.transport.execute;
+  let lateAcquire: (() => Promise<void>) | null = null, calls = 0;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "lease-acquire" && ++calls === 1) {
+      lateAcquire = () => execute(plan, effect, objects);
+      throw new PublicationExecutionError(true, true);
+    }
+    await execute(plan, effect, objects);
+  };
+  const interrupted = await publish(options(f));
+  const refused = await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  expect(refused.state).toBe("pending");
+  expect(refused.reason).toBe("dispatch-outcome-unknown");
+  expect(calls).toBe(1);
+  // Model the proposed unsafe replay directly on this synthetic remote.
+  for (const effect of f.plan.manifest.effects) await execute(f.plan, effect, interrupted.objects);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  if (lateAcquire === null) throw Error("missing delayed accepted acquisition");
+  await (lateAcquire as () => Promise<void>)();
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
+});
+
+
+test("a lease acquired by the next run after release does not invalidate completed publication", async () => {
+  const f = setup(), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    await execute(plan, effect, objects);
+    if (effect.kind === "lease-release") f.refs.set(f.settings.publication.lease_ref, "f".repeat(40));
+  };
+  const result = await publish(options(f));
+  expect(result.state).toBe("complete");
+  expect(result.journal.events.some(event => event.kind === "invalidation")).toBe(false);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe("f".repeat(40));
+});
+
+
+test("an absent business effect cannot replay after the publication lease is lost", async () => {
+  for (const replacement of [null, "f".repeat(40)]) {
+    const f = setup(), execute = f.transport.execute;
+    f.transport.execute = async (plan, effect, objects) => {
+      if (effect.kind === "pr-create") throw new PublicationExecutionError(false, true);
+      await execute(plan, effect, objects);
+    };
+    const stopped = await publish(options(f));
+    f.transport.execute = execute;
+    if (replacement === null) f.refs.delete(f.settings.publication.lease_ref);
+    else f.refs.set(f.settings.publication.lease_ref, replacement);
+    const result = await resumeEffects({ ...options(f), journal_directory: stopped.journal.directory });
+    expect(result.state).toBe("pending");
+    expect(f.executed).toEqual(["lease", "receipt", "push"]);
+    expect(f.refs.get(f.settings.publication.lease_ref)).toBe(replacement ?? undefined);
+  }
 });

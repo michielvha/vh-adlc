@@ -54,6 +54,9 @@ export function publicationFixture(roots: string[]) {
     async observe(plan, effect, objects) {
       observed.push(effect.id);
       const leaseObject = objects.lease_object ?? objects.object;
+      if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== leaseObject
+        && objects.lease_object && objects.lease_object !== objects.object) return { state: "done", outcome: { state: "observed",
+          observation_sha256: hash("lease-no-longer-owned"), resource_id: String(effect.payload.ref), object: refs.get(String(effect.payload.ref)) ?? null } };
       if (effect.kind === "lease-acquire" && refs.has(String(effect.payload.ref)) && refs.get(String(effect.payload.ref)) !== leaseObject)
         return { state: "conflict", reason: "foreign-lease-object" };
       if (!done.has(effect.id) || (effect.kind === "lease-acquire" && !refs.has(String(effect.payload.ref)))) return { state: "absent", evidence: retainAbsence({ artifact_root: artifacts, source_repo: repo,

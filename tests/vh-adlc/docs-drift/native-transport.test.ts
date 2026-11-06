@@ -259,7 +259,7 @@ test("native issue evidence is read from bound Git objects before exact issue cr
   f.update(state => { state.issues[0].body = body + "\nchanged payload"; });
   expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("conflict");
   f.update(state => { state.issues[0].body = "edited"; });
-  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("unknown");
+  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("absent");
   const changed = { ...issue, payload: { ...issue.payload, evidence_sha256: hash("wrong bytes") } };
   await expect(f.transport.execute(f.plan, changed, f.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
   expect(f.inspect().issues).toHaveLength(1);
@@ -300,13 +300,13 @@ test("native configured refs preserve valid Unicode identities", async () => {
   expect(await f.transport.ref(ref)).toEqual({ state: "present", object: f.commit });
 });
 
-test("removed issue markers stay ambiguous instead of becoming retryable absence", async () => {
+test("removed issue markers remain visible in the native absence inventory", async () => {
   const f = setup(); await f.transport.identity();
   const body = publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + `\nhttps://github.com/fixture/docs/blob/${f.commit}/README.md`;
   const issue: Effect = { id: "issue", kind: "issue-create", payload: { title: "Selected issue", body, labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
   await f.transport.execute(f.plan, issue, f.objects);
   f.update(state => { state.issues[0].body = "marker removed"; });
-  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("unknown");
+  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("absent");
 });
 
 
@@ -327,13 +327,13 @@ test("native refresh uses the exact old head and preserves competing heads", asy
   expect(f.inspect().refs["refs/heads/docs-drift/one"]).toBe("f".repeat(40));
 });
 
-test("removed explanation markers block a duplicate comment attempt", async () => {
+test("removed explanation markers remain visible in the native absence inventory", async () => {
   const f = setup(); await f.transport.identity();
   f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
   const comment: Effect = { id: "explain", kind: "comment-create", payload: { number: 77, body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain"), prior_ids: [] } };
   await f.transport.execute(f.plan, comment, f.objects);
   f.update(state => { state.comments["77"][0].body = "marker removed"; });
-  expect((await f.transport.observe(f.plan, comment, f.objects)).state).toBe("unknown");
+  expect((await f.transport.observe(f.plan, comment, f.objects)).state).toBe("absent");
   expect(f.inspect().comments["77"]).toHaveLength(1);
 });
 
@@ -402,13 +402,43 @@ test("an owned refresh waits for PR head propagation instead of claiming foreign
   expect((await f.transport.observe(f.plan, refresh, f.objects)).state).toBe("done");
 });
 
-test("unexplained actor activity stays unknown and a replaced operation marker cannot prove absence", async () => {
+test("unexplained actor activity remains inventory data under the journal dispatch guard", async () => {
   const f = setup(); await f.transport.identity();
   const issue: Effect = { id: "issue", kind: "issue-create", payload: { title: "Selected issue",
     body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + `\nhttps://github.com/fixture/docs/blob/${f.commit}/README.md`,
     labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
   for (const body of ["Unrelated workflow notice", publicationMarker(f.settings, "other-operation")]) {
     f.update(state => { state.issues = [{ id: 901, number: 701, title: "Other item", body, labels: [], user: { login: "fixture-bot", id: 20 } }]; });
-    expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("unknown");
+    expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("absent");
   }
+});
+
+
+test("unrelated actor items cannot hide an exact native comment outcome or prevent its first dispatch", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => {
+    state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+      head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } });
+    state.comments["77"] = [{ id: 690, body: "Unrelated CI notice", user: { login: "fixture-bot", id: 20 } }];
+  });
+  const effect: Effect = { id: "explain", kind: "comment-create", payload: { number: 77,
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain"), prior_ids: [] } };
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("absent");
+  await f.transport.execute(f.plan, effect, f.objects);
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
+  const calls = readFileSync(f.calls, "utf8").split("\n").filter(line => line.includes('"POST"') && line.includes('/comments'));
+  expect(calls).toHaveLength(1);
+});
+
+
+test("a different native lease holder after release proves this run no longer owns the ref", async () => {
+  const f = setup(); await f.transport.identity();
+  const objects = { ...f.objects, lease_object: "a".repeat(40) };
+  const effect: Effect = { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } };
+  f.update(state => { state.refs[f.settings.publication.lease_ref] = objects.lease_object; });
+  await f.transport.execute(f.plan, effect, objects);
+  f.update(state => { state.refs[f.settings.publication.lease_ref] = "f".repeat(40); });
+  const observed = await f.transport.observe(f.plan, effect, objects);
+  expect(observed.state).toBe("done");
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe("f".repeat(40));
 });
