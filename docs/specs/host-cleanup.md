@@ -389,6 +389,7 @@ None.
 | 2026-11-03 | R-8 | spec | `aa5c66e7fe2c62142e7cf330b6fc504a87ec0d6c` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 | 2026-11-06 | R-9 | implementation | `1ad76f2a3ff81c2f1c69ce0fe06ca8fac9e10c03` | claude-opus-5-5 | procedural | 10 criteria met, 3 not verified, 5 findings, 0 blocking |
 | 2026-11-06 | R-10 | spec | `6d0c8af90cdc036493479430e57b6f2c202cba48` | claude-opus-5-5 | procedural | 6 findings, 0 blocking |
+| 2026-11-06 | R-11 | spec | `1fdaced37fbcefc58a02328a71cc88eebfe83753` | claude-opus-5-5 | procedural | 4 findings, 0 blocking |
 
 ### R-1
 
@@ -1280,6 +1281,36 @@ SEVERITY: nit
 WHERE: plugins/vh-adlc/references/clean.md, What counts as in use (AC-14 artifact)
 EVIDENCE: `references/clean.md:51` says an entry is in use "when a running container bind-mounts the entry or a path inside it". `internal/clean/engine.go:110` lists `/containers/json?all=1`, and `engineState.binds` takes the bind sources of every listed container, stopped ones included. Design says only "a container bind mount". The page states less protection than the code gives.
 PROPOSAL: Drop "running" from that sentence, or say that stopped containers count too.
+
+### R-11
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Commands
+EVIDENCE: Design says "A dry run reports `answered`. An applied run reports `pass`, or `fail` on `removal-failed`, `manifest-invalid`, `engine-unreachable` or `kind-unavailable`." The code disagrees. `Clean` in `internal/clean/clean.go` sets `report.Answered` for a dry run, then switches to `report.Fail` when any finding is in the `failing` list (`clean.go:80-83` and `165-173`). That list holds `removal-failed`, `manifest-invalid`, `engine-unreachable`, `kind-unavailable`, `temp-base-refused` and `host-settings-invalid`. `plugins/vh-adlc/references/clean.md:42` agrees with the code: "a dry run fails on them too". A dry run with an invalid working-tree manifest exited 1 with `fail` (see F-02). R-6 F-08 and R-7 F-03 both asked Design to state what a dry run reports for these codes. Only the checked task T10 records the choice ("every failing code fails a dry run too"), and Tasks are not normative. The operation's apply step depends on this result (`SKILL.md` step 2). No criterion states a result, so an implementation review would not catch the mismatch.
+PROPOSAL: Have Design say that a dry run reports `answered`, or `fail` on the same codes as an applied run, which is what the code and `references/clean.md` already do.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Where the rules come from; Design, Operation and allow rules
+EVIDENCE: Setup: a scratch clone of this repository at 1fdaced, so `origin/HEAD` holds the branch's valid manifest; a binary built from HEAD outside the repository; and a working-tree `.vh-adlc/cleanup.yaml` replaced with `schema_version: 2`. `clean --dry-run --older-than 10000h` exited 1 with result `fail` and one finding, `manifest-invalid`, "the working tree's manifest: schema_version must be 1". `workingTreeManifest` (`clean.go:243-253`) is read only on a dry run, so an applied run would use the valid default-branch manifest and pass. `SKILL.md` step 2 and `references/clean.md` step 2 apply only when the dry run answered with no failing finding. So in a repository with a broken, uncommitted manifest edit, a session blocked on space cannot clean through the operation, even though Design says "An applied run uses only the default-branch manifest". Design does not say what happens to an invalid working-tree copy.
+PROPOSAL: Report an invalid working-tree manifest on a dry run as a note that does not fail the run, for example beside `manifest-unmerged`. Otherwise, state in Design that it fails the dry run and that the operation then sends the user to a terminal.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, What clean will and will not touch
+EVIDENCE: The stated limit names a bind of "all of `/tmp` or `/`, the temp base, or the project's temp root". Under Temp root, a valid `temp_base` only has to be absolute, not `$HOME`, outside any Git work tree and not above the repository. So a base such as `~/.cache/vh-adlc` or `/var/tmp/vh` is valid. Bind sources reach the in-use check through `files.go:124`, and `usage.holds` (`files.go:283-290`) calls `within(p, entry)` (`host.go:108-111`), which holds only for the entry itself or a path inside it. So a container that bind-mounts any directory above a custom base also marks no temp-root entry as in use, for example a dev container that mounts `$HOME`. The stated limit does not name that case. R-10 F-03 proposed "any ancestor of the scanned directory", and Q1 offered only the temp base and the temp root.
+PROPOSAL: Widen the sentence in Design and in `references/clean.md` to a bind of the temp base, the project's temp root, or any directory above them.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Sources
+EVIDENCE: The first Sources entry is labelled "Pinned feature-document standard". It and the coding, Go and prose links point at `vhco-pro/docs` blob `e4d58d2cd69bd42f1efacf91dfdd3f01a24e134a`. The repository pin is `0e52f51f01b84eda75a976763c42d8ec0a07b544` (`AGENTS.md:4`). `vh-adlc lint` and `gate` report `knowledge.revision` 0e52f51, and the R-8 records cite that pin.
+PROPOSAL: Point the four links at 0e52f51, or drop the word "Pinned".
 
 ## Sources
 
