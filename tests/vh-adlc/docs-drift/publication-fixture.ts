@@ -58,7 +58,8 @@ export function publicationFixture(roots: string[]) {
         return { state: "conflict", reason: "foreign-lease-object" };
       if (!done.has(effect.id) || (effect.kind === "lease-acquire" && !refs.has(String(effect.payload.ref)))) return { state: "absent", evidence: retainAbsence({ artifact_root: artifacts, source_repo: repo,
         plan, effect, transport: "collector", lookup: { fixture_effect: effect.id, state: "absent" } }) };
-      return { state: "done", outcome: { state: "observed", observation_sha256: hash(effect.id), resource_id: effect.id, object: effect.kind === "lease-release" ? null : objects.object } };
+      return { state: "done", outcome: { state: "observed", observation_sha256: hash(effect.id), resource_id: effect.id,
+        object: effect.kind === "lease-release" ? null : effect.kind === "lease-acquire" ? leaseObject : objects.object } };
     },
     async execute(plan, effect, objects) {
       executed.push(effect.id);

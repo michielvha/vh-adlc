@@ -129,7 +129,7 @@ export function createNativeTransport(options: {
       if (seen.has(nativeId)) throw Error("incomplete duplicate native inventory");
       seen.add(nativeId);
       if (markerMatches(item.body, plan, effect)) {
-        if (baseline.has(nativeId)) return { candidates, ambiguous: true };
+        if (baseline.has(nativeId)) return { candidates, ambiguous: false, conflict: true };
         candidates.push(item); continue;
       }
       // PRs share the issues list but cannot be the result of an issue-create effect.
@@ -137,10 +137,10 @@ export function createNativeTransport(options: {
       if (baseline.has(nativeId) || owner.actor_id !== plan.manifest.actor_id) continue;
       const other = plan.manifest.effects.find(other => other.id !== effect.id && other.kind === effect.kind
         && other.payload.body === item.body && (effect.kind !== "comment-create" || other.payload.number === effect.payload.number));
-      if (!other || otherMatches.has(other.id)) return { candidates, ambiguous: true };
+      if (!other || otherMatches.has(other.id)) return { candidates, ambiguous: true, conflict: false };
       otherMatches.add(other.id);
     }
-    return { candidates, ambiguous: false };
+    return { candidates, ambiguous: false, conflict: false };
   }
   function inventoryEvidence(items: unknown[]) {
     return items.map(value => {
@@ -236,7 +236,9 @@ export function createNativeTransport(options: {
           const target = getRef(text(p.ref));
           if (effect.kind === "branch-refresh") {
             const pr = pull(positive(p.number), plan);
-            if (pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present" || pr.head !== target.object) return { state: "conflict", reason: "native-refresh-scope-changed" };
+            if (pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return { state: "conflict", reason: "native-refresh-scope-changed" };
+            if (target.object === p.head && pr.head === p.expected_head) return { state: "unknown", reason: "native-PR-head-sync-pending" };
+            if (pr.head !== target.object) return { state: "conflict", reason: "native-refresh-scope-changed" };
           }
           const expected = effect.kind === "push" || effect.kind === "branch-refresh" ? text(p.head)
             : effect.kind === "receipt-retain" ? objects.object : objects.lease_object ?? objects.object;
@@ -284,8 +286,9 @@ export function createNativeTransport(options: {
         if (effect.kind === "issue-create") {
           checkIssueEvidence(effect);
           const inventory = list(`${prefix}/issues?state=all&per_page=100`);
-          const { candidates, ambiguous } = creationCandidates(inventory, plan, effect);
-          if (ambiguous) return { state: "conflict", reason: "native-issue-origin-ambiguous" };
+          const { candidates, ambiguous, conflict } = creationCandidates(inventory, plan, effect);
+          if (conflict) return { state: "conflict", reason: "native-issue-baseline-marker-changed" };
+          if (ambiguous) return { state: "unknown", reason: "native-issue-origin-ambiguous" };
           if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
           if (candidates.length !== 1) return { state: "conflict", reason: "ambiguous-native-issue" };
           const issue = candidates[0];
@@ -295,8 +298,9 @@ export function createNativeTransport(options: {
         if (effect.kind === "comment-create") {
           const pr = pull(positive(p.number), plan, false);
           const inventory = list(`${prefix}/issues/${p.number}/comments?per_page=100`);
-          const { candidates, ambiguous } = creationCandidates(inventory, plan, effect);
-          if (ambiguous) return { state: "conflict", reason: "native-comment-origin-ambiguous" };
+          const { candidates, ambiguous, conflict } = creationCandidates(inventory, plan, effect);
+          if (conflict) return { state: "conflict", reason: "native-comment-baseline-marker-changed" };
+          if (ambiguous) return { state: "unknown", reason: "native-comment-origin-ambiguous" };
           if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
           if (candidates.length !== 1 || !ownedActor(candidates[0].user, plan) || candidates[0].body !== p.body) return { state: "conflict", reason: "native-comment-payload-changed" };
           return observed(candidates[0], String(positive(candidates[0].id)), pr.head);

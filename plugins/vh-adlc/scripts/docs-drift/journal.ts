@@ -23,10 +23,12 @@ export type PlanPolicy = {
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
 export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string } };
+export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
+type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant };
 type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean };
 type Event = {
   schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended" | "recovery-only";
-  effect_id: string; payload: { effect_sha256: string } | Outcome | { reason: string } | Retirement | { attempt_id: string } | AttemptEnd;
+  effect_id: string; payload: { effect_sha256: string } | Outcome | { reason: string } | Retirement | Attempt | AttemptEnd;
 };
 type Header = {
   schema_version: 1; kind: "docs-drift-journal"; operation_id: string; repository: string;
@@ -197,10 +199,17 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
     if (!prior.some(item => item.kind === "intent")) fail("outcome or handoff without intent");
     if (["outcome", "retired-absence"].includes(event.kind) && prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")) fail("effect already terminal");
     if (event.kind === "attempt") {
-      identifier(exact(event.payload, ["attempt_id"]).attempt_id);
+      const scoped = Object.hasOwn(event.payload, "reconciliation");
+      const payload = exact(event.payload, scoped ? ["attempt_id", "reconciliation"] : ["attempt_id"]);
+      identifier(payload.attempt_id);
+      if (scoped) {
+        const grant = exact(payload.reconciliation, ["scope_sha256", "request_sha256"]);
+        hash(grant.scope_sha256); hash(grant.request_sha256);
+        if (effect.kind !== "receipt-retain" && effect.kind !== "lease-release") fail("cleanup cannot replay business effects");
+      }
       const latest = prior.findLast(item => item.kind === "attempt");
       if (prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")
-        || (effect.kind !== "lease-release" && previous.some(item => item.kind === "invalidation" || item.kind === "recovery-only"))
+        || (!scoped && effect.kind !== "lease-release" && previous.some(item => item.kind === "invalidation" || item.kind === "recovery-only"))
         || (latest && !prior.some(item => item.kind === "attempt-ended" && item.revision > latest.revision))) fail("attempt already pending or operation terminal");
       if (prior.some(item => item.kind === "attempt" && (item.payload as { attempt_id: string }).attempt_id === (event.payload as { attempt_id: string }).attempt_id)) fail("repeated attempt identity");
     }
@@ -312,8 +321,8 @@ export function appendRetirement(journal: Journal, effectId: string, retirement:
   return append(journal, "retired-absence", effectId, retirement);
 }
 
-export function appendAttempt(journal: Journal, effectId: string, attemptId: string): Journal {
-  return append(journal, "attempt", effectId, { attempt_id: identifier(attemptId) });
+export function appendAttempt(journal: Journal, effectId: string, attemptId: string, reconciliation?: ReconciliationGrant): Journal {
+  return append(journal, "attempt", effectId, { attempt_id: identifier(attemptId), ...(reconciliation ? { reconciliation } : {}) });
 }
 export function appendAttemptEnd(journal: Journal, effectId: string, status: AttemptEnd): Journal {
   return append(journal, "attempt-ended", effectId, status);

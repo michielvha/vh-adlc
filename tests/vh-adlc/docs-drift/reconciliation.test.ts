@@ -1,3 +1,4 @@
+import { appendInvalidation, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -200,4 +201,119 @@ test("a new original journal cannot execute an operation retired in another root
   expect(second.state).toBe("pending");
   expect(second.reason).toBe("operation-started-elsewhere");
   expect(f.executed.includes("pr")).toBe(false);
+});
+
+
+test("cleanup preserves the operation fence before retiring later actions", async () => {
+  const f = publicationFixture(roots), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "receipt-retain") throw new PublicationExecutionError(false, true);
+    await execute(plan, effect, objects);
+  };
+  const stopped = await publish(options(f));
+  f.transport.execute = execute;
+  const rejected = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: ["receipt", "push", "pr"] });
+  expect(rejected.state).toBe("pending");
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  const scopeRecords: ReconciliationScope[] = [];
+  const cleanup = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: ["push", "pr"],
+    authorize: scope => { scopeRecords.push(structuredClone(scope)); return request(scope); } });
+  expect(cleanup.state).toBe("retired");
+  expect(f.refs.get(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(cleanup.objects.object);
+  expect(f.executed).toEqual(["lease", "receipt", "release"]);
+  expect(scopeRecords.length).toBeGreaterThan(0);
+  expect(scopeRecords.every(scope => scope.retain_receipt?.effect_id === "receipt"
+    && scope.retain_receipt.ref === f.settings.publication.receipt_ref_prefix + "operation-1"
+    && scope.retain_receipt.object === cleanup.objects.object)).toBe(true);
+  const other = join(f.root, "after-cleanup");
+  mkdirSync(other, { mode: 0o700 });
+  const rerun = await publish({ ...options(f), artifact_root: other, transport: { ...f.transport, artifact_root: other } });
+  expect(rerun.reason).toBe("operation-started-elsewhere");
+  expect(f.executed.includes("pr")).toBe(false);
+});
+
+test("two absences past a client timeout cannot retire a server-side request that can still complete", async () => {
+  const f = publicationFixture(roots), execute = f.transport.execute;
+  let lateCommit: (() => Promise<void>) | null = null;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "pr-create") {
+      lateCommit = () => execute(plan, effect, objects);
+      throw new PublicationExecutionError(true, true);
+    }
+    await execute(plan, effect, objects);
+  };
+  const stopped = await publish(options(f));
+  f.transport.execute = execute;
+  const recovered = join(f.root, "late-server-recovery");
+  mkdirSync(recovered, { mode: 0o700 });
+  f.transport = { ...f.transport, artifact_root: recovered };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: recovered, settings: f.settings,
+    transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: recovered } });
+  expect(restored.state).toBe("pending");
+  const pr = f.plan.manifest.effects.find(effect => effect.kind === "pr-create");
+  if (!pr) throw Error("missing creation fixture");
+  expect((await f.transport.observe(f.plan, pr, restored.objects)).state).toBe("absent");
+  const emulatedClientTimeout = 10;
+  await Bun.sleep(emulatedClientTimeout * 2);
+  expect((await f.transport.observe(f.plan, pr, restored.objects)).state).toBe("absent");
+  const refused = await reconcileAbsent(input(f, restored.journal.directory));
+  expect(refused.state).toBe("pending");
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  if (lateCommit === null) throw Error("missing accepted server request");
+  await (lateCommit as () => Promise<void>)();
+  const observed = await resumeEffects({ ...options(f), artifact_root: recovered, journal_directory: restored.journal.directory });
+  expect(observed.state).toBe("pending");
+  const cleanup = await reconcileAbsent({ ...input(f, observed.journal.directory), retire_effect_ids: [] });
+  expect(cleanup.state).toBe("complete");
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+});
+
+
+test("cleanup cannot retain a missing fence under a grant that omits that effect", async () => {
+  const f = publicationFixture(roots), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "receipt-retain") throw new PublicationExecutionError(false, true);
+    await execute(plan, effect, objects);
+  };
+  const stopped = await publish(options(f));
+  f.transport.execute = execute;
+  const cleanup = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: ["push", "pr"],
+    authorize: scope => request({ ...scope, retain_receipt: null }) });
+  expect(cleanup.state).toBe("pending");
+  expect(f.executed).toEqual(["lease"]);
+  expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(false);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+});
+
+
+test("removing an already recorded operation fence blocks cleanup lease release", async () => {
+  const { f, interrupted } = await abandoned();
+  f.refs.delete(f.settings.publication.receipt_ref_prefix + "operation-1");
+  const cleanup = await reconcileAbsent(input(f, interrupted.journal.directory));
+  expect(cleanup.state).toBe("pending");
+  expect(cleanup.reason).toBe("retained-operation-removed");
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  expect(f.executed).toEqual(["lease", "receipt", "push"]);
+});
+
+
+test("separate cleanup authority can retain metadata after publication proof was invalidated", async () => {
+  const f = publicationFixture(roots), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "receipt-retain") throw new PublicationExecutionError(false, true);
+    await execute(plan, effect, objects);
+  };
+  const stopped = await publish(options(f));
+  appendInvalidation(readJournal(stopped.journal.directory, f.repo), "receipt", "current-publication-proof-changed");
+  f.transport.execute = execute;
+  f.input.grants = [];
+  f.input.reviewer.native = Buffer.from("lost original proof");
+  const cleanup = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: ["push", "pr"] });
+  expect(cleanup.state).toBe("retired");
+  expect(f.executed).toEqual(["lease", "receipt", "release"]);
+  const attempt = cleanup.journal.events.find(event => event.kind === "attempt" && event.effect_id === "receipt"
+    && "reconciliation" in event.payload);
+  expect(attempt).toBeDefined();
 });

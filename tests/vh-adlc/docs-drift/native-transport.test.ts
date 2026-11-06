@@ -256,8 +256,10 @@ test("native issue evidence is read from bound Git objects before exact issue cr
   expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("absent");
   await f.transport.execute(f.plan, issue, f.objects);
   expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("done");
-  f.update(state => { state.issues[0].body = "edited"; });
+  f.update(state => { state.issues[0].body = body + "\nchanged payload"; });
   expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("conflict");
+  f.update(state => { state.issues[0].body = "edited"; });
+  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("unknown");
   const changed = { ...issue, payload: { ...issue.payload, evidence_sha256: hash("wrong bytes") } };
   await expect(f.transport.execute(f.plan, changed, f.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
   expect(f.inspect().issues).toHaveLength(1);
@@ -304,7 +306,7 @@ test("removed issue markers stay ambiguous instead of becoming retryable absence
   const issue: Effect = { id: "issue", kind: "issue-create", payload: { title: "Selected issue", body, labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
   await f.transport.execute(f.plan, issue, f.objects);
   f.update(state => { state.issues[0].body = "marker removed"; });
-  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("conflict");
+  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("unknown");
 });
 
 
@@ -331,7 +333,7 @@ test("removed explanation markers block a duplicate comment attempt", async () =
   const comment: Effect = { id: "explain", kind: "comment-create", payload: { number: 77, body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain"), prior_ids: [] } };
   await f.transport.execute(f.plan, comment, f.objects);
   f.update(state => { state.comments["77"][0].body = "marker removed"; });
-  expect((await f.transport.observe(f.plan, comment, f.objects)).state).toBe("conflict");
+  expect((await f.transport.observe(f.plan, comment, f.objects)).state).toBe("unknown");
   expect(f.inspect().comments["77"]).toHaveLength(1);
 });
 
@@ -385,4 +387,28 @@ test("an exact created PR awaiting its approved labels stays unknown without mat
   await f.transport.execute(f.plan, pr, f.objects);
   f.update(state => { state.prs[0].labels = []; });
   expect(await f.transport.observe(f.plan, pr, f.objects)).toEqual({ state: "unknown", reason: "native-PR-labels-incomplete" });
+});
+
+test("an owned refresh waits for PR head propagation instead of claiming foreign change", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => {
+    state.refs["refs/heads/docs-drift/one"] = f.commit;
+    state.prs.push({ number: 501, state: "open", user: { login: "fixture-bot", id: 20 },
+      head: { ref: "docs-drift/one", sha: "e".repeat(40), repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } });
+  });
+  const refresh: Effect = { id: "refresh", kind: "branch-refresh", payload: { number: 501, ref: "refs/heads/docs-drift/one", expected_head: "e".repeat(40), head: f.commit } };
+  expect(await f.transport.observe(f.plan, refresh, f.objects)).toEqual({ state: "unknown", reason: "native-PR-head-sync-pending" });
+  f.update(state => { (state.prs[0].head as { sha: string }).sha = f.commit; });
+  expect((await f.transport.observe(f.plan, refresh, f.objects)).state).toBe("done");
+});
+
+test("unexplained actor activity stays unknown and a replaced operation marker cannot prove absence", async () => {
+  const f = setup(); await f.transport.identity();
+  const issue: Effect = { id: "issue", kind: "issue-create", payload: { title: "Selected issue",
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + `\nhttps://github.com/fixture/docs/blob/${f.commit}/README.md`,
+    labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
+  for (const body of ["Unrelated workflow notice", publicationMarker(f.settings, "other-operation")]) {
+    f.update(state => { state.issues = [{ id: 901, number: 701, title: "Other item", body, labels: [], user: { login: "fixture-bot", id: 20 } }]; });
+    expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("unknown");
+  }
 });

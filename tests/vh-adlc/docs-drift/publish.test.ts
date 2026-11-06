@@ -1,5 +1,6 @@
 import { afterAll, expect, test } from "bun:test";
-import { rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
@@ -96,5 +97,14 @@ test("a consolidation refresh cannot finish while its PR retains the old receipt
   const input = fixture(f.input.manifest.bindings, effects);
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...f.policy, corrections: [], attention: [] });
   await expect(publish({ ...options(f), plan, gate: async () => ({ review: input, policy: f.policy }) })).rejects.toThrow("refresh");
+  expect(f.executed).toEqual([]);
+});
+
+
+test("a mismatched artifact root fails before journal creation or effects", async () => {
+  const f = setup(), wrong = join(f.root, "unselected-root");
+  mkdirSync(wrong, { mode: 0o700 });
+  await expect(publish({ ...options(f), artifact_root: wrong })).rejects.toThrow("artifact");
+  expect(existsSync(join(wrong, "docs-drift-operation-1"))).toBe(false);
   expect(f.executed).toEqual([]);
 });

@@ -5,6 +5,7 @@ import { canonicalJSON } from "./protocol";
 import { publicationMarker } from "./report-history";
 import { loadCommittedSettings, type Settings } from "./settings";
 import type { OwnedObjectStore } from "./snapshot";
+import { externalArtifactDirectory } from "./snapshot";
 import type { PlanObjects, PublicationTransport } from "./transport";
 
 export type PublicationGate = { review: Parameters<typeof validateReviewedManifest>[0]; policy: PlanPolicy };
@@ -59,6 +60,8 @@ export function validatePublicationShape(plan: SealedPlan, settings: Settings, d
 
 /** Actual source/authority/native artifacts come from the entry's controller, never from report flags. */
 export async function verifyPublicationGate(options: PublishOptions, journal: Journal | null): Promise<void> {
+  if (externalArtifactDirectory(options.artifact_root, options.source_repo)
+    !== externalArtifactDirectory(options.transport.artifact_root, options.source_repo)) fail("artifact root binding");
   if (options.transport.kind !== options.plan.transport || options.transport.object_store !== options.object_store.root) fail("transport or object store binding");
   const gate = await options.gate(journal === null ? null : structuredClone(journal));
   const plan = readVerifiedPlan(canonicalJSON(options.plan), () => gate.policy);

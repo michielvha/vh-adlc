@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { appendAttempt, appendAttemptEnd, readJournal, type Journal } from "./journal";
+import { appendAttempt, appendAttemptEnd, readJournal, type Journal, type ReconciliationGrant } from "./journal";
 import type { Effect } from "./manifests";
 import type { PlanObjects, PublicationTransport } from "./transport";
 
@@ -22,13 +22,13 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
 
 /** A durable revision-CAS admits one executor. Unconfirmed dispatch never becomes proven absence. */
 export async function executeAttempt(options: {
-  journal: Journal; effect: Effect; objects: PlanObjects; transport: PublicationTransport;
+  journal: Journal; effect: Effect; objects: PlanObjects; transport: PublicationTransport; reconciliation?: ReconciliationGrant;
 }): Promise<Journal> {
   let journal = options.journal;
   const pending = pendingAttempt(journal, options.effect);
   if (pending) throw Error(pending);
   const id = randomUUID();
-  journal = appendAttempt(journal, options.effect.id, id);
+  journal = appendAttempt(journal, options.effect.id, id, options.reconciliation);
   let failure: unknown;
   let status = { sent: true, reaped: true };
   try {

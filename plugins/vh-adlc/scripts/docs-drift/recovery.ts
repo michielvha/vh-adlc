@@ -90,7 +90,13 @@ export async function resumeEffects(options: PublishOptions & { journal_director
         journal = appendOutcome(journal, effect.id, observation.outcome);
         continue;
       }
-      if (isObservationOnly(journal)) return blocked(effect.id, "retained-restore-no-replay");
+      const acquisition = journal.plan.manifest.effects[0];
+      const ownedRelease = effect.kind === "lease-release" && journal.header.recovery_mode === "original"
+        && journal.plan.manifest.effects.every(item => item.id === effect.id || terminal(journal, item.id))
+        && journal.events.some(event => event.effect_id === acquisition.id && event.kind === "attempt")
+        && journal.events.some(event => event.effect_id === acquisition.id && event.kind === "outcome"
+          && "object" in event.payload && event.payload.object === objects.lease_object);
+      if (isObservationOnly(journal) && !ownedRelease) return blocked(effect.id, "retained-restore-no-replay");
       const attempt = pendingAttempt(journal, effect);
       if (attempt) return blocked(effect.id, attempt);
       if (retired.size > 0 || invalidated) return blocked(effect.id, "reconciliation-only-no-replay");
@@ -218,6 +224,7 @@ export type ReconciliationScope = {
   repository: string; repository_id: number; operation_id: string; plan_sha256: string;
   lease_ref: string; lease_object: string; release_effect_id: string; retire_effect_ids: string[];
   actor: string; actor_id: number;
+  retain_receipt: { effect_id: string; ref: string; object: string } | null;
 };
 type ReconciliationAuthority = { scope_sha256: string; request_sha256: string };
 
@@ -231,9 +238,10 @@ export async function reconcileAbsent(options: {
   if (dirname(journal.directory) !== externalArtifactDirectory(options.transport.artifact_root, options.source_repo)) throw Error("selected reconciliation artifact root changed");
   const { plan } = journal;
   const objects = writePublicationObjects(options.object_store, plan, journal.header);
-  const release = plan.manifest.effects.at(-1), acquire = plan.manifest.effects[0];
+  const release = plan.manifest.effects.at(-1), acquire = plan.manifest.effects[0], receipt = plan.manifest.effects[1];
   if (!release || release.kind !== "lease-release" || acquire?.kind !== "lease-acquire" || release.payload.ref !== acquire.payload.ref
     || release.payload.ref !== options.settings.publication.lease_ref || plan.manifest.repository !== options.settings.repository
+    || receipt?.kind !== "receipt-retain" || receipt.payload.ref !== options.settings.publication.receipt_ref_prefix + plan.manifest.operation_id
     || plan.transport !== options.transport.kind || options.transport.object_store !== options.object_store.root) throw Error("reconciliation scope changed");
   if (!Array.isArray(options.retire_effect_ids)) throw Error("invalid selected retirement IDs");
   const ids = [...options.retire_effect_ids];
@@ -242,15 +250,20 @@ export async function reconcileAbsent(options: {
   const finished = () => plan.manifest.effects.every(effect => terminal(journal, effect.id) || isRetired(effect.id));
   const result = (state: PublishResult["state"], reason: string | null): PublishResult => ({ state, reason, journal, objects });
   const blocked = (reason: string) => result("pending", reason);
+  if (ids.includes(receipt.id) || isRetired(receipt.id)) return blocked("receipt-retention-required");
   if (finished()) return result(journal.events.some(event => event.kind === "retired-absence") ? "retired" : "complete", null);
   try {
     const identity = await options.transport.identity();
     if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id) return blocked("reconciliation-repository-changed");
     const lease = await options.transport.ref(String(release.payload.ref));
     if (lease.state === "present" && lease.object !== objects.lease_object) return blocked("foreign-publication-lease");
+    const retained = await options.transport.ref(String(receipt.payload.ref));
+    if (retained.state === "present" && retained.object !== objects.object) return blocked("retained-operation-changed");
+    if (retained.state === "absent" && terminal(journal, receipt.id)) return blocked("retained-operation-removed");
     const scope: ReconciliationScope = { repository: identity.repository, repository_id: identity.repository_id, operation_id: plan.manifest.operation_id,
       plan_sha256: sha256(canonicalJSON(plan)), lease_ref: String(release.payload.ref), lease_object: objects.lease_object,
-      release_effect_id: release.id, retire_effect_ids: [...ids], actor: identity.actor, actor_id: identity.actor_id };
+      release_effect_id: release.id, retire_effect_ids: [...ids], actor: identity.actor, actor_id: identity.actor_id,
+      retain_receipt: retained.state === "absent" ? { effect_id: receipt.id, ref: String(receipt.payload.ref), object: objects.object } : null };
     const scopeHash = sha256(canonicalJSON(scope));
     const authorize = async (original?: ReconciliationAuthority): Promise<ReconciliationAuthority> => {
       const value = await options.authorize(structuredClone(scope));
@@ -263,6 +276,13 @@ export async function reconcileAbsent(options: {
       return { scope_sha256: scopeHash, request_sha256: grant.request_sha256 };
     };
     const grant = await authorize();
+    const requireOwnedLease = async () => {
+      const currentIdentity = await options.transport.identity();
+      if (currentIdentity.actor_id !== identity.actor_id || currentIdentity.actor !== identity.actor
+        || currentIdentity.repository_id !== identity.repository_id || currentIdentity.repository !== identity.repository) throw Error("cleanup actor changed");
+      const currentLease = await options.transport.ref(scope.lease_ref);
+      if (currentLease.state !== "present" || currentLease.object !== objects.lease_object) throw Error("owned cleanup lease changed");
+    };
     const bytes = canonicalJSON({ schema_version: 1, scope, authority: grant });
     const path = join(dirname(journal.directory), `reconciliation-${scopeHash}-${grant.request_sha256}.json`);
     try { publishArtifact(path, bytes); }
@@ -278,6 +298,17 @@ export async function reconcileAbsent(options: {
       if (observation.state === "unknown" || observation.state === "conflict") return blocked(observation.reason);
       if (!intended(journal, effect.id)) journal = appendIntent(journal, effect.id);
       if (observation.state === "done") { journal = appendOutcome(journal, effect.id, observation.outcome); continue; }
+      if (effect.id === receipt.id) {
+        if (!scope.retain_receipt) return blocked("receipt-retention-scope-changed");
+        await authorize(grant);
+        await requireOwnedLease();
+        if (pendingAttempt(journal, effect)) return blocked("receipt-attempt-pending");
+        journal = await executeAttempt({ journal, effect, objects, transport: options.transport, reconciliation: grant });
+        const after = await options.transport.observe(plan, effect, objects);
+        if (after.state !== "done") return blocked("receipt-retention-outcome-unconfirmed");
+        journal = appendOutcome(journal, effect.id, after.outcome);
+        continue;
+      }
       if (observation.state !== "absent" || !ids.includes(effect.id) || !observation.evidence) return blocked("known-absence-retirement-not-authorized");
       if (journal.header.recovery_mode === "observation-only") return blocked("retained-absence-not-definitive");
       const pending = pendingAttempt(journal, effect, true);
@@ -287,20 +318,18 @@ export async function reconcileAbsent(options: {
       await authorize(grant);
       journal = appendRetirement(journal, effect.id, { ...grant, lookup });
     }
+    const fence = await options.transport.ref(String(receipt.payload.ref));
+    if (fence.state !== "present" || fence.object !== objects.object) return blocked("retained-operation-removed");
     if (!intended(journal, release.id)) journal = appendIntent(journal, release.id);
     const before = await options.transport.observe(plan, release, objects);
     if (before.state === "conflict" || before.state === "unknown") return blocked(before.reason);
     if (before.state === "done") journal = appendOutcome(journal, release.id, before.outcome);
     else {
       await authorize(grant);
-      const currentIdentity = await options.transport.identity();
-      if (currentIdentity.actor_id !== identity.actor_id || currentIdentity.actor !== identity.actor
-        || currentIdentity.repository_id !== identity.repository_id || currentIdentity.repository !== identity.repository) return blocked("cleanup-actor-changed");
-      const currentLease = await options.transport.ref(scope.lease_ref);
-      if (currentLease.state !== "present" || currentLease.object !== objects.lease_object) return blocked("owned-cleanup-lease-changed");
+      await requireOwnedLease();
       const attempt = pendingAttempt(journal, release);
       if (attempt) return blocked(attempt);
-      journal = await executeAttempt({ journal, effect: release, objects, transport: options.transport });
+      journal = await executeAttempt({ journal, effect: release, objects, transport: options.transport, reconciliation: grant });
       const after = await options.transport.observe(plan, release, objects);
       if (after.state !== "done") return blocked("lease-release-outcome-unconfirmed");
       journal = appendOutcome(journal, release.id, after.outcome);

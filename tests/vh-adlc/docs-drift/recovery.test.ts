@@ -498,3 +498,20 @@ test("an operation observed elsewhere remains non-replaying even after receipt c
   expect(f.executed).toEqual([]);
   expect(resumed.journal.events.some(event => event.kind === "invalidation")).toBe(false);
 });
+
+
+test("an original acquiring run can release only its owned completed recovery-only lease", async () => {
+  const f = setup(), execute = f.transport.execute;
+  f.transport.execute = async (plan, effect, objects) => {
+    await execute(plan, effect, objects);
+    if (effect.kind === "lease-acquire") {
+      f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.object);
+      for (const id of ["receipt", "push", "pr"]) f.done.add(id);
+    }
+  };
+  const stopped = await publish(options(f));
+  expect(stopped.reason).toBe("operation-started-elsewhere");
+  const result = await resumeEffects({ ...options(f), journal_directory: stopped.journal.directory });
+  expect(result.state).toBe("complete");
+  expect(f.executed).toEqual(["lease", "release"]);
+});
