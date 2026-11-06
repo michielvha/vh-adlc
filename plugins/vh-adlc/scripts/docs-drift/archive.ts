@@ -1,6 +1,10 @@
 import { decodeUTF8, sha256 } from "./protocol";
 import type { ArchiveLimits } from "./zip-reader";
 
+export class ArchiveSetupError extends Error {
+  constructor() { super("docs-drift archive bundle unavailable or corrupt. Run verified setup"); }
+}
+
 function json(bytes: Buffer): Record<string, unknown> {
   const parsed: unknown = JSON.parse(decodeUTF8(bytes));
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("invalid docs-drift archive JSON object");
@@ -14,7 +18,7 @@ export async function readReportArchive(bytes: Uint8Array, expected: { sha256: s
   try {
     reader = await import("./vendor/zip-reader.cjs");
     if (typeof reader.readEntries !== "function") throw new Error("missing reader");
-  } catch { throw new Error("docs-drift archive bundle unavailable or corrupt; run verified setup"); }
+  } catch { throw new ArchiveSetupError(); }
   const entries = await reader.readEntries(bytes, limits);
   return { report: json(entries.report), provenance: json(entries.provenance),
     report_bytes: entries.report, provenance_bytes: entries.provenance,

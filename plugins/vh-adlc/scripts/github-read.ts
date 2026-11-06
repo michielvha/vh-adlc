@@ -63,7 +63,7 @@ export function ghRead(hostname: string, endpoint: string, options: ReadOptions 
 export class GitHubReadError extends Error {
   constructor(public status: number | null, public apiMessage: string) { super(`GitHub GET unavailable (${status ?? "unknown"})`); }
 }
-export type PageResult = { items: unknown[]; pages: number; complete: boolean; error?: { status: number | null; message: string } };
+export type PageResult = { items: unknown[]; pages: number; complete: boolean; bounded?: boolean; error?: { status: number | null; message: string } };
 export type ReadObservation = { method: "GET"; hostname: string; endpoint: string; started_at: string; observed_at: string; status: number | null };
 export type GitHubReader = ReturnType<typeof createGitHubReader>;
 
@@ -88,10 +88,12 @@ export function createGitHubReader(hostname: string, options: Omit<ReadOptions, 
   return {
     trace() { return observations.map(row => ({ ...row })); },
     get(endpoint: string) { return response(endpoint).value; },
-    pages(endpoint: string, expected: { repositoryId?: number; key?: string; sha?: string } = {}): PageResult {
+    pages(endpoint: string, expected: { repositoryId?: number; key?: string; sha?: string; max_items?: number } = {}): PageResult {
       const items: unknown[] = [], seen = new Set<string>();
       let target: string | null = `${endpoint}${endpoint.includes("?") ? "&" : "?"}page=1`, page = 0, total: number | undefined;
+      let bounded: boolean | undefined;
       try {
+        if (expected.max_items !== undefined && (!Number.isSafeInteger(expected.max_items) || expected.max_items < 1)) throw Error("invalid-item-bound");
         while (target) {
           if (seen.has(target)) throw Error("repeated-next-url");
           if (page >= (options.max_pages ?? 10_000)) throw Error("pagination-bound-reached");
@@ -111,10 +113,16 @@ export function createGitHubReader(hostname: string, options: Omit<ReadOptions, 
           let nextTarget: string | null = null;
           parsePage(`${current.headers}\r\n\r\n${JSON.stringify(array)}`, { hostname, endpoint, page,
             repositoryId: expected.repositoryId, onNext(url) { nextTarget = url; } });
+          if (total !== undefined && items.length > total) throw Error("list-total-inconsistent");
           target = nextTarget;
+          if (expected.max_items !== undefined && items.length >= expected.max_items) {
+            bounded = items.length > expected.max_items || target !== null || (total !== undefined && total > expected.max_items);
+            items.splice(expected.max_items);
+            target = null;
+          }
         }
-        if (total !== undefined && total !== items.length) throw Error("list-total-incomplete");
-        return { items, pages: page, complete: true };
+        if (total !== undefined && total !== items.length && bounded !== true) throw Error("list-total-incomplete");
+        return { items, pages: page, complete: true, ...(bounded === undefined ? {} : { bounded }) };
       } catch (error) {
         return { items, pages: page, complete: false, error: error instanceof GitHubReadError
           ? { status: error.status, message: error.apiMessage } : { status: null, message: error instanceof Error ? error.message : "Read failed" } };
@@ -127,7 +135,7 @@ export function createGitHubReader(hostname: string, options: Omit<ReadOptions, 
 export type RepositoryIdentity = { id: number; full_name: string; default_branch?: string };
 export type PullRequestInput = {
   number: number; state: "open" | "closed"; merged_at: string | null; body: string; draft: boolean;
-  actor: string; actor_type: string; head_sha: string; head_ref: string; head_repository: RepositoryIdentity | null;
+  actor: string; actor_id: number; actor_type: string; head_sha: string; head_ref: string; head_repository: RepositoryIdentity | null;
   base_sha: string; base_ref: string; base_repository: RepositoryIdentity;
 };
 export type WorkflowRunInput = {
@@ -140,7 +148,11 @@ export type ArtifactInput = {
   created_at: string; expires_at: string;
   workflow_run: { id: number; repository_id: number; head_repository_id: number; head_branch: string; head_sha: string };
 };
-export type TypedPage<T> = { items: T[]; pages: number; complete: boolean; diagnostics: string[] };
+export type JobInput = {
+  id: number; run_id: number; attempt: number; head_sha: string; name: string; status: string; conclusion: string | null;
+  steps: Array<{ number: number; name: string; status: string; conclusion: string | null }>;
+};
+export type TypedPage<T> = { items: T[]; pages: number; complete: boolean; bounded?: boolean; diagnostics: string[] };
 export type RepositoryReader = ReturnType<typeof createRepositoryReader>;
 
 function readObject(value: unknown): Record<string, unknown> {
@@ -198,7 +210,7 @@ function readGitTree(value: unknown, expected: string, maxEntries: number): { sh
 }
 
 
-/** Typed GET routes bind every request to one literal repository; transport and pagination remain shared. */
+/** Typed GET routes bind every request to one literal repository. Transport and pagination remain shared. */
 export function createRepositoryReader(reader: GitHubReader, repository: string) {
   if (!/^[a-z0-9-]+\/[a-z0-9_.-]+$/iu.test(repository) || repository.split("/").some(part => part === "." || part === "..")) throw Error("invalid-github-read-repository");
   const prefix = `repos/${repository}`;
@@ -213,7 +225,7 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
     if (object.state !== "open" && object.state !== "closed") throw Error("invalid-github-read-pr-state");
     if (object.body !== null && typeof object.body !== "string") throw Error("invalid-github-read-pr-body");
     return { number: readID(object.number), state: object.state, merged_at: nullableText(object.merged_at), body: object.body ?? "", draft: readBoolean(object.draft),
-      actor: readText(user.login), actor_type: readText(user.type), head_sha: readSHA(head.sha), head_ref: readText(head.ref),
+      actor: readText(user.login), actor_id: readID(user.id), actor_type: readText(user.type), head_sha: readSHA(head.sha), head_ref: readText(head.ref),
       head_repository: head.repo === null ? null : readRepository(head.repo), base_sha: readSHA(base.sha), base_ref: readText(base.ref), base_repository: selectedRepository(base.repo) };
   }
   function run(value: unknown): WorkflowRunInput {
@@ -231,8 +243,8 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
       created_at: readText(object.created_at), expires_at: readText(object.expires_at), workflow_run: { id: readID(source.id), repository_id: readID(source.repository_id),
         head_repository_id: readID(source.head_repository_id), head_branch: readText(source.head_branch), head_sha: readSHA(source.head_sha) } };
   }
-  function list<T extends { id: number } | { number: number }>(endpoint: string, parse: (value: unknown) => T, key?: string): TypedPage<T> {
-    const page = reader.pages(endpoint, { repositoryId: identity?.id, key });
+  function list<T extends { id: number } | { number: number }>(endpoint: string, parse: (value: unknown) => T, key?: string, maxItems?: number): TypedPage<T> {
+    const page = reader.pages(endpoint, { repositoryId: identity?.id, key, max_items: maxItems });
     const items: T[] = [], diagnostics: string[] = [];
     const seen = new Set<number>();
     if (!page.complete) diagnostics.push(page.error?.message ?? "Incomplete GitHub collection");
@@ -245,7 +257,7 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
         items.push(item);
       } catch { diagnostics.push("Malformed, repeated or foreign GitHub collection entry"); }
     }
-    return { items, pages: page.pages, complete: page.complete && diagnostics.length === 0, diagnostics };
+    return { items, pages: page.pages, complete: page.complete && diagnostics.length === 0, diagnostics, ...(page.bounded === undefined ? {} : { bounded: page.bounded }) };
   }
   return {
     repository(): RepositoryIdentity & { default_branch: string } {
@@ -285,6 +297,28 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
         if (result.workflow_id !== workflow || result.event !== "schedule" || result.head_branch !== branch) throw Error("github-read-run-filter-changed");
         return result;
       }, "workflow_runs");
+    },
+    recentRuns(workflow: number, branch: string, maxRuns: number): TypedPage<WorkflowRunInput> {
+      readID(workflow); readText(branch); readID(maxRuns);
+      return list(`${prefix}/actions/workflows/${workflow}/runs?event=schedule&branch=${encodeURIComponent(branch)}&status=completed&per_page=${Math.min(maxRuns, 100)}`, value => {
+        const result = run(value);
+        if (result.workflow_id !== workflow || result.event !== "schedule" || result.head_branch !== branch || result.status !== "completed") throw Error("github-read-run-filter-changed");
+        return result;
+      }, "workflow_runs", maxRuns);
+    },
+    jobs(runID: number, attempt: number): TypedPage<JobInput> {
+      readID(runID); readID(attempt);
+      return list(`${prefix}/actions/runs/${runID}/attempts/${attempt}/jobs?per_page=100`, value => {
+        const object = readObject(value);
+        if (readID(object.run_id) !== runID || !Array.isArray(object.steps) || (object.run_attempt !== undefined && object.run_attempt !== attempt)) throw Error("github-read-job-run-changed");
+        const steps = object.steps.map(value => {
+          const step = readObject(value);
+          return { number: readID(step.number), name: readText(step.name), status: readText(step.status), conclusion: nullableText(step.conclusion) };
+        });
+        if (new Set(steps.map(step => step.number)).size !== steps.length) throw Error("repeated-github-job-step");
+        return { id: readID(object.id), run_id: runID, attempt, head_sha: readSHA(object.head_sha), name: readText(object.name),
+          status: readText(object.status), conclusion: nullableText(object.conclusion), steps };
+      }, "jobs");
     },
     artifacts(runID: number): TypedPage<ArtifactInput> {
       return list(`${prefix}/actions/runs/${readID(runID)}/artifacts?per_page=100`, value => {

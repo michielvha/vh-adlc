@@ -16,7 +16,7 @@ afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: 
 function directory() { const root = mkdtempSync(join(tmpdir(), "docs-drift-github-")); roots.push(root); return root; }
 const repository = { id: 11, full_name: "fixture/docs", default_branch: "main" };
 function pull(number = 1, options: Record<string, unknown> = {}) {
-  return { number, state: "open", merged_at: null, body: "Reviewed body", draft: false, user: { login: "fixture-bot", type: "Bot" }, head: { sha: "c".repeat(40), ref: "docs-drift/fix", repo: repository }, base: { sha: "b".repeat(40), ref: "main", repo: repository }, ...options };
+  return { number, state: "open", merged_at: null, body: "Reviewed body", draft: false, user: { login: "fixture-bot", id: 12, type: "Bot" }, head: { sha: "c".repeat(40), ref: "docs-drift/fix", repo: repository }, base: { sha: "b".repeat(40), ref: "main", repo: repository }, ...options };
 }
 function reader(responses: Record<string, unknown>) {
   const root = directory();
@@ -65,8 +65,8 @@ test("discovery collects shared, legacy and explicit proposals and retains requi
   const original = settingsFixture();
   const fixture = { ...original, legacy_proposals: { ...original.legacy_proposals, ids: [7] } };
   const settings = parseSettings(fixture);
-  const legacy = pull(2, { user: { login: "legacy-bot", type: "Bot" }, head: { sha: "d".repeat(40), ref: "docs-audit/old", repo: repository } });
-  const unrelated = pull(3, { user: { login: "someone", type: "User" } });
+  const legacy = pull(2, { user: { login: "legacy-bot", id: 13, type: "Bot" }, head: { sha: "d".repeat(40), ref: "docs-audit/old", repo: repository } });
+  const unrelated = pull(3, { user: { login: "someone", id: 14, type: "User" } });
   const api = reader({ ...routes([pull(1), legacy, unrelated]), "repos/fixture/docs/pulls/7": pull(7, { state: "closed", merged_at: null }) });
   const collected = collectProposals(api.selected, settings);
   expect(collected.complete).toBe(true);

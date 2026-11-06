@@ -53,7 +53,7 @@ function nonempty(value: string): string {
   canonicalJSON(value);
   return value;
 }
-function timestamp(value: string): number {
+export function reportTime(value: string): number {
   if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/u.test(value) || !Number.isFinite(Date.parse(value))) invalid("timestamp");
   const normalized = value.replace(/(?:\.(\d{1,3}))?Z$/u, (_, fraction: string | undefined) => `.${(fraction ?? "").padEnd(3, "0")}Z`);
   const parsed = Date.parse(value);
@@ -124,11 +124,11 @@ function priorProjection(value: unknown): string {
 function priorMatches(input: ReportInput): { matches: Map<string, string[]>; diagnostics: string[] } {
   const matches = new Map<string, string[]>();
   const diagnostics = [...input.history.diagnostics];
-  const start = timestamp(input.started_at);
-  if (timestamp(input.history.captured_at) > start) invalid("history snapshot must precede run");
+  const start = reportTime(input.started_at);
+  if (reportTime(input.history.captured_at) > start) invalid("history snapshot must precede run");
   for (const record of input.history.records) {
     try {
-      if (record.bytes.byteLength > 16 * 1024 * 1024 || sha256(record.bytes) !== hash(record.sha256) || timestamp(record.expires_at) <= start) invalid("history bytes or expiry");
+      if (record.bytes.byteLength > 16 * 1024 * 1024 || sha256(record.bytes) !== hash(record.sha256) || reportTime(record.expires_at) <= start) invalid("history bytes or expiry");
       const parsed: unknown = JSON.parse(decodeUTF8(record.bytes));
       if (!canonicalJSON(parsed).equals(Buffer.from(record.bytes))) invalid("history canonical bytes");
       const report = object(parsed);
@@ -137,7 +137,7 @@ function priorMatches(input: ReportInput): { matches: Map<string, string[]>; dia
         || !Array.isArray(report.failures) || report.failures.length !== 0 || !Array.isArray(report.attention)
         || !["no-change", "carried-attention", "carried-delivery", "published", "new-attention"].includes(String(report.outcome))) invalid("history scope or terminal state");
       if (typeof report.started_at !== "string" || typeof report.completed_at !== "string"
-        || timestamp(report.completed_at) < timestamp(report.started_at) || timestamp(report.completed_at) >= timestamp(input.history.captured_at)) invalid("history chronology");
+        || reportTime(report.completed_at) < reportTime(report.started_at) || reportTime(report.completed_at) >= reportTime(input.history.captured_at)) invalid("history chronology");
       const projections = report.attention.map(entry => priorProjection(object(entry).projection));
       for (const projection of projections) matches.set(projection, [...(matches.get(projection) ?? []), nonempty(record.locator)]);
     } catch {
@@ -151,7 +151,7 @@ function priorMatches(input: ReportInput): { matches: Map<string, string[]>; dia
 export function buildReport(input: ReportInput): Report {
   consumer(input.repository, input.scope_sha256);
   nonempty(input.run_id);
-  if (timestamp(input.completed_at) < timestamp(input.started_at)) invalid("run chronology");
+  if (reportTime(input.completed_at) < reportTime(input.started_at)) invalid("run chronology");
   if (!/^[a-f0-9]{40,64}$/u.test(input.source_commit)) invalid("source commit");
   const { matches, diagnostics } = priorMatches(input);
   const failures = [...input.failures];
