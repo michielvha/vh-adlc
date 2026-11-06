@@ -196,7 +196,8 @@ Document native auto-add as an optional complement, including rule limits and ex
       Evidence: `bun test tests/vh-adlc/projects/inventory.test.ts` fails because the native transport module is absent.
 - [x] T4 `plugins/vh-adlc/scripts/projects/github.ts`, `inventory.ts`, `cli.ts` - T3 passes with native gh calls, source-linked facts and versioned output (AC-02, AC-03)
       Evidence: `bun test tests/vh-adlc/projects` passes six tests through actual gh-shaped subprocess requests; no live board access or mutations. The fixture uses a direct stdout fd write because Bun stream writes were refused by the host sandbox.
-- [ ] T5 `tests/vh-adlc/projects/apply.test.ts` - approved-batch, conflict, retry and partial-failure scenarios fail against the absent updater (AC-04, AC-05)
+- [x] T5 `tests/vh-adlc/projects/apply.test.ts` - approved-batch, conflict, retry and partial-failure scenarios fail against the absent updater (AC-04, AC-05)
+      Evidence: `bun test tests/vh-adlc/projects/apply.test.ts` fails because the updater module is absent.
 - [ ] T6 `plugins/vh-adlc/scripts/projects/apply.ts`, `cli.ts` - T5 passes with strict operation scope, fresh reads and verified receipts (AC-04, AC-05)
 - [ ] T7 `plugins/vh-adlc/skills/vh-adlc-projects/SKILL.md`, `plugins/vh-adlc/references/projects.md`, `plugins/vh-adlc/references/lifecycle.md`, both plugin manifests, `tests/vh-adlc/check.test.ts`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - registered operation and setup guide pass package checks, with reusable config/output and explicit host limits (AC-01, AC-03, AC-06)
 - [ ] T8 `docs/specs/github-projects-coordinator.md` - after separate live permission and access, record the disposable-board trial and independent implementation review; production resources match baseline (AC-07)
