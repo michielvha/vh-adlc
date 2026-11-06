@@ -1,0 +1,338 @@
+[
+  {
+    "name": "literal exact",
+    "pattern": "src/app.ts",
+    "path": "src/app.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "literal case",
+    "pattern": "src/app.ts",
+    "path": "src/App.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "literal subtree",
+    "pattern": "src/",
+    "path": "src/deep/app.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "directory name alone",
+    "pattern": "src/",
+    "path": "src",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "directory sibling",
+    "pattern": "src/",
+    "path": "src-other/app.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "wildcard directory is literal",
+    "pattern": "src/*/",
+    "path": "src/*/deep/a.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "wildcard directory does not expand",
+    "pattern": "src/*/",
+    "path": "src/x/deep/a.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "unclosed bracket directory is literal",
+    "pattern": "src/[/",
+    "path": "src/[/a.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "question directory is literal",
+    "pattern": "src/?/",
+    "path": "src/?/a.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "escape directory is literal",
+    "pattern": "src/\\*/",
+    "path": "src/\\*/a.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "escaped ordinary literal stays literal",
+    "pattern": "src/\\a.ts",
+    "path": "src/\\a.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "ordinary backslash is not decoded",
+    "pattern": "src/\\a.ts",
+    "path": "src/a.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "trailing backslash literal",
+    "pattern": "src/back\\",
+    "path": "src/back\\",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "wildcard one segment",
+    "pattern": "src/*.ts",
+    "path": "src/app.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "wildcard excludes nested",
+    "pattern": "src/*.ts",
+    "path": "src/deep/app.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "one rune",
+    "pattern": "src/?.ts",
+    "path": "src/🚀.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "one excludes slash",
+    "pattern": "src/?.ts",
+    "path": "src//.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "one excludes two runes",
+    "pattern": "src/?.ts",
+    "path": "src/ab.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "byte star followed by runes",
+    "pattern": "*??",
+    "path": "🚀",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "byte star followed by three runes",
+    "pattern": "*???",
+    "path": "🚀",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "byte star cannot supply four runes",
+    "pattern": "*????",
+    "path": "🚀",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "partial rune class",
+    "pattern": "*[�]",
+    "path": "é",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "literal replacement rune",
+    "pattern": "[�]",
+    "path": "�",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "class consumes slash",
+    "pattern": "src[/]app.ts",
+    "path": "src/app.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "negated class consumes slash",
+    "pattern": "src[^x]app.ts",
+    "path": "src/app.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "class range",
+    "pattern": "src/[a-c].ts",
+    "path": "src/b.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "negated class",
+    "pattern": "src/[^a-c].ts",
+    "path": "src/d.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "bang in class is literal",
+    "pattern": "src/[!a].ts",
+    "path": "src/!.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "reversed range",
+    "pattern": "src/[z-a].ts",
+    "path": "src/a.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "negated reversed range",
+    "pattern": "src/[^z-a].ts",
+    "path": "src/a.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "Unicode range",
+    "pattern": "src/[α-ω].ts",
+    "path": "src/β.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "escaped question",
+    "pattern": "src/\\?.ts",
+    "path": "src/?.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "escaped opening bracket",
+    "pattern": "src/\\[x\\].ts",
+    "path": "src/[x].ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "escaped slash with wildcard",
+    "pattern": "src\\/*.ts",
+    "path": "src/app.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "escaped dash",
+    "pattern": "src/[\\-].ts",
+    "path": "src/-.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "escaped closing bracket",
+    "pattern": "src/[\\]].ts",
+    "path": "src/].ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "dot prefix remains literal",
+    "pattern": "./src/*.ts",
+    "path": "src/a.ts",
+    "valid": true,
+    "matched": false
+  },
+  {
+    "name": "dot prefix exact",
+    "pattern": "./src/*.ts",
+    "path": "./src/a.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "newline filename",
+    "pattern": "src/*.ts",
+    "path": "src/a\nb.ts",
+    "valid": true,
+    "matched": true
+  },
+  {
+    "name": "unsupported doublestar",
+    "pattern": "src/**",
+    "path": "src/a.ts",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "unsupported directory doublestar",
+    "pattern": "src/**/",
+    "path": "src/**/a.ts",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "unsupported middle doublestar",
+    "pattern": "src/p**x.ts",
+    "path": "src/px.ts",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "unclosed class",
+    "pattern": "src/[",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "empty class",
+    "pattern": "src/[]",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "unclosed negated class",
+    "pattern": "src/[^]",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "unclosed range",
+    "pattern": "src/[a-]",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "unescaped dash",
+    "pattern": "src/[-a]",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  },
+  {
+    "name": "trailing escape in pattern",
+    "pattern": "src/*\\",
+    "path": "src/a",
+    "valid": false,
+    "matched": false
+  }
+]
