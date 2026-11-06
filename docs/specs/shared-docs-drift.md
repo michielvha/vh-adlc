@@ -459,6 +459,7 @@ None.
 | 2026-11-06 | R-43 | spec | `0b6183fdc24c4297751df1503ed8bff25929f9e1` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
 | 2026-11-06 | R-44 | spec | `82f5f66164d8df705147897d75f09b2e04cf25f8` | claude-opus-5.5 | procedural | 3 should-fix; 1 nit. Full requested read coverage. |
 | 2026-11-06 | R-45 | spec | `4a27a4b574202234335fd42f91d6ba59f0cd8731` | claude-opus-5.5 | procedural | 3 should-fix. Full requested read coverage. |
+| 2026-11-06 | R-46 | spec | `49e070dbf0434542b0c11fbac42dc5132c4a77f6` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
 
 ### R-1
 
@@ -1386,6 +1387,10 @@ SEVERITY: should-fix
 WHERE: Design, Attention and carried-delivery paragraph (chunk 00241 line 58); PR-carried attention (chunk 00241 line 77); Scheduled worker cutover (chunk 00241 lines 31 and 45); Test Plan AC-05/AC-06 (chunk 00321 lines 75-76)
 EVIDENCE: Carried delivery works only from "relevant open owned proposals and their durable reviewed bindings". PR-carried attention requires a match with "the reviewed publication receipt and immutable intent plan from its owned operation", read through the retained operation ref. Only the new shared publishers create those refs ("Every scheduled and interactive publisher creates a retained immutable operation ref", chunk 00161 line 61). The legacy scheduled worker has published real advisory PRs (Context, chunk 00001 lines 69 and 74: `.github/workflows/docs-drift-audit.yml` "owns the scheduled scan, advisory worker and PR publication"). Cutover drains legacy runs but does not resolve or close the open legacy advisory PRs those runs created. Closure of superseded proposals waits for a merged consolidation, which is the owner's settled policy. So on the first post-cutover scheduled run, legacy-era advisory PRs are still open with no receipt ref. The spec does not say whether they count as "relevant open owned proposals". If they are not collected, the shared run republishes the same unmerged corrections as a competing advisory PR on the same paths. That contradicts "do not publish the same correction again merely because it is not merged". If they are collected, the "unverifiable proposed binding" branch turns every overlapping path into needs-resolution. Neither result is stated or tested. The AC-05 carried-delivery and history tests use only an "open owned advisory" with a retained receipt, and the AC-06 cutover tests cover legacy runs and sessions, not legacy open PRs.
 PROPOSAL: Define how pre-cutover legacy advisory PRs are identified (for example, by the legacy branch namespace/actor recorded in D's pre-cutover inventory) and how the first and later shared runs treat them. One option that fits the settled policies: complete PR collection includes them. Same-path overlap with a fresh verified correction becomes a disclosed needs-resolution decision, not a new competing PR, and that decision is then carryable under the attention policy. Only a separately selected resolve consolidates or supersedes them. Add an AC-06 Test Plan case with an open legacy advisory PR at cutover showing no duplicate advisory, the defined status on the first run and the carried status on the next unchanged run.
+
+### R-46
+
+NO FINDINGS
 
 ## Sources
 
