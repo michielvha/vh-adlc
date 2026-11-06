@@ -38,6 +38,13 @@ without asking, and `references/review-protocol.md` for the review mode.
 - Put every judgement call into Open Questions in the standard's decision shape, and put each to the owner
   with the host's question tool. Never answer one yourself. Fold the owner's answers into the document.
 - Creating an issue needs explicit authority.
+- When the resolved template includes `### Owner summary` inside Context, write that subsection for
+  the owner before the background detail. Use its guidance rather than creating a second template.
+  On a normative revision, refresh it against the changed scope; before acceptance, reconcile its
+  decisions and proof wording with the current document. Keep planned checks distinct from observed
+  results. Summary-only corrections do not create acceptance or change the normative baseline.
+- Keep the conversation summary below even when the document already contains its saved summary.
+  Untouched historical documents need no summary backfill; preserve returned review records exactly.
 - Run `vh-adlc lint` and fix what it reports before committing.
 
 ## Review mode
