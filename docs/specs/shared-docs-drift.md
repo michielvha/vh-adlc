@@ -681,6 +681,7 @@ None.
 | 2026-11-07 | R-51 | spec | `8d3699fbe73c909fa0f86a20c7848d0a91934467` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-52 | spec | `1615493012697fea744a5bc896d482c90db7958d` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-53 | spec | `ead38e2899800f3512f2051b3119d005898cc9e8` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
+| 2026-11-07 | R-54 | spec | `ece5472b33e6b320bc8370dee99ca0db5fdb57a9` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -1721,6 +1722,15 @@ EVIDENCE: The spec makes several demands of the new executor capture. It says to
 3. Existing rejection proof depends on that persisted stdout. `rejections.ts:59-62` reads the stdout file and digests it. `rejections.ts:91` reads the command directory again whenever the proof is later verified.
 Satisfying the exclusion, the transient parsing, crash safety and preserved rejection evidence together therefore requires changing `owned-process.ts` and `rejections.ts`, plus their tests. T78 names only `journal.ts`, `observations.ts`, `transport.ts`, `attempts.ts` and `delivery-ack.test.ts`. No task names those two files.
 PROPOSAL: Add `plugins/vh-adlc/scripts/docs-drift/owned-process.ts` and `plugins/vh-adlc/scripts/docs-drift/rejections.ts`, with their existing tests, to T78. State in the capture paragraph how mutation-response bytes are captured: through a bounded in-memory or ephemeral path that never persists raw bodies or secret-bearing headers, including after a crash. Also state how existing rejection evidence stays verifiable and readable for already-serialized journals. Add a Test Plan case: a crash between command completion and projection persistence leaves no raw response body or header canary in the artifact root, and existing rejection proofs still verify.
+
+### R-54
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md: the Design "Authority and delivery" paragraph after the authority table (chunk 00212). It conflicts with the "Delivery acknowledgement during recovery" capture and approval paragraph (chunk 00248) and the ownership and settlement text (chunk 00270). Related places are the owner summary (chunk 00061), AC-05 (chunk 00463) and Tasks T23, T25 and T79 (chunk 00598).
+EVIDENCE: The authority paragraph puts "delivery acknowledgement in recovery" in the same list as the other recovery effects. It then says each one "requires the actual current request or an adopted consumer procedure that names that effect and scope." The approved acknowledgement contract is narrower. Chunk 00248 requires a fresh bounded lookup whose exact scope is shown to the owner. The approval is bound to the complete immutable scope and its evidence digests, and any changed binding needs a new lookup and a new approval. The owner summary says "This acknowledgement has its own approval scope." AC-05 says "An explicitly approved delivery acknowledgement." Chunk 00270 says "The owner's approval supplies permission." A standing adopted consumer procedure is written before the run, so it cannot name evidence digests that only exist after the lookup. The generic rule therefore lets an unattended adopted grant authorize acknowledgement, which contradicts per-instance owner approval. This matters in practice. Current recovery.ts `reconcileAbsent` uses one `authorize(scope)` callback, with the comment that the actual request or adopted-procedure controller names this cleanup. The reconciliation and native-transport tests drive cleanup and retirement through that same callback with synthetic request digests. T23 only says "Route an exact owner-approved acknowledgement request." Neither T25 (authority and lifecycle wording) nor T79 says that an adopted procedure cannot supply this approval. No planned test refuses an acknowledgement authorized only by an adopted procedure.
+PROPOSAL: Change the authority paragraph so delivery acknowledgement is an exception to the "current request or adopted consumer procedure" rule. It should require the owner's actual current approval of the exact presented lookup scope and evidence digests. No standing adopted procedure, scheduled or unattended context, or publication, closure, retirement or cleanup grant can supply that approval. Carry the same sentence into T25's authority.md and lifecycle.md updates. Add a T79 and AC-05 Test Plan case that refuses an acknowledgement authorized only by an adopted procedure, or by a cleanup or retirement grant through the existing reconciliation authorize path. That case must record no acknowledgement, stop no replay and release no lease.
 
 ## Sources
 
