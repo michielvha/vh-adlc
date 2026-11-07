@@ -351,7 +351,7 @@ export function writePublicationObjects(store: OwnedObjectStore, plan: SealedPla
   const objects = writePlanObject(store, plan);
   const commit = Buffer.from(`tree ${objects.tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift lease ${plan.manifest.operation_id} ${header.run_id}\n`);
   const lease_object = header.observed_lease_object ?? writeMetadataObject(store.root, "commit", commit);
-  const receipt_object = Object.hasOwn(header, "observed_receipt_object") ? header.observed_receipt_object ?? lease_object : objects.object;
+  const receipt_object = Object.hasOwn(header, "observed_receipt_object") ? header.observed_receipt_object ?? (header.recovery_mode === "observation-only" ? objects.object : lease_object) : objects.object;
   return { ...objects, lease_object, receipt_object };
 }
 

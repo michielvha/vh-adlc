@@ -125,7 +125,12 @@ async function restoredAcquisition(options: PublishOptions, journal: Journal, ob
   const receipt = journal.plan.manifest.effects[1];
   if (receipt?.kind !== "receipt-retain" || receipt.payload.ref !== options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id) return null;
   const lease = await options.transport.ref(options.settings.publication.lease_ref);
-  if (lease.state === "present" && lease.object !== journal.header.observed_lease_object) return null;
+  if (lease.state === "present" && lease.object !== journal.header.observed_lease_object) {
+    const current = await options.transport.readPlanObject(lease.object);
+    const bytes = Buffer.from(current.bytes);
+    if (current.objects.object !== lease.object || current.objects.plan_sha256 !== sha256(bytes)
+      || bytes.equals(canonicalJSON(journal.plan))) return null;
+  }
   const retained = await options.transport.observe(journal.plan, receipt, objects);
   if (retained.state !== "done") return null;
   const bytes = canonicalJSON({ schema_version: 1, kind: "receipt-proves-acquisition", operation_id: journal.plan.manifest.operation_id,

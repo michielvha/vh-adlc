@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { inspectRetainedOperation, restoreRetainedOperation, resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
-import { readJournal, sealPlan, appendRecoveryOnly, createJournal, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { readJournal, sealPlan, appendRecoveryOnly, createJournal, writePublicationObjects, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -598,4 +598,50 @@ test("a receipt landing after the precheck cannot leave a new original holding a
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
   expect(f.refs.get(receiptRef)).toBe(priorObjects.receipt_object);
   expect(f.executed).toEqual(["lease"]);
+});
+
+
+test("a completed retained operation can be reconstructed read-only while another plan holds the lease", async () => {
+  for (const when of ["before-inspection", "after-inspection"] as const) {
+    const f = setup();
+    const completed = await publish(options(f));
+    expect(completed.state).toBe("complete");
+    const effects = structuredClone(f.input.manifest.effects);
+    effects[1].payload.ref = f.settings.publication.receipt_ref_prefix + "operation-2";
+    effects[3].payload.body = String(effects[3].payload.body).replace("operation-1", "operation-2");
+    const other = fixture(f.input.manifest.bindings, effects, "operation-2");
+    const foreignPlan = sealPlan({ reviewed: validateReviewedManifest(other), grants: other.grants,
+      ...f.policy, corrections: [], attention: [] });
+    const foreign = writePlanObject(f.store, foreignPlan);
+    const artifacts = join(f.root, "historical-observer"); mkdirSync(artifacts, { mode: 0o700 });
+    f.transport = { ...f.transport, artifact_root: artifacts };
+    if (when === "before-inspection") f.refs.set(f.settings.publication.lease_ref, foreign.object);
+    const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifacts,
+      settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+    f.refs.set(f.settings.publication.lease_ref, foreign.object);
+    const before = [...f.executed];
+    const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifacts } });
+    expect(restored.state).toBe("complete");
+    expect(f.executed).toEqual(before);
+    expect(f.refs.get(f.settings.publication.lease_ref)).toBe(foreign.object);
+  }
+});
+
+
+test("retained reconstruction stays pending for an unreadable or newly replaced same-plan lease", async () => {
+  for (const mode of ["unreadable", "same-plan"] as const) {
+    const f = setup(); await publish(options(f));
+    const artifacts = join(f.root, "uncertain-lease-observer"); mkdirSync(artifacts, { mode: 0o700 });
+    f.transport = { ...f.transport, artifact_root: artifacts };
+    const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifacts,
+      settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+    const unused = join(f.root, "same-plan-lease"); mkdirSync(unused, { mode: 0o700 });
+    const created = createJournal({ source_repo: f.repo, artifact_root: unused, plan: f.plan });
+    const samePlan = writePublicationObjects(f.store, f.plan, created.header);
+    f.refs.set(f.settings.publication.lease_ref, mode === "same-plan" ? samePlan.lease_object : "f".repeat(40));
+    const before = [...f.executed];
+    const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifacts } });
+    expect(restored.state).toBe("pending");
+    expect(f.executed).toEqual(before);
+  }
 });

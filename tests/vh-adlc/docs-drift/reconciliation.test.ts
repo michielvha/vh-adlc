@@ -1,4 +1,4 @@
-import { appendInvalidation, appendRecoveryOnly, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendInvalidation, appendRecoveryOnly, readJournal, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { retainAbsence } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
@@ -8,6 +8,8 @@ import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { reconcileAbsent, resumeEffects, inspectRetainedOperation, restoreRetainedOperation, type ReconciliationScope } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationFixture, legacyReceiptInterruption, publicationOptions as options } from "./publication-fixture";
+import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { hash } from "./manifest-fixture";
 
 const roots: string[] = [];
@@ -347,4 +349,35 @@ test("cleanup can observe its completed release after a lost acknowledgement and
   expect(result.state).toBe("complete");
   expect(f.refs.get(f.settings.publication.lease_ref)).toBe("f".repeat(40));
   expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+});
+
+
+test("lease-fallback restoration retains a canonical receipt from a separate owned object store", async () => {
+  const f = publicationFixture(roots);
+  const original = await legacyReceiptInterruption(f);
+  // The remote business effects happened before the old mirror was lost.
+  f.done.add("push"); f.done.add("pr");
+  const parent = join(f.root, "second-host-objects"), artifacts = join(f.root, "second-host-artifacts");
+  mkdirSync(parent, { mode: 0o700 }); mkdirSync(artifacts, { mode: 0o700 });
+  const store = createOwnedObjectStore({ parent, evidence_directory: artifacts, source_repo: f.repo,
+    source_commit: f.plan.manifest.bindings.source_commit, repository: "fixture/docs", owner: "fixture", run: "second-host" });
+  const execute = f.transport.execute;
+  f.transport = { ...f.transport, object_store: store.root, artifact_root: artifacts, async execute(plan, effect, objects) {
+    if (effect.kind === "receipt-retain") readGit(store.root, "cat-file", "-e", objects.receipt_object! + "^{commit}");
+    await execute(plan, effect, objects);
+  } };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifacts,
+    settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
+  expect(inspection.receipt_object).toBeNull();
+  const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifacts, object_store: store } });
+  expect(restored.journal.header.observed_receipt_object).toBeNull();
+  expect(restored.objects.receipt_object).toBe(writePlanObject(store, f.plan).object);
+  expect(restored.objects.receipt_object).not.toBe(original.objects.lease_object);
+  const cleaned = await reconcileAbsent({ ...input(f, restored.journal.directory), object_store: store, retire_effect_ids: [] });
+  expect(cleaned.state).toBe("complete");
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(f.refs.get(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(cleaned.objects.object);
+  f.transport = { ...f.transport, object_store: f.store.root, artifact_root: f.artifacts };
+  const resumedLegacy = await resumeEffects({ ...options(f), journal_directory: original.journal.directory });
+  expect(resumedLegacy.state).toBe("complete");
 });
