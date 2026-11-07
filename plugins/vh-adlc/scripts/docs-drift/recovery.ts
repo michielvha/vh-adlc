@@ -2,7 +2,7 @@ import { executeAttempt, pendingAttempt, hasEffectAttempt } from "./attempts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRetirement, appendRecoveryOnly, isObservationOnly, readJournal, writePlanObject, writePublicationObjects, createJournal, publishArtifact, readArtifact, readVerifiedPlan, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRetirement, appendRecoveryOnly, isObservationOnly, readJournal, writePlanObject, writePublicationObjects, createJournal, publishArtifact, readArtifact, readRetainedPlan, readVerifiedPlan, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { readLookup } from "./observations";
 import { canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { publicationMarker } from "./report-history";
@@ -149,10 +149,10 @@ type RetainedOptions = {
   verify_policy: (plan: SealedPlan) => PlanPolicy | null;
 };
 export type RetainedInspection = {
-  state: "inspection"; directory: string; plan: SealedPlan; ref: string; objects: PlanObjects; lease_object: string | null; receipt_object: string | null;
+  state: "inspection"; policy_state: "current" | "unavailable-or-changed"; directory: string; plan: SealedPlan; ref: string; objects: PlanObjects; lease_object: string | null; receipt_object: string | null;
   observations: Array<{ effect_id: string; observation: EffectObservation }>;
 };
-const inspected = new WeakMap<object, { transport: PublicationTransport; source_repo: string; verify_policy: RetainedOptions["verify_policy"] }>();
+const inspected = new WeakMap<object, { transport: PublicationTransport; source_repo: string }>();
 
 /** Inspect the fixed retained payload. Replay requires the original native proof and current authority. */
 export async function inspectRetainedOperation(options: RetainedOptions): Promise<RetainedInspection> {
@@ -174,7 +174,10 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
   if (Object.keys(objects).sort().join(",") !== "blob,object,plan_sha256,tree" || objects.object !== target.object
     || [objects.object, objects.tree, objects.blob].some(value => !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value))
     || objects.plan_sha256 !== sha256(bytes)) throw Error("retained metadata object binding");
-  const plan = readVerifiedPlan(bytes, options.verify_policy);
+  const plan = readRetainedPlan(bytes);
+  let policy_state: RetainedInspection["policy_state"] = "current";
+  try { readVerifiedPlan(bytes, options.verify_policy); }
+  catch { policy_state = "unavailable-or-changed"; }
   if (plan.manifest.repository !== options.settings.repository || plan.manifest.repository_id !== identity.repository_id
     || plan.manifest.actor !== options.settings.publication.actor || plan.manifest.operation_id !== options.operation_id
     || plan.transport !== options.transport.kind) throw Error("retained operation scope changed");
@@ -206,9 +209,9 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
     root: directory, owner: process.getuid?.() ?? null, run, repository: plan.manifest.repository, source_commit: plan.manifest.bindings.source_commit, ref, object: objects.object }));
   mkdirSync(directory, { mode: 0o700 });
   publishArtifact(join(directory, "plan.json"), bytes);
-  publishArtifact(join(directory, "observations.json"), canonicalJSON({ state: "inspection", reader_identity: identity, ref, objects, lease_object, receipt_object, observations }));
-  const result: RetainedInspection = freezeJSON({ state: "inspection", directory, plan, ref, objects, lease_object, receipt_object, observations });
-  inspected.set(result, { transport: options.transport, source_repo: source, verify_policy: options.verify_policy });
+  publishArtifact(join(directory, "observations.json"), canonicalJSON({ state: "inspection", policy_state, reader_identity: identity, ref, objects, lease_object, receipt_object, observations }));
+  const result: RetainedInspection = freezeJSON({ state: "inspection", policy_state, directory, plan, ref, objects, lease_object, receipt_object, observations });
+  inspected.set(result, { transport: options.transport, source_repo: source });
   return result;
 }
 
@@ -216,7 +219,7 @@ export async function restoreRetainedOperation(options: { inspection: RetainedIn
   const origin = inspected.get(options.inspection), publication = options.publication;
   if (!origin || origin.transport !== publication.transport || origin.source_repo !== realpathSync(publication.source_repo)
     || !canonicalJSON(options.inspection.plan).equals(canonicalJSON(publication.plan))) throw Error("missing actual retained inspection");
-  readVerifiedPlan(canonicalJSON(publication.plan), origin.verify_policy);
+  readRetainedPlan(canonicalJSON(publication.plan));
   if (publication.transport.kind !== publication.plan.transport || publication.transport.object_store !== publication.object_store.root
     || publication.artifact_root !== publication.transport.artifact_root) throw Error("restored transport or artifact scope changed");
   const identity = await publication.transport.identity();

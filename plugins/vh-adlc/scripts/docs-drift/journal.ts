@@ -126,9 +126,14 @@ export function sealPlan(options: {
   });
 }
 
+/** Structural read for retained diagnostics only. Current policy and grants separately gate every replay. */
+export function readRetainedPlan(bytes: Uint8Array): SealedPlan {
+  return parsePlan(parseCanonical(bytes));
+}
+
 /** The native adopter supplies current policy. A plan cannot authorize its own historical evidence. */
 export function readVerifiedPlan(bytes: Uint8Array, verifyPolicy: (plan: SealedPlan) => PlanPolicy | null): SealedPlan {
-  const plan = parsePlan(parseCanonical(bytes));
+  const plan = readRetainedPlan(bytes);
   const policy = verifyPolicy(structuredClone(plan));
   if (policy === null || policy.adoption_sha256 !== plan.adoption_sha256 || policy.context !== plan.context || policy.transport !== plan.transport || policy.publication_kind !== plan.publication_kind) fail("current policy unavailable or changed");
   if (typeof policy.pr_draft !== "boolean") fail("missing draft policy");

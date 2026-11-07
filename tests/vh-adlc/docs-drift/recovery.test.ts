@@ -3,11 +3,11 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
-import { inspectRetainedOperation, restoreRetainedOperation, resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
+import { inspectRetainedOperation, restoreRetainedOperation, resumeEffects, reconcileAbsent } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { readJournal, sealPlan, appendRecoveryOnly, createJournal, writePublicationObjects, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
-import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { fixture, hash } from "./manifest-fixture";
 import { publicationFixture, legacyReceiptInterruption, publicationOptions as options } from "./publication-fixture";
 
@@ -184,6 +184,7 @@ test("lost local artifacts permit fixed-ref inspection without manufacturing ori
   const artifactRoot = f.artifacts;
   const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifactRoot, settings: f.settings, transport: f.transport, operation_id: "operation-1", verify_policy: () => f.policy });
   expect(inspection.state).toBe("inspection");
+  expect(inspection.policy_state).toBe("current");
   expect(inspection.observations.find(item => item.effect_id === "pr")?.observation.state).toBe("done");
   expect(readFileSync(join(inspection.directory, "plan.json"), "utf8")).toContain("Exact reviewed body");
   await expect(restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifactRoot } })).rejects.toThrow();
@@ -660,4 +661,46 @@ test("a receipt appearing during lease-fallback inspection requires a fresh cohe
   const fresh = await inspectRetainedOperation(input);
   expect(fresh.receipt_object).toBe(stopped.objects.object);
   expect(fresh.observations.find(item => item.effect_id === "receipt")?.observation.state).toBe("done");
+});
+
+test.each(["adoption", "model", "unavailable"] as const)("retained read-only cleanup survives %s policy drift without business replay", async changed => {
+  const { f, interrupted } = await interruptedPR();
+  const artifactRoot = join(f.root, "policy-drift-restoration"); mkdirSync(artifactRoot, { mode: 0o700 });
+  f.transport = { ...f.transport, artifact_root: artifactRoot };
+  const currentPolicy = { ...f.policy, adoption_sha256: changed === "adoption" ? hash("new adoption") : f.policy.adoption_sha256,
+    worker: changed === "model" ? { ...f.policy.worker, adopted_model: "claude-opus-5.6" } : f.policy.worker };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifactRoot, settings: f.settings,
+    transport: f.transport, operation_id: "operation-1", verify_policy: () => {
+      if (changed === "unavailable") throw Error("current policy unavailable");
+      return currentPolicy;
+    } });
+  expect(inspection.policy_state).toBe("unavailable-or-changed");
+  const before = [...f.executed];
+  const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifactRoot,
+    gate: async () => { throw Error("old business grant unavailable"); } } });
+  expect(restored.journal.header.recovery_mode).toBe("observation-only");
+  expect(restored.state).toBe("pending");
+  expect(f.executed).toEqual(before);
+  const completed = await reconcileAbsent({ source_repo: f.repo, journal_directory: restored.journal.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, retire_effect_ids: [],
+    authorize: async scope => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("current exact-owned cleanup request") }) });
+  expect(completed.state).toBe("complete");
+  expect(f.executed).toEqual([...before, "release"]);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(interrupted.journal.plan.adoption_sha256).toBe(f.plan.adoption_sha256);
+});
+
+test("policy-drift inspection never turns an unseen retained action into a replay grant", async () => {
+  const f = setup(), observe = f.transport.observe;
+  f.transport.observe = async (plan, effect, objects) => effect.id === "pr" ? { state: "unknown", reason: "initial-read-unavailable" } : observe(plan, effect, objects);
+  await publish(options(f)); f.transport.observe = observe;
+  const artifactRoot = join(f.root, "unseen-policy-drift"); mkdirSync(artifactRoot, { mode: 0o700 });
+  f.transport = { ...f.transport, artifact_root: artifactRoot };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: artifactRoot, settings: f.settings,
+    transport: f.transport, operation_id: "operation-1", verify_policy: () => null });
+  expect(inspection.policy_state).toBe("unavailable-or-changed");
+  const before = [...f.executed];
+  const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifactRoot } });
+  expect(restored.state).toBe("pending"); expect(restored.reason).toBe("retained-restore-no-replay");
+  expect(f.executed).toEqual(before); expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
 });
