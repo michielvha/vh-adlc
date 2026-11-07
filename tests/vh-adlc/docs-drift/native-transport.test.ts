@@ -10,6 +10,7 @@ import { sealPlan, writePlanObject, createJournal, writePublicationObjects, appe
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { readLookup } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { fixture, hash, role, bindings } from "./manifest-fixture";
@@ -48,7 +49,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, labels_unavailable: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -186,10 +187,27 @@ else if (endpoint?.startsWith('repos/fixture/docs/git/ref/')) {
         value = { message: 'Not Found' };
     }
 }
+else if (endpoint?.startsWith('repos/fixture/docs/labels?')) {
+    if (state.label_list_status) { status = state.label_list_status; value = { message: 'label inventory unavailable' }; }
+    else value = [...new Map(Object.values(state.labels).map(label => [label.id, label])).values()].map(label => ({ color: '123abc', default: false, ...label }));
+}
 else if (endpoint?.startsWith('repos/fixture/docs/labels/')) {
     const name = decodeURIComponent(endpoint.slice('repos/fixture/docs/labels/'.length));
+    if (state.label_race !== 'none' && !state.label_race_done) {
+        state.label_race_done = true;
+        delete state.labels.documentation;
+        delete state.labels.Documentation;
+        state.labels.archived = { id: 101, name: 'archived' };
+        for (const item of [...state.prs, ...state.issues])
+            for (const label of item.labels ?? []) if (label.id === 101) label.name = 'archived';
+        if (state.label_race === 'replace')
+            state.labels.documentation = state.labels.Documentation = { id: 999, name: 'documentation' };
+        save();
+    }
     if (state.labels_unavailable) { status = 503; value = { message: 'label metadata unavailable' }; }
-    else if (state.labels[name]) value = state.labels[name];
+    else if (state.label_lookup_status) { status = state.label_lookup_status; value = { message: 'label lookup unavailable' }; }
+    else if (state.label_non_label_response) value = { id: 101, name: 'documentation', default_branch: 'main' };
+    else if (state.labels[name]) value = { color: '123abc', default: false, ...state.labels[name] };
     else { status = 404; value = { message: 'label absent' }; }
 }
 else if (endpoint?.startsWith('repos/fixture/docs/pulls?')) {
@@ -330,12 +348,12 @@ test("native comment and closure keep legacy authors and exact target heads", as
 test("native PR updates distinguish the approved old payload, partial changes and exact completion", async () => {
   const f = setup(); await f.transport.identity();
   const original = { title: "Old title", body: "Old body", labels: ["old"], draft: false };
-  f.update(state => { state.prs.push({ ...original, labels: [{ name: "old" }], number: 501, state: "open", user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  f.update(state => { state.prs.push({ ...original, labels: [{ id: 102, name: "old" }], number: 501, state: "open", user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
   const update: Effect = { id: "update", kind: "pr-update", payload: { number: 501, expected_head: f.commit, expected_payload_sha256: sha256(canonicalJSON(original)), expected_payload: original, title: "New title", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("update"), labels: ["documentation"], draft: true } };
   expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("absent");
   f.update(state => { state.prs[0].title = update.payload.title; state.prs[0].body = update.payload.body; });
   expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("absent");
-  f.update(state => { state.prs[0].labels = [{ name: "documentation" }]; });
+  f.update(state => { state.prs[0].labels = [{ id: 101, name: "documentation" }]; });
   expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("absent");
   await f.transport.execute(f.plan, update, f.objects);
   expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("done");
@@ -969,7 +987,7 @@ test.each(["pr-create", "issue-create", "pr-update"] as const)("server-canonical
   f.update(state => { state.labels.Documentation = state.labels.documentation; state.refs["refs/heads/docs-drift/one"] = f.commit; });
   const body = publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("selected");
   const original = { title: "Old title", body: "Old body", labels: ["old"], draft: false };
-  if (kind === "pr-update") f.update(state => { state.prs.push({ ...original, labels: [{ name: "old" }], number: 501, state: "open",
+  if (kind === "pr-update") f.update(state => { state.prs.push({ ...original, labels: [{ id: 102, name: "old" }], number: 501, state: "open",
     user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
   const common = { title: "Reviewed title", body, labels: ["Documentation"], draft: true };
   const effect: Effect = kind === "pr-create" ? { id: "selected", kind, payload: { ...common, base: "main", branch: "docs-drift/one" } }
@@ -993,7 +1011,7 @@ test.each(["pr-create", "issue-create", "pr-update"] as const)("server-canonical
     }
     expect(sentLabels).toEqual(["Documentation"]);
   }
-  f.update(state => { (kind === "issue-create" ? state.issues[0] : state.prs[0]).labels = [{ name: "documentation" }, { name: "other" }]; });
+  f.update(state => { (kind === "issue-create" ? state.issues[0] : state.prs[0]).labels = [{ id: 101, name: "documentation" }, { id: 103, name: "other" }]; });
   expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("conflict");
 });
 
@@ -1008,7 +1026,7 @@ test.each([["DÖCS", "döcs"], ["Docs/API", "docs/api"], ["Σ", "ς"]])("native 
   expect(effect.payload.labels).toEqual([requested]);
   f.update(state => { state.labels_unavailable = true; });
   expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
-  f.update(state => { state.labels_unavailable = false; Object.assign(state.labels[canonical], { id: "malformed" }); });
+  f.update(state => { state.labels_unavailable = false; Object.assign(state.labels[requested], { id: "malformed" }); });
   expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
 });
 
@@ -1021,4 +1039,76 @@ test("multiple reviewed aliases of one label preserve assignment-set semantics",
   expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
   expect(f.inspect().prs[0].labels).toEqual([{ id: 101, name: "documentation" }]);
   expect(effect.payload.labels).toEqual(["Documentation", "documentation"]);
+});
+
+
+test.each(["rename", "replace"] as const)("label resolution keeps the native resource snapshot through a concurrent %s", async race => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.labels.Documentation = state.labels.documentation; state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect: Effect = { id: "pr", kind: "pr-create", payload: { title: "Reviewed PR", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"),
+    labels: ["Documentation"], draft: true, base: "main", branch: "docs-drift/one" } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  f.update(state => { state.label_race = race; });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("conflict");
+});
+
+test.each([false, true])("a deleted original label requires label-surface visibility before conflict retirement (hidden=%s)", async hidden => {
+  const f = setup(); await f.transport.identity();
+  const original = { title: "Old title", body: "Old body", labels: ["old", "other"], draft: true };
+  f.update(state => { state.prs.push({ ...original, labels: [{ id: 102, name: "old" }, { id: 103, name: "other" }], number: 77, state: "open",
+    user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  const effect: Effect = { id: "update", kind: "pr-update", payload: { number: 77, expected_head: f.commit, expected_payload: original,
+    expected_payload_sha256: sha256(canonicalJSON(original)), title: "Reviewed title", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("update"), labels: ["documentation"], draft: true } };
+  const selected = await startCleanupJournal(f, [effect]);
+  f.update(state => { delete state.labels.old; state.prs[0].labels = [{ id: 103, name: "other" }]; if (hidden) state.label_list_status = 403; });
+  expect((await f.transport.observe(selected.plan, effect, selected.objects)).state).toBe(hidden ? "unknown" : "conflict");
+  const result = await reconcileAbsent({ source_repo: selected.repo, journal_directory: selected.journal.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, retire_effect_ids: [effect.id],
+    authorize: async scope => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("current deleted-label cleanup approval") }) });
+  expect(result.state).toBe(hidden ? "pending" : "retired");
+  expect(f.inspect().refs[f.settings.publication.lease_ref] === undefined).toBe(!hidden);
+  expect(f.inspect().prs[0].title).toBe("Old title");
+});
+
+test("alias outcome retains its exact snapshot and expected-name resolution evidence", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.labels.Documentation = state.labels.documentation; state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect: Effect = { id: "pr", kind: "pr-create", payload: { title: "Reviewed PR", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"),
+    labels: ["Documentation"], draft: true, base: "main", branch: "docs-drift/one" } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  const result = await f.transport.observe(f.plan, effect, f.objects);
+  expect(result.state).toBe("done");
+  if (result.state !== "done" || !result.outcome.lookup) throw Error("missing alias support lookup");
+  const support = readLookup({ evidence: result.outcome.lookup, artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"),
+    plan: f.plan, effect, transport: "native", state: "done" });
+  expect(result.outcome.observation_sha256).toBe(support.sha256);
+  const retained: unknown = JSON.parse(readFileSync(support.path, "utf8"));
+  expect(retained).toMatchObject({ state: "done", lookup: { label_comparisons: [{ observed: [{ id: 101, name: "documentation" }],
+    expected: [{ requested: "Documentation", id: 101, canonical: "documentation" }] }] } });
+  expect(readFileSync(f.calls, "utf8")).not.toContain('"repos/fixture/docs/labels/documentation"');
+});
+
+test("a dot-segment lookup cannot treat repository metadata as a label identity", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect: Effect = { id: "pr", kind: "pr-create", payload: { title: "Reviewed PR", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"),
+    labels: [".."], draft: true, base: "main", branch: "docs-drift/one" } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  f.update(state => { state.prs[0].labels = [{ id: 101, name: "documentation" }]; state.label_non_label_response = true; });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
+  expect(readFileSync(f.calls, "utf8")).toContain("repos/fixture/docs/labels/%2E%2E");
+});
+
+
+test.each(["missing", "duplicate", "invalid"] as const)("native label snapshots reject %s identities even when names match", async kind => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect: Effect = { id: "pr", kind: "pr-create", payload: { title: "Reviewed PR", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"),
+    labels: ["documentation", "other"], draft: true, base: "main", branch: "docs-drift/one" } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  f.update(state => {
+    state.prs[0].labels = kind === "missing" ? [{ name: "documentation" }, { id: 103, name: "other" }]
+      : [{ id: kind === "invalid" ? -1 : 101, name: "documentation" }, { id: 101, name: "other" }];
+  });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
 });

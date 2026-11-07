@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { authorizeEffects, effectDigest, manifestDigest, modelMatches, parseActionManifest, requireReviewedManifest, workerInputDigest } from "./manifests";
 import type { ActionManifest, EffectGrant, ReviewedManifest, RolePolicy } from "./manifests";
 import { canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
@@ -21,7 +21,7 @@ export type PlanPolicy = {
   adoption_sha256: string; context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"]; pr_draft: boolean;
   worker: RolePolicy; reviewer: RolePolicy;
 };
-export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
+export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null; lookup?: { path: string; sha256: string } };
 export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string }; never_dispatched?: true; unapplied?: true };
 export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
 type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant; atomic_receipt_id?: string };
@@ -190,8 +190,14 @@ function eventFiles(directory: string): string[] {
   }
   return files.filter(file => !file.startsWith(".tmp-"));
 }
-function outcome(value: unknown): Outcome {
-  const receipt = exact(value, ["state", "observation_sha256", "resource_id", "object"]);
+function outcome(value: unknown, artifactRoot: string): Outcome {
+  const supported = value !== null && typeof value === "object" && Object.hasOwn(value, "lookup");
+  const receipt = exact(value, ["state", "observation_sha256", "resource_id", "object", ...(supported ? ["lookup"] : [])]);
+  if (supported) {
+    const lookup = exact(receipt.lookup, ["path", "sha256"]);
+    if (hash(lookup.sha256) !== receipt.observation_sha256 || typeof lookup.path !== "string" || !lookup.path.startsWith("/")
+      || lookup.path.includes("\0") || resolve(lookup.path) !== lookup.path || dirname(lookup.path) !== artifactRoot) fail("invalid outcome lookup");
+  }
   if (receipt.state !== "observed") fail("outcome state");
   hash(receipt.observation_sha256);
   if (receipt.resource_id !== null && (typeof receipt.resource_id !== "string" || receipt.resource_id.length === 0 || /[\u0000-\u0020\u007f]/u.test(receipt.resource_id))) fail("outcome resource");
@@ -265,7 +271,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
         || prior.some(item => item.kind === "attempt-ended" && item.revision > attempt.revision)
         || typeof payload.sent !== "boolean" || typeof payload.reaped !== "boolean") fail("invalid attempt ending");
     }
-    else if (event.kind === "outcome") outcome(event.payload);
+    else if (event.kind === "outcome") outcome(event.payload, dirname(header.directory));
     else if (event.kind === "retired-absence") {
       const undispatched = Object.hasOwn(event.payload, "never_dispatched"), unapplied = Object.hasOwn(event.payload, "unapplied");
       if (undispatched && unapplied) fail("contradictory retirement proof");
@@ -358,7 +364,7 @@ export function appendIntent(journal: Journal, effectId: string, atomicAcquisiti
   if (!effect) fail("unknown effect intent");
   return append(journal, "intent", effectId, { effect_sha256: effectDigest([effect]), ...(atomicAcquisition ? { atomic_acquisition: atomicAcquisition } : {}) });
 }
-export function appendOutcome(journal: Journal, effectId: string, receipt: Outcome): Journal { return append(journal, "outcome", effectId, outcome(receipt)); }
+export function appendOutcome(journal: Journal, effectId: string, receipt: Outcome): Journal { return append(journal, "outcome", effectId, outcome(receipt, dirname(journal.directory))); }
 export function appendHandoff(journal: Journal, effectId: string, reason: string): Journal { return append(journal, "handoff", effectId, { reason: identifier(reason) }); }
 
 export function appendInvalidation(journal: Journal, effectId: string, reason: string): Journal { return append(journal, "invalidation", effectId, { reason: identifier(reason) }); }

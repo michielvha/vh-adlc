@@ -12,7 +12,7 @@ export type AbsenceEvidence = { path: string; sha256: string };
 /** Each record comes from a fresh transport lookup, under that transport's selected artifact root. */
 export function retainLookup(options: {
   artifact_root: string; source_repo: string; plan: SealedPlan; effect: Effect;
-  transport: "native" | "collector"; lookup: unknown; state: "absent" | "conflict";
+  transport: "native" | "collector"; lookup: unknown; state: "absent" | "conflict" | "done";
 }): AbsenceEvidence {
   const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
   const bytes = canonicalJSON({ schema_version: 1, state: options.state, transport: options.transport,
@@ -27,7 +27,7 @@ export function retainLookup(options: {
 
 export function readLookup(options: {
   evidence: AbsenceEvidence; artifact_root: string; source_repo: string; plan: SealedPlan; effect: Effect;
-  transport: "native" | "collector"; state: "absent" | "conflict";
+  transport: "native" | "collector"; state: "absent" | "conflict" | "done";
 }): AbsenceEvidence {
   const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
   const evidence = options.evidence;

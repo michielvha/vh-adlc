@@ -8,6 +8,7 @@ import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-dri
 import { createOwnedObjectStore, captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { publicationFixture } from "./publication-fixture";
+import { retainLookup, readLookup } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
 import { fixture, hash, role, bindings } from "./manifest-fixture";
 
 const roots: string[] = [];
@@ -263,4 +264,23 @@ test("legacy never-dispatched retirement remains readable", () => {
   expect(retained.kind).toBe("retired-absence");
   expect(retained.payload).toMatchObject({ never_dispatched: true });
   expect(Object.hasOwn(retained.payload, "unapplied")).toBe(false);
+});
+
+
+test("supported outcomes retain scoped lookup digests while historical journal reading stays structural", () => {
+  const f = setup(), effect = f.plan.manifest.effects[0];
+  let journal = appendIntent(createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan }), effect.id);
+  const lookup = retainLookup({ artifact_root: f.artifacts, source_repo: f.repo, plan: f.plan, effect,
+    transport: "native", state: "done", lookup: { resource_sha256: hash("native snapshot"), label_comparisons: [] } });
+  const receipt = { state: "observed" as const, observation_sha256: lookup.sha256, resource_id: "77", object: null, lookup };
+  expect(() => appendOutcome(journal, effect.id, { ...receipt, observation_sha256: hash("unrelated") })).toThrow("lookup");
+  expect(() => appendOutcome(journal, effect.id, { ...receipt, lookup: { ...lookup, path: join(f.root, "foreign.json") } })).toThrow("lookup");
+  expect(() => appendOutcome(journal, effect.id, { ...receipt, lookup: { ...lookup, path: join(f.artifacts, "child") + "/../lookup.json" } })).toThrow("lookup");
+  journal = appendOutcome(journal, effect.id, receipt);
+  expect(readJournal(journal.directory, f.repo).events.at(-1)?.payload).toEqual(receipt);
+  expect(readLookup({ evidence: lookup, artifact_root: f.artifacts, source_repo: f.repo, plan: f.plan, effect, transport: "native", state: "done" })).toEqual(lookup);
+  expect(() => readLookup({ evidence: lookup, artifact_root: f.artifacts, source_repo: f.repo, plan: f.plan, effect, transport: "native", state: "conflict" })).toThrow("scope");
+  unlinkSync(lookup.path);
+  expect(readJournal(journal.directory, f.repo).events.at(-1)?.payload).toEqual(receipt);
+  expect(() => readLookup({ evidence: lookup, artifact_root: f.artifacts, source_repo: f.repo, plan: f.plan, effect, transport: "native", state: "done" })).toThrow();
 });

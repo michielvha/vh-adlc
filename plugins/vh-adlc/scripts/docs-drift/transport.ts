@@ -51,11 +51,21 @@ function actor(value: unknown) {
   const input = record(value);
   return { actor: text(input.login), actor_id: positive(input.id) };
 }
-function labelNames(value: unknown): string[] {
+type NativeLabel = { id: number; name: string };
+type LabelComparison = { observed: NativeLabel[]; expected: { requested: string; id: number | null; canonical: string | null }[] };
+function nativeLabels(value: unknown): NativeLabel[] {
   if (!Array.isArray(value)) throw Error("incomplete native labels");
-  const result = value.map(item => text(record(item).name)).sort();
-  if (new Set(result).size !== result.length) throw Error("duplicate native labels");
-  return result;
+  const labels = value.map(item => { const label = record(item); return { id: positive(label.id), name: text(label.name) }; });
+  if (new Set(labels.map(label => label.id)).size !== labels.length || new Set(labels.map(label => label.name)).size !== labels.length)
+    throw Error("duplicate native labels");
+  return labels.sort((left, right) => left.name < right.name ? -1 : left.name > right.name ? 1 : 0);
+}
+function labelNames(value: unknown): string[] { return nativeLabels(value).map(label => label.name); }
+function repositoryLabel(value: unknown): NativeLabel {
+  const label = record(value);
+  if (typeof label.color !== "string" || !/^[a-f0-9]{6}$/iu.test(label.color) || typeof label.default !== "boolean")
+    throw Error("incomplete repository label");
+  return { id: positive(label.id), name: text(label.name) };
 }
 class IssueEvidenceConflict extends Error {
   constructor(readonly lookup: Record<string, unknown>) { super("published issue evidence changed"); }
@@ -117,26 +127,37 @@ export function createNativeTransport(options: {
     if (!page.complete) throw Error("incomplete native publication collection");
     return page.items;
   }
-  function labelsMatch(actual: string[], expected: string[]): boolean {
-    if (same(actual, expected)) return true;
+  function labelsMatch(value: unknown, expected: string[], comparisons?: LabelComparison[]): boolean {
+    const actual = nativeLabels(value);
+    if (same(actual.map(label => label.name), expected)) return true;
     if (actual.length === 0 || expected.length === 0) return false;
-    const resolved = new Map<string, number>();
-    const identity = (name: string): number => {
-      const cached = resolved.get(name);
-      if (cached !== undefined) return cached;
-      const label = record(reader.get(`${prefix}/labels/${encodeURIComponent(name)}`));
-      text(label.name);
-      const id = positive(label.id);
-      resolved.set(name, id);
-      return id;
+    const resolved = new Map<string, NativeLabel | null>();
+    const identity = (name: string): NativeLabel | null => {
+      if (resolved.has(name)) return resolved.get(name) ?? null;
+      let label = actual.find(item => item.name === name) ?? null;
+      if (!label) {
+        try { label = repositoryLabel(reader.get(`${prefix}/labels/${encodeURIComponent(name).replaceAll(".", "%2E")}`)); }
+        catch (error) {
+          if (!(error instanceof GitHubReadError) || error.status !== 404) throw error;
+          // Contents visibility does not establish label-read permission. Require the complete label surface.
+          const labels = list(`${prefix}/labels?per_page=100`).map(repositoryLabel);
+          nativeLabels(labels);
+          label = labels.find(item => item.name === name) ?? null;
+        }
+      }
+      resolved.set(name, label);
+      return label;
     };
-    const actualIds = actual.map(identity);
-    if (new Set(actualIds).size !== actualIds.length) throw Error("duplicate native label identities");
-    const expectedIds = [...new Set(expected.map(identity))];
-    return same(actualIds.sort((left, right) => left - right), expectedIds.sort((left, right) => left - right));
+    const expectedLabels = expected.map(requested => { const label = identity(requested);
+      return { requested, id: label?.id ?? null, canonical: label?.name ?? null }; });
+    comparisons?.push({ observed: actual, expected: expectedLabels });
+    if (expectedLabels.some(label => label.id === null)) return false;
+    const expectedIds = [...new Set(expectedLabels.map(label => label.id))].sort((left, right) => Number(left) - Number(right));
+    return same(actual.map(label => label.id).sort((left, right) => left - right), expectedIds);
   }
-  function fieldsMatch(actual: ReturnType<typeof expectedFields>, expected: ReturnType<typeof expectedFields>): boolean {
-    return same({ ...actual, labels: [] }, { ...expected, labels: [] }) && labelsMatch(actual.labels, expected.labels);
+  function fieldsMatch(value: unknown, expected: ReturnType<typeof expectedFields>, comparisons?: LabelComparison[]): boolean {
+    const actual = submittedFields(value);
+    return same({ ...actual, labels: [] }, { ...expected, labels: [] }) && labelsMatch(record(value).labels, expected.labels, comparisons);
   }
   function ownedActor(input: unknown, plan: SealedPlan): boolean {
     const identity = actor(input);
@@ -168,7 +189,7 @@ export function createNativeTransport(options: {
   function mutablePull(effect: Effect, plan: SealedPlan) {
     const pr = pull(positive(effect.payload.number), plan, effect.kind !== "pr-close");
     if (pr.input.state !== "open" || pr.head !== effect.payload.expected_head) throw Error("native mutable PR target changed");
-    if (effect.kind === "pr-update" && !updateTransitions(effect).some(fields => fieldsMatch(submittedFields(pr.input), fields))) throw Error("native mutable PR payload changed");
+    if (effect.kind === "pr-update" && !updateTransitions(effect).some(fields => fieldsMatch(pr.input, fields))) throw Error("native mutable PR payload changed");
     return pr;
   }
   function observed(input: unknown, resourceId: string | null, object: string | null): EffectObservation {
@@ -305,13 +326,20 @@ export function createNativeTransport(options: {
     },
     async observe(plan, effect, objects) {
       const p = effect.payload;
+      const comparisons: LabelComparison[] = [];
       try {
         const absent = (lookup: unknown): EffectObservation => ({ state: "absent", evidence: retainAbsence({
-          artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", lookup: { result: lookup, requests: reader.trace() },
+          artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", lookup: { result: lookup, label_comparisons: comparisons, requests: reader.trace() },
         }) });
         const conflicted = (reason: string, lookup: unknown): EffectObservation => ({ state: "conflict", reason,
           evidence: retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native",
-            state: "conflict", lookup: { reason, result: lookup, requests: reader.trace() } }) });
+            state: "conflict", lookup: { reason, result: lookup, label_comparisons: comparisons, requests: reader.trace() } }) });
+        const observedLabels = (input: unknown, resourceId: string, object: string | null): EffectObservation => {
+          if (comparisons.length === 0) return observed(input, resourceId, object);
+          const lookup = retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", state: "done",
+            lookup: { resource_sha256: sha256(canonicalJSON(input)), label_comparisons: comparisons, requests: reader.trace() } });
+          return { state: "done", outcome: { state: "observed", observation_sha256: lookup.sha256, resource_id: resourceId, object, lookup } };
+        };
         if (["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(effect.kind)) {
           const target = getRef(text(p.ref));
           if (effect.kind === "push" && (target.state === "absent" || target.object !== p.head)) {
@@ -358,12 +386,12 @@ export function createNativeTransport(options: {
           const actual = submittedFields(pr.input), expected = expectedFields(effect);
           if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
             || !pr.branch.startsWith(settings.publication.branch_prefix) || pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
-          if (!fieldsMatch(actual, expected)) {
+          if (!fieldsMatch(pr.input, expected, comparisons)) {
             if (actual.labels.length === 0 && same({ ...actual, labels: expected.labels }, expected))
               return { state: "unknown", reason: "native-PR-labels-incomplete" };
             return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
           }
-          return observed(pr.input, String(candidate.number), pr.head);
+          return observedLabels(pr.input, String(candidate.number), pr.head);
         }
         if (effect.kind === "pr-update" || effect.kind === "pr-close") {
           const pr = pull(positive(p.number), plan, false, false);
@@ -371,12 +399,12 @@ export function createNativeTransport(options: {
             || !pr.branch.startsWith(settings.publication.branch_prefix))) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
           if (effect.kind === "pr-close" && pr.input.state === "closed") return observed(pr.input, String(p.number), pr.head);
-          if (effect.kind === "pr-update" && fieldsMatch(submittedFields(pr.input), expectedFields(effect))) return observed(pr.input, String(p.number), pr.head);
+          if (effect.kind === "pr-update" && fieldsMatch(pr.input, expectedFields(effect), comparisons)) return observedLabels(pr.input, String(p.number), pr.head);
           const base = text(record(pr.input.base).ref);
           if (base !== settings.publication.base) return conflicted("native-PR-destination-changed", { number: p.number, base, head: pr.head, state: pr.input.state });
           if (effect.kind === "pr-close") return absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           const transitions = updateTransitions(effect);
-          return pr.input.state === "open" && transitions.some(fields => fieldsMatch(submittedFields(pr.input), fields))
+          return pr.input.state === "open" && transitions.some(fields => fieldsMatch(pr.input, fields, comparisons))
             ? absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user),
               source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
         }
@@ -394,8 +422,8 @@ export function createNativeTransport(options: {
           }
           if (candidates.length !== 1) return conflicted("ambiguous-native-issue", { inventory: inventoryEvidence(inventory) });
           const issue = candidates[0];
-          if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !labelsMatch(labelNames(issue.labels), reviewedLabels(p.labels))) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
-          return observed(issue, String(positive(issue.number)), null);
+          if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !labelsMatch(issue.labels, reviewedLabels(p.labels), comparisons)) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
+          return observedLabels(issue, String(positive(issue.number)), null);
         }
         if (effect.kind === "comment-create") {
           const pr = pull(positive(p.number), plan, false, false);

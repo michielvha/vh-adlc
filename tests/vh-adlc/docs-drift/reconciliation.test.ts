@@ -398,7 +398,7 @@ test("selected cleanup retires a conflicting action that the original journal ne
     expect(f.executed.includes(selected)).toBe(false);
     expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
     const retired = cleanup.journal.events.find(event => event.kind === "retired-absence" && event.effect_id === selected);
-    if (!retired || !("lookup" in retired.payload)) throw Error("missing non-success retirement");
+    if (!retired || !("lookup" in retired.payload) || !retired.payload.lookup) throw Error("missing non-success retirement");
     expect(JSON.parse(readFileSync(retired.payload.lookup.path, "utf8")).state).toBe("conflict");
     expect(cleanup.journal.events.some(event => event.effect_id === selected && event.kind === "outcome")).toBe(false);
     expect((await resumeEffects({ ...options(f), journal_directory: cleanup.journal.directory })).state).toBe("retired");
