@@ -4,12 +4,12 @@ import { mkdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { inspectRetainedOperation, restoreRetainedOperation, resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
-import { readJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { readJournal, sealPlan, appendRecoveryOnly, createJournal, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { fixture, hash } from "./manifest-fixture";
-import { publicationFixture, publicationOptions as options } from "./publication-fixture";
+import { publicationFixture, legacyReceiptInterruption, publicationOptions as options } from "./publication-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -471,7 +471,7 @@ test("a completed operation can be reconstructed read-only after its lease and o
   expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
 });
 
-test("a receipt appearing during acquisition cannot be adopted as this run's retention", async () => {
+test("a changed receipt after atomic acquisition stops before business effects", async () => {
   const f = setup(), execute = f.transport.execute;
   f.transport.execute = async (plan, effect, objects) => {
     await execute(plan, effect, objects);
@@ -482,8 +482,8 @@ test("a receipt appearing during acquisition cannot be adopted as this run's ret
   };
   const result = await publish(options(f));
   expect(result.state).toBe("pending");
-  expect(result.reason).toBe("operation-started-elsewhere");
-  expect(f.executed).toEqual(["lease"]);
+  expect(result.reason).toBe("foreign-receipt-object");
+  expect(f.executed).toEqual(["lease", "receipt"]);
 });
 
 test("an operation observed elsewhere remains non-replaying even after receipt cleanup", async () => {
@@ -500,17 +500,11 @@ test("an operation observed elsewhere remains non-replaying even after receipt c
 });
 
 
-test("an original acquiring run can release only its owned completed recovery-only lease", async () => {
-  const f = setup(), execute = f.transport.execute;
-  f.transport.execute = async (plan, effect, objects) => {
-    await execute(plan, effect, objects);
-    if (effect.kind === "lease-acquire") {
-      f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.object);
-      for (const id of ["receipt", "push", "pr"]) f.done.add(id);
-    }
-  };
-  const stopped = await publish(options(f));
-  expect(stopped.reason).toBe("operation-started-elsewhere");
+test("an original legacy acquiring run can release only its owned completed recovery-only lease", async () => {
+  const f = setup(), stopped = await legacyReceiptInterruption(f);
+  f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", stopped.objects.object);
+  for (const id of ["receipt", "push", "pr"]) f.done.add(id);
+  appendRecoveryOnly(stopped.journal, "receipt", "operation-started-elsewhere");
   const result = await resumeEffects({ ...options(f), journal_directory: stopped.journal.directory });
   expect(result.state).toBe("complete");
   expect(f.executed).toEqual(["lease", "release"]);
@@ -570,4 +564,38 @@ test("an absent business effect cannot replay after the publication lease is los
     expect(f.executed).toEqual(["lease", "receipt", "push"]);
     expect(f.refs.get(f.settings.publication.lease_ref)).toBe(replacement ?? undefined);
   }
+});
+
+
+test("an uncertain sent candidate push stays pending instead of dispatching another create", async () => {
+  const f = setup(), execute = f.transport.execute;
+  let pushes = 0;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "push" && ++pushes === 1) throw new PublicationExecutionError(true, true);
+    await execute(plan, effect, objects);
+  };
+  const stopped = await publish(options(f));
+  const result = await resumeEffects({ ...options(f), journal_directory: stopped.journal.directory });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("dispatch-outcome-unknown");
+  expect(pushes).toBe(1);
+  expect(f.executed.includes("pr")).toBe(false);
+});
+
+
+test("a receipt landing after the precheck cannot leave a new original holding a lease", async () => {
+  const f = setup(), execute = f.transport.execute, other = join(f.root, "other-acquirer");
+  mkdirSync(other, { mode: 0o700 });
+  const earlier = createJournal({ source_repo: f.repo, artifact_root: other, plan: f.plan });
+  const priorObjects = writePublicationObjects(f.store, f.plan, earlier.header);
+  const receiptRef = f.settings.publication.receipt_ref_prefix + "operation-1";
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "lease-acquire") f.refs.set(receiptRef, priorObjects.receipt_object);
+    await execute(plan, effect, objects);
+  };
+  const result = await publish(options(f));
+  expect(result.state).toBe("pending");
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(f.refs.get(receiptRef)).toBe(priorObjects.receipt_object);
+  expect(f.executed).toEqual(["lease"]);
 });

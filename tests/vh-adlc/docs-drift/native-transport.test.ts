@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createNativeTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
-import { sealPlan, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { sealPlan, writePlanObject, createJournal, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -29,7 +29,12 @@ function setup() {
   const commit = readGit(repo, "rev-parse", "HEAD").toString().trim(), tree = readGit(repo, "rev-parse", "HEAD^{tree}").toString().trim();
   const settings = parseSettings(settingsFixture());
   const store = createOwnedObjectStore({ parent, evidence_directory: evidence, source_repo: repo, source_commit: commit, repository: "fixture/docs", owner: "fixture", run: "fixture-run" });
-  const input = fixture({ ...bindings, source_commit: commit, candidate_commit: commit, candidate_tree: tree });
+  const defaults = fixture({ ...bindings, source_commit: commit, candidate_commit: commit, candidate_tree: tree });
+  const input = fixture(defaults.manifest.bindings, [
+    { id: "lease", kind: "lease-acquire", payload: { ref: settings.publication.lease_ref } },
+    { id: "receipt", kind: "receipt-retain", payload: { ref: settings.publication.receipt_ref_prefix + "operation-1" } },
+    ...defaults.manifest.effects,
+  ]);
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: hash("adoption"), context: "trial", transport: "native", corrections: [], attention: [] });
   const objects = writePlanObject(store, plan);
   const statePath = join(root, "state.json"), calls = join(root, "calls.jsonl");
@@ -51,23 +56,32 @@ appendFileSync(log, JSON.stringify({ program: process.argv[1].split('/').at(-1),
 const save = () => writeFileSync(statePath, JSON.stringify(state));
 const option = name => args[args.indexOf(name) + 1];
 if (process.argv[1].endsWith('/git')) {
-    const lease = args.find(a => a.startsWith('--force-with-lease=')).slice(19), split = lease.lastIndexOf(':');
-    const ref = lease.slice(0, split), expected = lease.slice(split + 1), target = args.at(-1), head = target.slice(0, target.indexOf(':'));
+    const leases = args.filter(a => a.startsWith('--force-with-lease=')).map(arg => {
+        const value = arg.slice(19), split = value.lastIndexOf(':');
+        return { ref: value.slice(0, split), expected: value.slice(split + 1) };
+    });
+    const separator = args.indexOf('--', args.indexOf('push'));
+    const updates = args.slice(separator + 2).map(spec => {
+        const split = spec.indexOf(':'), head = spec.slice(0, split), ref = spec.slice(split + 1);
+        const lease = leases.find(lease => lease.ref === ref);
+        if (!lease) process.exit(2);
+        return { ref, head, expected: lease.expected };
+    });
     if (state.race) {
-        state.refs[ref] = 'f'.repeat(40);
+        state.refs[updates[0].ref] = 'f'.repeat(40);
         state.race = false;
         save();
     }
-    if ((state.refs[ref] ?? '') !== expected)
-        process.exit(1);
-    if (head) {
-        state.refs[ref] = head;
-        for (const pr of state.prs)
-            if ('refs/heads/' + pr.head.ref === ref)
-                pr.head.sha = head;
+    for (const update of updates) {
+        const current = state.refs[update.ref] ?? '';
+        if (current !== update.head && current !== update.expected) process.exit(1);
     }
-    else
-        delete state.refs[ref];
+    for (const { ref, head } of updates) {
+        if (head) {
+            state.refs[ref] = head;
+            for (const pr of state.prs) if ('refs/heads/' + pr.head.ref === ref) pr.head.sha = head;
+        } else delete state.refs[ref];
+    }
     save();
     process.exit(0);
 }
@@ -174,24 +188,26 @@ test("native transport pins observed identities and uses absence-bound Git ref c
   expect(await f.transport.identity()).toEqual({ repository: "fixture/docs", repository_id: 10, default_branch: "main", actor: "fixture-bot", actor_id: 20 });
   const lease: Effect = { id: "lease", kind: "lease-acquire", payload: { ref: f.settings.publication.lease_ref } };
   expect(await f.transport.ref(String(lease.payload.ref))).toEqual({ state: "absent" });
-  await f.transport.execute(f.plan, lease, f.objects, "attempt-native-lease");
+  const selected = acquisition(f);
+  await f.transport.execute(f.plan, lease, selected.objects, "attempt-native-lease");
   const artifacts = join(f.root, "artifacts");
   const ownerPath = readdirSync(artifacts).find(path => path.endsWith(".native-command.json"));
   if (!ownerPath) throw Error("missing native command owner record");
   const owner = JSON.parse(readFileSync(join(artifacts, ownerPath), "utf8"));
   expect(owner.effect_id).toBe("lease");
   expect(owner.attempt_id).toBe("attempt-native-lease");
-  expect((await f.transport.observe(f.plan, lease, f.objects)).state).toBe("done");
+  expect((await f.transport.observe(f.plan, lease, selected.objects)).state).toBe("done");
   const calls = readFileSync(f.calls, "utf8");
   expect(calls).toContain('--force-with-lease=' + f.settings.publication.lease_ref + ':');
   expect(calls).not.toContain("synthetic-credential");
-  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(f.objects.object);
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object);
 });
 
 test("native atomic leases refuse a changed remote ref without replacing it", async () => {
   const f = setup(); await f.transport.identity(); f.update(state => { state.race = true; });
   const lease: Effect = { id: "lease", kind: "lease-acquire", payload: { ref: f.settings.publication.lease_ref } };
-  const error = await f.transport.execute(f.plan, lease, f.objects).then(() => null, error => error);
+  const selected = acquisition(f);
+  const error = await f.transport.execute(f.plan, lease, selected.objects).then(() => null, error => error);
   expect(error).toBeInstanceOf(PublicationExecutionError);
   expect(error.sent).toBe(true);
   expect(error.reaped).toBe(true);
@@ -441,4 +457,66 @@ test("a different native lease holder after release proves this run no longer ow
   const observed = await f.transport.observe(f.plan, effect, objects);
   expect(observed.state).toBe("done");
   expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe("f".repeat(40));
+});
+
+
+function acquisition(f: ReturnType<typeof setup>) {
+  const journal = createJournal({ source_repo: join(f.root, "source"), artifact_root: join(f.root, "artifacts"), plan: f.plan });
+  return { plan: f.plan, objects: writePublicationObjects(f.store, f.plan, journal.header), effect: f.plan.manifest.effects[0] };
+}
+
+function realGitServer(f: ReturnType<typeof setup>, advertiseAtomic = true) {
+  const server = join(f.root, "receive.git");
+  readGit(f.root, "init", "--bare", "--template=", server);
+  if (!advertiseAtomic) readGit(server, "config", "receive.advertiseAtomic", "false");
+  writeFileSync(join(f.root, "bin/git"), `#!${process.execPath}
+const args = process.argv.slice(2), target = 'https://github.com/fixture/docs.git';
+if (args.filter(arg => arg === target).length !== 1) process.exit(90);
+const push = args.indexOf('push');
+if (push < 0) process.exit(91);
+args.splice(push, 0, '-c', 'protocol.file.allow=always');
+const result = Bun.spawnSync(['/usr/bin/git', ...args.map(arg => arg === target ? ${JSON.stringify(server)} : arg)], { stdout: 'pipe', stderr: 'pipe' });
+process.stdout.write(result.stdout); process.stderr.write(result.stderr); process.exit(result.exitCode);
+`, { mode: 0o700 });
+  return server;
+}
+
+test("atomic acquisition cannot leave a lease when another same-plan receipt already exists on real Git", async () => {
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f), server = realGitServer(f);
+  const receipt = f.settings.publication.receipt_ref_prefix + "operation-1";
+  readGit(f.store.root, "-c", "protocol.file.allow=always", "push", "--", server, selected.objects.object + ":" + receipt);
+  await expect(f.transport.execute(selected.plan, selected.effect, selected.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
+  expect(() => readGit(server, "rev-parse", "--verify", f.settings.publication.lease_ref)).toThrow();
+  expect(readGit(server, "rev-parse", receipt).toString().trim()).toBe(selected.objects.object);
+});
+
+test("real Git atomic acquisition either creates both refs or fails without sequential fallback", async () => {
+  for (const supported of [true, false]) {
+    const f = setup(); await f.transport.identity();
+    const selected = acquisition(f), server = realGitServer(f, supported);
+    const run = f.transport.execute(selected.plan, selected.effect, selected.objects);
+    const receipt = f.settings.publication.receipt_ref_prefix + "operation-1";
+    if (supported) {
+      await run;
+      expect(readGit(server, "rev-parse", f.settings.publication.lease_ref).toString().trim()).toBe(selected.objects.lease_object);
+      expect(readGit(server, "rev-parse", receipt).toString().trim()).toBe(selected.objects.lease_object);
+    } else {
+      await expect(run).rejects.toBeInstanceOf(PublicationExecutionError);
+      expect(() => readGit(server, "rev-parse", "--verify", f.settings.publication.lease_ref)).toThrow();
+      expect(() => readGit(server, "rev-parse", "--verify", receipt)).toThrow();
+    }
+  }
+});
+
+
+test("real Git treats an identical retained receipt as up to date, so uncertain acquisition cannot be replayed", async () => {
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f), server = realGitServer(f);
+  await f.transport.execute(selected.plan, selected.effect, selected.objects);
+  readGit(server, "update-ref", "-d", f.settings.publication.lease_ref, selected.objects.lease_object);
+  // This direct lower-level call models the retry refused by the journal controller.
+  await f.transport.execute(selected.plan, selected.effect, selected.objects);
+  expect(readGit(server, "rev-parse", f.settings.publication.lease_ref).toString().trim()).toBe(selected.objects.lease_object);
+  expect(readGit(server, "rev-parse", f.settings.publication.receipt_ref_prefix + "operation-1").toString().trim()).toBe(selected.objects.receipt_object);
 });

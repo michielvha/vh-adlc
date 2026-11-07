@@ -2,11 +2,12 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { appendIntent, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendIntent, appendAttempt, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore, captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
+import { publicationFixture } from "./publication-fixture";
 import { fixture, hash, role, bindings } from "./manifest-fixture";
 
 const roots: string[] = [];
@@ -171,7 +172,7 @@ test("resource ownership is recorded explicitly before the journal directory exi
 });
 
 
-test("same reviewed plan has stable receipt objects and distinct durable acquiring leases", () => {
+test("same reviewed plan has stable plan bytes and distinct acquiring receipts", () => {
   const { repo, artifacts, plan, commit } = setup();
   const parent = join(artifacts, "objects"), evidence = join(artifacts, "evidence"), second = join(artifacts, "second-root");
   for (const directory of [parent, evidence, second]) mkdirSync(directory, { mode: 0o700 });
@@ -184,6 +185,8 @@ test("same reviewed plan has stable receipt objects and distinct durable acquiri
   expect(a.tree).toBe(b.tree);
   expect(a.blob).toBe(b.blob);
   expect(a.lease_object).not.toBe(b.lease_object);
+  expect(a.receipt_object).toBe(a.lease_object);
+  expect(b.receipt_object).toBe(b.lease_object);
   expect(a.lease_object).not.toBe(a.object);
   expect(writePublicationObjects(store, plan, readJournal(first.directory, repo).header).lease_object).toBe(a.lease_object);
   expect(readGit(store.root, "rev-parse", a.lease_object + "^{tree}").toString().trim()).toBe(a.tree);
@@ -198,4 +201,21 @@ test("native outcome resources preserve valid Unicode ref identities", () => {
   journal = appendOutcome(journal, "push", { state: "observed", observation_sha256: hash("native Unicode ref"),
     resource_id: "refs/heads/docs-drift/évidence-🧪", object: plan.manifest.bindings.candidate_commit });
   expect(readJournal(journal.directory, repo).events.at(-1)?.kind).toBe("outcome");
+});
+
+
+test("paired metadata intents cannot bypass business-effect ordering or bind another acquisition", () => {
+  const f = publicationFixture(roots);
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  journal = appendIntent(journal, "lease");
+  expect(() => appendIntent(journal, "receipt", "other-lease")).toThrow();
+  expect(() => appendIntent(journal, "push", "lease")).toThrow();
+  journal = appendIntent(journal, "receipt", "lease");
+  journal = appendAttempt(journal, "lease", "paired-acquisition", undefined, "receipt");
+  expect(() => appendIntent(journal, "push")).toThrow();
+  const objects = writePublicationObjects(f.store, f.plan, journal.header);
+  journal = appendOutcome(journal, "lease", { state: "observed", observation_sha256: hash("actual acquired nonce"), resource_id: "lease", object: objects.lease_object });
+  expect(() => appendIntent(journal, "push")).toThrow();
+  journal = appendOutcome(journal, "receipt", { state: "observed", observation_sha256: hash("actual retained nonce"), resource_id: "receipt", object: objects.receipt_object });
+  expect(appendIntent(journal, "push").events.at(-1)?.effect_id).toBe("push");
 });

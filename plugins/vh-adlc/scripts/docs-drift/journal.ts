@@ -24,15 +24,16 @@ export type PlanPolicy = {
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
 export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string } };
 export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
-type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant };
+type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant; atomic_receipt_id?: string };
+type Intent = { effect_sha256: string; atomic_acquisition?: string };
 type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean };
 type Event = {
   schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended" | "recovery-only";
-  effect_id: string; payload: { effect_sha256: string } | Outcome | { reason: string } | Retirement | Attempt | AttemptEnd;
+  effect_id: string; payload: Intent | Outcome | { reason: string } | Retirement | Attempt | AttemptEnd;
 };
 type Header = {
   schema_version: 1; kind: "docs-drift-journal"; operation_id: string; repository: string;
-  source_repo: string; directory: string; plan_sha256: string; owner_uid: number; run_id: string; observed_lease_object: string | null; recovery_mode: "original" | "observation-only";
+  source_repo: string; directory: string; plan_sha256: string; owner_uid: number; run_id: string; observed_lease_object: string | null; recovery_mode: "original" | "observation-only"; observed_receipt_object?: string | null;
 };
 export type Journal = {
   directory: string; source_repo: string; header: Header; plan: SealedPlan;
@@ -190,17 +191,28 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
   if (!effect) fail("unknown effect");
   const prior = previous.filter(item => item.effect_id === event.effect_id);
   if (event.kind === "intent") {
-    const payload = exact(event.payload, ["effect_sha256"]);
+    const paired = Object.hasOwn(event.payload, "atomic_acquisition");
+    const payload = exact(event.payload, paired ? ["effect_sha256", "atomic_acquisition"] : ["effect_sha256"]);
+    const acquisition = plan.manifest.effects[0];
+    if (paired && (effect !== plan.manifest.effects[1] || effect.kind !== "receipt-retain" || acquisition.kind !== "lease-acquire"
+      || payload.atomic_acquisition !== acquisition.id || !previous.some(item => item.kind === "intent" && item.effect_id === acquisition.id))) fail("invalid paired metadata intent");
     if (payload.effect_sha256 !== effectDigest([effect]) || prior.length !== 0) fail("changed or repeated intent");
     for (const earlier of plan.manifest.effects.slice(0, plan.manifest.effects.indexOf(effect))) {
-      if (!previous.some(item => item.effect_id === earlier.id && (item.kind === "outcome" || item.kind === "retired-absence"))) fail("effect order has pending earlier effect");
+      if (!(paired && earlier === acquisition) && !previous.some(item => item.effect_id === earlier.id && (item.kind === "outcome" || item.kind === "retired-absence"))) fail("effect order has pending earlier effect");
     }
   } else {
     if (!prior.some(item => item.kind === "intent")) fail("outcome or handoff without intent");
     if (["outcome", "retired-absence"].includes(event.kind) && prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")) fail("effect already terminal");
     if (event.kind === "attempt") {
       const scoped = Object.hasOwn(event.payload, "reconciliation");
-      const payload = exact(event.payload, scoped ? ["attempt_id", "reconciliation"] : ["attempt_id"]);
+      const paired = Object.hasOwn(event.payload, "atomic_receipt_id");
+      const payload = exact(event.payload, ["attempt_id", ...(scoped ? ["reconciliation"] : []), ...(paired ? ["atomic_receipt_id"] : [])]);
+      if (paired) {
+        const receipt = plan.manifest.effects[1];
+        if (scoped || effect !== plan.manifest.effects[0] || effect.kind !== "lease-acquire" || receipt?.kind !== "receipt-retain"
+          || payload.atomic_receipt_id !== receipt.id || !previous.some(item => item.kind === "intent" && item.effect_id === receipt.id
+            && "atomic_acquisition" in item.payload && item.payload.atomic_acquisition === effect.id)) fail("invalid atomic metadata attempt");
+      }
       identifier(payload.attempt_id);
       if (scoped) {
         const grant = exact(payload.reconciliation, ["scope_sha256", "request_sha256"]);
@@ -234,7 +246,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
   }
 }
 
-export function createJournal(options: { source_repo: string; artifact_root: string; plan: SealedPlan; recovery_mode?: "observation-only"; observed_lease_object?: string | null }): Journal {
+export function createJournal(options: { source_repo: string; artifact_root: string; plan: SealedPlan; recovery_mode?: "observation-only"; observed_lease_object?: string | null; observed_receipt_object?: string | null }): Journal {
   const source = realpathSync(options.source_repo);
   const root = externalArtifactDirectory(options.artifact_root, source);
   const plan = parsePlan(options.plan), planBytes = canonicalJSON(plan);
@@ -243,7 +255,9 @@ export function createJournal(options: { source_repo: string; artifact_root: str
   if (owner === undefined) fail("POSIX owner identity required");
   if (options.observed_lease_object !== undefined && options.observed_lease_object !== null
     && (options.recovery_mode !== "observation-only" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(options.observed_lease_object))) fail("invalid observed recovery lease");
-  const header: Header = { observed_lease_object: options.observed_lease_object ?? null, recovery_mode: options.recovery_mode ?? "original", owner_uid: owner, run_id: randomUUID(), schema_version: 1, kind: "docs-drift-journal", operation_id: plan.manifest.operation_id,
+  if (options.observed_receipt_object !== undefined && options.observed_receipt_object !== null
+    && (options.recovery_mode !== "observation-only" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(options.observed_receipt_object))) fail("invalid observed recovery receipt");
+  const header: Header = { observed_receipt_object: options.observed_receipt_object ?? null, observed_lease_object: options.observed_lease_object ?? null, recovery_mode: options.recovery_mode ?? "original", owner_uid: owner, run_id: randomUUID(), schema_version: 1, kind: "docs-drift-journal", operation_id: plan.manifest.operation_id,
     repository: plan.manifest.repository, source_repo: source, directory, plan_sha256: sha256(planBytes) };
   // The resource record precedes directory creation. Failed/partial resources remain for inspection.
   publishArtifact(join(root, plan.manifest.operation_id + ".journal-owner.json"), canonicalJSON(header));
@@ -261,7 +275,11 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
   externalArtifactDirectory(directory, source);
   privateDirectory(dirname(directory));
   const headerBytes = readArtifact(join(directory, "header.json"));
-  const header = exact(parseCanonical(headerBytes), ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id", "recovery_mode", "observed_lease_object"]) as Header;
+  const value = parseCanonical(headerBytes);
+  const hasReceipt = value !== null && typeof value === "object" && Object.hasOwn(value, "observed_receipt_object");
+  const header = exact(value, ["schema_version", "kind", "operation_id", "repository", "source_repo", "directory", "plan_sha256", "owner_uid", "run_id", "recovery_mode", "observed_lease_object", ...(hasReceipt ? ["observed_receipt_object"] : [])]) as Header;
+  if (hasReceipt && header.observed_receipt_object !== null && (header.recovery_mode !== "observation-only"
+    || typeof header.observed_receipt_object !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(header.observed_receipt_object))) fail("changed recovery receipt");
   if (!["original", "observation-only"].includes(header.recovery_mode) || header.schema_version !== 1 || header.kind !== "docs-drift-journal" || header.directory !== directory || header.source_repo !== source || header.owner_uid !== process.getuid?.() || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(header.run_id)
     || (header.observed_lease_object !== null && (header.recovery_mode !== "observation-only"
       || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(header.observed_lease_object)))) fail("changed journal ownership");
@@ -294,10 +312,10 @@ function append(journal: Journal, kind: Event["kind"], effectId: string, payload
   publishArtifact(join(current.directory, "events", String(event.revision).padStart(10, "0") + ".json"), canonicalJSON(event));
   return readJournal(current.directory, current.source_repo);
 }
-export function appendIntent(journal: Journal, effectId: string): Journal {
+export function appendIntent(journal: Journal, effectId: string, atomicAcquisition?: string): Journal {
   const effect = journal.plan.manifest.effects.find(effect => effect.id === effectId);
   if (!effect) fail("unknown effect intent");
-  return append(journal, "intent", effectId, { effect_sha256: effectDigest([effect]) });
+  return append(journal, "intent", effectId, { effect_sha256: effectDigest([effect]), ...(atomicAcquisition ? { atomic_acquisition: atomicAcquisition } : {}) });
 }
 export function appendOutcome(journal: Journal, effectId: string, receipt: Outcome): Journal { return append(journal, "outcome", effectId, outcome(receipt)); }
 export function appendHandoff(journal: Journal, effectId: string, reason: string): Journal { return append(journal, "handoff", effectId, { reason: identifier(reason) }); }
@@ -321,19 +339,20 @@ export function appendRetirement(journal: Journal, effectId: string, retirement:
   return append(journal, "retired-absence", effectId, retirement);
 }
 
-export function appendAttempt(journal: Journal, effectId: string, attemptId: string, reconciliation?: ReconciliationGrant): Journal {
-  return append(journal, "attempt", effectId, { attempt_id: identifier(attemptId), ...(reconciliation ? { reconciliation } : {}) });
+export function appendAttempt(journal: Journal, effectId: string, attemptId: string, reconciliation?: ReconciliationGrant, atomicReceiptId?: string): Journal {
+  return append(journal, "attempt", effectId, { attempt_id: identifier(attemptId), ...(reconciliation ? { reconciliation } : {}), ...(atomicReceiptId ? { atomic_receipt_id: atomicReceiptId } : {}) });
 }
 export function appendAttemptEnd(journal: Journal, effectId: string, status: AttemptEnd): Journal {
   return append(journal, "attempt-ended", effectId, status);
 }
 
-/** The immutable plan receipt is shared, while the acquiring journal owns a distinct lease commit. */
+/** Canonical plan bytes stay stable across per-run acquisition objects. */
 export function writePublicationObjects(store: OwnedObjectStore, plan: SealedPlan, header: Header) {
   const objects = writePlanObject(store, plan);
-  if (header.observed_lease_object !== null) return { ...objects, lease_object: header.observed_lease_object };
   const commit = Buffer.from(`tree ${objects.tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift lease ${plan.manifest.operation_id} ${header.run_id}\n`);
-  return { ...objects, lease_object: writeMetadataObject(store.root, "commit", commit) };
+  const lease_object = header.observed_lease_object ?? writeMetadataObject(store.root, "commit", commit);
+  const receipt_object = Object.hasOwn(header, "observed_receipt_object") ? header.observed_receipt_object ?? lease_object : objects.object;
+  return { ...objects, lease_object, receipt_object };
 }
 
 export function appendRecoveryOnly(journal: Journal, effectId: string, reason: string): Journal {

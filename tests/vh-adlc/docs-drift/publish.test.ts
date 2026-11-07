@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
-import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { sealPlan, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { fixture, hash, bindings } from "./manifest-fixture";
 import { publicationFixture, publicationOptions as options } from "./publication-fixture";
 
@@ -41,7 +41,7 @@ test("missing current authority, changed actor or stale source denies before nat
   }
 });
 
-test("under-lease payload or permission changes leave the operation pending without publishing", async () => {
+test("under-lease payload changes stop business effects after atomic metadata creation", async () => {
   const f = setup();
   const execute = f.transport.execute;
   f.transport.execute = async (plan, effect, objects) => {
@@ -49,7 +49,7 @@ test("under-lease payload or permission changes leave the operation pending with
     if (effect.kind === "lease-acquire") f.input.current.effects[3].payload.body = "changed after lease";
   };
   const result = await publish(options(f));
-  expect(result.state).toBe("pending"); expect(f.executed).toEqual(["lease"]);
+  expect(result.state).toBe("pending"); expect(f.executed).toEqual(["lease", "receipt"]);
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
 });
 
@@ -107,4 +107,36 @@ test("a mismatched artifact root fails before journal creation or effects", asyn
   await expect(publish({ ...options(f), artifact_root: wrong })).rejects.toThrow("artifact");
   expect(existsSync(join(wrong, "docs-drift-operation-1"))).toBe(false);
   expect(f.executed).toEqual([]);
+});
+
+
+test("both metadata intents and their exact pairing precede acquisition dispatch", async () => {
+  const f = setup(), execute = f.transport.execute;
+  let inspected = false;
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.kind === "lease-acquire") {
+      const journal = readJournal(join(f.artifacts, "docs-drift-operation-1"), f.repo);
+      const intents = journal.events.filter(event => event.kind === "intent");
+      expect(intents.map(event => event.effect_id)).toEqual(["lease", "receipt"]);
+      const attempt = journal.events.find(event => event.kind === "attempt");
+      if (!attempt) throw Error("missing atomic attempt");
+      expect(attempt.payload).toHaveProperty("atomic_receipt_id", "receipt");
+      inspected = true;
+    }
+    await execute(plan, effect, objects);
+  };
+  const result = await publish(options(f));
+  expect(result.state).toBe("complete");
+  expect(inspected).toBe(true);
+});
+
+
+test("atomic metadata creation still requires each separate current effect grant", async () => {
+  for (const id of ["lease", "receipt"]) {
+    const f = setup();
+    f.input.grants = f.input.grants.filter(grant => grant.effect_id !== id);
+    await expect(publish(options(f))).rejects.toThrow();
+    expect(f.executed).toEqual([]);
+    expect(f.refs.size).toBe(0);
+  }
 });

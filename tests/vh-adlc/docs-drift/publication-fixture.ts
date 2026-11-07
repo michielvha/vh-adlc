@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import type { PublicationTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
-import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { sealPlan, createJournal, readJournal, appendIntent, appendAttempt, appendAttemptEnd, appendOutcome, appendHandoff, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { retainAbsence } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
@@ -57,22 +57,31 @@ export function publicationFixture(roots: string[]) {
       if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== leaseObject
         && objects.lease_object && objects.lease_object !== objects.object) return { state: "done", outcome: { state: "observed",
           observation_sha256: hash("lease-no-longer-owned"), resource_id: String(effect.payload.ref), object: refs.get(String(effect.payload.ref)) ?? null } };
+      const receiptObject = objects.receipt_object ?? objects.object;
+      if (effect.kind === "receipt-retain" && refs.has(String(effect.payload.ref)) && refs.get(String(effect.payload.ref)) !== receiptObject)
+        return { state: "conflict", reason: "foreign-receipt-object" };
       if (effect.kind === "lease-acquire" && refs.has(String(effect.payload.ref)) && refs.get(String(effect.payload.ref)) !== leaseObject)
         return { state: "conflict", reason: "foreign-lease-object" };
-      if (!done.has(effect.id) || (effect.kind === "lease-acquire" && !refs.has(String(effect.payload.ref)))) return { state: "absent", evidence: retainAbsence({ artifact_root: artifacts, source_repo: repo,
+      if (!done.has(effect.id) || (["lease-acquire", "receipt-retain"].includes(effect.kind) && !refs.has(String(effect.payload.ref)))) return { state: "absent", evidence: retainAbsence({ artifact_root: artifacts, source_repo: repo,
         plan, effect, transport: "collector", lookup: { fixture_effect: effect.id, state: "absent" } }) };
       return { state: "done", outcome: { state: "observed", observation_sha256: hash(effect.id), resource_id: effect.id,
-        object: effect.kind === "lease-release" ? null : effect.kind === "lease-acquire" ? leaseObject : objects.object } };
+        object: effect.kind === "lease-release" ? null : effect.kind === "lease-acquire" ? leaseObject : effect.kind === "receipt-retain" ? receiptObject : objects.object } };
     },
     async execute(plan, effect, objects) {
       executed.push(effect.id);
       if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== (objects.lease_object ?? objects.object)) throw Error("changed fixture lease");
       done.add(effect.id);
       if (effect.kind === "lease-acquire") {
-        if (refs.has(String(effect.payload.ref))) throw Error("fixture lease acquisition conflict");
-        refs.set(String(effect.payload.ref), objects.lease_object ?? objects.object);
+        const receipt = plan.manifest.effects[1];
+        if (receipt?.kind !== "receipt-retain") throw Error("missing fixture metadata envelope");
+        const lease = objects.lease_object ?? objects.object, retained = objects.receipt_object ?? objects.object;
+        if ((refs.has(String(effect.payload.ref)) && refs.get(String(effect.payload.ref)) !== lease)
+          || (refs.has(String(receipt.payload.ref)) && refs.get(String(receipt.payload.ref)) !== retained)) throw new Error("fixture atomic metadata conflict");
+        refs.set(String(effect.payload.ref), lease);
+        refs.set(String(receipt.payload.ref), retained);
+        done.add(receipt.id); executed.push(receipt.id);
       }
-      if (effect.kind === "receipt-retain") refs.set(String(effect.payload.ref), objects.object);
+      if (effect.kind === "receipt-retain") refs.set(String(effect.payload.ref), objects.receipt_object ?? objects.object);
       if (effect.kind === "lease-release") refs.delete(String(effect.payload.ref));
     },
   };
@@ -84,3 +93,27 @@ export function publicationOptions(f: ReturnType<typeof publicationFixture>) {
   return { source_repo: f.repo, artifact_root: f.artifacts, object_store: f.store, settings: f.settings, plan: f.plan, transport: f.transport, gate: f.gate };
 }
 
+
+/** Serialized data from the pre-atomic publisher, retained for recovery compatibility tests. */
+export async function legacyReceiptInterruption(f: ReturnType<typeof publicationFixture>, artifactRoot = f.artifacts) {
+  const created = createJournal({ source_repo: f.repo, artifact_root: artifactRoot, plan: f.plan });
+  const legacy = { ...created.header };
+  delete legacy.observed_receipt_object;
+  const header = canonicalJSON(legacy);
+  writeFileSync(join(created.directory, "header.json"), header, { mode: 0o600 });
+  writeFileSync(join(artifactRoot, "operation-1.journal-owner.json"), header, { mode: 0o600 });
+  let journal = readJournal(created.directory, f.repo);
+  const objects = writePublicationObjects(f.store, f.plan, journal.header);
+  journal = appendIntent(journal, "lease");
+  journal = appendAttempt(journal, "lease", "legacy-acquisition");
+  f.refs.set(f.settings.publication.lease_ref, objects.lease_object);
+  f.done.add("lease"); f.executed.push("lease");
+  journal = appendAttemptEnd(journal, "lease", { attempt_id: "legacy-acquisition", sent: true, reaped: true });
+  journal = appendOutcome(journal, "lease", { state: "observed", observation_sha256: hash("legacy-acquisition"),
+    resource_id: f.settings.publication.lease_ref, object: objects.lease_object });
+  journal = appendIntent(journal, "receipt");
+  journal = appendAttempt(journal, "receipt", "legacy-unsent-receipt");
+  journal = appendAttemptEnd(journal, "receipt", { attempt_id: "legacy-unsent-receipt", sent: false, reaped: true });
+  journal = appendHandoff(journal, "receipt", "legacy-unsent-retention");
+  return { state: "pending" as const, reason: "legacy-unsent-retention", journal, objects };
+}

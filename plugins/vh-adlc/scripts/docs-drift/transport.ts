@@ -15,7 +15,7 @@ import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
 import { requireOwnedStore } from "./proposals";
 import { readGit } from "./git";
 import type { Settings } from "./settings";
-export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string };
+export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string; receipt_object?: string };
 export type RefObservation = { state: "absent" } | { state: "present"; object: string };
 export type EffectObservation = { state: "done"; outcome: Outcome } | { state: "absent"; evidence?: AbsenceEvidence } | { state: "unknown" | "conflict"; reason: string };
 type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null };
@@ -188,11 +188,12 @@ export function createNativeTransport(options: {
     if (!endpoint.startsWith(prefix + "/")) throw Error("foreign mutation destination");
     await run(plan, ["gh", "api", "--hostname", settings.hostname, "--method", method, "--silent", endpoint], canonicalJSON(input), delivery);
   }
-  async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string, delivery: NativeDelivery): Promise<void> {
+  async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string, delivery: NativeDelivery, companion?: { ref: string; head: string; expected: string }): Promise<void> {
     requireOwnedStore(store, settings.repository);
+    const updates = [{ ref, head, expected }, ...(companion ? [companion] : [])];
     const argv = gitReadArguments(["--no-lazy-fetch", "--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=",
-      "-c", "credential.helper=!gh auth git-credential", "-c", "http.extraHeader=", "push", "--porcelain", `--force-with-lease=${ref}:${expected}`,
-      "--", `https://${settings.hostname}/${settings.repository}.git`, `${head ?? ""}:${ref}`]);
+      "-c", "credential.helper=!gh auth git-credential", "-c", "http.extraHeader=", "push", "--porcelain", ...(companion ? ["--atomic"] : []), ...updates.map(update => `--force-with-lease=${update.ref}:${update.expected}`),
+      "--", `https://${settings.hostname}/${settings.repository}.git`, ...updates.map(update => `${update.head ?? ""}:${update.ref}`)]);
     await run(plan, argv, null, delivery);
   }
 
@@ -235,7 +236,7 @@ export function createNativeTransport(options: {
             if (pr.head !== target.object) return { state: "conflict", reason: "native-refresh-scope-changed" };
           }
           const expected = effect.kind === "push" || effect.kind === "branch-refresh" ? text(p.head)
-            : effect.kind === "receipt-retain" ? objects.object : objects.lease_object ?? objects.object;
+            : effect.kind === "receipt-retain" ? objects.receipt_object ?? objects.object : objects.lease_object ?? objects.object;
           if (effect.kind === "lease-release") {
             if (target.state === "absent") return observed({ ref: p.ref, state: "absent" }, text(p.ref), null);
             if (target.object === expected) return absent({ ref: p.ref, target });
@@ -307,10 +308,20 @@ export function createNativeTransport(options: {
       const delivery = { sent: false, reaped: true, effect_id: effect.id, attempt_id: attempt_id ?? null };
       try {
         const p = effect.payload;
-        if (effect.kind === "lease-acquire" || effect.kind === "receipt-retain") {
-          const object = effect.kind === "lease-acquire" ? objects.lease_object ?? objects.object : objects.object;
-          await pushRef(plan, text(p.ref), object, "", delivery); return;
+        if (effect.kind === "lease-acquire") {
+          const receipt = plan.manifest.effects[1];
+          if (plan.manifest.effects[0].id !== effect.id || receipt?.kind !== "receipt-retain"
+            || p.ref !== settings.publication.lease_ref || receipt.payload.ref !== settings.publication.receipt_ref_prefix + plan.manifest.operation_id
+            || !objects.lease_object || objects.receipt_object !== objects.lease_object || objects.receipt_object === objects.object
+            || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(objects.receipt_object)) throw Error("atomic acquisition scope changed");
+          const metadata = readGit(store.root, "show", objects.receipt_object + ":plan.json");
+          if (!metadata.equals(canonicalJSON(plan))
+            || readGit(store.root, "rev-parse", objects.receipt_object + "^{tree}").toString().trim() !== objects.tree
+            || readGit(store.root, "rev-list", "--parents", "-n", "1", objects.receipt_object).toString().trim() !== objects.receipt_object) throw Error("atomic metadata object changed");
+          await pushRef(plan, text(p.ref), objects.lease_object, "", delivery, { ref: text(receipt.payload.ref), head: objects.receipt_object, expected: "" });
+          return;
         }
+        if (effect.kind === "receipt-retain") { await pushRef(plan, text(p.ref), objects.receipt_object ?? objects.object, "", delivery); return; }
         if (effect.kind === "lease-release") { await pushRef(plan, text(p.ref), null, objects.lease_object ?? objects.object, delivery); return; }
         if (effect.kind === "push" || effect.kind === "branch-refresh") {
           const tree = readGit(store.root, "rev-parse", "--verify", "--end-of-options", text(p.head) + "^{tree}").toString().trim();

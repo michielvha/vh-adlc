@@ -1,4 +1,4 @@
-import { executeAttempt, pendingAttempt } from "./attempts";
+import { executeAttempt, pendingAttempt, hasEffectAttempt } from "./attempts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -73,7 +73,7 @@ export async function resumeEffects(options: PublishOptions & { journal_director
       if (effect.kind === "receipt-retain" && !terminal(journal, effect.id) && !isObservationOnly(journal)) {
         const receipt = await options.transport.ref(String(effect.payload.ref));
         journal = readJournal(journal.directory, options.source_repo);
-        if (receipt.state === "present" && !journal.events.some(event => event.kind === "attempt" && event.effect_id === effect.id))
+        if (receipt.state === "present" && !hasEffectAttempt(journal, effect.id))
           return blocked(effect.id, "operation-started-elsewhere", false, true);
       }
       const observation = await options.transport.observe(journal.plan, effect, objects);
@@ -144,7 +144,7 @@ type RetainedOptions = {
   verify_policy: (plan: SealedPlan) => PlanPolicy | null;
 };
 export type RetainedInspection = {
-  state: "inspection"; directory: string; plan: SealedPlan; ref: string; objects: PlanObjects; lease_object: string | null;
+  state: "inspection"; directory: string; plan: SealedPlan; ref: string; objects: PlanObjects; lease_object: string | null; receipt_object: string | null;
   observations: Array<{ effect_id: string; observation: EffectObservation }>;
 };
 const inspected = new WeakMap<object, { transport: PublicationTransport; source_repo: string; verify_policy: RetainedOptions["verify_policy"] }>();
@@ -159,6 +159,7 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
   if (identity.repository !== options.settings.repository || identity.default_branch !== options.settings.default_branch) throw Error("retained inspection repository scope");
   let ref = options.settings.publication.receipt_ref_prefix + options.operation_id;
   let target = await options.transport.ref(ref);
+  const receipt_object = target.state === "present" ? target.object : null;
   if (target.state === "absent") { ref = options.settings.publication.lease_ref; target = await options.transport.ref(ref); }
   if (target.state === "absent") throw Error("retained operation unavailable; original proof cannot be reconstructed");
   const native = await options.transport.readPlanObject(target.object);
@@ -180,7 +181,7 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
         && retainedLease.objects.blob === objects.blob && retainedLease.objects.plan_sha256 === objects.plan_sha256) lease_object = lease.object;
     } catch { /* An unavailable or foreign lease establishes no cleanup ownership. */ }
   }
-  const observationObjects = { ...objects, ...(lease_object === null ? {} : { lease_object }) };
+  const observationObjects = { ...objects, receipt_object: receipt_object ?? objects.object, ...(lease_object === null ? {} : { lease_object }) };
   const observations: RetainedInspection["observations"] = [];
   for (const effect of plan.manifest.effects) {
     let observation: EffectObservation;
@@ -195,8 +196,8 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
     root: directory, owner: process.getuid?.() ?? null, run, repository: plan.manifest.repository, source_commit: plan.manifest.bindings.source_commit, ref, object: objects.object }));
   mkdirSync(directory, { mode: 0o700 });
   publishArtifact(join(directory, "plan.json"), bytes);
-  publishArtifact(join(directory, "observations.json"), canonicalJSON({ state: "inspection", reader_identity: identity, ref, objects, lease_object, observations }));
-  const result: RetainedInspection = freezeJSON({ state: "inspection", directory, plan, ref, objects, lease_object, observations });
+  publishArtifact(join(directory, "observations.json"), canonicalJSON({ state: "inspection", reader_identity: identity, ref, objects, lease_object, receipt_object, observations }));
+  const result: RetainedInspection = freezeJSON({ state: "inspection", directory, plan, ref, objects, lease_object, receipt_object, observations });
   inspected.set(result, { transport: options.transport, source_repo: source, verify_policy: options.verify_policy });
   return result;
 }
@@ -213,7 +214,7 @@ export async function restoreRetainedOperation(options: { inspection: RetainedIn
   const objects = writePlanObject(publication.object_store, publication.plan);
   if (objects.tree !== options.inspection.objects.tree || objects.blob !== options.inspection.objects.blob
     || objects.plan_sha256 !== options.inspection.objects.plan_sha256) throw Error("restored operation object changed");
-  const journal = createJournal({ source_repo: publication.source_repo, artifact_root: publication.artifact_root, plan: publication.plan, recovery_mode: "observation-only", observed_lease_object: options.inspection.lease_object });
+  const journal = createJournal({ source_repo: publication.source_repo, artifact_root: publication.artifact_root, plan: publication.plan, recovery_mode: "observation-only", observed_lease_object: options.inspection.lease_object, observed_receipt_object: options.inspection.receipt_object });
   publishArtifact(join(journal.directory, "retained-origin.json"), canonicalJSON({ schema_version: 1,
     source: "retained-ref", ref: options.inspection.ref, object: options.inspection.objects.object, plan_sha256: objects.plan_sha256 }));
   return resumeEffects({ ...publication, journal_directory: journal.directory });
@@ -239,6 +240,7 @@ export async function reconcileAbsent(options: {
   const { plan } = journal;
   const objects = writePublicationObjects(options.object_store, plan, journal.header);
   const release = plan.manifest.effects.at(-1), acquire = plan.manifest.effects[0], receipt = plan.manifest.effects[1];
+  const receiptObject = objects.receipt_object ?? objects.object;
   if (!release || release.kind !== "lease-release" || acquire?.kind !== "lease-acquire" || release.payload.ref !== acquire.payload.ref
     || release.payload.ref !== options.settings.publication.lease_ref || plan.manifest.repository !== options.settings.repository
     || receipt?.kind !== "receipt-retain" || receipt.payload.ref !== options.settings.publication.receipt_ref_prefix + plan.manifest.operation_id
@@ -266,12 +268,12 @@ export async function reconcileAbsent(options: {
     const lease = await options.transport.ref(String(release.payload.ref));
     if (lease.state === "present" && lease.object !== objects.lease_object) return blocked("foreign-publication-lease");
     const retained = await options.transport.ref(String(receipt.payload.ref));
-    if (retained.state === "present" && retained.object !== objects.object) return blocked("retained-operation-changed");
+    if (retained.state === "present" && retained.object !== receiptObject) return blocked("retained-operation-changed");
     if (retained.state === "absent" && terminal(journal, receipt.id)) return blocked("retained-operation-removed");
     const scope: ReconciliationScope = { repository: identity.repository, repository_id: identity.repository_id, operation_id: plan.manifest.operation_id,
       plan_sha256: sha256(canonicalJSON(plan)), lease_ref: String(release.payload.ref), lease_object: objects.lease_object,
       release_effect_id: release.id, retire_effect_ids: [...ids], actor: identity.actor, actor_id: identity.actor_id,
-      retain_receipt: retained.state === "absent" ? { effect_id: receipt.id, ref: String(receipt.payload.ref), object: objects.object } : null };
+      retain_receipt: retained.state === "absent" ? { effect_id: receipt.id, ref: String(receipt.payload.ref), object: receiptObject } : null };
     const scopeHash = sha256(canonicalJSON(scope));
     const authorize = async (original?: ReconciliationAuthority): Promise<ReconciliationAuthority> => {
       const value = await options.authorize(structuredClone(scope));
@@ -327,7 +329,7 @@ export async function reconcileAbsent(options: {
       journal = appendRetirement(journal, effect.id, { ...grant, lookup });
     }
     const fence = await options.transport.ref(String(receipt.payload.ref));
-    if (fence.state !== "present" || fence.object !== objects.object) return blocked("retained-operation-removed");
+    if (fence.state !== "present" || fence.object !== receiptObject) return blocked("retained-operation-removed");
     if (!intended(journal, release.id)) journal = appendIntent(journal, release.id);
     const before = await options.transport.observe(plan, release, objects);
     if (before.state === "conflict" || before.state === "unknown") return blocked(before.reason);

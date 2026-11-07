@@ -1,4 +1,4 @@
-import { executeAttempt } from "./attempts";
+import { executeAttempt, hasEffectAttempt } from "./attempts";
 import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRecoveryOnly, createJournal, readJournal, readVerifiedPlan, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { effectMarker, manifestDigest, parseActionManifest, validateReviewedManifest, type Effect } from "./manifests";
 import { canonicalJSON } from "./protocol";
@@ -97,7 +97,7 @@ export async function publish(options: PublishOptions): Promise<PublishResult> {
       if (index <= 1) {
         const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
         journal = readJournal(journal.directory, options.source_repo);
-        const attempted = journal.events.some(event => event.kind === "attempt" && event.effect_id === journal.plan.manifest.effects[1].id);
+        const attempted = hasEffectAttempt(journal, journal.plan.manifest.effects[1].id);
         if (receipt.state === "present" && !attempted) return pending(journal, effect, "operation-started-elsewhere", objects, false, true);
       }
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
@@ -106,7 +106,7 @@ export async function publish(options: PublishOptions): Promise<PublishResult> {
       } else if (effect.kind !== "lease-release" && (lease.state !== "present" || lease.object !== objects.lease_object)) {
         return pending(journal, effect, "publication-lease-lost", objects, true);
       }
-      journal = appendIntent(journal, effect.id);
+      if (!journal.events.some(event => event.kind === "intent" && event.effect_id === effect.id)) journal = appendIntent(journal, effect.id);
       const before = index === 0 ? { state: "absent" as const } : await options.transport.observe(journal.plan, effect, objects);
       if (before.state === "conflict" || before.state === "unknown") return pending(journal, effect, before.reason, objects, before.state === "conflict");
       if (before.state === "done") {

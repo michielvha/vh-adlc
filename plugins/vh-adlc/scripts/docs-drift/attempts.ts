@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { appendAttempt, appendAttemptEnd, readJournal, type Journal, type ReconciliationGrant } from "./journal";
+import { appendAttempt, appendAttemptEnd, appendIntent, readJournal, type Journal, type ReconciliationGrant } from "./journal";
 import type { Effect } from "./manifests";
 import type { PlanObjects, PublicationTransport } from "./transport";
 
@@ -9,14 +9,18 @@ export class PublicationExecutionError extends Error {
 }
 
 export function pendingAttempt(journal: Journal, effect: Effect, retirement = false): string | null {
-  const events = journal.events.filter(event => event.effect_id === effect.id);
+  const paired = new Set(journal.events.filter(event => event.kind === "attempt" && "atomic_receipt_id" in event.payload
+    && event.payload.atomic_receipt_id === effect.id).map(event => "attempt_id" in event.payload ? event.payload.attempt_id : ""));
+  const events = journal.events.filter(event => event.effect_id === effect.id
+    || (["attempt", "attempt-ended"].includes(event.kind) && "attempt_id" in event.payload && paired.has(event.payload.attempt_id)));
   const attempt = events.findLast(event => event.kind === "attempt");
   if (!attempt) return null;
   const ended = events.findLast(event => event.kind === "attempt-ended");
   if (!ended || ended.revision < attempt.revision) return "attempt-in-flight";
   const status = ended.payload as { sent: boolean; reaped: boolean };
   if (!status.reaped) return "attempt-not-reaped";
-  if (status.sent && (retirement || ["lease-acquire", "pr-create", "issue-create", "comment-create"].includes(effect.kind))) return "dispatch-outcome-unknown";
+  if (status.sent && (retirement || ["lease-acquire", "push", "pr-create", "issue-create", "comment-create"].includes(effect.kind)
+    || "atomic_receipt_id" in attempt.payload && attempt.payload.atomic_receipt_id === effect.id)) return "dispatch-outcome-unknown";
   return null;
 }
 
@@ -28,7 +32,14 @@ export async function executeAttempt(options: {
   const pending = pendingAttempt(journal, options.effect);
   if (pending) throw Error(pending);
   const id = randomUUID();
-  journal = appendAttempt(journal, options.effect.id, id, options.reconciliation);
+  let receipt: Effect | undefined;
+  if (options.effect.kind === "lease-acquire") {
+    receipt = journal.plan.manifest.effects[1];
+    if (journal.plan.manifest.effects[0].id !== options.effect.id || receipt?.kind !== "receipt-retain") throw Error("missing atomic metadata envelope");
+    const receiptId = receipt.id;
+    if (!journal.events.some(event => event.kind === "intent" && event.effect_id === receiptId)) journal = appendIntent(journal, receiptId, options.effect.id);
+  }
+  journal = appendAttempt(journal, options.effect.id, id, options.reconciliation, receipt?.id);
   let failure: unknown;
   let status = { sent: true, reaped: true };
   try {
@@ -43,4 +54,9 @@ export async function executeAttempt(options: {
   journal = appendAttemptEnd(journal, options.effect.id, { attempt_id: id, ...status });
   if (failure !== undefined) throw failure;
   return journal;
+}
+
+export function hasEffectAttempt(journal: Journal, effectId: string): boolean {
+  return journal.events.some(event => event.kind === "attempt" && (event.effect_id === effectId
+    || "atomic_receipt_id" in event.payload && event.payload.atomic_receipt_id === effectId));
 }

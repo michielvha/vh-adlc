@@ -1,4 +1,4 @@
-import { appendInvalidation, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendInvalidation, appendRecoveryOnly, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { retainAbsence } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { reconcileAbsent, resumeEffects, inspectRetainedOperation, restoreRetainedOperation, type ReconciliationScope } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { publicationFixture, publicationOptions as options } from "./publication-fixture";
+import { publicationFixture, legacyReceiptInterruption, publicationOptions as options } from "./publication-fixture";
 import { hash } from "./manifest-fixture";
 
 const roots: string[] = [];
@@ -206,13 +206,8 @@ test("a new original journal cannot execute an operation retired in another root
 
 
 test("cleanup preserves the operation fence before retiring later actions", async () => {
-  const f = publicationFixture(roots), execute = f.transport.execute;
-  f.transport.execute = async (plan, effect, objects) => {
-    if (effect.kind === "receipt-retain") throw new PublicationExecutionError(false, true);
-    await execute(plan, effect, objects);
-  };
-  const stopped = await publish(options(f));
-  f.transport.execute = execute;
+  const f = publicationFixture(roots);
+  const stopped = await legacyReceiptInterruption(f);
   const rejected = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: ["receipt", "push", "pr"] });
   expect(rejected.state).toBe("pending");
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
@@ -273,13 +268,8 @@ test("two absences past a client timeout cannot retire a server-side request tha
 
 
 test("cleanup cannot retain a missing fence under a grant that omits that effect", async () => {
-  const f = publicationFixture(roots), execute = f.transport.execute;
-  f.transport.execute = async (plan, effect, objects) => {
-    if (effect.kind === "receipt-retain") throw new PublicationExecutionError(false, true);
-    await execute(plan, effect, objects);
-  };
-  const stopped = await publish(options(f));
-  f.transport.execute = execute;
+  const f = publicationFixture(roots);
+  const stopped = await legacyReceiptInterruption(f);
   const cleanup = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: ["push", "pr"],
     authorize: scope => request({ ...scope, retain_receipt: null }) });
   expect(cleanup.state).toBe("pending");
@@ -301,14 +291,9 @@ test("removing an already recorded operation fence blocks cleanup lease release"
 
 
 test("separate cleanup authority can retain metadata after publication proof was invalidated", async () => {
-  const f = publicationFixture(roots), execute = f.transport.execute;
-  f.transport.execute = async (plan, effect, objects) => {
-    if (effect.kind === "receipt-retain") throw new PublicationExecutionError(false, true);
-    await execute(plan, effect, objects);
-  };
-  const stopped = await publish(options(f));
+  const f = publicationFixture(roots);
+  const stopped = await legacyReceiptInterruption(f);
   appendInvalidation(readJournal(stopped.journal.directory, f.repo), "receipt", "current-publication-proof-changed");
-  f.transport.execute = execute;
   f.input.grants = [];
   f.input.reviewer.native = Buffer.from("lost original proof");
   const cleanup = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: ["push", "pr"] });
@@ -320,29 +305,25 @@ test("separate cleanup authority can retain metadata after publication proof was
 });
 
 
-test("a recovery-only original cannot retire another holder's uncertain creation", async () => {
+test("a legacy recovery-only original cannot retire another holder's uncertain creation", async () => {
   const f = publicationFixture(roots), execute = f.transport.execute;
+  const first = await legacyReceiptInterruption(f);
   f.transport.execute = async (plan, effect, objects) => {
     if (effect.kind === "pr-create") throw new PublicationExecutionError(true, true);
     await execute(plan, effect, objects);
   };
-  await publish(options(f));
+  await resumeEffects({ ...options(f), journal_directory: first.journal.directory });
   f.refs.delete(f.settings.publication.lease_ref);
   f.transport.execute = execute;
   const other = join(f.root, "recovery-only-owner");
   mkdirSync(other, { mode: 0o700 });
-  const nativeRef = f.transport.ref;
-  let receiptReads = 0;
+  const second = await legacyReceiptInterruption(f, other);
+  appendRecoveryOnly(second.journal, "receipt", "operation-started-elsewhere");
   const transport: typeof f.transport = { ...f.transport, artifact_root: other, async observe(plan, effect, objects) {
     const observed = await f.transport.observe(plan, effect, objects);
     return observed.state === "absent" ? { state: "absent" as const, evidence: retainAbsence({
       artifact_root: other, source_repo: f.repo, plan, effect, transport: "collector", lookup: { synthetic: effect.id, state: "absent" } }) } : observed;
-  }, async ref(ref: string) {
-    if (ref.startsWith(f.settings.publication.receipt_ref_prefix) && ++receiptReads === 1) return { state: "absent" as const };
-    return nativeRef(ref);
   } };
-  const second = await publish({ ...options(f), artifact_root: other, transport });
-  expect(second.reason).toBe("operation-started-elsewhere");
   const result = await reconcileAbsent({ ...input(f, second.journal.directory), transport });
   expect(result.state).toBe("pending");
   expect(result.reason).toBe("retained-absence-not-definitive");
