@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revising recovery for the owner-approved acknowledgement of an applied delivery whose payload changed; fresh spec review and acceptance precede implementation."
+status_description: "R-49 requires owner decision Q2 on eligible acknowledgement effects before the next spec review and renewed acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -74,7 +74,7 @@ Reports remain available on any harness. Protected publication uses the configur
 
 Migration retains the legacy publishing routes until the published component passes actual marketplace, installed-model resolve/closure/issue and Claude forwarding checks, the hosted advisory/history checks and paired consumer review. Cutover drains publishers and records the approved component and policy. Rollback quiesces shared publication before restoring the legacy routes. Compatible updates require review and installed checks. Contract, execution, provider, permission or publication changes require the affected trials and an approved successor pin.
 
-The previous implementation run passed 1,915 repository tests and 34 registration tests. Copilot Opus5.5 component review23 returned NO FINDINGS for its scoped recovery correction. The new acknowledgement is planned work requiring a fresh spec review and your acceptance. Runtime/adoption, normal entry integration and actual migration checks remain open. Acceptance authorizes local implementation and tests on the existing feature branch. Shipment and live model/provider/consumer operations retain their separate approval gates.
+The previous implementation run passed 1,915 repository tests and 34 registration tests. Copilot Opus5.5 component review23 returned NO FINDINGS for its scoped recovery correction. The new acknowledgement is planned work. Fresh Copilot Opus5.5 spec review R-49 read all 215 required chunks and requests one owner choice about eligible write types. That choice, a new review and your acceptance precede implementation. Runtime/adoption, normal entry integration and actual migration checks remain open. Acceptance authorizes local implementation and tests on the existing feature branch. Shipment and live model/provider/consumer operations retain their separate approval gates.
 
 ### Terms used here
 
@@ -597,7 +597,20 @@ Code tasks add and run the regression before the behavior change. Each task is o
 
 ## Open Questions
 
-None.
+### Q2: Which writes should delivery acknowledgement cover?
+
+**Recommendation**
+
+Include PR/issue/comment creation, proven PR updates and proven closures. Require a unique new marker for creation, direct native mutation evidence and original source-transition bindings for an update, and direct closure evidence plus the verified explanation for a closure. Branch/ref movement and lease/receipt metadata retain their existing recovery rules. Apply the same original ownership, settled requests, exact current approval and non-success requirements to every eligible kind.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Creations, updates and closures** | Approved recovery also handles an edited update or a closed PR that was later reopened when direct evidence proves the mutation. | Capture and verify distinct native proof for updates and closures, with positive and refusal tests per kind. |
+| **B. Creation only** | Acknowledgement covers newly created PRs, issues and comments whose marker/baseline proves delivery. | Changed update and closure cases continue through the existing stricter recovery paths. |
+
+**Why this is yours**
+
+R-49 F-01 identifies a contradiction between the draft's universal marker requirement and its proposed closure case. The action set determines the user-visible recovery capability and required native evidence. The owner approved the general acknowledgement policy; this remaining choice fixes its exact effect scope. The recommended option has been presented through the host question tool. Its answer precedes the normative effect/proof table and re-review.
 
 ## Review Log
 
