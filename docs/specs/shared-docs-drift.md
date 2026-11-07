@@ -669,6 +669,7 @@ None.
 | 2026-11-06 | R-48 | spec | `48ecc4eaf068472913a2a609ebd8a67834d887d5` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
 | 2026-11-06 | R-48 | spec | `48ecc4eaf068472913a2a609ebd8a67834d887d5` | n/a | n/a | accepted by owner |
 | 2026-11-07 | R-49 | spec | `7643bf0503dddebf535061a56e588b6936982406` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
+| 2026-11-07 | R-50 | spec | `fe19cf8444744873ce70492ec51c4562e9243234` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -1634,6 +1635,27 @@ SEVERITY: should-fix
 WHERE: docs/specs/shared-docs-drift.md lines 239-241 ("Delivery acknowledgement during recovery", eligibility paragraph); AC-05 Test Plan acknowledgement cases (line 452); T78 (line 575)
 EVIDENCE: The eligibility paragraph applies one rule to every effect: "Eligibility requires one unique native match for the original operation/effect marker, expected repository and actor, exact target and applicable head/branch bindings". The next sentence asks the spec to "Bind the pre-dispatch inventory or source payload so a marker that predated the selected effect cannot establish its application". The same paragraph then treats closures as eligible: "A closure requires direct terminal evidence for the closure itself in addition to its explanation". Only creation effects have a marker that this rule can test. In the current plan shape, `pr-close` carries only `number` and `expected_head`, with no marker (recovery.test.ts fixtures). `push` and `branch-refresh` are ref effects with no marker; transport.ts observes them only by ref object or PR head. `pr-update` edits an existing PR whose prior body is its source payload. Native observe() covers it through `mutablePull`/`updateTransitions`, not through a unique new marker. For pr-update, no direct per-mutation evidence is named, and none is available through the existing GET-only body comparison. As written, the marker requirement makes closure acknowledgement impossible, but the closure sentence makes it eligible. The pr-update, push and branch-refresh cases are left undetermined. "Account for every remaining effect through ... eligible acknowledgement" therefore has no defined meaning for those kinds. The AC-05 proof names only a "unique PR/issue/comment delivery" positive case, plus an "unproved closure" refusal. T78 says "effect-specific native proof" without the effect set. Implementers and reviewers cannot decide from the spec whether a reopened closed PR, an edited pr-update target or a force-moved pushed branch may be acknowledged or must stay pending.
 PROPOSAL: In the acknowledgement subsection, list the eligible effect kinds and the proof shape for each. For pr-create, issue-create and comment-create, use a unique effect marker that is absent from the bound pre-review inventory. For pr-close, require direct native closure evidence for that PR number by the expected actor at the bound expected head, plus the already-proved explanation, with no marker requirement. For pr-update, either name the direct native evidence and source-transition binding, or state that pr-update is ineligible. State explicitly that push, branch-refresh, lease-acquire, receipt-retain and lease-release are ineligible, or define their proof. Limit the marker sentence to creation effects. In the AC-05 Test Plan, add a positive case for each eligible kind beyond creation, and a refusal case for each ineligible kind showing that the lease stays pending. Name the same effect set in T78.
+
+### R-50
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md, "Delivery acknowledgement during recovery" proof table rows `pr-create` and `pr-update` (chunks 00228, 00249); AC-05 Test Plan acknowledgement cases (chunk 00467); T78 (chunk 00585)
+EVIDENCE: Native transport can partly apply one effect.
+- **`pr-update`:** it can send up to three owned requests: `PATCH pulls/{n}` for title and body, `PUT issues/{n}/labels`, and an optional `gh pr ready`/`--undo` (transport.ts 00481 lines 14-24). `updateTransitions` already treats the intermediate states as valid: source, source+title/body, and source+title/body+labels (transport.ts 00061 lines 26-35).
+- **`pr-create`:** the observer already reports a created PR whose labels are missing as `native-PR-labels-incomplete` (transport.ts 00361 lines 46-49).
+- **Quiescence rule:** it counts "native evidence of non-dispatch, definitive rejection or terminal application" for each owned request (spec 00249 line 15). So a `pr-update` whose PATCH applied but whose labels request was never sent or was definitively rejected is fully settled.
+- **Eligibility is undefined for that case.** The `pr-update` row asks for evidence of "applied field values" and binding to the "intended transition". The acknowledgement event means "the observed applied delivery and current mismatch" and "supplies no exact-completion or non-application verdict". The spec does not say whether a partly applied update or creation can be acknowledged as applied delivery. That matters because acknowledgement then permanently stops replay and allows lease release (00249 line 17).
+- **No test or task covers it.** The AC-05 plan names whole-effect positive cases only: "the original source-to-approved-field transition followed by a later edit". It has no partial-application case, and T78 does not name one.
+- **Two readings remain.** An implementer could acknowledge and release a half-applied effect, so its unapplied parts can never be replayed. Or they could keep it pending. A reviewer cannot tell which is correct.
+PROPOSAL:
+- **Proof table:** in the `pr-create` and `pr-update` rows (and in the general rule after the table), state that eligibility requires terminal application evidence for every native request the selected effect makes, covering its full approved payload. For `pr-update` that means title/body, labels and any draft-state change. For `pr-create` it means the created PR plus every requested label.
+- **Partial application:** a settled but partly applied effect stays pending and is not acknowledged. This is the conservative default and matches the existing "leave that effect pending" rule. If acknowledging partial application should instead be allowed, it needs its own owner decision and its own report wording.
+- **AC-05 Test Plan:** add refusal cases with the lease left pending:
+  - a `pr-update` whose PATCH applied and whose labels request was definitively rejected or never dispatched, then edited later;
+  - a `pr-create` whose label application is incomplete.
+- **T78:** name these partial-application refusals.
 
 ## Sources
 
