@@ -1,6 +1,6 @@
 ---
-status: blocked
-status_description: "Waiting on owner decision Q1 about acknowledging an applied delivery changed before its acknowledgement. The recovery repairs pass local tests, with runtime, entry and migration gates still open."
+status: draft
+status_description: "Revising recovery for the owner-approved acknowledgement of an applied delivery whose payload changed; fresh spec review and acceptance precede implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
