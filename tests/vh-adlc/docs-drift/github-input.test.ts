@@ -205,3 +205,14 @@ test("typed Git ref/tree/blob reads validate object IDs, complete trees and actu
   expect(() => truncated.selected.tree(tree)).toThrow();
   expect(() => api.selected.ref("https://foreign.invalid/receipt")).toThrow();
 });
+
+
+test("the fresh merge reader distinguishes actual delivery from a hypothetical merge commit", () => {
+  const sha = "d".repeat(40);
+  const merged = reader({ "repos/fixture/docs/pulls/1": pull(1, { state: "closed", merged_at: "2026-11-07T00:00:00Z", merge_commit_sha: sha }) });
+  expect(merged.selected.mergedPull(1).merge_commit_sha).toBe(sha);
+  const hypothetical = reader({ "repos/fixture/docs/pulls/1": pull(1, { merge_commit_sha: sha }) });
+  expect(hypothetical.selected.mergedPull(1).merge_commit_sha).toBeNull();
+  const missing = reader({ "repos/fixture/docs/pulls/1": pull(1, { state: "closed", merged_at: "2026-11-07T00:00:00Z" }) });
+  expect(() => missing.selected.mergedPull(1)).toThrow();
+});

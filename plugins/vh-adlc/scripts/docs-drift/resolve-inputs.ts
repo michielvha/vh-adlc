@@ -101,6 +101,21 @@ function fileHunks(store: OwnedObjectStore, mergeBase: string, head: string, fil
   return result;
 }
 
+/** Derive one complete immutable proposal using the shared Git inventory and hunk reader. */
+export function readResolutionProposal(store: OwnedObjectStore, proposal: PullRequestInput): ResolutionProposal {
+  const diff = readProposalDiff(store, proposal);
+  const mergeBase = diff.merge_base;
+  if (!diff.complete || !mergeBase || !diff.patch_sha256 || !diff.inputs_sha256) throw Error("incomplete selected full diff");
+  const files = diff.files.map(file => ({ path: file.path, status: file.status, before_mode: file.before_mode, after_mode: file.after_mode,
+    before_sha256: file.before === null ? null : sha256(file.before), after_sha256: file.after === null ? null : sha256(file.after) }));
+  const hunks = diff.files.flatMap(file => fileHunks(store, mergeBase, diff.head_sha, file));
+  if (new Set(hunks.map(hunk => hunk.id)).size !== hunks.length) throw Error("repeated complete hunk identity");
+  const binding = { number: proposal.number, head_sha: proposal.head_sha, base_sha: proposal.base_sha, merge_base: mergeBase,
+    body_sha256: sha256(Buffer.from(proposal.body)), metadata_sha256: canonicalDigest(metadata(proposal)),
+    diff_sha256: diff.patch_sha256, inputs_sha256: diff.inputs_sha256, files, hunks };
+  return { ...binding, binding_sha256: canonicalDigest(binding) };
+}
+
 /** Derive every selected unit from complete owned Git objects, never optional REST patches. */
 export function collectResolutionInputs(options: ResolutionCollection): ResolutionInputs {
   const { snapshot, store, reader } = options;
@@ -122,16 +137,7 @@ export function collectResolutionInputs(options: ResolutionCollection): Resoluti
         const proposal = reader.pull(number);
         if (proposal.number !== number || proposal.base_repository.id !== repository.id
           || proposal.base_repository.full_name.toLowerCase() !== result.repository || proposal.base_ref !== snapshot.settings.default_branch) throw Error("changed selected proposal identity");
-        const diff = readProposalDiff(store, proposal);
-        if (!diff.complete || !diff.merge_base || !diff.patch_sha256 || !diff.inputs_sha256) throw Error("incomplete selected full diff");
-        const files = diff.files.map(file => ({ path: file.path, status: file.status, before_mode: file.before_mode, after_mode: file.after_mode,
-          before_sha256: file.before === null ? null : sha256(file.before), after_sha256: file.after === null ? null : sha256(file.after) }));
-        const hunks = diff.files.flatMap(file => fileHunks(store, diff.merge_base!, diff.head_sha, file));
-        if (new Set(hunks.map(hunk => hunk.id)).size !== hunks.length) throw Error("repeated complete hunk identity");
-        const binding = { number, head_sha: proposal.head_sha, base_sha: proposal.base_sha, merge_base: diff.merge_base,
-          body_sha256: sha256(Buffer.from(proposal.body)), metadata_sha256: canonicalDigest(metadata(proposal)),
-          diff_sha256: diff.patch_sha256, inputs_sha256: diff.inputs_sha256, files, hunks };
-        result.proposals.push({ ...binding, binding_sha256: canonicalDigest(binding) });
+        result.proposals.push(readResolutionProposal(store, proposal));
       } catch { result.diagnostics.push(`Required complete proposal ${number} unavailable`); }
     }
   } catch { result.diagnostics.push("Selected repository metadata unavailable or changed"); }

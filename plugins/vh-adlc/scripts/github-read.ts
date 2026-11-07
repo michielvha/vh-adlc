@@ -271,6 +271,13 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
       if (result.number !== number) throw Error("github-read-pr-number-changed");
       return result;
     },
+    mergedPull(number: number): PullRequestInput & { merge_commit_sha: string | null } {
+      const raw = readObject(reader.get(`${prefix}/pulls/${readID(number)}`));
+      const result = pull(raw);
+      if (result.number !== number) throw Error("github-read-pr-number-changed");
+      if (result.merged_at !== null && result.state !== "closed") throw Error("github-read-merge-state-changed");
+      return { ...result, merge_commit_sha: result.merged_at === null ? null : readSHA(raw.merge_commit_sha) };
+    },
     pulls(base: string): TypedPage<PullRequestInput> {
       readText(base);
       return list(`${prefix}/pulls?state=open&base=${encodeURIComponent(base)}&per_page=100`, value => {

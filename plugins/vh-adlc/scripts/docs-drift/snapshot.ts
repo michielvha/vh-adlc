@@ -120,7 +120,17 @@ function requiredInputs(values: RequiredInput[]): RequiredInput[] {
 
 /** Bind source and negative reads to immutable objects while leaving the caller's checkout intact. */
 export function captureSnapshot(directory: string, sourceCommit: string, options: { required_inputs?: RequiredInput[] } = {}) {
-  const repo = repositoryRoot(directory);
+  return snapshotAt(repositoryRoot(directory), sourceCommit, options);
+}
+
+/** Read immutable inputs in the collector's separately verified owned bare store. */
+export function captureBareSnapshot(directory: string, sourceCommit: string, options: { required_inputs?: RequiredInput[] } = {}) {
+  const repo = realpathSync(directory);
+  if (readGit(repo, "rev-parse", "--is-bare-repository").toString().trim() !== "true") incomplete("bare snapshot required");
+  return snapshotAt(repo, sourceCommit, options);
+}
+
+function snapshotAt(repo: string, sourceCommit: string, options: { required_inputs?: RequiredInput[] }) {
   completeHistory(repo, sourceCommit);
   const loaded = loadCommittedSettings(repo, sourceCommit);
   const blobs = readCommittedTree(repo, sourceCommit);

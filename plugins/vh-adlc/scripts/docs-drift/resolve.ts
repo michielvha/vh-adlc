@@ -191,6 +191,13 @@ function feedbackValid(item: Decision, edits: Map<string, Edit>, options: Resolu
     && (change.detector_id === null || finding.detector === change.detector_id) && (change.document === null || finding.document === change.document));
 }
 
+export function resolutionSource(snapshot: Snapshot): ResolutionRecord["source"] {
+  return { settings_sha256: snapshot.settings_sha256, scope_sha256: snapshot.protocol.bindings.scope_sha256,
+    feedback_sha256: snapshot.protocol.bindings.feedback_sha256, read_set: snapshot.read_set, entries: snapshot.entries,
+    absent: snapshot.absent, read_set_sha256: snapshot.read_set_sha256, history_sha256: snapshot.history_sha256,
+    required_inputs: snapshot.required_inputs };
+}
+
 function recordBytes(record: ResolutionRecord): Buffer {
   return Buffer.from(Object.entries(record).sort(([left], [right]) => compareUTF8(left, right)).map(([key, value]) => `${key}: ${JSON.stringify(value, null, 2).replace(/\n/gu, "\n  ")}\n`).join(""));
 }
@@ -274,9 +281,7 @@ export async function buildResolution(options: ResolutionOptions): Promise<Resol
         ...item.edit_ids, ...(item.feedback?.edit_id ? [item.feedback.edit_id] : [])
       ].map(id => { const selected = edits.get(id); if (!selected) fail("missing record edit"); return selected.path; }))].sort(compareUTF8) })),
       postimages: changes.map(({ after_base64, ...change }) => change), carried_decisions: carries,
-      source: { settings_sha256: snapshot.settings_sha256, scope_sha256: snapshot.protocol.bindings.scope_sha256,
-        feedback_sha256: snapshot.protocol.bindings.feedback_sha256, read_set: snapshot.read_set, entries: snapshot.entries,
-        absent: snapshot.absent, read_set_sha256: snapshot.read_set_sha256, history_sha256: snapshot.history_sha256, required_inputs: snapshot.required_inputs },
+      source: resolutionSource(snapshot),
       verification: verifications, changed_paths: changes.map(change => change.path) };
     const bytes = recordBytes(record);
     if (!canonicalJSON(readResolutionRecord(bytes, snapshot.settings)).equals(canonicalJSON(record))) fail("record round trip");
