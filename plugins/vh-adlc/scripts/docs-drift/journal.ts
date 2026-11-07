@@ -173,7 +173,13 @@ function eventFiles(directory: string): string[] {
   privateDirectory(directory);
   const files = readdirSync(directory).sort();
   for (const file of files) {
-    if (/^\.tmp-[a-f0-9-]{36}$/u.test(file)) { readArtifact(join(directory, file)); continue; }
+    if (/^\.tmp-[a-f0-9-]{36}$/u.test(file)) {
+      try { readArtifact(join(directory, file)); }
+      catch (error) {
+        if (!(error instanceof Error && "code" in error && error.code === "ENOENT")) throw error;
+      }
+      continue;
+    }
     if (!/^\d{10}\.json$/u.test(file)) fail("unexpected event file");
   }
   return files.filter(file => !file.startsWith(".tmp-"));
