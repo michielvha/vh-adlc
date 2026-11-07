@@ -1,8 +1,8 @@
 import { appendInvalidation, appendRecoveryOnly, readJournal, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
-import { retainAbsence } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
-import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
+import { retainAbsence, retainLookup } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
+import { executeAttempt, PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { reconcileAbsent, resumeEffects, inspectRetainedOperation, restoreRetainedOperation, type ReconciliationScope } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
@@ -380,4 +380,94 @@ test("lease-fallback restoration retains a canonical receipt from a separate own
   f.transport = { ...f.transport, object_store: f.store.root, artifact_root: f.artifacts };
   const resumedLegacy = await resumeEffects({ ...options(f), journal_directory: original.journal.directory });
   expect(resumedLegacy.state).toBe("complete");
+});
+
+
+test("selected cleanup retires a conflicting action that the original journal never attempted", async () => {
+  for (const selected of ["push", "pr"]) {
+    const f = publicationFixture(roots), observe = f.transport.observe;
+    f.transport.observe = async (plan, effect, objects) => effect.id === selected ? {
+      state: "conflict", reason: "actual-target-changed", evidence: retainLookup({ artifact_root: f.artifacts,
+        source_repo: f.repo, plan, effect, transport: "collector", state: "conflict", lookup: { target: "changed-by-another-owner" } }),
+    } : observe(plan, effect, objects);
+    const stopped = await publish(options(f));
+    expect(stopped.state).toBe("pending");
+    expect(stopped.journal.events.some(event => event.effect_id === selected && event.kind === "attempt")).toBe(false);
+    const cleanup = await reconcileAbsent({ ...input(f, stopped.journal.directory), retire_effect_ids: selected === "push" ? ["push", "pr"] : ["pr"] });
+    expect(cleanup.state).toBe("retired");
+    expect(f.executed.includes(selected)).toBe(false);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+    const retired = cleanup.journal.events.find(event => event.kind === "retired-absence" && event.effect_id === selected);
+    if (!retired || !("lookup" in retired.payload)) throw Error("missing non-success retirement");
+    expect(JSON.parse(readFileSync(retired.payload.lookup.path, "utf8")).state).toBe("conflict");
+    expect(cleanup.journal.events.some(event => event.effect_id === selected && event.kind === "outcome")).toBe(false);
+    expect((await resumeEffects({ ...options(f), journal_directory: cleanup.journal.directory })).state).toBe("retired");
+    const effect = f.plan.manifest.effects.find(item => item.id === selected)!;
+    await expect(executeAttempt({ journal: cleanup.journal, effect, objects: cleanup.objects, transport: f.transport })).rejects.toThrow();
+    expect(f.executed.includes(selected)).toBe(false);
+  }
+});
+
+test("conflicting cleanup cannot retire an attempted action or a changed native lookup", async () => {
+  for (const mode of ["attempted", "changed-lookup", "unselected", "recovery-only"]) {
+    let f: ReturnType<typeof publicationFixture>, directory: string;
+    if (mode === "attempted") {
+      const abandonedRun = await abandoned(); f = abandonedRun.f; directory = abandonedRun.interrupted.journal.directory;
+    } else {
+      f = publicationFixture(roots);
+      const observe = f.transport.observe;
+      f.transport.observe = async (plan, effect, objects) => effect.id === "pr" ? { state: "unknown", reason: "initial-read-unavailable" } : observe(plan, effect, objects);
+      directory = (await publish(options(f))).journal.directory;
+      f.transport.observe = observe;
+    }
+    if (mode === "recovery-only") appendRecoveryOnly(readJournal(directory, f.repo), "pr", "operation-started-elsewhere");
+    const observe = f.transport.observe;
+    f.transport.observe = async (plan, effect, objects) => {
+      if (effect.id !== "pr") return observe(plan, effect, objects);
+      const evidence = retainLookup({ artifact_root: f.artifacts, source_repo: f.repo, plan, effect,
+        transport: "collector", state: "conflict", lookup: { target: "changed" } });
+      if (mode === "changed-lookup") writeFileSync(evidence.path, "{}");
+      return { state: "conflict", reason: "actual-target-changed", evidence };
+    };
+    const cleanup = await reconcileAbsent({ ...input(f, directory), retire_effect_ids: mode === "unselected" ? [] : ["pr"] });
+    expect(cleanup.state).toBe("pending");
+    expect(cleanup.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+    expect(f.executed.includes("pr")).toBe(false);
+  }
+});
+
+test("a racing original dispatch wins the journal CAS before conflicting cleanup can retire it", async () => {
+  const f = publicationFixture(roots), observe = f.transport.observe, execute = f.transport.execute;
+  f.transport.observe = async (plan, effect, objects) => effect.id === "pr" ? { state: "unknown", reason: "initial-read-unavailable" } : observe(plan, effect, objects);
+  const stopped = await publish(options(f));
+  let conflict = true, entered!: () => void, finish!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const release = new Promise<void>(resolve => { finish = resolve; });
+  f.transport.observe = async (plan, effect, objects) => effect.id === "pr" && conflict ? {
+    state: "conflict", reason: "actual-target-changed", evidence: retainLookup({ artifact_root: f.artifacts, source_repo: f.repo,
+      plan, effect, transport: "collector", state: "conflict", lookup: { target: "changed" } }),
+  } : observe(plan, effect, objects);
+  f.transport.execute = async (plan, effect, objects) => {
+    if (effect.id === "pr") { entered(); await release; }
+    await execute(plan, effect, objects);
+  };
+  let calls = 0, running: Promise<Awaited<ReturnType<typeof resumeEffects>>> | undefined;
+  try {
+    const cleanup = await reconcileAbsent({ ...input(f, stopped.journal.directory), authorize: async scope => {
+      if (++calls === 2) {
+        conflict = false;
+        running = resumeEffects({ ...options(f), journal_directory: stopped.journal.directory });
+        await started;
+      }
+      return request(scope);
+    } });
+    expect(cleanup.state).toBe("pending");
+    const actual = readJournal(stopped.journal.directory, f.repo);
+    expect(actual.events.some(event => event.kind === "attempt" && event.effect_id === "pr")).toBe(true);
+    expect(actual.events.some(event => event.kind === "retired-absence")).toBe(false);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  } finally { finish(); }
+  if (!running) throw Error("missing original executor");
+  expect((await running).state).toBe("complete");
 });

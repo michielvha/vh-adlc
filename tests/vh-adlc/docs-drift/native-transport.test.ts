@@ -611,3 +611,17 @@ test("actual Git rejection supplies positive proof for both atomic metadata refs
   expect(() => readGit(server, "rev-parse", "--verify", f.settings.publication.lease_ref)).toThrow();
   expect(readGit(server, "rev-parse", receipt).toString().trim()).toBe(selected.objects.object);
 });
+
+test("native conflicting PR-head evidence preserves the actual conflict without copying credential fields", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+    head: { ref: "docs-audit/old", sha: "e".repeat(40), repo: { id: 10, temp_clone_token: "fixture-sensitive-token" } },
+    base: { ref: "main", repo: { id: 10, temp_clone_token: "fixture-sensitive-token" } } }); });
+  const closure: Effect = { id: "close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } };
+  const observed = await f.transport.observe(f.plan, closure, f.objects);
+  if (observed.state !== "conflict" || !observed.evidence) throw Error("missing native conflict evidence");
+  const text = readFileSync(observed.evidence.path, "utf8");
+  expect(JSON.parse(text).state).toBe("conflict");
+  expect(text).toContain("e".repeat(40));
+  expect(text).not.toContain("fixture-sensitive-token");
+});

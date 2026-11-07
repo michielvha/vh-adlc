@@ -22,7 +22,7 @@ export type PlanPolicy = {
   worker: RolePolicy; reviewer: RolePolicy;
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
-export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string } };
+export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string }; never_dispatched?: true };
 export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
 type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant; atomic_receipt_id?: string };
 type Intent = { effect_sha256: string; atomic_acquisition?: string };
@@ -186,7 +186,7 @@ function outcome(value: unknown): Outcome {
   if (receipt.object !== null && (typeof receipt.object !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(receipt.object))) fail("outcome object");
   return receipt as Outcome;
 }
-function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void {
+function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header: Header): void {
   const effect = plan.manifest.effects.find(effect => effect.id === event.effect_id);
   if (!effect) fail("unknown effect");
   const prior = previous.filter(item => item.effect_id === event.effect_id);
@@ -242,7 +242,12 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
     }
     else if (event.kind === "outcome") outcome(event.payload);
     else if (event.kind === "retired-absence") {
-      const payload = exact(event.payload, ["scope_sha256", "request_sha256", "lookup"]);
+      const undispatched = Object.hasOwn(event.payload, "never_dispatched");
+      const payload = exact(event.payload, ["scope_sha256", "request_sha256", "lookup", ...(undispatched ? ["never_dispatched"] : [])]);
+      if (undispatched && (payload.never_dispatched !== true || header.recovery_mode !== "original"
+        || ["lease-acquire", "receipt-retain", "lease-release"].includes(effect.kind)
+        || previous.some(item => item.kind === "recovery-only" || item.kind === "attempt" && (item.effect_id === effect.id
+          || "atomic_receipt_id" in item.payload && item.payload.atomic_receipt_id === effect.id)))) fail("unproven never-dispatched retirement");
       hash(payload.scope_sha256); hash(payload.request_sha256);
       const lookup = exact(payload.lookup, ["path", "sha256"]);
       hash(lookup.sha256);
@@ -304,7 +309,7 @@ export function readJournal(directory: string, sourceRepo: string, expected?: { 
     const bytes = readArtifact(join(eventDirectory, file));
     const event = exact(parseCanonical(bytes), ["schema_version", "revision", "previous_sha256", "kind", "effect_id", "payload"]) as Event;
     if (event.schema_version !== 1 || event.revision !== index + 1 || event.previous_sha256 !== previous) fail("changed event chain");
-    validateEvent(event, plan, events);
+    validateEvent(event, plan, events, header);
     events.push(event); previous = sha256(bytes);
   }
   if (!canonicalJSON(files).equals(canonicalJSON(eventFiles(eventDirectory)))) fail("journal read conflict");
@@ -315,7 +320,7 @@ function append(journal: Journal, kind: Event["kind"], effectId: string, payload
   const current = readJournal(journal.directory, journal.source_repo, journal);
   if (current.revision >= 9999999999) fail("revision limit");
   const event: Event = { schema_version: 1, revision: current.revision + 1, previous_sha256: current.digest, kind, effect_id: effectId, payload };
-  validateEvent(event, current.plan, current.events);
+  validateEvent(event, current.plan, current.events, current.header);
   publishArtifact(join(current.directory, "events", String(event.revision).padStart(10, "0") + ".json"), canonicalJSON(event));
   return readJournal(current.directory, current.source_repo);
 }

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRetirement, appendRecoveryOnly, isObservationOnly, readJournal, writePlanObject, writePublicationObjects, createJournal, publishArtifact, readArtifact, readVerifiedPlan, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
-import { readAbsence } from "./observations";
+import { readLookup } from "./observations";
 import { canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { publicationMarker } from "./report-history";
 import { externalArtifactDirectory } from "./snapshot";
@@ -310,7 +310,7 @@ export async function reconcileAbsent(options: {
       journal = readJournal(journal.directory, options.source_repo);
       const active = pendingAttempt(journal, effect);
       if (observation.state !== "done" && (active === "attempt-in-flight" || active === "attempt-not-reaped")) return blocked(active);
-      if (observation.state === "unknown" || observation.state === "conflict") return blocked(observation.reason);
+      if (observation.state === "unknown" || observation.state === "conflict" && ["lease-acquire", "receipt-retain"].includes(effect.kind)) return blocked(observation.reason);
       if (!intended(journal, effect.id)) journal = appendIntent(journal, effect.id);
       if (observation.state === "done") { journal = appendOutcome(journal, effect.id, observation.outcome); continue; }
       if (effect.id === receipt.id) {
@@ -324,14 +324,17 @@ export async function reconcileAbsent(options: {
         journal = appendOutcome(journal, effect.id, after.outcome);
         continue;
       }
-      if (observation.state !== "absent" || !ids.includes(effect.id) || !observation.evidence) return blocked("known-absence-retirement-not-authorized");
+      if (!ids.includes(effect.id) || !observation.evidence) return blocked("known-absence-retirement-not-authorized");
       if (isObservationOnly(journal)) return blocked("retained-absence-not-definitive");
+      const conflicting = observation.state === "conflict";
+      if (conflicting && hasEffectAttempt(journal, effect.id)) return blocked("conflicting-action-was-attempted");
       const pending = pendingAttempt(journal, effect, true);
       if (pending) return blocked(pending);
-      const lookup = readAbsence({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
-        plan, effect, transport: options.transport.kind });
+      const lookup = readLookup({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
+        plan, effect, transport: options.transport.kind, state: conflicting ? "conflict" : "absent" });
       await authorize(grant);
-      journal = appendRetirement(journal, effect.id, { ...grant, lookup });
+      await requireOwnedLease();
+      journal = appendRetirement(journal, effect.id, { ...grant, lookup, ...(conflicting ? { never_dispatched: true as const } : {}) });
     }
     const fence = await options.transport.ref(String(receipt.payload.ref));
     if (fence.state !== "present" || fence.object !== receiptObject) return blocked("retained-operation-removed");

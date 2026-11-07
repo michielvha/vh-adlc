@@ -10,7 +10,7 @@ import { gitEnvironment, gitReadArguments } from "../git-read";
 import { canonicalJSON, protocolPath, sha256 } from "./protocol";
 import { effectMarker } from "./manifests";
 import { publicationMarker } from "./report-history";
-import { retainAbsence, type AbsenceEvidence } from "./observations";
+import { retainAbsence, retainLookup, type AbsenceEvidence } from "./observations";
 import { executeOwnedProcess } from "./owned-process";
 import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
 import { requireOwnedStore } from "./proposals";
@@ -18,7 +18,7 @@ import { readGit } from "./git";
 import type { Settings } from "./settings";
 export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string; receipt_object?: string };
 export type RefObservation = { state: "absent" } | { state: "present"; object: string };
-export type EffectObservation = { state: "done"; outcome: Outcome } | { state: "absent"; evidence?: AbsenceEvidence } | { state: "unknown" | "conflict"; reason: string };
+export type EffectObservation = { state: "done"; outcome: Outcome } | { state: "absent"; evidence?: AbsenceEvidence } | { state: "unknown"; reason: string } | { state: "conflict"; reason: string; evidence?: AbsenceEvidence };
 type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; rejection?: RejectionEvidence };
 export type PublicationIdentity = { repository: string; repository_id: number; default_branch: string; actor: string; actor_id: number };
 
@@ -237,13 +237,16 @@ export function createNativeTransport(options: {
         const absent = (lookup: unknown): EffectObservation => ({ state: "absent", evidence: retainAbsence({
           artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", lookup: { result: lookup, requests: reader.trace() },
         }) });
+        const conflicted = (reason: string, lookup: unknown): EffectObservation => ({ state: "conflict", reason,
+          evidence: retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native",
+            state: "conflict", lookup: { reason, result: lookup, requests: reader.trace() } }) });
         if (["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(effect.kind)) {
           const target = getRef(text(p.ref));
           if (effect.kind === "branch-refresh") {
             const pr = pull(positive(p.number), plan);
-            if (pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return { state: "conflict", reason: "native-refresh-scope-changed" };
+            if (pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
             if (target.object === p.head && pr.head === p.expected_head) return { state: "unknown", reason: "native-PR-head-sync-pending" };
-            if (pr.head !== target.object) return { state: "conflict", reason: "native-refresh-scope-changed" };
+            if (pr.head !== target.object) return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
           }
           const expected = effect.kind === "push" || effect.kind === "branch-refresh" ? text(p.head)
             : effect.kind === "receipt-retain" ? objects.receipt_object ?? objects.object : objects.lease_object ?? objects.object;
@@ -252,31 +255,31 @@ export function createNativeTransport(options: {
             if (target.object === expected) return absent({ ref: p.ref, target });
             if (objects.lease_object && objects.lease_object !== objects.object)
               return observed({ ref: p.ref, state: "not-owned", object: target.object }, text(p.ref), target.object);
-            return { state: "conflict", reason: "foreign-lease-object" };
+            return conflicted("foreign-lease-object", { ref: p.ref, target });
           }
           if (target.state === "absent") return absent({ ref: p.ref, target });
           if (target.object === expected) return observed({ ref: p.ref, object: target.object }, text(p.ref), target.object);
           if (effect.kind === "branch-refresh" && target.object === p.expected_head) return absent({ ref: p.ref, target });
-          return { state: "conflict", reason: "native-ref-changed" };
+          return conflicted("native-ref-changed", { ref: p.ref, target });
         }
         if (effect.kind === "pr-create") {
           const owner = settings.repository.split("/")[0];
           const candidates = list(`${prefix}/pulls?state=all&base=${encodeURIComponent(text(p.base))}&head=${encodeURIComponent(owner + ":" + text(p.branch))}&per_page=100`);
           if (candidates.length === 0) return absent({ candidates });
-          if (candidates.length !== 1) return { state: "conflict", reason: "ambiguous-native-PR" };
+          if (candidates.length !== 1) return conflicted("ambiguous-native-PR", { candidates: candidates.map(value => { const item = record(value); return { number: positive(item.number), body_sha256: sha256(canonicalJSON(item.body)), actor: actor(item.user) }; }) });
           const candidate = record(candidates[0]), pr = pull(positive(candidate.number), plan);
           const actual = submittedFields(pr.input), expected = expectedFields(effect);
-          if (pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return { state: "conflict", reason: "native-PR-payload-changed" };
+          if (pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
           if (!same(actual, expected)) {
             if (actual.labels.length === 0 && same({ ...actual, labels: expected.labels }, expected))
               return { state: "unknown", reason: "native-PR-labels-incomplete" };
-            return { state: "conflict", reason: "native-PR-payload-changed" };
+            return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
           }
           return observed(pr.input, String(candidate.number), pr.head);
         }
         if (effect.kind === "pr-update" || effect.kind === "pr-close") {
           const pr = pull(positive(p.number), plan, effect.kind !== "pr-close");
-          if (pr.head !== p.expected_head) return { state: "conflict", reason: "native-PR-head-changed" };
+          if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
           if (effect.kind === "pr-close") return pr.input.state === "closed" ? observed(pr.input, String(p.number), pr.head) : absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           if (same(submittedFields(pr.input), expectedFields(effect))) return observed(pr.input, String(p.number), pr.head);
           const original = record(p.expected_payload);
@@ -289,26 +292,26 @@ export function createNativeTransport(options: {
             { ...source, title: target.title, body: target.body, labels: target.labels }];
           return pr.input.state === "open" && transitions.some(fields => same(submittedFields(pr.input), fields))
             ? absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user),
-              source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : { state: "conflict", reason: "native-PR-update-source-changed" };
+              source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
         }
         if (effect.kind === "issue-create") {
           checkIssueEvidence(effect);
           const inventory = list(`${prefix}/issues?state=all&per_page=100`);
           const { candidates, conflict } = creationCandidates(inventory, plan, effect);
-          if (conflict) return { state: "conflict", reason: "native-issue-baseline-marker-changed" };
+          if (conflict) return conflicted("native-issue-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
           if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
-          if (candidates.length !== 1) return { state: "conflict", reason: "ambiguous-native-issue" };
+          if (candidates.length !== 1) return conflicted("ambiguous-native-issue", { inventory: inventoryEvidence(inventory) });
           const issue = candidates[0];
-          if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !same(labelNames(issue.labels), [...p.labels as string[]].sort())) return { state: "conflict", reason: "native-issue-payload-changed" };
+          if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !same(labelNames(issue.labels), [...p.labels as string[]].sort())) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
           return observed(issue, String(positive(issue.number)), null);
         }
         if (effect.kind === "comment-create") {
           const pr = pull(positive(p.number), plan, false);
           const inventory = list(`${prefix}/issues/${p.number}/comments?per_page=100`);
           const { candidates, conflict } = creationCandidates(inventory, plan, effect);
-          if (conflict) return { state: "conflict", reason: "native-comment-baseline-marker-changed" };
+          if (conflict) return conflicted("native-comment-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
           if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
-          if (candidates.length !== 1 || !ownedActor(candidates[0].user, plan) || candidates[0].body !== p.body) return { state: "conflict", reason: "native-comment-payload-changed" };
+          if (candidates.length !== 1 || !ownedActor(candidates[0].user, plan) || candidates[0].body !== p.body) return conflicted("native-comment-payload-changed", { inventory: inventoryEvidence(inventory) });
           return observed(candidates[0], String(positive(candidates[0].id)), pr.head);
         }
         throw Error("unsupported native effect");
