@@ -15,23 +15,26 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
     && event.payload.atomic_receipt_id === effect.id).map(event => "attempt_id" in event.payload ? event.payload.attempt_id : ""));
   const events = journal.events.filter(event => event.effect_id === effect.id
     || (["attempt", "attempt-ended"].includes(event.kind) && "attempt_id" in event.payload && paired.has(event.payload.attempt_id)));
-  const attempt = events.findLast(event => event.kind === "attempt");
-  if (!attempt) return null;
-  const ended = events.findLast(event => event.kind === "attempt-ended");
-  if (!ended || ended.revision < attempt.revision) return "attempt-in-flight";
-  const status = ended.payload as { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; attempt_id: string };
-  if (!status.reaped) return "attempt-not-reaped";
-  if (status.rejection) {
-    try {
-      const dispatched = journal.plan.manifest.effects.find(item => item.id === attempt.effect_id);
-      if (!dispatched) return "rejection-proof-unavailable";
-      readRejection({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo, plan: journal.plan,
-        effect: dispatched, attempt_id: status.attempt_id, evidence: status.rejection });
-      return null;
-    } catch { return "rejection-proof-unavailable"; }
+  const attempts = events.filter(event => event.kind === "attempt");
+  for (const attempt of retirement ? attempts : attempts.slice(-1)) {
+    const attemptId = (attempt.payload as { attempt_id: string }).attempt_id;
+    const ended = events.findLast(event => event.kind === "attempt-ended"
+      && "attempt_id" in event.payload && event.payload.attempt_id === attemptId);
+    if (!ended || ended.revision < attempt.revision) return "attempt-in-flight";
+    const status = ended.payload as { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; attempt_id: string };
+    if (!status.reaped) return "attempt-not-reaped";
+    if (status.rejection) {
+      try {
+        const dispatched = journal.plan.manifest.effects.find(item => item.id === attempt.effect_id);
+        if (!dispatched) return "rejection-proof-unavailable";
+        readRejection({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo, plan: journal.plan,
+          effect: dispatched, attempt_id: attemptId, evidence: status.rejection });
+        continue;
+      } catch { return "rejection-proof-unavailable"; }
+    }
+    if (status.sent && (retirement || ["lease-acquire", "push", "pr-create", "issue-create", "comment-create"].includes(effect.kind)
+      || "atomic_receipt_id" in attempt.payload && attempt.payload.atomic_receipt_id === effect.id)) return "dispatch-outcome-unknown";
   }
-  if (status.sent && (retirement || ["lease-acquire", "push", "pr-create", "issue-create", "comment-create"].includes(effect.kind)
-    || "atomic_receipt_id" in attempt.payload && attempt.payload.atomic_receipt_id === effect.id)) return "dispatch-outcome-unknown";
   return null;
 }
 

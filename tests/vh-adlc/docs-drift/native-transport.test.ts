@@ -625,3 +625,73 @@ test("native conflicting PR-head evidence preserves the actual conflict without 
   expect(text).toContain("e".repeat(40));
   expect(text).not.toContain("fixture-sensitive-token");
 });
+
+test("a rejected closure replay cannot retire an earlier sent request whose outcome remains unknown", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+    head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  const effects: Effect[] = [f.plan.manifest.effects[0], f.plan.manifest.effects[1],
+    { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [], body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } },
+    { id: "close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } },
+    { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } }];
+  const input = fixture(f.plan.manifest.bindings, effects);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
+    adoption_sha256: hash("adoption"), context: "trial", transport: "native", corrections: [], attention: [] });
+  const repo = join(f.root, "source"), artifacts = join(f.root, "artifacts");
+  let journal = createJournal({ source_repo: repo, artifact_root: artifacts, plan });
+  const objects = writePublicationObjects(f.store, plan, journal.header);
+  journal = appendIntent(journal, "lease");
+  journal = await executeAttempt({ journal, effect: effects[0], objects, transport: f.transport });
+  for (const effect of effects.slice(0, 3)) {
+    if (effect.id === "explain") {
+      journal = appendIntent(journal, effect.id);
+      journal = await executeAttempt({ journal, effect, objects, transport: f.transport });
+    }
+    const observed = await f.transport.observe(plan, effect, objects);
+    if (observed.state !== "done") throw Error("missing completed metadata/explanation");
+    journal = appendOutcome(journal, effect.id, observed.outcome);
+  }
+  const closure = effects[3];
+  journal = appendIntent(journal, closure.id);
+  for (const code of [502, 403]) {
+    f.update(state => { state.reject_http = code; });
+    await expect(executeAttempt({ journal, effect: closure, objects, transport: f.transport })).rejects.toBeInstanceOf(PublicationExecutionError);
+    journal = readJournal(journal.directory, repo);
+  }
+  expect(pendingAttempt(journal, closure)).toBeNull();
+  expect(pendingAttempt(journal, closure, true)).toBe("dispatch-outcome-unknown");
+  f.update(state => { state.reject_http = 0; });
+  const cleanupOptions = { source_repo: repo, journal_directory: journal.directory, object_store: f.store, settings: f.settings,
+    transport: f.transport, retire_effect_ids: [closure.id],
+    authorize: async (scope: unknown) => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("actual selected cleanup request") }) };
+  const refused = await reconcileAbsent(cleanupOptions);
+  expect(refused.state).toBe("pending");
+  expect(refused.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(objects.lease_object);
+  // The first accepted request can still arrive after the second request was rejected.
+  f.update(state => { state.prs[0].state = "closed"; });
+  const completed = await reconcileAbsent({ ...cleanupOptions, retire_effect_ids: [] });
+  expect(completed.state).toBe("complete");
+  expect(completed.journal.events.some(event => event.kind === "outcome" && event.effect_id === closure.id)).toBe(true);
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+});
+
+test("retirement rechecks every rejected attempt including the atomic receipt aliases", async () => {
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f);
+  let journal = appendIntent(selected.journal, selected.effect.id);
+  f.update(state => { state.reject_git = true; });
+  for (let count = 0; count < 2; count++) {
+    await expect(executeAttempt({ journal, effect: selected.effect, objects: selected.objects, transport: f.transport })).rejects.toBeInstanceOf(PublicationExecutionError);
+    journal = readJournal(journal.directory, join(f.root, "source"));
+  }
+  const receipt = journal.plan.manifest.effects[1];
+  expect(pendingAttempt(journal, selected.effect, true)).toBeNull();
+  expect(pendingAttempt(journal, receipt, true)).toBeNull();
+  const oldest = journal.events.find(event => event.kind === "attempt-ended");
+  if (!oldest || !("rejection" in oldest.payload) || !oldest.payload.rejection) throw Error("missing first rejection proof");
+  writeFileSync(oldest.payload.rejection.path, "{}");
+  expect(pendingAttempt(journal, selected.effect)).toBeNull();
+  expect(pendingAttempt(journal, selected.effect, true)).toBe("rejection-proof-unavailable");
+  expect(pendingAttempt(journal, receipt, true)).toBe("rejection-proof-unavailable");
+});
