@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Bounded success-evidence retention is approved. The revised spec awaits fresh Copilot review and renewed acceptance."
+status_description: "Copilot Opus5.5 R-57 returned NO FINDINGS. The revised recovery spec awaits renewed owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -74,7 +74,7 @@ Reports remain available on any harness. Protected publication uses the configur
 
 Migration retains the legacy publishing routes until the published component passes actual marketplace, installed-model resolve/closure/issue and Claude forwarding checks, the hosted advisory/history checks and paired consumer review. Cutover drains publishers and records the approved component and policy. Rollback quiesces shared publication before restoring the legacy routes. Compatible updates require review and installed checks. Contract, execution, provider, permission or publication changes require the affected trials and an approved successor pin.
 
-The previous implementation run passed 1,915 repository tests and 34 registration tests. Copilot Opus5.5 component review23 returned NO FINDINGS for its scoped recovery correction. The acknowledgement and success-evidence capture remain planned work. Your decisions now cover creations, proven updates and closures, require full application including labels, and permit bounded private success records. The implementation plan includes memory-only response capture, projected HTTP and Git rejection evidence, old-journal compatibility and strict separation of synthetic trial proof from production proof. Fresh spec review and renewed acceptance precede implementation. Runtime/adoption, normal entry integration and actual migration checks remain open. Acceptance authorizes local implementation and tests on the existing feature branch. Shipment and live model/provider/consumer operations retain their separate approval gates.
+The previous implementation run passed 1,915 repository tests and 34 registration tests. Copilot Opus5.5 component review23 returned NO FINDINGS for its scoped recovery correction. The acknowledgement and success-evidence capture remain planned work. Your decisions now cover creations, proven updates and closures, require full application including labels, and permit bounded private success records. The implementation plan includes memory-only response capture, projected HTTP and Git rejection evidence, old-journal compatibility and strict separation of synthetic trial proof from production proof. Fresh Copilot Opus5.5 R-57 at `b9342ea` returned NO FINDINGS after all 246 required chunk reads. Renewed owner acceptance precedes implementation. Runtime/adoption, normal entry integration and actual migration checks remain open. Acceptance authorizes local implementation and tests on the existing feature branch. Shipment and live model/provider/consumer operations retain their separate approval gates.
 
 ### Terms used here
 
@@ -687,6 +687,7 @@ None.
 | 2026-11-07 | R-54 | spec | `ece5472b33e6b320bc8370dee99ca0db5fdb57a9` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-55 | spec | `6deccdcf4b8921e58a6bc7dc48e63b3090ddbb54` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-56 | spec | `6caabfb632d3c4255eb475b8983c332d737644c7` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
+| 2026-11-07 | R-57 | spec | `b9342ea91e2e4549febd9f37ca6d2a90d5ca3479` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
 
 ### R-1
 
@@ -1754,6 +1755,10 @@ SEVERITY: should-fix
 WHERE: docs/specs/shared-docs-drift.md, Design "Delivery acknowledgement during recovery", capture paragraph (chunk 00247 line 18); Tasks T78 (chunk 00600 line 1); AC-05 Test Plan acknowledgement cases (chunk 00477 line 1)
 EVIDENCE: The capture paragraph has two rules that conflict. First, it says mutation capture must "extend `scripts/docs-drift/owned-process.ts` to drain stdout/stderr through bounded in-memory pipes" and "Never redirect these raw streams to retained files or temporary disk paths." Second, it says "Git rejection parsing retains its existing bounded ref-status proof." The only new format it defines is "versioned projected HTTP rejection evidence", and "New HTTP captures use the projected format." The existing Git ref-status proof depends on retained stdout files. Git pushes are owned native mutation commands: transport.ts:308-314 `pushRef` calls `run(..., { protocol: "git", updates })`. transport.ts:280 writes `stdout`/`stderr` files into the native command directory, and owned-process.ts:28 spawns with `stdout: Bun.file(stdout)`. rejections.ts:46-59 `observedCommand` then reads `join(directory, "stdout")` from disk again on every verification. attempts.ts `pendingAttempt` uses that proof to settle rejected lease-acquire, receipt-retain, push, branch-refresh and lease-release attempts, and acknowledgement cleanup depends on those attempts settling. The current tests also rely on rewriting that file-backed Git proof. native-transport.test.ts expects "rejection-proof-unavailable" after `writeFileSync(ended.payload.rejection.path, "{}")` and covers real Git atomic rejection. If Git pushes follow the memory-only rule, the spec defines no projected Git ref-status record, so newly rejected pushes cannot keep a definitive rejection proof. The spec gives no other way to settle them, so they would stay pending forever. If Git pushes keep the file-backed proof, that breaks "Never redirect these raw streams" for every owned mutation command. T78 plans "memory-only mutation capture" and "projected HTTP rejection evidence" but has no test for a new Git rejection format. The Test Plan only says "Preserve Git rejection verification".
 PROPOSAL: State the Git rule explicitly in the capture paragraph. Option A: `git push` also drains through bounded memory pipes and retains a versioned projected porcelain ref-status record (per-ref status, ref names, command/attempt linkage, digest, limits). It uses the same hash-linked journal path as the HTTP projection, and the reader for legacy file-backed Git proofs stays in place. Add T78 and AC-05 cases for a new projected Git rejection, tampered or incomplete projected Git proof, and legacy file-backed Git proof compatibility. Option B: limit memory-only capture to HTTP/gh mutation responses, say that the bounded Git porcelain stdout file stays as retained rejection evidence, and explain why it holds no raw response body, credential or secret-bearing header.
+
+### R-57
+
+NO FINDINGS
 
 ## Sources
 
