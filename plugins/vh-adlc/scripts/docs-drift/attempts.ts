@@ -2,7 +2,7 @@ import { dirname } from "node:path";
 import { canonicalJSON } from "./protocol";
 import { readRejection, type RejectionEvidence } from "./rejections";
 import { randomUUID } from "node:crypto";
-import { appendAttempt, appendAttemptEnd, appendIntent, readJournal, type Journal, type ReconciliationGrant } from "./journal";
+import { appendAttempt, appendAttemptEnd, appendIntent, appendRecoveryOnly, readJournal, type Journal, type ReconciliationGrant } from "./journal";
 import type { Effect } from "./manifests";
 import type { PlanObjects, PublicationTransport } from "./transport";
 
@@ -40,10 +40,20 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
 }
 
 /** A lost acknowledgement of a local ending must not erase its already published status. */
-async function recordEnding(journal: Journal, effectId: string, ending: Parameters<typeof appendAttemptEnd>[2]): Promise<Journal> {
+async function recordEnding(journal: Journal, effectId: string, ending: Parameters<typeof appendAttemptEnd>[2], phase: "pre-dispatch" | "executed"): Promise<Journal | null> {
   for (;;) {
     try {
-      const current = readJournal(journal.directory, journal.source_repo);
+      let current = readJournal(journal.directory, journal.source_repo);
+      if (!current.events.some(event => event.kind === "attempt" && event.effect_id === effectId
+        && "attempt_id" in event.payload && event.payload.attempt_id === ending.attempt_id)) {
+        if (phase === "executed" && !current.events.some(event => event.kind === "recovery-only")) {
+          const marker = current.events.some(event => event.kind === "intent" && event.effect_id === effectId)
+            ? effectId : current.plan.manifest.effects[0].id;
+          if (!current.events.some(event => event.kind === "intent" && event.effect_id === marker)) current = appendIntent(current, marker);
+          appendRecoveryOnly(current, marker, "executed-attempt-claim-unavailable");
+        }
+        return null;
+      }
       const existing = current.events.find(event => event.kind === "attempt-ended" && event.effect_id === effectId
         && "attempt_id" in event.payload && event.payload.attempt_id === ending.attempt_id);
       if (existing) {
@@ -82,10 +92,7 @@ export async function executeAttempt(options: {
       || !("attempt_id" in claimed.payload) || claimed.payload.attempt_id !== id) throw Error("attempt dispatch fence changed");
     journal = current;
   } catch (error) {
-    const current = readJournal(journal.directory, journal.source_repo);
-    if (current.events.some(event => event.kind === "attempt" && event.effect_id === options.effect.id
-      && "attempt_id" in event.payload && event.payload.attempt_id === id))
-      await recordEnding(current, options.effect.id, { attempt_id: id, sent: false, reaped: true });
+    await recordEnding(journal, options.effect.id, { attempt_id: id, sent: false, reaped: true }, "pre-dispatch");
     throw error;
   }
   let failure: unknown;
@@ -97,9 +104,10 @@ export async function executeAttempt(options: {
     status = error instanceof PublicationExecutionError ? { sent: error.sent, reaped: error.reaped, ...(error.rejection ? { rejection: error.rejection } : {}) } : { sent: true, reaped: false };
   }
   // An observer may already have recorded an actual outcome. Keep its receipt and our process status.
-  journal = await recordEnding(journal, options.effect.id, { attempt_id: id, ...status });
+  const ended = await recordEnding(journal, options.effect.id, { attempt_id: id, ...status }, "executed");
+  if (ended === null) throw Error("executed attempt claim unavailable");
   if (failure !== undefined) throw failure;
-  return journal;
+  return ended;
 }
 
 export function hasEffectAttempt(journal: Journal, effectId: string): boolean {
