@@ -36,7 +36,7 @@ function setup() {
     { id: "receipt", kind: "receipt-retain", payload: { ref: settings.publication.receipt_ref_prefix + "operation-1" } },
     ...defaults.manifest.effects,
   ]);
-  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: hash("adoption"), context: "trial", transport: "native", corrections: [], attention: [] });
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "trial", transport: "native", corrections: [], attention: [] });
   const objects = writePlanObject(store, plan);
   const statePath = join(root, "state.json"), calls = join(root, "calls.jsonl");
   const readme = readGit(repo, "show", "HEAD:README.md"), blobSha = readGit(repo, "rev-parse", "HEAD:README.md").toString().trim();
@@ -575,7 +575,7 @@ test("a positively rejected native candidate push permits separately approved re
   const release: Effect = { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } };
   const input = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects, release]);
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
-    adoption_sha256: hash("adoption"), context: "trial", transport: "native", corrections: [], attention: [] });
+    adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "trial", transport: "native", corrections: [], attention: [] });
   const repo = join(f.root, "source"), artifacts = join(f.root, "artifacts");
   let journal = createJournal({ source_repo: repo, artifact_root: artifacts, plan });
   const objects = writePublicationObjects(f.store, plan, journal.header);
@@ -636,7 +636,7 @@ test("a rejected closure replay cannot retire an earlier sent request whose outc
     { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } }];
   const input = fixture(f.plan.manifest.bindings, effects);
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
-    adoption_sha256: hash("adoption"), context: "trial", transport: "native", corrections: [], attention: [] });
+    adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "trial", transport: "native", corrections: [], attention: [] });
   const repo = join(f.root, "source"), artifacts = join(f.root, "artifacts");
   let journal = createJournal({ source_repo: repo, artifact_root: artifacts, plan });
   const objects = writePublicationObjects(f.store, plan, journal.header);

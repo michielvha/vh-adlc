@@ -21,9 +21,9 @@ export class PublicationScopeChanged extends Error {}
 
 export function validatePublicationShape(plan: SealedPlan, settings: Settings, draft: boolean): void {
   const { manifest } = plan;
-  if (plan.context === "production" ? draft !== settings.publication.pr_draft : draft !== true) fail("declared production or trial draft policy");
+  if (plan.context === "production" ? draft !== (settings.publication.pr_state[plan.publication_kind] === "draft") : draft !== true) fail("declared production or trial draft policy");
   if (manifest.repository !== settings.repository || manifest.actor !== settings.publication.actor) fail("selected repository or actor");
-  if (plan.context === "production" && settings.adoption.mode !== "adopted") fail("consumer adoption is not active");
+  if (plan.context === "production" && settings.publication.mode !== "adopted") fail("consumer adoption is not active");
   if (canonicalJSON(plan).length > settings.reports.max_entry_bytes) fail("retained plan size bound");
   const effects = manifest.effects;
   const first = effects[0], second = effects[1], last = effects.at(-1);
@@ -68,7 +68,7 @@ export async function verifyPublicationGate(options: PublishOptions, journal: Jo
   if (manifestDigest(parseActionManifest(gate.review.current)) !== plan.manifest_sha256) throw new PublicationScopeChanged("current-manifest-changed");
   const checked = validateReviewedManifest(gate.review);
   const current = sealPlan({ reviewed: checked, grants: gate.review.grants, adoption_sha256: gate.policy.adoption_sha256,
-    context: gate.policy.context, transport: gate.policy.transport, corrections: plan.corrections, attention: plan.attention });
+    context: gate.policy.context, transport: gate.policy.transport, publication_kind: gate.policy.publication_kind, corrections: plan.corrections, attention: plan.attention });
   if (!canonicalJSON(current).equals(canonicalJSON(plan))) fail("changed current review or authority");
   const committed = loadCommittedSettings(options.source_repo, plan.manifest.bindings.source_commit);
   if (committed.settings_sha256 !== plan.manifest.bindings.settings_sha256 || !canonicalJSON(committed.settings).equals(canonicalJSON(options.settings))) fail("source settings binding");

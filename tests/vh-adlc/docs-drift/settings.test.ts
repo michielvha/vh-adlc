@@ -67,8 +67,8 @@ test.each([
   (value: ReturnType<typeof settingsFixture>) => ({ ...value, publication: { ...value.publication, base: "other" } }),
   (value: ReturnType<typeof settingsFixture>) => ({ ...value, reports: { ...value.reports, artifact_name_template: "docs-{run_id}-{run_attempt}}" } }),
   (value: ReturnType<typeof settingsFixture>) => ({ ...value, detector_options: { links: new Date() } }),
-  (value: ReturnType<typeof settingsFixture>) => ({ ...value, adoption: { ...value.adoption, mode: "adopted" } }),
-  (value: ReturnType<typeof settingsFixture>) => ({ ...value, component_pin: ".vh-adlc/docs-drift-components/fixture.yaml", adoption: { ...value.adoption, mode: "adopted" } }),
+  (value: ReturnType<typeof settingsFixture>) => ({ ...value, publication: { ...value.publication, mode: "adopted" } }),
+  (value: ReturnType<typeof settingsFixture>) => ({ ...value, component_pin: ".vh-adlc/docs-drift-components/fixture.yaml", publication: { ...value.publication, mode: "adopted" } }),
   (value: ReturnType<typeof settingsFixture>) => ({ ...value, trial: { definition_path: "trial.yaml", definition_sha256: "b".repeat(64), production_enabled: true } }),
 ])("unknown, incomplete or unsafe settings are rejected %#", change => {
   expect(() => parseSettings(change(settingsFixture()))).toThrow();
@@ -132,4 +132,29 @@ test("committed settings use exact selected Git bytes, reject suffix conflicts a
   git("commit", "-qm", "suffix conflict");
   expect(() => loadCommittedSettings(repo, git("rev-parse", "HEAD"))).toThrow();
   expect(loadCommittedSettings(repo, commit).settings_sha256).toBe(result.settings_sha256);
+});
+
+
+test("the accepted publication block is the only adoption and per-operation PR-state authority", () => {
+  const base = settingsFixture(), publication = base.publication;
+  const input = { ...base, publication: { ...publication, mode: "staged", adoption_record: ".vh-adlc/docs-drift-adoptions/fixture.yaml",
+    pr_state: { advisory: "ready", resolve: "draft" } } };
+  const parsed = parseSettings(input);
+  expect(parsed.publication).toMatchObject({ mode: "staged", adoption_record: input.publication.adoption_record,
+    pr_state: { advisory: "ready", resolve: "draft" } });
+  expect(Object.hasOwn(parsed, "adoption")).toBe(false);
+  const before = settingsProjections(parsed).protected;
+  expect(settingsProjections(parseSettings({ ...input, publication: { ...input.publication, pr_state: { advisory: "draft", resolve: "draft" } } })).protected).not.toEqual(before);
+  for (const changed of [
+    { ...input, adoption: { mode: "adopted", record_path: input.publication.adoption_record } },
+    { ...input, publication: { ...input.publication, pr_draft: false } },
+    { ...input, publication: { ...input.publication, mode: "rolled-back" } },
+    { ...input, publication: { ...input.publication, adoption_record: "../foreign.yaml" } },
+    { ...input, publication: { ...input.publication, mode: undefined } },
+    { ...input, publication: { ...input.publication, adoption_record: undefined } },
+    { ...input, publication: { ...input.publication, pr_state: undefined } },
+    { ...input, publication: { ...input.publication, pr_state: { advisory: "ready" } } },
+    { ...input, publication: { ...input.publication, pr_state: { advisory: "ready", resolve: "unknown" } } },
+    { ...input, publication: { ...input.publication, pr_state: { advisory: "ready", resolve: "draft", fallback: "draft" } } },
+  ]) expect(() => parseSettings(changed)).toThrow();
 });

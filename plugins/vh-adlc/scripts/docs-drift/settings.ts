@@ -9,7 +9,7 @@ export type DetectorSelector = { all_inventory: true } | { roots: string[]; excl
 const fields = [
   "schema_version", "protocol_version", "repository", "hostname", "default_branch", "roots", "exclusions", "suffixes",
   "required_detectors", "detector_inputs", "detector_options", "feedback_files", "scanner", "project_procedure",
-  "verification_commands", "generation_commands", "read_set", "component_pin", "adoption", "pr_discovery", "publication",
+  "verification_commands", "generation_commands", "read_set", "component_pin", "pr_discovery", "publication",
   "reports", "runtime_loader", "clients", "execution", "legacy_proposals", "knowledge_pages", "trial",
 ] as const;
 
@@ -224,11 +224,11 @@ function executionSettings(value: unknown, clients: ReturnType<typeof clientSett
 
 function publicationSettings(value: unknown, selectedRepository: string, base: string) {
   const input = object(value, [
-    "repository", "base", "actor", "branch_prefix", "pr_draft", "lease_ref", "receipt_ref_prefix",
+    "repository", "base", "actor", "branch_prefix", "mode", "adoption_record", "pr_state", "lease_ref", "receipt_ref_prefix",
     "resolution_root", "closure", "merge_methods",
   ], "publication");
   if (repository(input.repository, "publication repository") !== selectedRepository || ref(input.base, "publication base") !== base) invalid("publication destination");
-  if (typeof input.pr_draft !== "boolean") invalid("publication pr_draft");
+  const states = object(input.pr_state, ["advisory", "resolve"], "publication pr_state");
   const lease = ref(input.lease_ref, "publication lease_ref");
   const receipts = ref(input.receipt_ref_prefix, "publication receipt_ref_prefix", true);
   const branchPrefix = ref(input.branch_prefix, "publication branch_prefix", true);
@@ -244,7 +244,11 @@ function publicationSettings(value: unknown, selectedRepository: string, base: s
   for (const method of methods) choice(method, ["merge", "squash", "rebase"], "publication merge_methods");
   return {
     repository: selectedRepository, base, actor: text(input.actor, "publication actor"), branch_prefix: branchPrefix,
-    pr_draft: input.pr_draft, lease_ref: lease, receipt_ref_prefix: receipts,
+    mode: choice(input.mode, ["staged", "adopted"], "publication mode"),
+    adoption_record: yamlPath(input.adoption_record, "publication adoption_record"),
+    pr_state: { advisory: choice(states.advisory, ["draft", "ready"], "publication pr_state advisory"),
+      resolve: choice(states.resolve, ["draft", "ready"], "publication pr_state resolve") },
+    lease_ref: lease, receipt_ref_prefix: receipts,
     resolution_root: path(input.resolution_root, "publication resolution_root"),
     closure: choice(input.closure, ["after-merge"], "publication closure"),
     merge_methods: methods,
@@ -310,10 +314,9 @@ export function parseSettings(value: unknown) {
   const options = object(input.detector_options, required, "detector_options");
   const clients = clientSettings(input.clients);
   const execution = executionSettings(input.execution, clients);
-  const adoption = object(input.adoption, ["mode", "record_path"], "adoption");
-  const mode = choice(adoption.mode, ["staged", "adopted", "rolled-back"], "adoption mode");
+  const publication = publicationSettings(input.publication, selectedRepository, base);
   const componentPin = input.component_pin === null ? null : yamlPath(input.component_pin, "component_pin");
-  if (mode === "adopted" && componentPin === null) invalid("adopted component_pin");
+  if (publication.mode === "adopted" && componentPin === null) invalid("adopted component_pin");
   const discovery = object(input.pr_discovery, ["repository", "base", "authors", "branch_prefixes"], "pr_discovery");
   if (repository(discovery.repository, "pr_discovery repository") !== selectedRepository || ref(discovery.base, "pr_discovery base") !== base) invalid("pr_discovery destination");
   const legacy = object(input.legacy_proposals, ["authors", "branch_prefixes", "ids"], "legacy_proposals");
@@ -322,7 +325,7 @@ export function parseSettings(value: unknown) {
   if (new Set(legacyIDs).size !== legacyIDs.length) invalid("legacy_proposals ids");
   const reports = reportSettings(input.reports);
   if (reports.workflow_path !== execution.scheduled_workflow) invalid("reports scheduled workflow");
-  if (mode === "adopted" && reports.workflow_id === null) invalid("adopted reports workflow_id");
+  if (publication.mode === "adopted" && reports.workflow_id === null) invalid("adopted reports workflow_id");
   let trial: { definition_path: string; definition_sha256: string } | null = null;
   if (input.trial !== undefined) {
     const block = object(input.trial, ["definition_path", "definition_sha256"], "trial");
@@ -341,7 +344,6 @@ export function parseSettings(value: unknown) {
     verification_commands: commands(input.verification_commands, "verification_commands"),
     generation_commands: commands(input.generation_commands, "generation_commands"),
     read_set: readSet(input.read_set), component_pin: componentPin,
-    adoption: { mode, record_path: yamlPath(adoption.record_path, "adoption record_path") },
     pr_discovery: {
       repository: selectedRepository,
       base,
@@ -349,7 +351,7 @@ export function parseSettings(value: unknown) {
       branch_prefixes: unique(strings(discovery.branch_prefixes, "pr_discovery branch_prefixes", true)
         .map(value => ref(value, "pr_discovery branch_prefixes", true)), "pr_discovery branch_prefixes"),
     },
-    publication: publicationSettings(input.publication, selectedRepository, base), reports, runtime_loader: loaderSettings(input.runtime_loader), clients, execution,
+    publication, reports, runtime_loader: loaderSettings(input.runtime_loader), clients, execution,
     legacy_proposals: {
       authors: unique(strings(legacy.authors, "legacy_proposals authors"), "legacy_proposals authors"),
       branch_prefixes: unique(strings(legacy.branch_prefixes, "legacy_proposals branch_prefixes")
@@ -389,7 +391,6 @@ const classifications = {
   generation_commands: "protected",
   read_set: "protected",
   component_pin: "protected",
-  adoption: "protected",
   pr_discovery: "protected",
   publication: "protected",
   reports: "protected",

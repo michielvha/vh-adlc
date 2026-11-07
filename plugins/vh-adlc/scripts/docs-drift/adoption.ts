@@ -71,7 +71,7 @@ export function verifyCutoverAssembly(options: { repo: string; source_candidate:
   const { repo, source_candidate: candidate, delivery_commit: delivery, record_path: path } = options;
   immutable(candidate); immutable(delivery); protocolPath(path);
   const bindings = collectAdoptionBindings(repo, candidate);
-  if (bindings.settings.adoption.mode !== "adopted" || bindings.settings.adoption.record_path !== path) fail("cutover candidate selection");
+  if (bindings.settings.publication.mode !== "adopted" || bindings.settings.publication.adoption_record !== path) fail("cutover candidate selection");
   const parents = readGit(repo, "rev-list", "--parents", "-n", "1", delivery).toString().trim().split(" ");
   if (parents.length !== 2 || parents[0] !== delivery || parents[1] !== candidate) fail("cutover must be the direct single-parent child");
   if (committedInput(repo, candidate, path) !== null) fail("candidate already contains adoption record");

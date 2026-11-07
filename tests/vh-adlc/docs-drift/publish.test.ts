@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
+import { publish, validatePublicationShape } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { sealPlan, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { fixture, hash, bindings } from "./manifest-fixture";
@@ -139,4 +139,22 @@ test("atomic metadata creation still requires each separate current effect grant
     expect(f.executed).toEqual([]);
     expect(f.refs.size).toBe(0);
   }
+});
+
+
+test.each(["advisory", "resolve"] as const)("the publisher derives %s PR state from explicit consumer policy", kind => {
+  const f = setup();
+  const settings = { ...f.settings, publication: { ...f.settings.publication, mode: "adopted" as const,
+    pr_state: { advisory: "ready" as const, resolve: "draft" as const } } };
+  const expected = kind === "resolve";
+  const plan = structuredClone(f.plan);
+  Object.assign(plan, { context: "production", transport: "native", publication_kind: kind });
+  const pr = plan.manifest.effects.find(effect => effect.kind === "pr-create")!;
+  pr.payload.draft = expected;
+  expect(() => validatePublicationShape(plan, settings, expected)).not.toThrow();
+  expect(() => validatePublicationShape(plan, settings, !expected)).toThrow("draft policy");
+  expect(() => validatePublicationShape(plan, { ...settings, publication: { ...settings.publication, mode: "staged" } }, expected)).toThrow("adoption");
+  plan.context = "trial"; pr.payload.draft = true;
+  expect(() => validatePublicationShape(plan, settings, true)).not.toThrow();
+  expect(() => validatePublicationShape(plan, settings, false)).toThrow("draft policy");
 });

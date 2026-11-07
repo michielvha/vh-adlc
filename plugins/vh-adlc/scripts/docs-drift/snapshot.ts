@@ -87,7 +87,7 @@ function readSetFor(settings: Settings): ReadSet {
   const alwaysPaths = [
     "AGENTS.md", ".vh-adlc/docs-drift.yaml", settings.scanner.script, settings.project_procedure,
     settings.execution.worker_workflow, settings.execution.scheduled_workflow, settings.execution.claude_command,
-    settings.runtime_loader.launcher, settings.adoption.record_path, ...settings.feedback_files,
+    settings.runtime_loader.launcher, settings.publication.adoption_record, ...settings.feedback_files,
   ];
   if (settings.scanner.adapter !== null) alwaysPaths.push(settings.scanner.adapter);
   if (settings.component_pin !== null) alwaysPaths.push(settings.component_pin);

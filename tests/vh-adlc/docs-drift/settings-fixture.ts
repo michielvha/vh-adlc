@@ -21,11 +21,11 @@ export function settingsFixture() {
     generation_commands: [],
     read_set: { source_roots: null, reference_roots: null },
     component_pin: null,
-    adoption: { mode: "staged", record_path: ".vh-adlc/docs-drift-adoptions/fixture.yaml" },
     pr_discovery: { repository: "fixture/docs", base: "main", authors: ["fixture-bot"], branch_prefixes: ["docs-drift/"] },
     publication: {
       repository: "fixture/docs", base: "main", actor: "fixture-bot", branch_prefix: "docs-drift/",
-      pr_draft: false, lease_ref: "refs/heads/docs-drift-lease", receipt_ref_prefix: "refs/heads/docs-drift-receipts/",
+      mode: "staged", adoption_record: ".vh-adlc/docs-drift-adoptions/fixture.yaml",
+      pr_state: { advisory: "ready", resolve: "ready" }, lease_ref: "refs/heads/docs-drift-lease", receipt_ref_prefix: "refs/heads/docs-drift-receipts/",
       resolution_root: ".vh-adlc/docs-drift/resolutions", closure: "after-merge", merge_methods: ["merge", "squash", "rebase"],
     },
     reports: {

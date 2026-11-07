@@ -14,11 +14,11 @@ type RoleBinding = Omit<ReviewedManifest["worker"], "records">;
 export type SealedPlan = {
   schema_version: 1; manifest: ActionManifest; manifest_sha256: string; approval_sha256: string;
   adoption_sha256: string; context: "production" | "trial"; transport: "native" | "collector";
-  review_verdict: "clean"; roles: { worker: RoleBinding; reviewer: RoleBinding };
+  publication_kind: "advisory" | "resolve"; review_verdict: "clean"; roles: { worker: RoleBinding; reviewer: RoleBinding };
   corrections: CorrectionInput[]; attention: AttentionProjection[];
 };
 export type PlanPolicy = {
-  adoption_sha256: string; context: SealedPlan["context"]; transport: SealedPlan["transport"]; pr_draft: boolean;
+  adoption_sha256: string; context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"]; pr_draft: boolean;
   worker: RolePolicy; reviewer: RolePolicy;
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
@@ -72,9 +72,10 @@ function roleBinding(value: unknown): RoleBinding {
   return input as RoleBinding;
 }
 function parsePlan(value: unknown): SealedPlan {
-  const input = exact(value, ["schema_version", "manifest", "manifest_sha256", "approval_sha256", "adoption_sha256", "context", "transport", "review_verdict", "roles", "corrections", "attention"]);
+  const input = exact(value, ["schema_version", "manifest", "manifest_sha256", "approval_sha256", "adoption_sha256", "context", "transport", "publication_kind", "review_verdict", "roles", "corrections", "attention"]);
   if (input.schema_version !== 1 || input.review_verdict !== "clean" || !["production", "trial"].includes(String(input.context))
     || !["native", "collector"].includes(String(input.transport)) || (input.context === "production" && input.transport !== "native")) fail("plan context or verdict");
+  if (input.publication_kind !== "advisory" && input.publication_kind !== "resolve") fail("publication kind");
   hash(input.approval_sha256); hash(input.adoption_sha256);
   const manifest = parseActionManifest(input.manifest);
   if (manifestDigest(manifest) !== hash(input.manifest_sha256)) fail("plan manifest digest");
@@ -109,7 +110,7 @@ function parsePlan(value: unknown): SealedPlan {
 /** Native records stay external. Only their exact reviewed digests and provenance enter the plan. */
 export function sealPlan(options: {
   reviewed: ReviewedManifest; grants: EffectGrant[]; adoption_sha256: string;
-  context: SealedPlan["context"]; transport: SealedPlan["transport"];
+  context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"];
   corrections: CorrectionInput[]; attention: AttentionProjection[];
 }): SealedPlan {
   requireReviewedManifest(options.reviewed);
@@ -120,7 +121,7 @@ export function sealPlan(options: {
   return parsePlan({
     schema_version: 1, manifest, manifest_sha256, approval_sha256: sha256(canonicalJSON(options.grants)),
     adoption_sha256: options.adoption_sha256, context: options.context, transport: options.transport,
-    review_verdict: "clean", roles: { worker: workerBinding, reviewer: reviewerBinding },
+    publication_kind: options.publication_kind, review_verdict: "clean", roles: { worker: workerBinding, reviewer: reviewerBinding },
     corrections: options.corrections, attention: options.attention,
   });
 }
@@ -129,7 +130,7 @@ export function sealPlan(options: {
 export function readVerifiedPlan(bytes: Uint8Array, verifyPolicy: (plan: SealedPlan) => PlanPolicy | null): SealedPlan {
   const plan = parsePlan(parseCanonical(bytes));
   const policy = verifyPolicy(structuredClone(plan));
-  if (policy === null || policy.adoption_sha256 !== plan.adoption_sha256 || policy.context !== plan.context || policy.transport !== plan.transport) fail("current policy unavailable or changed");
+  if (policy === null || policy.adoption_sha256 !== plan.adoption_sha256 || policy.context !== plan.context || policy.transport !== plan.transport || policy.publication_kind !== plan.publication_kind) fail("current policy unavailable or changed");
   if (typeof policy.pr_draft !== "boolean") fail("missing draft policy");
   for (const effect of plan.manifest.effects) {
     if (["pr-create", "pr-update"].includes(effect.kind) && effect.payload.draft !== policy.pr_draft) fail("current draft policy");

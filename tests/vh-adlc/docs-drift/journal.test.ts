@@ -25,8 +25,8 @@ function setup() {
   const commit = readGit(repo, "rev-parse", "HEAD").toString().trim();
   const input = fixture({ ...bindings, source_commit: commit });
   const checked = validateReviewedManifest(input);
-  const plan = sealPlan({ reviewed: checked, grants: input.grants, adoption_sha256: hash("adoption"), context: "production", transport: "native", corrections: [], attention: [] });
-  const policy = () => ({ adoption_sha256: hash("adoption"), context: "production" as const, transport: "native" as const, pr_draft: true, worker: role, reviewer: role });
+  const plan = sealPlan({ reviewed: checked, grants: input.grants, adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "production", transport: "native", corrections: [], attention: [] });
+  const policy = () => ({ adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "production" as const, transport: "native" as const, pr_draft: true, worker: role, reviewer: role });
   return { root, repo, artifacts, commit, input, checked, plan, policy };
 }
 
@@ -54,12 +54,12 @@ test("changed plan payloads, role provenance or returned proof cannot become dur
     const changed = structuredClone(plan); change(changed);
     expect(() => readVerifiedPlan(canonicalJSON(changed), policy)).toThrow();
   }
-  expect(() => sealPlan({ reviewed: structuredClone(checked), grants: input.grants, adoption_sha256: hash("adoption"), context: "production", transport: "native", corrections: [], attention: [] })).toThrow("review");
+  expect(() => sealPlan({ reviewed: structuredClone(checked), grants: input.grants, adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "production", transport: "native", corrections: [], attention: [] })).toThrow("review");
 });
 
 test("collector plans remain separate from actual native production evidence", () => {
   const { checked, input, policy } = setup();
-  const options = { reviewed: checked, grants: input.grants, adoption_sha256: hash("adoption"), corrections: [], attention: [] };
+  const options = { reviewed: checked, grants: input.grants, adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, corrections: [], attention: [] };
   expect(() => sealPlan({ ...options, context: "production", transport: "collector" })).toThrow();
   const collector = sealPlan({ ...options, context: "trial", transport: "collector" });
   expect(() => readVerifiedPlan(canonicalJSON(collector), policy)).toThrow("policy");
@@ -138,7 +138,7 @@ test("metadata-only parentless Git objects are deterministic and never alter sou
 test("delivered corrections and carried attention cannot be added after candidate review", () => {
   const { checked, input, plan, policy } = setup();
   const correction = { repository: "fixture/docs", scope_sha256: bindings.scope_sha256, identity: "unreviewed", path: "docs/a.md", patch_sha256: hash("patch"), postimage_sha256: hash("post"), verification_sha256: hash("check"), inputs_sha256: hash("inputs") };
-  expect(() => sealPlan({ reviewed: checked, grants: input.grants, adoption_sha256: hash("adoption"), context: "production", transport: "native", corrections: [correction], attention: [] })).toThrow("delivery");
+  expect(() => sealPlan({ reviewed: checked, grants: input.grants, adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "production", transport: "native", corrections: [correction], attention: [] })).toThrow("delivery");
   const changed = structuredClone(plan); changed.corrections = [correction];
   expect(() => readVerifiedPlan(canonicalJSON(changed), policy)).toThrow("delivery");
 });
@@ -230,4 +230,10 @@ test("observation-only journals reject unscoped attempts but retain separately g
   journal = appendIntent(journal, "receipt");
   expect(() => appendAttempt(journal, "receipt", "separately-granted-cleanup", {
     scope_sha256: hash("exact current metadata cleanup"), request_sha256: hash("actual request") })).not.toThrow();
+});
+
+
+test("retained publication operation cannot change between advisory and resolve", () => {
+  const { plan, policy } = setup();
+  expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...policy(), publication_kind: "resolve" }))).toThrow("policy");
 });

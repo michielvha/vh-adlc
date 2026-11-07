@@ -36,7 +36,7 @@ export function publicationFixture(roots: string[]) {
     { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } },
   ];
   const input = fixture({ ...bindings, source_commit: commit, settings_sha256: sha256(settingsBytes) }, effects);
-  const policy = { adoption_sha256: hash("adoption"), context: "trial" as const, transport: "collector" as const, pr_draft: true, worker: role, reviewer: role };
+  const policy = { adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "trial" as const, transport: "collector" as const, pr_draft: true, worker: role, reviewer: role };
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
   const store = createOwnedObjectStore({ parent, evidence_directory: evidence, source_repo: repo, source_commit: commit, repository: "fixture/docs", owner: "fixture", run: "fixture-run" });
   const executed: string[] = [], observed: string[] = [];

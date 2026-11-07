@@ -23,7 +23,7 @@ function commit(repo: string, message: string) {
 }
 function source() {
   const f = publicationFixture(roots), settings = { ...settingsFixture(),
-    component_pin: ".vh-adlc/docs-drift-components/shared.yaml", adoption: { mode: "adopted", record_path: ".vh-adlc/docs-drift-adoptions/fixture.yaml" },
+    component_pin: ".vh-adlc/docs-drift-components/shared.yaml", publication: { ...settingsFixture().publication, mode: "adopted" },
     reports: { ...settingsFixture().reports, workflow_id: 19 } };
   write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings));
   write(f.repo, settings.component_pin, canonicalJSON(pin()));
@@ -82,7 +82,7 @@ test("missing or symlinked protected source and malformed pin bytes cannot estab
 });
 
 test("cutover assembly allows only the selected record as the exact direct child's change", () => {
-  const f = source(), path = f.configured.adoption.record_path;
+  const f = source(), path = f.configured.publication.adoption_record;
   write(f.repo, path, "schema_version: 1\nsource_candidate: " + f.candidate + "\n");
   const delivery = commit(f.repo, "record-only cutover child");
   const before = captureRepositoryState(f.repo);
@@ -97,7 +97,7 @@ test("cutover assembly allows only the selected record as the exact direct child
 });
 
 test("cutover rejects a second changed path even when the selected record is present", () => {
-  const f = source(), path = f.configured.adoption.record_path;
+  const f = source(), path = f.configured.publication.adoption_record;
   write(f.repo, path, "schema_version: 1\nsource_candidate: " + f.candidate + "\n");
   write(f.repo, "README.md", "unrelated change\n");
   const delivery = commit(f.repo, "mixed cutover child");
