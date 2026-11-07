@@ -18,7 +18,7 @@ export function resolutionFixture(roots: string[]) {
   settings.feedback_files.push("docs/corrections.yaml");
   put(repo, ".vh-adlc/docs-drift.yaml", JSON.stringify(settings) + "\n");
   put(repo, "docs/guide.md", "# Guide\nOld claim\n");
-  put(repo, "docs/corrections.yaml", "corrections: []\n");
+  put(repo, "docs/corrections.yaml", "corrections:\n  - id: interpret-1\n    note: Keep the declared contract when the earlier interpretation was wrong.\n");
   put(repo, "docs/docs-procedure.md", "# Project procedure\nDetector errors use docs/suppressions.yaml. Interpretation errors use docs/corrections.yaml.\n");
   const base = commitAll(repo);
   git(repo, "switch", "-qc", "docs-drift/one");

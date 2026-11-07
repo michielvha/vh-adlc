@@ -7,7 +7,7 @@ import { readResolutionProposal } from "./resolve-inputs";
 import { captureBareSnapshot, captureRepositoryState, readCommittedTree, type OwnedObjectStore, type RequiredInput, type Snapshot } from "./snapshot";
 import { loadCommittedSettings, type Settings } from "./settings";
 
-type Reader = Pick<RepositoryReader, "repository" | "mergedPull" | "pull" | "ref" | "trace">;
+type Reader = Pick<RepositoryReader, "repository" | "mergedPull" | "pull" | "ref" | "trace" | "comments">;
 export type ClosureCollection = {
   source_repo: string; store: OwnedObjectStore; settings: Settings; reader: Reader; consolidation_id: number;
   required_inputs: RequiredInput[];
@@ -29,7 +29,7 @@ function selectedRepository(proposal: PullRequestInput, settings: Settings, id: 
 }
 function nativeShape(proposal: ReturnType<Reader["mergedPull"]>, settings: Settings, id: number): void {
   selectedRepository(proposal, settings, id);
-  if (proposal.state !== "closed" || proposal.merged_at === null || proposal.merge_commit_sha === null || proposal.draft
+  if (proposal.merged !== true || proposal.state !== "closed" || proposal.merged_at === null || proposal.merge_commit_sha === null || proposal.draft
     || proposal.actor !== settings.publication.actor || proposal.head_repository?.id !== id
     || proposal.head_repository.full_name.toLowerCase() !== settings.repository
     || !proposal.head_ref.startsWith(settings.publication.branch_prefix)) fail("actual merged consolidation identity");
@@ -107,6 +107,7 @@ export function collectClosureInputs(options: ClosureCollection): ClosureInputs 
     if (current.ref !== "refs/heads/" + options.settings.default_branch) fail("default ref changed");
     result.current_default = current.sha;
     const currentSnapshot = captureBareSnapshot(options.store.root, current.sha, { required_inputs: options.required_inputs });
+    if (!same(currentSnapshot.settings, options.settings)) fail("current committed settings changed");
     const merged = mergeCommit === current.sha ? currentSnapshot : captureBareSnapshot(options.store.root, mergeCommit);
     readGit(options.store.root, "merge-base", "--is-ancestor", mergeCommit, current.sha);
     const record = locateRecord(options, consolidation, repository.id);

@@ -209,10 +209,29 @@ test("typed Git ref/tree/blob reads validate object IDs, complete trees and actu
 
 test("the fresh merge reader distinguishes actual delivery from a hypothetical merge commit", () => {
   const sha = "d".repeat(40);
-  const merged = reader({ "repos/fixture/docs/pulls/1": pull(1, { state: "closed", merged_at: "2026-11-07T00:00:00Z", merge_commit_sha: sha }) });
+  const merged = reader({ "repos/fixture/docs/pulls/1": pull(1, { state: "closed", merged: true, merged_at: "2026-11-07T00:00:00Z", merge_commit_sha: sha }) });
   expect(merged.selected.mergedPull(1).merge_commit_sha).toBe(sha);
-  const hypothetical = reader({ "repos/fixture/docs/pulls/1": pull(1, { merge_commit_sha: sha }) });
+  const hypothetical = reader({ "repos/fixture/docs/pulls/1": pull(1, { merged: false, merge_commit_sha: sha }) });
   expect(hypothetical.selected.mergedPull(1).merge_commit_sha).toBeNull();
-  const missing = reader({ "repos/fixture/docs/pulls/1": pull(1, { state: "closed", merged_at: "2026-11-07T00:00:00Z" }) });
+  const missing = reader({ "repos/fixture/docs/pulls/1": pull(1, { state: "closed", merged: true, merged_at: "2026-11-07T00:00:00Z" }) });
   expect(() => missing.selected.mergedPull(1)).toThrow();
+});
+
+
+test("closure metadata requires the actual merged flag and consistent native state", () => {
+  for (const flag of [undefined, false, "true"]) {
+    const api = reader({ "repos/fixture/docs/pulls/1": pull(1, { state: "closed", merged_at: "2026-11-07T00:00:00Z",
+      merged: flag, merge_commit_sha: "d".repeat(40) }) });
+    expect(() => api.selected.mergedPull(1)).toThrow();
+  }
+});
+
+
+test("comment baselines use complete native GET inventories and preserve malformed-neighbor gaps", () => {
+  const route = "repos/fixture/docs/issues/1/comments?per_page=100&page=1";
+  const good = { id: 90, body: "Existing explanation", user: { login: "fixture-bot", id: 12 } };
+  const api = reader({ [route]: [good, { id: "bad", body: "Incomplete item", user: good.user }, { ...good, id: 92 }] });
+  const comments = api.selected.comments(1);
+  expect(comments.complete).toBe(false);
+  expect(comments.items.map(item => item.id)).toEqual([90, 92]);
 });

@@ -18,7 +18,7 @@ type Feedback = {
 export type Decision = { proposal: number; hunk_id: string; disposition: "apply" | "apply-modified" | "already-fixed" | "wrong" | "defer";
   reason: string; evidence: Quote[]; edit_ids: string[]; feedback: Feedback | null; carry: string | null };
 type Carry = { proposal: number; hunk_id: string; text: string; request_sha256: string; inputs_sha256: string };
-type Verification = { state: "passed" | "failed" | "unknown"; inputs_sha256: string; artifact_sha256: string; method: string; asset_checks: string[] };
+export type Verification = { state: "passed" | "failed" | "unknown"; inputs_sha256: string; artifact_sha256: string; method: string; asset_checks: string[] };
 export type ResolutionChange = { path: string; before_sha256: string | null; after_sha256: string | null;
   before_mode: string | null; after_mode: string | null; after_base64: string | null };
 export type VerificationScope = { inputs_sha256: string; source_commit: string; decision: Decision; edits: Edit[];
@@ -102,7 +102,7 @@ function carry(value: unknown): Carry {
   const input = object(value, ["proposal", "hunk_id", "text", "request_sha256", "inputs_sha256"]);
   return { proposal: integer(input.proposal, 1), hunk_id: text(input.hunk_id), text: text(input.text), request_sha256: hash(input.request_sha256), inputs_sha256: hash(input.inputs_sha256) };
 }
-function verification(value: unknown, expected: string): Verification {
+export function readVerification(value: unknown, expected: string): Verification {
   const input = object(value, ["state", "inputs_sha256", "artifact_sha256", "method", "asset_checks"]);
   const result = { state: choice(input.state, ["passed", "failed", "unknown"]), inputs_sha256: hash(input.inputs_sha256),
     artifact_sha256: hash(input.artifact_sha256), method: text(input.method), asset_checks: strings(input.asset_checks).map(hash) };
@@ -265,7 +265,7 @@ export async function buildResolution(options: ResolutionOptions): Promise<Resol
       const digest = canonicalDigest(binding);
       const scope: VerificationScope = { inputs_sha256: digest, source_commit: snapshot.source_commit, decision: item,
         edits: boundEdits, changes, scan_sha256: binding.scan_sha256 };
-      const observed = verification(await options.observe_verification(freezeJSON(JSON.parse(canonicalJSON(scope).toString()) as VerificationScope)), digest);
+      const observed = readVerification(await options.observe_verification(freezeJSON(JSON.parse(canonicalJSON(scope).toString()) as VerificationScope)), digest);
       if (observed.state !== "passed" && !(item.disposition === "defer" && observed.state === "unknown")) fail("selected verification incomplete");
       if (units.get(selectedKey(item.proposal, item.hunk_id))?.kind === "binary" && item.edit_ids.length > 0 && observed.asset_checks.length === 0) fail("binary asset checks");
       verifications.push({ ...observed, proposal: item.proposal, hunk_id: item.hunk_id });
@@ -404,7 +404,7 @@ export function readResolutionRecord(bytes: Uint8Array, settings: Settings): Res
   const verifications = array(input.verification, value => {
     const input = object(value, ["proposal", "hunk_id", "state", "inputs_sha256", "artifact_sha256", "method", "asset_checks"]);
     const { proposal, hunk_id, ...binding } = input;
-    return { proposal: integer(proposal, 1), hunk_id: text(hunk_id), ...verification(binding, hash(input.inputs_sha256)) };
+    return { proposal: integer(proposal, 1), hunk_id: text(hunk_id), ...readVerification(binding, hash(input.inputs_sha256)) };
   });
   if (!canonicalJSON(verifications.map(item => selectedKey(item.proposal, item.hunk_id)).sort(compareUTF8)).equals(canonicalJSON(expected))
     || verifications.some(item => item.state !== "passed" && !(item.state === "unknown" && dispositions.some(selected => selected.proposal === item.proposal && selected.hunk_id === item.hunk_id && selected.disposition === "defer")))) fail("record verification accounting");

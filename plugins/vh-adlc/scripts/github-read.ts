@@ -138,6 +138,7 @@ export type PullRequestInput = {
   actor: string; actor_id: number; actor_type: string; head_sha: string; head_ref: string; head_repository: RepositoryIdentity | null;
   base_sha: string; base_ref: string; base_repository: RepositoryIdentity;
 };
+export type CommentInput = { id: number; body: string | null; actor: string; actor_id: number };
 export type WorkflowRunInput = {
   id: number; run_attempt: number; workflow_id: number; path: string; event: string; status: string;
   conclusion: string | null; head_sha: string; head_branch: string | null; repository: RepositoryIdentity;
@@ -271,12 +272,20 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
       if (result.number !== number) throw Error("github-read-pr-number-changed");
       return result;
     },
-    mergedPull(number: number): PullRequestInput & { merge_commit_sha: string | null } {
+    mergedPull(number: number): PullRequestInput & { merged: boolean; merge_commit_sha: string | null } {
       const raw = readObject(reader.get(`${prefix}/pulls/${readID(number)}`));
       const result = pull(raw);
       if (result.number !== number) throw Error("github-read-pr-number-changed");
-      if (result.merged_at !== null && result.state !== "closed") throw Error("github-read-merge-state-changed");
-      return { ...result, merge_commit_sha: result.merged_at === null ? null : readSHA(raw.merge_commit_sha) };
+      const merged = readBoolean(raw.merged);
+      if (merged !== (result.merged_at !== null) || (merged && result.state !== "closed")) throw Error("github-read-merge-state-changed");
+      return { ...result, merged, merge_commit_sha: merged ? readSHA(raw.merge_commit_sha) : null };
+    },
+    comments(number: number): TypedPage<CommentInput> {
+      return list(`${prefix}/issues/${readID(number)}/comments?per_page=100`, value => {
+        const item = readObject(value), user = readObject(item.user);
+        if (item.body !== null && typeof item.body !== "string") throw Error("invalid-github-comment-body");
+        return { id: readID(item.id), body: item.body, actor: readText(user.login), actor_id: readID(user.id) };
+      });
     },
     pulls(base: string): TypedPage<PullRequestInput> {
       readText(base);
