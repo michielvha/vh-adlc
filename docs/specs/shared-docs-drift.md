@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "The owner approved acknowledgement scope. The revised effect-proof contract awaits fresh Copilot review and renewed acceptance."
+status_description: "R-50 requests owner decision Q3 on partial delivery before the next spec review and renewed acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -74,7 +74,7 @@ Reports remain available on any harness. Protected publication uses the configur
 
 Migration retains the legacy publishing routes until the published component passes actual marketplace, installed-model resolve/closure/issue and Claude forwarding checks, the hosted advisory/history checks and paired consumer review. Cutover drains publishers and records the approved component and policy. Rollback quiesces shared publication before restoring the legacy routes. Compatible updates require review and installed checks. Contract, execution, provider, permission or publication changes require the affected trials and an approved successor pin.
 
-The previous implementation run passed 1,915 repository tests and 34 registration tests. Copilot Opus5.5 component review23 returned NO FINDINGS for its scoped recovery correction. The new acknowledgement is planned work. Copilot Opus5.5 spec review R-49 read all 215 required chunks and requested an exact eligible-effect list. You approved creations, proven PR updates and proven closures. The revised contract now lists proof for those five effect kinds and preserves existing recovery for branch/ref and lease/receipt effects. A new review and your acceptance precede implementation. Runtime/adoption, normal entry integration and actual migration checks remain open. Acceptance authorizes local implementation and tests on the existing feature branch. Shipment and live model/provider/consumer operations retain their separate approval gates.
+The previous implementation run passed 1,915 repository tests and 34 registration tests. Copilot Opus5.5 component review23 returned NO FINDINGS for its scoped recovery correction. The new acknowledgement is planned work. Copilot Opus5.5 spec review R-49 read all 215 required chunks and requested an exact eligible-effect list. You approved creations, proven PR updates and proven closures. The revised contract now lists proof for those five effect kinds and preserves existing recovery for branch/ref and lease/receipt effects. Fresh Copilot Opus5.5 R-50 read all 216 required chunks and requests one further choice about partly applied effects, such as PR text applied while labels fail. The recommendation keeps those pending and requires complete application proof before acknowledgement. Your decision, a new review and renewed acceptance precede implementation. Runtime/adoption, normal entry integration and actual migration checks remain open. Acceptance authorizes local implementation and tests on the existing feature branch. Shipment and live model/provider/consumer operations retain their separate approval gates.
 
 ### Terms used here
 
@@ -612,7 +612,21 @@ Code tasks add and run the regression before the behavior change. Each task is o
 
 ## Open Questions
 
-None.
+### Q3: May recovery acknowledge a partly applied delivery?
+
+**Recommendation**
+
+Keep partial deliveries pending. Acknowledgement requires proof that every native request needed for the effect's full approved payload applied before the later mismatch. For a PR update this includes text, labels and any draft-state change. For PR creation it includes requested labels.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Full application required** | Cleanup cannot discard retries for approved changes that never applied. Settled partial effects remain pending. | Some partial failures require further reconciliation instead of this acknowledgement. |
+| **B. Approve partial cleanup** | Separately approved cleanup can account for applied and unapplied portions and stop the original operation. | Define additional evidence, approval and reporting for abandoned unapplied portions, then test their permanent no-replay disposition. |
+
+**Why this is yours**
+
+Copilot Opus5.5 R-50 F-01 found that the current draft does not distinguish a completely applied effect from one with settled but rejected or undispatched component requests. Acknowledgement permanently stops replay and can release the lease. This choice determines whether an approved but unapplied portion may be abandoned. The owner question is pending.
+
 
 ## Review Log
 
