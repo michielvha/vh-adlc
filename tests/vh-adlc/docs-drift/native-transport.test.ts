@@ -49,7 +49,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -176,7 +176,11 @@ else if (endpoint === 'repos/fixture/docs/git/blobs/' + state.blob.sha)
     value = state.blob;
 else if (endpoint?.startsWith('repos/fixture/docs/git/ref/')) {
     const ref = 'refs/' + decodeURIComponent(endpoint.slice('repos/fixture/docs/git/ref/'.length));
-    if (state.forbidden) {
+    if (state.ref_status) {
+        status = state.ref_status;
+        value = { message: 'ref unavailable' };
+    }
+    else if (state.forbidden) {
         status = 403;
         value = { message: 'denied' };
     }
@@ -1191,4 +1195,54 @@ test("issue-create alias evidence retains only its successful current comparison
   expect(second.label_comparisons).toEqual(comparisons);
   expect(first.requests.map(request => request.endpoint)).not.toContain("repos/fixture/docs/git/commits/" + f.commit);
   expect(second.requests.map(request => request.endpoint)).toEqual(first.requests.map(request => request.endpoint));
+});
+
+
+test.each(["lease-acquire", "receipt-retain", "lease-release", "push"] as const)("%s cannot reuse earlier contents visibility after access loss", async kind => {
+  const f = setup(); await f.transport.identity();
+  const ref = kind === "push" ? "refs/heads/docs-drift/missing" : kind === "receipt-retain" ? f.settings.publication.receipt_ref_prefix + "operation-1" : f.settings.publication.lease_ref;
+  f.update(value => { value.refs[ref] = f.commit; value.source_status = 404; value.ref_status = 404; });
+  const effect: Effect = { id: "selected", kind, payload: { ref, ...(kind === "push" ? { head: f.commit } : {}) } };
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
+  await expect(f.transport.ref(ref)).rejects.toThrow();
+  expect(f.inspect().refs[ref]).toBe(f.commit);
+});
+
+test.each(["lease-release", "receipt-retain"] as const)("%s retains fresh access proof for a visible ref absence", async kind => {
+  const f = setup(); await f.transport.identity();
+  const ref = kind === "receipt-retain" ? f.settings.publication.receipt_ref_prefix + "operation-1" : f.settings.publication.lease_ref;
+  const effect: Effect = { id: "selected", kind, payload: { ref } };
+  const result = await f.transport.observe(f.plan, effect, f.objects);
+  expect(result.state).toBe(kind === "lease-release" ? "done" : "absent");
+  const support = result.state === "done" ? result.outcome.lookup : result.state === "absent" ? result.evidence : undefined;
+  if (!support) throw Error("missing fresh ref absence support");
+  readLookup({ evidence: support, artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan: f.plan, effect,
+    transport: "native", state: kind === "lease-release" ? "done" : "absent" });
+  const retained: { lookup: { requests: { endpoint: string; status: number }[] } } = JSON.parse(readFileSync(support.path, "utf8"));
+  expect(retained.lookup.requests.map(({ endpoint, status }) => ({ endpoint, status }))).toEqual([
+    { endpoint: "repos/fixture/docs/git/ref/" + ref.slice("refs/".length), status: 404 },
+    { endpoint: "repos/fixture/docs/git/commits/" + f.commit, status: 200 },
+  ]);
+});
+
+test.each(["alias-target", "empty-target", "empty-done"] as const)("PR update retains exact-name and empty comparison evidence (%s)", async kind => {
+  const f = setup(); await f.transport.identity();
+  const common = { title: "Reviewed update", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("update"), draft: true };
+  const original = { ...common, labels: ["old"] };
+  const observed = kind === "empty-done" ? [] : [{ id: 102, name: "old" }];
+  f.update(value => {
+    value.labels.Documentation = value.labels.documentation;
+    value.prs.push({ ...common, labels: observed, number: 77, state: "open", user: { login: "fixture-bot", id: 20 },
+      head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } });
+  });
+  const effect: Effect = { id: "update", kind: "pr-update", payload: { ...common, labels: kind === "alias-target" ? ["Documentation"] : [],
+    number: 77, expected_head: f.commit, expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)) } };
+  const result = await f.transport.observe(f.plan, effect, f.objects);
+  expect(result.state).toBe(kind === "empty-done" ? "done" : "absent");
+  const support = result.state === "done" ? result.outcome.lookup : result.state === "absent" ? result.evidence : undefined;
+  if (!support) throw Error("missing exact or empty comparison support");
+  const retained: { lookup: { label_comparisons: unknown[] } } = JSON.parse(readFileSync(support.path, "utf8"));
+  const expected = [{ observed, expected: kind === "alias-target" ? [{ requested: "Documentation", id: 101, canonical: "documentation" }] : [], matched: kind === "empty-done" }];
+  if (kind !== "empty-done") expected.push({ observed, expected: [{ requested: "old", id: 102, canonical: "old" }], matched: true });
+  expect(retained.lookup.label_comparisons).toEqual(expected);
 });

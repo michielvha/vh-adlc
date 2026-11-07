@@ -118,7 +118,11 @@ export function createNativeTransport(options: {
   function getRef(ref: string): RefObservation {
     try { return { state: "present", object: repository.ref(ref).sha }; }
     catch (error) {
-      if (error instanceof GitHubReadError && error.status === 404 && contentsObserved) return { state: "absent" };
+      if (error instanceof GitHubReadError && error.status === 404 && contentsObserved) {
+        // Identity preflight is not proof of current access. A hidden ref also returns 404.
+        repository.commit(store.source_commit);
+        return { state: "absent" };
+      }
       throw error;
     }
   }
@@ -129,8 +133,15 @@ export function createNativeTransport(options: {
   }
   function labelsMatch(value: unknown, expected: string[], comparisons?: LabelComparison[]): boolean {
     const actual = nativeLabels(value);
-    if (same(actual.map(label => label.name), expected)) return true;
-    if (actual.length === 0 || expected.length === 0) return false;
+    const namesMatch = same(actual.map(label => label.name), expected);
+    if (namesMatch || actual.length === 0 || expected.length === 0) {
+      const expectedLabels = expected.map(requested => {
+        const label = actual.find(item => item.name === requested);
+        return { requested, id: label?.id ?? null, canonical: label?.name ?? null };
+      });
+      comparisons?.push({ observed: actual, expected: expectedLabels, matched: namesMatch });
+      return namesMatch;
+    }
     const resolved = new Map<string, NativeLabel | null>();
     const identity = (name: string): NativeLabel | null => {
       if (resolved.has(name)) return resolved.get(name) ?? null;
@@ -336,8 +347,7 @@ export function createNativeTransport(options: {
         const conflicted = (reason: string, lookup: unknown): EffectObservation => ({ state: "conflict", reason,
           evidence: retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native",
             state: "conflict", lookup: { reason, result: lookup, label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } }) });
-        const observedLabels = (input: unknown, resourceId: string, object: string | null): EffectObservation => {
-          if (comparisons.length === 0) return observed(input, resourceId, object);
+        const observedLookup = (input: unknown, resourceId: string, object: string | null): EffectObservation => {
           const lookup = retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", state: "done",
             lookup: { resource_sha256: sha256(canonicalJSON(input)), label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } });
           return { state: "done", outcome: { state: "observed", observation_sha256: lookup.sha256, resource_id: resourceId, object, lookup } };
@@ -366,7 +376,7 @@ export function createNativeTransport(options: {
           const expected = effect.kind === "push" || effect.kind === "branch-refresh" ? text(p.head)
             : effect.kind === "receipt-retain" ? objects.receipt_object ?? objects.object : objects.lease_object ?? objects.object;
           if (effect.kind === "lease-release") {
-            if (target.state === "absent") return observed({ ref: p.ref, state: "absent" }, text(p.ref), null);
+            if (target.state === "absent") return observedLookup({ ref: p.ref, state: "absent" }, text(p.ref), null);
             if (target.object === expected) return absent({ ref: p.ref, target });
             if (objects.lease_object && objects.lease_object !== objects.object)
               return observed({ ref: p.ref, state: "not-owned", object: target.object }, text(p.ref), target.object);
@@ -393,7 +403,7 @@ export function createNativeTransport(options: {
               return { state: "unknown", reason: "native-PR-labels-incomplete" };
             return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
           }
-          return observedLabels(pr.input, String(candidate.number), pr.head);
+          return observedLookup(pr.input, String(candidate.number), pr.head);
         }
         if (effect.kind === "pr-update" || effect.kind === "pr-close") {
           const pr = pull(positive(p.number), plan, false, false);
@@ -401,7 +411,7 @@ export function createNativeTransport(options: {
             || !pr.branch.startsWith(settings.publication.branch_prefix))) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
           if (effect.kind === "pr-close" && pr.input.state === "closed") return observed(pr.input, String(p.number), pr.head);
-          if (effect.kind === "pr-update" && fieldsMatch(pr.input, expectedFields(effect), comparisons)) return observedLabels(pr.input, String(p.number), pr.head);
+          if (effect.kind === "pr-update" && fieldsMatch(pr.input, expectedFields(effect), comparisons)) return observedLookup(pr.input, String(p.number), pr.head);
           const base = text(record(pr.input.base).ref);
           if (base !== settings.publication.base) return conflicted("native-PR-destination-changed", { number: p.number, base, head: pr.head, state: pr.input.state });
           if (effect.kind === "pr-close") return absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
@@ -425,7 +435,7 @@ export function createNativeTransport(options: {
           if (candidates.length !== 1) return conflicted("ambiguous-native-issue", { inventory: inventoryEvidence(inventory) });
           const issue = candidates[0];
           if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !labelsMatch(issue.labels, reviewedLabels(p.labels), comparisons)) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
-          return observedLabels(issue, String(positive(issue.number)), null);
+          return observedLookup(issue, String(positive(issue.number)), null);
         }
         if (effect.kind === "comment-create") {
           const pr = pull(positive(p.number), plan, false, false);
