@@ -653,6 +653,7 @@ None.
 | 2026-11-06 | R-47 | spec | `c24f55371ca5bd98ed3e833c8bd3926404ff77ef` | claude-opus-5.5 | procedural | 1 should-fix; 2 nit. Full requested read coverage. |
 | 2026-11-06 | R-48 | spec | `48ecc4eaf068472913a2a609ebd8a67834d887d5` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
 | 2026-11-06 | R-48 | spec | `48ecc4eaf068472913a2a609ebd8a67834d887d5` | n/a | n/a | accepted by owner |
+| 2026-11-07 | R-49 | spec | `7643bf0503dddebf535061a56e588b6936982406` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -1609,6 +1610,15 @@ PROPOSAL: Add `tests/vh-adlc/settings-file.test.ts` to covers. This changes the 
 ### R-48
 
 NO FINDINGS
+
+### R-49
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md lines 239-241 ("Delivery acknowledgement during recovery", eligibility paragraph); AC-05 Test Plan acknowledgement cases (line 452); T78 (line 575)
+EVIDENCE: The eligibility paragraph applies one rule to every effect: "Eligibility requires one unique native match for the original operation/effect marker, expected repository and actor, exact target and applicable head/branch bindings". The next sentence asks the spec to "Bind the pre-dispatch inventory or source payload so a marker that predated the selected effect cannot establish its application". The same paragraph then treats closures as eligible: "A closure requires direct terminal evidence for the closure itself in addition to its explanation". Only creation effects have a marker that this rule can test. In the current plan shape, `pr-close` carries only `number` and `expected_head`, with no marker (recovery.test.ts fixtures). `push` and `branch-refresh` are ref effects with no marker; transport.ts observes them only by ref object or PR head. `pr-update` edits an existing PR whose prior body is its source payload. Native observe() covers it through `mutablePull`/`updateTransitions`, not through a unique new marker. For pr-update, no direct per-mutation evidence is named, and none is available through the existing GET-only body comparison. As written, the marker requirement makes closure acknowledgement impossible, but the closure sentence makes it eligible. The pr-update, push and branch-refresh cases are left undetermined. "Account for every remaining effect through ... eligible acknowledgement" therefore has no defined meaning for those kinds. The AC-05 proof names only a "unique PR/issue/comment delivery" positive case, plus an "unproved closure" refusal. T78 says "effect-specific native proof" without the effect set. Implementers and reviewers cannot decide from the spec whether a reopened closed PR, an edited pr-update target or a force-moved pushed branch may be acknowledged or must stay pending.
+PROPOSAL: In the acknowledgement subsection, list the eligible effect kinds and the proof shape for each. For pr-create, issue-create and comment-create, use a unique effect marker that is absent from the bound pre-review inventory. For pr-close, require direct native closure evidence for that PR number by the expected actor at the bound expected head, plus the already-proved explanation, with no marker requirement. For pr-update, either name the direct native evidence and source-transition binding, or state that pr-update is ineligible. State explicitly that push, branch-refresh, lease-acquire, receipt-retain and lease-release are ineligible, or define their proof. Limit the marker sentence to creation effects. In the AC-05 Test Plan, add a positive case for each eligible kind beyond creation, and a refusal case for each ineligible kind showing that the lease stays pending. Name the same effect set in T78.
 
 ## Sources
 
