@@ -672,6 +672,7 @@ None.
 | 2026-11-06 | R-48 | spec | `48ecc4eaf068472913a2a609ebd8a67834d887d5` | n/a | n/a | accepted by owner |
 | 2026-11-07 | R-49 | spec | `7643bf0503dddebf535061a56e588b6936982406` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-50 | spec | `fe19cf8444744873ce70492ec51c4562e9243234` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
+| 2026-11-07 | R-51 | spec | `8d3699fbe73c909fa0f86a20c7848d0a91934467` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -1658,6 +1659,15 @@ PROPOSAL:
   - a `pr-update` whose PATCH applied and whose labels request was definitively rejected or never dispatched, then edited later;
   - a `pr-create` whose label application is incomplete.
 - **T78:** name these partial-application refusals.
+
+### R-51
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md, Design "Delivery acknowledgement during recovery": the `issue-create` proof-table row and the full-application paragraph after the table; Test Plan AC-05 acknowledgement cases; Tasks T78.
+EVIDENCE: The `pr-create` and `pr-update` rows require proof that the full approved payload was applied, including labels. The `issue-create` row only requires "One unique native issue with the operation/effect marker and expected creator/target" plus "Direct native application evidence binds the created resource to that effect and attempt". It never mentions the issue's requested labels. The general rule after the table names only "every requested PR label and any draft-state change". Native issue creation sends the labels in the same request as the title and body (transport.ts 00481 line 27: `mutation(plan, "POST", `${prefix}/issues`, { title: p.title, body: p.body, labels: p.labels }, delivery)`). Native observation reports an issue whose labels differ from the requested set as `conflicted("native-issue-payload-changed")` (transport.ts 00421 line 23). That conflict is the changed-delivery state this acknowledgement path is meant to resolve. A created issue whose requested labels were never applied is therefore a partly applied effect. The current wording doesn't clearly classify it as one, and an implementer could accept the marker and creation evidence alone as eligible. The AC-05 refusals cover only PR cases: "a PR update whose text PATCH applied but whose labels request was never dispatched or definitively rejected", "PR creation with incomplete label application" and "an update with an unapplied requested draft-state change". T78 likewise names only "incomplete PR creation labels" and the PR update cases. No planned test refuses an issue created without its requested labels.
+PROPOSAL: Add to the `issue-create` row: "Prove terminal application of the full approved payload, including title, body and every requested label." Change "every requested PR label" in the general rule to "every requested PR or issue label". Add an AC-05 refusal case and a matching T78 case for an issue created with incomplete or absent requested labels. In that case the lease stays pending, no acknowledgement is recorded and abandoning the missing labels is not authorized.
 
 ## Sources
 
