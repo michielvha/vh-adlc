@@ -65,6 +65,9 @@ export async function resumeEffects(options: PublishOptions & { journal_director
           const lease = await options.transport.ref(options.settings.publication.lease_ref);
           if (lease.state === "present" && lease.object !== objects.lease_object) {
             const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
+            // Per-run receipts identify this owner. Shared canonical receipts keep the legacy ambiguity fence.
+            if (receipt.state === "present" && receipt.object === objects.receipt_object && receipt.object !== objects.object)
+              return blocked(effect.id, "lease-acquisition-observation-changed");
             if (receipt.state === "present") return blocked(effect.id, "operation-started-elsewhere", false, true);
             return blocked(effect.id, "publication-lease-occupied");
           }
@@ -84,6 +87,8 @@ export async function resumeEffects(options: PublishOptions & { journal_director
         const lease = await options.transport.ref(options.settings.publication.lease_ref);
         if (lease.state === "absent" || lease.object !== objects.lease_object) {
           const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
+          if (receipt.state === "present" && receipt.object === objects.receipt_object && receipt.object !== objects.object)
+            return blocked(effect.id, "lease-acquisition-observation-changed");
           if (receipt.state === "present") return blocked(effect.id, "operation-started-elsewhere", false, true);
           return blocked(effect.id, "publication-lease-occupied");
         }
@@ -113,6 +118,8 @@ export async function resumeEffects(options: PublishOptions & { journal_director
       const lease = await options.transport.ref(options.settings.publication.lease_ref);
       if (effect.kind === "lease-acquire") {
         const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
+        if (receipt.state === "present" && receipt.object === objects.receipt_object && receipt.object !== objects.object)
+          return blocked(effect.id, "lease-acquisition-observation-changed");
         if (receipt.state === "present") return blocked(effect.id, "operation-started-elsewhere", false, true);
         if (lease.state !== "absent") return blocked(effect.id, "publication-lease-occupied");
       } else if (lease.state !== "present" || lease.object !== objects.lease_object) {

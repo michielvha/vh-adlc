@@ -1,6 +1,6 @@
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { inspectRetainedOperation, restoreRetainedOperation, resumeEffects, reconcileAbsent } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
@@ -768,4 +768,84 @@ test("a late own acquisition after a competing observation stays recoverable", a
   const completed = await resumeEffects({ ...options(f), journal_directory: journal.directory });
   expect(completed.state).toBe("complete");
   expect(f.executed).toEqual(["push", "pr", "release"]);
+});
+
+
+test.each(["precheck", "post-conflict"] as const)("own atomic receipt arriving between lease and receipt reads stays recoverable (%s)", async phase => {
+  const f = setup();
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  journal = appendIntent(journal, "lease"); journal = appendIntent(journal, "receipt", "lease");
+  journal = appendAttempt(journal, "lease", "late-own-receipt", undefined, "receipt");
+  journal = appendAttemptEnd(journal, "lease", { attempt_id: "late-own-receipt", sent: true, reaped: true });
+  const objects = writePublicationObjects(f.store, f.plan, journal.header);
+  const ref = f.transport.ref, observe = f.transport.observe;
+  let conflicted = false, arrived = false;
+  if (phase === "precheck") f.refs.set(f.settings.publication.lease_ref, "e".repeat(40));
+  f.transport.ref = async name => {
+    const earlier = await ref(name);
+    if (!arrived && name === f.settings.publication.lease_ref && (phase === "precheck" || conflicted)) {
+      arrived = true;
+      f.refs.set(f.settings.publication.lease_ref, objects.lease_object);
+      f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.receipt_object);
+      f.done.add("lease"); f.done.add("receipt");
+    }
+    return earlier;
+  };
+  f.transport.observe = async (plan, effect, current) => {
+    if (phase !== "post-conflict" || effect.kind !== "lease-acquire" || conflicted) return observe(plan, effect, current);
+    f.refs.set(f.settings.publication.lease_ref, "e".repeat(40));
+    const earlier = await observe(plan, effect, current);
+    f.refs.delete(f.settings.publication.lease_ref); conflicted = true;
+    return earlier;
+  };
+  const stopped = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  expect(stopped.journal.events.some(event => event.kind === "invalidation" || event.kind === "recovery-only")).toBe(false);
+  expect(stopped.reason).toBe("lease-acquisition-observation-changed");
+  expect(f.executed).toEqual([]);
+  const completed = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  expect(completed.state).toBe("complete");
+  expect(f.executed).toEqual(["push", "pr", "release"]);
+});
+
+
+test("an own receipt arriving at the final acquisition guard is reobserved without replay", async () => {
+  const f = setup(), journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  const objects = writePublicationObjects(f.store, f.plan, journal.header), ref = f.transport.ref;
+  let leaseReads = 0;
+  f.transport.ref = async name => {
+    const earlier = await ref(name);
+    if (name === f.settings.publication.lease_ref && ++leaseReads === 2) {
+      let concurrent = readJournal(journal.directory, f.repo);
+      concurrent = appendIntent(concurrent, "receipt", "lease");
+      concurrent = appendAttempt(concurrent, "lease", "concurrent-own-acquisition", undefined, "receipt");
+      appendAttemptEnd(concurrent, "lease", { attempt_id: "concurrent-own-acquisition", sent: true, reaped: true });
+      f.refs.set(f.settings.publication.lease_ref, objects.lease_object);
+      f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.receipt_object);
+      f.done.add("lease"); f.done.add("receipt");
+    }
+    return earlier;
+  };
+  const stopped = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  expect(stopped.reason).toBe("lease-acquisition-observation-changed");
+  expect(stopped.journal.events.some(event => event.kind === "invalidation" || event.kind === "recovery-only")).toBe(false);
+  expect(f.executed).toEqual([]);
+  const completed = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  expect(completed.state).toBe("complete");
+  expect(f.executed).toEqual(["push", "pr", "release"]);
+});
+
+test("a canonical legacy receipt retains ambiguous-run fencing", async () => {
+  const f = setup(), created = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  const legacy = { ...created.header }; delete legacy.observed_receipt_object;
+  writeFileSync(join(created.directory, "header.json"), canonicalJSON(legacy));
+  writeFileSync(join(f.artifacts, "operation-1.journal-owner.json"), canonicalJSON(legacy));
+  const journal = readJournal(created.directory, f.repo), objects = writePublicationObjects(f.store, f.plan, journal.header);
+  expect(objects.receipt_object).toBe(objects.object);
+  f.refs.set(f.settings.publication.lease_ref, "e".repeat(40));
+  f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.receipt_object);
+  const result = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  expect(result.reason).toBe("operation-started-elsewhere");
+  expect(result.journal.events.some(event => event.kind === "recovery-only")).toBe(true);
+  expect(result.journal.events.some(event => event.kind === "invalidation")).toBe(false);
+  expect(f.executed).toEqual([]);
 });
