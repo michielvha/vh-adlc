@@ -1,4 +1,5 @@
 import { dirname } from "node:path";
+import { canonicalJSON } from "./protocol";
 import { readRejection, type RejectionEvidence } from "./rejections";
 import { randomUUID } from "node:crypto";
 import { appendAttempt, appendAttemptEnd, appendIntent, readJournal, type Journal, type ReconciliationGrant } from "./journal";
@@ -38,6 +39,26 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
   return null;
 }
 
+/** A lost acknowledgement of a local ending must not erase its already published status. */
+async function recordEnding(journal: Journal, effectId: string, ending: Parameters<typeof appendAttemptEnd>[2]): Promise<Journal> {
+  for (;;) {
+    try {
+      const current = readJournal(journal.directory, journal.source_repo);
+      const existing = current.events.find(event => event.kind === "attempt-ended" && event.effect_id === effectId
+        && "attempt_id" in event.payload && event.payload.attempt_id === ending.attempt_id);
+      if (existing) {
+        if (!canonicalJSON(existing.payload).equals(canonicalJSON(ending))) throw Error("attempt ending changed");
+        return current;
+      }
+      return appendAttemptEnd(current, effectId, ending);
+    } catch (error) {
+      if (!(error instanceof Error)
+        || !["docs-drift journal revision conflict", "docs-drift journal read conflict"].includes(error.message)) throw error;
+      await Bun.sleep(5);
+    }
+  }
+}
+
 /** A durable revision-CAS admits one executor. Unconfirmed dispatch never becomes proven absence. */
 export async function executeAttempt(options: {
   journal: Journal; effect: Effect; objects: PlanObjects; transport: PublicationTransport; reconciliation?: ReconciliationGrant;
@@ -53,19 +74,30 @@ export async function executeAttempt(options: {
     const receiptId = receipt.id;
     if (!journal.events.some(event => event.kind === "intent" && event.effect_id === receiptId)) journal = appendIntent(journal, receiptId, options.effect.id);
   }
-  journal = appendAttempt(journal, options.effect.id, id, options.reconciliation, receipt?.id);
+  try {
+    journal = appendAttempt(journal, options.effect.id, id, options.reconciliation, receipt?.id);
+    const current = readJournal(journal.directory, journal.source_repo, journal);
+    const claimed = current.events.at(-1);
+    if (claimed?.kind !== "attempt" || claimed.effect_id !== options.effect.id
+      || !("attempt_id" in claimed.payload) || claimed.payload.attempt_id !== id) throw Error("attempt dispatch fence changed");
+    journal = current;
+  } catch (error) {
+    const current = readJournal(journal.directory, journal.source_repo);
+    if (current.events.some(event => event.kind === "attempt" && event.effect_id === options.effect.id
+      && "attempt_id" in event.payload && event.payload.attempt_id === id))
+      await recordEnding(current, options.effect.id, { attempt_id: id, sent: false, reaped: true });
+    throw error;
+  }
   let failure: unknown;
   let status: { sent: boolean; reaped: boolean; rejection?: RejectionEvidence } = { sent: true, reaped: true };
   try {
-    readJournal(journal.directory, journal.source_repo, journal);
     await options.transport.execute(journal.plan, options.effect, options.objects, id);
   } catch (error) {
     failure = error;
     status = error instanceof PublicationExecutionError ? { sent: error.sent, reaped: error.reaped, ...(error.rejection ? { rejection: error.rejection } : {}) } : { sent: true, reaped: false };
   }
   // An observer may already have recorded an actual outcome. Keep its receipt and our process status.
-  journal = readJournal(journal.directory, journal.source_repo);
-  journal = appendAttemptEnd(journal, options.effect.id, { attempt_id: id, ...status });
+  journal = await recordEnding(journal, options.effect.id, { attempt_id: id, ...status });
   if (failure !== undefined) throw failure;
   return journal;
 }
