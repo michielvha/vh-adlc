@@ -523,6 +523,12 @@ function acquisition(f: ReturnType<typeof setup>) {
   return { journal, plan: f.plan, objects: writePublicationObjects(f.store, f.plan, journal.header), effect: f.plan.manifest.effects[0] };
 }
 
+function competingPublication(f: ReturnType<typeof setup>) {
+  const artifacts = join(f.root, "competitor-artifacts"); mkdirSync(artifacts, { mode: 0o700 });
+  const journal = createJournal({ source_repo: join(f.root, "source"), artifact_root: artifacts, plan: f.plan });
+  return writePublicationObjects(f.store, f.plan, journal.header);
+}
+
 function realGitServer(f: ReturnType<typeof setup>, advertiseAtomic = true) {
   const server = join(f.root, "receive.git");
   readGit(f.root, "init", "--bare", "--template=", server);
@@ -541,12 +547,13 @@ process.stdout.write(result.stdout); process.stderr.write(result.stderr); proces
 
 test("atomic acquisition cannot leave a lease when another same-plan receipt already exists on real Git", async () => {
   const f = setup(); await f.transport.identity();
-  const selected = acquisition(f), server = realGitServer(f);
+  const selected = acquisition(f), winner = competingPublication(f), server = realGitServer(f);
+  expect(winner.receipt_object).not.toBe(selected.objects.receipt_object);
   const receipt = f.settings.publication.receipt_ref_prefix + "operation-1";
-  readGit(f.store.root, "-c", "protocol.file.allow=always", "push", "--", server, selected.objects.object + ":" + receipt);
+  readGit(f.store.root, "-c", "protocol.file.allow=always", "push", "--", server, winner.receipt_object + ":" + receipt);
   await expect(f.transport.execute(selected.plan, selected.effect, selected.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
   expect(() => readGit(server, "rev-parse", "--verify", f.settings.publication.lease_ref)).toThrow();
-  expect(readGit(server, "rev-parse", receipt).toString().trim()).toBe(selected.objects.object);
+  expect(readGit(server, "rev-parse", receipt).toString().trim()).toBe(winner.receipt_object);
 });
 
 test("real Git atomic acquisition either creates both refs or fails without sequential fallback", async () => {
@@ -655,14 +662,15 @@ test("a positively rejected native candidate push permits separately approved re
 
 test("actual Git rejection supplies positive proof for both atomic metadata refs", async () => {
   const f = setup(); await f.transport.identity();
-  const selected = acquisition(f), server = realGitServer(f);
+  const selected = acquisition(f), winner = competingPublication(f), server = realGitServer(f);
+  expect(winner.receipt_object).not.toBe(selected.objects.receipt_object);
   const receipt = f.settings.publication.receipt_ref_prefix + "operation-1";
-  readGit(f.store.root, "-c", "protocol.file.allow=always", "push", "--", server, selected.objects.object + ":" + receipt);
+  readGit(f.store.root, "-c", "protocol.file.allow=always", "push", "--", server, winner.receipt_object + ":" + receipt);
   const error = await f.transport.execute(selected.plan, selected.effect, selected.objects, "real-rejected-atomic-push").then(() => null, error => error);
   expect(error).toBeInstanceOf(PublicationExecutionError);
   expect(error.rejection).toBeDefined();
   expect(() => readGit(server, "rev-parse", "--verify", f.settings.publication.lease_ref)).toThrow();
-  expect(readGit(server, "rev-parse", receipt).toString().trim()).toBe(selected.objects.object);
+  expect(readGit(server, "rev-parse", receipt).toString().trim()).toBe(winner.receipt_object);
 });
 
 test("native conflicting PR-head evidence preserves the actual conflict without copying credential fields", async () => {
@@ -794,7 +802,7 @@ test("an existing exact explanation survives base retargeting while a new POST s
   expect(f.inspect().comments["77"]).toHaveLength(1);
 });
 
-test.each(["original-base", "retargeted"] as const)("lost-mirror cleanup observes merged deleted-branch delivery and existing issue/explanation without replay (%s)", async baseSelection => {
+test.each(["original-base", "retargeted"] as const)("lost-mirror inspection preserves an ambiguous live lease after observing completed delivery (%s)", async baseSelection => {
   const f = setup(); await f.transport.identity();
   const branch = "refs/heads/docs-drift/one";
   const effects: Effect[] = [f.plan.manifest.effects[0], f.plan.manifest.effects[1], f.plan.manifest.effects[2],
@@ -844,11 +852,12 @@ test.each(["original-base", "retargeted"] as const)("lost-mirror cleanup observe
   const completed = await reconcileAbsent({ source_repo: repo, journal_directory: restored.journal.directory, object_store: f.store,
     settings: f.settings, transport, retire_effect_ids: [],
     authorize: async scope => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("actual owned metadata cleanup request") }) });
-  expect(completed.state).toBe("complete");
-  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+  expect(completed.state).toBe("pending");
+  expect(completed.reason).toBe("inferred-publication-lease");
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(objects.lease_object);
   expect(f.inspect().refs[branch]).toBeUndefined();
   expect(f.inspect().issues).toHaveLength(1); expect(f.inspect().comments["77"]).toHaveLength(1);
-  expect(completed.journal.events.filter(event => event.kind === "attempt").map(event => event.effect_id)).toEqual(["release"]);
+  expect(completed.journal.events.filter(event => event.kind === "attempt").map(event => event.effect_id)).toEqual([]);
 });
 
 test("an unfinished retargeted refresh retains its destination guard", async () => {

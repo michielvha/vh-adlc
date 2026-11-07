@@ -166,7 +166,7 @@ test("cleanup cannot retire or release while the original attempt is in flight",
 });
 
 
-test("lost original proof still permits read-only restoration and separately approved terminal lease cleanup", async () => {
+test("lost original ownership proof permits read-only restoration while preserving its live lease", async () => {
   const f = publicationFixture(roots), execute = f.transport.execute;
   f.transport.execute = async (plan, effect, objects) => {
     await execute(plan, effect, objects);
@@ -187,9 +187,10 @@ test("lost original proof still permits read-only restoration and separately app
   expect(restored.reason).toBe("retained-restore-no-replay");
   expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
   const cleanup = await reconcileAbsent({ ...input(f, restored.journal.directory), retire_effect_ids: [] });
-  expect(cleanup.state).toBe("complete");
-  expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
-  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(cleanup.state).toBe("pending");
+  expect(cleanup.reason).toBe("inferred-publication-lease");
+  expect(f.executed).toEqual(["lease", "receipt", "push", "pr"]);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
   expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(true);
 });
 
@@ -263,9 +264,10 @@ test("two absences past a client timeout cannot retire a server-side request tha
   const observed = await resumeEffects({ ...options(f), artifact_root: recovered, journal_directory: restored.journal.directory });
   expect(observed.state).toBe("pending");
   const cleanup = await reconcileAbsent({ ...input(f, observed.journal.directory), retire_effect_ids: [] });
-  expect(cleanup.state).toBe("complete");
+  expect(cleanup.state).toBe("pending");
+  expect(cleanup.reason).toBe("inferred-publication-lease");
   expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
-  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
 });
 
 
@@ -352,7 +354,7 @@ test("cleanup can observe its completed release after a lost acknowledgement and
 });
 
 
-test("lease-fallback restoration retains a canonical receipt from a separate owned object store", async () => {
+test("lease-fallback inspection waits for original ownership proof before retaining metadata", async () => {
   const f = publicationFixture(roots);
   const original = await legacyReceiptInterruption(f);
   // The remote business effects happened before the old mirror was lost.
@@ -374,12 +376,15 @@ test("lease-fallback restoration retains a canonical receipt from a separate own
   expect(restored.objects.receipt_object).toBe(writePlanObject(store, f.plan).object);
   expect(restored.objects.receipt_object).not.toBe(original.objects.lease_object);
   const cleaned = await reconcileAbsent({ ...input(f, restored.journal.directory), object_store: store, retire_effect_ids: [] });
-  expect(cleaned.state).toBe("complete");
-  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
-  expect(f.refs.get(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(cleaned.objects.object);
+  expect(cleaned.state).toBe("pending");
+  expect(cleaned.reason).toBe("inferred-publication-lease");
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(original.objects.lease_object);
+  expect(f.refs.has(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(false);
   f.transport = { ...f.transport, object_store: f.store.root, artifact_root: f.artifacts };
-  const resumedLegacy = await resumeEffects({ ...options(f), journal_directory: original.journal.directory });
-  expect(resumedLegacy.state).toBe("complete");
+  const ownedCleanup = await reconcileAbsent({ ...input(f, original.journal.directory), retire_effect_ids: [] });
+  expect(ownedCleanup.state).toBe("complete");
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(f.refs.get(f.settings.publication.receipt_ref_prefix + "operation-1")).toBe(ownedCleanup.objects.receipt_object);
 });
 
 
@@ -522,4 +527,38 @@ test("changing conflict lookup bytes during approval stops retirement before lea
   expect(cleaned.state).toBe("pending");
   expect(cleaned.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+});
+
+
+test("a restored mirror cannot release the original live run's same-plan lease", async () => {
+  const f = publicationFixture(roots), observe = f.transport.observe;
+  let pause = true;
+  f.transport.observe = async (plan, effect, objects) => effect.id === "pr" && pause && f.done.has("pr")
+    ? { state: "unknown", reason: "live-owner-paused-after-delivery" } : observe(plan, effect, objects);
+  const original = await publish(options(f));
+  expect(original.state).toBe("pending");
+  const leaseObject = original.objects.lease_object;
+  if (typeof leaseObject !== "string") throw Error("missing original lease nonce");
+  pause = false;
+  const mirrorRoot = join(f.root, "read-only-mirror"); mkdirSync(mirrorRoot, { mode: 0o700 });
+  const mirrorTransport = { ...f.transport, artifact_root: mirrorRoot };
+  const inspection = await inspectRetainedOperation({ source_repo: f.repo, artifact_root: mirrorRoot, settings: f.settings,
+    transport: mirrorTransport, operation_id: "operation-1", verify_policy: () => f.policy });
+  expect(inspection.lease_object).toBe(leaseObject);
+  const mirrorOptions = { ...options(f), artifact_root: mirrorRoot, transport: mirrorTransport };
+  const restored = await restoreRetainedOperation({ inspection, publication: mirrorOptions });
+  const before = [...f.executed];
+  let approvals = 0;
+  const cleanup = await reconcileAbsent({ source_repo: f.repo, journal_directory: restored.journal.directory, object_store: f.store,
+    settings: f.settings, transport: mirrorTransport, retire_effect_ids: [], authorize: async scope => { approvals++; return request(scope); } });
+  expect(cleanup.state).toBe("pending");
+  expect(cleanup.reason).toBe("inferred-publication-lease");
+  expect(approvals).toBe(0);
+  expect(f.executed).toEqual(before);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(leaseObject);
+  const owner = await resumeEffects({ ...options(f), journal_directory: original.journal.directory });
+  expect(owner.state).toBe("complete");
+  const observed = await resumeEffects({ ...mirrorOptions, journal_directory: restored.journal.directory });
+  expect(observed.state).toBe("complete");
+  expect(f.executed).toEqual([...before, "release"]);
 });

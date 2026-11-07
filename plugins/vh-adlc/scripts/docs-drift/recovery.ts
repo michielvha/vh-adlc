@@ -271,6 +271,8 @@ export async function reconcileAbsent(options: {
   try {
     const identity = await options.transport.identity();
     if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id) return blocked("reconciliation-repository-changed");
+    const lease = await options.transport.ref(String(release.payload.ref));
+    if (journal.header.recovery_mode === "observation-only" && lease.state === "present") return blocked("inferred-publication-lease");
     if (plan.manifest.effects.slice(0, -1).every(effect => terminal(journal, effect.id) || isRetired(effect.id))) {
       const released = await options.transport.observe(plan, release, objects);
       if (released.state === "done") {
@@ -279,7 +281,6 @@ export async function reconcileAbsent(options: {
         return result(journal.events.some(event => event.kind === "retired-absence") ? "retired" : "complete", null);
       }
     }
-    const lease = await options.transport.ref(String(release.payload.ref));
     if (lease.state === "present" && lease.object !== objects.lease_object) return blocked("foreign-publication-lease");
     const retained = await options.transport.ref(String(receipt.payload.ref));
     if (retained.state === "present" && retained.object !== receiptObject) return blocked("retained-operation-changed");
@@ -301,6 +302,7 @@ export async function reconcileAbsent(options: {
     };
     const grant = await authorize();
     const requireOwnedLease = async () => {
+      if (journal.header.recovery_mode === "observation-only") throw Error("original lease ownership proof unavailable");
       const currentIdentity = await options.transport.identity();
       if (currentIdentity.actor_id !== identity.actor_id || currentIdentity.actor !== identity.actor
         || currentIdentity.repository_id !== identity.repository_id || currentIdentity.repository !== identity.repository) throw Error("cleanup actor changed");

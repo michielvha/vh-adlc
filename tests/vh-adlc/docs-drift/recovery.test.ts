@@ -663,7 +663,7 @@ test("a receipt appearing during lease-fallback inspection requires a fresh cohe
   expect(fresh.observations.find(item => item.effect_id === "receipt")?.observation.state).toBe("done");
 });
 
-test.each(["adoption", "model", "unavailable"] as const)("retained read-only cleanup survives %s policy drift without business replay", async changed => {
+test.each(["adoption", "model", "unavailable"] as const)("retained inspection survives %s policy drift while preserving ambiguous lease ownership", async changed => {
   const { f, interrupted } = await interruptedPR();
   const artifactRoot = join(f.root, "policy-drift-restoration"); mkdirSync(artifactRoot, { mode: 0o700 });
   f.transport = { ...f.transport, artifact_root: artifactRoot };
@@ -684,9 +684,10 @@ test.each(["adoption", "model", "unavailable"] as const)("retained read-only cle
   const completed = await reconcileAbsent({ source_repo: f.repo, journal_directory: restored.journal.directory, object_store: f.store,
     settings: f.settings, transport: f.transport, retire_effect_ids: [],
     authorize: async scope => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("current exact-owned cleanup request") }) });
-  expect(completed.state).toBe("complete");
-  expect(f.executed).toEqual([...before, "release"]);
-  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(completed.state).toBe("pending");
+  expect(completed.reason).toBe("inferred-publication-lease");
+  expect(f.executed).toEqual(before);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
   expect(interrupted.journal.plan.adoption_sha256).toBe(f.plan.adoption_sha256);
 });
 

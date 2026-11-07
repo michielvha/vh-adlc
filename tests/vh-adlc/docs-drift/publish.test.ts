@@ -3,8 +3,9 @@ import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { publish, validatePublicationShape } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
-import { sealPlan, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { createJournal, writePublicationObjects, sealPlan, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
+import { resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { fixture, hash, bindings } from "./manifest-fixture";
 import { publicationFixture, publicationOptions as options } from "./publication-fixture";
 
@@ -162,11 +163,13 @@ test.each(["advisory", "resolve"] as const)("the publisher derives %s PR state f
 
 
 test("a losing atomic acquisition throws before any after-observation or invalidation", async () => {
-  const f = setup(), winningLease = "e".repeat(40);
-  f.transport.execute = async (_plan, effect, objects) => {
+  const f = setup(), winnerRoot = join(f.root, "winner-artifacts"); mkdirSync(winnerRoot, { mode: 0o700 });
+  const winner = createJournal({ source_repo: f.repo, artifact_root: winnerRoot, plan: f.plan });
+  const winning = writePublicationObjects(f.store, f.plan, winner.header);
+  f.transport.execute = async (_plan, effect) => {
     f.executed.push(effect.id);
-    f.refs.set(f.settings.publication.lease_ref, winningLease);
-    f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.object);
+    f.refs.set(f.settings.publication.lease_ref, winning.lease_object);
+    f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", winning.receipt_object);
     throw new PublicationExecutionError(true, true);
   };
   const result = await publish(options(f));
@@ -175,5 +178,12 @@ test("a losing atomic acquisition throws before any after-observation or invalid
   expect(f.observed).toEqual([]);
   expect(f.executed).toEqual(["lease"]);
   expect(result.journal.events.some(event => event.kind === "invalidation")).toBe(false);
-  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(winningLease);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(winning.lease_object);
+  expect(winning.receipt_object).toBe(winning.lease_object);
+  expect(winning.receipt_object).not.toBe(result.objects.receipt_object);
+  const resumed = await resumeEffects({ ...options(f), journal_directory: result.journal.directory });
+  expect(resumed.reason).toBe("operation-started-elsewhere");
+  expect(resumed.journal.events.some(event => event.kind === "recovery-only")).toBe(true);
+  expect(resumed.journal.events.some(event => event.kind === "invalidation")).toBe(false);
+  expect(f.executed).toEqual(["lease"]);
 });
