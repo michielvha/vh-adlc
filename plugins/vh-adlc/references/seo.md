@@ -59,6 +59,33 @@ count or a substitute for the owner's search-performance records. No source is
 required to have data for a new or small site. Avoid collecting every tool's
 version of the same measurement when it adds no useful evidence.
 
+### Search Console inspection and export handoff
+
+Name the exact property and canonical URLs. The read-only Search Console API
+provides the indexed inspection result and Performance data. Google's **Test
+live URL** runs in the Search Console interface. Record those two inspection
+results separately from anonymous HTTP or browser checks. Keep Google's
+index verdict, coverage reason, last crawl, declared and Google-selected
+canonicals, and the live test's fetch result where available.
+
+If access is missing, give the owner the exact property, URLs and smallest
+handoff. Ask for an authorized OAuth connection with `webmasters.readonly`, or
+the inspection results and the Performance CSV export. Specify the search type
+and date range, and capture the applied filters. Keep query, page, country and
+device breakdowns separate. Account credentials belong in the approved OAuth
+flow.
+
+### Verified crawler requests
+
+When the owner authorizes access to logs, verify the client address against the
+crawler's published ranges or a forward-confirmed reverse DNS result. Confirm
+which address a trusted proxy records and check how it handles client-supplied
+forwarding headers before attributing requests. A user-agent string alone
+cannot establish crawler identity. Separate normal crawling from user-triggered
+inspection fetches. Export only the covered time window, public paths, response
+statuses and aggregate counts. Note where edge caching, filtering or log
+rotation limits the sample.
+
 ## Optional Semrush
 
 Use it only through an authorized local credential/client or a connected tool.
@@ -89,6 +116,12 @@ its intended next step. Keep canonical-host migration and deployment findings
 separate from repository source: merged, built, deployed, crawlable and indexed
 are distinct states. A draft visible in a private preview is not a live page.
 Report noindex as an observed policy, considering the owner's launch intent.
+
+When a page appears and then disappears during startup, delay the suspected
+resource in a clean browser context and verify that the request was held.
+Check that the heading and readable content remain present until the browser
+takes over. Record the served build identity and repeat against the live
+deployment when the change ships.
 
 Review search intent, useful original answers, internal linking, topic overlap,
 headings and metadata. Inspect the actual images against their passage; an image
@@ -139,6 +172,8 @@ Recheck terms when using these services; this procedure does not freeze free-pla
 limits or guarantee data availability.
 
 - [Google Search Console](https://support.google.com/webmasters/answer/9128668): verification and first-party search tooling.
+- The [indexed URL Inspection API](https://developers.google.com/webmaster-tools/v1/urlInspection.index/inspect) and [URL Inspection interface](https://support.google.com/webmasters/answer/9012289) describe indexed results and live tests.
+- [Google crawler verification](https://developers.google.com/crawling/docs/crawlers-fetchers/verify-google-requests) describes crawler categories, IP ranges and DNS verification.
 - [Search Analytics query](https://developers.google.com/webmaster-tools/v1/searchanalytics/query): dimensions, read authorization and row limits.
 - [Bing Webmaster Tools](https://www.bing.com/webmasters/about): free verified-site tooling.
 - [Bing Search performance](https://www.bing.com/webmasters/help/search-performance-c680da36): engine-specific metrics and exports.
