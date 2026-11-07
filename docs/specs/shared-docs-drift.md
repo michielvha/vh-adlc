@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Full application is required for acknowledgement, including issue labels. The revised spec awaits fresh Copilot review and renewed acceptance."
+status_description: "R-52 requests owner decision Q4 on bounded success-evidence retention before renewed review and acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -74,7 +74,7 @@ Reports remain available on any harness. Protected publication uses the configur
 
 Migration retains the legacy publishing routes until the published component passes actual marketplace, installed-model resolve/closure/issue and Claude forwarding checks, the hosted advisory/history checks and paired consumer review. Cutover drains publishers and records the approved component and policy. Rollback quiesces shared publication before restoring the legacy routes. Compatible updates require review and installed checks. Contract, execution, provider, permission or publication changes require the affected trials and an approved successor pin.
 
-The previous implementation run passed 1,915 repository tests and 34 registration tests. Copilot Opus5.5 component review23 returned NO FINDINGS for its scoped recovery correction. The new acknowledgement is planned work. Copilot Opus5.5 spec review R-49 read all 215 required chunks and requested an exact eligible-effect list. You approved creations, proven PR updates and proven closures. The revised contract now lists proof for those five effect kinds and preserves existing recovery for branch/ref and lease/receipt effects. Copilot Opus5.5 R-50 read all 216 required chunks and found an undefined partial-delivery case. You chose to keep partial deliveries pending. The revised contract requires proof that the full approved write applied, including requested labels and draft-state changes. R-51 read all 216 required chunks and found that the issue-label example and refusal test were missing. The draft now requires full issue-label application and tests that refusal too. Fresh review and renewed acceptance precede implementation. Runtime/adoption, normal entry integration and actual migration checks remain open. Acceptance authorizes local implementation and tests on the existing feature branch. Shipment and live model/provider/consumer operations retain their separate approval gates.
+The previous implementation run passed 1,915 repository tests and 34 registration tests. Copilot Opus5.5 component review23 returned NO FINDINGS for its scoped recovery correction. The new acknowledgement is planned work. Copilot Opus5.5 spec review R-49 read all 215 required chunks and requested an exact eligible-effect list. You approved creations, proven PR updates and proven closures. The revised contract now lists proof for those five effect kinds and preserves existing recovery for branch/ref and lease/receipt effects. Copilot Opus5.5 R-50 read all 216 required chunks and found an undefined partial-delivery case. You chose to keep partial deliveries pending. The revised contract requires proof that the full approved write applied, including requested labels and draft-state changes. R-51 read all 216 required chunks and found that the issue-label example and refusal test were missing. The draft now requires full issue-label application and tests that refusal too. R-52 read all 216 required chunks and found that the current executor suppresses successful mutation responses, leaving the new proof requirements without explicit capture. Q4 asks whether to retain bounded private success evidence with body hashes and per-command bindings. That decision, fresh review and renewed acceptance precede implementation. Runtime/adoption, normal entry integration and actual migration checks remain open. Acceptance authorizes local implementation and tests on the existing feature branch. Shipment and live model/provider/consumer operations retain their separate approval gates.
 
 ### Terms used here
 
@@ -614,7 +614,21 @@ Code tasks add and run the regression before the behavior change. Each task is o
 
 ## Open Questions
 
-None.
+### Q4: Should the executor retain bounded success evidence for acknowledgement?
+
+**Recommendation**
+
+Retain a bounded private evidence artifact for each native mutation command, bound to the original run, effect, attempt and command. Capture native status, resource identity, mutating actor, applied-field digests, label identities and draft state where available. Store body contents only as digests. Link the evidence through the execution result and durable journal. Require evidence for every component of a multi-command effect. Missing or inadequate capture, including pre-capture attempts, remains pending unless an independent native record proves every required binding.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Bounded success evidence** | The approved acknowledgement can verify application through records captured during the actual write. | Extend executor/journal contracts, retain bounded private metadata and test evidence integrity and legacy refusals. |
+| **B. Current retention** | Preserve current success-response suppression. | Acknowledgement remains unavailable whenever current native records cannot establish the exact application and attempt bindings. |
+
+**Why this is yours**
+
+Copilot Opus5.5 R-52 F-01 identified the conflict between the new success-proof requirements and the existing deliberate response suppression. This choice changes retained evidence and usable recovery coverage. The recommendation excludes raw response bodies. The owner question is pending.
+
 
 ## Review Log
 
