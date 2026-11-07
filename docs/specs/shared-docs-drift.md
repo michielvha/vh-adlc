@@ -673,6 +673,7 @@ None.
 | 2026-11-07 | R-49 | spec | `7643bf0503dddebf535061a56e588b6936982406` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-50 | spec | `fe19cf8444744873ce70492ec51c4562e9243234` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-51 | spec | `8d3699fbe73c909fa0f86a20c7848d0a91934467` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
+| 2026-11-07 | R-52 | spec | `1615493012697fea744a5bc896d482c90db7958d` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -1668,6 +1669,38 @@ SEVERITY: should-fix
 WHERE: docs/specs/shared-docs-drift.md, Design "Delivery acknowledgement during recovery": the `issue-create` proof-table row and the full-application paragraph after the table; Test Plan AC-05 acknowledgement cases; Tasks T78.
 EVIDENCE: The `pr-create` and `pr-update` rows require proof that the full approved payload was applied, including labels. The `issue-create` row only requires "One unique native issue with the operation/effect marker and expected creator/target" plus "Direct native application evidence binds the created resource to that effect and attempt". It never mentions the issue's requested labels. The general rule after the table names only "every requested PR label and any draft-state change". Native issue creation sends the labels in the same request as the title and body (transport.ts 00481 line 27: `mutation(plan, "POST", `${prefix}/issues`, { title: p.title, body: p.body, labels: p.labels }, delivery)`). Native observation reports an issue whose labels differ from the requested set as `conflicted("native-issue-payload-changed")` (transport.ts 00421 line 23). That conflict is the changed-delivery state this acknowledgement path is meant to resolve. A created issue whose requested labels were never applied is therefore a partly applied effect. The current wording doesn't clearly classify it as one, and an implementer could accept the marker and creation evidence alone as eligible. The AC-05 refusals cover only PR cases: "a PR update whose text PATCH applied but whose labels request was never dispatched or definitively rejected", "PR creation with incomplete label application" and "an update with an unapplied requested draft-state change". T78 likewise names only "incomplete PR creation labels" and the PR update cases. No planned test refuses an issue created without its requested labels.
 PROPOSAL: Add to the `issue-create` row: "Prove terminal application of the full approved payload, including title, body and every requested label." Change "every requested PR label" in the general rule to "every requested PR or issue label". Add an AC-05 refusal case and a matching T78 case for an issue created with incomplete or absent requested labels. In that case the lease stays pending, no acknowledgement is recorded and abandoning the missing labels is not authorized.
+
+### R-52
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md, Design "Delivery acknowledgement during recovery": the `pr-create`, `issue-create`, `comment-create`, `pr-update` and `pr-close` proof table rows and the native evidence binding paragraph (line 260); Test Plan AC-05 acknowledgement cases (line 469); T78 (line 592).
+EVIDENCE: The Design requires every eligible effect to have native evidence bound "to the original request through the retained exact response or an independently retrievable native mutation record that establishes the listed resource, actor, applied transition and attempt bindings". It also says "If the native service supplies no such proof, leave that effect pending." The evidence has to bind the selected attempt, and that attempt ID is local. GitHub timeline and issue event records do not carry it, so in practice only a response that the executor retains at dispatch can supply the attempt binding.
+
+The current source keeps no such response:
+- `PublicationTransport.execute` returns `Promise<void>` (transport.ts 00001 line 36).
+- Native `mutation()` runs `gh api ... --include --jq empty` (transport.ts 00301 line 6), which drops the response body on success.
+- `pr-create` runs `gh pr create ... --label=...` (transport.ts 00481 lines 9 to 11), and its stdout identifies only the created PR. It does not show which labels were applied.
+- `pr-update` is three separate commands: PATCH, then PUT labels, then `gh pr ready` (transport.ts 00481 lines 14 to 24).
+- The `attempt-ended` payload holds only `attempt_id`, `sent`, `reaped` and optional `rejection` (journal.ts 00241 lines 20 to 24). It has nowhere to record success evidence.
+
+The spec's own Task evidence records this suppression as deliberate. T43 (line 518) says "mutation response bodies suppressed". T54 (line 545) says "successful response bodies remain suppressed". Neither the Design nor T78 says that the executor must now capture and retain success evidence for each owned command, what bounded or hashed form it takes given that earlier sensitive-projection decision, or where the journal links it. They also don't say how journals and in-flight runs written before capture existed should be treated.
+
+T78 lists transport.ts and attempts.ts but only asks to "Require effect-specific native proof". Every AC-05 positive case assumes "direct native mutation evidence" already exists. As written, an implementer could either:
+- treat ambiguous timeline events as the "independently retrievable native mutation record", which the Design forbids, or
+- find no admissible proof source for the owner-approved `pr-update`, `pr-close` and label-bearing creations, so acknowledgement never applies to them.
+PROPOSAL: Add an evidence-capture rule to the acknowledgement Design.
+- The native executor retains a bounded private artifact for each owned command, linked to the run, effect, attempt and command. For a successful mutation it records the HTTP status and the native resource ID, mutating actor, applied field digests, label IDs and draft state.
+- Bodies are stored only as digests, consistent with the T43/T54 suppression.
+- The `execute` contract returns or links this artifact, and the journal binds it, for example through a success-evidence field on `attempt-ended`.
+- A multi-command effect needs evidence from every command. Where a CLI step cannot supply applied-state evidence, that component counts as unprovable and the effect stays pending.
+- Journals and attempts recorded before this capture existed lack the binding, so they stay pending unless a native record establishes every listed binding.
+
+Name the executor and `execute` contract change in T78. In AC-05, add these cases:
+- refusal when the success artifact is missing, tampered or unlinked;
+- refusal for a pre-capture legacy attempt;
+- a positive case driven only by captured evidence.
 
 ## Sources
 
