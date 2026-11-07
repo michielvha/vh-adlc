@@ -66,10 +66,13 @@ function submittedFields(value: unknown) {
   if (typeof item.body !== "string" || typeof item.draft !== "boolean") throw Error("incomplete native PR payload");
   return { title: text(item.title), body: item.body, labels: labelNames(item.labels), draft: item.draft };
 }
+function reviewedLabels(value: unknown): string[] {
+  if (!Array.isArray(value)) throw Error("invalid reviewed labels");
+  return value.map(text).sort();
+}
 function expectedFields(effect: Effect) {
   const p = effect.payload;
-  if (!Array.isArray(p.labels)) throw Error("invalid reviewed labels");
-  return { title: p.title, body: p.body, labels: [...p.labels].sort(), draft: p.draft };
+  return { title: p.title, body: p.body, labels: reviewedLabels(p.labels), draft: p.draft };
 }
 function updateTransitions(effect: Effect) {
   const p = effect.payload, original = record(p.expected_payload);
@@ -114,6 +117,27 @@ export function createNativeTransport(options: {
     if (!page.complete) throw Error("incomplete native publication collection");
     return page.items;
   }
+  function labelsMatch(actual: string[], expected: string[]): boolean {
+    if (same(actual, expected)) return true;
+    if (actual.length === 0 || expected.length === 0) return false;
+    const resolved = new Map<string, number>();
+    const identity = (name: string): number => {
+      const cached = resolved.get(name);
+      if (cached !== undefined) return cached;
+      const label = record(reader.get(`${prefix}/labels/${encodeURIComponent(name)}`));
+      text(label.name);
+      const id = positive(label.id);
+      resolved.set(name, id);
+      return id;
+    };
+    const actualIds = actual.map(identity);
+    if (new Set(actualIds).size !== actualIds.length) throw Error("duplicate native label identities");
+    const expectedIds = [...new Set(expected.map(identity))];
+    return same(actualIds.sort((left, right) => left - right), expectedIds.sort((left, right) => left - right));
+  }
+  function fieldsMatch(actual: ReturnType<typeof expectedFields>, expected: ReturnType<typeof expectedFields>): boolean {
+    return same({ ...actual, labels: [] }, { ...expected, labels: [] }) && labelsMatch(actual.labels, expected.labels);
+  }
   function ownedActor(input: unknown, plan: SealedPlan): boolean {
     const identity = actor(input);
     return identity.actor === plan.manifest.actor && identity.actor_id === plan.manifest.actor_id;
@@ -144,7 +168,7 @@ export function createNativeTransport(options: {
   function mutablePull(effect: Effect, plan: SealedPlan) {
     const pr = pull(positive(effect.payload.number), plan, effect.kind !== "pr-close");
     if (pr.input.state !== "open" || pr.head !== effect.payload.expected_head) throw Error("native mutable PR target changed");
-    if (effect.kind === "pr-update" && !updateTransitions(effect).some(fields => same(submittedFields(pr.input), fields))) throw Error("native mutable PR payload changed");
+    if (effect.kind === "pr-update" && !updateTransitions(effect).some(fields => fieldsMatch(submittedFields(pr.input), fields))) throw Error("native mutable PR payload changed");
     return pr;
   }
   function observed(input: unknown, resourceId: string | null, object: string | null): EffectObservation {
@@ -334,7 +358,7 @@ export function createNativeTransport(options: {
           const actual = submittedFields(pr.input), expected = expectedFields(effect);
           if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
             || !pr.branch.startsWith(settings.publication.branch_prefix) || pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
-          if (!same(actual, expected)) {
+          if (!fieldsMatch(actual, expected)) {
             if (actual.labels.length === 0 && same({ ...actual, labels: expected.labels }, expected))
               return { state: "unknown", reason: "native-PR-labels-incomplete" };
             return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
@@ -347,12 +371,12 @@ export function createNativeTransport(options: {
             || !pr.branch.startsWith(settings.publication.branch_prefix))) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
           if (effect.kind === "pr-close" && pr.input.state === "closed") return observed(pr.input, String(p.number), pr.head);
-          if (effect.kind === "pr-update" && same(submittedFields(pr.input), expectedFields(effect))) return observed(pr.input, String(p.number), pr.head);
+          if (effect.kind === "pr-update" && fieldsMatch(submittedFields(pr.input), expectedFields(effect))) return observed(pr.input, String(p.number), pr.head);
           const base = text(record(pr.input.base).ref);
           if (base !== settings.publication.base) return conflicted("native-PR-destination-changed", { number: p.number, base, head: pr.head, state: pr.input.state });
           if (effect.kind === "pr-close") return absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           const transitions = updateTransitions(effect);
-          return pr.input.state === "open" && transitions.some(fields => same(submittedFields(pr.input), fields))
+          return pr.input.state === "open" && transitions.some(fields => fieldsMatch(submittedFields(pr.input), fields))
             ? absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user),
               source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
         }
@@ -370,7 +394,7 @@ export function createNativeTransport(options: {
           }
           if (candidates.length !== 1) return conflicted("ambiguous-native-issue", { inventory: inventoryEvidence(inventory) });
           const issue = candidates[0];
-          if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !same(labelNames(issue.labels), [...p.labels as string[]].sort())) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
+          if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !labelsMatch(labelNames(issue.labels), reviewedLabels(p.labels))) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
           return observed(issue, String(positive(issue.number)), null);
         }
         if (effect.kind === "comment-create") {

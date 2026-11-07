@@ -1,6 +1,6 @@
 import { executeAttempt, pendingAttempt, PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { reconcileAbsent, inspectRetainedOperation, restoreRetainedOperation } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
@@ -48,7 +48,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0 };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, labels_unavailable: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -57,6 +57,15 @@ const state = JSON.parse(readFileSync(statePath, 'utf8')), args = process.argv.s
 appendFileSync(log, JSON.stringify({ program: process.argv[1].split('/').at(-1), args }) + '\\n');
 const save = () => writeFileSync(statePath, JSON.stringify(state));
 const option = name => args[args.indexOf(name) + 1];
+const applyLabels = names => {
+    const seen = new Set();
+    return names.map(name => state.labels[name] ?? { name }).filter(label => {
+        const key = label.id ?? label.name;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+};
 if (process.argv[1].endsWith('/git')) {
     const leases = args.filter(a => a.startsWith('--force-with-lease=')).map(arg => {
         const value = arg.slice(19), split = value.lastIndexOf(':');
@@ -94,7 +103,7 @@ if (process.argv[1].endsWith('/git')) {
 if (args[0] === 'pr' && args[1] === 'create') {
     const branch = option('--head'), body = readFileSync(option('--body-file'), 'utf8');
     state.prs.push({ number: 501, state: 'open', title: args.find(a => a.startsWith('--title=')).slice(8), body, draft: args.includes('--draft'),
-        labels: args.filter(a => a.startsWith('--label=')).map(a => ({ name: a.slice(8) })), user: { login: 'fixture-bot', id: 20 },
+        labels: applyLabels(args.filter(a => a.startsWith('--label=')).map(a => a.slice(8))), user: { login: 'fixture-bot', id: 20 },
         base: { ref: 'main', repo: { id: 10 } }, head: { ref: branch, sha: state.refs['refs/heads/' + branch], repo: { id: 10 } } });
     save();
     process.exit(state.partial_pr_error ? 1 : 0);
@@ -120,7 +129,7 @@ if (method !== 'GET') {
     }
     const payload = JSON.parse(readFileSync(option('--input'), 'utf8'));
     if (method === 'POST' && endpoint === 'repos/fixture/docs/issues')
-        state.issues.push({ ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: 20 }, labels: payload.labels.map(name => ({ name })) });
+        state.issues.push({ ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: 20 }, labels: applyLabels(payload.labels) });
     else if (method === 'POST' && endpoint.endsWith('/comments')) {
         const number = endpoint.split('/').at(-2);
         (state.comments[number] ??= []).push({ id: 701, body: payload.body, user: { login: 'fixture-bot', id: 20 } });
@@ -128,7 +137,7 @@ if (method !== 'GET') {
     else if (method === 'PATCH' && endpoint.includes('/pulls/'))
         Object.assign(state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-1))), payload);
     else if (method === 'PUT' && endpoint.endsWith('/labels'))
-        state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-2))).labels = payload.labels.map(name => ({ name }));
+        state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-2))).labels = applyLabels(payload.labels);
     else
         process.exit(1);
     save();
@@ -176,6 +185,12 @@ else if (endpoint?.startsWith('repos/fixture/docs/git/ref/')) {
         status = 404;
         value = { message: 'Not Found' };
     }
+}
+else if (endpoint?.startsWith('repos/fixture/docs/labels/')) {
+    const name = decodeURIComponent(endpoint.slice('repos/fixture/docs/labels/'.length));
+    if (state.labels_unavailable) { status = 503; value = { message: 'label metadata unavailable' }; }
+    else if (state.labels[name]) value = state.labels[name];
+    else { status = 404; value = { message: 'label absent' }; }
 }
 else if (endpoint?.startsWith('repos/fixture/docs/pulls?')) {
     const query = new URL(endpoint, 'https://example.invalid/').searchParams;
@@ -946,4 +961,64 @@ test.each(["missing-body", "duplicate-number"] as const)("incomplete PR inventor
     });
     expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
   })();
+});
+
+
+test.each(["pr-create", "issue-create", "pr-update"] as const)("server-canonical labels preserve the reviewed %s payload", async kind => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.labels.Documentation = state.labels.documentation; state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const body = publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("selected");
+  const original = { title: "Old title", body: "Old body", labels: ["old"], draft: false };
+  if (kind === "pr-update") f.update(state => { state.prs.push({ ...original, labels: [{ name: "old" }], number: 501, state: "open",
+    user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  const common = { title: "Reviewed title", body, labels: ["Documentation"], draft: true };
+  const effect: Effect = kind === "pr-create" ? { id: "selected", kind, payload: { ...common, base: "main", branch: "docs-drift/one" } }
+    : kind === "pr-update" ? { id: "selected", kind, payload: { ...common, number: 501, expected_head: f.commit,
+      expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)) } }
+      : { id: "selected", kind, payload: { title: common.title, body: body + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+        labels: common.labels, prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
+  const reviewed = canonicalJSON(effect);
+  await f.transport.execute(f.plan, effect, f.objects);
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
+  expect(canonicalJSON(effect)).toEqual(reviewed);
+  if (kind === "pr-create") expect(readFileSync(f.calls, "utf8")).toContain("--label=Documentation");
+  else {
+    let sentLabels: unknown;
+    for (const name of readdirSync(join(f.root, "artifacts"))) {
+      if (!name.startsWith("native-command-")) continue;
+      const path = join(f.root, "artifacts", name, "payload.json");
+      if (!existsSync(path)) continue;
+      const payload: unknown = JSON.parse(readFileSync(path, "utf8"));
+      if (payload !== null && typeof payload === "object" && Object.hasOwn(payload, "labels")) sentLabels = Reflect.get(payload, "labels");
+    }
+    expect(sentLabels).toEqual(["Documentation"]);
+  }
+  f.update(state => { (kind === "issue-create" ? state.issues[0] : state.prs[0]).labels = [{ name: "documentation" }, { name: "other" }]; });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("conflict");
+});
+
+test.each([["DÖCS", "döcs"], ["Docs/API", "docs/api"], ["Σ", "ς"]])("native label identity resolves %s without local case assumptions", async (requested, canonical) => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.labels[requested] = state.labels[canonical] = { id: 201, name: canonical }; });
+  const effect: Effect = { id: "issue", kind: "issue-create", payload: { title: "Reviewed issue", labels: [requested], prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+    evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
+  expect(effect.payload.labels).toEqual([requested]);
+  f.update(state => { state.labels_unavailable = true; });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
+  f.update(state => { state.labels_unavailable = false; Object.assign(state.labels[canonical], { id: "malformed" }); });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
+});
+
+test("multiple reviewed aliases of one label preserve assignment-set semantics", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.labels.Documentation = state.labels.documentation; state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect: Effect = { id: "pr", kind: "pr-create", payload: { title: "Reviewed PR", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"),
+    labels: ["Documentation", "documentation"], draft: true, base: "main", branch: "docs-drift/one" } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
+  expect(f.inspect().prs[0].labels).toEqual([{ id: 101, name: "documentation" }]);
+  expect(effect.payload.labels).toEqual(["Documentation", "documentation"]);
 });
