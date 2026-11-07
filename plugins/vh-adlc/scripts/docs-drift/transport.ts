@@ -115,12 +115,18 @@ export function createNativeTransport(options: {
   const prefix = "repos/" + settings.repository;
 
   let contentsObserved = false;
+  function contentsAccess(selected: ReturnType<typeof createRepositoryReader>) {
+    const current = selected.repository();
+    const head = selected.ref("refs/heads/" + current.default_branch);
+    selected.commit(head.sha);
+    return current;
+  }
   function getRef(ref: string): RefObservation {
     try { return { state: "present", object: repository.ref(ref).sha }; }
     catch (error) {
       if (error instanceof GitHubReadError && error.status === 404 && contentsObserved) {
         // Identity preflight is not proof of current access. A hidden ref also returns 404.
-        repository.commit(store.source_commit);
+        contentsAccess(repository);
         return { state: "absent" };
       }
       throw error;
@@ -260,11 +266,7 @@ export function createNativeTransport(options: {
     } catch (error) {
       if (!(error instanceof GitHubReadError) || error.status !== 404) throw error;
       // A hidden repository or lost permission also returns 404. Establish fresh contents access first.
-      if (name.toLowerCase() === settings.repository) evidence.commit(store.source_commit);
-      else {
-        const visible = evidence.repository(), head = evidence.ref("refs/heads/" + visible.default_branch);
-        evidence.commit(head.sha);
-      }
+      contentsAccess(evidence);
       changed("object-absent", { status: 404 });
     }
     const permalink = `https://${settings.hostname}/${name}/blob/${commit}/${parts.map(encodeURIComponent).join("/")}`;
@@ -315,9 +317,8 @@ export function createNativeTransport(options: {
   return {
     kind: "native", object_store: store.root, artifact_root: root,
     async identity() {
-      const repo = repository.repository();
-      // A visible immutable source commit establishes contents-read capability before ref absence.
-      repository.commit(store.source_commit);
+      // Source fixtures may be unrelated to publication history. Probe the native publication head.
+      const repo = contentsAccess(repository);
       contentsObserved = true;
       const response = Bun.spawnSync(["gh", "api", "--hostname", settings.hostname, "--method", "POST", "graphql", "-f",
         "query=query { viewer { login databaseId } }"], { env: environment, stdout: "pipe", stderr: "pipe", timeout: options.timeout_ms ?? 30000 });
@@ -410,7 +411,12 @@ export function createNativeTransport(options: {
           if (effect.kind === "pr-update" && (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
             || !pr.branch.startsWith(settings.publication.branch_prefix))) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
-          if (effect.kind === "pr-close" && pr.input.state === "closed") return observed(pr.input, String(p.number), pr.head);
+          if (effect.kind === "pr-close" && pr.input.state === "closed") {
+            if (pr.input.merged_at === null) return observed(pr.input, String(p.number), pr.head);
+            if (typeof pr.input.merged_at === "string" && Number.isFinite(Date.parse(pr.input.merged_at)))
+              return conflicted("native-PR-merged", { number: p.number, head: pr.head, merged_at: pr.input.merged_at });
+            throw Error("incomplete native PR merge state");
+          }
           if (effect.kind === "pr-update" && fieldsMatch(pr.input, expectedFields(effect), comparisons)) return observedLookup(pr.input, String(p.number), pr.head);
           const base = text(record(pr.input.base).ref);
           if (base !== settings.publication.base) return conflicted("native-PR-destination-changed", { number: p.number, base, head: pr.head, state: pr.input.state });

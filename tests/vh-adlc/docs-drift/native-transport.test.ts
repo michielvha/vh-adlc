@@ -43,13 +43,13 @@ function setup() {
   const statePath = join(root, "state.json"), calls = join(root, "calls.jsonl");
   const readme = readGit(repo, "show", "HEAD:README.md"), blobSha = readGit(repo, "rev-parse", "HEAD:README.md").toString().trim();
   const planBytes = canonicalJSON(plan);
-  const state = { commit, tree,
+  const state = { commit, tree, publication_commit: commit, repository_id: 10,
     metadata_commit: { sha: objects.object, tree: { sha: objects.tree }, parents: [] as Array<{ sha: string }>, message: "retained metadata" },
     metadata_tree: { sha: objects.tree, truncated: false, tree: [{ path: "plan.json", mode: "100644", type: "blob", sha: objects.blob }] },
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -103,7 +103,7 @@ if (process.argv[1].endsWith('/git')) {
 }
 if (args[0] === 'pr' && args[1] === 'create') {
     const branch = option('--head'), body = readFileSync(option('--body-file'), 'utf8');
-    state.prs.push({ number: 501, state: 'open', title: args.find(a => a.startsWith('--title=')).slice(8), body, draft: args.includes('--draft'),
+    state.prs.push({ number: 501, state: 'open', merged_at: null, title: args.find(a => a.startsWith('--title=')).slice(8), body, draft: args.includes('--draft'),
         labels: applyLabels(args.filter(a => a.startsWith('--label=')).map(a => a.slice(8))), user: { login: 'fixture-bot', id: 20 },
         base: { ref: 'main', repo: { id: 10 } }, head: { ref: branch, sha: state.refs['refs/heads/' + branch], repo: { id: 10 } } });
     save();
@@ -155,11 +155,13 @@ if (endpoint === 'user') {
         value = { login: 'fixture-bot', id: 20 };
 }
 else if (endpoint === 'repos/fixture/docs')
-    value = { id: 10, full_name: 'fixture/docs', default_branch: 'main' };
+    value = { id: state.repository_id, full_name: 'fixture/docs', default_branch: 'main' };
 else if (endpoint === 'repos/fixture/docs/git/commits/' + state.commit) {
     if (state.source_status) { status = state.source_status; value = { message: 'contents unavailable' }; }
     else value = { sha: state.commit, tree: { sha: state.tree }, parents: [], message: 'fixture' };
 }
+else if (endpoint === 'repos/fixture/docs/git/commits/' + state.publication_commit)
+    value = { sha: state.publication_commit, tree: { sha: state.tree }, parents: [], message: 'publication head' };
 else if (state.evidence_commit && endpoint === 'repos/fixture/docs/git/commits/' + state.evidence_commit) {
     if (state.evidence_status) { status = state.evidence_status; value = { message: 'evidence unavailable' }; }
     else value = { sha: state.evidence_commit, tree: { sha: state.tree }, parents: [], message: 'evidence fixture' };
@@ -289,7 +291,7 @@ test("native permission errors are unknown and never become complete absence", a
 
 test("explicit legacy targets stay available for explanation and post-merge closure", async () => {
   const f = setup(); await f.transport.identity();
-  f.update(state => { state.prs.push({ number: 77, state: "closed", user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  f.update(state => { state.prs.push({ number: 77, state: "closed", merged_at: null, user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
   const closure: Effect = { id: "close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } };
   expect((await f.transport.observe(f.plan, closure, f.objects)).state).toBe("done");
 });
@@ -339,7 +341,7 @@ test("native issue evidence is read from bound Git objects before exact issue cr
 
 test("native comment and closure keep legacy authors and exact target heads", async () => {
   const f = setup(); await f.transport.identity();
-  f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  f.update(state => { state.prs.push({ number: 77, state: "open", merged_at: null, user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
   const comment: Effect = { id: "explain", kind: "comment-create", payload: { number: 77, body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain"), prior_ids: [] } };
   await f.transport.execute(f.plan, comment, f.objects);
   expect((await f.transport.observe(f.plan, comment, f.objects)).state).toBe("done");
@@ -679,7 +681,7 @@ test("native conflicting PR-head evidence preserves the actual conflict without 
 
 test("a rejected closure replay cannot retire an earlier sent request whose outcome remains unknown", async () => {
   const f = setup(); await f.transport.identity();
-  f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+  f.update(state => { state.prs.push({ number: 77, state: "open", merged_at: null, user: { login: "legacy-bot", id: 90 },
     head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
   const effects: Effect[] = [f.plan.manifest.effects[0], f.plan.manifest.effects[1],
     { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [], body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } },
@@ -1221,6 +1223,8 @@ test.each(["lease-release", "receipt-retain"] as const)("%s retains fresh access
   const retained: { lookup: { requests: { endpoint: string; status: number }[] } } = JSON.parse(readFileSync(support.path, "utf8"));
   expect(retained.lookup.requests.map(({ endpoint, status }) => ({ endpoint, status }))).toEqual([
     { endpoint: "repos/fixture/docs/git/ref/" + ref.slice("refs/".length), status: 404 },
+    { endpoint: "repos/fixture/docs", status: 200 },
+    { endpoint: "repos/fixture/docs/git/ref/heads/main", status: 200 },
     { endpoint: "repos/fixture/docs/git/commits/" + f.commit, status: 200 },
   ]);
 });
@@ -1245,4 +1249,38 @@ test.each(["alias-target", "empty-target", "empty-done"] as const)("PR update re
   const expected = [{ observed, expected: kind === "alias-target" ? [{ requested: "Documentation", id: 101, canonical: "documentation" }] : [], matched: kind === "empty-done" }];
   if (kind !== "empty-done") expected.push({ observed, expected: [{ requested: "old", id: 102, canonical: "old" }], matched: true });
   expect(retained.lookup.label_comparisons).toEqual(expected);
+});
+
+
+test("native visibility follows publication history when the scratch source is absent there", async () => {
+  const f = setup(), publication = "b".repeat(40);
+  f.update(value => { value.publication_commit = publication; value.refs["refs/heads/main"] = publication; value.source_status = 404;
+    value.evidence_commit = "d".repeat(40); value.evidence_status = 404; });
+  expect((await f.transport.identity()).repository_id).toBe(10);
+  expect(await f.transport.ref(f.settings.publication.lease_ref)).toEqual({ state: "absent" });
+  const issue: Effect = { id: "issue", kind: "issue-create", payload: { title: "Reviewed issue", labels: [], prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + "\nhttps://github.com/fixture/docs/blob/" + "d".repeat(40) + "/README.md",
+    evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: "d".repeat(40), evidence_sha256: sha256(f.readme) } };
+  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("conflict");
+  expect(readFileSync(f.calls, "utf8")).not.toContain('"repos/fixture/docs/git/commits/' + f.commit + '"');
+});
+
+test("a same-name replacement repository cannot supply retained ref absence", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(value => { value.repository_id = 11; });
+  const effect: Effect = { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } };
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
+  await expect(f.transport.ref(f.settings.publication.lease_ref)).rejects.toThrow();
+});
+
+test.each(["merged", "unmerged", "missing", "malformed"] as const)("closure recovery distinguishes a %s PR merge state", async state => {
+  const f = setup(); await f.transport.identity();
+  f.update(value => { const pr: Record<string, unknown> = { number: 77, state: "closed", user: { login: "legacy-bot", id: 90 },
+    head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } };
+    if (state !== "missing") pr.merged_at = state === "merged" ? "2026-11-07T00:00:00Z" : state === "unmerged" ? null : 7;
+    value.prs.push(pr); });
+  const effect: Effect = { id: "close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } };
+  const result = await f.transport.observe(f.plan, effect, f.objects);
+  expect(result.state).toBe(state === "merged" ? "conflict" : state === "unmerged" ? "done" : "unknown");
+  if (state === "merged") expect(result).toMatchObject({ reason: "native-PR-merged" });
 });
