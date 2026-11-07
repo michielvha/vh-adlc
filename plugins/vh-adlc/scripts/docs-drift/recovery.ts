@@ -339,7 +339,6 @@ export async function reconcileAbsent(options: {
       if (!ids.includes(effect.id) || !observation.evidence) return blocked("known-absence-retirement-not-authorized");
       if (isObservationOnly(journal)) return blocked("retained-absence-not-definitive");
       const conflicting = observation.state === "conflict";
-      if (conflicting && hasEffectAttempt(journal, effect.id)) return blocked("conflicting-action-was-attempted");
       const pending = pendingAttempt(journal, effect, true);
       if (pending) return blocked(pending);
       const lookup = readLookup({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
@@ -351,7 +350,9 @@ export async function reconcileAbsent(options: {
       await requireOwnedLease();
       readLookup({ evidence: lookup, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
         plan, effect, transport: options.transport.kind, state: conflicting ? "conflict" : "absent" });
-      journal = appendRetirement(journal, effect.id, { ...retirementGrant, lookup, ...(conflicting ? { never_dispatched: true as const } : {}) });
+      const currentAttempt = pendingAttempt(journal, effect, true);
+      if (currentAttempt) return blocked(currentAttempt);
+      journal = appendRetirement(journal, effect.id, { ...retirementGrant, lookup, ...(conflicting ? { unapplied: true as const } : {}) });
     }
     const fence = await options.transport.ref(String(receipt.payload.ref));
     if (fence.state !== "present" || fence.object !== receiptObject) return blocked("retained-operation-removed");

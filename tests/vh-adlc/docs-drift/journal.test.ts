@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { appendIntent, appendAttempt, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendIntent, appendAttempt, appendAttemptEnd, appendRetirement, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore, captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -236,4 +236,31 @@ test("observation-only journals reject unscoped attempts but retain separately g
 test("retained publication operation cannot change between advisory and resolve", () => {
   const { plan, policy } = setup();
   expect(() => readVerifiedPlan(canonicalJSON(plan), () => ({ ...policy(), publication_kind: "resolve" }))).toThrow("policy");
+});
+
+
+test.each(["in-flight", "sent", "unreaped", "unsent"] as const)("unapplied retirement cannot fabricate negative dispatch proof (%s)", state => {
+  const f = setup();
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  const effect = f.plan.manifest.effects[0];
+  journal = appendIntent(journal, effect.id);
+  journal = appendAttempt(journal, effect.id, "owned-negative-proof");
+  if (state !== "in-flight") journal = appendAttemptEnd(journal, effect.id, { attempt_id: "owned-negative-proof", sent: state !== "unsent", reaped: state !== "unreaped" });
+  const retirement = { scope_sha256: hash("scope"), request_sha256: hash("request"), unapplied: true as const,
+    lookup: { path: join(f.artifacts, "lookup.json"), sha256: hash("lookup") } };
+  if (state === "unsent") expect(appendRetirement(journal, effect.id, retirement).revision).toBe(journal.revision + 1);
+  else expect(() => appendRetirement(journal, effect.id, retirement)).toThrow("unapplied");
+});
+
+
+test("legacy never-dispatched retirement remains readable", () => {
+  const f = setup(), effect = f.plan.manifest.effects[0];
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  journal = appendIntent(journal, effect.id);
+  journal = appendRetirement(journal, effect.id, { scope_sha256: hash("scope"), request_sha256: hash("request"), never_dispatched: true,
+    lookup: { path: join(f.artifacts, "lookup.json"), sha256: hash("lookup") } });
+  const retained = readJournal(journal.directory, f.repo).events.at(-1)!;
+  expect(retained.kind).toBe("retired-absence");
+  expect(retained.payload).toMatchObject({ never_dispatched: true });
+  expect(Object.hasOwn(retained.payload, "unapplied")).toBe(false);
 });

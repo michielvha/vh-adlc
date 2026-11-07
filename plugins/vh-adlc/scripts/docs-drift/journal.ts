@@ -22,7 +22,7 @@ export type PlanPolicy = {
   worker: RolePolicy; reviewer: RolePolicy;
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null };
-export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string }; never_dispatched?: true };
+export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string }; never_dispatched?: true; unapplied?: true };
 export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
 type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant; atomic_receipt_id?: string };
 type Intent = { effect_sha256: string; atomic_acquisition?: string };
@@ -198,6 +198,18 @@ function outcome(value: unknown): Outcome {
   if (receipt.object !== null && (typeof receipt.object !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(receipt.object))) fail("outcome object");
   return receipt as Outcome;
 }
+function attemptsUnapplied(events: Event[], effectId: string): boolean {
+  const attempts = events.filter(event => event.kind === "attempt" && (event.effect_id === effectId
+    || "atomic_receipt_id" in event.payload && event.payload.atomic_receipt_id === effectId));
+  return attempts.every(attempt => {
+    if (!("attempt_id" in attempt.payload)) return false;
+    const id = attempt.payload.attempt_id;
+    const ended = events.find(event => event.kind === "attempt-ended" && event.effect_id === attempt.effect_id
+      && "attempt_id" in event.payload && event.payload.attempt_id === id);
+    return ended !== undefined && "sent" in ended.payload && ended.payload.reaped
+      && (!ended.payload.sent || "rejection" in ended.payload);
+  });
+}
 function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header: Header): void {
   const effect = plan.manifest.effects.find(effect => effect.id === event.effect_id);
   if (!effect) fail("unknown effect");
@@ -255,8 +267,12 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
     }
     else if (event.kind === "outcome") outcome(event.payload);
     else if (event.kind === "retired-absence") {
-      const undispatched = Object.hasOwn(event.payload, "never_dispatched");
-      const payload = exact(event.payload, ["scope_sha256", "request_sha256", "lookup", ...(undispatched ? ["never_dispatched"] : [])]);
+      const undispatched = Object.hasOwn(event.payload, "never_dispatched"), unapplied = Object.hasOwn(event.payload, "unapplied");
+      if (undispatched && unapplied) fail("contradictory retirement proof");
+      const payload = exact(event.payload, ["scope_sha256", "request_sha256", "lookup", ...(undispatched ? ["never_dispatched"] : []), ...(unapplied ? ["unapplied"] : [])]);
+      if (unapplied && (payload.unapplied !== true || header.recovery_mode !== "original"
+        || ["lease-acquire", "receipt-retain", "lease-release"].includes(effect.kind)
+        || previous.some(item => item.kind === "recovery-only") || !attemptsUnapplied(previous, effect.id))) fail("unproven unapplied retirement");
       if (undispatched && (payload.never_dispatched !== true || header.recovery_mode !== "original"
         || ["lease-acquire", "receipt-retain", "lease-release"].includes(effect.kind)
         || previous.some(item => item.kind === "recovery-only" || item.kind === "attempt" && (item.effect_id === effect.id

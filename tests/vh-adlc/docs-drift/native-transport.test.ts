@@ -34,7 +34,8 @@ function setup() {
   const input = fixture(defaults.manifest.bindings, [
     { id: "lease", kind: "lease-acquire", payload: { ref: settings.publication.lease_ref } },
     { id: "receipt", kind: "receipt-retain", payload: { ref: settings.publication.receipt_ref_prefix + "operation-1" } },
-    ...defaults.manifest.effects,
+    ...defaults.manifest.effects.map(effect => effect.kind === "pr-create" ? { ...effect, payload: { ...effect.payload,
+      body: String(effect.payload.body) + publicationMarker(settings, "operation-1") + "\n" + effectMarker(effect.id) } } : effect),
   ]);
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "trial", transport: "native", corrections: [], attention: [] });
   const objects = writePlanObject(store, plan);
@@ -47,7 +48,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0 };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -145,8 +146,14 @@ if (endpoint === 'user') {
 }
 else if (endpoint === 'repos/fixture/docs')
     value = { id: 10, full_name: 'fixture/docs', default_branch: 'main' };
-else if (endpoint === 'repos/fixture/docs/git/commits/' + state.commit)
-    value = { sha: state.commit, tree: { sha: state.tree }, parents: [], message: 'fixture' };
+else if (endpoint === 'repos/fixture/docs/git/commits/' + state.commit) {
+    if (state.source_status) { status = state.source_status; value = { message: 'contents unavailable' }; }
+    else value = { sha: state.commit, tree: { sha: state.tree }, parents: [], message: 'fixture' };
+}
+else if (state.evidence_commit && endpoint === 'repos/fixture/docs/git/commits/' + state.evidence_commit) {
+    if (state.evidence_status) { status = state.evidence_status; value = { message: 'evidence unavailable' }; }
+    else value = { sha: state.evidence_commit, tree: { sha: state.tree }, parents: [], message: 'evidence fixture' };
+}
 else if (endpoint === 'repos/fixture/docs/git/commits/' + state.metadata_commit.sha)
     value = state.metadata_commit;
 else if (endpoint === 'repos/fixture/docs/git/trees/' + state.metadata_tree.sha)
@@ -748,7 +755,7 @@ test("an existing exact explanation survives base retargeting while a new POST s
   expect(f.inspect().comments["77"]).toHaveLength(1);
 });
 
-test("lost-mirror cleanup observes merged deleted-branch delivery and existing issue/explanation without replay", async () => {
+test.each(["original-base", "retargeted"] as const)("lost-mirror cleanup observes merged deleted-branch delivery and existing issue/explanation without replay (%s)", async baseSelection => {
   const f = setup(); await f.transport.identity();
   const branch = "refs/heads/docs-drift/one";
   const effects: Effect[] = [f.plan.manifest.effects[0], f.plan.manifest.effects[1], f.plan.manifest.effects[2],
@@ -778,6 +785,7 @@ test("lost-mirror cleanup observes merged deleted-branch delivery and existing i
   }
   f.update(state => {
     const delivered = state.prs.find(pr => pr.number === 501)!; delivered.state = "closed"; delivered.merged = true;
+    if (baseSelection === "retargeted") (delivered.base as { ref: string }).ref = "release";
     delete state.refs[branch]; state.tree_response.tree = []; (state.prs[0].base as { ref: string }).ref = "release";
   });
   rmSync(original.directory, { recursive: true });
@@ -813,4 +821,129 @@ test("an unfinished retargeted refresh retains its destination guard", async () 
   });
   const effect: Effect = { id: "refresh", kind: "branch-refresh", payload: { number: 501, ref: "refs/heads/docs-drift/one", expected_head: "e".repeat(40), head: f.commit } };
   expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("conflict");
+});
+
+
+async function startCleanupJournal(f: ReturnType<typeof setup>, effects: Effect[]) {
+  const selected = [f.plan.manifest.effects[0], f.plan.manifest.effects[1], ...effects,
+    { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } } satisfies Effect];
+  const input = fixture(f.plan.manifest.bindings, selected);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
+    adoption_sha256: hash("adoption"), publication_kind: "resolve", context: "trial", transport: "native", corrections: [], attention: [] });
+  const repo = join(f.root, "source");
+  let journal = createJournal({ source_repo: repo, artifact_root: join(f.root, "artifacts"), plan });
+  const objects = writePublicationObjects(f.store, plan, journal.header);
+  journal = appendIntent(journal, "lease");
+  journal = await executeAttempt({ journal, effect: selected[0], objects, transport: f.transport });
+  for (const effect of selected.slice(0, 2)) {
+    const observation = await f.transport.observe(plan, effect, objects);
+    if (observation.state !== "done") throw Error("native metadata not completed");
+    journal = appendOutcome(journal, effect.id, observation.outcome);
+  }
+  return { repo, journal, objects, plan };
+}
+
+test.each(["close", "update", "issue-missing", "issue-changed"] as const)("definitively changed unattempted target can be retired without execution (%s)", async scenario => {
+  const f = setup(); await f.transport.identity();
+  const originalPayload = { title: "Original title", body: "Original body", labels: [], draft: true };
+  f.update(state => { state.prs.push({ ...originalPayload, number: 77, state: "open", user: { login: "fixture-bot", id: 20 },
+    head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  const body = publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("selected");
+  const evidencePath = scenario === "issue-missing" ? "missing.md" : "README.md";
+  const effect: Effect = scenario === "close" ? { id: "selected", kind: "pr-close", payload: { number: 77, expected_head: f.commit } }
+    : scenario === "update" ? { id: "selected", kind: "pr-update", payload: { number: 77, expected_head: f.commit,
+      expected_payload: originalPayload, expected_payload_sha256: sha256(canonicalJSON(originalPayload)), title: "Reviewed title", body, labels: [], draft: true } }
+      : { id: "selected", kind: "issue-create", payload: { title: "Reviewed issue", body: body + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/" + evidencePath,
+        labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: evidencePath, evidence_commit: f.commit, evidence_sha256: scenario === "issue-changed" ? hash("different expected evidence") : sha256(f.readme) } };
+  const selected = await startCleanupJournal(f, [effect]);
+  f.update(state => {
+    if (scenario === "close" || scenario === "update") (state.prs[0].base as { ref: string }).ref = "release";
+  });
+  expect((await f.transport.observe(selected.plan, effect, selected.objects)).state).toBe("conflict");
+  const scopes: unknown[] = [];
+  const completed = await reconcileAbsent({ source_repo: selected.repo, journal_directory: selected.journal.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, retire_effect_ids: [effect.id], authorize: async scope => {
+      scopes.push(scope);
+      return { scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("actual changed-target retirement") };
+    } });
+  expect(completed.state).toBe("retired");
+  expect(scopes.some(scope => typeof scope === "object" && scope !== null && Object.hasOwn(scope, "retirement"))).toBe(true);
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+  expect(f.inspect().issues).toHaveLength(0);
+  expect(f.inspect().prs[0].state).toBe("open");
+});
+
+
+test.each(["visible-404", "hidden-404", "403", "500", "malformed-blob"] as const)("evidence failures retain definitive versus unknown state (%s)", async failure => {
+  const f = setup(); await f.transport.identity();
+  const evidenceCommit = "e".repeat(40);
+  f.update(state => { state.evidence_commit = evidenceCommit; });
+  const effect: Effect = { id: "issue", kind: "issue-create", payload: { title: "Synthetic issue", labels: [], prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + "\nhttps://github.com/fixture/docs/blob/" + evidenceCommit + "/README.md",
+    evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: evidenceCommit, evidence_sha256: sha256(f.readme) } };
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("absent");
+  f.update(state => {
+    if (failure === "malformed-blob") state.blob.content = Buffer.alloc(f.readme.length).toString("base64");
+    else state.evidence_status = failure === "403" ? 403 : failure === "500" ? 500 : 404;
+    if (failure === "hidden-404") state.source_status = 404;
+  });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe(failure === "visible-404" ? "conflict" : "unknown");
+  expect(f.inspect().issues).toHaveLength(0);
+});
+
+test.each(["unsent", "rejected", "unknown", "unknown-then-rejected", "rejected-proof-changed"] as const)("conflict retirement accounts for the complete native attempt history (%s)", async history => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+    head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  const effect: Effect = { id: "close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } };
+  const selected = await startCleanupJournal(f, [effect]);
+  let journal = appendIntent(selected.journal, effect.id);
+  if (history === "unsent") f.update(state => { (state.prs[0].base as { ref: string }).ref = "release"; });
+  const statuses = history === "unsent" ? [0] : history.startsWith("rejected") ? [403] : history === "unknown" ? [502] : [502, 403];
+  for (const status of statuses) {
+    f.update(state => { state.reject_http = status; });
+    await expect(executeAttempt({ journal, effect, objects: selected.objects, transport: f.transport })).rejects.toBeInstanceOf(PublicationExecutionError);
+    journal = readJournal(journal.directory, selected.repo);
+  }
+  f.update(state => { state.reject_http = 0; (state.prs[0].base as { ref: string }).ref = "release"; });
+  const result = await reconcileAbsent({ source_repo: selected.repo, journal_directory: journal.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, retire_effect_ids: [effect.id],
+    authorize: async scope => {
+      if (history === "rejected-proof-changed" && scope.retirement) {
+        const ending = journal.events.findLast(event => event.kind === "attempt-ended" && event.effect_id === effect.id);
+        if (!ending || !("rejection" in ending.payload) || !ending.payload.rejection) throw Error("missing native rejection proof");
+        writeFileSync(ending.payload.rejection.path, "changed during approval");
+      }
+      return { scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("explicit exact unapplied target retirement") };
+    } });
+  const retirable = history === "unsent" || history === "rejected";
+  expect(result.state).toBe(retirable ? "retired" : "pending");
+  expect(f.inspect().prs[0].state).toBe("open");
+  expect(f.inspect().refs[f.settings.publication.lease_ref] === undefined).toBe(retirable);
+});
+
+
+test("unrelated PR inventory cannot hide an exact existing operation payload", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect = f.plan.manifest.effects.find(item => item.kind === "pr-create")!;
+  await f.transport.execute(f.plan, effect, f.objects);
+  f.update(state => { state.prs.push({ ...state.prs[0], number: 502, body: "Unrelated owned PR body" }); });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
+  expect(f.inspect().prs).toHaveLength(2);
+});
+
+test.each(["missing-body", "duplicate-number"] as const)("incomplete PR inventory cannot hide behind one exact positive match (%s)", invalid => {
+  return (async () => {
+    const f = setup(); await f.transport.identity();
+    f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+    const effect = f.plan.manifest.effects.find(item => item.kind === "pr-create")!;
+    await f.transport.execute(f.plan, effect, f.objects);
+    f.update(state => {
+      const other: Record<string, unknown> = { ...state.prs[0], number: invalid === "duplicate-number" ? 501 : 502, body: "Unrelated body" };
+      if (invalid === "missing-body") delete other.body;
+      state.prs.push(other);
+    });
+    expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
+  })();
 });

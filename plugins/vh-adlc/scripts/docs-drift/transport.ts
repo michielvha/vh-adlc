@@ -57,6 +57,10 @@ function labelNames(value: unknown): string[] {
   if (new Set(result).size !== result.length) throw Error("duplicate native labels");
   return result;
 }
+class IssueEvidenceConflict extends Error {
+  constructor(readonly lookup: Record<string, unknown>) { super("published issue evidence changed"); }
+}
+
 function submittedFields(value: unknown) {
   const item = record(value);
   if (typeof item.body !== "string" || typeof item.draft !== "boolean") throw Error("incomplete native PR payload");
@@ -66,6 +70,16 @@ function expectedFields(effect: Effect) {
   const p = effect.payload;
   if (!Array.isArray(p.labels)) throw Error("invalid reviewed labels");
   return { title: p.title, body: p.body, labels: [...p.labels].sort(), draft: p.draft };
+}
+function updateTransitions(effect: Effect) {
+  const p = effect.payload, original = record(p.expected_payload);
+  if (Object.keys(original).sort().join(",") !== "body,draft,labels,title" || typeof original.body !== "string"
+    || typeof original.draft !== "boolean" || !Array.isArray(original.labels)) throw Error("missing original PR payload");
+  const source = { title: text(original.title), body: original.body, labels: original.labels.map(text).sort(), draft: original.draft };
+  if (sha256(canonicalJSON(source)) !== p.expected_payload_sha256) throw Error("original PR payload changed");
+  const target = expectedFields(effect);
+  return [source, { ...source, title: target.title, body: target.body },
+    { ...source, title: target.title, body: target.body, labels: target.labels }];
 }
 function same(left: unknown, right: unknown): boolean { return canonicalJSON(left).equals(canonicalJSON(right)); }
 
@@ -113,6 +127,26 @@ export function createNativeTransport(options: {
     if (input.state !== "open" && input.state !== "closed") throw Error("unknown native PR state");
     return { input, head: text(head.sha), branch: text(head.ref) };
   }
+  function headRepository(pr: { input: Record<string, unknown> }): number | null {
+    const selected = record(pr.input.head).repo;
+    return selected === null ? null : positive(record(selected).id);
+  }
+  function pullInventory(items: unknown[]) {
+    const seen = new Set<number>();
+    return items.map(value => {
+      const item = record(value), number = positive(item.number);
+      if (seen.has(number)) throw Error("duplicate native PR inventory number");
+      seen.add(number);
+      if (item.body !== null && typeof item.body !== "string") throw Error("incomplete native PR body");
+      return { number, body_sha256: sha256(canonicalJSON(item.body)), actor: actor(item.user) };
+    });
+  }
+  function mutablePull(effect: Effect, plan: SealedPlan) {
+    const pr = pull(positive(effect.payload.number), plan, effect.kind !== "pr-close");
+    if (pr.input.state !== "open" || pr.head !== effect.payload.expected_head) throw Error("native mutable PR target changed");
+    if (effect.kind === "pr-update" && !updateTransitions(effect).some(fields => same(submittedFields(pr.input), fields))) throw Error("native mutable PR payload changed");
+    return pr;
+  }
   function observed(input: unknown, resourceId: string | null, object: string | null): EffectObservation {
     return { state: "done", outcome: { state: "observed", observation_sha256: sha256(canonicalJSON(input)), resource_id: resourceId, object } };
   }
@@ -148,22 +182,36 @@ export function createNativeTransport(options: {
   function checkIssueEvidence(effect: Effect): void {
     const p = effect.payload;
     const name = text(p.evidence_repository), path = protocolPath(p.evidence_path), commit = text(p.evidence_commit);
-    const evidence = createRepositoryReader(reader, name);
-    let tree = evidence.commit(commit).tree_sha;
-    const parts = path.split("/");
-    for (const [index, part] of parts.entries()) {
-      const entry = evidence.tree(tree).entries.find(entry => entry.path === part);
-      if (!entry) throw Error("published issue evidence absent");
-      if (index < parts.length - 1) {
-        if (entry.type !== "tree" || entry.mode !== "040000") throw Error("invalid issue evidence path");
-        tree = entry.sha;
-      } else {
-        if (entry.type !== "blob" || !["100644", "100755"].includes(entry.mode)
-          || sha256(evidence.blob(entry.sha, settings.reports.max_entry_bytes)) !== p.evidence_sha256) throw Error("published issue evidence changed");
+    const evidence = createRepositoryReader(reader, name), parts = path.split("/");
+    function changed(reason: string, observed: unknown = null): never {
+      throw new IssueEvidenceConflict({ repository: name, path, commit, expected_sha256: p.evidence_sha256, reason, observed });
+    }
+    try {
+      let tree = evidence.commit(commit).tree_sha;
+      for (const [index, part] of parts.entries()) {
+        const entry = evidence.tree(tree).entries.find(entry => entry.path === part);
+        if (!entry) changed("path-absent", { parent_tree: tree, part });
+        if (index < parts.length - 1) {
+          if (entry.type !== "tree" || entry.mode !== "040000") changed("non-directory-parent", { type: entry.type, mode: entry.mode });
+          tree = entry.sha;
+        } else {
+          if (entry.type !== "blob" || !["100644", "100755"].includes(entry.mode)) changed("nonregular-evidence", { type: entry.type, mode: entry.mode });
+          const actual = sha256(evidence.blob(entry.sha, settings.reports.max_entry_bytes));
+          if (actual !== p.evidence_sha256) changed("digest-mismatch", { sha256: actual });
+        }
       }
+    } catch (error) {
+      if (!(error instanceof GitHubReadError) || error.status !== 404) throw error;
+      // A hidden repository or lost permission also returns 404. Establish fresh contents access first.
+      if (name.toLowerCase() === settings.repository) evidence.commit(store.source_commit);
+      else {
+        const visible = evidence.repository(), head = evidence.ref("refs/heads/" + visible.default_branch);
+        evidence.commit(head.sha);
+      }
+      changed("object-absent", { status: 404 });
     }
     const permalink = `https://${settings.hostname}/${name}/blob/${commit}/${parts.map(encodeURIComponent).join("/")}`;
-    if (!text(p.body).includes(permalink)) throw Error("reviewed issue body omits bound evidence permalink");
+    if (!text(p.body).includes(permalink)) changed("missing-evidence-permalink");
   }
   async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }): Promise<void> {
     const id = randomUUID(), directory = join(root, "native-command-" + id);
@@ -248,12 +296,14 @@ export function createNativeTransport(options: {
             for (const value of candidates) {
               const candidate = record(value);
               if (!ownedActor(candidate.user, plan)) continue;
-              const pr = pull(positive(candidate.number), plan, true, false);
-              if (pr.branch === branch && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
+              const pr = pull(positive(candidate.number), plan, false, false);
+              if (headRepository(pr) === plan.manifest.repository_id && pr.branch === branch && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
             }
           }
           if (effect.kind === "branch-refresh") {
-            const pr = pull(positive(p.number), plan, true, false);
+            const pr = pull(positive(p.number), plan, false, false);
+            if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
+              || !pr.branch.startsWith(settings.publication.branch_prefix)) return conflicted("native-refresh-scope-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
             if ("refs/heads/" + pr.branch === p.ref && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
             if (text(record(pr.input.base).ref) !== settings.publication.base || pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
             if (target.object === p.head && pr.head === p.expected_head) return { state: "unknown", reason: "native-PR-head-sync-pending" };
@@ -275,12 +325,15 @@ export function createNativeTransport(options: {
         }
         if (effect.kind === "pr-create") {
           const owner = settings.repository.split("/")[0];
-          const candidates = list(`${prefix}/pulls?state=all&base=${encodeURIComponent(text(p.base))}&head=${encodeURIComponent(owner + ":" + text(p.branch))}&per_page=100`);
+          const candidates = list(`${prefix}/pulls?state=all&head=${encodeURIComponent(owner + ":" + text(p.branch))}&per_page=100`);
           if (candidates.length === 0) return absent({ candidates });
-          if (candidates.length !== 1) return conflicted("ambiguous-native-PR", { candidates: candidates.map(value => { const item = record(value); return { number: positive(item.number), body_sha256: sha256(canonicalJSON(item.body)), actor: actor(item.user) }; }) });
-          const candidate = record(candidates[0]), pr = pull(positive(candidate.number), plan);
+          const inventory = pullInventory(candidates);
+          const matches = candidates.map(record).filter(item => markerMatches(item.body, plan, effect));
+          if (matches.length !== 1) return conflicted("ambiguous-or-changed-native-PR", { candidates: inventory });
+          const candidate = matches[0], pr = pull(positive(candidate.number), plan, false, false);
           const actual = submittedFields(pr.input), expected = expectedFields(effect);
-          if (pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
+          if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
+            || !pr.branch.startsWith(settings.publication.branch_prefix) || pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
           if (!same(actual, expected)) {
             if (actual.labels.length === 0 && same({ ...actual, labels: expected.labels }, expected))
               return { state: "unknown", reason: "native-PR-labels-incomplete" };
@@ -289,18 +342,16 @@ export function createNativeTransport(options: {
           return observed(pr.input, String(candidate.number), pr.head);
         }
         if (effect.kind === "pr-update" || effect.kind === "pr-close") {
-          const pr = pull(positive(p.number), plan, effect.kind !== "pr-close");
+          const pr = pull(positive(p.number), plan, false, false);
+          if (effect.kind === "pr-update" && (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
+            || !pr.branch.startsWith(settings.publication.branch_prefix))) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
-          if (effect.kind === "pr-close") return pr.input.state === "closed" ? observed(pr.input, String(p.number), pr.head) : absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
-          if (same(submittedFields(pr.input), expectedFields(effect))) return observed(pr.input, String(p.number), pr.head);
-          const original = record(p.expected_payload);
-          if (Object.keys(original).sort().join(",") !== "body,draft,labels,title" || typeof original.body !== "string"
-            || typeof original.draft !== "boolean" || !Array.isArray(original.labels)) throw Error("missing original PR payload");
-          const source = { title: text(original.title), body: original.body, labels: original.labels.map(text).sort(), draft: original.draft };
-          if (sha256(canonicalJSON(source)) !== p.expected_payload_sha256) throw Error("original PR payload changed");
-          const target = expectedFields(effect);
-          const transitions = [source, { ...source, title: target.title, body: target.body },
-            { ...source, title: target.title, body: target.body, labels: target.labels }];
+          if (effect.kind === "pr-close" && pr.input.state === "closed") return observed(pr.input, String(p.number), pr.head);
+          if (effect.kind === "pr-update" && same(submittedFields(pr.input), expectedFields(effect))) return observed(pr.input, String(p.number), pr.head);
+          const base = text(record(pr.input.base).ref);
+          if (base !== settings.publication.base) return conflicted("native-PR-destination-changed", { number: p.number, base, head: pr.head, state: pr.input.state });
+          if (effect.kind === "pr-close") return absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
+          const transitions = updateTransitions(effect);
           return pr.input.state === "open" && transitions.some(fields => same(submittedFields(pr.input), fields))
             ? absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user),
               source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
@@ -309,7 +360,14 @@ export function createNativeTransport(options: {
           const inventory = list(`${prefix}/issues?state=all&per_page=100`);
           const { candidates, conflict } = creationCandidates(inventory, plan, effect);
           if (conflict) return conflicted("native-issue-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
-          if (candidates.length === 0) { checkIssueEvidence(effect); return absent({ inventory: inventoryEvidence(inventory), candidates }); }
+          if (candidates.length === 0) {
+            try { checkIssueEvidence(effect); }
+            catch (error) {
+              if (error instanceof IssueEvidenceConflict) return conflicted("native-issue-evidence-changed", error.lookup);
+              throw error;
+            }
+            return absent({ inventory: inventoryEvidence(inventory), candidates });
+          }
           if (candidates.length !== 1) return conflicted("ambiguous-native-issue", { inventory: inventoryEvidence(inventory) });
           const issue = candidates[0];
           if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !same(labelNames(issue.labels), [...p.labels as string[]].sort())) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
@@ -352,6 +410,7 @@ export function createNativeTransport(options: {
           await pushRef(plan, text(p.ref), text(p.head), effect.kind === "branch-refresh" ? text(p.expected_head) : "", delivery); return;
         }
         if (effect.kind === "pr-create") {
+          if (p.base !== settings.publication.base) throw Error("native PR destination policy changed");
           const branch = getRef("refs/heads/" + text(p.branch));
           if (branch.state !== "present" || branch.object !== plan.manifest.bindings.candidate_commit
             || repository.commit(branch.object).tree_sha !== plan.manifest.bindings.candidate_tree) throw Error("native candidate branch changed");
@@ -363,9 +422,11 @@ export function createNativeTransport(options: {
           await run(plan, argv, null, delivery); return;
         }
         if (effect.kind === "pr-update") {
+          mutablePull(effect, plan);
           await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { title: p.title, body: p.body }, delivery);
+          mutablePull(effect, plan);
           await mutation(plan, "PUT", `${prefix}/issues/${p.number}/labels`, { labels: p.labels }, delivery);
-          const pr = pull(positive(p.number), plan);
+          const pr = mutablePull(effect, plan);
           if (pr.input.draft !== p.draft) {
             const argv = ["gh", "pr", "ready", String(p.number), "--repo", settings.repository];
             if (p.draft === true) argv.push("--undo");
@@ -375,7 +436,7 @@ export function createNativeTransport(options: {
         }
         if (effect.kind === "issue-create") { checkIssueEvidence(effect); await mutation(plan, "POST", `${prefix}/issues`, { title: p.title, body: p.body, labels: p.labels }, delivery); return; }
         if (effect.kind === "comment-create") { pull(positive(p.number), plan, false); await mutation(plan, "POST", `${prefix}/issues/${positive(p.number)}/comments`, { body: p.body }, delivery); return; }
-        if (effect.kind === "pr-close") { await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { state: "closed" }, delivery); return; }
+        if (effect.kind === "pr-close") { mutablePull(effect, plan); await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { state: "closed" }, delivery); return; }
         throw Error("unsupported native publication effect");
       } catch { throw new PublicationExecutionError(delivery.sent, delivery.reaped, delivery.rejection); }
     },

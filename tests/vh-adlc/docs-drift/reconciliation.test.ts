@@ -408,11 +408,18 @@ test("selected cleanup retires a conflicting action that the original journal ne
   }
 });
 
-test("conflicting cleanup cannot retire an attempted action or a changed native lookup", async () => {
+test("conflicting cleanup cannot retire an uncertain action or a changed native lookup", async () => {
   for (const mode of ["attempted", "changed-lookup", "unselected", "recovery-only"]) {
     let f: ReturnType<typeof publicationFixture>, directory: string;
     if (mode === "attempted") {
-      const abandonedRun = await abandoned(); f = abandonedRun.f; directory = abandonedRun.interrupted.journal.directory;
+      f = publicationFixture(roots);
+      const execute = f.transport.execute;
+      f.transport.execute = async (plan, effect, objects) => {
+        if (effect.id === "pr") throw new PublicationExecutionError(true, true);
+        await execute(plan, effect, objects);
+      };
+      directory = (await publish(options(f))).journal.directory;
+      f.transport.execute = execute;
     } else {
       f = publicationFixture(roots);
       const observe = f.transport.observe;
