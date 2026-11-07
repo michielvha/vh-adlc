@@ -680,6 +680,7 @@ None.
 | 2026-11-07 | R-50 | spec | `fe19cf8444744873ce70492ec51c4562e9243234` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-51 | spec | `8d3699fbe73c909fa0f86a20c7848d0a91934467` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-52 | spec | `1615493012697fea744a5bc896d482c90db7958d` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
+| 2026-11-07 | R-53 | spec | `ead38e2899800f3512f2051b3119d005898cc9e8` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 
 ### R-1
 
@@ -1707,6 +1708,19 @@ Name the executor and `execute` contract change in T78. In AC-05, add these case
 - refusal when the success artifact is missing, tampered or unlinked;
 - refusal for a pre-capture legacy attempt;
 - a positive case driven only by captured evidence.
+
+### R-53
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md:262-266 (executor success-evidence capture and the retained-artifact exclusion), :598 (T78 file list)
+EVIDENCE: The spec makes several demands of the new executor capture. It says to "Exclude raw response bodies, credentials, headers containing secrets and unrestricted stdout/stderr from retained artifacts". It says "The executor may parse bounded native response bytes transiently to construct the projection". It says to "Preserve the existing rejection evidence and settlement distinctions", and to keep evidence safe "across crashes and retries". The current executor conflicts with these demands in four ways:
+1. Native command output streams straight into persistent files. `owned-process.ts:28` spawns with `stdout: Bun.file(stdout), stderr: Bun.file(stderr)`. Those paths are created in the retained `native-command-<id>` directory under the artifact root (`transport.ts:275-290`).
+2. Response bodies are currently suppressed only by `--jq empty` (`transport.ts:306`). Capturing applied-field responses for the success projection requires removing that suppression. Once removed, raw response bodies and `--include` headers would land in those persisted stdout files.
+3. Existing rejection proof depends on that persisted stdout. `rejections.ts:59-62` reads the stdout file and digests it. `rejections.ts:91` reads the command directory again whenever the proof is later verified.
+Satisfying the exclusion, the transient parsing, crash safety and preserved rejection evidence together therefore requires changing `owned-process.ts` and `rejections.ts`, plus their tests. T78 names only `journal.ts`, `observations.ts`, `transport.ts`, `attempts.ts` and `delivery-ack.test.ts`. No task names those two files.
+PROPOSAL: Add `plugins/vh-adlc/scripts/docs-drift/owned-process.ts` and `plugins/vh-adlc/scripts/docs-drift/rejections.ts`, with their existing tests, to T78. State in the capture paragraph how mutation-response bytes are captured: through a bounded in-memory or ephemeral path that never persists raw bodies or secret-bearing headers, including after a crash. Also state how existing rejection evidence stays verifiable and readable for already-serialized journals. Add a Test Plan case: a crash between command completion and projection persistence leaves no raw response body or header canary in the artifact root, and existing rejection proofs still verify.
 
 ## Sources
 
