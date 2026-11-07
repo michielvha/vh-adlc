@@ -104,11 +104,11 @@ export function createNativeTransport(options: {
     const identity = actor(input);
     return identity.actor === plan.manifest.actor && identity.actor_id === plan.manifest.actor_id;
   }
-  function pull(number: number, plan: SealedPlan, requireOwner = true) {
+  function pull(number: number, plan: SealedPlan, requireOwner = true, requireBase = true) {
     const input = record(reader.get(`${prefix}/pulls/${positive(number)}`));
     if (positive(input.number) !== number || (requireOwner && !ownedActor(input.user, plan))) throw Error("foreign native PR");
     const base = record(input.base), head = record(input.head);
-    if (positive(record(base.repo).id) !== plan.manifest.repository_id || text(base.ref) !== settings.publication.base) throw Error("native PR destination changed");
+    if (positive(record(base.repo).id) !== plan.manifest.repository_id || (requireBase && text(base.ref) !== settings.publication.base)) throw Error("native PR destination changed");
     if (requireOwner && (positive(record(head.repo).id) !== plan.manifest.repository_id || !text(head.ref).startsWith(settings.publication.branch_prefix))) throw Error("foreign native PR branch");
     if (input.state !== "open" && input.state !== "closed") throw Error("unknown native PR state");
     return { input, head: text(head.sha), branch: text(head.ref) };
@@ -242,9 +242,20 @@ export function createNativeTransport(options: {
             state: "conflict", lookup: { reason, result: lookup, requests: reader.trace() } }) });
         if (["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(effect.kind)) {
           const target = getRef(text(p.ref));
+          if (effect.kind === "push" && (target.state === "absent" || target.object !== p.head)) {
+            const owner = settings.repository.split("/")[0], branch = text(p.ref).slice("refs/heads/".length);
+            const candidates = list(`${prefix}/pulls?state=all&head=${encodeURIComponent(owner + ":" + branch)}&per_page=100`);
+            for (const value of candidates) {
+              const candidate = record(value);
+              if (!ownedActor(candidate.user, plan)) continue;
+              const pr = pull(positive(candidate.number), plan, true, false);
+              if (pr.branch === branch && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
+            }
+          }
           if (effect.kind === "branch-refresh") {
-            const pr = pull(positive(p.number), plan);
-            if (pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
+            const pr = pull(positive(p.number), plan, true, false);
+            if ("refs/heads/" + pr.branch === p.ref && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
+            if (text(record(pr.input.base).ref) !== settings.publication.base || pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
             if (target.object === p.head && pr.head === p.expected_head) return { state: "unknown", reason: "native-PR-head-sync-pending" };
             if (pr.head !== target.object) return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
           }
@@ -295,18 +306,17 @@ export function createNativeTransport(options: {
               source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
         }
         if (effect.kind === "issue-create") {
-          checkIssueEvidence(effect);
           const inventory = list(`${prefix}/issues?state=all&per_page=100`);
           const { candidates, conflict } = creationCandidates(inventory, plan, effect);
           if (conflict) return conflicted("native-issue-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
-          if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
+          if (candidates.length === 0) { checkIssueEvidence(effect); return absent({ inventory: inventoryEvidence(inventory), candidates }); }
           if (candidates.length !== 1) return conflicted("ambiguous-native-issue", { inventory: inventoryEvidence(inventory) });
           const issue = candidates[0];
           if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !same(labelNames(issue.labels), [...p.labels as string[]].sort())) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
           return observed(issue, String(positive(issue.number)), null);
         }
         if (effect.kind === "comment-create") {
-          const pr = pull(positive(p.number), plan, false);
+          const pr = pull(positive(p.number), plan, false, false);
           const inventory = list(`${prefix}/issues/${p.number}/comments?per_page=100`);
           const { candidates, conflict } = creationCandidates(inventory, plan, effect);
           if (conflict) return conflicted("native-comment-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
@@ -364,7 +374,7 @@ export function createNativeTransport(options: {
           return;
         }
         if (effect.kind === "issue-create") { checkIssueEvidence(effect); await mutation(plan, "POST", `${prefix}/issues`, { title: p.title, body: p.body, labels: p.labels }, delivery); return; }
-        if (effect.kind === "comment-create") { await mutation(plan, "POST", `${prefix}/issues/${positive(p.number)}/comments`, { body: p.body }, delivery); return; }
+        if (effect.kind === "comment-create") { pull(positive(p.number), plan, false); await mutation(plan, "POST", `${prefix}/issues/${positive(p.number)}/comments`, { body: p.body }, delivery); return; }
         if (effect.kind === "pr-close") { await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { state: "closed" }, delivery); return; }
         throw Error("unsupported native publication effect");
       } catch { throw new PublicationExecutionError(delivery.sent, delivery.reaped, delivery.rejection); }

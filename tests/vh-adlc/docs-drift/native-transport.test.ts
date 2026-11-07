@@ -3,7 +3,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { reconcileAbsent } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
+import { reconcileAbsent, inspectRetainedOperation, restoreRetainedOperation } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { createNativeTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { sealPlan, writePlanObject, createJournal, writePublicationObjects, appendIntent, appendOutcome, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
@@ -170,8 +170,11 @@ else if (endpoint?.startsWith('repos/fixture/docs/git/ref/')) {
         value = { message: 'Not Found' };
     }
 }
-else if (endpoint?.startsWith('repos/fixture/docs/pulls?'))
-    value = state.prs;
+else if (endpoint?.startsWith('repos/fixture/docs/pulls?')) {
+    const query = new URL(endpoint, 'https://example.invalid/').searchParams;
+    const base = query.get('base'), branch = query.get('head')?.split(':').at(-1);
+    value = state.prs.filter(pr => (!base || pr.base.ref === base) && (!branch || pr.head.ref === branch));
+}
 else if (endpoint?.startsWith('repos/fixture/docs/pulls/'))
     value = state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-1)));
 else if (endpoint?.includes('/comments?'))
@@ -553,7 +556,11 @@ test("positive native Git rejection permits a new attempt while damaged proof st
 
 test("a complete API rejection differs from retryable and partial native CLI failures", async () => {
   for (const status of [403, 408, 429, 502]) {
-    const f = setup(); await f.transport.identity(); f.update(state => { state.reject_http = status; });
+    const f = setup(); await f.transport.identity(); f.update(state => {
+      state.reject_http = status;
+      state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+        head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } });
+    });
     const effect: Effect = { id: "comment", kind: "comment-create", payload: { number: 77, prior_ids: [], body: "exact body" } };
     const error = await f.transport.execute(f.plan, effect, f.objects, "http-rejection-attempt").then(() => null, error => error);
     expect(error).toBeInstanceOf(PublicationExecutionError);
@@ -694,4 +701,116 @@ test("retirement rechecks every rejected attempt including the atomic receipt al
   expect(pendingAttempt(journal, selected.effect)).toBeNull();
   expect(pendingAttempt(journal, selected.effect, true)).toBe("rejection-proof-unavailable");
   expect(pendingAttempt(journal, receipt, true)).toBe("rejection-proof-unavailable");
+});
+
+
+test.each(["push-absent", "push-moved", "refresh-closed"] as const)("an exact owned PR head preserves historical push observation (%s)", scenario => {
+  return (async () => {
+    const f = setup(); await f.transport.identity();
+    f.update(state => {
+      state.prs.push({ number: 501, state: "closed", user: { login: "fixture-bot", id: 20 },
+        head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } });
+      if (scenario === "push-moved") state.refs["refs/heads/docs-drift/one"] = "f".repeat(40);
+    });
+    const effect: Effect = scenario === "refresh-closed"
+      ? { id: "refresh", kind: "branch-refresh", payload: { number: 501, ref: "refs/heads/docs-drift/one", head: f.commit, expected_head: "e".repeat(40) } }
+      : { id: "push", kind: "push", payload: { ref: "refs/heads/docs-drift/one", head: f.commit } };
+    expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
+    f.update(state => { (state.prs[0].head as { sha: string }).sha = "e".repeat(40); });
+    expect((await f.transport.observe(f.plan, effect, f.objects)).state).not.toBe("done");
+    f.update(state => { (state.prs[0].head as { sha: string }).sha = f.commit; state.prs[0].user = { login: "other-bot", id: 99 }; });
+    expect((await f.transport.observe(f.plan, effect, f.objects)).state).not.toBe("done");
+  })();
+});
+
+test("an existing exact issue remains observable when its original evidence disappears", async () => {
+  const f = setup(); await f.transport.identity();
+  const issue: Effect = { id: "issue", kind: "issue-create", payload: { title: "Synthetic issue", labels: [], prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+    evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
+  await f.transport.execute(f.plan, issue, f.objects);
+  f.update(state => { state.tree_response.tree = []; });
+  expect((await f.transport.observe(f.plan, issue, f.objects)).state).toBe("done");
+  await expect(f.transport.execute(f.plan, issue, f.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
+  expect(f.inspect().issues).toHaveLength(1);
+});
+
+test("an existing exact explanation survives base retargeting while a new POST stays guarded", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+    head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  const effect: Effect = { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  f.update(state => { (state.prs[0].base as { ref: string }).ref = "release"; });
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
+  await expect(f.transport.execute(f.plan, effect, f.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
+  expect(f.inspect().comments["77"]).toHaveLength(1);
+});
+
+test("lost-mirror cleanup observes merged deleted-branch delivery and existing issue/explanation without replay", async () => {
+  const f = setup(); await f.transport.identity();
+  const branch = "refs/heads/docs-drift/one";
+  const effects: Effect[] = [f.plan.manifest.effects[0], f.plan.manifest.effects[1], f.plan.manifest.effects[2],
+    { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/one", title: "Synthetic delivery", labels: [], draft: false,
+      body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr") } },
+    { id: "issue", kind: "issue-create", payload: { title: "Synthetic issue", labels: [], prior_ids: [],
+      body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+      evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } },
+    { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [],
+      body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } },
+    { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } }];
+  const input = fixture(f.plan.manifest.bindings, effects), policy = { adoption_sha256: hash("adoption"), publication_kind: "advisory" as const,
+    context: "production" as const, transport: "native" as const, pr_draft: false, worker: role, reviewer: role };
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
+  const repo = join(f.root, "source"), artifacts = join(f.root, "artifacts");
+  const original = createJournal({ source_repo: repo, artifact_root: artifacts, plan }), objects = writePublicationObjects(f.store, plan, original.header);
+  const bytes = canonicalJSON(plan);
+  f.update(state => {
+    state.metadata_commit = { sha: objects.lease_object!, tree: { sha: objects.tree }, parents: [], message: "retained operation" };
+    state.metadata_tree = { sha: objects.tree, truncated: false, tree: [{ path: "plan.json", mode: "100644", type: "blob", sha: objects.blob }] };
+    state.metadata_blob = { sha: objects.blob, encoding: "base64", size: bytes.length, content: bytes.toString("base64") };
+    state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+      head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } });
+  });
+  for (const effect of effects.slice(0, -1)) {
+    if (effect.kind !== "receipt-retain") await f.transport.execute(plan, effect, objects);
+  }
+  f.update(state => {
+    const delivered = state.prs.find(pr => pr.number === 501)!; delivered.state = "closed"; delivered.merged = true;
+    delete state.refs[branch]; state.tree_response.tree = []; (state.prs[0].base as { ref: string }).ref = "release";
+  });
+  rmSync(original.directory, { recursive: true });
+  const restoredRoot = join(f.root, "fresh-host-artifacts"); mkdirSync(restoredRoot, { mode: 0o700 });
+  const transport = createNativeTransport({ settings: f.settings, object_store: f.store, artifact_root: restoredRoot,
+    source_repo: repo, credential: "synthetic-credential", path: join(f.root, "bin") + ":" + process.env.PATH });
+  const inspection = await inspectRetainedOperation({ source_repo: repo, artifact_root: restoredRoot, settings: f.settings,
+    transport, operation_id: "operation-1", verify_policy: () => policy });
+  for (const id of ["push", "pr", "issue", "explain"]) {
+    const selected = inspection.observations.find(item => item.effect_id === id);
+    expect({ id, state: selected?.observation.state }).toEqual({ id, state: "done" });
+  }
+  const restored = await restoreRetainedOperation({ inspection, publication: { source_repo: repo, artifact_root: restoredRoot,
+    object_store: f.store, settings: f.settings, plan, transport,
+    gate: async () => { throw Error("original business proof unavailable"); } } });
+  expect(restored.state).toBe("pending");
+  const completed = await reconcileAbsent({ source_repo: repo, journal_directory: restored.journal.directory, object_store: f.store,
+    settings: f.settings, transport, retire_effect_ids: [],
+    authorize: async scope => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("actual owned metadata cleanup request") }) });
+  expect(completed.state).toBe("complete");
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+  expect(f.inspect().refs[branch]).toBeUndefined();
+  expect(f.inspect().issues).toHaveLength(1); expect(f.inspect().comments["77"]).toHaveLength(1);
+  expect(completed.journal.events.filter(event => event.kind === "attempt").map(event => event.effect_id)).toEqual(["release"]);
+});
+
+test("an unfinished retargeted refresh retains its destination guard", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => {
+    state.refs["refs/heads/docs-drift/one"] = "e".repeat(40);
+    state.prs.push({ number: 501, state: "open", user: { login: "fixture-bot", id: 20 },
+      head: { ref: "docs-drift/one", sha: "e".repeat(40), repo: { id: 10 } }, base: { ref: "release", repo: { id: 10 } } });
+  });
+  const effect: Effect = { id: "refresh", kind: "branch-refresh", payload: { number: 501, ref: "refs/heads/docs-drift/one", expected_head: "e".repeat(40), head: f.commit } };
+  expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("conflict");
 });
