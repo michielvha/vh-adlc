@@ -1,11 +1,12 @@
-import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
+import { executeAttempt, pendingAttempt, PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { reconcileAbsent } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { createNativeTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
-import { sealPlan, writePlanObject, createJournal, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { sealPlan, writePlanObject, createJournal, writePublicationObjects, appendIntent, appendOutcome, readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -46,7 +47,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: {} as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -67,6 +68,10 @@ if (process.argv[1].endsWith('/git')) {
         if (!lease) process.exit(2);
         return { ref, head, expected: lease.expected };
     });
+    if (state.reject_git) {
+        process.stdout.write('To https://github.com/fixture/docs.git\\n' + updates.map(item => '!\\t' + item.head + ':' + item.ref + '\\t[remote rejected] (pre-receive hook declined)\\n').join('') + 'Done\\n');
+        process.exit(1);
+    }
     if (state.race) {
         state.refs[updates[0].ref] = 'f'.repeat(40);
         state.race = false;
@@ -91,7 +96,7 @@ if (args[0] === 'pr' && args[1] === 'create') {
         labels: args.filter(a => a.startsWith('--label=')).map(a => ({ name: a.slice(8) })), user: { login: 'fixture-bot', id: 20 },
         base: { ref: 'main', repo: { id: 10 } }, head: { ref: branch, sha: state.refs['refs/heads/' + branch], repo: { id: 10 } } });
     save();
-    process.exit(0);
+    process.exit(state.partial_pr_error ? 1 : 0);
 }
 if (args.includes('graphql')) {
     const response = { data: { viewer: { login: 'fixture-bot', databaseId: 20 } } };
@@ -108,6 +113,10 @@ if (args[0] === 'pr' && args[1] === 'ready') {
 const endpoint = args.find(a => a === 'user' || a.startsWith('repos/'));
 const method = option('--method');
 if (method !== 'GET') {
+    if (state.reject_http) {
+        process.stdout.write('HTTP/2.0 ' + state.reject_http + ' rejected\\r\\n\\r\\n{"message":"rejected"}');
+        process.exit(1);
+    }
     const payload = JSON.parse(readFileSync(option('--input'), 'utf8'));
     if (method === 'POST' && endpoint === 'repos/fixture/docs/issues')
         state.issues.push({ ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: 20 }, labels: payload.labels.map(name => ({ name })) });
@@ -462,7 +471,7 @@ test("a different native lease holder after release proves this run no longer ow
 
 function acquisition(f: ReturnType<typeof setup>) {
   const journal = createJournal({ source_repo: join(f.root, "source"), artifact_root: join(f.root, "artifacts"), plan: f.plan });
-  return { plan: f.plan, objects: writePublicationObjects(f.store, f.plan, journal.header), effect: f.plan.manifest.effects[0] };
+  return { journal, plan: f.plan, objects: writePublicationObjects(f.store, f.plan, journal.header), effect: f.plan.manifest.effects[0] };
 }
 
 function realGitServer(f: ReturnType<typeof setup>, advertiseAtomic = true) {
@@ -519,4 +528,86 @@ test("real Git treats an identical retained receipt as up to date, so uncertain 
   await f.transport.execute(selected.plan, selected.effect, selected.objects);
   expect(readGit(server, "rev-parse", f.settings.publication.lease_ref).toString().trim()).toBe(selected.objects.lease_object);
   expect(readGit(server, "rev-parse", f.settings.publication.receipt_ref_prefix + "operation-1").toString().trim()).toBe(selected.objects.receipt_object);
+});
+
+
+test("positive native Git rejection permits a new attempt while damaged proof stays pending", async () => {
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f);
+  let journal = appendIntent(selected.journal, selected.effect.id);
+  f.update(state => { state.reject_git = true; });
+  await expect(executeAttempt({ journal, effect: selected.effect, objects: selected.objects, transport: f.transport })).rejects.toBeInstanceOf(PublicationExecutionError);
+  journal = readJournal(journal.directory, join(f.root, "source"));
+  expect(pendingAttempt(journal, selected.effect)).toBeNull();
+  expect(pendingAttempt(journal, f.plan.manifest.effects[1])).toBeNull();
+  const ended = journal.events.findLast(event => event.kind === "attempt-ended");
+  if (!ended || !("rejection" in ended.payload) || !ended.payload.rejection) throw Error("missing positive rejection proof");
+  const proof = readFileSync(ended.payload.rejection.path);
+  writeFileSync(ended.payload.rejection.path, "{}");
+  expect(pendingAttempt(journal, selected.effect)).toBe("rejection-proof-unavailable");
+  writeFileSync(ended.payload.rejection.path, proof);
+  f.update(state => { state.reject_git = false; });
+  journal = await executeAttempt({ journal, effect: selected.effect, objects: selected.objects, transport: f.transport });
+  expect((await f.transport.observe(journal.plan, selected.effect, selected.objects)).state).toBe("done");
+});
+
+test("a complete API rejection differs from retryable and partial native CLI failures", async () => {
+  for (const status of [403, 408, 429, 502]) {
+    const f = setup(); await f.transport.identity(); f.update(state => { state.reject_http = status; });
+    const effect: Effect = { id: "comment", kind: "comment-create", payload: { number: 77, prior_ids: [], body: "exact body" } };
+    const error = await f.transport.execute(f.plan, effect, f.objects, "http-rejection-attempt").then(() => null, error => error);
+    expect(error).toBeInstanceOf(PublicationExecutionError);
+    expect(Boolean(error.rejection)).toBe(status === 403);
+  }
+  const f = setup(); await f.transport.identity(); f.update(state => {
+    state.refs["refs/heads/docs-drift/one"] = f.commit; state.partial_pr_error = true;
+  });
+  const effect = f.plan.manifest.effects.find(effect => effect.kind === "pr-create")!;
+  const error = await f.transport.execute(f.plan, effect, f.objects, "partial-creation").then(() => null, error => error);
+  expect(error).toBeInstanceOf(PublicationExecutionError);
+  expect(error.rejection).toBeUndefined();
+  expect(f.inspect().prs).toHaveLength(1);
+});
+
+
+test("a positively rejected native candidate push permits separately approved retirement and lease cleanup", async () => {
+  const f = setup(); await f.transport.identity();
+  const release: Effect = { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } };
+  const input = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects, release]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants,
+    adoption_sha256: hash("adoption"), context: "trial", transport: "native", corrections: [], attention: [] });
+  const repo = join(f.root, "source"), artifacts = join(f.root, "artifacts");
+  let journal = createJournal({ source_repo: repo, artifact_root: artifacts, plan });
+  const objects = writePublicationObjects(f.store, plan, journal.header);
+  journal = appendIntent(journal, "lease");
+  journal = await executeAttempt({ journal, effect: plan.manifest.effects[0], objects, transport: f.transport });
+  for (const effect of plan.manifest.effects.slice(0, 2)) {
+    const observed = await f.transport.observe(plan, effect, objects);
+    if (observed.state !== "done") throw Error("missing metadata observation");
+    journal = appendOutcome(journal, effect.id, observed.outcome);
+  }
+  const push = plan.manifest.effects[2];
+  journal = appendIntent(journal, push.id);
+  f.update(state => { state.reject_git = true; });
+  await expect(executeAttempt({ journal, effect: push, objects, transport: f.transport })).rejects.toBeInstanceOf(PublicationExecutionError);
+  f.update(state => { state.reject_git = false; });
+  const cleaned = await reconcileAbsent({ source_repo: repo, journal_directory: journal.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, retire_effect_ids: ["push", "pr"],
+    authorize: async scope => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("actual selected cleanup request") }) });
+  expect(cleaned.state).toBe("retired");
+  expect(cleaned.journal.events.some(event => event.effect_id === push.id && event.kind === "retired-absence")).toBe(true);
+  expect(cleaned.journal.events.some(event => event.effect_id === push.id && event.kind === "outcome")).toBe(false);
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+});
+
+test("actual Git rejection supplies positive proof for both atomic metadata refs", async () => {
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f), server = realGitServer(f);
+  const receipt = f.settings.publication.receipt_ref_prefix + "operation-1";
+  readGit(f.store.root, "-c", "protocol.file.allow=always", "push", "--", server, selected.objects.object + ":" + receipt);
+  const error = await f.transport.execute(selected.plan, selected.effect, selected.objects, "real-rejected-atomic-push").then(() => null, error => error);
+  expect(error).toBeInstanceOf(PublicationExecutionError);
+  expect(error.rejection).toBeDefined();
+  expect(() => readGit(server, "rev-parse", "--verify", f.settings.publication.lease_ref)).toThrow();
+  expect(readGit(server, "rev-parse", receipt).toString().trim()).toBe(selected.objects.object);
 });

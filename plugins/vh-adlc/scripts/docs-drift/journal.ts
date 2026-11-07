@@ -26,7 +26,7 @@ export type Retirement = { scope_sha256: string; request_sha256: string; lookup:
 export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
 type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant; atomic_receipt_id?: string };
 type Intent = { effect_sha256: string; atomic_acquisition?: string };
-type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean };
+type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean; rejection?: { path: string; sha256: string } };
 type Event = {
   schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended" | "recovery-only";
   effect_id: string; payload: Intent | Outcome | { reason: string } | Retirement | Attempt | AttemptEnd;
@@ -226,7 +226,14 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[]): void 
       if (prior.some(item => item.kind === "attempt" && (item.payload as { attempt_id: string }).attempt_id === (event.payload as { attempt_id: string }).attempt_id)) fail("repeated attempt identity");
     }
     else if (event.kind === "attempt-ended") {
-      const payload = exact(event.payload, ["attempt_id", "sent", "reaped"]);
+      const rejected = Object.hasOwn(event.payload, "rejection");
+      const payload = exact(event.payload, ["attempt_id", "sent", "reaped", ...(rejected ? ["rejection"] : [])]);
+      if (rejected) {
+        const evidence = exact(payload.rejection, ["path", "sha256"]);
+        hash(evidence.sha256);
+        if (payload.sent !== true || payload.reaped !== true || typeof evidence.path !== "string"
+          || !evidence.path.startsWith("/") || evidence.path.includes("\0")) fail("invalid rejection evidence");
+      }
       identifier(payload.attempt_id);
       const attempt = prior.findLast(item => item.kind === "attempt");
       if (!attempt || (attempt.payload as { attempt_id: string }).attempt_id !== payload.attempt_id

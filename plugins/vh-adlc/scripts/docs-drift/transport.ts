@@ -1,3 +1,4 @@
+import { retainRejection, type RejectionEvidence, type RejectedUpdate } from "./rejections";
 import { PublicationExecutionError } from "./attempts";
 import type { Effect } from "./manifests";
 import type { Outcome, SealedPlan, writePlanObject } from "./journal";
@@ -18,7 +19,7 @@ import type { Settings } from "./settings";
 export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string; receipt_object?: string };
 export type RefObservation = { state: "absent" } | { state: "present"; object: string };
 export type EffectObservation = { state: "done"; outcome: Outcome } | { state: "absent"; evidence?: AbsenceEvidence } | { state: "unknown" | "conflict"; reason: string };
-type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null };
+type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; rejection?: RejectionEvidence };
 export type PublicationIdentity = { repository: string; repository_id: number; default_branch: string; actor: string; actor_id: number };
 
 /** The production entry constructs its native transport. Only the separate trial entry injects a collector. */
@@ -164,7 +165,7 @@ export function createNativeTransport(options: {
     const permalink = `https://${settings.hostname}/${name}/blob/${commit}/${parts.map(encodeURIComponent).join("/")}`;
     if (!text(p.body).includes(permalink)) throw Error("reviewed issue body omits bound evidence permalink");
   }
-  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery): Promise<void> {
+  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }): Promise<void> {
     const id = randomUUID(), directory = join(root, "native-command-" + id);
     writeFileSync(join(root, id + ".native-command.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-native-command", operation_id: plan.manifest.operation_id,
       root: directory, effect_id: delivery.effect_id, attempt_id: delivery.attempt_id, argv_sha256: sha256(canonicalJSON(argv)) }), { flag: "wx", mode: 0o600 });
@@ -182,11 +183,20 @@ export function createNativeTransport(options: {
       started: pid => { delivery.sent = true; delivery.reaped = false; writeFileSync(join(directory, "started.json"), canonicalJSON({ pid }), { flag: "wx", mode: 0o600 }); } });
     delivery.reaped = result.reaped;
     writeFileSync(join(directory, "process.json"), canonicalJSON(result), { flag: "wx", mode: 0o600 });
-    if (result.exit_code !== 0 || !result.reaped || result.timed_out || result.cancelled !== null || result.output_limit) throw Error("native publication command incomplete; inspect owned artifacts");
+    if (result.exit_code !== 0 || !result.reaped || result.timed_out || result.cancelled !== null || result.output_limit) {
+      if (protocol && delivery.attempt_id !== null && delivery.completed_commands === 0 && delivery.effect.kind !== "pr-update") {
+        try {
+          delivery.rejection = retainRejection({ artifact_root: root, source_repo: options.source_repo, plan,
+            effect: delivery.effect, attempt_id: delivery.attempt_id, command_directory: directory, protocol });
+        } catch { /* An incomplete or ambiguous response supplies no rejection proof. */ }
+      }
+      throw Error("native publication command incomplete; inspect owned artifacts");
+    }
+    delivery.completed_commands++;
   }
   async function mutation(plan: SealedPlan, method: string, endpoint: string, input: unknown, delivery: NativeDelivery): Promise<void> {
     if (!endpoint.startsWith(prefix + "/")) throw Error("foreign mutation destination");
-    await run(plan, ["gh", "api", "--hostname", settings.hostname, "--method", method, "--silent", endpoint], canonicalJSON(input), delivery);
+    await run(plan, ["gh", "api", "--hostname", settings.hostname, "--method", method, "--include", "--jq", "empty", endpoint], canonicalJSON(input), delivery, { protocol: "http" });
   }
   async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string, delivery: NativeDelivery, companion?: { ref: string; head: string; expected: string }): Promise<void> {
     requireOwnedStore(store, settings.repository);
@@ -194,7 +204,7 @@ export function createNativeTransport(options: {
     const argv = gitReadArguments(["--no-lazy-fetch", "--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=",
       "-c", "credential.helper=!gh auth git-credential", "-c", "http.extraHeader=", "push", "--porcelain", ...(companion ? ["--atomic"] : []), ...updates.map(update => `--force-with-lease=${update.ref}:${update.expected}`),
       "--", `https://${settings.hostname}/${settings.repository}.git`, ...updates.map(update => `${update.head ?? ""}:${update.ref}`)]);
-    await run(plan, argv, null, delivery);
+    await run(plan, argv, null, delivery, { protocol: "git", updates });
   }
 
   return {
@@ -305,7 +315,7 @@ export function createNativeTransport(options: {
       } catch { return { state: "unknown", reason: "native-publication-observation-unavailable" }; }
     },
     async execute(plan, effect, objects, attempt_id) {
-      const delivery = { sent: false, reaped: true, effect_id: effect.id, attempt_id: attempt_id ?? null };
+      const delivery: NativeDelivery = { sent: false, reaped: true, effect_id: effect.id, attempt_id: attempt_id ?? null, effect, completed_commands: 0 };
       try {
         const p = effect.payload;
         if (effect.kind === "lease-acquire") {
@@ -354,7 +364,7 @@ export function createNativeTransport(options: {
         if (effect.kind === "comment-create") { await mutation(plan, "POST", `${prefix}/issues/${positive(p.number)}/comments`, { body: p.body }, delivery); return; }
         if (effect.kind === "pr-close") { await mutation(plan, "PATCH", `${prefix}/pulls/${positive(p.number)}`, { state: "closed" }, delivery); return; }
         throw Error("unsupported native publication effect");
-      } catch { throw new PublicationExecutionError(delivery.sent, delivery.reaped); }
+      } catch { throw new PublicationExecutionError(delivery.sent, delivery.reaped, delivery.rejection); }
     },
   };
 }

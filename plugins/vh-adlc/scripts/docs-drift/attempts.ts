@@ -1,3 +1,5 @@
+import { dirname } from "node:path";
+import { readRejection, type RejectionEvidence } from "./rejections";
 import { randomUUID } from "node:crypto";
 import { appendAttempt, appendAttemptEnd, appendIntent, readJournal, type Journal, type ReconciliationGrant } from "./journal";
 import type { Effect } from "./manifests";
@@ -5,7 +7,7 @@ import type { PlanObjects, PublicationTransport } from "./transport";
 
 /** Only the native executor's process/preflight observations supply this status. */
 export class PublicationExecutionError extends Error {
-  constructor(readonly sent: boolean, readonly reaped: boolean) { super("native publication execution unavailable"); }
+  constructor(readonly sent: boolean, readonly reaped: boolean, readonly rejection?: RejectionEvidence) { super("native publication execution unavailable"); }
 }
 
 export function pendingAttempt(journal: Journal, effect: Effect, retirement = false): string | null {
@@ -17,8 +19,17 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
   if (!attempt) return null;
   const ended = events.findLast(event => event.kind === "attempt-ended");
   if (!ended || ended.revision < attempt.revision) return "attempt-in-flight";
-  const status = ended.payload as { sent: boolean; reaped: boolean };
+  const status = ended.payload as { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; attempt_id: string };
   if (!status.reaped) return "attempt-not-reaped";
+  if (status.rejection) {
+    try {
+      const dispatched = journal.plan.manifest.effects.find(item => item.id === attempt.effect_id);
+      if (!dispatched) return "rejection-proof-unavailable";
+      readRejection({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo, plan: journal.plan,
+        effect: dispatched, attempt_id: status.attempt_id, evidence: status.rejection });
+      return null;
+    } catch { return "rejection-proof-unavailable"; }
+  }
   if (status.sent && (retirement || ["lease-acquire", "push", "pr-create", "issue-create", "comment-create"].includes(effect.kind)
     || "atomic_receipt_id" in attempt.payload && attempt.payload.atomic_receipt_id === effect.id)) return "dispatch-outcome-unknown";
   return null;
@@ -41,13 +52,13 @@ export async function executeAttempt(options: {
   }
   journal = appendAttempt(journal, options.effect.id, id, options.reconciliation, receipt?.id);
   let failure: unknown;
-  let status = { sent: true, reaped: true };
+  let status: { sent: boolean; reaped: boolean; rejection?: RejectionEvidence } = { sent: true, reaped: true };
   try {
     readJournal(journal.directory, journal.source_repo, journal);
     await options.transport.execute(journal.plan, options.effect, options.objects, id);
   } catch (error) {
     failure = error;
-    status = error instanceof PublicationExecutionError ? { sent: error.sent, reaped: error.reaped } : { sent: true, reaped: false };
+    status = error instanceof PublicationExecutionError ? { sent: error.sent, reaped: error.reaped, ...(error.rejection ? { rejection: error.rejection } : {}) } : { sent: true, reaped: false };
   }
   // An observer may already have recorded an actual outcome. Keep its receipt and our process status.
   journal = readJournal(journal.directory, journal.source_repo);
