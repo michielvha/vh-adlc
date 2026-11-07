@@ -1136,3 +1136,59 @@ test.each(["done", "absent", "conflict"] as const)("retained %s lookup evidence 
   expect(first.label_comparisons).toEqual(state === "absent" ? [] : [{ observed: [{ id: state === "done" ? 101 : 103, name: state === "done" ? "documentation" : "other" }],
     expected: [{ requested: "Documentation", id: 101, canonical: "documentation" }], matched: state === "done" }]);
 });
+
+
+test.each(["source", "target"] as const)("PR update %s evidence attributes only the evaluated label comparisons", async state => {
+  const f = setup(); await f.transport.identity();
+  const common = { title: "Reviewed update", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("update"), draft: true };
+  const original = { ...common, labels: ["Old"] };
+  f.update(value => {
+    value.labels.Documentation = value.labels.documentation; value.labels.Old = value.labels.old;
+    value.prs.push({ ...common, labels: state === "source" ? [{ id: 102, name: "old" }] : [{ id: 101, name: "documentation" }], number: 77, state: "open",
+      user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } });
+  });
+  const effect: Effect = { id: "update", kind: "pr-update", payload: { ...common, labels: ["Documentation"], number: 77, expected_head: f.commit,
+    expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)) } };
+  async function lookup() {
+    const result = await f.transport.observe(f.plan, effect, f.objects);
+    expect(result.state).toBe(state === "source" ? "absent" : "done");
+    const support = result.state === "done" ? result.outcome.lookup : result.state === "absent" ? result.evidence : undefined;
+    if (!support) throw Error("missing update lookup evidence");
+    readLookup({ evidence: support, artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan: f.plan, effect,
+      transport: "native", state: state === "source" ? "absent" : "done" });
+    const retained: { lookup: { requests: { endpoint: string }[]; label_comparisons: unknown[] } } = JSON.parse(readFileSync(support.path, "utf8"));
+    return retained.lookup;
+  }
+  const first = await lookup(), second = await lookup();
+  const observed = state === "source" ? [{ id: 102, name: "old" }] : [{ id: 101, name: "documentation" }];
+  const comparisons = [{ observed, expected: [{ requested: "Documentation", id: 101, canonical: "documentation" }], matched: state === "target" }];
+  if (state === "source") comparisons.push({ observed, expected: [{ requested: "Old", id: 102, canonical: "old" }], matched: true });
+  expect(first.label_comparisons).toEqual(comparisons);
+  expect(second.label_comparisons).toEqual(comparisons);
+  expect(first.requests.map(request => request.endpoint)).not.toContain("repos/fixture/docs/git/commits/" + f.commit);
+  expect(second.requests.map(request => request.endpoint)).toEqual(first.requests.map(request => request.endpoint));
+});
+
+test("issue-create alias evidence retains only its successful current comparison", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(value => { value.labels.Documentation = value.labels.documentation; });
+  const effect: Effect = { id: "issue", kind: "issue-create", payload: { title: "Reviewed issue", labels: ["Documentation"], prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("issue") + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+    evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
+  await f.transport.execute(f.plan, effect, f.objects);
+  async function lookup() {
+    const result = await f.transport.observe(f.plan, effect, f.objects);
+    expect(result.state).toBe("done");
+    if (result.state !== "done" || !result.outcome.lookup) throw Error("missing issue lookup evidence");
+    const support = readLookup({ evidence: result.outcome.lookup, artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"),
+      plan: f.plan, effect, transport: "native", state: "done" });
+    const retained: { lookup: { requests: { endpoint: string }[]; label_comparisons: unknown[] } } = JSON.parse(readFileSync(support.path, "utf8"));
+    return retained.lookup;
+  }
+  const first = await lookup(), second = await lookup();
+  const comparisons = [{ observed: [{ id: 101, name: "documentation" }], expected: [{ requested: "Documentation", id: 101, canonical: "documentation" }], matched: true }];
+  expect(first.label_comparisons).toEqual(comparisons);
+  expect(second.label_comparisons).toEqual(comparisons);
+  expect(first.requests.map(request => request.endpoint)).not.toContain("repos/fixture/docs/git/commits/" + f.commit);
+  expect(second.requests.map(request => request.endpoint)).toEqual(first.requests.map(request => request.endpoint));
+});
