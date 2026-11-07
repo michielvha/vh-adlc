@@ -1112,3 +1112,27 @@ test.each(["missing", "duplicate", "invalid"] as const)("native label snapshots 
   });
   expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("unknown");
 });
+
+
+test.each(["done", "absent", "conflict"] as const)("retained %s lookup evidence includes only current observation requests", async state => {
+  const f = setup(); await f.transport.identity();
+  f.update(value => { value.labels.Documentation = value.labels.documentation; value.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect: Effect = { id: "pr", kind: "pr-create", payload: { title: "Reviewed PR", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"),
+    labels: ["Documentation"], draft: true, base: "main", branch: "docs-drift/one" } };
+  if (state !== "absent") await f.transport.execute(f.plan, effect, f.objects);
+  if (state === "conflict") f.update(value => { value.prs[0].labels = [{ id: 103, name: "other" }]; });
+  async function lookup() {
+    const result = await f.transport.observe(f.plan, effect, f.objects);
+    expect(result.state).toBe(state);
+    const support = result.state === "done" ? result.outcome.lookup
+      : result.state === "absent" || result.state === "conflict" ? result.evidence : undefined;
+    if (!support) throw Error("missing native lookup evidence");
+    const retained: { lookup: { requests: { endpoint: string }[]; label_comparisons: unknown[] } } = JSON.parse(readFileSync(support.path, "utf8"));
+    return retained.lookup;
+  }
+  const first = await lookup(), second = await lookup();
+  expect(first.requests.map(request => request.endpoint)).not.toContain("repos/fixture/docs/git/commits/" + f.commit);
+  expect(second.requests.map(request => request.endpoint)).toEqual(first.requests.map(request => request.endpoint));
+  expect(first.label_comparisons).toEqual(state === "absent" ? [] : [{ observed: [{ id: state === "done" ? 101 : 103, name: state === "done" ? "documentation" : "other" }],
+    expected: [{ requested: "Documentation", id: 101, canonical: "documentation" }], matched: state === "done" }]);
+});

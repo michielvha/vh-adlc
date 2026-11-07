@@ -52,7 +52,7 @@ function actor(value: unknown) {
   return { actor: text(input.login), actor_id: positive(input.id) };
 }
 type NativeLabel = { id: number; name: string };
-type LabelComparison = { observed: NativeLabel[]; expected: { requested: string; id: number | null; canonical: string | null }[] };
+type LabelComparison = { matched: boolean; observed: NativeLabel[]; expected: { requested: string; id: number | null; canonical: string | null }[] };
 function nativeLabels(value: unknown): NativeLabel[] {
   if (!Array.isArray(value)) throw Error("incomplete native labels");
   const labels = value.map(item => { const label = record(item); return { id: positive(label.id), name: text(label.name) }; });
@@ -150,10 +150,11 @@ export function createNativeTransport(options: {
     };
     const expectedLabels = expected.map(requested => { const label = identity(requested);
       return { requested, id: label?.id ?? null, canonical: label?.name ?? null }; });
-    comparisons?.push({ observed: actual, expected: expectedLabels });
-    if (expectedLabels.some(label => label.id === null)) return false;
     const expectedIds = [...new Set(expectedLabels.map(label => label.id))].sort((left, right) => Number(left) - Number(right));
-    return same(actual.map(label => label.id).sort((left, right) => left - right), expectedIds);
+    const matched = expectedLabels.every(label => label.id !== null)
+      && same(actual.map(label => label.id).sort((left, right) => left - right), expectedIds);
+    comparisons?.push({ observed: actual, expected: expectedLabels, matched });
+    return matched;
   }
   function fieldsMatch(value: unknown, expected: ReturnType<typeof expectedFields>, comparisons?: LabelComparison[]): boolean {
     const actual = submittedFields(value);
@@ -326,18 +327,19 @@ export function createNativeTransport(options: {
     },
     async observe(plan, effect, objects) {
       const p = effect.payload;
+      const requestStart = reader.trace().length;
       const comparisons: LabelComparison[] = [];
       try {
         const absent = (lookup: unknown): EffectObservation => ({ state: "absent", evidence: retainAbsence({
-          artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", lookup: { result: lookup, label_comparisons: comparisons, requests: reader.trace() },
+          artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", lookup: { result: lookup, label_comparisons: comparisons, requests: reader.trace().slice(requestStart) },
         }) });
         const conflicted = (reason: string, lookup: unknown): EffectObservation => ({ state: "conflict", reason,
           evidence: retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native",
-            state: "conflict", lookup: { reason, result: lookup, label_comparisons: comparisons, requests: reader.trace() } }) });
+            state: "conflict", lookup: { reason, result: lookup, label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } }) });
         const observedLabels = (input: unknown, resourceId: string, object: string | null): EffectObservation => {
           if (comparisons.length === 0) return observed(input, resourceId, object);
           const lookup = retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", state: "done",
-            lookup: { resource_sha256: sha256(canonicalJSON(input)), label_comparisons: comparisons, requests: reader.trace() } });
+            lookup: { resource_sha256: sha256(canonicalJSON(input)), label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } });
           return { state: "done", outcome: { state: "observed", observation_sha256: lookup.sha256, resource_id: resourceId, object, lookup } };
         };
         if (["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(effect.kind)) {
