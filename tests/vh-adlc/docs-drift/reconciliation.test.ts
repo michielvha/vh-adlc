@@ -471,3 +471,48 @@ test("a racing original dispatch wins the journal CAS before conflicting cleanup
   if (!running) throw Error("missing original executor");
   expect((await running).state).toBe("complete");
 });
+
+
+test("conflict retirement needs a grant naming that exact observed conflict lookup", async () => {
+  const f = publicationFixture(roots), observe = f.transport.observe;
+  f.transport.observe = async (plan, effect, objects) => effect.id === "pr" ? {
+    state: "conflict", reason: "actual-target-changed", evidence: retainLookup({ artifact_root: f.artifacts, source_repo: f.repo,
+      plan, effect, transport: "collector", state: "conflict", lookup: { target: "changed-by-another-owner" } }),
+  } : observe(plan, effect, objects);
+  const stopped = await publish(options(f));
+  const scopes: ReconciliationScope[] = [];
+  const refused = await reconcileAbsent({ ...input(f, stopped.journal.directory), authorize: scope => {
+    scopes.push(structuredClone(scope));
+    return "retirement" in scope ? Promise.resolve(null) : request(scope);
+  } });
+  expect(refused.state).toBe("pending");
+  expect(scopes.some(scope => "retirement" in scope)).toBe(true);
+  expect(refused.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  const approved: ReconciliationScope[] = [];
+  const cleaned = await reconcileAbsent({ ...input(f, stopped.journal.directory), authorize: scope => {
+    approved.push(structuredClone(scope)); return request(scope);
+  } });
+  expect(cleaned.state).toBe("retired");
+  const scope = approved.find(scope => "retirement" in scope);
+  const retirement = cleaned.journal.events.find(event => event.kind === "retired-absence" && event.effect_id === "pr");
+  if (!scope || !retirement || !("scope_sha256" in retirement.payload)) throw Error("missing conflict-specific authority");
+  expect(retirement.payload.scope_sha256).toBe(sha256(canonicalJSON(scope)));
+  expect(readFileSync(join(f.artifacts, `reconciliation-${retirement.payload.scope_sha256}-${retirement.payload.request_sha256}.json`), "utf8")).toContain("conflict");
+});
+
+test("changing conflict lookup bytes during approval stops retirement before lease release", async () => {
+  const f = publicationFixture(roots), observe = f.transport.observe;
+  f.transport.observe = async (plan, effect, objects) => effect.id === "pr" ? {
+    state: "conflict", reason: "actual-target-changed", evidence: retainLookup({ artifact_root: f.artifacts, source_repo: f.repo,
+      plan, effect, transport: "collector", state: "conflict", lookup: { target: "changed" } }),
+  } : observe(plan, effect, objects);
+  const stopped = await publish(options(f));
+  const cleaned = await reconcileAbsent({ ...input(f, stopped.journal.directory), authorize: scope => {
+    if (scope.retirement) writeFileSync(scope.retirement.lookup.path, "{}");
+    return request(scope);
+  } });
+  expect(cleaned.state).toBe("pending");
+  expect(cleaned.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+});

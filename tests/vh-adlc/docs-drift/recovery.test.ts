@@ -645,3 +645,19 @@ test("retained reconstruction stays pending for an unreadable or newly replaced 
     expect(f.executed).toEqual(before);
   }
 });
+
+
+test("a receipt appearing during lease-fallback inspection requires a fresh coherent inspection", async () => {
+  const f = setup(), stopped = await legacyReceiptInterruption(f), observe = f.transport.observe;
+  const receiptRef = f.settings.publication.receipt_ref_prefix + "operation-1";
+  f.transport.observe = async (plan, effect, objects) => {
+    if (effect.kind === "lease-acquire") { f.refs.set(receiptRef, stopped.objects.object); f.done.add("receipt"); }
+    return observe(plan, effect, objects);
+  };
+  const input = { source_repo: f.repo, artifact_root: f.artifacts, settings: f.settings, transport: f.transport,
+    operation_id: "operation-1", verify_policy: () => f.policy };
+  await expect(inspectRetainedOperation(input)).rejects.toThrow("receipt changed");
+  const fresh = await inspectRetainedOperation(input);
+  expect(fresh.receipt_object).toBe(stopped.objects.object);
+  expect(fresh.observations.find(item => item.effect_id === "receipt")?.observation.state).toBe("done");
+});

@@ -219,3 +219,15 @@ test("paired metadata intents cannot bypass business-effect ordering or bind ano
   journal = appendOutcome(journal, "receipt", { state: "observed", observation_sha256: hash("actual retained nonce"), resource_id: "receipt", object: objects.receipt_object });
   expect(appendIntent(journal, "push").events.at(-1)?.effect_id).toBe("push");
 });
+
+
+test("observation-only journals reject unscoped attempts but retain separately granted metadata cleanup", () => {
+  const f = publicationFixture(roots);
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan, recovery_mode: "observation-only" });
+  journal = appendIntent(journal, "lease");
+  expect(() => appendAttempt(journal, "lease", "forbidden-read-only-dispatch")).toThrow();
+  journal = appendOutcome(journal, "lease", { state: "observed", observation_sha256: hash("native retained acquisition"), resource_id: f.settings.publication.lease_ref, object: null });
+  journal = appendIntent(journal, "receipt");
+  expect(() => appendAttempt(journal, "receipt", "separately-granted-cleanup", {
+    scope_sha256: hash("exact current metadata cleanup"), request_sha256: hash("actual request") })).not.toThrow();
+});

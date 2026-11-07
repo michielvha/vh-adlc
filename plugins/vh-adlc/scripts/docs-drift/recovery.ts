@@ -162,8 +162,9 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
   const root = externalArtifactDirectory(options.artifact_root, source);
   const identity = await options.transport.identity();
   if (identity.repository !== options.settings.repository || identity.default_branch !== options.settings.default_branch) throw Error("retained inspection repository scope");
-  let ref = options.settings.publication.receipt_ref_prefix + options.operation_id;
-  let target = await options.transport.ref(ref);
+  const receiptRef = options.settings.publication.receipt_ref_prefix + options.operation_id;
+  const inspectedReceipt = await options.transport.ref(receiptRef);
+  let ref = receiptRef, target = inspectedReceipt;
   const receipt_object = target.state === "present" ? target.object : null;
   if (target.state === "absent") { ref = options.settings.publication.lease_ref; target = await options.transport.ref(ref); }
   if (target.state === "absent") throw Error("retained operation unavailable; original proof cannot be reconstructed");
@@ -190,12 +191,16 @@ export async function inspectRetainedOperation(options: RetainedOptions): Promis
   const observations: RetainedInspection["observations"] = [];
   for (const effect of plan.manifest.effects) {
     let observation: EffectObservation;
-    try { observation = await options.transport.observe(plan, effect, observationObjects); }
-    catch { observation = { state: "unknown", reason: "native-inspection-unavailable" }; }
+    try {
+      observation = receipt_object === null && effect.kind === "receipt-retain"
+        ? { state: "unknown", reason: "receipt-not-retained-at-inspection-start" }
+        : await options.transport.observe(plan, effect, observationObjects);
+    } catch { observation = { state: "unknown", reason: "native-inspection-unavailable" }; }
     observations.push({ effect_id: effect.id, observation });
   }
   const current = await options.transport.ref(ref);
   if (current.state !== "present" || current.object !== target.object) throw Error("retained ref changed during inspection");
+  if (!canonicalJSON(await options.transport.ref(receiptRef)).equals(canonicalJSON(inspectedReceipt))) throw Error("retained receipt changed during inspection");
   const run = randomUUID(), directory = join(root, "retained-inspection-" + run);
   publishArtifact(join(root, run + ".retained-inspection-owner.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-retained-inspection",
     root: directory, owner: process.getuid?.() ?? null, run, repository: plan.manifest.repository, source_commit: plan.manifest.bindings.source_commit, ref, object: objects.object }));
@@ -231,6 +236,7 @@ export type ReconciliationScope = {
   lease_ref: string; lease_object: string; release_effect_id: string; retire_effect_ids: string[];
   actor: string; actor_id: number;
   retain_receipt: { effect_id: string; ref: string; object: string } | null;
+  retirement?: { effect_id: string; observed_state: "conflict"; lookup: { path: string; sha256: string } };
 };
 type ReconciliationAuthority = { scope_sha256: string; request_sha256: string };
 
@@ -279,9 +285,9 @@ export async function reconcileAbsent(options: {
       plan_sha256: sha256(canonicalJSON(plan)), lease_ref: String(release.payload.ref), lease_object: objects.lease_object,
       release_effect_id: release.id, retire_effect_ids: [...ids], actor: identity.actor, actor_id: identity.actor_id,
       retain_receipt: retained.state === "absent" ? { effect_id: receipt.id, ref: String(receipt.payload.ref), object: receiptObject } : null };
-    const scopeHash = sha256(canonicalJSON(scope));
-    const authorize = async (original?: ReconciliationAuthority): Promise<ReconciliationAuthority> => {
-      const value = await options.authorize(structuredClone(scope));
+    const authorize = async (original?: ReconciliationAuthority, selectedScope = scope): Promise<ReconciliationAuthority> => {
+      const scopeHash = sha256(canonicalJSON(selectedScope));
+      const value = await options.authorize(structuredClone(selectedScope));
       if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error("missing current reconciliation authority");
       canonicalJSON(value);
       const grant = value as Record<string, unknown>;
@@ -298,12 +304,15 @@ export async function reconcileAbsent(options: {
       const currentLease = await options.transport.ref(scope.lease_ref);
       if (currentLease.state !== "present" || currentLease.object !== objects.lease_object) throw Error("owned cleanup lease changed");
     };
-    const bytes = canonicalJSON({ schema_version: 1, scope, authority: grant });
-    const path = join(dirname(journal.directory), `reconciliation-${scopeHash}-${grant.request_sha256}.json`);
-    try { publishArtifact(path, bytes); }
-    catch (error) {
-      if (!(error instanceof Error) || error.message !== "docs-drift journal revision conflict" || !readArtifact(path).equals(bytes)) throw error;
-    }
+    const retainAuthority = (selectedScope: ReconciliationScope, authority: ReconciliationAuthority) => {
+      const bytes = canonicalJSON({ schema_version: 1, scope: selectedScope, authority });
+      const path = join(dirname(journal.directory), `reconciliation-${authority.scope_sha256}-${authority.request_sha256}.json`);
+      try { publishArtifact(path, bytes); }
+      catch (error) {
+        if (!(error instanceof Error) || error.message !== "docs-drift journal revision conflict" || !readArtifact(path).equals(bytes)) throw error;
+      }
+    };
+    retainAuthority(scope, grant);
     for (const effect of plan.manifest.effects.slice(0, -1)) {
       if (terminal(journal, effect.id) || isRetired(effect.id)) continue;
       const observation = await options.transport.observe(plan, effect, objects);
@@ -332,9 +341,14 @@ export async function reconcileAbsent(options: {
       if (pending) return blocked(pending);
       const lookup = readLookup({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
         plan, effect, transport: options.transport.kind, state: conflicting ? "conflict" : "absent" });
-      await authorize(grant);
+      const retirementScope: ReconciliationScope = conflicting ? { ...scope,
+        retirement: { effect_id: effect.id, observed_state: "conflict", lookup } } : scope;
+      const retirementGrant = await authorize(grant, retirementScope);
+      retainAuthority(retirementScope, retirementGrant);
       await requireOwnedLease();
-      journal = appendRetirement(journal, effect.id, { ...grant, lookup, ...(conflicting ? { never_dispatched: true as const } : {}) });
+      readLookup({ evidence: lookup, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
+        plan, effect, transport: options.transport.kind, state: conflicting ? "conflict" : "absent" });
+      journal = appendRetirement(journal, effect.id, { ...retirementGrant, lookup, ...(conflicting ? { never_dispatched: true as const } : {}) });
     }
     const fence = await options.transport.ref(String(receipt.payload.ref));
     if (fence.state !== "present" || fence.object !== receiptObject) return blocked("retained-operation-removed");

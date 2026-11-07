@@ -207,6 +207,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
       const scoped = Object.hasOwn(event.payload, "reconciliation");
       const paired = Object.hasOwn(event.payload, "atomic_receipt_id");
       const payload = exact(event.payload, ["attempt_id", ...(scoped ? ["reconciliation"] : []), ...(paired ? ["atomic_receipt_id"] : [])]);
+      if (!scoped && header.recovery_mode === "observation-only") fail("read-only journal cannot dispatch");
       if (paired) {
         const receipt = plan.manifest.effects[1];
         if (scoped || effect !== plan.manifest.effects[0] || effect.kind !== "lease-acquire" || receipt?.kind !== "receipt-retain"
