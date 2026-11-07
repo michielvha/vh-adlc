@@ -80,6 +80,15 @@ export async function resumeEffects(options: PublishOptions & { journal_director
       journal = readJournal(journal.directory, options.source_repo);
       const active = pendingAttempt(journal, effect);
       if (observation.state !== "done" && (active === "attempt-in-flight" || active === "attempt-not-reaped")) return blocked(effect.id, active);
+      if (observation.state === "conflict" && effect.kind === "lease-acquire" && !terminal(journal, effect.id) && !isObservationOnly(journal)) {
+        const lease = await options.transport.ref(options.settings.publication.lease_ref);
+        if (lease.state === "absent" || lease.object !== objects.lease_object) {
+          const receipt = await options.transport.ref(options.settings.publication.receipt_ref_prefix + journal.plan.manifest.operation_id);
+          if (receipt.state === "present") return blocked(effect.id, "operation-started-elsewhere", false, true);
+          return blocked(effect.id, "publication-lease-occupied");
+        }
+        return blocked(effect.id, "lease-acquisition-observation-changed");
+      }
       if (observation.state === "conflict" || observation.state === "unknown") return blocked(effect.id, observation.reason, observation.state === "conflict");
       if (terminal(journal, effect.id)) {
         if (observation.state !== "done") return blocked(effect.id, "completed-effect-materially-changed", true);

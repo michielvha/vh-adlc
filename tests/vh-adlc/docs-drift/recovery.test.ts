@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, rmSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { inspectRetainedOperation, restoreRetainedOperation, resumeEffects, reconcileAbsent } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
-import { readJournal, sealPlan, appendRecoveryOnly, createJournal, writePublicationObjects, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendIntent, appendAttempt, appendAttemptEnd, readJournal, sealPlan, appendRecoveryOnly, createJournal, writePublicationObjects, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -704,4 +704,68 @@ test("policy-drift inspection never turns an unseen retained action into a repla
   const restored = await restoreRetainedOperation({ inspection, publication: { ...options(f), artifact_root: artifactRoot } });
   expect(restored.state).toBe("pending"); expect(restored.reason).toBe("retained-restore-no-replay");
   expect(f.executed).toEqual(before); expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+});
+
+
+test.each(["held", "released", "same-operation"] as const)("acquisition between recovery reads preserves the reviewed operation (%s)", async state => {
+  const f = setup(), journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  const competitorRoot = join(f.root, "racing-owner"); mkdirSync(competitorRoot, { mode: 0o700 });
+  const competitor = createJournal({ source_repo: f.repo, artifact_root: competitorRoot, plan: f.plan });
+  const competing = writePublicationObjects(f.store, f.plan, competitor.header), observe = f.transport.observe;
+  let race = true;
+  f.transport.observe = async (plan, effect, objects) => {
+    if (effect.kind !== "lease-acquire" || !race) return observe(plan, effect, objects);
+    race = false;
+    f.refs.set(f.settings.publication.lease_ref, competing.lease_object);
+    if (state === "same-operation") f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", competing.receipt_object);
+    const result = await observe(plan, effect, objects);
+    if (state === "released") f.refs.delete(f.settings.publication.lease_ref);
+    return result;
+  };
+  const stopped = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  expect(stopped.journal.events.some(event => event.kind === "invalidation")).toBe(false);
+  expect(stopped.state).toBe("pending");
+  expect(stopped.reason).toBe(state === "same-operation" ? "operation-started-elsewhere" : "publication-lease-occupied");
+  expect(f.executed).toEqual([]);
+  f.refs.delete(f.settings.publication.lease_ref);
+  if (state === "same-operation") f.refs.delete(f.settings.publication.receipt_ref_prefix + "operation-1");
+  const resumed = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  if (state === "same-operation") {
+    expect(resumed.state).toBe("pending");
+    expect(resumed.journal.events.some(event => event.kind === "recovery-only")).toBe(true);
+    expect(f.executed).toEqual([]);
+  } else {
+    expect(resumed.state).toBe("complete");
+    expect(f.executed).toEqual(["lease", "receipt", "push", "pr", "release"]);
+  }
+});
+
+
+test("a late own acquisition after a competing observation stays recoverable", async () => {
+  const f = setup();
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  journal = appendIntent(journal, "lease");
+  journal = appendIntent(journal, "receipt", "lease");
+  journal = appendAttempt(journal, "lease", "delayed-acquisition", undefined, "receipt");
+  journal = appendAttemptEnd(journal, "lease", { attempt_id: "delayed-acquisition", sent: true, reaped: true });
+  const observe = f.transport.observe;
+  let late = true;
+  f.transport.observe = async (plan, effect, objects) => {
+    if (effect.kind !== "lease-acquire" || !late) return observe(plan, effect, objects);
+    late = false;
+    f.refs.set(f.settings.publication.lease_ref, "e".repeat(40));
+    const earlier = await observe(plan, effect, objects);
+    if (!objects.lease_object || !objects.receipt_object) throw Error("missing per-run metadata");
+    f.refs.set(f.settings.publication.lease_ref, objects.lease_object);
+    f.refs.set(f.settings.publication.receipt_ref_prefix + "operation-1", objects.receipt_object);
+    f.done.add("lease"); f.done.add("receipt");
+    return earlier;
+  };
+  const stopped = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  expect(stopped.reason).toBe("lease-acquisition-observation-changed");
+  expect(stopped.journal.events.some(event => event.kind === "invalidation" || event.kind === "recovery-only")).toBe(false);
+  expect(f.executed).toEqual([]);
+  const completed = await resumeEffects({ ...options(f), journal_directory: journal.directory });
+  expect(completed.state).toBe("complete");
+  expect(f.executed).toEqual(["push", "pr", "release"]);
 });
