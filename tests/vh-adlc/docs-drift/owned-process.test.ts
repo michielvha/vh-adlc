@@ -35,10 +35,17 @@ test(`memory capture handles an escaped pipe holder (overflow=${overflow})`, asy
   const begin = Date.now();
   let returned = false;
   let signalledAfterReturn = false;
+  let signalledAbsentGroup = false;
+  const absentGroups = new Set<number>();
   const kill = process.kill.bind(process);
   const signals = spyOn(process, "kill").mockImplementation((pid, signal) => {
     if (returned) signalledAfterReturn = true;
-    return kill(pid, signal);
+    if (absentGroups.has(pid)) signalledAbsentGroup = true;
+    try { return kill(pid, signal); }
+    catch (error) {
+      if (pid < 0 && error instanceof Error && "code" in error && error.code === "ESRCH") absentGroups.add(pid);
+      throw error;
+    }
   });
   try {
     const result = await executeOwnedProcess({
@@ -60,6 +67,7 @@ test(`memory capture handles an escaped pipe holder (overflow=${overflow})`, asy
     returned = true;
     await Bun.sleep(300);
     expect(signalledAfterReturn).toBe(false);
+    expect(signalledAbsentGroup).toBe(false);
   } finally { signals.mockRestore(); rmSync(root, { recursive: true, force: true }); }
 }, 10000);
 
