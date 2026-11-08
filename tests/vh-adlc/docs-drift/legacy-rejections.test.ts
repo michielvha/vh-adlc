@@ -37,7 +37,7 @@ for (const kind of ["git", "http"] as const) {
       const owner = canonicalJSON({ schema_version: 1, kind: "docs-drift-native-command",
         operation_id: plan.manifest.operation_id, root: directory, effect_id: effect.id,
         attempt_id: "legacy-attempt", argv_sha256: sha256(canonicalJSON(argv)) });
-      const protocol = kind === "git" ? { protocol: "git", updates: [{ ref, head: null }] } : { protocol: "http" };
+      const protocol = kind === "git" ? { protocol: "git", updates: [{ ref, head: null, expected: objects.lease_object }] } : { protocol: "http" };
       const stdout = Buffer.from(kind === "git"
         ? `To https://github.com/fixture/docs.git\n!\t:${ref}\t[rejected] (stale info)\nDone\n`
         : 'HTTP/2.0 403 Forbidden\r\n\r\n{"message":"legacy denied"}');
@@ -61,6 +61,14 @@ for (const kind of ["git", "http"] as const) {
         writeFileSync(path, "{}");
         expect(() => readRejection(options)).toThrow();
         writeFileSync(path, original);
+      }
+      if (kind === "git") {
+        const changed = JSON.parse(proof.toString());
+        changed.protocol.updates[0].expected = "e".repeat(40);
+        const bytes = canonicalJSON(changed);
+        writeFileSync(proofPath, bytes);
+        expect(() => readRejection({ ...options, evidence: { path: proofPath, sha256: sha256(bytes) } })).toThrow();
+        writeFileSync(proofPath, proof);
       }
       for (const extra of [{ capture: "future-format" }, { extra: true }]) {
         const changedOwner = canonicalJSON({ ...JSON.parse(owner.toString()), ...extra });

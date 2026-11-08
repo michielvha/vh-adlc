@@ -2128,7 +2128,7 @@ for (const change of ["valid", "target", "method", "projected-owner", "input"] a
 }
 
 for (const change of ["valid", "ref", "head", "lease"] as const) {
-  test(`legacy Git rejection without stored expected values preserves request binding (${change})`, async () => {
+  test(`file-backed Git rejection without stored expected values preserves request binding (${change})`, async () => {
     const f = setup(); await f.transport.identity();
     const selected = acquisition(f), attempt_id = "legacy-git-request";
     let journal = appendIntent(selected.journal, selected.effect.id);
