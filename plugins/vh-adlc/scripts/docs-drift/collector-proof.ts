@@ -31,7 +31,7 @@ function record(value: unknown): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error("missing fixture resource");
   return value as Record<string, unknown>;
 }
-function labels(value: unknown, known: Options["labels"]): CollectorLabel[] {
+export function collectorLabels(value: unknown, known: ReadonlyMap<string, CollectorLabel>): CollectorLabel[] {
   if (!Array.isArray(value) || value.length > 1000) throw Error("invalid fixture labels");
   const selected = new Map<number, CollectorLabel>();
   for (const name of value) {
@@ -52,8 +52,8 @@ function prepare(options: Options) {
   const parent = ["pr-update", "pr-close", "comment-create"].includes(effect.kind) ? record(resources.get("pulls/" + positive(p.number))) : null;
   const source = parent ? projectBeforeSource(parent) : null;
   if (source && source.base_ref !== settings.publication.base) throw Error("fixture parent destination changed");
-  const wanted = ["pr-create", "issue-create", "pr-update"].includes(effect.kind) ? labels(p.labels, options.labels) : null;
-  const originalLabels = effect.kind === "pr-update" ? labels(record(p.expected_payload).labels, options.labels) : null;
+  const wanted = ["pr-create", "issue-create", "pr-update"].includes(effect.kind) ? collectorLabels(p.labels, options.labels) : null;
+  const originalLabels = effect.kind === "pr-update" ? collectorLabels(record(p.expected_payload).labels, options.labels) : null;
   if (source && ["pr-update", "pr-close"].includes(effect.kind) && (source.state !== "open" || source.head_sha !== p.expected_head)) throw Error("fixture mutable target changed");
   if (effect.kind === "pr-update") {
     const original = record(p.expected_payload), author = record(parent!.user);

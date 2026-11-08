@@ -1,4 +1,4 @@
-import { executeCollectorEffect } from "./collector-proof";
+import { collectorLabels, executeCollectorEffect } from "./collector-proof";
 import { executeCollectorRefs } from "./collector-refs";
 import { projectBeforeSource } from "./delivery-proof";
 import { readGit } from "./git";
@@ -55,6 +55,7 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
   }
   function observeResource(plan: SealedPlan, effect: Effect): EffectObservation {
     const state = readTrialTracker(context), p = effect.payload, surface = resourceSurface(effect);
+    const parent = surface === "comments" ? projectBeforeSource(state.resources.get("pulls/" + p.number)) : null;
     const inventory = [...state.resources.entries()].filter(([key, value]) => key.startsWith(surface + "/")
       && (surface !== "comments" || value.parent_number === p.number)).map(([, value]) => value);
     const marker = publicationMarker(settings, plan.manifest.operation_id), selectedMarker = effectMarker(effect.id);
@@ -66,12 +67,13 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
     if (!matches.length && creation) return { state: "absent", evidence: retainAbsence(observation) };
     if (matches.length !== 1) return { state: "unknown", reason: "synthetic target missing or ambiguous" };
     const item = matches[0], user = object(item.user);
-    const labels = Array.isArray(item.labels) ? item.labels.map(label => object(label).name).sort() : null;
-    const fieldsMatch = (fields: Record<string, unknown>) => same({ title: item.title, body: item.body, labels, draft: item.draft },
-      { ...fields, labels: Array.isArray(fields.labels) ? [...fields.labels].sort() : fields.labels });
+    const labelIDs = Array.isArray(item.labels) ? item.labels.map(label => object(label).id).sort((left, right) => Number(left) - Number(right)) : null;
+    const labelsMatch = (requested: unknown) => same(labelIDs, collectorLabels(requested, state.labels).map(label => label.id));
+    const fieldsMatch = (fields: Record<string, unknown>) => same({ title: item.title, body: item.body, draft: item.draft },
+      { title: fields.title, body: fields.body, draft: fields.draft }) && labelsMatch(fields.labels);
     let matchesTarget = item.body === p.body;
     if (["pr-create", "pr-update"].includes(effect.kind)) matchesTarget = fieldsMatch({ title: p.title, body: p.body, labels: p.labels, draft: p.draft });
-    if (effect.kind === "issue-create") matchesTarget = item.title === p.title && item.body === p.body && same(labels, [...p.labels as string[]].sort())
+    if (effect.kind === "issue-create") matchesTarget = item.title === p.title && item.body === p.body && labelsMatch(p.labels)
       && item.state === "open" && !Object.hasOwn(item, "pull_request");
     if (creation) matchesTarget &&= user.id === TRIAL_IDENTITY.actor_id && user.login === TRIAL_IDENTITY.actor;
     if (surface === "pulls") {
@@ -92,7 +94,7 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
     }
     if (!matchesTarget) return { state: "conflict", reason: "synthetic reviewed target changed", evidence: retainLookup({ ...observation, state: "conflict" }) };
     return { state: "done", outcome: { state: "observed", observation_sha256: sha256(canonicalJSON(lookup)),
-      resource_id: String(item.id), object: surface === "pulls" ? projectBeforeSource(item).head_sha : null } };
+      resource_id: String(item.id), object: surface === "pulls" ? projectBeforeSource(item).head_sha : parent?.head_sha ?? null } };
   }
   return {
     kind: "collector", object_store: context.store.root, artifact_root: context.artifacts,

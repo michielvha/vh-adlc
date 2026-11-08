@@ -152,6 +152,61 @@ function persistentPublication(legacy = false) {
     settings, plan, transport: createTrialTransport(context), gate: async () => ({ review: input, policy }) } };
 }
 
+async function reviewedTrialEffects(options: ReturnType<typeof persistentPublication>["options"], effects: Effect[], kind: "advisory" | "resolve" = "advisory") {
+  const original = await options.gate();
+  const input = manifestFixture(original.review.manifest.bindings, effects, original.review.manifest.operation_id);
+  const policy = { ...original.policy, publication_kind: kind };
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
+  return { ...options, plan, gate: async () => ({ review: input, policy }) };
+}
+
+test.each(["pr-create", "pr-update", "issue-create"] as const)("persistent %s accepts canonical label aliases", async kind => {
+  const { f, context, options } = persistentPublication(kind === "pr-update");
+  const effects = structuredClone(options.plan.manifest.effects), selected = effects[3];
+  if (kind === "issue-create") {
+    effects[3] = { id: selected.id, kind, payload: { title: "Synthetic issue", body: selected.payload.body + "\nhttps://docs-drift.invalid/fixture/docs/blob/" + f.sourceCommit + "/docs/guide.md",
+      labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "docs/guide.md", evidence_commit: f.sourceCommit,
+      evidence_sha256: sha256(readFileSync(join(f.source, "docs/guide.md"))) } };
+  }
+  effects[3].payload.labels = ["Documentation", "documentation"];
+  if (kind === "pr-update") {
+    const before = effects[3].payload.expected_payload as Record<string, unknown>;
+    before.labels = ["DOCUMENTATION", "documentation"];
+    effects[3].payload.expected_payload_sha256 = sha256(canonicalJSON(before));
+  }
+  const scoped = await reviewedTrialEffects(options, effects);
+  expect((await publish(scoped)).state).toBe("complete");
+  const resource = readTrialTracker(context).resources.get(kind === "issue-create" ? "issues/501" : kind === "pr-update" ? "pulls/77" : "pulls/501");
+  expect(resource?.labels).toEqual([{ id: 101, name: "documentation" }]);
+}, 60000);
+
+test("persistent explanation and closure proof supports non-success acknowledgement after reopening", async () => {
+  const { context, options } = persistentPublication(true), current = options.plan.manifest.effects;
+  const explanation: Effect = { id: "explanation", kind: "comment-create", payload: { number: 77, prior_ids: [],
+    body: publicationMarker(context.settings, options.plan.manifest.operation_id) + "\n" + effectMarker("explanation") + "\nSynthetic closure explanation" } };
+  const close: Effect = { id: "close", kind: "pr-close", payload: { number: 77, expected_head: context.source_commit } };
+  const scoped = await reviewedTrialEffects(options, [current[0], current[1], explanation, close, current.at(-1)!], "resolve");
+  const execute = scoped.transport.execute;
+  scoped.transport.execute = async (...args) => {
+    const result = await execute(...args);
+    if (args[1].kind === "pr-close") throw new PublicationExecutionError(true, true, undefined, result ?? undefined);
+    return result;
+  };
+  const pending = await publish(scoped);
+  expect(pending.state).toBe("pending");
+  expect(readAppliedDelivery({ source_repo: context.source, journal_directory: pending.journal.directory,
+    effect_id: close.id, settings: context.settings, transport: "collector" }).explanation_effect_id).toBe(explanation.id);
+  const tracker = readTrialTracker(context); tracker.resources.get("pulls/77")!.state = "open"; persistTrialTracker(context, tracker);
+  const acknowledged = await acknowledgeDeliveries({ source_repo: context.source, journal_directory: pending.journal.directory,
+    object_store: context.store, settings: context.settings, transport: createTrialTransport(context), acknowledge_effect_ids: [close.id], retire_effect_ids: [],
+    authorize: async scope => ({ kind: "owner-delivery-acknowledgement", source: "owner-current-request", scope_sha256: sha256(canonicalJSON(scope)),
+      request_sha256: hash("synthetic acknowledgement preserves reopening") }) });
+  expect(acknowledged.state).toBe("acknowledged");
+  expect(readTrialTracker(context).resources.get("pulls/77")?.state).toBe("open");
+  expect([...readTrialTracker(context).resources.keys()].filter(key => key.startsWith("comments/"))).toHaveLength(1);
+  expect((await createTrialTransport(context).ref(context.settings.publication.lease_ref)).state).toBe("absent");
+}, 60000);
+
 test("the common publisher persists branches, receipts and tracker resources across fresh transports", async () => {
   const { f, context, options } = persistentPublication();
   const result = await publish(options);
