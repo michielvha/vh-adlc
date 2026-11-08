@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import * as workerCallers from "../../../plugins/vh-adlc/scripts/docs-drift/worker-callers";
 import { verifyWorkerCallers } from "../../../plugins/vh-adlc/scripts/docs-drift/worker-callers";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
@@ -87,4 +88,39 @@ test("declaring a component pin as a fixture difference cannot bypass exact shar
     worker_path: ".github/workflows/docs-drift-worker.yml", component_pin: ".vh-adlc/components/fixture.yaml", production_pr_draft: false,
     input_differences: { fixture: { trial: "synthetic", scheduled: "consumer" },
       component_pin: { trial: ".vh-adlc/components/candidate.yaml", scheduled: ".vh-adlc/components/fixture.yaml" } } })).toThrow();
+});
+
+
+test("compatible adoption changes only the scheduled caller's immutable component selection", () => {
+  const previous = callers().scheduled, next = structuredClone(previous);
+  next.jobs.worker.with.component_pin = ".vh-adlc/components/successor.yaml";
+  expect(typeof workerCallers.verifyCompatibleWorkerCaller).toBe("function");
+  const result = workerCallers.verifyCompatibleWorkerCaller({ previous: canonicalJSON(previous), next: canonicalJSON(next),
+    worker_path: ".github/workflows/docs-drift-worker.yml", previous_component_pin: ".vh-adlc/components/fixture.yaml",
+    next_component_pin: ".vh-adlc/components/successor.yaml" });
+  expect(result.previous_sha256).toBe(sha256(canonicalJSON(previous)));
+  expect(result.next_sha256).toBe(sha256(canonicalJSON(next)));
+  expect(result.contract_sha256).toMatch(/^[a-f0-9]{64}$/u);
+});
+
+test.each(["permissions", "cron", "secrets", "extra-input", "draft", "worker"] as const)("compatible callers refuse a changed %s", scenario => {
+  const previous = callers().scheduled, next = structuredClone(previous);
+  next.jobs.worker.with.component_pin = ".vh-adlc/components/successor.yaml";
+  if (scenario === "permissions") next.permissions.contents = "read";
+  if (scenario === "cron") next.on.schedule = [{ cron: "0 8 * * *" }];
+  if (scenario === "secrets") next.jobs.worker.secrets.PROVIDER_TOKEN = "${{ secrets.OTHER_TOKEN }}";
+  if (scenario === "extra-input") next.jobs.worker.with.extra = "unexpected";
+  if (scenario === "draft") next.jobs.worker.with.pr_draft = true;
+  if (scenario === "worker") next.jobs.worker.uses = "./.github/workflows/other-worker.yml";
+  expect(() => workerCallers.verifyCompatibleWorkerCaller({ previous: canonicalJSON(previous), next: canonicalJSON(next),
+    worker_path: ".github/workflows/docs-drift-worker.yml", previous_component_pin: ".vh-adlc/components/fixture.yaml",
+    next_component_pin: ".vh-adlc/components/successor.yaml" })).toThrow(scenario === "worker" ? "selected committed worker" : "compatible caller fields changed");
+});
+
+test("compatible caller checks refuse in-place pin mutation and a mismatched selected pin", () => {
+  const previous = callers().scheduled, next = structuredClone(previous);
+  const options = { previous: canonicalJSON(previous), next: canonicalJSON(next), worker_path: ".github/workflows/docs-drift-worker.yml",
+    previous_component_pin: ".vh-adlc/components/fixture.yaml", next_component_pin: ".vh-adlc/components/fixture.yaml" };
+  expect(() => workerCallers.verifyCompatibleWorkerCaller(options)).toThrow("distinct immutable component pins required");
+  expect(() => workerCallers.verifyCompatibleWorkerCaller({ ...options, next_component_pin: ".vh-adlc/components/successor.yaml" })).toThrow("compatible selected pin differs");
 });

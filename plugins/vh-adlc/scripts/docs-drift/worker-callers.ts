@@ -43,6 +43,16 @@ function caller(bytes: Uint8Array, worker: string) {
   return { root, job, inputs, triggers: record(root.on) };
 }
 
+function scheduledTriggers(triggers: Record<string, unknown>): void {
+  fields(triggers, ["workflow_dispatch", "schedule"]);
+  const schedule = triggers.schedule;
+  if (!Array.isArray(schedule) || schedule.length === 0) fail("scheduled trigger required");
+  for (const entry of schedule) {
+    const trigger = record(entry); fields(trigger, ["cron"]);
+    if (typeof trigger.cron !== "string" || trigger.cron.trim().split(/\s+/u).length !== 5) fail("literal scheduled cron required");
+  }
+}
+
 /** Compare complete committed callers. This proof grants no effect or adoption readiness. */
 export function verifyWorkerCallers(options: {
   trial: Uint8Array; scheduled: Uint8Array; worker_path: string; component_pin: string; production_pr_draft: boolean;
@@ -53,13 +63,7 @@ export function verifyWorkerCallers(options: {
   if (!/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(worker) || typeof options.production_pr_draft !== "boolean") fail("worker path or draft policy");
   const trial = caller(options.trial, worker), scheduled = caller(options.scheduled, worker);
   if (Object.keys(trial.triggers).length !== 1 || !Object.hasOwn(trial.triggers, "workflow_dispatch")) fail("trial must be dispatch-only");
-  fields(scheduled.triggers, ["workflow_dispatch", "schedule"]);
-  const schedule = scheduled.triggers.schedule;
-  if (!Array.isArray(schedule) || schedule.length === 0) fail("scheduled trigger required");
-  for (const entry of schedule) {
-    const trigger = record(entry); fields(trigger, ["cron"]);
-    if (typeof trigger.cron !== "string" || trigger.cron.trim().split(/\s+/u).length !== 5) fail("literal scheduled cron required");
-  }
+  scheduledTriggers(scheduled.triggers);
   for (const selected of [trial, scheduled]) {
     if (Object.hasOwn(selected.triggers, "workflow_dispatch") && selected.triggers.workflow_dispatch !== null) record(selected.triggers.workflow_dispatch);
   }
@@ -77,4 +81,20 @@ export function verifyWorkerCallers(options: {
   if (!canonicalJSON(trial.root).equals(canonicalJSON(scheduled.root))) fail("protected caller contract differs");
   return freezeJSON({ worker_path: worker, trial_sha256: sha256(options.trial), scheduled_sha256: sha256(options.scheduled),
     contract_sha256: canonicalDigest({ caller: scheduled.root, input_differences: differences, production_pr_draft: options.production_pr_draft }) });
+}
+
+
+/** The compatible route permits the exact pin selector change in an otherwise identical caller. */
+export function verifyCompatibleWorkerCaller(options: {
+  previous: Uint8Array; next: Uint8Array; worker_path: string; previous_component_pin: string; next_component_pin: string;
+}) {
+  const worker = protocolPath(options.worker_path), previousPin = protocolPath(options.previous_component_pin), nextPin = protocolPath(options.next_component_pin);
+  if (!/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(worker) || !previousPin.endsWith(".yaml") || !nextPin.endsWith(".yaml")
+    || previousPin === nextPin) fail("distinct immutable component pins required");
+  const previous = caller(options.previous, worker), next = caller(options.next, worker);
+  scheduledTriggers(previous.triggers); scheduledTriggers(next.triggers);
+  if (previous.inputs.component_pin !== previousPin || next.inputs.component_pin !== nextPin) fail("compatible selected pin differs");
+  delete previous.inputs.component_pin; delete next.inputs.component_pin;
+  if (!canonicalJSON(previous.root).equals(canonicalJSON(next.root))) fail("compatible caller fields changed");
+  return freezeJSON({ previous_sha256: sha256(options.previous), next_sha256: sha256(options.next), contract_sha256: canonicalDigest(previous.root) });
 }
