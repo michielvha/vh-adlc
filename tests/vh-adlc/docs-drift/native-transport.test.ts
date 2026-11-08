@@ -2083,24 +2083,87 @@ for (const change of ["atomic-subset", "atomic-head", "push-head", "http-target"
   });
 }
 
-test("legacy HTTP rejection keeps its exact suppressed-output request binding", async () => {
-  const f = setup(); await f.transport.identity();
-  f.update(state => { state.reject_http = 403;
-    state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
-      head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
-  const effect: Effect = { id: "legacy-comment", kind: "comment-create", payload: { number: 77, prior_ids: [], body: "exact legacy body" } };
-  const attempt_id = "legacy-http-rejection";
-  const failure = await f.transport.execute(f.plan, effect, f.objects, attempt_id).then(() => null, error => error);
-  if (!(failure instanceof PublicationExecutionError) || !failure.rejection) throw Error("missing native rejection");
-  const proof = JSON.parse(readFileSync(failure.rejection.path, "utf8"));
-  const ownerPath = join(f.transport.artifact_root, proof.command_directory.split("native-command-").at(-1) + ".native-command.json");
-  const owner = JSON.parse(readFileSync(ownerPath, "utf8"));
-  delete owner.capture;
-  owner.argv_sha256 = sha256(canonicalJSON(["gh", "api", "--hostname", f.settings.hostname, "--method", "POST", "--include", "--jq", "empty",
-    `repos/${f.plan.manifest.repository}/issues/77/comments`]));
-  writeFileSync(ownerPath, canonicalJSON(owner));
-  writeFileSync(join(proof.command_directory, "stdout"), 'HTTP/2.0 403 Forbidden\r\n\r\n{"message":"denied"}', { mode: 0o600 });
-  const scope = { source_repo: join(f.root, "source"), artifact_root: f.transport.artifact_root, plan: f.plan, effect, attempt_id };
-  const legacy = retainRejection({ ...scope, command_directory: proof.command_directory, protocol: { protocol: "http" } });
-  expect(readRejection({ ...scope, evidence: legacy })).toEqual(legacy);
-});
+for (const change of ["valid", "target", "method", "projected-owner", "input"] as const) {
+  test(`legacy HTTP rejection preserves its exact request binding (${change})`, async () => {
+    const f = setup(); await f.transport.identity();
+    f.update(state => { state.reject_http = 403;
+      state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+        head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+    const effect: Effect = { id: "legacy-comment", kind: "comment-create", payload: { number: 77, prior_ids: [], body: "exact legacy body" } };
+    const selected = await startCleanupJournal(f, [effect]), attempt_id = "legacy-http-rejection";
+    let journal = appendIntent(selected.journal, effect.id);
+    journal = journalArtifacts.appendAttempt(journal, effect.id, attempt_id);
+    const failure = await f.transport.execute(selected.plan, effect, selected.objects, attempt_id).then(() => null, error => error);
+    if (!(failure instanceof PublicationExecutionError) || !failure.rejection) throw Error("missing native rejection");
+    const captured = JSON.parse(readFileSync(failure.rejection.path, "utf8"));
+    const ownerPath = join(f.transport.artifact_root, captured.command_directory.split("native-command-").at(-1) + ".native-command.json");
+    const owner = JSON.parse(readFileSync(ownerPath, "utf8"));
+    delete owner.capture;
+    const args = ["gh", "api", "--hostname", f.settings.hostname, "--method", "POST", "--include", "--jq", "empty",
+      `repos/${selected.plan.manifest.repository}/issues/77/comments`];
+    owner.argv_sha256 = sha256(canonicalJSON(args));
+    writeFileSync(ownerPath, canonicalJSON(owner));
+    writeFileSync(join(captured.command_directory, "stdout"), 'HTTP/2.0 403 Forbidden\r\n\r\n{"message":"denied"}', { mode: 0o600 });
+    const scope = { source_repo: selected.repo, artifact_root: f.transport.artifact_root, plan: selected.plan, effect, attempt_id, header: journal.header };
+    const legacy = retainRejection({ ...scope, command_directory: captured.command_directory, protocol: { protocol: "http" } });
+    expect(readRejection({ ...scope, evidence: legacy })).toEqual(legacy);
+    const proof = JSON.parse(readFileSync(legacy.path, "utf8"));
+    if (change === "target") args[args.length - 1] = `repos/${selected.plan.manifest.repository}/issues/78/comments`;
+    if (change === "method") args[5] = "PATCH";
+    if (change === "projected-owner") {
+      owner.capture = "projected-v2";
+      proof.command.stdout_sha256 = sha256(readFileSync(join(captured.command_directory, "rejection-response.json")));
+    }
+    if (change === "input") writeFileSync(join(captured.command_directory, "payload.json"), canonicalJSON({ body: "changed legacy input" }));
+    owner.argv_sha256 = sha256(canonicalJSON(args));
+    writeFileSync(ownerPath, canonicalJSON(owner));
+    proof.command.owner_sha256 = sha256(canonicalJSON(owner));
+    const bytes = canonicalJSON(proof); writeFileSync(legacy.path, bytes);
+    journal = journalArtifacts.appendAttemptEnd(journal, effect.id, { attempt_id, sent: true, reaped: true,
+      rejection: { path: legacy.path, sha256: sha256(bytes) } });
+    expect(pendingAttempt(journal, effect)).toBe(change === "valid" ? null : "rejection-proof-unavailable");
+    expect(f.inspect().comments["77"]).toBeUndefined();
+    expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object);
+  });
+}
+
+for (const change of ["valid", "ref", "head", "lease"] as const) {
+  test(`legacy Git rejection without stored expected values preserves request binding (${change})`, async () => {
+    const f = setup(); await f.transport.identity();
+    const selected = acquisition(f), attempt_id = "legacy-git-request";
+    let journal = appendIntent(selected.journal, selected.effect.id);
+    journal = journalArtifacts.appendAttempt(journal, selected.effect.id, attempt_id);
+    f.update(state => { state.reject_git = true; });
+    const failure = await f.transport.execute(selected.plan, selected.effect, selected.objects, attempt_id).then(() => null, error => error);
+    if (!(failure instanceof PublicationExecutionError) || !failure.rejection) throw Error("missing rejected native Git request");
+    const captured = JSON.parse(readFileSync(failure.rejection.path, "utf8"));
+    const ownerPath = join(f.transport.artifact_root, captured.command_directory.split("native-command-").at(-1) + ".native-command.json");
+    const owner = JSON.parse(readFileSync(ownerPath, "utf8")); delete owner.capture;
+    writeFileSync(ownerPath, canonicalJSON(owner));
+    const updates = captured.protocol.updates as { ref: string; head: string; expected?: string }[];
+    for (const update of updates) delete update.expected;
+    const stdout = () => "To https://github.com/fixture/docs.git\n"
+      + updates.map(update => `!\t${update.head}:${update.ref}\t[rejected] (stale info)\n`).join("") + "Done\n";
+    writeFileSync(join(captured.command_directory, "stdout"), stdout(), { mode: 0o600 });
+    const scope = { artifact_root: f.transport.artifact_root, source_repo: join(f.root, "source"), plan: selected.plan,
+      effect: selected.effect, attempt_id, header: journal.header };
+    const legacy = retainRejection({ ...scope, command_directory: captured.command_directory, protocol: { protocol: "git", updates } });
+    expect(readRejection({ ...scope, evidence: legacy })).toEqual(legacy);
+    const proof = JSON.parse(readFileSync(legacy.path, "utf8"));
+    if (change === "ref") updates[1].ref = "refs/heads/foreign-receipt";
+    if (change === "head") updates[0].head = "e".repeat(40);
+    owner.argv_sha256 = sha256(canonicalJSON(nativePushArguments(f.settings.hostname, selected.plan.manifest.repository,
+      updates.map(update => ({ ref: update.ref, head: update.head, expected: change === "lease" ? "e".repeat(40) : "" })))));
+    writeFileSync(ownerPath, canonicalJSON(owner));
+    writeFileSync(join(captured.command_directory, "stdout"), stdout());
+    proof.protocol.updates = updates;
+    proof.command.owner_sha256 = sha256(canonicalJSON(owner));
+    proof.command.stdout_sha256 = sha256(Buffer.from(stdout()));
+    proof.command.observed = { protocol: "git", refs: updates.map(update => update.ref) };
+    const bytes = canonicalJSON(proof); writeFileSync(legacy.path, bytes);
+    journal = journalArtifacts.appendAttemptEnd(journal, selected.effect.id, { attempt_id, sent: true, reaped: true,
+      rejection: { path: legacy.path, sha256: sha256(bytes) } });
+    expect(pendingAttempt(journal, selected.effect)).toBe(change === "valid" ? null : "rejection-proof-unavailable");
+    expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+  });
+}
