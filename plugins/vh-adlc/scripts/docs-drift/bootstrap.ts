@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { executeOwnedProcess } from "./owned-process";
+import { executeOwnedProcess, type OwnedProcess } from "./owned-process";
 import { parseClientBinding } from "./settings";
-import { publishArtifact } from "./journal";
-import { chmodSync, closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { publishArtifact, syncDirectory } from "./journal";
+import { chmodSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { readGit } from "./git";
 import { canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
@@ -111,7 +111,7 @@ const clientPayloadLimit = 1024 * 1024 * 1024;
 function privateRuntimeDirectory(path: string, create = false): void {
   if (create && !existsSync(path)) {
     privateRuntimeDirectory(dirname(path), true);
-    try { mkdirSync(path, { mode: 0o700 }); }
+    try { mkdirSync(path, { mode: 0o700 }); syncDirectory(dirname(path)); }
     catch (error) { if (!(error instanceof Error) || !("code" in error) || error.code !== "EEXIST") throw error; }
   }
   const item = lstatSync(path), owner = process.getuid?.();
@@ -164,14 +164,18 @@ function clientRecord(bytes: Uint8Array, id: string, client: ClientBinding): Cli
 async function clientFiles(distribution: Uint8Array, client: ClientBinding, format: ClientFormat, executable: string) {
   if (distribution.byteLength > clientArchiveLimit || sha256(distribution) !== client.distribution_sha256) fail("client distribution checksum");
   if (format !== "tar" && format !== "executable") fail("client distribution format");
-  const files = format === "tar" ? await new Bun.Archive(distribution).files()
+  const archiveFiles = format === "tar" ? await new Bun.Archive(distribution).files()
     : new Map([[executable, new File([Buffer.from(distribution)], executable)]]);
-  if (!files.size || files.size > 50000 || !files.has(executable)) fail("client distribution executable or inventory");
+  if (!archiveFiles.size || archiveFiles.size > 50000) fail("client distribution executable or inventory");
+  const files = new Map<string, File>();
   let total = 0;
-  for (const [path, file] of files) {
-    protocolPath(path);
+  for (const [path, file] of archiveFiles) {
+    const selected = protocolPath(path.replace(/^(?:\.\/)+/u, ""));
+    if (files.has(selected)) fail("client distribution path collision");
     if (file.size > clientArchiveLimit || (total += file.size) > clientPayloadLimit) fail("client distribution size bound");
+    files.set(selected, file);
   }
+  if (!files.has(executable)) fail("client distribution executable or inventory");
   return files;
 }
 function nativeClientVersion(stdout: Uint8Array, client: ClientBinding): string {
@@ -184,7 +188,7 @@ function nativeClientVersion(stdout: Uint8Array, client: ClientBinding): string 
   return version;
 }
 
-/** Read only the selected checksum-bound cache entry. Ambient clients and host profiles supply no fallback. */
+/** Read the checksum-bound cache entry selected by the protected client binding. */
 export async function inspectRetainedClient(options: { cache_directory: string; client_id: string; client: ClientBinding }) {
   const client = parseClientBinding(options.client), paths = clientPaths(options.cache_directory, options.client_id, client);
   privateRuntimeDirectory(dirname(paths.index)); privateRuntimeDirectory(paths.profile);
@@ -236,16 +240,19 @@ export async function retainClientDistribution(options: {
   const build = "builds/" + randomUUID(), root = join(options.cache_directory, build), directory = join(root, "package");
   privateRuntimeDirectory(join(options.cache_directory, "builds"), true); privateRuntimeDirectory(root, true); privateRuntimeDirectory(directory, true);
   publishArtifact(join(root, "distribution"), Buffer.from(options.distribution));
-  if (options.format === "tar") await new Bun.Archive(options.distribution).extract(directory);
-  else { mkdirSync(dirname(join(directory, executable)), { recursive: true, mode: 0o700 }); writeFileSync(join(directory, executable), options.distribution, { mode: 0o700 }); }
-  chmodSync(directory, 0o700);
   const retained: PayloadFile[] = [];
   for (const [path, file] of files) {
-    const target = join(directory, path), item = lstatSync(target);
+    const target = join(directory, path), bytes = new Uint8Array(await file.arrayBuffer());
+    privateRuntimeDirectory(dirname(target), true);
+    // Private package files retain owner execution so bundled native helpers can run.
+    const fd = openSync(target, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o700);
+    try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
+    syncDirectory(dirname(target));
+    const item = lstatSync(target);
     if (!item.isFile() || item.isSymbolicLink() || item.nlink !== 1 || item.uid !== process.getuid?.()) fail("regular retained client file required");
     chmodSync(target, (item.mode & 0o777 & ~0o022) | (path === executable ? 0o500 : 0o400));
     retained.push({ path, mode: (lstatSync(target).mode & 0o100) ? "100755" : "100644", size: file.size,
-      sha256: sha256(new Uint8Array(await file.arrayBuffer())) });
+      sha256: sha256(bytes) });
   }
   retained.sort((left, right) => compareUTF8(left.path, right.path));
   const expected = { files: retained, component_sha256: componentDigest(retained) };
@@ -258,9 +265,23 @@ export async function retainClientDistribution(options: {
     TMPDIR: join(probeProfile, "temporary"), COPILOT_HOME: probeProfile, COPILOT_CACHE_HOME: join(probeProfile, "cache"),
     COPILOT_AUTO_UPDATE: "false", CLAUDE_CONFIG_DIR: probeProfile,
     DISABLE_AUTOUPDATER: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1", CODEX_HOME: probeProfile };
-  const versionProcess = await executeOwnedProcess({ argv: args, cwd: probeProfile, env: environment, watched_outputs: [],
-    stdout: join(root, "version-stdout"), stderr: join(root, "version-stderr"), capture: "memory", timeout_ms: 10000, max_output_bytes: 65536,
-    started: pid => publishArtifact(join(root, "version-owner.json"), canonicalJSON({ pid, argv_sha256: sha256(canonicalJSON(args)) })) });
+  let startedPID: number | null = null, versionProcess: OwnedProcess;
+  try {
+    versionProcess = await executeOwnedProcess({ argv: args, cwd: probeProfile, env: environment, watched_outputs: [],
+      stdout: join(root, "version-stdout"), stderr: join(root, "version-stderr"), capture: "memory", timeout_ms: 10000, max_output_bytes: 65536,
+      started: pid => {
+        startedPID = pid;
+        publishArtifact(join(root, "version-owner.json"), canonicalJSON({ pid, argv_sha256: sha256(canonicalJSON(args)) }));
+      } });
+  } catch (error) {
+    const code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "native-client-start-failed";
+    try {
+      publishArtifact(join(root, "version-failure.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-native-client-start-failure",
+        client_id: options.client_id, distribution_sha256: client.distribution_sha256, argv_sha256: sha256(canonicalJSON(args)),
+        capture_verified: false, pid: startedPID, error_code: code }));
+    } catch (captureError) { throw new AggregateError([error, captureError], "Client startup failed and its failure evidence could not be retained"); }
+    throw error;
+  }
   const { captured, ...completion } = versionProcess;
   const stdout = captured?.stdout ?? new Uint8Array(), stderr = captured?.stderr ?? new Uint8Array();
   publishArtifact(join(root, "version-stdout"), stdout); publishArtifact(join(root, "version-stderr"), stderr);

@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { chmodSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
@@ -85,7 +85,7 @@ async function clientFixture(options: { cache?: string; provider?: "copilot" | "
   const headers = { copilot: "GitHub Copilot CLI " + reported + ".", claude: reported + " (Claude Code)", codex: "codex-cli " + reported };
   const program = options.program ?? "#!/bin/sh\nprintf '%s\\n' '" + headers[provider] + "'\nexit 0\n" + "#".repeat(options.padding_bytes ?? 0);
   const executable = "bin/" + provider, format = options.format ?? "tar";
-  const distribution = format === "tar" ? await new Bun.Archive({ [executable]: program, "LICENSE": "Synthetic distribution\n" }, { compress: "gzip" }).bytes()
+  const distribution: Uint8Array = format === "tar" ? await new Bun.Archive({ [executable]: program, "LICENSE": "Synthetic distribution\n" }, { compress: "gzip" }).bytes()
     : Buffer.from(program);
   const configured = settingsFixture(); Object.assign(configured.clients["copilot-linux"], {
     provider, version, platform: process.platform + "-" + process.arch, distribution_sha256: sha256(distribution) });
@@ -193,10 +193,21 @@ test("approved and successor client snapshots coexist while same-build setup is 
   const repeated = await Promise.all([bootstrap.retainClientDistribution(approved.setup), bootstrap.retainClientDistribution(approved.setup)]);
   expect(repeated.map(item => item.executable)).toEqual([first.executable, first.executable]);
   expect(readFileSync(approved.index)).toEqual(originalIndex);
-  const candidate = await clientFixture({ cache: approved.cache, version: "fixture-2.0.0" });
+  const barrier = ["#!/bin/sh", "while :; do", "  count=0", "  for owner in \"$HOME\"/../../*/version-owner.json; do",
+    "    if [ -f \"$owner\" ]; then count=$((count + 1)); fi", "  done", "  if [ \"$count\" -ge 3 ]; then break; fi", "  sleep 1", "done",
+    "printf '%s\\n' 'GitHub Copilot CLI fixture-2.0.0.'"].join("\n") + "\n";
+  const candidate = await clientFixture({ cache: approved.cache, version: "fixture-2.0.0", program: barrier });
   const newer = await Promise.all([bootstrap.retainClientDistribution(candidate.setup), bootstrap.retainClientDistribution(candidate.setup)]);
   expect(newer[0].executable).toBe(newer[1].executable);
   expect(newer[0].executable).not.toBe(first.executable);
+  const builds = readdirSync(join(approved.cache, "builds"));
+  expect(builds).toHaveLength(3);
+  const selectedRoots = [dirname(first.directory), dirname(newer[0].directory)];
+  const unselected = builds.map(name => join(approved.cache, "builds", name)).filter(path => !selectedRoots.includes(path));
+  expect(unselected).toHaveLength(1);
+  const conflictEvidence = JSON.parse(readFileSync(join(unselected[0], "version-process.json"), "utf8")) as { capture_verified: boolean; process: { reaped: boolean } };
+  expect(conflictEvidence.capture_verified).toBe(true);
+  expect(conflictEvidence.process.reaped).toBe(true);
   const rollback = await bootstrap.inspectRetainedClient(approved.setup);
   expect(rollback.executable).toBe(first.executable);
   expect(rollback.version_evidence_sha256).toBe(first.version_evidence_sha256);
@@ -234,4 +245,61 @@ test("a failed native version command retains its process result and publishes n
   const result = JSON.parse(readFileSync(join(f.cache, "builds", build, "version-process.json"), "utf8")) as { process: { exit_code: number; reaped: boolean } };
   expect(result.process).toMatchObject({ exit_code: 7, reaped: true });
   expect(() => readFileSync(f.index)).toThrow("ENOENT");
+});
+
+function syntheticTar(entries: Array<{ name: string; type: "0" | "1" | "2" | "5"; link?: string; body?: string }>): Buffer {
+  const blocks: Buffer[] = [];
+  for (const entry of entries) {
+    const header = Buffer.alloc(512), body = Buffer.from(entry.body ?? "");
+    if (Buffer.byteLength(entry.name) > 100 || Buffer.byteLength(entry.link ?? "") > 100) throw Error("short synthetic tar paths required");
+    header.write(entry.name, 0, 100); header.write("0000700\0", 100, 8);
+    header.write("0000000\0", 108, 8); header.write("0000000\0", 116, 8);
+    header.write(body.length.toString(8).padStart(11, "0") + "\0", 124, 12);
+    header.write("00000000000\0", 136, 12); header.fill(32, 148, 156);
+    header.write(entry.type, 156); header.write(entry.link ?? "", 157, 100);
+    header.write("ustar\0", 257); header.write("00", 263);
+    const checksum = header.reduce((sum, value) => sum + value, 0);
+    header.write(checksum.toString(8).padStart(6, "0") + "\0 ", 148, 8);
+    blocks.push(header);
+    if (body.length) blocks.push(body, Buffer.alloc((512 - body.length % 512) % 512));
+  }
+  return Buffer.concat([...blocks, Buffer.alloc(1024)]);
+}
+
+test("retention materializes regular tar files while link and directory entries create no outside writes", async () => {
+  const f = await clientFixture(), outside = realpathSync(mkdtempSync("/tmp/vh20-outside-")); roots.push(outside); chmodSync(outside, 0o700);
+  f.setup.distribution = syntheticTar([
+    { name: "bin", type: "2", link: outside },
+    { name: f.setup.executable, type: "0", body: f.program },
+    { name: "hardlink", type: "1", link: outside + "/absent" },
+    { name: outside + "/directory", type: "5" },
+  ]);
+  f.client.distribution_sha256 = sha256(f.setup.distribution);
+  const selected = await bootstrap.retainClientDistribution(f.setup);
+  expect(readFileSync(selected.executable, "utf8")).toBe(f.program);
+  expect(lstatSync(join(selected.directory, "bin")).isSymbolicLink()).toBe(false);
+  expect(readdirSync(selected.directory)).toEqual(["bin"]);
+  expect(readdirSync(outside)).toEqual([]);
+});
+
+test("an exec-format startup failure retains a diagnostic record and no selected client", async () => {
+  const f = await clientFixture({ format: "executable", program: "\0invalid-native-executable" });
+  let failed: unknown;
+  try { await bootstrap.retainClientDistribution(f.setup); } catch (error) { failed = error; }
+  expect(failed).toBeInstanceOf(Error);
+  expect(typeof failed === "object" && failed !== null && "code" in failed ? failed.code : null).toBe("ENOEXEC");
+  const [build] = readdirSync(join(f.cache, "builds"));
+  const record = JSON.parse(readFileSync(join(f.cache, "builds", build, "version-failure.json"), "utf8")) as { capture_verified: boolean; error_code: string };
+  expect(record.capture_verified).toBe(false);
+  expect(record.error_code).toBe("ENOEXEC");
+  expect(() => readFileSync(f.index)).toThrow("ENOENT");
+});
+
+test("a tar current-directory prefix retains the canonical client location", async () => {
+  const f = await clientFixture();
+  f.setup.distribution = syntheticTar([{ name: "./" + f.setup.executable, type: "0", body: f.program }]);
+  f.client.distribution_sha256 = sha256(f.setup.distribution);
+  const selected = await bootstrap.retainClientDistribution(f.setup);
+  expect(selected.executable_relative).toBe(f.setup.executable);
+  expect(readFileSync(selected.executable, "utf8")).toBe(f.program);
 });
