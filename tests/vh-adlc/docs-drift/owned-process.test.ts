@@ -29,7 +29,8 @@ for (const oversized of [false, true]) {
   });
 }
 
-test("memory capture returns when an escaped helper holds a pipe open", async () => {
+for (const overflow of [false, true]) {
+test(`memory capture handles an escaped pipe holder (overflow=${overflow})`, async () => {
   const root = mkdtempSync(join(tmpdir(), "docs-drift-held-pipe-"));
   const begin = Date.now();
   let returned = false;
@@ -42,14 +43,16 @@ test("memory capture returns when an escaped helper holds a pipe open", async ()
   try {
     const result = await executeOwnedProcess({
       argv: [process.execPath, "-e", `
-        const helper = Bun.spawn([process.execPath, "-e", 'require("node:fs").writeFileSync("ready", "ready"); setTimeout(() => {}, 5000)'],
+        const helper = Bun.spawn([process.execPath, "-e", ${JSON.stringify('require("node:fs").writeFileSync("ready", "ready"); ' + (overflow
+          ? 'setTimeout(() => { process.stdout.write("x".repeat(8192)); process.exit(0); }, 500)'
+          : 'setTimeout(() => {}, 5000)'))}],
           { detached: true, stdin: "ignore", stdout: "inherit", stderr: "inherit" });
         while (!require("node:fs").existsSync("ready")) await Bun.sleep(5);
         process.exit(0);
       `], cwd: root,
       env: { PATH: "/usr/bin:/bin" }, watched_outputs: [],
       stdout: join(root, "stdout"), stderr: join(root, "stderr"), capture: "memory",
-      timeout_ms: 100, started: () => {},
+      max_output_bytes: 1024, timeout_ms: 100, started: () => {},
     });
     expect(Date.now() - begin).toBeLessThan(4000);
     expect(result.output_limit).toBe(true);
@@ -59,6 +62,8 @@ test("memory capture returns when an escaped helper holds a pipe open", async ()
     expect(signalledAfterReturn).toBe(false);
   } finally { signals.mockRestore(); rmSync(root, { recursive: true, force: true }); }
 }, 10000);
+
+}
 
 test("memory capture keeps the owned child timeout", async () => {
   const root = mkdtempSync(join(tmpdir(), "docs-drift-memory-timeout-"));

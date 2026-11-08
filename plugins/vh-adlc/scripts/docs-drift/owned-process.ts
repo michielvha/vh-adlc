@@ -32,7 +32,9 @@ export async function executeOwnedProcess(options: {
     try { process.kill(-child.pid, value); return true; } catch { return false; }
   };
   let escalation: ReturnType<typeof setTimeout> | undefined;
+  let groupCleanupStarted = false;
   const stop = () => {
+    if (groupCleanupStarted) return;
     signal("SIGTERM");
     escalation ??= setTimeout(() => signal("SIGKILL"), 200);
   };
@@ -81,6 +83,7 @@ export async function executeOwnedProcess(options: {
     ]);
     result.reaped = result.exit_code !== null;
   } finally {
+    groupCleanupStarted = true;
     clearTimeout(timer);
     clearTimeout(reap);
     clearInterval(monitor);
@@ -104,6 +107,7 @@ export async function executeOwnedProcess(options: {
   if (capturedResult) {
     const { value } = await capturedResult;
     clearTimeout(captureDeadline);
+    clearTimeout(escalation);
     if (value === null) result.output_limit = true;
     else result.captured = { stdout: value[0], stderr: value[1] };
   }
