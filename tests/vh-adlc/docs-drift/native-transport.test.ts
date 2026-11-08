@@ -1,4 +1,4 @@
-import { readSuccess } from "../../../plugins/vh-adlc/scripts/docs-drift/success";
+import { readSuccess, retainSuccess } from "../../../plugins/vh-adlc/scripts/docs-drift/success";
 import * as journalArtifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { retainRejection, readRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
 import { executeAttempt, pendingAttempt, PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
@@ -52,7 +52,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, reject_labels: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, reject_labels: false, response_creator_id: null as number | null, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -135,7 +135,7 @@ if (method !== 'GET') {
     const payload = JSON.parse(readFileSync(option('--input'), 'utf8'));
     let returned;
     if (method === 'POST' && endpoint === 'repos/fixture/docs/issues') {
-        returned = { ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: 20 }, labels: applyLabels(payload.labels) };
+        returned = { ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: state.response_creator_id ?? 20 }, labels: applyLabels(payload.labels) };
         state.issues.push(returned);
     } else if (method === 'POST' && endpoint.endsWith('/comments')) {
         const number = endpoint.split('/').at(-2);
@@ -148,7 +148,7 @@ if (method !== 'GET') {
         state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-2))).labels = returned;
     } else process.exit(1);
     save();
-    process.stdout.write(args.includes('--jq') ? '{}' : 'HTTP/2.0 200 OK\\r\\n\\r\\n' + JSON.stringify(returned));
+    process.stdout.write(args.includes('--jq') ? '{}' : 'HTTP/2.0 ' + (method === 'POST' ? 201 : 200) + ' OK\\r\\n\\r\\n' + JSON.stringify(returned));
     process.exit(0);
 }
 let status = 200, value;
@@ -1415,7 +1415,7 @@ test("successful native issue delivery returns attempt-bound private evidence", 
   expect(() => readSuccess({ ...scope, evidence: proof })).toThrow();
 });
 
-for (const corrupt of [false, true]) {
+for (const corrupt of [false, true, "mismatched-response"] as const) {
 test(`the original journal retains honest process status (corrupt=${corrupt})`, async () => {
   const f = setup(); await f.transport.identity();
   const effect: Effect = { id: "captured-issue", kind: "issue-create", payload: {
@@ -1435,6 +1435,7 @@ test(`the original journal retains honest process status (corrupt=${corrupt})`, 
       resource_id: String(metadata.payload.ref), object: objects.lease_object });
   }
   journal = appendIntent(journal, effect.id);
+  if (corrupt === "mismatched-response") f.update(state => { state.response_creator_id = 21; });
   if (corrupt) {
     const execute = f.transport.execute;
     f.transport.execute = async (...args) => {
@@ -1493,14 +1494,15 @@ test("partial native update retains its first success while cleanup remains pend
     command_index: number; attempt_id: string; facts: { number: number; head_sha: string; user_id: number }; identity: { actor_id: number };
   };
   expect(projection.command_index).toBe(0);
-  const wrongTarget = { ...projection, facts: { ...projection.facts, number: 502 } };
-  const changedBytes = canonicalJSON(wrongTarget);
   const proof = error.execution.successes[0];
   const originalBytes = readFileSync(proof.path);
-  writeFileSync(proof.path, changedBytes);
-  expect(() => readSuccess({ artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan, effect,
-    attempt_id: projection.attempt_id, evidence: { path: proof.path, sha256: sha256(changedBytes) } })).toThrow();
-  writeFileSync(proof.path, originalBytes);
+  for (const field of ["number", "head_repository_id", "base_repository_id"]) {
+    const changed = { ...projection, facts: { ...projection.facts, [field]: field === "number" ? 502 : 11 } };
+    const changedBytes = canonicalJSON(changed); writeFileSync(proof.path, changedBytes);
+    expect(() => readSuccess({ artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan, effect,
+      attempt_id: projection.attempt_id, evidence: { path: proof.path, sha256: sha256(changedBytes) } })).toThrow();
+    writeFileSync(proof.path, originalBytes);
+  }
   expect(projection.facts.head_sha).toBe(f.commit);
   expect(projection.facts.user_id).toBe(20);
   expect(projection.identity.actor_id).toBe(20);
@@ -1518,6 +1520,13 @@ test("partial native update retains its first success while cleanup remains pend
   if (!completed || !("execution" in completed.payload) || !completed.payload.execution) throw Error("missing completed capture");
   expect(completed.payload.execution.successes.map(reference => JSON.parse(readFileSync(reference.path, "utf8")).command_index)).toEqual([0, 1]);
   expect((await f.transport.observe(plan, effect, objects)).state).toBe("done");
+  const labels = completed.payload.execution.successes[1];
+  const bytes = readFileSync(labels.path), invalid = JSON.parse(bytes.toString());
+  invalid.facts.labels = null; invalid.facts.id = 5010;
+  const malformed = canonicalJSON(invalid); writeFileSync(labels.path, malformed);
+  expect(() => readSuccess({ artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan, effect,
+    attempt_id: invalid.attempt_id, evidence: { path: labels.path, sha256: sha256(malformed) } })).toThrow();
+  writeFileSync(labels.path, bytes);
 });
 
 test("native closure capture keeps the legacy creator distinct from the mutating actor", async () => {
@@ -1553,4 +1562,60 @@ test("a same-name replacement repository is refused before native mutation dispa
   expect(error.sent).toBe(false);
   expect(error.reaped).toBe(true);
   expect(f.inspect().issues).toHaveLength(0);
+});
+
+for (const stage of ["retain", "read"] as const) {
+  test(`foreign base repository is refused during success ${stage}`, async () => {
+    const f = setup(); await f.transport.identity();
+    f.update(state => { state.prs.push({ id: 7700, number: 77, state: "open", body: "Legacy", labels: [],
+      user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } },
+      base: { ref: "main", repo: { id: 10 } } }); });
+    const effect: Effect = { id: "scoped-close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } };
+    const reviewed = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects.slice(0, 2), effect, f.plan.manifest.effects.at(-1)!]);
+    const plan = sealPlan({ reviewed: validateReviewedManifest(reviewed), grants: reviewed.grants, adoption_sha256: hash("adoption"),
+      publication_kind: "advisory", context: "trial", transport: "native", corrections: [], attention: [] });
+    const result = await f.transport.execute(plan, effect, writePlanObject(f.store, plan), "scope-attempt");
+    if (!result?.successes[0]) throw Error("missing scoped closure capture");
+    const proof = result.successes[0], projection = JSON.parse(readFileSync(proof.path, "utf8"));
+    const scope = { artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan, effect, attempt_id: "scope-attempt" };
+    if (stage === "read") {
+      projection.facts.base_repository_id = 11;
+      const bytes = canonicalJSON(projection); writeFileSync(proof.path, bytes);
+      expect(() => readSuccess({ ...scope, evidence: { path: proof.path, sha256: sha256(bytes) } })).toThrow();
+    } else {
+      const response = { ...f.inspect().prs[0], base: { ref: "main", repo: { id: 11 } } };
+      const identity = await f.transport.identity();
+      expect(() => retainSuccess({ ...scope, command_directory: projection.command_directory, command_index: 0,
+        hostname: f.settings.hostname, method: "PATCH", endpoint: "repos/fixture/docs/pulls/77", identity,
+        response: Buffer.from("HTTP/2.0 200 OK\r\n\r\n" + JSON.stringify(response)) })).toThrow();
+    }
+  });
+}
+
+test("native comment capture binds its complete parent destination", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.prs.push({ id: 7700, number: 77, state: "open", body: "Legacy", labels: [],
+    user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } },
+    base: { ref: "main", repo: { id: 10 } } }); });
+  const effect: Effect = { id: "scoped-comment", kind: "comment-create", payload: { number: 77, body: "Bound comment", prior_ids: [] } };
+  const reviewed = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects.slice(0, 2), effect, f.plan.manifest.effects.at(-1)!]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(reviewed), grants: reviewed.grants, adoption_sha256: hash("adoption"),
+    publication_kind: "advisory", context: "trial", transport: "native", corrections: [], attention: [] });
+  const result = await f.transport.execute(plan, effect, writePlanObject(f.store, plan), "comment-attempt");
+  if (!result?.successes[0]) throw Error("missing comment capture");
+  const evidence = result.successes[0], original = readFileSync(evidence.path);
+  const scope = { artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan, effect, attempt_id: "comment-attempt" };
+  expect(readSuccess({ ...scope, evidence })).toEqual(evidence);
+  for (const mode of ["host", "partial-parent", "target", "status", "resource-shape"]) {
+    const value = JSON.parse(original.toString());
+    if (mode === "host") value.facts.parent_host = "foreign.example";
+    if (mode === "partial-parent") {
+      value.facts.parent_url_sha256 = null; value.facts.parent_host = null; value.facts.parent_path = null;
+    }
+    if (mode === "target") value.facts.parent_number = 78;
+    if (mode === "status") value.status = 200;
+    if (mode === "resource-shape") { value.facts.id = null; value.facts.labels = []; }
+    const bytes = canonicalJSON(value); writeFileSync(evidence.path, bytes);
+    expect(() => readSuccess({ ...scope, evidence: { path: evidence.path, sha256: sha256(bytes) } })).toThrow();
+  }
 });

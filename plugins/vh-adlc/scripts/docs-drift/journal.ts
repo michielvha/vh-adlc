@@ -213,7 +213,7 @@ function attemptsUnapplied(events: Event[], effectId: string): boolean {
     const id = attempt.payload.attempt_id;
     const ended = events.find(event => event.kind === "attempt-ended" && event.effect_id === attempt.effect_id
       && "attempt_id" in event.payload && event.payload.attempt_id === id);
-    return ended !== undefined && "sent" in ended.payload && !("capture_unverified" in ended.payload) && ended.payload.reaped
+    return ended !== undefined && "sent" in ended.payload && ended.payload.reaped
       && (!ended.payload.sent || "rejection" in ended.payload);
   });
 }
@@ -268,7 +268,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
         if (payload.sent !== true || payload.reaped !== true || typeof evidence.path !== "string"
           || !evidence.path.startsWith("/") || evidence.path.includes("\0")) fail("invalid rejection evidence");
       }
-      if (unverified && (payload.capture_unverified !== true || executed)) fail("invalid unverified capture");
+      if (unverified && (payload.capture_unverified !== true || executed || rejected || payload.sent !== true)) fail("invalid unverified capture");
       if (executed && rejected) fail("contradictory execution and rejection");
       if (executed) {
         const execution = exact(payload.execution, ["successes"]);

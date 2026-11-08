@@ -1,4 +1,4 @@
-import { readSuccess, type ExecutionEvidence } from "./success";
+import { readSuccess, type ExecutionResult } from "./success";
 import { dirname } from "node:path";
 import { canonicalJSON } from "./protocol";
 import { readRejection, type RejectionEvidence } from "./rejections";
@@ -9,7 +9,7 @@ import type { PlanObjects, PublicationTransport } from "./transport";
 
 /** Only the native executor's process/preflight observations supply this status. */
 export class PublicationExecutionError extends Error {
-  constructor(readonly sent: boolean, readonly reaped: boolean, readonly rejection?: RejectionEvidence, readonly execution?: ExecutionEvidence) { super("native publication execution unavailable"); }
+  constructor(readonly sent: boolean, readonly reaped: boolean, readonly rejection?: RejectionEvidence, readonly execution?: ExecutionResult) { super("native publication execution unavailable"); }
 }
 
 export function pendingAttempt(journal: Journal, effect: Effect, retirement = false): string | null {
@@ -24,8 +24,8 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
       && "attempt_id" in event.payload && event.payload.attempt_id === attemptId);
     if (!ended || ended.revision < attempt.revision) return "attempt-in-flight";
     const status = ended.payload as { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; attempt_id: string; capture_unverified?: true };
-    if (status.capture_unverified) return "success-proof-unavailable";
     if (!status.reaped) return "attempt-not-reaped";
+    if (status.capture_unverified) return "success-proof-unavailable";
     if (status.rejection) {
       try {
         const dispatched = journal.plan.manifest.effects.find(item => item.id === attempt.effect_id);
@@ -98,7 +98,7 @@ export async function executeAttempt(options: {
     throw error;
   }
   let failure: unknown;
-  let status: { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; execution?: ExecutionEvidence; capture_unverified?: true } = { sent: true, reaped: true };
+  let status: { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; execution?: ExecutionResult; capture_unverified?: true } = { sent: true, reaped: true };
   try {
     const execution = await options.transport.execute(journal.plan, options.effect, options.objects, id);
     if (execution) status.execution = execution;
@@ -108,15 +108,15 @@ export async function executeAttempt(options: {
   }
   if (status.execution) {
     try {
-      if (status.rejection) throw Error("contradictory execution and rejection");
+      if (Object.hasOwn(status.execution, "capture_unverified")) throw Error("success-proof-unavailable");
+      if (Object.keys(status.execution).join(",") !== "successes" || status.rejection) throw Error("contradictory execution and rejection");
       const successes = status.execution.successes;
       if (!Array.isArray(successes) || successes.length > 16 || new Set(successes.map(item => item.path)).size !== successes.length) throw Error("invalid captured execution");
       for (const evidence of successes) readSuccess({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo,
         plan: journal.plan, effect: options.effect, attempt_id: id, evidence });
     } catch (error) {
       failure ??= error;
-      const { execution: unverifiedExecution, ...observedStatus } = status;
-      status = { ...observedStatus, capture_unverified: true };
+      status = { sent: status.sent, reaped: status.reaped, ...(status.sent ? { capture_unverified: true } : {}) };
     }
   }
   // An observer may already have recorded an actual outcome. Keep its receipt and our process status.

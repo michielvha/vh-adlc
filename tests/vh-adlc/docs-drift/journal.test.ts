@@ -247,7 +247,7 @@ test.each(["in-flight", "sent", "unreaped", "unsent", "capture-unverified"] as c
   journal = appendIntent(journal, effect.id);
   journal = appendAttempt(journal, effect.id, "owned-negative-proof");
   if (state !== "in-flight") journal = appendAttemptEnd(journal, effect.id, { attempt_id: "owned-negative-proof", sent: state !== "unsent", reaped: state !== "unreaped",
-    ...(state === "capture-unverified" ? { capture_unverified: true as const, rejection: { path: join(f.artifacts, "rejection.json"), sha256: hash("rejection") } } : {}) });
+    ...(state === "capture-unverified" ? { capture_unverified: true as const } : {}) });
   const retirement = { scope_sha256: hash("scope"), request_sha256: hash("request"), unapplied: true as const,
     lookup: { path: join(f.artifacts, "lookup.json"), sha256: hash("lookup") } };
   if (state === "unsent") expect(appendRetirement(journal, effect.id, retirement).revision).toBe(journal.revision + 1);
@@ -303,3 +303,11 @@ test.each(["duplicate", "oversized", "unsent", "foreign", "unnormalized", "rejec
       ...(kind === "rejected" ? { rejection: { path: join(f.artifacts, "rejection-fixture.json"), sha256: hash("rejection") } } : {}) };
     expect(() => appendAttemptEnd(journal, effect.id, status)).toThrow();
   });
+
+test.each(["unsent", "rejected"] as const)("unverified capture rejects a contradictory %s ending", kind => {
+  const f = setup(); let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  const effect = f.plan.manifest.effects[0];
+  journal = appendIntent(journal, effect.id); journal = appendAttempt(journal, effect.id, "capture-attempt");
+  expect(() => appendAttemptEnd(journal, effect.id, { attempt_id: "capture-attempt", sent: kind !== "unsent", reaped: true,
+    capture_unverified: true, ...(kind === "rejected" ? { rejection: { path: join(f.artifacts, "rejection.json"), sha256: hash("rejection") } } : {}) })).toThrow();
+});

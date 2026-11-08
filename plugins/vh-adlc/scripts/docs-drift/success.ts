@@ -9,6 +9,7 @@ import type { PublicationIdentity } from "./transport";
 
 export type SuccessEvidence = { path: string; sha256: string };
 export type ExecutionEvidence = { successes: SuccessEvidence[] };
+export type ExecutionResult = ExecutionEvidence & { capture_unverified?: true };
 type Scope = { artifact_root: string; source_repo: string; plan: SealedPlan; effect: Effect; attempt_id: string };
 type Facts = {
   id: number | null; number: number | null; title_sha256: string | null; body_sha256: string | null;
@@ -139,7 +140,21 @@ function identityScope(plan: SealedPlan, identity: PublicationIdentity): void {
   if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
     || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("success identity scope changed");
 }
-function responseScope(effect: Effect, index: number, repository: string, actor: string, actorId: number, hostname: string, facts: Facts): void {
+function responseScope(effect: Effect, index: number, repository: string, repositoryId: number, actor: string, actorId: number, hostname: string, status: number, facts: Facts): void {
+  const request = expectedRequest(effect, repository, index);
+  if (status !== (request.method === "POST" ? 201 : 200)) throw Error("unsupported native success status");
+  const parents = [facts.parent_repository, facts.parent_number, facts.parent_url_sha256, facts.parent_host, facts.parent_path];
+  if (parents.some(value => value !== null) && parents.some(value => value === null)) throw Error("incomplete success parent binding");
+  if (request.method === "PUT") {
+    if (facts.labels === null || Object.entries(facts).some(([key, value]) => key !== "labels" && value !== null)) throw Error("invalid label response shape");
+  } else if (facts.id === null) throw Error("missing success resource identity");
+  if ((effect.kind === "pr-update" || effect.kind === "pr-close") && index === 0) {
+    if (facts.base_repository_id !== null && facts.base_repository_id !== repositoryId) throw Error("success base repository changed");
+    if (effect.kind === "pr-update" && facts.head_repository_id !== null && facts.head_repository_id !== repositoryId) throw Error("success head repository changed");
+  }
+  if ((facts.user_id === null) !== (facts.user_login_sha256 === null)) throw Error("incomplete success creator binding");
+  if (effect.kind === "issue-create" && facts.number === null || effect.kind === "comment-create" && facts.number !== null) throw Error("invalid creation response shape");
+  if (facts.parent_number !== null && facts.number !== null && facts.parent_number !== facts.number) throw Error("inconsistent native parent number");
   if (facts.parent_url_sha256 !== null) {
     const host = hostname === "github.com" ? "api.github.com" : hostname;
     const path = `/repos/${repository}/issues/${facts.parent_number}`;
@@ -185,7 +200,7 @@ export function retainSuccess(options: Scope & {
   const projected = projectSuccess(options.response);
   if (projected === null) return null;
   identityScope(options.plan, options.identity);
-  responseScope(options.effect, options.command_index, options.plan.manifest.repository, options.identity.actor, options.identity.actor_id, options.hostname, projected.facts);
+  responseScope(options.effect, options.command_index, options.plan.manifest.repository, options.plan.manifest.repository_id, options.identity.actor, options.identity.actor_id, options.hostname, projected.status, projected.facts);
   const command = commandScope(options, options.command_directory, options.hostname, options.method, options.endpoint, options.command_index);
   if (options.identity.repository !== options.plan.manifest.repository
     || !Number.isSafeInteger(options.command_index) || options.command_index < 0 || options.command_index > 15
@@ -257,7 +272,7 @@ export function readSuccess(options: Scope & { evidence: SuccessEvidence }): Suc
     if (facts[field] !== null && (typeof facts[field] !== "string" || !facts[field] || facts[field].includes("\0"))) throw Error("invalid success parent location");
   }
   if (facts.parent_repository !== null && facts.parent_repository !== options.plan.manifest.repository) throw Error("invalid success parent repository");
-  responseScope(options.effect, Number(value.command_index), options.plan.manifest.repository, String(identity.actor), Number(identity.actor_id), String(value.hostname), facts as Facts);
+  responseScope(options.effect, Number(value.command_index), options.plan.manifest.repository, options.plan.manifest.repository_id, String(identity.actor), Number(identity.actor_id), String(value.hostname), Number(value.status), facts as Facts);
   if (facts.id === null && facts.labels === null) throw Error("empty success facts");
   if (!canonicalJSON(commandScope(options, value.command_directory, String(value.hostname), String(value.method), String(value.endpoint), Number(value.command_index))).equals(canonicalJSON(value.command))) throw Error("success command evidence changed");
   return options.evidence;
