@@ -1,5 +1,9 @@
 import { afterAll, expect, test } from "bun:test";
-import { chmodSync, linkSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
+import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
+import { settingsFixture } from "./settings-fixture";
 import { dirname, join } from "node:path";
 import { computeComponentIdentity, inspectRetainedPayload } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
@@ -70,4 +74,164 @@ test("a shared or symlinked runtime root cannot stand in for the recorded owned 
     if (mode === "symlink") symlinkSync(f.payload, path);
     expect(() => inspectRetainedPayload({ directory: path, expected: f.identity })).toThrow();
   }
+});
+
+async function clientFixture(options: { cache?: string; provider?: "copilot" | "claude" | "codex"; version?: string;
+  reported_version?: string; format?: "tar" | "executable"; program?: string; padding_bytes?: number } = {}) {
+  const cache = options.cache ?? realpathSync(mkdtempSync(join(tmpdir(), "vh-retained-client-")));
+  if (!options.cache) roots.push(cache);
+  chmodSync(cache, 0o700);
+  const provider = options.provider ?? "copilot", version = options.version ?? "fixture-1.0.0", reported = options.reported_version ?? version;
+  const headers = { copilot: "GitHub Copilot CLI " + reported + ".", claude: reported + " (Claude Code)", codex: "codex-cli " + reported };
+  const program = options.program ?? "#!/bin/sh\nprintf '%s\\n' '" + headers[provider] + "'\nexit 0\n" + "#".repeat(options.padding_bytes ?? 0);
+  const executable = "bin/" + provider, format = options.format ?? "tar";
+  const distribution = format === "tar" ? await new Bun.Archive({ [executable]: program, "LICENSE": "Synthetic distribution\n" }, { compress: "gzip" }).bytes()
+    : Buffer.from(program);
+  const configured = settingsFixture(); Object.assign(configured.clients["copilot-linux"], {
+    provider, version, platform: process.platform + "-" + process.arch, distribution_sha256: sha256(distribution) });
+  const client = parseSettings(configured).clients["copilot-linux"];
+  const setup = { cache_directory: cache, client_id: "copilot-linux", client, distribution, format, executable };
+  return { cache, client, setup, program, index: join(cache, "clients/copilot-linux", client.distribution_sha256 + ".json") };
+}
+
+test("approved client distribution remains selected after an unrelated host client changes", async () => {
+  expect(typeof bootstrap.retainClientDistribution).toBe("function");
+  const cache = realpathSync(mkdtempSync(join(tmpdir(), "vh-retained-client-"))); roots.push(cache); chmodSync(cache, 0o700);
+  const program = "#!/bin/sh\nprintf '%s\\n' 'GitHub Copilot CLI fixture-1.0.0.' \"Run 'copilot update' to check for updates.\"\n";
+  const distribution = await new Bun.Archive({ "bin/copilot": program, "LICENSE": "Synthetic fixture distribution\n" }, { compress: "gzip" }).bytes();
+  const configured = settingsFixture(); Object.assign(configured.clients["copilot-linux"], {
+    platform: process.platform + "-" + process.arch, distribution_sha256: sha256(distribution) });
+  const client = parseSettings(configured).clients["copilot-linux"];
+  const selected = await bootstrap.retainClientDistribution({ cache_directory: cache, client_id: "copilot-linux", client,
+    distribution, format: "tar", executable: "bin/copilot" });
+  expect(readFileSync(selected.executable, "utf8")).toBe(program);
+  const unrelated = join(cache, "host-client"); writeFileSync(unrelated, "unrelated newer global client\n");
+  const checked = await bootstrap.inspectRetainedClient({ cache_directory: cache, client_id: "copilot-linux", client });
+  expect(checked.executable).toBe(selected.executable);
+  expect(checked.client).toEqual(client);
+  expect(checked.version).toBe(client.version);
+  expect(readFileSync(unrelated, "utf8")).toBe("unrelated newer global client\n");
+}, 30000);
+
+test("retained setup refuses linked cache parents before writing outside its namespace", async () => {
+  const cache = realpathSync(mkdtempSync(join(tmpdir(), "vh-client-linked-"))), outside = realpathSync(mkdtempSync(join(tmpdir(), "vh-client-outside-")));
+  roots.push(cache, outside); chmodSync(cache, 0o700); chmodSync(outside, 0o700);
+  symlinkSync(outside, join(cache, "clients"));
+  const distribution = Buffer.from("#!/bin/sh\nprintf '%s\\n' 'GitHub Copilot CLI fixture-1.0.0.'\n");
+  const configured = settingsFixture(); Object.assign(configured.clients["copilot-linux"], {
+    platform: process.platform + "-" + process.arch, distribution_sha256: sha256(distribution) });
+  const client = parseSettings(configured).clients["copilot-linux"];
+  await expect(bootstrap.retainClientDistribution({ cache_directory: cache, client_id: "copilot-linux", client,
+    distribution, format: "executable", executable: "copilot" })).rejects.toThrow("private owned runtime directory required");
+  expect(readdirSync(outside)).toEqual([]);
+  expect(readdirSync(cache)).toEqual(["clients"]);
+});
+
+test.each(["copilot", "claude", "codex"] as const)("a retained %s client has exact native version evidence", async provider => {
+  const f = await clientFixture({ provider, format: "executable" });
+  const selected = await bootstrap.retainClientDistribution(f.setup);
+  expect(selected.version).toBe(f.client.version);
+  expect(selected.client.provider).toBe(provider);
+  expect(readFileSync(selected.executable, "utf8")).toBe(f.program);
+});
+
+test.each(["checksum", "platform", "executable"] as const)("retained setup rejects %s before creating build state", async scenario => {
+  const f = await clientFixture();
+  if (scenario === "checksum") f.setup.distribution = Buffer.concat([Buffer.from(f.setup.distribution), Buffer.from("wrong bytes")]);
+  if (scenario === "platform") Object.assign(f.client, { platform: process.platform === "darwin" ? "linux-x64" : "darwin-arm64" });
+  if (scenario === "executable") f.setup.executable = "missing/client";
+  const reason = scenario === "checksum" ? "client distribution checksum" : scenario === "platform" ? "client platform differs from host" : "client distribution executable or inventory";
+  await expect(bootstrap.retainClientDistribution(f.setup)).rejects.toThrow(reason);
+  expect(readdirSync(f.cache)).toEqual([]);
+});
+
+test("a mismatched native version preserves its original failed setup capture without selecting it", async () => {
+  const f = await clientFixture({ reported_version: "fixture-2.0.0" });
+  await expect(bootstrap.retainClientDistribution(f.setup)).rejects.toThrow("native client version differs from approved build");
+  const builds = readdirSync(join(f.cache, "builds"));
+  expect(builds).toHaveLength(1);
+  const build = join(f.cache, "builds", builds[0]);
+  expect(readFileSync(join(build, "version-stdout"), "utf8")).toContain("fixture-2.0.0");
+  expect(JSON.parse(readFileSync(join(build, "version-process.json"), "utf8")).process.reaped).toBe(true);
+  expect(() => readFileSync(f.index)).toThrow("ENOENT");
+});
+
+test.each(["missing-package", "replaced-executable", "ambient-file", "linked-executable", "hardlinked-executable", "forged-file-manifest", "unreaped-version", "missing-owner", "extra-proof-field"] as const)("retained client inspection rejects %s without a global fallback", async scenario => {
+  const f = await clientFixture(), selected = await bootstrap.retainClientDistribution(f.setup), root = dirname(selected.directory);
+  const global = join(f.cache, "global-client"); writeFileSync(global, "unrelated available host client\n");
+  if (scenario === "missing-package") rmSync(join(root, "distribution"));
+  if (scenario === "replaced-executable") writeFileSync(selected.executable, Buffer.alloc(readFileSync(selected.executable).length, 120));
+  if (scenario === "ambient-file") writeFileSync(join(selected.directory, "ambient-plugin.js"), "unexpected active input\n");
+  if (scenario === "linked-executable") { rmSync(selected.executable); symlinkSync(global, selected.executable); }
+  if (scenario === "hardlinked-executable") linkSync(selected.executable, join(f.cache, "other-hardlink"));
+  if (scenario === "forged-file-manifest") {
+    writeFileSync(selected.executable, "forged build\n");
+    const record = JSON.parse(readFileSync(f.index, "utf8")) as { files: Array<{ path: string; sha256: string; size: number }> };
+    const row = record.files.find(item => item.path === f.setup.executable);
+    if (!row) throw Error("missing retained executable");
+    const bytes = readFileSync(selected.executable); row.sha256 = sha256(bytes); row.size = bytes.length;
+    writeFileSync(f.index, canonicalJSON(record));
+  }
+  if (scenario === "unreaped-version" || scenario === "extra-proof-field") {
+    const path = join(root, "version-process.json"), record = JSON.parse(readFileSync(path, "utf8")) as { process: { reaped: boolean } };
+    if (scenario === "unreaped-version") record.process.reaped = false;
+    else Object.assign(record, { approved: true });
+    writeFileSync(path, canonicalJSON(record));
+  }
+  if (scenario === "missing-owner") rmSync(join(root, "version-owner.json"));
+  const reason = { "missing-package": "distribution", "replaced-executable": "runtime input bytes changed",
+    "ambient-file": "unexpected or changed runtime input", "linked-executable": "foreign or linked runtime input",
+    "hardlinked-executable": "unexpected or changed runtime input", "forged-file-manifest": "client payload differs from verified distribution",
+    "unreaped-version": "native client version evidence", "missing-owner": "version-owner.json", "extra-proof-field": "retained runtime evidence fields" }[scenario];
+  await expect(bootstrap.inspectRetainedClient(f.setup)).rejects.toThrow(reason);
+  expect(readFileSync(global, "utf8")).toBe("unrelated available host client\n");
+});
+
+test("approved and successor client snapshots coexist while same-build setup is idempotent and concurrent", async () => {
+  const approved = await clientFixture(), first = await bootstrap.retainClientDistribution(approved.setup);
+  const originalIndex = readFileSync(approved.index);
+  const repeated = await Promise.all([bootstrap.retainClientDistribution(approved.setup), bootstrap.retainClientDistribution(approved.setup)]);
+  expect(repeated.map(item => item.executable)).toEqual([first.executable, first.executable]);
+  expect(readFileSync(approved.index)).toEqual(originalIndex);
+  const candidate = await clientFixture({ cache: approved.cache, version: "fixture-2.0.0" });
+  const newer = await Promise.all([bootstrap.retainClientDistribution(candidate.setup), bootstrap.retainClientDistribution(candidate.setup)]);
+  expect(newer[0].executable).toBe(newer[1].executable);
+  expect(newer[0].executable).not.toBe(first.executable);
+  const rollback = await bootstrap.inspectRetainedClient(approved.setup);
+  expect(rollback.executable).toBe(first.executable);
+  expect(rollback.version_evidence_sha256).toBe(first.version_evidence_sha256);
+  expect(readFileSync(approved.index)).toEqual(originalIndex);
+});
+
+test("native distributions larger than report artifacts retain their actual approved bytes", async () => {
+  const f = await clientFixture({ format: "executable", padding_bytes: 17 * 1024 * 1024 });
+  const selected = await bootstrap.retainClientDistribution(f.setup);
+  expect(readFileSync(selected.executable).length).toBe(f.setup.distribution.length);
+  expect((await bootstrap.inspectRetainedClient(f.setup)).version).toBe(f.client.version);
+}, 30000);
+
+test("version probes use fresh profiles and caches while inherited credential values are absent", async () => {
+  const program = ["#!/bin/sh", "printf '%s\\n' \"${COPILOT_GITHUB_TOKEN-unset}\" \"${ANTHROPIC_API_KEY-unset}\" \"$COPILOT_CACHE_HOME\" \"$TMPDIR\" > \"$HOME/probe-environment\"",
+    "printf '%s\\n' 'GitHub Copilot CLI fixture-1.0.0.'"].join("\n") + "\n";
+  const f = await clientFixture({ program });
+  const previousCopilot = process.env.COPILOT_GITHUB_TOKEN, previousClaude = process.env.ANTHROPIC_API_KEY;
+  process.env.COPILOT_GITHUB_TOKEN = "synthetic-inherited-copilot-canary"; process.env.ANTHROPIC_API_KEY = "synthetic-inherited-claude-canary";
+  try {
+    const selected = await bootstrap.retainClientDistribution(f.setup), probe = join(dirname(selected.directory), "probe-profile");
+    expect(readFileSync(join(probe, "probe-environment"), "utf8").trim().split("\n")).toEqual(["unset", "unset", join(probe, "cache"), join(probe, "temporary")]);
+    expect(probe).not.toBe(selected.profile_directory);
+    expect(readdirSync(selected.profile_directory)).toEqual([]);
+  } finally {
+    if (previousCopilot === undefined) delete process.env.COPILOT_GITHUB_TOKEN; else process.env.COPILOT_GITHUB_TOKEN = previousCopilot;
+    if (previousClaude === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = previousClaude;
+  }
+});
+
+test("a failed native version command retains its process result and publishes no client selection", async () => {
+  const f = await clientFixture({ program: "#!/bin/sh\nprintf '%s\\n' 'GitHub Copilot CLI fixture-1.0.0.'\nexit 7\n" });
+  await expect(bootstrap.retainClientDistribution(f.setup)).rejects.toThrow("owned client version process incomplete");
+  const [build] = readdirSync(join(f.cache, "builds"));
+  const result = JSON.parse(readFileSync(join(f.cache, "builds", build, "version-process.json"), "utf8")) as { process: { exit_code: number; reaped: boolean } };
+  expect(result.process).toMatchObject({ exit_code: 7, reaped: true });
+  expect(() => readFileSync(f.index)).toThrow("ENOENT");
 });

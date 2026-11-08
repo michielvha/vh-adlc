@@ -150,24 +150,26 @@ function readSet(value: unknown): { source_roots: string[] | null; reference_roo
   return { source_roots: bound(input.source_roots, "read_set source_roots"), reference_roots: bound(input.reference_roots, "read_set reference_roots") };
 }
 
+export function parseClientBinding(value: unknown) {
+  const client = object(value, ["provider", "version", "platform", "distribution_url", "distribution_sha256"], "clients entry");
+  const version = text(client.version, "clients version");
+  if (["latest", "main", "master", "nightly", "canary"].includes(version.toLowerCase())) invalid("clients version");
+  const distribution = text(client.distribution_url, "clients distribution_url");
+  let url: URL;
+  try { url = new URL(distribution); } catch { invalid("clients distribution_url"); }
+  if (url.protocol !== "https:" || url.username || url.password || url.hash || url.search) invalid("clients distribution_url");
+  return {
+    provider: choice(client.provider, ["copilot", "claude", "codex"], "clients provider"), version,
+    platform: choice(client.platform, ["linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64"], "clients platform"),
+    distribution_url: distribution,
+    distribution_sha256: digest(client.distribution_sha256, "clients distribution_sha256"),
+  };
+}
+
 function clientSettings(value: unknown) {
   const input = object(value, null, "clients");
   identifiers(Object.keys(input), "clients", true);
-  return Object.fromEntries(Object.entries(input).map(([id, value]) => {
-    const client = object(value, ["provider", "version", "platform", "distribution_url", "distribution_sha256"], "clients entry");
-    const version = text(client.version, "clients version");
-    if (["latest", "main", "master", "nightly", "canary"].includes(version.toLowerCase())) invalid("clients version");
-    const distribution = text(client.distribution_url, "clients distribution_url");
-    let url: URL;
-    try { url = new URL(distribution); } catch { invalid("clients distribution_url"); }
-    if (url.protocol !== "https:" || url.username || url.password || url.hash || url.search) invalid("clients distribution_url");
-    return [id, {
-      provider: choice(client.provider, ["copilot", "claude", "codex"], "clients provider"), version,
-      platform: choice(client.platform, ["linux-x64", "linux-arm64", "darwin-x64", "darwin-arm64"], "clients platform"),
-      distribution_url: distribution,
-      distribution_sha256: digest(client.distribution_sha256, "clients distribution_sha256"),
-    }] as const;
-  }));
+  return Object.fromEntries(Object.entries(input).map(([id, value]) => [id, parseClientBinding(value)] as const));
 }
 
 export type IdentitySource = { provider: "copilot" | "claude" | "codex"; event_type: string; field_path: string[] };
