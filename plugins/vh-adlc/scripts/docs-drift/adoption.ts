@@ -311,7 +311,7 @@ export function collectUpgradeChanges(options: {
       const selected = entries.filter(name => [previous.settings.execution.entries[name], next.settings.execution.entries[name]]
         .some(entry => entry.worker.client === path[1] || entry.reviewer.client === path[1]));
       mark(...(selected.length ? selected : entries));
-    } else if (path[0] === "runtime_loader") mark("copilot", "claude");
+    } else if (path[0] === "runtime_loader") mark(...entries);
     else if (path[0] === "execution" && path[1] === "entries" && (path[2] === "hosted" || path[2] === "copilot" || path[2] === "claude")) mark(path[2]);
     else if (path[0] === "execution" && path[1] === "claude_command") mark("claude");
     else if (path[0] === "execution") mark("hosted");
@@ -336,7 +336,7 @@ export function collectUpgradeChanges(options: {
   for (const path of changedBlobs) {
     if (path === scheduled && callerProof) continue;
     if ([previous.settings.execution.claude_command, next.settings.execution.claude_command].includes(path)) mark("claude");
-    else if ([previous.settings.runtime_loader.launcher, next.settings.runtime_loader.launcher].includes(path)) mark("copilot", "claude");
+    else if ([previous.settings.runtime_loader.launcher, next.settings.runtime_loader.launcher].includes(path)) mark(...entries);
     else if ([previous.settings.execution.worker_workflow, next.settings.execution.worker_workflow,
       previous.settings.execution.scheduled_workflow, next.settings.execution.scheduled_workflow].includes(path)) mark("hosted");
     else mark(...entries);

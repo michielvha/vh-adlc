@@ -135,15 +135,17 @@ test.each(["hosted", "copilot", "claude"] as const)("a protected client change m
   expect(changes(f).known_affected_entries).toEqual([entry]);
 });
 
-test.each(["launcher", "claude-command", "worker", "permissions", "verification", "read-set"] as const)("protected %s changes retain the corresponding affected entries", scenario => {
+test.each(["launcher", "loader-argv", "loader-provider", "claude-command", "worker", "permissions", "verification", "read-set"] as const)("protected %s changes retain the corresponding affected entries", scenario => {
   const f = upgradeFixture();
   if (scenario === "launcher") write(f.repo, f.proposed.runtime_loader.launcher, "Changed protected launcher\n");
+  if (scenario === "loader-argv") f.proposed.runtime_loader.argv.push("--no-custom-instructions");
+  if (scenario === "loader-provider") f.proposed.runtime_loader.provider = "claude";
   if (scenario === "claude-command") write(f.repo, f.proposed.execution.claude_command, "Changed protected Claude forwarding\n");
   if (scenario === "worker") write(f.repo, f.proposed.execution.worker_workflow, "Changed protected hosted worker\n");
   if (scenario === "permissions") f.proposed.execution.permissions.contents = "read";
   if (scenario === "verification") f.proposed.verification_commands = [["bun", "test", "different-check"]];
   if (scenario === "read-set") f.proposed.read_set.source_roots = ["src"];
-  const expected = { launcher: ["copilot", "claude"], "claude-command": ["claude"], worker: ["hosted"], permissions: ["hosted"],
+  const expected = { launcher: ["hosted", "copilot", "claude"], "loader-argv": ["hosted", "copilot", "claude"], "loader-provider": ["hosted", "copilot", "claude"], "claude-command": ["claude"], worker: ["hosted"], permissions: ["hosted"],
     verification: ["hosted", "copilot", "claude"], "read-set": ["hosted", "copilot", "claude"] } satisfies Record<typeof scenario, Array<"hosted" | "copilot" | "claude">>;
   expect(changes(f).known_affected_entries).toEqual(expected[scenario]);
 });
