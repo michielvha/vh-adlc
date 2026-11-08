@@ -36,10 +36,12 @@ export async function executeOwnedProcess(options: {
     signal("SIGTERM");
     escalation ??= setTimeout(() => signal("SIGKILL"), 200);
   };
+  const readers: ReadableStreamDefaultReader<Uint8Array>[] = [];
   let capturedBytes = 0;
   async function drain(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
     const chunks: Uint8Array[] = [];
     const reader = stream.getReader();
+    readers.push(reader);
     try {
       while (true) {
         const next = await reader.read();
@@ -56,6 +58,11 @@ export async function executeOwnedProcess(options: {
     : null;
   // Attach rejection handling immediately while process termination is still being awaited.
   const capturedResult = captured?.then(value => ({ value }), () => ({ value: null }));
+  const captureDeadline = capturedResult ? setTimeout(() => {
+    result.output_limit = true;
+    stop();
+    for (const reader of readers) reader.cancel().catch(() => {});
+  }, timeout + 2500) : undefined;
   const interrupt = () => { result.cancelled = "SIGINT"; stop(); };
   const terminate = () => { result.cancelled = "SIGTERM"; stop(); };
   process.once("SIGINT", interrupt);
@@ -97,6 +104,7 @@ export async function executeOwnedProcess(options: {
   }
   if (capturedResult) {
     const { value } = await capturedResult;
+    clearTimeout(captureDeadline);
     if (value === null) result.output_limit = true;
     else result.captured = { stdout: value[0], stderr: value[1] };
   }

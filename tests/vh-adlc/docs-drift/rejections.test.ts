@@ -1,5 +1,6 @@
+import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { expect, test } from "bun:test";
-import { gitRejection, httpRejection, projectRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
+import { gitRejection, httpRejection, projectRejection, projectedRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
 
 const updates = [{ ref: "refs/heads/docs-drift/one", head: "a".repeat(40) },
   { ref: "refs/heads/docs-drift/receipt/one", head: "b".repeat(40) }];
@@ -34,4 +35,30 @@ test("rejection projections omit response bodies and secret-bearing headers", ()
   expect(JSON.parse(text).observed).toEqual({ protocol: "http", status: 403 });
   expect(projectRejection(Buffer.from(rejected()), { protocol: "git", updates })).not.toBeNull();
   expect(projectRejection(Buffer.from(rejected().replace("!\t", "*\t")), { protocol: "git", updates })).toBeNull();
+});
+
+test("projected Git evidence rejects vacuous and duplicate ref selections", () => {
+  for (const selected of [[], [updates[0], updates[0]]]) {
+    const protocol = { protocol: "git" as const, updates: selected };
+    const bytes = canonicalJSON({ schema_version: 2, protocol, response_sha256: "a".repeat(64),
+      observed: { protocol: "git", refs: selected.map(item => item.ref), statuses: selected.map(() => ({ kind: "rejected", reason: "stale info" })) } });
+    expect(() => projectedRejection(bytes, protocol)).toThrow();
+  }
+});
+
+test("projected Git recovery rechecks status reasons and exact schema", () => {
+  const protocol = { protocol: "git" as const, updates };
+  const valid = projectRejection(Buffer.from(rejected()), protocol)!;
+  expect(projectedRejection(valid, protocol)).toEqual({ protocol: "git", refs: updates.map(item => item.ref),
+    statuses: updates.map(() => ({ kind: "rejected", reason: "stale info" })) });
+  for (const change of [
+    (value: { observed: { statuses: { kind: string; reason: string }[]; extra?: boolean } }) => { value.observed.statuses[0].reason = "unknown"; },
+    (value: { observed: { statuses: { kind: string; reason: string }[]; extra?: boolean } }) => { value.observed.statuses[0].kind = "accepted"; },
+    (value: { observed: { statuses: { kind: string; reason: string }[]; extra?: boolean } }) => { value.observed.statuses.pop(); },
+    (value: { observed: { statuses: { kind: string; reason: string }[]; extra?: boolean } }) => { value.observed.extra = true; },
+  ]) {
+    const value = JSON.parse(valid.toString());
+    change(value);
+    expect(() => projectedRejection(canonicalJSON(value), protocol)).toThrow();
+  }
 });

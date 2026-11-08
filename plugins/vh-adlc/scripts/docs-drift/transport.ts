@@ -275,7 +275,7 @@ export function createNativeTransport(options: {
   async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }): Promise<void> {
     const id = randomUUID(), directory = join(root, "native-command-" + id);
     writeFileSync(join(root, id + ".native-command.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-native-command", operation_id: plan.manifest.operation_id,
-      root: directory, capture: "projected-v1", effect_id: delivery.effect_id, attempt_id: delivery.attempt_id, argv_sha256: sha256(canonicalJSON(argv)) }), { flag: "wx", mode: 0o600 });
+      root: directory, capture: "projected-v2", effect_id: delivery.effect_id, attempt_id: delivery.attempt_id, argv_sha256: sha256(canonicalJSON(argv)) }), { flag: "wx", mode: 0o600 });
     mkdirSync(directory, { mode: 0o700 });
     const stdout = join(directory, "stdout"), stderr = join(directory, "stderr");
     const command = [...argv];

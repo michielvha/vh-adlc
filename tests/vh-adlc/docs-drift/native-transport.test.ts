@@ -126,7 +126,7 @@ const endpoint = args.find(a => a === 'user' || a.startsWith('repos/'));
 const method = option('--method');
 if (method !== 'GET') {
     if (state.reject_http) {
-        process.stdout.write('HTTP/2.0 ' + state.reject_http + ' rejected\\r\\n\\r\\n{"message":"rejected"}');
+        process.stdout.write('HTTP/2.0 ' + state.reject_http + ' rejected\\r\\nX-Secret: header-canary\\r\\n\\r\\n{"message":"body-canary"}');
         process.exit(1);
     }
     const payload = JSON.parse(readFileSync(option('--input'), 'utf8'));
@@ -626,7 +626,7 @@ test("positive native Git rejection permits a new attempt while damaged proof st
   const legacy = retainRejection({ ...scope, command_directory: commandDirectory, protocol: retained.protocol });
   expect(readRejection({ ...scope, evidence: legacy })).toEqual(legacy);
   // Restore the new command's immutable bytes before using the original journal again.
-  owner.capture = "projected-v1";
+  owner.capture = "projected-v2";
   writeFileSync(ownerPath, canonicalJSON(owner));
   f.update(state => { state.reject_git = false; });
   journal = await executeAttempt({ journal, effect: selected.effect, objects: selected.objects, transport: f.transport });
@@ -644,6 +644,14 @@ test("a complete API rejection differs from retryable and partial native CLI fai
     const error = await f.transport.execute(f.plan, effect, f.objects, "http-rejection-attempt").then(() => null, error => error);
     expect(error).toBeInstanceOf(PublicationExecutionError);
     expect(Boolean(error.rejection)).toBe(status === 403);
+    if (error.rejection) {
+      const proof = JSON.parse(readFileSync(error.rejection.path, "utf8"));
+      expect(existsSync(join(proof.command_directory, "stdout"))).toBe(false);
+      expect(existsSync(join(proof.command_directory, "stderr"))).toBe(false);
+      const projection = readFileSync(join(proof.command_directory, "rejection-response.json"), "utf8");
+      expect(projection).not.toContain("header-canary");
+      expect(projection).not.toContain("body-canary");
+    }
   }
   const f = setup(); await f.transport.identity(); f.update(state => {
     state.refs["refs/heads/docs-drift/one"] = f.commit; state.partial_pr_error = true;

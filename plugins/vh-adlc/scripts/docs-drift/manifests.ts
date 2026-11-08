@@ -55,7 +55,7 @@ function positive(value: unknown): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) invalid("positive integer");
   return value;
 }
-function ref(value: unknown): string {
+export function ref(value: unknown): string {
   const result = text(value);
   if (!result.startsWith("refs/heads/") || result.includes("..") || result.includes("@{") ||
       /[\u0000-\u0020\u007f~^:?*\[\\]/u.test(result) || result.split("/").some(part => !part || part.startsWith(".") || part.endsWith(".") || part.endsWith(".lock"))) invalid("ref");

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
 import { publishArtifact, readArtifact, type SealedPlan } from "./journal";
-import { effectDigest, type Effect } from "./manifests";
+import { effectDigest, ref as publicationRef, type Effect } from "./manifests";
 import { canonicalJSON, decodeUTF8, sha256 } from "./protocol";
 import { externalArtifactDirectory } from "./snapshot";
 
@@ -10,6 +10,19 @@ export type RejectionEvidence = { path: string; sha256: string };
 export type RejectedUpdate = { ref: string; head: string | null };
 export type RejectionProtocol = { protocol: "git"; updates: RejectedUpdate[] } | { protocol: "http" };
 type Scope = { artifact_root: string; source_repo: string; plan: SealedPlan; effect: Effect; attempt_id: string };
+
+function validateUpdates(updates: RejectedUpdate[]): void {
+  if (!Array.isArray(updates) || updates.length < 1 || updates.length > 16) throw Error("invalid rejection refs");
+  const refs = new Set<string>();
+  for (const update of updates) {
+    if (update === null || typeof update !== "object" || update.head !== null
+      && (typeof update.head !== "string" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(update.head))) throw Error("invalid rejection head");
+    const ref = publicationRef(update.ref);
+    if (refs.has(ref)) throw Error("duplicate rejection ref");
+    refs.add(ref);
+  }
+}
+const localReasons = new Set(["stale info", "fetch first", "non-fast-forward", "already exists", "atomic push failed"]);
 
 /** A mixed, missing or truncated status report establishes no non-application proof. */
 export function gitRejection(bytes: Uint8Array, updates: RejectedUpdate[]) {
@@ -46,23 +59,29 @@ export function httpRejection(bytes: Uint8Array) {
 /** Project only parsed definitive rejection facts, never the native response body or headers. */
 export function projectRejection(bytes: Uint8Array, protocol: RejectionProtocol): Buffer | null {
   if (bytes.byteLength > 16 * 1024 * 1024 || protocol.protocol === "git" && protocol.updates.length > 16) return null;
+  if (protocol.protocol === "git") validateUpdates(protocol.updates);
   const parsed = protocol.protocol === "git" ? gitRejection(bytes, protocol.updates) : httpRejection(bytes);
   if (!parsed) return null;
   const statuses = protocol.protocol === "git" ? new Map(decodeUTF8(bytes).split("\n").slice(1, -2).map(line => {
     const fields = line.split("\t");
-    return [fields[1], fields[2].startsWith("[remote rejected]") ? "remote-rejected" : "rejected"];
+    const remote = fields[2].startsWith("[remote rejected]");
+    const reason = fields[2].slice(remote ? 19 : 12, -1);
+    return [fields[1], remote
+      ? { kind: "remote-rejected", reason_sha256: sha256(Buffer.from(reason)), reason_bytes: Buffer.byteLength(reason) }
+      : { kind: "rejected", reason }];
   })) : null;
   const observed = protocol.protocol === "git" ? { ...parsed,
     statuses: protocol.updates.map(update => statuses?.get(`${update.head ?? ""}:${update.ref}`)) } : parsed;
-  const projection = canonicalJSON({ schema_version: 1, protocol, response_sha256: sha256(bytes), observed });
+  const projection = canonicalJSON({ schema_version: 2, protocol, response_sha256: sha256(bytes), observed });
   return projection.byteLength <= 65536 ? projection : null;
 }
 
-function projectedRejection(bytes: Uint8Array, protocol: RejectionProtocol) {
+export function projectedRejection(bytes: Uint8Array, protocol: RejectionProtocol) {
   if (bytes.byteLength > 65536) throw Error("oversized rejection projection");
+  if (protocol.protocol === "git") validateUpdates(protocol.updates);
   const value = JSON.parse(decodeUTF8(bytes)) as Record<string, unknown>;
   if (!canonicalJSON(value).equals(bytes) || Object.keys(value).sort().join(",") !== "observed,protocol,response_sha256,schema_version"
-    || value.schema_version !== 1 || !canonicalJSON(value.protocol).equals(canonicalJSON(protocol))
+    || value.schema_version !== 2 || !canonicalJSON(value.protocol).equals(canonicalJSON(protocol))
     || typeof value.response_sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(value.response_sha256)) throw Error("invalid rejection projection");
   const observed = value.observed as Record<string, unknown>;
   if (observed === null || typeof observed !== "object" || Array.isArray(observed)) throw Error("invalid rejection facts");
@@ -71,7 +90,13 @@ function projectedRejection(bytes: Uint8Array, protocol: RejectionProtocol) {
       || !Number.isInteger(observed.status) || Number(observed.status) < 400 || Number(observed.status) > 499
       || observed.status === 408 || observed.status === 429) throw Error("invalid HTTP rejection projection");
   } else if (protocol.updates.length > 16 || !Array.isArray(observed.statuses) || observed.statuses.length !== protocol.updates.length
-    || observed.statuses.some(status => status !== "rejected" && status !== "remote-rejected")
+    || observed.statuses.some(status => {
+      if (status === null || typeof status !== "object" || Array.isArray(status)) return true;
+      if (status.kind === "rejected") return Object.keys(status).sort().join(",") !== "kind,reason" || !localReasons.has(status.reason);
+      return status.kind !== "remote-rejected" || Object.keys(status).sort().join(",") !== "kind,reason_bytes,reason_sha256"
+        || typeof status.reason_sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(status.reason_sha256)
+        || !Number.isSafeInteger(status.reason_bytes) || status.reason_bytes < 1 || status.reason_bytes > 16 * 1024 * 1024;
+    })
     || !canonicalJSON(observed).equals(canonicalJSON({ protocol: "git", refs: protocol.updates.map(item => item.ref), statuses: observed.statuses }))) {
     throw Error("invalid Git rejection projection");
   }
@@ -84,6 +109,9 @@ function observedCommand(options: Scope, directory: string, protocol: RejectionP
     || !/^native-command-[a-f0-9-]{36}$/u.test(directory.slice(root.length + 1))) throw Error("foreign rejection command");
   const ownerBytes = readArtifact(join(root, directory.slice(root.length + 1).replace("native-command-", "") + ".native-command.json"));
   const owner = JSON.parse(decodeUTF8(ownerBytes)) as Record<string, unknown>;
+  const capture = Object.hasOwn(owner, "capture");
+  const ownerKeys = ["schema_version", "kind", "root", "operation_id", "effect_id", "attempt_id", "argv_sha256", ...(capture ? ["capture"] : [])].sort().join(",");
+  if (Object.keys(owner).sort().join(",") !== ownerKeys || capture && owner.capture !== "projected-v2") throw Error("unsupported command capture");
   if (owner.schema_version !== 1 || owner.kind !== "docs-drift-native-command" || owner.root !== directory
     || owner.operation_id !== options.plan.manifest.operation_id || owner.effect_id !== options.effect.id
     || owner.attempt_id !== options.attempt_id) throw Error("rejection command scope changed");
@@ -91,7 +119,7 @@ function observedCommand(options: Scope, directory: string, protocol: RejectionP
   const status = JSON.parse(decodeUTF8(processBytes)) as Record<string, unknown>;
   if (typeof status.exit_code !== "number" || status.exit_code <= 0 || status.reaped !== true
     || status.timed_out !== false || status.cancelled !== null || status.output_limit !== false) throw Error("incomplete rejected command");
-  const projected = owner.capture === "projected-v1";
+  const projected = owner.capture === "projected-v2";
   const stdout = readArtifact(join(directory, projected ? "rejection-response.json" : "stdout"));
   const observed = projected ? projectedRejection(stdout, protocol)
     : protocol.protocol === "git" ? gitRejection(stdout, protocol.updates) : httpRejection(stdout);
@@ -123,8 +151,7 @@ export function readRejection(options: Scope & { evidence: RejectionEvidence }):
     || value.attempt_id !== options.attempt_id || typeof value.command_directory !== "string") throw Error("rejection proof scope changed");
   const protocol = value.protocol as RejectionProtocol;
   if (protocol === null || typeof protocol !== "object" || !["git", "http"].includes(protocol.protocol)) throw Error("invalid rejection protocol");
-  if (protocol.protocol === "git" && (!Array.isArray(protocol.updates) || protocol.updates.some(item => item === null
-    || typeof item !== "object" || typeof item.ref !== "string" || item.head !== null && typeof item.head !== "string"))) throw Error("invalid rejection refs");
+  if (protocol.protocol === "git") validateUpdates(protocol.updates);
   const command = observedCommand(options, value.command_directory, protocol);
   if (!canonicalJSON(command).equals(canonicalJSON(value.command))) throw Error("rejected command evidence changed");
   return evidence;
