@@ -160,7 +160,7 @@ async function reviewedTrialEffects(options: ReturnType<typeof persistentPublica
   return { ...options, plan, gate: async () => ({ review: input, policy }) };
 }
 
-test.each(["pr-create", "pr-update", "issue-create"] as const)("persistent %s accepts canonical label aliases", async kind => {
+async function labeledTrialPublication(kind: "pr-create" | "pr-update" | "issue-create", requestedLabels: string[]) {
   const { f, context, options } = persistentPublication(kind === "pr-update");
   const effects = structuredClone(options.plan.manifest.effects), selected = effects[3];
   if (kind === "issue-create") {
@@ -168,16 +168,62 @@ test.each(["pr-create", "pr-update", "issue-create"] as const)("persistent %s ac
       labels: [], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "docs/guide.md", evidence_commit: f.sourceCommit,
       evidence_sha256: sha256(readFileSync(join(f.source, "docs/guide.md"))) } };
   }
-  effects[3].payload.labels = ["Documentation", "documentation"];
+  effects[3].payload.labels = requestedLabels;
   if (kind === "pr-update") {
     const before = effects[3].payload.expected_payload as Record<string, unknown>;
     before.labels = ["DOCUMENTATION", "documentation"];
     effects[3].payload.expected_payload_sha256 = sha256(canonicalJSON(before));
   }
   const scoped = await reviewedTrialEffects(options, effects);
-  expect((await publish(scoped)).state).toBe("complete");
+  return { f, context, options: scoped };
+}
+
+test.each(["pr-create", "pr-update", "issue-create"] as const)("persistent %s accepts canonical label aliases", async kind => {
+  const { context, options } = await labeledTrialPublication(kind, ["Documentation", "documentation"]);
+  expect((await publish(options)).state).toBe("complete");
   const resource = readTrialTracker(context).resources.get(kind === "issue-create" ? "issues/501" : kind === "pr-update" ? "pulls/77" : "pulls/501");
   expect(resource?.labels).toEqual([{ id: 101, name: "documentation" }]);
+}, 60000);
+
+test.each(["pr-create", "pr-update", "issue-create", "pr-update-before"] as const)("a deleted reviewed label is an observed conflict (%s)", async scenario => {
+  const kind = scenario === "pr-update-before" ? "pr-update" : scenario;
+  const { context, options } = await labeledTrialPublication(kind, ["documentation"]);
+  const execute = options.transport.execute;
+  options.transport.execute = async (...args) => {
+    const captured = await execute(...args);
+    if (args[1].kind === kind) throw new PublicationExecutionError(true, true, undefined, captured ?? undefined);
+    return captured;
+  };
+  const interrupted = scenario === "pr-update-before" ? null : await publish(options);
+  const tracker = readTrialTracker(context); tracker.labels.delete("documentation");
+  for (const resource of tracker.resources.values()) resource.labels = [];
+  persistTrialTracker(context, tracker);
+  const transport = createTrialTransport(context);
+  const result = interrupted
+    ? await resumeEffects({ ...options, transport, journal_directory: interrupted.journal.directory })
+    : await publish({ ...options, transport });
+  expect(result.state).toBe("pending");
+  expect((await transport.observe(options.plan, options.plan.manifest.effects[3], result.objects)).state).toBe("conflict");
+  expect(result.reason).toBe("synthetic-reviewed-target-changed");
+  expect(result.journal.events.some(event => event.kind === "invalidation")).toBe(true);
+}, 60000);
+
+test.each(["missing-target", "foreign-actor", "foreign-ref"] as const)("persistent recovery records a typed handoff (%s)", async scenario => {
+  const { f, context, options } = persistentPublication(true);
+  if (scenario === "foreign-ref") git(f.source, "push", f.origin, f.contextCommit + ":refs/heads/docs-drift/persistent");
+  else {
+    const state = readTrialTracker(context);
+    if (scenario === "missing-target") state.resources.delete("pulls/77");
+    else state.resources.get("pulls/77")!.user = { id: 90, login: "unconfigured-bot", type: "Bot" };
+    persistTrialTracker(context, state);
+  }
+  const result = await publish(options);
+  expect(result.state).toBe("pending");
+  const reason = scenario === "missing-target" ? "synthetic-target-missing-or-ambiguous"
+    : scenario === "foreign-actor" ? "synthetic-pr-outside-configured-refresh-scope" : "foreign-synthetic-ref";
+  expect(result.reason).toBe(reason);
+  expect(result.journal.events.some(event => event.kind === "handoff" && "reason" in event.payload && event.payload.reason === reason)).toBe(true);
+  expect(result.journal.events.some(event => event.kind === "invalidation")).toBe(scenario !== "missing-target");
 }, 60000);
 
 test("persistent explanation and closure proof supports non-success acknowledgement after reopening", async () => {
@@ -197,6 +243,8 @@ test("persistent explanation and closure proof supports non-success acknowledgem
   expect(readAppliedDelivery({ source_repo: context.source, journal_directory: pending.journal.directory,
     effect_id: close.id, settings: context.settings, transport: "collector" }).explanation_effect_id).toBe(explanation.id);
   const tracker = readTrialTracker(context); tracker.resources.get("pulls/77")!.state = "open"; persistTrialTracker(context, tracker);
+  const otherRefs = git(context.origin, "for-each-ref", "--format=%(refname) %(objectname)").split("\n")
+    .filter(row => !row.startsWith(context.settings.publication.lease_ref + " "));
   const acknowledged = await acknowledgeDeliveries({ source_repo: context.source, journal_directory: pending.journal.directory,
     object_store: context.store, settings: context.settings, transport: createTrialTransport(context), acknowledge_effect_ids: [close.id], retire_effect_ids: [],
     authorize: async scope => ({ kind: "owner-delivery-acknowledgement", source: "owner-current-request", scope_sha256: sha256(canonicalJSON(scope)),
@@ -204,7 +252,12 @@ test("persistent explanation and closure proof supports non-success acknowledgem
   expect(acknowledged.state).toBe("acknowledged");
   expect(readTrialTracker(context).resources.get("pulls/77")?.state).toBe("open");
   expect([...readTrialTracker(context).resources.keys()].filter(key => key.startsWith("comments/"))).toHaveLength(1);
-  expect((await createTrialTransport(context).ref(context.settings.publication.lease_ref)).state).toBe("absent");
+  const observed = createTrialTransport(context);
+  expect((await observed.ref(context.settings.publication.lease_ref)).state).toBe("absent");
+  expect(await observed.ref(context.settings.publication.receipt_ref_prefix + options.plan.manifest.operation_id))
+    .toEqual({ state: "present", object: pending.objects.receipt_object ?? pending.objects.object });
+  expect(git(context.origin, "for-each-ref", "--format=%(refname) %(objectname)").split("\n")
+    .filter(row => !row.startsWith(context.settings.publication.lease_ref + " "))).toEqual(otherRefs);
 }, 60000);
 
 test("the common publisher persists branches, receipts and tracker resources across fresh transports", async () => {

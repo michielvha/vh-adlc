@@ -65,10 +65,14 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
     const lookup = { inventory, matches };
     const observation = { artifact_root: context.artifacts, source_repo: context.source, plan, effect, transport: "collector" as const, lookup };
     if (!matches.length && creation) return { state: "absent", evidence: retainAbsence(observation) };
-    if (matches.length !== 1) return { state: "unknown", reason: "synthetic target missing or ambiguous" };
+    if (matches.length !== 1) return { state: "unknown", reason: "synthetic-target-missing-or-ambiguous" };
     const item = matches[0], user = object(item.user);
     const labelIDs = Array.isArray(item.labels) ? item.labels.map(label => object(label).id).sort((left, right) => Number(left) - Number(right)) : null;
-    const labelsMatch = (requested: unknown) => same(labelIDs, collectorLabels(requested, state.labels).map(label => label.id));
+    const labelsMatch = (requested: unknown) => {
+      if (!Array.isArray(requested)) throw Error("invalid reviewed fixture labels");
+      if (requested.some(name => typeof name !== "string" || !state.labels.has(name.toLowerCase()))) return false;
+      return same(labelIDs, collectorLabels(requested, state.labels).map(label => label.id));
+    };
     const fieldsMatch = (fields: Record<string, unknown>) => same({ title: item.title, body: item.body, draft: item.draft },
       { title: fields.title, body: fields.body, draft: fields.draft }) && labelsMatch(fields.labels);
     let matchesTarget = item.body === p.body;
@@ -83,7 +87,7 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
         && source.head_repository_id === TRIAL_IDENTITY.repository_id && item.merged_at === null && item.merged !== true;
       if (effect.kind === "pr-update" && !isRefreshTarget(settings, TRIAL_IDENTITY, { number: source.number, actor: String(user.login),
         actor_id: Number(user.id), head_ref: source.head_ref, head_repository_id: source.head_repository_id })) {
-        return { state: "conflict", reason: "synthetic PR outside configured refresh scope", evidence: retainLookup({ ...observation, state: "conflict" }) };
+        return { state: "conflict", reason: "synthetic-pr-outside-configured-refresh-scope", evidence: retainLookup({ ...observation, state: "conflict" }) };
       }
       matchesTarget &&= validPull;
       if (effect.kind === "pr-create" && (source.head_ref !== p.branch || source.state !== "open")) matchesTarget = false;
@@ -92,7 +96,7 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
         && fieldsMatch(object(p.expected_payload))) return { state: "absent", evidence: retainAbsence(observation) };
       if (effect.kind === "pr-close" && validPull && source.state === "open") return { state: "absent", evidence: retainAbsence(observation) };
     }
-    if (!matchesTarget) return { state: "conflict", reason: "synthetic reviewed target changed", evidence: retainLookup({ ...observation, state: "conflict" }) };
+    if (!matchesTarget) return { state: "conflict", reason: "synthetic-reviewed-target-changed", evidence: retainLookup({ ...observation, state: "conflict" }) };
     return { state: "done", outcome: { state: "observed", observation_sha256: sha256(canonicalJSON(lookup)),
       resource_id: String(item.id), object: surface === "pulls" ? projectBeforeSource(item).head_sha : parent?.head_sha ?? null } };
   }
@@ -129,7 +133,7 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
         state: "observed", observation_sha256: sha256(canonicalJSON(lookup)), resource_id: name, object: observed } };
       const retained = { artifact_root: context.artifacts, source_repo: context.source, plan, effect, transport: "collector" as const, lookup };
       if (observed !== null && effect.kind !== "lease-release" && !(effect.kind === "branch-refresh" && observed === effect.payload.expected_head)) {
-        return { state: "conflict", reason: "foreign synthetic ref", evidence: retainLookup({ ...retained, state: "conflict" }) };
+        return { state: "conflict", reason: "foreign-synthetic-ref", evidence: retainLookup({ ...retained, state: "conflict" }) };
       }
       return { state: "absent", evidence: retainAbsence(retained) };
     },
