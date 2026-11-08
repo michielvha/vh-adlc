@@ -1,5 +1,5 @@
 import { nativeMutationArguments, projectSuccess, retainSuccess, type ExecutionResult } from "./success";
-import { retainBefore, type BeforeData } from "./delivery-proof";
+import { projectBeforeSource, retainBefore, type BeforeData } from "./delivery-proof";
 import { projectRejection, retainRejection, type RejectionEvidence, type RejectedUpdate } from "./rejections";
 import { PublicationExecutionError } from "./attempts";
 import type { Effect } from "./manifests";
@@ -219,14 +219,7 @@ export function createNativeTransport(options: {
     if (["pr-update", "pr-close", "comment-create"].includes(effect.kind)) {
       const input = pull(positive(p.number), plan, false, false).input;
       try {
-        const projected = projectSuccess(Buffer.from("HTTP/2.0 200 OK\r\n\r\n" + JSON.stringify(input)));
-        const facts = projected?.facts;
-        if (!facts || facts.state === null || typeof facts.draft !== "boolean" || facts.labels === null) throw Error("incomplete baseline source");
-        source = { id: positive(facts.id), number: positive(facts.number), state: facts.state, draft: facts.draft,
-          head_sha: text(facts.head_sha), head_ref: text(facts.head_ref), head_repository_id: facts.head_repository_id,
-          base_ref: text(facts.base_ref), base_repository_id: positive(facts.base_repository_id),
-          title_sha256: text(facts.title_sha256), body_sha256: text(facts.body_sha256), labels: facts.labels,
-          payload_sha256: sha256(canonicalJSON(submittedFields(input))) };
+        source = projectBeforeSource(input);
       } catch { /* Incomplete legacy reads cannot establish a delivery baseline. */ }
     }
     if (["pr-create", "issue-create", "comment-create"].includes(effect.kind)) {

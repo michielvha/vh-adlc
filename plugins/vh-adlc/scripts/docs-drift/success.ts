@@ -126,7 +126,24 @@ export function projectSuccess(bytes: Uint8Array): { status: number; facts: Fact
 export function nativeMutationArguments(hostname: string, method: string, endpoint: string): string[] {
   return ["gh", "api", "--hostname", hostname, "--method", method, "--include", endpoint];
 }
-function expectedRequest(effect: Effect, repository: string, index: number, endpoint?: string) {
+export function collectorMutationArguments(method: string, endpoint: string): string[] {
+  return ["collector", method, endpoint];
+}
+/** The fixture tracker applies the selected fields atomically to its own objects. */
+export function collectorRequest(effect: Effect, repository: string) {
+  const p = effect.payload, prefix = "repos/" + repository;
+  if (effect.kind === "pr-create") return { method: "POST", endpoint: prefix + "/pulls", input: { title: p.title, body: p.body, base: p.base, head: p.branch, draft: p.draft, labels: p.labels } };
+  if (effect.kind === "issue-create") return { method: "POST", endpoint: prefix + "/issues", input: { title: p.title, body: p.body, labels: p.labels } };
+  if (effect.kind === "comment-create") return { method: "POST", endpoint: `${prefix}/issues/${positive(p.number)}/comments`, input: { body: p.body } };
+  if (effect.kind === "pr-update") return { method: "PATCH", endpoint: `${prefix}/pulls/${positive(p.number)}`, input: { title: p.title, body: p.body, labels: p.labels, draft: p.draft } };
+  if (effect.kind === "pr-close") return { method: "PATCH", endpoint: `${prefix}/pulls/${positive(p.number)}`, input: { state: "closed" } };
+  throw Error("unsupported collector request");
+}
+function expectedRequest(effect: Effect, repository: string, index: number, endpoint?: string, transport: "native" | "collector" = "native") {
+  if (transport === "collector") {
+    if (index !== 0) throw Error("unsupported collector command index");
+    return collectorRequest(effect, repository);
+  }
   const p = effect.payload, prefix = "repos/" + repository;
   if (effect.kind === "pr-create") {
     if (index === 0) return { method: "POST", endpoint: prefix + "/pulls", input: { title: p.title, body: p.body, base: p.base, head: p.branch, draft: p.draft } };
@@ -149,8 +166,8 @@ function identityScope(plan: SealedPlan, identity: PublicationIdentity): void {
   if (identity.repository !== plan.manifest.repository || identity.repository_id !== plan.manifest.repository_id
     || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("success identity scope changed");
 }
-function responseScope(effect: Effect, index: number, repository: string, repositoryId: number, actor: string, actorId: number, hostname: string, status: number, facts: Facts): void {
-  const method = effect.kind === "pr-create" && index === 1 ? "PUT" : expectedRequest(effect, repository, index).method;
+function responseScope(effect: Effect, index: number, repository: string, repositoryId: number, actor: string, actorId: number, hostname: string, status: number, facts: Facts, transport: "native" | "collector"): void {
+  const method = effect.kind === "pr-create" && index === 1 && transport === "native" ? "PUT" : expectedRequest(effect, repository, index, undefined, transport).method;
   if (status !== (method === "POST" ? 201 : 200)) throw Error("unsupported native success status");
   const parents = [facts.parent_repository, facts.parent_number, facts.parent_url_sha256, facts.parent_host, facts.parent_path];
   if (parents.some(value => value !== null) && parents.some(value => value === null)) throw Error("incomplete success parent binding");
@@ -177,27 +194,47 @@ function responseScope(effect: Effect, index: number, repository: string, reposi
   if (effect.kind === "comment-create" && (facts.parent_number !== effect.payload.number || facts.parent_repository !== repository)) throw Error("success parent changed");
 }
 
-function commandScope(options: Scope, directory: string, hostname: string, method: string, endpoint: string, index: number) {
+function commandScope(options: Scope, directory: string, hostname: string, method: string, endpoint: string, index: number,
+  projection: { response_sha256: string; status: number; facts: Facts }) {
   const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
+  const collector = options.plan.transport === "collector", prefix = collector ? "collector-command-" : "native-command-";
   if (dirname(directory) !== root || realpathSync(directory) !== directory
-    || !/^native-command-[a-f0-9-]{36}$/u.test(directory.slice(root.length + 1))) throw Error("foreign success command");
-  const ownerBytes = readArtifact(join(root, directory.slice(root.length + 1).replace("native-command-", "") + ".native-command.json"));
+    || !directory.slice(root.length + 1).startsWith(prefix)
+    || !/^[a-f0-9-]{36}$/u.test(directory.slice(root.length + 1 + prefix.length))) throw Error("foreign success command");
+  const id = directory.slice(root.length + 1 + prefix.length);
+  const ownerBytes = readArtifact(join(root, id + (collector ? ".collector-command.json" : ".native-command.json")));
   const owner = object(JSON.parse(decodeUTF8(ownerBytes)));
   if (Object.keys(owner).sort().join(",") !== "argv_sha256,attempt_id,capture,effect_id,kind,operation_id,root,schema_version") throw Error("unsupported success command format");
-  if (owner.schema_version !== 1 || owner.kind !== "docs-drift-native-command" || owner.capture !== "projected-v2"
+  if (owner.schema_version !== 1 || owner.kind !== (collector ? "docs-drift-collector-command" : "docs-drift-native-command")
+    || owner.capture !== (collector ? "fixture-v1" : "projected-v2")
     || owner.root !== directory || owner.operation_id !== options.plan.manifest.operation_id
     || owner.effect_id !== options.effect.id || owner.attempt_id !== options.attempt_id) throw Error("success command scope changed");
-  const processBytes = readArtifact(join(directory, "process.json"));
+  const processBytes = readArtifact(join(directory, collector ? "fixture-result.json" : "process.json"));
   const process = object(JSON.parse(decodeUTF8(processBytes)));
-  if (process.exit_code !== 0 || process.reaped !== true || process.timed_out !== false
-    || process.cancelled !== null || process.output_limit !== false) throw Error("incomplete successful command");
+  if (!collector && (process.exit_code !== 0 || process.reaped !== true || process.timed_out !== false
+    || process.cancelled !== null || process.output_limit !== false)) throw Error("incomplete successful command");
   const input = readArtifact(join(directory, "payload.json"));
-  const expected = expectedRequest(options.effect, options.plan.manifest.repository, index, endpoint);
+  const expected = expectedRequest(options.effect, options.plan.manifest.repository, index, endpoint, options.plan.transport);
   if (typeof hostname !== "string" || !hostname || /[\r\n\0]/u.test(hostname) || method !== expected.method || endpoint !== expected.endpoint
-    || owner.argv_sha256 !== sha256(canonicalJSON(nativeMutationArguments(hostname, method, endpoint)))
+    || owner.argv_sha256 !== sha256(canonicalJSON(collector ? collectorMutationArguments(method, endpoint) : nativeMutationArguments(hostname, method, endpoint)))
     || !input.equals(canonicalJSON(expected.input))) throw Error("success request scope changed");
-  return { owner_sha256: sha256(ownerBytes), process_sha256: sha256(processBytes),
+  const command = { owner_sha256: sha256(ownerBytes), process_sha256: sha256(processBytes),
     request_sha256: sha256(canonicalJSON({ argv_sha256: digest(owner.argv_sha256), input_sha256: sha256(input) })) };
+  if (collector) {
+    const keys = ["schema_version", "kind", "transport", "context", "operation_id", "effect_id", "attempt_id", "completed",
+      "request_sha256", "response_sha256", "projection_sha256", "before"].sort().join(",");
+    if (processBytes.byteLength > 65536 || !canonicalJSON(process).equals(processBytes) || Object.keys(process).sort().join(",") !== keys
+      || process.schema_version !== 1 || process.kind !== "docs-drift-collector-result" || process.transport !== "collector" || process.context !== "trial"
+      || process.operation_id !== options.plan.manifest.operation_id || process.effect_id !== options.effect.id
+      || process.attempt_id !== options.attempt_id || process.completed !== true || process.request_sha256 !== command.request_sha256
+      || process.response_sha256 !== projection.response_sha256
+      || process.projection_sha256 !== sha256(canonicalJSON({ status: projection.status, facts: projection.facts }))) throw Error("unproved collector completion");
+    const before = object(process.before);
+    if (Object.keys(before).sort().join(",") !== "path,sha256" || typeof before.path !== "string" || dirname(before.path) !== root
+      || realpathSync(before.path) !== before.path) throw Error("foreign collector baseline");
+    return { ...command, baseline_sha256: digest(before.sha256) };
+  }
+  return command;
 }
 
 export function retainSuccess(options: Scope & {
@@ -205,22 +242,25 @@ export function retainSuccess(options: Scope & {
   identity: PublicationIdentity; response: Uint8Array;
 }): SuccessEvidence | null {
   const selected = options.plan.manifest.effects.find(effect => effect.id === options.effect.id);
-  if (options.plan.transport !== "native" || !selected || effectDigest([selected]) !== effectDigest([options.effect])) return null;
+  if (!["native", "collector"].includes(options.plan.transport) || !["production", "trial"].includes(options.plan.context)
+    || options.plan.transport === "collector" && options.plan.context !== "trial"
+    || !selected || effectDigest([selected]) !== effectDigest([options.effect])) return null;
   const projected = projectSuccess(options.response);
   if (projected === null) return null;
   identityScope(options.plan, options.identity);
-  responseScope(options.effect, options.command_index, options.plan.manifest.repository, options.plan.manifest.repository_id, options.identity.actor, options.identity.actor_id, options.hostname, projected.status, projected.facts);
-  const command = commandScope(options, options.command_directory, options.hostname, options.method, options.endpoint, options.command_index);
+  responseScope(options.effect, options.command_index, options.plan.manifest.repository, options.plan.manifest.repository_id, options.identity.actor, options.identity.actor_id, options.hostname, projected.status, projected.facts, options.plan.transport);
+  const response_sha256 = sha256(options.response);
+  const command = commandScope(options, options.command_directory, options.hostname, options.method, options.endpoint, options.command_index, { ...projected, response_sha256 });
   if (options.identity.repository !== options.plan.manifest.repository
     || !Number.isSafeInteger(options.command_index) || options.command_index < 0 || options.command_index > 15
     || !["POST", "PUT", "PATCH"].includes(options.method)
     || !options.endpoint.startsWith("repos/" + options.identity.repository + "/")) throw Error("invalid success destination");
-  const bytes = canonicalJSON({ schema_version: 2, transport: "native", context: options.plan.context,
+  const bytes = canonicalJSON({ schema_version: 2, transport: options.plan.transport, context: options.plan.context,
     operation_id: options.plan.manifest.operation_id, repository: options.plan.manifest.repository,
     plan_sha256: sha256(canonicalJSON(options.plan)), effect_sha256: effectDigest([options.effect]), attempt_id: options.attempt_id,
     command_directory: options.command_directory, command_index: options.command_index, command,
     hostname: options.hostname, method: options.method, endpoint: options.endpoint, identity: options.identity,
-    response_sha256: sha256(options.response), ...projected });
+    response_sha256, ...projected });
   if (bytes.byteLength > 65536) return null;
   const path = join(externalArtifactDirectory(options.artifact_root, options.source_repo), "success-" + randomUUID() + ".json");
   publishArtifact(path, bytes);
@@ -236,7 +276,9 @@ export function readSuccess(options: Scope & { evidence: SuccessEvidence }): Suc
   const bytes = readArtifact(options.evidence.path);
   if (bytes.byteLength > 65536 || sha256(bytes) !== options.evidence.sha256) throw Error("changed success proof");
   const value = object(JSON.parse(decodeUTF8(bytes)));
-  if (options.plan.transport !== "native" || !canonicalJSON(value).equals(bytes) || value.schema_version !== 2 || value.transport !== "native"
+  if (!["native", "collector"].includes(options.plan.transport) || !["production", "trial"].includes(options.plan.context)
+    || options.plan.transport === "collector" && options.plan.context !== "trial"
+    || !canonicalJSON(value).equals(bytes) || value.schema_version !== 2 || value.transport !== options.plan.transport
     || value.context !== options.plan.context || value.operation_id !== options.plan.manifest.operation_id
     || value.repository !== options.plan.manifest.repository || value.plan_sha256 !== sha256(canonicalJSON(options.plan))
     || value.effect_sha256 !== effectDigest([options.effect]) || value.attempt_id !== options.attempt_id
@@ -281,8 +323,9 @@ export function readSuccess(options: Scope & { evidence: SuccessEvidence }): Suc
     if (facts[field] !== null && (typeof facts[field] !== "string" || !facts[field] || facts[field].includes("\0"))) throw Error("invalid success parent location");
   }
   if (facts.parent_repository !== null && facts.parent_repository !== options.plan.manifest.repository) throw Error("invalid success parent repository");
-  responseScope(options.effect, Number(value.command_index), options.plan.manifest.repository, options.plan.manifest.repository_id, String(identity.actor), Number(identity.actor_id), String(value.hostname), Number(value.status), facts as Facts);
+  responseScope(options.effect, Number(value.command_index), options.plan.manifest.repository, options.plan.manifest.repository_id, String(identity.actor), Number(identity.actor_id), String(value.hostname), Number(value.status), facts as Facts, options.plan.transport);
   if (facts.id === null && facts.labels === null) throw Error("empty success facts");
-  if (!canonicalJSON(commandScope(options, value.command_directory, String(value.hostname), String(value.method), String(value.endpoint), Number(value.command_index))).equals(canonicalJSON(value.command))) throw Error("success command evidence changed");
+  if (!canonicalJSON(commandScope(options, value.command_directory, String(value.hostname), String(value.method), String(value.endpoint), Number(value.command_index),
+    { response_sha256: digest(value.response_sha256), status: Number(value.status), facts: facts as Facts })).equals(canonicalJSON(value.command))) throw Error("success command evidence changed");
   return options.evidence;
 }

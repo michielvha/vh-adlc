@@ -12,6 +12,8 @@ import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/setti
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { fixture, hash, role, bindings } from "./manifest-fixture";
 import { settingsFixture } from "./settings-fixture";
+import { executeCollectorEffect, type CollectorResources, type CollectorLabel } from "../../../plugins/vh-adlc/scripts/docs-drift/collector-proof";
+import { projectBeforeSource } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof";
 
 
 export function publicationFixture(roots: string[]) {
@@ -41,6 +43,10 @@ export function publicationFixture(roots: string[]) {
   const store = createOwnedObjectStore({ parent, evidence_directory: evidence, source_repo: repo, source_commit: commit, repository: "fixture/docs", owner: "fixture", run: "fixture-run" });
   const executed: string[] = [], observed: string[] = [];
   const refs = new Map<string, string>(), done = new Set<string>();
+  const resources: CollectorResources = new Map();
+  const resourceLabels = new Map<string, CollectorLabel>([
+    ["documentation", { id: 101, name: "documentation" }], ["old", { id: 102, name: "old" }], ["other", { id: 103, name: "other" }],
+  ]);
   const transport: PublicationTransport = {
     kind: "collector", object_store: store.root, artifact_root: artifacts,
     async identity() { return { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20, default_branch: "main" }; },
@@ -64,12 +70,20 @@ export function publicationFixture(roots: string[]) {
         return { state: "conflict", reason: "foreign-lease-object" };
       if (!done.has(effect.id) || (["lease-acquire", "receipt-retain"].includes(effect.kind) && !refs.has(String(effect.payload.ref)))) return { state: "absent", evidence: retainAbsence({ artifact_root: artifacts, source_repo: repo,
         plan, effect, transport: "collector", lookup: { fixture_effect: effect.id, state: "absent" } }) };
+      let parentHead: string | undefined;
+      if (effect.kind === "comment-create") {
+        try { parentHead = projectBeforeSource(resources.get("pulls/" + effect.payload.number)).head_sha; }
+        catch { /* Abstract fixtures retain their original observed object. */ }
+      }
       return { state: "done", outcome: { state: "observed", observation_sha256: hash(effect.id), resource_id: effect.id,
-        object: effect.kind === "lease-release" ? null : effect.kind === "lease-acquire" ? leaseObject : effect.kind === "receipt-retain" ? receiptObject : objects.object } };
+        object: effect.kind === "lease-release" ? null : effect.kind === "lease-acquire" ? leaseObject : effect.kind === "receipt-retain" ? receiptObject : parentHead ?? objects.object } };
     },
-    async execute(plan, effect, objects) {
+    async execute(plan, effect, objects, attempt_id) {
       executed.push(effect.id);
       if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== (objects.lease_object ?? objects.object)) throw Error("changed fixture lease");
+      const captured = attempt_id && ["pr-create", "issue-create", "comment-create", "pr-update", "pr-close"].includes(effect.kind)
+        ? executeCollectorEffect({ source_repo: repo, artifact_root: artifacts, plan, effect, attempt_id, settings,
+          identity: await transport.identity(), resources, labels: resourceLabels }) : null;
       done.add(effect.id);
       if (effect.kind === "lease-acquire") {
         const receipt = plan.manifest.effects[1];
@@ -83,10 +97,11 @@ export function publicationFixture(roots: string[]) {
       }
       if (effect.kind === "receipt-retain") refs.set(String(effect.payload.ref), objects.receipt_object ?? objects.object);
       if (effect.kind === "lease-release") refs.delete(String(effect.payload.ref));
+      return captured ?? undefined;
     },
   };
   const gate = async () => ({ review: input, policy });
-  return { root, repo, artifacts, store, settings, input, policy, plan, transport, gate, executed, observed, refs, done };
+  return { root, repo, artifacts, store, settings, input, policy, plan, transport, gate, executed, observed, refs, done, resources, resourceLabels };
 }
 
 export function publicationOptions(f: ReturnType<typeof publicationFixture>) {

@@ -1666,10 +1666,11 @@ test("native PR creation links application evidence for the resource and its lab
 });
 
 for (const kind of ["issue-create", "comment-create", "pr-update", "pr-close"] as const) {
-test(`captured ${kind} proof survives a later edit without inferring application from that edit`, async () => {
+for (const nullBody of kind === "comment-create" || kind === "pr-close" ? [false, true] : [false])
+test(`captured ${kind} proof survives a later edit (null parent body=${nullBody})`, async () => {
   const { readAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof");
   const f = setup(); await f.transport.identity();
-  const original = { title: "Original title", body: "Original body", labels: ["old"], draft: true };
+  const original = { title: "Original title", body: nullBody ? null : "Original body", labels: ["old"], draft: true };
   if (kind !== "issue-create") f.update(state => { state.prs.push({ ...original, id: 901, number: 77, state: "open", merged_at: null,
     labels: [{ id: 102, name: "old" }], user: { login: kind === "pr-close" ? "legacy-bot" : "fixture-bot", id: kind === "pr-close" ? 90 : 20 },
     head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", sha: f.commit, repo: { id: 10 } } }); });
@@ -1792,7 +1793,7 @@ test("capture persistence failure retains no raw response canaries and supplies 
   }
 });
 
-for (const mode of ["missing-before", "missing-success", "foreign-before", "missing-file", "oversized", "tampered", "extra-command", "unreaped", "pre-capture", "changed-host"] as const) {
+for (const mode of ["missing-before", "missing-success", "foreign-before", "missing-file", "oversized", "tampered", "extra-command", "unreaped", "pre-capture", "changed-host", "collector-relabel"] as const) {
 test(`original captured delivery refuses ${mode} proof`, async () => {
   const { readAppliedDelivery, readBefore, retainBefore } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof");
   const f = setup(); await f.transport.identity();
@@ -1802,6 +1803,15 @@ test(`original captured delivery refuses ${mode} proof`, async () => {
   f.transport.execute = async (...args) => {
     const captured = await execute(...args);
     if (!captured?.before || captured.commands !== 2 || captured.successes.length !== 2 || !args[3]) throw Error("incomplete native test fixture capture");
+    if (mode === "collector-relabel") {
+      const { readSuccess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/success");
+      const plan = { ...selected.plan, transport: "collector" as const, context: "trial" as const };
+      const evidence = captured.successes[0], value = JSON.parse(readFileSync(evidence.path, "utf8"));
+      value.transport = plan.transport; value.context = plan.context; value.plan_sha256 = sha256(canonicalJSON(plan));
+      const bytes = canonicalJSON(value); writeFileSync(evidence.path, bytes);
+      expect(() => readSuccess({ source_repo: selected.repo, artifact_root: f.transport.artifact_root,
+        plan, effect, attempt_id: args[3]!, evidence: { path: evidence.path, sha256: sha256(bytes) } })).toThrow();
+    }
     if (mode === "missing-before") { delete captured.before; }
     if (mode === "missing-success") captured.successes = captured.successes.slice(0, 1);
     if (mode === "foreign-before") {
@@ -1832,5 +1842,36 @@ test(`original captured delivery refuses ${mode} proof`, async () => {
   expect(() => readAppliedDelivery({ source_repo: selected.repo, journal_directory: selected.journal.directory,
     effect_id: effect.id, settings })).toThrow();
   expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object);
+});
+}
+
+for (const mode of ["unsent", "rejected"] as const) {
+test(`acknowledgement journal rejects a proven ${mode}-only native history`, async () => {
+  const { appendAcknowledgement } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const f = setup(); await f.transport.identity();
+  const effect: Effect = { id: "never-applied", kind: "issue-create", payload: { title: "Reviewed issue", labels: ["documentation"], prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("never-applied") + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+    evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit,
+    evidence_sha256: mode === "unsent" ? hash("different source evidence") : sha256(f.readme) } };
+  const selected = await startCleanupJournal(f, [effect]);
+  if (mode === "rejected") f.update(state => { state.reject_http = 403; });
+  await expect(executeAttempt({ journal: appendIntent(selected.journal, effect.id), effect,
+    objects: selected.objects, transport: f.transport })).rejects.toBeInstanceOf(PublicationExecutionError);
+  const journal = readJournal(selected.journal.directory, selected.repo), ending = journal.events.at(-1);
+  if (!ending || !("sent" in ending.payload)) throw Error("missing native attempt status");
+  expect(ending.payload.sent).toBe(mode === "rejected");
+  expect(ending.payload.reaped).toBe(true);
+  if (mode === "rejected") {
+    if (!ending.payload.rejection) throw Error("missing definitive native rejection");
+    readRejection({ artifact_root: f.transport.artifact_root, source_repo: selected.repo, plan: selected.plan,
+      effect, attempt_id: ending.payload.attempt_id, evidence: ending.payload.rejection });
+  }
+  f.update(state => { state.reject_http = 0; });
+  const observed = await f.transport.observe(selected.plan, effect, selected.objects);
+  const lookup = observed.state === "absent" || observed.state === "conflict" ? observed.evidence : undefined;
+  if (!lookup) throw Error("missing current native non-application lookup");
+  expect(() => appendAcknowledgement(journal, effect.id, { kind: "owner-delivery-acknowledgement",
+    scope_sha256: hash("schema exact owner scope"), request_sha256: hash("schema owner request"), lookup,
+    application_sha256: hash("contradictory schema application"), settlement_sha256: hash("native settled requests") })).toThrow("invalid delivery acknowledgement");
 });
 }

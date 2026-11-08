@@ -310,7 +310,8 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
       const payload = exact(event.payload, ["kind", "scope_sha256", "request_sha256", "lookup", "application_sha256", "settlement_sha256"]);
       if (payload.kind !== "owner-delivery-acknowledgement" || header.recovery_mode !== "original"
         || !["pr-create", "issue-create", "comment-create", "pr-update", "pr-close"].includes(effect.kind)
-        || !prior.some(item => item.kind === "attempt") || prior.some(item => item.kind === "acknowledged-delivery" || item.kind === "retired-absence")
+        || !prior.some(item => item.kind === "attempt") || prior.some(item => ["outcome", "retired-absence", "acknowledged-delivery"].includes(item.kind))
+        || attemptsUnapplied(previous, effect.id)
         || previous.some(item => item.kind === "recovery-only")) fail("invalid delivery acknowledgement");
       for (const attempt of previous.filter(item => item.kind === "attempt")) {
         const ended = attemptEnding(previous, attempt);
