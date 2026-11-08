@@ -413,3 +413,5 @@ export async function reconcileAbsent(options: {
     return result(journal.events.some(event => event.kind === "retired-absence") ? "retired" : "complete", null);
   } catch { journal = readJournal(options.journal_directory, options.source_repo); return blocked("reconciliation-authority-or-evidence-unavailable"); }
 }
+
+export { acknowledgeDeliveries, type AcknowledgementScope } from "./delivery-ack";

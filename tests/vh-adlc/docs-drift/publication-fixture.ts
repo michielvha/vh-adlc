@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import type { PublicationTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { sealPlan, createJournal, readJournal, appendIntent, appendAttempt, appendAttemptEnd, appendOutcome, appendHandoff, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
-import { retainAbsence } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
+import { retainAbsence, retainLookup } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -74,6 +74,17 @@ export function publicationFixture(roots: string[], options: { owned_resources?:
     async observe(plan, effect, objects) {
       observed.push(effect.id);
       const leaseObject = objects.lease_object ?? objects.object;
+      if (options.owned_resources && ["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(effect.kind)) {
+        const ref = String(effect.payload.ref), actual = refs.get(ref) ?? null;
+        const expected = effect.kind === "push" || effect.kind === "branch-refresh" ? String(effect.payload.head)
+          : effect.kind === "receipt-retain" ? objects.receipt_object ?? objects.object : objects.lease_object ?? objects.object;
+        const lookup = { fixture_ref: ref, actual, expected };
+        if (effect.kind === "lease-release" ? actual !== expected : actual === expected) return { state: "done", outcome: {
+          state: "observed", observation_sha256: sha256(canonicalJSON(lookup)), resource_id: ref, object: actual } };
+        const scope = { artifact_root: artifacts, source_repo: repo, plan, effect, transport: "collector" as const, lookup };
+        if (effect.kind !== "lease-release" && actual !== null) return { state: "conflict", reason: "foreign-fixture-ref", evidence: retainLookup({ ...scope, state: "conflict" }) };
+        return { state: "absent", evidence: retainAbsence(scope) };
+      }
       if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== leaseObject
         && objects.lease_object && objects.lease_object !== objects.object) return { state: "done", outcome: { state: "observed",
           observation_sha256: hash("lease-no-longer-owned"), resource_id: String(effect.payload.ref), object: refs.get(String(effect.payload.ref)) ?? null } };

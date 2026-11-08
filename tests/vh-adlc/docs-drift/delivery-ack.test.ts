@@ -1,10 +1,10 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 import { join } from "node:path";
 import { executeAttempt, PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { resumeEffects, reconcileAbsent } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 import { retainLookup } from "../../../plugins/vh-adlc/scripts/docs-drift/observations";
-import { chmodSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { readAppliedDelivery, readBefore, retainBefore, type BeforeData } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof";
 import { appendAcknowledgement, appendAttempt, appendAttemptEnd, appendIntent, appendOutcome, appendRecoveryOnly, createJournal, isObservationOnly, readJournal, sealPlan, type DeliveryAcknowledgement } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
@@ -551,4 +551,372 @@ test("owned collector refuses a foreign acquisition companion without taking its
     .rejects.toMatchObject({ sent: false, reaped: true });
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
   expect(f.refs.get(receipt)).toBe("f".repeat(40));
+});
+
+test("an exact current-owner acknowledgement preserves the changed delivery and releases its original lease", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, effect } = await collectorDeliveryFixture("pr-create");
+  const interrupted = await publish(publicationOptions(f));
+  const resource = [...f.resources.values()][0], originalBody = resource.body;
+  resource.body = String(resource.body) + "\nOwner-kept delivery edit";
+  const changed = canonicalJSON(resource);
+  const result = await acknowledgeDeliveries({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+    authorize: async scope => ({ kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+      scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("synthetic current owner approval") }) });
+  expect(result.state).toBe("acknowledged");
+  expect(canonicalJSON(resource)).toEqual(changed);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  expect(f.refs.get(f.settings.publication.receipt_ref_prefix + f.plan.manifest.operation_id)).toBe(interrupted.objects.receipt_object);
+  expect(result.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+  resource.body = originalBody;
+  const restored = await resumeEffects({ ...publicationOptions(f), journal_directory: result.journal.directory });
+  expect(restored.state).toBe("acknowledged");
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+});
+
+test("an already equal collector ref cannot claim another application", async () => {
+  const f = publicationFixture(roots, { owned_resources: true });
+  const completed = await publish(publicationOptions(f));
+  const push = f.plan.manifest.effects.find(effect => effect.kind === "push")!;
+  await expect(f.transport.execute(f.plan, push, completed.objects, "unchanged-ref-attempt"))
+    .rejects.toMatchObject({ sent: false, reaped: true });
+  expect(f.refs.get(String(push.payload.ref))).toBe(String(push.payload.head));
+});
+
+for (const body of ["Owner replaced the update body", "", null]) {
+test(`a proven PR update stays identifiable after later marker removal (${body === null ? "null" : body.length})`, async () => {
+  const { lookupAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-lookup");
+  const { f, effect } = await collectorDeliveryFixture("pr-update");
+  const interrupted = await publish(publicationOptions(f));
+  f.resources.get("pulls/77")!.body = body;
+  const lookup = await lookupAppliedDelivery({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+    effect_id: effect.id, settings: f.settings, transport: f.transport });
+  expect(lookup.differences).toEqual(["body_sha256"]);
+});
+}
+
+test("collector ref rewrites derive a rewrite status from the original ref", async () => {
+  const { executeCollectorRefs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/collector-refs");
+  const { readGitSuccess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git-success");
+  const { writePublicationObjects } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const f = publicationFixture(roots, { owned_resources: true });
+  const effect: Effect = { id: "refresh", kind: "branch-refresh", payload: { number: 77, ref: "refs/heads/docs-drift/one",
+    expected_head: "e".repeat(40), head: f.input.manifest.bindings.candidate_commit } };
+  const input = fixture(f.input.manifest.bindings, [effect]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...f.policy, corrections: [], attention: [] });
+  const journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan });
+  const objects = writePublicationObjects(f.store, plan, journal.header);
+  f.refs.set(String(effect.payload.ref), String(effect.payload.expected_head));
+  const result = executeCollectorRefs({ source_repo: f.repo, artifact_root: f.artifacts, plan, effect, attempt_id: "fixture-rewrite",
+    settings: f.settings, identity: await f.transport.identity(), objects, refs: f.refs });
+  const evidence = result.successes[0];
+  expect(JSON.parse(readFileSync(evidence.path, "utf8")).projection.statuses).toEqual(["+"]);
+  expect(readGitSuccess({ source_repo: f.repo, artifact_root: f.artifacts, plan, effect, attempt_id: "fixture-rewrite", evidence }).updates[0].expected).toBe("e".repeat(40));
+});
+
+async function changedDeliveryFixture(kind: CollectorKind = "pr-create") {
+  const { f, effect } = await collectorDeliveryFixture(kind), interrupted = await publish(publicationOptions(f));
+  const application = readAppliedDelivery({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+    effect_id: effect.id, settings: f.settings, transport: "collector" });
+  const key = kind === "issue-create" ? "issues/" + application.number
+    : kind === "comment-create" ? "comments/" + application.resource_id : "pulls/" + application.number;
+  const resource = f.resources.get(key)!;
+  if (kind === "pr-close") resource.state = "open";
+  else resource.body = String(resource.body) + "\nLater owner edit";
+  const authorize = async (scope: unknown) => ({ kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+    scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("current synthetic owner request") });
+  const options = { source_repo: f.repo, journal_directory: interrupted.journal.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [], authorize };
+  return { f, effect, interrupted, resource, options };
+}
+
+for (const mode of ["standing", "unattended", "cleanup", "retirement", "wrong-scope", "changed-request"] as const) {
+test(`acknowledgement refuses ${mode} authority before stopping replay`, async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, options, interrupted } = await changedDeliveryFixture(); let calls = 0;
+  const result = await acknowledgeDeliveries({ ...options, authorize: async scope => {
+    const grant = await options.authorize(scope); calls++;
+    if (mode === "standing" || mode === "unattended") grant.source = mode;
+    if (mode === "cleanup" || mode === "retirement") grant.kind = mode;
+    if (mode === "wrong-scope") grant.scope_sha256 = hash("another scope");
+    if (mode === "changed-request" && calls > 1) grant.request_sha256 = hash("new current request");
+    return grant;
+  } });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("acknowledgement-owner-approval-required");
+  expect(result.journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(false);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
+  expect(f.executed.includes("release")).toBe(false);
+});
+}
+
+for (const mode of ["payload", "source", "actor", "lease"] as const) {
+test(`acknowledgement revalidates ${mode} after owner approval`, async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, options, interrupted, resource } = await changedDeliveryFixture(); let changed = false;
+  const result = await acknowledgeDeliveries({ ...options, authorize: async scope => {
+    const grant = await options.authorize(scope);
+    if (!changed) {
+      changed = true;
+      if (mode === "payload") resource.body = String(resource.body) + "\nNew edit during approval";
+      if (mode === "source") writeFileSync(join(f.repo, "README.md"), "Changed source during approval\n");
+      if (mode === "actor") {
+        const identity = await f.transport.identity(); f.transport.identity = async () => ({ ...identity, actor_id: 99 });
+      }
+      if (mode === "lease") f.refs.set(f.settings.publication.lease_ref, "f".repeat(40));
+    }
+    return grant;
+  } });
+  expect(result.state).toBe("pending");
+  expect(result.journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(false);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(mode === "lease" ? "f".repeat(40) : interrupted.objects.lease_object);
+  expect(f.executed.includes("release")).toBe(false);
+});
+}
+
+for (const kind of ["issue-create", "comment-create", "pr-update", "pr-close"] as const) {
+test(`owner-approved ${kind} acknowledgement preserves its delivery`, async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, effect, options, resource } = await changedDeliveryFixture(kind), bytes = canonicalJSON(resource);
+  const result = await acknowledgeDeliveries(options);
+  expect(result.state).toBe("acknowledged");
+  expect(canonicalJSON(resource)).toEqual(bytes);
+  expect(result.journal.events.filter(event => event.effect_id === effect.id && event.kind === "acknowledged-delivery")).toHaveLength(1);
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+});
+}
+
+test("acknowledgement recovery does not duplicate a locally published event with a lost response", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const ledger = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const { f, effect, options } = await changedDeliveryFixture(), append = ledger.appendAcknowledgement;
+  const lost = spyOn(ledger, "appendAcknowledgement").mockImplementationOnce((...args) => {
+    append(...args); throw Error("lost local acknowledgement response");
+  });
+  try {
+    const first = await acknowledgeDeliveries(options);
+    expect(first.state).toBe("pending");
+    expect(first.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  } finally { lost.mockRestore(); }
+  const recovered = await acknowledgeDeliveries(options);
+  expect(recovered.state).toBe("acknowledged");
+  expect(recovered.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+});
+
+for (const replacement of [false, true]) {
+test(`owner cleanup recovers a lost release response without repeating deletion (replacement=${replacement})`, async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, effect, options } = await changedDeliveryFixture(), execute = f.transport.execute;
+  f.transport.execute = async (...args) => {
+    const captured = await execute(...args);
+    if (args[1].kind === "lease-release") throw new PublicationExecutionError(true, true, undefined, captured ?? undefined);
+    return captured;
+  };
+  const first = await acknowledgeDeliveries(options);
+  expect(first.state).toBe("pending");
+  if (replacement) f.refs.set(f.settings.publication.lease_ref, "f".repeat(40));
+  const recovered = await acknowledgeDeliveries(options);
+  expect(recovered.state).toBe("acknowledged");
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(replacement ? "f".repeat(40) : undefined);
+  expect(recovered.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+});
+}
+
+test("concurrent acknowledgement cleanup writes one disposition and deletes only once", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, effect, options } = await changedDeliveryFixture();
+  await Promise.all([acknowledgeDeliveries(options), acknowledgeDeliveries(options)]);
+  const recovered = await acknowledgeDeliveries(options);
+  expect(recovered.state).toBe("acknowledged");
+  expect(recovered.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+});
+
+test("an approved remaining absence is retired in the same acknowledgement cleanup", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { publicationMarker } = await import("../../../plugins/vh-adlc/scripts/docs-drift/report-history");
+  const { effectMarker } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
+  const f = publicationFixture(roots, { owned_resources: true }), execute = f.transport.execute;
+  const future: Effect = { id: "future", kind: "issue-create", payload: { title: "Later reviewed issue", labels: ["documentation"], prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("future") + "\nhttps://github.com/fixture/docs/blob/" + f.input.manifest.bindings.source_commit + "/README.md",
+    evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.input.manifest.bindings.source_commit,
+    evidence_sha256: sha256(readFileSync(join(f.repo, "README.md"))) } };
+  const effects = [...f.plan.manifest.effects.slice(0, -1), future, f.plan.manifest.effects.at(-1)!];
+  f.input = fixture(f.input.manifest.bindings, effects);
+  f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
+  f.gate = async () => ({ review: f.input, policy: f.policy });
+  f.transport.execute = async (...args) => {
+    const captured = await execute(...args);
+    if (args[1].id === "pr") throw new PublicationExecutionError(true, true, undefined, captured ?? undefined);
+    return captured;
+  };
+  const interrupted = await publish(publicationOptions(f));
+  [...f.resources.values()][0].title = "Later owner edit";
+  const result = await acknowledgeDeliveries({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: ["pr"], retire_effect_ids: [future.id],
+    authorize: async scope => ({ kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+      scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("explicit acknowledgement and absence retirement") }) });
+  expect(result.reason).toBeNull();
+  expect(result.state).toBe("acknowledged");
+  expect(result.journal.events.filter(event => event.kind === "retired-absence" && event.effect_id === future.id)).toHaveLength(1);
+  expect(f.executed.includes(future.id)).toBe(false);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+});
+
+test("a restored payload still needs fresh cleanup approval and never reactivates its acknowledged write", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, effect, options, resource } = await changedDeliveryFixture(); let calls = 0;
+  const first = await acknowledgeDeliveries({ ...options, authorize: async scope => {
+    const grant = await options.authorize(scope);
+    if (++calls === 3) resource.body = effect.payload.body;
+    return grant;
+  } });
+  expect(first.state).toBe("pending");
+  expect(first.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  const recovered = await acknowledgeDeliveries({ ...options, authorize: async scope => ({ ...await options.authorize(scope),
+    request_sha256: hash("fresh owner approval for the restored payload cleanup") }) });
+  expect(recovered.reason).toBeNull();
+  expect(recovered.state).toBe("acknowledged");
+  expect(recovered.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+});
+
+test("current-owner approval cannot bypass an executor still finishing its applied write", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const f = publicationFixture(roots, { owned_resources: true }), execute = f.transport.execute;
+  let entered!: () => void, finish!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const finished = new Promise<void>(resolve => { finish = resolve; });
+  f.transport.execute = async (...args) => {
+    const captured = await execute(...args);
+    if (args[1].id === "pr") {
+      entered(); await finished;
+      throw new PublicationExecutionError(true, true, undefined, captured ?? undefined);
+    }
+    return captured;
+  };
+  const publishing = publish(publicationOptions(f));
+  await started;
+  [...f.resources.values()][0].title = "Later owner edit";
+  let approvals = 0;
+  const options = { source_repo: f.repo, journal_directory: join(f.artifacts, "docs-drift-operation-1"), object_store: f.store,
+    settings: f.settings, transport: f.transport, acknowledge_effect_ids: ["pr"], retire_effect_ids: [],
+    authorize: async (scope: unknown) => { approvals++; return { kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+      scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("current owner after executor settlement") }; } };
+  try {
+    const blocked = await acknowledgeDeliveries(options);
+    expect(blocked.state).toBe("pending");
+    expect(blocked.reason).toBe("acknowledgement-executor-unsettled");
+    expect(approvals).toBe(0);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+  } finally { finish(); await publishing; }
+  const recovered = await acknowledgeDeliveries(options);
+  expect(recovered.reason).toBeNull();
+  expect(recovered.state).toBe("acknowledged");
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+});
+
+test("current-owner approval cannot turn a partial application into a completed delivery", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, effect } = await collectorDeliveryFixture("pr-create"), set = f.resources.set.bind(f.resources);
+  f.resources.set = (key, value) => set(key, { ...value, labels: [] });
+  const interrupted = await publish(publicationOptions(f)); let approvals = 0;
+  const result = await acknowledgeDeliveries({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+    authorize: async scope => { approvals++; return { kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+      scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("cannot approve absent application evidence") }; } });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("delivery-payload-incomplete");
+  expect(approvals).toBe(0);
+  expect(result.journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(false);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
+});
+
+test("current-owner permission cannot adopt another original run's same-plan lease", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { writePublicationObjects } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const { f, options, interrupted } = await changedDeliveryFixture();
+  const competingRoot = join(f.root, "competing-artifacts"); mkdirSync(competingRoot, { mode: 0o700 });
+  const competing = createJournal({ source_repo: f.repo, artifact_root: competingRoot, plan: f.plan });
+  const objects = writePublicationObjects(f.store, f.plan, competing.header);
+  expect(objects.object).toBe(interrupted.objects.object);
+  expect(objects.lease_object).not.toBe(interrupted.objects.lease_object);
+  f.refs.set(f.settings.publication.lease_ref, objects.lease_object!);
+  f.refs.set(f.settings.publication.receipt_ref_prefix + f.plan.manifest.operation_id, objects.receipt_object!);
+  let approvals = 0;
+  const result = await acknowledgeDeliveries({ ...options, authorize: async scope => { approvals++; return options.authorize(scope); } });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("acknowledgement-owned-lease-changed");
+  expect(approvals).toBe(0);
+  expect(result.journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(false);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(objects.lease_object);
+});
+
+test("a read-only mirror cannot gain cleanup ownership from current-owner permission", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, options, interrupted } = await changedDeliveryFixture();
+  const mirrorRoot = join(f.root, "mirror-artifacts"); mkdirSync(mirrorRoot, { mode: 0o700 });
+  const mirror = createJournal({ source_repo: f.repo, artifact_root: mirrorRoot, plan: f.plan, recovery_mode: "observation-only",
+    observed_lease_object: interrupted.objects.lease_object!, observed_receipt_object: interrupted.objects.receipt_object! });
+  let approvals = 0;
+  const result = await acknowledgeDeliveries({ ...options, journal_directory: mirror.directory, transport: { ...f.transport, artifact_root: mirrorRoot },
+    authorize: async scope => { approvals++; return options.authorize(scope); } });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("acknowledgement-original-owner-required");
+  expect(approvals).toBe(0);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
+});
+
+test("fresh approval cannot retry a release whose server outcome is unknown", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, options } = await changedDeliveryFixture(), execute = f.transport.execute;
+  let requests = 0, queued: Parameters<typeof execute> | undefined;
+  f.transport.execute = async (...args) => {
+    if (args[1].kind === "lease-release") {
+      requests++; queued = args;
+      throw new PublicationExecutionError(true, true);
+    }
+    return execute(...args);
+  };
+  expect((await acknowledgeDeliveries(options)).state).toBe("pending");
+  expect(requests).toBe(1);
+  const retry = await acknowledgeDeliveries(options);
+  expect(retry.state).toBe("pending");
+  expect(requests).toBe(1);
+  if (!queued) throw Error("missing queued fixture backend request");
+  // Model the first backend request completing after its client returned an unknown result.
+  await execute(...queued);
+  const settled = await acknowledgeDeliveries(options);
+  expect(settled.state).toBe("acknowledged");
+  expect(requests).toBe(1);
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+});
+
+test("a proven deletion cannot be repeated after the same old lease object is restored", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, options, interrupted } = await changedDeliveryFixture(), execute = f.transport.execute;
+  f.transport.execute = async (...args) => {
+    const captured = await execute(...args);
+    if (args[1].kind === "lease-release") {
+      f.refs.set(f.settings.publication.lease_ref, interrupted.objects.lease_object!);
+      throw new PublicationExecutionError(true, true, undefined, captured ?? undefined);
+    }
+    return captured;
+  };
+  expect((await acknowledgeDeliveries(options)).state).toBe("pending");
+  const retry = await acknowledgeDeliveries(options);
+  expect(retry.state).toBe("pending");
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
 });

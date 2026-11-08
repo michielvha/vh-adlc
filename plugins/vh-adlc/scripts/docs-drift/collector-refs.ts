@@ -35,6 +35,8 @@ export function executeCollectorRefs(options: {
   else if (effect.kind === "push" || effect.kind === "branch-refresh") updates = [{ ref: String(p.ref), head: String(p.head), expected: effect.kind === "push" ? "" : String(p.expected_head) }];
   else throw new PublicationExecutionError(false, true);
   if (updates.some(update => (refs.get(update.ref) ?? "") !== update.expected && refs.get(update.ref) !== update.head)) throw new PublicationExecutionError(false, true);
+  const previous = updates.map(update => refs.get(update.ref) ?? null);
+  if (updates.some((update, index) => previous[index] === update.head)) throw new PublicationExecutionError(false, true);
   let sent = false;
   try {
     const argv_sha256 = sha256(canonicalJSON(collectorRefArguments(updates)));
@@ -48,7 +50,7 @@ export function executeCollectorRefs(options: {
       else refs.set(update.ref, update.head);
     }
     if (updates.some(update => (refs.get(update.ref) ?? null) !== update.head)) throw Error("incomplete fixture ref transaction");
-    const response = Buffer.from("To owned-collector-fixture\n" + updates.map(update => `${update.head === null ? "-" : "*"}\t${update.head ?? ""}:${update.ref}\t[fixture applied]\n`).join("") + "Done\n");
+    const response = Buffer.from("To owned-collector-fixture\n" + updates.map((update, index) => `${update.head === null ? "-" : previous[index] === null ? "*" : "+"}\t${update.head ?? ""}:${update.ref}\t[fixture applied]\n`).join("") + "Done\n");
     const projected = projectGitSuccess(response, updates);
     if (!projected) throw Error("incomplete fixture ref projection");
     publishArtifact(join(directory, "fixture-result.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-collector-ref-result",

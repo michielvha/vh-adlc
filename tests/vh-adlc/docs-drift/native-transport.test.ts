@@ -92,9 +92,10 @@ if (process.argv[1].endsWith('/git')) {
         state.race = false;
         save();
     }
+    const previous = updates.map(update => state.refs[update.ref] ?? '');
     for (const update of updates) {
         const current = state.refs[update.ref] ?? '';
-        if (current !== update.head && current !== update.expected) process.exit(1);
+        if (!update.head ? current !== update.expected : current !== update.head && current !== update.expected) process.exit(1);
     }
     for (const { ref, head } of updates) {
         if (head) {
@@ -103,7 +104,12 @@ if (process.argv[1].endsWith('/git')) {
         } else delete state.refs[ref];
     }
     save();
-    process.stdout.write('To https://github.com/fixture/docs.git\\n' + updates.map(item => (item.head ? '*' : '-') + '\\t' + item.head + ':' + item.ref + '\\t[fixture applied]\\n').join('') + 'Done\\n');
+    const statusFor = (item, index) => {
+        if (!item.head) return '-';
+        if (previous[index] === item.head) return '=';
+        return previous[index] ? '+' : '*';
+    };
+    process.stdout.write('To https://github.com/fixture/docs.git\\n' + updates.map((item, index) => statusFor(item, index) + '\\t' + item.head + ':' + item.ref + '\\t[fixture applied]\\n').join('') + 'Done\\n');
     process.exit(0);
 }
 if (args.includes('graphql')) {
@@ -1707,14 +1713,23 @@ test(`captured ${kind} proof survives a later edit (null parent body=${nullBody}
     if (kind === "issue-create") state.issues[0].title = "Later owner edit";
     else if (kind === "comment-create") state.comments["77"][0].body += "\nLater owner edit";
     else if (kind === "pr-close") state.prs[0].state = "open";
-    else state.prs[0].title = "Later owner edit";
+    else state.prs[0].body = "Owner replaced the update body and removed its markers";
   });
   expect((await f.transport.observe(selected.plan, effect, selected.objects)).state).toBe(kind === "pr-close" ? "absent" : "conflict");
   expect(readAppliedDelivery(scope).proof_sha256).toBe(applied.proof_sha256);
   const { lookupAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-lookup");
   const lookup = await lookupAppliedDelivery({ ...scope, transport: f.transport });
   expect(lookup.resource_id).toBe(applied.resource_id);
-  expect(lookup.differences).toEqual([kind === "pr-close" ? "state" : kind === "comment-create" ? "body_sha256" : "title_sha256"]);
+  expect(lookup.differences).toEqual([kind === "pr-close" ? "state" : kind === "comment-create" || kind === "pr-update" ? "body_sha256" : "title_sha256"]);
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const cleaned = await acknowledgeDeliveries({ source_repo: selected.repo, journal_directory: journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+    authorize: async value => ({ kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+      scope_sha256: sha256(canonicalJSON(value)), request_sha256: hash("synthetic current owner native cleanup") }) });
+  expect(cleaned.reason).toBeNull();
+  expect(cleaned.state).toBe("acknowledged");
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+  expect(f.inspect().refs[f.settings.publication.receipt_ref_prefix + "operation-1"]).toBe(selected.objects.receipt_object!);
 });
 }
 
@@ -1883,6 +1898,16 @@ test(`acknowledgement journal rejects a proven ${mode}-only native history`, asy
   expect(() => appendAcknowledgement(journal, effect.id, { kind: "owner-delivery-acknowledgement",
     scope_sha256: hash("schema exact owner scope"), request_sha256: hash("schema owner request"), lookup,
     application_sha256: hash("contradictory schema application"), settlement_sha256: hash("native settled requests") })).toThrow("invalid delivery acknowledgement");
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  let approvals = 0;
+  const result = await acknowledgeDeliveries({ source_repo: selected.repo, journal_directory: journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+    authorize: async value => { approvals++; return { kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+      scope_sha256: sha256(canonicalJSON(value)), request_sha256: hash("cannot approve non-application") }; } });
+  expect(result.state).toBe("pending");
+  expect(approvals).toBe(0);
+  expect(result.journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(false);
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object!);
 });
 }
 
@@ -1959,4 +1984,35 @@ test("a zero-exit Git child without a complete terminal response supplies no suc
     objects: selected.objects, transport: f.transport })).rejects.toThrow("success-proof-unavailable");
   const ending = readJournal(selected.journal.directory, selected.journal.source_repo).events.at(-1);
   expect(ending?.payload).toMatchObject({ sent: true, reaped: true, capture_unverified: true, execution: { successes: [], commands: 1 } });
+});
+
+test("a real up-to-date atomic response cannot become another attempt's application proof", async () => {
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f); realGitServer(f);
+  const first = await executeAttempt({ journal: appendIntent(selected.journal, selected.effect.id), effect: selected.effect,
+    objects: selected.objects, transport: f.transport });
+  const unchanged = await f.transport.execute(f.plan, selected.effect, selected.objects, "second-unchanged-request");
+  expect(unchanged).toMatchObject({ successes: [], commands: 1, capture_unverified: true });
+  expect(readJournal(first.directory, first.source_repo).events).toEqual(first.events);
+});
+
+test("native acknowledgement cleanup preserves a later PR edit and its immutable receipt", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect = f.plan.manifest.effects.find(item => item.kind === "pr-create")!;
+  const selected = await startCleanupJournal(f, [effect]);
+  const journal = await executeAttempt({ journal: appendIntent(selected.journal, effect.id), effect,
+    objects: selected.objects, transport: f.transport });
+  f.update(state => { state.prs[0].title = "Owner-kept native edit"; });
+  const result = await acknowledgeDeliveries({ source_repo: selected.repo, journal_directory: journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+    authorize: async scope => ({ kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+      scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("actual synthetic owner request") }) });
+  expect(result.reason).toBeNull();
+  expect(result.state).toBe("acknowledged");
+  expect(f.inspect().prs[0].title).toBe("Owner-kept native edit");
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
+  expect(f.inspect().refs[f.settings.publication.receipt_ref_prefix + "operation-1"]).toBe(selected.objects.receipt_object!);
+  expect(result.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
 });

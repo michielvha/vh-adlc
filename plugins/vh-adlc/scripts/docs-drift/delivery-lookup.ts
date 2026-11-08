@@ -68,7 +68,7 @@ export async function lookupAppliedDelivery(options: {
   if (current.id !== application.resource_id || current.number !== application.number
     || current.user_id !== original.user_id || current.user_login_sha256 !== original.user_login_sha256) throw Error("delivery-current-target-changed");
   const marker = publicationMarker(options.settings, plan.manifest.operation_id);
-  if (effect.kind !== "pr-close") {
+  if (effect.kind !== "pr-close" && effect.kind !== "pr-update") {
     if (!markers(record(resources.resource).body, marker, effectMarker(effect.id))) throw Error("delivery-current-marker-changed");
     const matches = inventory(resources.inventory, marker, effectMarker(effect.id));
     if (matches.length !== 1 || matches[0] !== application.resource_id) throw Error("delivery-current-marker-ambiguous");
@@ -107,7 +107,8 @@ export async function lookupAppliedDelivery(options: {
         labels: before.label_ids, state: original.state,
         ...(["pr-create", "pr-update"].includes(effect.kind) ? { draft: p.draft as boolean } : {}) };
   const differences = (Object.keys(desired) as (keyof Facts)[]).filter(key => !same(current[key], desired[key])).sort();
-  if (!differences.length) throw Error("delivery-currently-matching");
+  const acknowledged = journal.events.some(event => event.kind === "acknowledged-delivery" && event.effect_id === effect.id);
+  if (!differences.length && !acknowledged) throw Error("delivery-currently-matching");
   if (!/^[a-f0-9]{64}$/u.test(resources.requests_sha256)) throw Error("incomplete delivery request trace");
   const projection = { effect_id: effect.id, resource_id: application.resource_id, application_sha256: application.proof_sha256,
     transport: plan.transport, context: plan.context, current, parent, differences,

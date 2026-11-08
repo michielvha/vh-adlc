@@ -48,6 +48,12 @@ export function collectorRefArguments(updates: GitUpdate[]): string[] {
   return ["collector", "refs", sha256(canonicalJSON(updates))];
 }
 
+function appliedStatus(update: GitUpdate, status: unknown): boolean {
+  if (update.head === null) return status === "-";
+  if (update.expected === "") return status === "*";
+  return status === " " || status === "+";
+}
+
 /** Only a complete positive porcelain response can settle these ref requests. */
 export function projectGitSuccess(bytes: Uint8Array, updates: GitUpdate[]): Projection | null {
   validateUpdates(updates);
@@ -62,8 +68,7 @@ export function projectGitSuccess(bytes: Uint8Array, updates: GitUpdate[]): Proj
   const statuses = new Map<string, string>();
   for (const line of lines) {
     const fields = line.split("\t"), update = selected.get(fields[1]);
-    if (fields.length !== 3 || !update || !fields[2] || ![" ", "+", "*", "=", "-"].includes(fields[0])
-      || (update.head === null ? fields[0] !== "-" : fields[0] === "-")) return null;
+    if (fields.length !== 3 || !update || !fields[2] || !appliedStatus(update, fields[0])) return null;
     selected.delete(fields[1]); statuses.set(fields[1], fields[0]);
   }
   if (selected.size) return null;
@@ -72,8 +77,7 @@ export function projectGitSuccess(bytes: Uint8Array, updates: GitUpdate[]): Proj
 function projection(value: unknown): Projection {
   const data = object(value, ["schema_version", "updates", "statuses", "response_sha256"]), updates = validateUpdates(data.updates);
   if (data.schema_version !== 1 || !Array.isArray(data.statuses) || data.statuses.length !== updates.length
-    || data.statuses.some((status, index) => ![" ", "+", "*", "=", "-"].includes(status)
-      || (updates[index].head === null ? status !== "-" : status === "-"))) throw Error("incomplete Git application projection");
+    || data.statuses.some((status, index) => !appliedStatus(updates[index], status))) throw Error("incomplete Git application projection");
   digest(data.response_sha256);
   return data as Projection;
 }

@@ -33,9 +33,19 @@ test("positive Git projection requires complete atomic statuses and valid deleti
   const companion = { ref: "refs/heads/docs-drift/two", head: "b".repeat(40), expected: "" };
   expect(projectGitSuccess(Buffer.from(successful), [...updates, companion])).toBeNull();
   const response = successful.replace("Done\n", "=\t" + companion.head + ":" + companion.ref + "\t[up to date]\nDone\n");
-  expect(projectGitSuccess(Buffer.from(response), [...updates, companion])?.statuses).toEqual(["*", "="]);
+  expect(projectGitSuccess(Buffer.from(response), [...updates, companion])).toBeNull();
   const deletion = [{ ...updates[0], head: null, expected: updates[0].head }];
   const deleted = "To https://github.com/fixture/docs.git\n-\t:" + deletion[0].ref + "\t[deleted]\nDone\n";
   expect(projectGitSuccess(Buffer.from(deleted), deletion)?.statuses).toEqual(["-"]);
   expect(projectGitSuccess(Buffer.from(deleted.replace("-\t", "=\t")), deletion)).toBeNull();
+});
+
+test("an up-to-date response cannot supply application proof for this attempt", () => {
+  expect(projectGitSuccess(Buffer.from(successful.replace("*\t", "=\t")), updates)).toBeNull();
+});
+
+test("terminal status distinguishes new refs from CAS rewrites", () => {
+  expect(projectGitSuccess(Buffer.from(successful.replace("*\t", "+\t")), updates)).toBeNull();
+  const rewrite = [{ ...updates[0], expected: "b".repeat(40) }];
+  expect(projectGitSuccess(Buffer.from(successful), rewrite)).toBeNull();
 });
