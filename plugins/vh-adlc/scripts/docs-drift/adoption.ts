@@ -121,11 +121,16 @@ function nativeIdentity(value: unknown): PublicationIdentity {
 
 type AdoptionBoundary = { kind: "observed" } | { kind: "test-only"; fixture_id: string };
 
-function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary): void {
+function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary, carried?: { names: string[]; receipts: unknown }): void {
   const receipts = object(value, Object.keys(receiptRequirements));
   const target = canonicalDigest({ schema_version: 1, repository: bindings.settings.repository,
     source_candidate: candidate, protected_sha256: bindings.protected_sha256, component_pin_sha256: bindings.component_pin.sha256, identity });
   for (const name of Object.keys(receiptRequirements) as (keyof typeof receiptRequirements)[]) {
+    if (carried?.names.includes(name)) {
+      const previous = object(carried.receipts, Object.keys(receiptRequirements));
+      if (!canonicalJSON(receipts[name]).equals(canonicalJSON(previous[name]))) fail("carried receipt changed " + name);
+      continue;
+    }
     const receipt = object(receipts[name], ["schema_version", "kind", "evidence_kind", "source_commit", "artifact_sha256",
       "bindings_sha256", "outcome", "native_conclusion", "worker_model", "reviewer_model", "client_bindings", "observations",
       ...(boundary.kind === "test-only" ? ["fixture_id"] : []),
@@ -196,7 +201,7 @@ function recordHistory(repo: string, ancestor: string, descendant: string, path:
  * Historical native execution and artifact contents are verified separately by the operator.
  * This read-only result supplies no publication, cleanup, workflow or merge authority.
  */
-function verifyAdoptionRecord(options: { repo: string; current_default: string; identity?: PublicationIdentity }, boundary: AdoptionBoundary) {
+function readAdoptionFrame(options: { repo: string; current_default: string; identity?: PublicationIdentity }, boundary: AdoptionBoundary) {
   const { repo, current_default: current } = options;
   immutable(current);
   if (loadCommittedSettings(repo, current).settings.publication.mode !== "adopted") fail("consumer is not adopted");
@@ -209,8 +214,6 @@ function verifyAdoptionRecord(options: { repo: string; current_default: string; 
   if (record.schema_version !== 1 || record.kind !== "docs-drift-adoption") fail("record schema");
   const candidate = immutable(record.source_candidate);
   if (candidate === current) fail("circular source candidate record");
-  // Successor records require the separate compatibility/trial verifier, implemented by T21.
-  if (record.predecessor !== null) fail("successor adoption evidence unavailable");
   const original = collectAdoptionBindings(repo, candidate);
   if (adoptionDigest(record.protected_sha256) !== original.protected_sha256
     || adoptionDigest(record.component_pin_sha256) !== original.component_pin.sha256
@@ -233,13 +236,116 @@ function verifyAdoptionRecord(options: { repo: string; current_default: string; 
   verifyCutoverAssembly({ repo, source_candidate: candidate, delivery_commit: delivery, record_path: path });
   const deliveryTime = Number(readGit(repo, "show", "-s", "--format=%ct", delivery).toString().trim()) * 1000;
   if (!Number.isSafeInteger(deliveryTime)) fail("cutover delivery time");
-  verifyRecordedReceipts(record.receipts, original, candidate, identity, deliveryTime, boundary);
   for (const historical of recordHistory(repo, delivery, current, path)) {
     if (historical.record?.mode !== "100644" || historical.record.sha256 !== input.sha256) fail("immutable adoption record changed");
   }
-  return freezeJSON({ kind: "docs-drift-runtime-adoption", current_default: current,
+  verifyRetainedInputs(repo, candidate, current, [[path, input.sha256], [original.component_pin.path, original.component_pin.sha256]]);
+  const result = freezeJSON({ kind: "docs-drift-runtime-adoption", current_default: current,
     source_candidate: candidate, delivery_commit: delivery, record_path: path, adoption_sha256: input.sha256,
     protected_sha256: bindings.protected_sha256, component_pin: bindings.component_pin.value, identity, receipts: record.receipts });
+  return { result, record, original, deliveryTime };
+}
+
+function verifyRetainedInputs(repo: string, base: string, candidate: string, inputs: [string, string][]) {
+  for (const [path, digest] of inputs) {
+    const selected = committedInput(repo, candidate, path);
+    if (!selected || selected.mode !== "100644" || selected.sha256 !== digest
+      || recordHistory(repo, base, candidate, path).some(row => row.record?.mode !== "100644" || row.record.sha256 !== digest)) fail("immutable predecessor input changed " + path);
+  }
+}
+
+type AdoptionResult = ReturnType<typeof readAdoptionFrame>["result"];
+const compatibleCarriedReceipts = ["hosted_advisory", "history_read", "quiescence", "copilot_entry", "claude_entry"];
+
+function predecessorLink(value: unknown, boundary: AdoptionBoundary) {
+  const link = object(value, ["schema_version", "evidence_kind", "route", "default_commit", "record_path", "record_sha256",
+    "carry_receipts", "compatibility", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "successor predecessor");
+  if (link.schema_version !== 1 || link.evidence_kind !== boundary.kind
+    || (boundary.kind === "test-only" && link.fixture_id !== boundary.fixture_id)) fail("predecessor evidence kind or fixture");
+  // Trial-route activation remains unavailable until its affected-surface verifier is implemented.
+  if (link.route !== "compatible") fail("successor trial evidence unavailable");
+  if (!canonicalJSON(link.carry_receipts).equals(canonicalJSON(compatibleCarriedReceipts))) fail("compatible carried receipt inventory");
+  return { default_commit: immutable(link.default_commit), record_sha256: adoptionDigest(link.record_sha256),
+    record_path: link.record_path, compatibility: link.compatibility };
+}
+
+function verifyCompatibility(repo: string, value: unknown, previous: AdoptionResult, next: ReturnType<typeof readAdoptionFrame>, boundary: AdoptionBoundary) {
+  const changes = compareUpgradeBindings({ repo, approved_default: previous.current_default,
+    source_candidate: next.result.source_candidate, identity: next.result.identity }, previous);
+  if (changes.known_affected_entries.length) fail("compatible upgrade changes execution bindings");
+  const receipt = object(value, ["schema_version", "evidence_kind", "source_candidate", "predecessor_adoption_sha256",
+    "previous_component", "next_component", "previous_protected_sha256", "classification", "reviewer_model", "artifact_sha256",
+    "diff_sha256", "dependencies_sha256", "observations", "regressions", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "compatibility receipt");
+  if (receipt.schema_version !== 1 || receipt.evidence_kind !== boundary.kind
+    || (boundary.kind === "test-only" && receipt.fixture_id !== boundary.fixture_id)
+    || receipt.source_candidate !== next.result.source_candidate || receipt.predecessor_adoption_sha256 !== previous.adoption_sha256
+    || receipt.previous_protected_sha256 !== previous.protected_sha256
+    || !canonicalJSON(receipt.previous_component).equals(canonicalJSON(previous.component_pin))
+    || !canonicalJSON(receipt.next_component).equals(canonicalJSON(next.result.component_pin))
+    || receipt.reviewer_model !== next.original.settings.execution.entries.copilot.reviewer.model) fail("compatibility receipt bindings");
+  if (receipt.classification !== "contract-preserving" && receipt.classification !== "contract-restoring") fail("compatibility classification");
+  for (const field of ["artifact_sha256", "diff_sha256", "dependencies_sha256"]) adoptionDigest(receipt[field]);
+  const observations = object(receipt.observations, ["full_diff_reviewed", "dependencies_complete", "no_blocking_findings",
+    "no_should_fix_findings", "contract_preserved", "affected_regressions", "installed_contract_checks"], "compatibility observations");
+  if (Object.values(observations).some(value => value !== true)) fail("incomplete compatibility observations");
+  if (!Array.isArray(receipt.regressions) || !receipt.regressions.length) fail("compatibility regressions required");
+  const ids = new Set<string>();
+  let restored = false;
+  for (const value of receipt.regressions) {
+    const regression = object(value, ["id", "evidence_kind", "category", "previous_source", "next_source", "command_sha256",
+      "accepted_rule_sha256", "expected_sha256", "before_sha256", "after_sha256", "before_result", "after_result", "artifact_sha256",
+      ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "compatibility regression");
+    if (typeof regression.id !== "string" || !regression.id || ids.has(regression.id)
+      || regression.evidence_kind !== boundary.kind || (boundary.kind === "test-only" && regression.fixture_id !== boundary.fixture_id)
+      || regression.previous_source !== previous.component_pin.source_commit
+      || regression.next_source !== next.result.component_pin.source_commit) fail("compatibility regression bindings");
+    ids.add(regression.id);
+    for (const field of ["command_sha256", "accepted_rule_sha256", "expected_sha256", "before_sha256", "after_sha256", "artifact_sha256"]) adoptionDigest(regression[field]);
+    if (regression.after_result !== "passed" || regression.after_sha256 !== regression.expected_sha256) fail("compatibility regression after result");
+    if (regression.category === "preservation") {
+      if (regression.before_result !== "passed" || regression.before_sha256 !== regression.expected_sha256) fail("compatibility preservation regression");
+    } else if (regression.category === "restoration" && receipt.classification === "contract-restoring") {
+      if (regression.before_result !== "failed" || regression.before_sha256 === regression.expected_sha256) fail("compatibility restoration regression");
+      restored = true;
+    } else fail("compatibility regression category");
+  }
+  if (receipt.classification === "contract-restoring" && !restored) fail("contract restoration regression required");
+}
+
+/** Walk immutable predecessor defaults before accepting any carried observation. */
+function verifyAdoptionRecord(options: { repo: string; current_default: string; identity?: PublicationIdentity }, boundary: AdoptionBoundary): AdoptionResult {
+  const frames: ReturnType<typeof readAdoptionFrame>[] = [], seen = new Set<string>();
+  let current = options.current_default;
+  while (true) {
+    if (seen.has(current)) fail("cyclic predecessor adoption");
+    seen.add(current);
+    const frame = readAdoptionFrame({ ...options, current_default: current }, boundary);
+    frames.push(frame);
+    verifyRetainedInputs(options.repo, current, options.current_default,
+      [[frame.result.record_path, frame.result.adoption_sha256], [frame.original.component_pin.path, frame.original.component_pin.sha256]]);
+    if (frame.record.predecessor === null) break;
+    const link = predecessorLink(frame.record.predecessor, boundary);
+    if (link.default_commit === frame.result.source_candidate) fail("predecessor must predate successor candidate");
+    try { readGit(options.repo, "merge-base", "--is-ancestor", link.default_commit, frame.result.source_candidate); }
+    catch { fail("predecessor default outside successor history"); }
+    current = link.default_commit;
+  }
+  let previous: AdoptionResult | null = null;
+  for (const frame of frames.reverse()) {
+    if (previous === null) {
+      verifyRecordedReceipts(frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity, frame.deliveryTime, boundary);
+    } else {
+      const link = predecessorLink(frame.record.predecessor, boundary);
+      if (link.default_commit !== previous.current_default || link.record_path !== previous.record_path
+        || link.record_sha256 !== previous.adoption_sha256) fail("predecessor adoption binding");
+      verifyCompatibility(options.repo, link.compatibility, previous, frame, boundary);
+      verifyRecordedReceipts(frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity,
+        frame.deliveryTime, boundary, { names: compatibleCarriedReceipts, receipts: previous.receipts });
+    }
+    previous = frame.result;
+  }
+  if (previous === null) fail("missing adoption record");
+  return previous;
 }
 
 /** Production always requires observed owner-attested receipts. */
@@ -309,16 +415,17 @@ export function checkUpgradeSignals(options: { repo: string; source: string; ide
 export function collectUpgradeChanges(options: {
   repo: string; approved_default: string; source_candidate: string; identity: PublicationIdentity;
 }) {
+  const adopted = verifyRuntimeAdoption({ repo: options.repo, current_default: options.approved_default, identity: options.identity });
+  return compareUpgradeBindings(options, adopted);
+}
+
+function compareUpgradeBindings(options: { repo: string; approved_default: string; source_candidate: string; identity: PublicationIdentity }, adopted: AdoptionResult) {
   const { repo } = options, base = immutable(options.approved_default), candidate = immutable(options.source_candidate);
-  const adopted = verifyRuntimeAdoption({ repo, current_default: base, identity: options.identity });
   try { readGit(repo, "merge-base", "--is-ancestor", base, candidate); }
   catch { fail("successor source must descend from approved default"); }
   const previous = collectAdoptionBindings(repo, base);
-  for (const [path, digest] of [[adopted.record_path, adopted.adoption_sha256], [previous.component_pin.path, previous.component_pin.sha256]]) {
-    const selected = committedInput(repo, candidate, path);
-    if (!selected || selected.mode !== "100644" || selected.sha256 !== digest
-      || recordHistory(repo, base, candidate, path).some(row => row.record?.mode !== "100644" || row.record.sha256 !== digest)) fail("immutable predecessor input changed " + path);
-  }
+  verifyRetainedInputs(repo, base, candidate,
+    [[adopted.record_path, adopted.adoption_sha256], [previous.component_pin.path, previous.component_pin.sha256]]);
   const next = collectAdoptionBindings(repo, candidate);
   if (previous.settings.repository !== next.settings.repository || previous.settings.hostname !== next.settings.hostname
     || previous.settings.default_branch !== next.settings.default_branch) fail("successor consumer identity differs");
