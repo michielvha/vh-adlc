@@ -397,13 +397,19 @@ test("every download has bounded connection, transfer and retry attempts", () =>
   expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
 });
 
-test("a server Retry-After cannot keep the installer waiting past its fallback budget", async () => {
-  let requests = 0;
-  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch() {
+test.each([false, true])("native curl bounds Retry-After and excludes user config unless the disable flag is removed (%s)", async removeDisable => {
+  let requests = 0, configuredHeaders = 0;
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch(request) {
+    if (request.headers.has("X-Fixture-Curlrc")) configuredHeaders += 1;
     requests++; return new Response("synthetic temporary outage", { status: 503, headers: { "Retry-After": "120" } });
   } });
   try {
     const { f, bin, calls } = apiFallbackFixture("retry-after", server.url.toString());
+    writeFileSync(join(f.home, ".curlrc"), 'header = "X-Fixture-Curlrc: 1"\n');
+    if (removeDisable) {
+      const installer = join(f.plugin, "scripts", "ensure-vh-adlc.sh");
+      writeFileSync(installer, readFileSync(installer, "utf8").replaceAll("curl -q -fsSL", "curl -fsSL"));
+    }
     let processGroup = 0;
     const outcome = await runOwnedClient(["bash", join(f.plugin, "scripts", "ensure-vh-adlc.sh")], {
       started: pid => { processGroup = pid; },
@@ -423,6 +429,7 @@ test("a server Retry-After cannot keep the installer waiting past its fallback b
     expect(readFileSync(join(f.dir, "installer.stdout"), "utf8").trim()).toBe(cached(f));
     expect(requests).toBeGreaterThan(0);
     expect(requests).toBe(1);
+    expect(configuredHeaders).toBe(removeDisable ? requests : 0);
     expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
   } finally { await server.stop(true); }
 }, 15000);
