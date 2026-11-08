@@ -306,7 +306,7 @@ for (const field of ["producer_workflow_id", "producer_workflow_path", "reader_w
 
 
 // Synthetic native processes and observed-shaped attestations exercise selection, never actual adoption.
-async function runtimeFixture() {
+async function runtimeFixture(options: { hostname?: string; provision_hostname?: string } = {}) {
   const shared = publicationFixture(roots), prefix = "plugins/vh-adlc/";
   write(shared.repo, prefix + ".claude-plugin/plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');
   write(shared.repo, prefix + "scripts/runner.ts", "// Synthetic retained worker\n");
@@ -317,11 +317,11 @@ async function runtimeFixture() {
   const distribution = Buffer.from("#!/bin/sh\nprintf '%s\\n' 'GitHub Copilot CLI fixture-1.0.0.'\n");
   const client = parseClientBinding({ ...settingsFixture().clients["copilot-linux"], platform: process.platform + "-" + process.arch,
     distribution_sha256: hash(distribution.toString()) });
-  const f = source({ pin: selectedPin, client }), delivery = deliverRecord(f, portableRecord(f));
+  const f = source({ pin: selectedPin, client, hostname: options.hostname }), delivery = deliverRecord(f, portableRecord(f));
   const cache = join(f.root, "approved-runtime"); mkdirSync(cache, { mode: 0o700 });
-  const retained = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: shared.repo, pin: selectedPin });
+  const retained = bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: shared.repo, pin: selectedPin });
   const native = await bootstrap.retainClientDistribution({ consumer_repo: f.repo, cache_directory: cache, client_id: "copilot-linux", client,
-    profile_scope: { hostname: "github.com", repository_id: 10, actor_id: 20, entry: "copilot" }, distribution, format: "executable", executable: "copilot" });
+    profile_scope: { hostname: options.provision_hostname ?? f.configured.hostname, repository_id: 10, actor_id: 20, entry: "copilot" }, distribution, format: "executable", executable: "copilot" });
   const selection = { repo: f.repo, current_default: delivery, identity: runtimeIdentity, cache_directory: cache,
     entry: "copilot" as const, launcher_path: join(f.repo, f.configured.runtime_loader.launcher),
     settings_path: join(f.repo, ".vh-adlc/docs-drift.yaml") };
@@ -389,4 +389,16 @@ test("approved runtime cache must stay outside its consumer worktree", async () 
 test("approved entry preflight refuses world-writable inputs with matching committed bytes", async () => {
   const f = await runtimeFixture(); chmodSync(f.selection.launcher_path, 0o666);
   await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow("regular committed entry input required");
+});
+
+test("approved entry derives the native profile host from committed consumer settings", async () => {
+  const f = await runtimeFixture({ hostname: "enterprise.example.invalid" });
+  const selected = await bootstrap.selectApprovedRuntime(f.selection);
+  expect(selected.worker.profile_directory).toBe(f.native.profile_directory);
+  expect(selected.worker.profile_directory).toContain("/enterprise.example.invalid/");
+});
+
+test("a profile provisioned for github.com cannot stand in for a committed enterprise host", async () => {
+  const f = await runtimeFixture({ hostname: "enterprise.example.invalid", provision_hostname: "github.com" });
+  await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow("ENOENT");
 });

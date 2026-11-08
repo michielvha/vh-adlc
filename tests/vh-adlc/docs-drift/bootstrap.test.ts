@@ -319,12 +319,12 @@ test("verified component setup keeps an exact approved snapshot through a host u
   const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
     source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
   expect(typeof bootstrap.retainComponentSnapshot).toBe("function");
-  const selected = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin });
+  const selected = bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin });
   expect(selected.component_sha256).toBe(pin.component_sha256);
   expect(readFileSync(join(selected.directory, "guide.md"), "utf8")).toBe("Synthetic complete payload\n");
   writeFileSync(join(f.plugin, "guide.md"), "New unrelated host installation\n");
-  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, pin }).directory).toBe(selected.directory);
-  expect(bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin }).directory).toBe(selected.directory);
+  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, consumer_repo: f.repo, pin }).directory).toBe(selected.directory);
+  expect(bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin }).directory).toBe(selected.directory);
   expect(readFileSync(join(f.plugin, "guide.md"), "utf8")).toBe("New unrelated host installation\n");
 });
 
@@ -336,7 +336,7 @@ test.each(["source", "version", "digest"] as const)("component setup refuses a m
   if (scenario === "source") pin.source_commit = "f".repeat(40);
   if (scenario === "version") pin.plugin_version = "0.14.0";
   if (scenario === "digest") pin.component_sha256 = "f".repeat(64);
-  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin })).toThrow();
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin })).toThrow();
   expect(readdirSync(cache)).toEqual([]);
 });
 
@@ -344,7 +344,7 @@ test.each(["missing", "replaced", "linked", "hardlinked", "ambient", "metadata",
   const f = component(), cache = join(f.root, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
   const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
     source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
-  const selected = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin });
+  const selected = bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin });
   const path = join(selected.directory, "guide.md");
   if (scenario === "missing") rmSync(path);
   if (scenario === "replaced") { chmodSync(path, 0o600); writeFileSync(path, "Changed retained payload bytes\n"); chmodSync(path, 0o400); }
@@ -357,24 +357,24 @@ test.each(["missing", "replaced", "linked", "hardlinked", "ambient", "metadata",
     const record = JSON.parse(readFileSync(index, "utf8")); record.pin.source_release = "v0.14.0";
     writeFileSync(index, canonicalJSON(record));
   }
-  expect(() => bootstrap.inspectRetainedComponent({ cache_directory: cache, pin })).toThrow();
-  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin })).toThrow();
+  expect(() => bootstrap.inspectRetainedComponent({ cache_directory: cache, consumer_repo: f.repo, pin })).toThrow();
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin })).toThrow();
 });
 
 test("separate component snapshots preserve rollback while a linked cache parent is refused", () => {
   const f = component(), cache = join(f.root, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
   const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
     source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
-  const original = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin });
+  const original = bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin });
   writeFileSync(join(f.plugin, "guide.md"), "New component payload\n");
   const nextSource = commit(f.repo), nextIdentity = computeComponentIdentity(f.repo, nextSource);
-  const next = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo,
+  const next = bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo,
     pin: { ...pin, source_commit: nextSource, component_sha256: nextIdentity.component_sha256 } });
   expect(next.directory).not.toBe(original.directory);
-  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, pin }).directory).toBe(original.directory);
+  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, consumer_repo: f.repo, pin }).directory).toBe(original.directory);
   const other = join(f.root, "other-cache"), outside = join(f.root, "outside-cache");
   mkdirSync(other, { mode: 0o700 }); mkdirSync(outside, { mode: 0o700 }); symlinkSync(outside, join(other, "components"));
-  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: other, source_repo: f.repo, pin })).toThrow("private owned runtime directory required");
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: other, consumer_repo: f.repo, source_repo: f.repo, pin })).toThrow("private owned runtime directory required");
   expect(readdirSync(outside)).toEqual([]);
 });
 
@@ -413,11 +413,11 @@ test("identical component bytes with a distinct complete approved pin coexist fo
   const f = component(), cache = join(f.root, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
   const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
     source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
-  const original = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin });
+  const original = bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin });
   const alternate = { ...pin, source_release: "0.13.0" };
-  const next = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin: alternate });
+  const next = bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin: alternate });
   expect(next.pin).toEqual(alternate);
-  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, pin }).directory).toBe(original.directory);
+  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, consumer_repo: f.repo, pin }).directory).toBe(original.directory);
   expect(next.directory).not.toBe(original.directory);
 });
 
@@ -446,7 +446,7 @@ test("component setup refuses a retained cache inside its source worktree", () =
   const f = component(), cache = join(f.repo, "nested-runtime-cache"); mkdirSync(cache, { mode: 0o700 });
   const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
     source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
-  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin })).toThrow("outside source and consumer worktrees");
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.repo, pin })).toThrow("outside source and consumer worktrees");
   expect(readdirSync(cache)).toEqual([]);
 });
 
@@ -480,7 +480,7 @@ test("source subdirectories cannot conceal a cache elsewhere in the same Git wor
   const f = component(), cache = join(f.repo, "nested-runtime-cache"); mkdirSync(cache, { mode: 0o700 });
   const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
     source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
-  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.plugin, pin })).toThrow("outside source and consumer worktrees");
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, consumer_repo: f.repo, source_repo: f.plugin, pin })).toThrow("outside source and consumer worktrees");
   expect(readdirSync(cache)).toEqual([]);
 });
 
@@ -488,4 +488,33 @@ test("client setup refuses a cache in its consumer worktree before any provision
   const f = await clientFixture(), consumer = publicationFixture(roots), cache = join(consumer.repo, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
   await expect(bootstrap.retainClientDistribution({ ...f.setup, cache_directory: cache, consumer_repo: consumer.repo })).rejects.toThrow("outside source and consumer worktrees");
   expect(readdirSync(cache)).toEqual([]);
+});
+
+test("a linked source worktree refuses a cache under the main checkout", () => {
+  const f = component(), linked = join(f.root, "linked-source"), cache = join(f.repo, "runtime-cache");
+  readGit(f.repo, "worktree", "add", "--detach", linked, f.source); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: linked, consumer_repo: linked, pin })).toThrow("outside source and consumer worktrees");
+  expect(readdirSync(cache)).toEqual([]);
+});
+
+test("component setup refuses its consumer checkout before writing package or selection files", () => {
+  const f = component(), consumer = publicationFixture(roots), cache = join(consumer.repo, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, consumer_repo: consumer.repo, pin })).toThrow("outside source and consumer worktrees");
+  expect(readdirSync(cache)).toEqual([]);
+});
+
+test("component setup supports a bare published source and refuses storage inside its metadata", () => {
+  const f = component(), bare = join(f.root, "published.git"), cache = join(f.root, "bare-source-cache");
+  readGit(f.repo, "clone", "--bare", "--no-hardlinks", f.repo, bare); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  const selected = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: bare, consumer_repo: f.repo, pin });
+  expect(selected.component_sha256).toBe(f.identity.component_sha256);
+  const nested = join(bare, "unsafe-runtime-cache"); mkdirSync(nested, { mode: 0o700 });
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: nested, source_repo: bare, consumer_repo: f.repo, pin })).toThrow("outside source and consumer worktrees");
+  expect(readdirSync(nested)).toEqual([]);
 });

@@ -18,11 +18,12 @@ export function commit(repo: string, message: string) {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
   return readGit(repo, "rev-parse", "HEAD").toString().trim();
 }
-export function source(roots: string[], options: { pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"] } = {}) {
+export function source(roots: string[], options: { pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"]; hostname?: string } = {}) {
   const f = publicationFixture(roots), settings = { ...settingsFixture(),
     component_pin: ".vh-adlc/docs-drift-components/shared.yaml", publication: { ...settingsFixture().publication, mode: "adopted" },
     reports: { ...settingsFixture().reports, workflow_id: 19 } };
   if (options.client) settings.clients["copilot-linux"] = options.client;
+  if (options.hostname) settings.hostname = options.hostname;
   write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings));
   write(f.repo, settings.component_pin, canonicalJSON(options.pin ?? pin()));
   for (const path of [settings.project_procedure, settings.execution.worker_workflow, settings.execution.scheduled_workflow,

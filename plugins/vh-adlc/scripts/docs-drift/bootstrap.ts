@@ -6,7 +6,7 @@ import { collectAdoptionBindings, parseComponentPin, verifyRuntimeAdoption } fro
 import type { PublicationIdentity } from "./transport";
 import { publishArtifact, syncDirectory } from "./journal";
 import { chmodSync, closeSync, constants, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { homedir } from "node:os";
 import { readGit } from "./git";
 import { canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
@@ -138,9 +138,11 @@ function inspectCacheLocation(cache: string, repo?: string): void {
   const inside = (path: string) => cache === path || cache.startsWith(path + "/");
   if (repo) {
     const common = realpathSync(readGit(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").toString().trim());
-    const bare = readGit(repo, "rev-parse", "--is-bare-repository").toString().trim() === "true";
-    const root = bare ? common : realpathSync(readGit(repo, "rev-parse", "--show-toplevel").toString().trim());
-    if (inside(root) || inside(common)) fail("cache must be outside source and consumer worktrees");
+    const listed = decodeUTF8(readGit(repo, "worktree", "list", "--porcelain", "-z")).split("\0")
+      .filter(field => field.startsWith("worktree ")).map(field => field.slice("worktree ".length));
+    if (!listed.length || listed.some(path => !isAbsolute(path))) fail("complete Git worktree inventory required");
+    const roots = listed.map(path => existsSync(path) ? realpathSync(path) : resolve(path));
+    if (inside(common) || roots.some(inside)) fail("cache must be outside source and consumer worktrees");
   }
   for (const path of [process.env.COPILOT_HOME ?? join(homedir(), ".copilot"),
     process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), process.env.CODEX_HOME ?? join(homedir(), ".codex")]) {
@@ -341,15 +343,15 @@ function writeRuntimeFile(path: string, bytes: Uint8Array, mode: number): void {
   syncDirectory(dirname(path));
 }
 
-function componentPaths(cache: string, pin: ComponentPin) {
-  inspectCacheLocation(cache);
+function componentPaths(cache: string, pin: ComponentPin, consumer: string) {
+  inspectCacheLocation(cache, consumer);
   const base = join(cache, "components");
   return { base, index: join(base, sha256(canonicalJSON(pin)) + ".json") };
 }
 
 /** Inspect only the exact published pin selected by committed consumer policy. */
-export function inspectRetainedComponent(options: { cache_directory: string; pin: ComponentPin }) {
-  const pin = parseComponentPin(options.pin), paths = componentPaths(options.cache_directory, pin);
+export function inspectRetainedComponent(options: { cache_directory: string; consumer_repo: string; pin: ComponentPin }) {
+  const pin = parseComponentPin(options.pin), paths = componentPaths(options.cache_directory, pin, options.consumer_repo);
   privateRuntimeDirectory(paths.base);
   const record = runtimeJSON(readRuntimeFile(paths.index), ["schema_version", "kind", "pin", "build", "identity"]);
   if (record.schema_version !== 1 || record.kind !== "docs-drift-retained-component"
@@ -375,9 +377,9 @@ export function inspectRetainedComponent(options: { cache_directory: string; pin
 }
 
 /** Setup receives an independently verified published source and its protected pin. */
-export function retainComponentSnapshot(options: { cache_directory: string; source_repo: string; pin: ComponentPin }) {
+export function retainComponentSnapshot(options: { cache_directory: string; consumer_repo: string; source_repo: string; pin: ComponentPin }) {
   inspectCacheLocation(options.cache_directory, options.source_repo);
-  const pin = parseComponentPin(options.pin), paths = componentPaths(options.cache_directory, pin);
+  const pin = parseComponentPin(options.pin), paths = componentPaths(options.cache_directory, pin, options.consumer_repo);
   const identity = computeComponentIdentity(options.source_repo, pin.source_commit);
   if (identity.plugin_version !== pin.plugin_version || identity.component_sha256 !== pin.component_sha256) fail("published component pin mismatch");
   privateRuntimeDirectory(paths.base, true);
@@ -428,7 +430,7 @@ export async function selectApprovedRuntime(options: {
   const launcherSHA = inspectEntryInput(options.repo, options.current_default, settings.runtime_loader.launcher, options.launcher_path);
   const settingsSHA = inspectEntryInput(options.repo, options.current_default, ".vh-adlc/docs-drift.yaml", options.settings_path);
   if (settingsSHA !== bindings.settings_sha256) fail("invoked settings changed");
-  const component = inspectRetainedComponent({ cache_directory: options.cache_directory, pin: adopted.component_pin });
+  const component = inspectRetainedComponent({ cache_directory: options.cache_directory, consumer_repo: options.repo, pin: adopted.component_pin });
   const entry = settings.execution.entries[options.entry];
   async function role(selected: typeof entry.worker) {
     const retained = await inspectRetainedClient({ cache_directory: options.cache_directory, consumer_repo: options.repo,
