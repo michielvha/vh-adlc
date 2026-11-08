@@ -114,7 +114,7 @@ if [[ "$offline" == true ]]; then
 fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/vh-adlc-ensure.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-if ! curl -fsSL --retry 2 -o "$work/asset.tar.gz" "$url"; then
+if ! curl -fsSL --connect-timeout 5 --max-time 10 --retry 1 -o "$work/asset.tar.gz" "$url"; then
   asset_name=$(field name)
   [[ "$asset_name" == "vh-adlc_${version}_${platform}.tar.gz" &&
      "$url" == "https://github.com/michielvha/vh-adlc/releases/download/v${version}/${asset_name}" ]] ||
@@ -122,7 +122,7 @@ if ! curl -fsSL --retry 2 -o "$work/asset.tar.gz" "$url"; then
   command -v python3 >/dev/null 2>&1 || die "binary unavailable: the release API fallback requires python3"
   repo_api=https://api.github.com/repos/michielvha/vh-adlc
   echo "vh-adlc: trying the locked release through the GitHub asset API" >&2
-  curl -fsSL --retry 2 --max-filesize 1048576 -o "$work/release.json" "$repo_api/releases/tags/v$version" ||
+  curl -fsSL --connect-timeout 5 --max-time 10 --retry 1 --max-filesize 1048576 -o "$work/release.json" "$repo_api/releases/tags/v$version" ||
     die "binary unavailable: reading the locked release metadata failed"
   # Bind the API object to the canonical lock URL, asset name and release tag.
   api_asset_url=$(python3 -I - "$work/release.json" "$version" "$asset_name" "$url" "$repo_api" 2>/dev/null <<'PY'
@@ -152,7 +152,7 @@ if asset.get("url") != expected:
 print(expected)
 PY
   ) || die "binary unavailable: the release API did not identify the locked asset"
-  curl -fsSL --retry 2 -H 'Accept: application/octet-stream' -o "$work/asset.tar.gz" "$api_asset_url" ||
+  curl -fsSL --connect-timeout 5 --max-time 25 --retry 1 -H 'Accept: application/octet-stream' -o "$work/asset.tar.gz" "$api_asset_url" ||
     die "binary unavailable: downloading the locked API asset failed"
 fi
 [[ "$(sha256 "$work/asset.tar.gz")" == "$asset_sha" ]] ||

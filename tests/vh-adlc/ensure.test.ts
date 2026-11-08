@@ -312,7 +312,7 @@ test("installs the released binary from the real lock", () => {
     .toEqual({ exit: 0, result: "answered", value: { schema_version: 1, source_roots: ["src"] } });
 }, 120_000);
 
-function apiFallbackFixture(mode: "valid" | "wrong-host" | "wrong-browser" | "duplicate" | "wrong-archive" | "wrong-binary") {
+function apiFallbackFixture(mode: "valid" | "bounded" | "wrong-host" | "wrong-browser" | "duplicate" | "wrong-archive" | "wrong-binary") {
   const f = fixture(mode === "wrong-binary" ? { binarySha: "0".repeat(64) } : {});
   const assets = f.lock.assets as Record<string, Record<string, string>>;
   const selected = assets[platform()];
@@ -327,6 +327,14 @@ function apiFallbackFixture(mode: "valid" | "wrong-host" | "wrong-browser" | "du
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
 const args = process.argv.slice(2), url = args.at(-1), output = args[args.indexOf('-o') + 1];
 appendFileSync(${JSON.stringify(calls)}, url + '\\n');
+if (${JSON.stringify(mode)} === 'bounded') {
+  const connect = Number(args[args.indexOf('--connect-timeout') + 1]);
+  const total = Number(args[args.indexOf('--max-time') + 1]);
+  const retries = Number(args[args.indexOf('--retry') + 1]);
+  if (!args.includes('--connect-timeout') || !args.includes('--max-time') || !args.includes('--retry')
+    || !Number.isFinite(connect) || connect <= 0 || connect > 5
+    || !Number.isFinite(total) || total <= 0 || total > 25 || retries > 1) process.exit(91);
+}
 if (url === ${JSON.stringify(selected.url)}) process.exit(22);
 if (url === ${JSON.stringify("https://api.github.com/repos/michielvha/vh-adlc/releases/tags/v" + VERSION)}) {
   writeFileSync(output, JSON.stringify(${JSON.stringify(release)}));
@@ -361,4 +369,12 @@ test("release metadata parsing cannot import code from the caller's checkout", (
   const r = run(f, [], [bin]);
   expect(r.code).toBe(0);
   expect(existsSync(marker)).toBe(false);
+});
+
+test("every download has bounded connection, transfer and retry attempts", () => {
+  const { f, bin, calls } = apiFallbackFixture("bounded");
+  const result = run(f, [], [bin]);
+  expect(result.code).toBe(0);
+  expect(result.out).toBe(cached(f));
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
 });
