@@ -1,4 +1,4 @@
-import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
+import { PublicationExecutionError, hasInFlightAttempt, pendingAttempt } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -888,4 +888,69 @@ test(`recovery retains its lease until an observed write's executor settles (${r
   expect(recovered.state).toBe("complete");
   expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
   expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+});
+
+for (const route of ["resume", "cleanup"] as const) for (const recorded of [false, true])
+test(`an earlier unknown attempt cannot hide an active retry (${route}, recorded=${recorded})`, async () => {
+  const f = setup(), execute = f.transport.execute;
+  const original = { title: "Original title", body: "Original body", labels: [], draft: true };
+  const effect: Effect = { id: "update", kind: "pr-update", payload: { number: 77,
+    expected_head: f.input.manifest.bindings.candidate_commit, expected_payload: original,
+    expected_payload_sha256: sha256(canonicalJSON(original)), title: "Reviewed title", labels: [], draft: true,
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("update") } };
+  f.input = fixture(f.input.manifest.bindings, [...f.input.manifest.effects.slice(0, 2), effect, f.input.manifest.effects.at(-1)!]);
+  f.gate = async () => ({ review: f.input, policy: f.policy });
+  f.plan = sealPlan({ reviewed: validateReviewedManifest(f.input), grants: f.input.grants, ...f.policy, corrections: [], attention: [] });
+  f.transport.execute = async (plan, selected, objects) => {
+    if (selected.id === effect.id) throw new PublicationExecutionError(true, true);
+    await execute(plan, selected, objects);
+  };
+  const interrupted = await publish(options(f));
+  expect(interrupted.state).toBe("pending");
+  let entered!: () => void, release!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const finish = new Promise<void>(resolve => { release = resolve; });
+  f.transport.execute = async (plan, selected, objects) => {
+    await execute(plan, selected, objects);
+    if (selected.id === effect.id) { entered(); await finish; }
+  };
+  const running = resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory });
+  await started;
+  try {
+    if (recorded) {
+      const journal = readJournal(interrupted.journal.directory, f.repo);
+      const observation = await f.transport.observe(f.plan, effect, interrupted.objects);
+      if (observation.state !== "done") throw Error("missing synthetic retry application");
+      appendOutcome(journal, effect.id, observation.outcome);
+    }
+    const result = route === "resume"
+      ? await resumeEffects({ ...options(f), journal_directory: interrupted.journal.directory })
+      : await reconcileAbsent({ source_repo: f.repo, journal_directory: interrupted.journal.directory, object_store: f.store,
+        settings: f.settings, transport: f.transport, retire_effect_ids: [],
+        authorize: async scope => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("current retry cleanup request") }) });
+    expect(result.state).toBe("pending");
+    expect(result.reason).toBe("attempt-in-flight");
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+    expect(f.executed.includes("release")).toBe(false);
+  } finally { release(); }
+  const settled = await running;
+  const completed = await resumeEffects({ ...options(f), journal_directory: settled.journal.directory });
+  expect(completed.state).toBe("complete");
+  expect(f.executed.filter(id => id === effect.id)).toHaveLength(1);
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
+});
+
+test("all-attempt liveness includes atomic receipt aliases and preserves settlement status", () => {
+  const f = setup(), lease = f.plan.manifest.effects[0], receipt = f.plan.manifest.effects[1];
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  journal = appendIntent(journal, lease.id);
+  journal = appendIntent(journal, receipt.id, lease.id);
+  journal = appendAttempt(journal, lease.id, "atomic-active", undefined, receipt.id);
+  expect(hasInFlightAttempt(journal, lease)).toBe(true);
+  expect(hasInFlightAttempt(journal, receipt)).toBe(true);
+  expect(hasInFlightAttempt(journal, f.plan.manifest.effects[2])).toBe(false);
+  journal = appendAttemptEnd(journal, lease.id, { attempt_id: "atomic-active", sent: true, reaped: false });
+  expect(hasInFlightAttempt(journal, lease)).toBe(false);
+  expect(hasInFlightAttempt(journal, receipt)).toBe(false);
+  expect(pendingAttempt(journal, receipt, true)).toBe("attempt-not-reaped");
 });

@@ -1,4 +1,4 @@
-import { executeAttempt, pendingAttempt, hasEffectAttempt } from "./attempts";
+import { executeAttempt, pendingAttempt, hasEffectAttempt, hasInFlightAttempt } from "./attempts";
 import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -38,7 +38,7 @@ export async function resumeEffects(options: PublishOptions & { journal_director
     journal = appendHandoff(journal, effectId, reason);
     return { state: "pending", reason, journal, objects };
   };
-  const executing = journal.plan.manifest.effects.find(effect => pendingAttempt(journal, effect, true) === "attempt-in-flight");
+  const executing = journal.plan.manifest.effects.find(effect => hasInFlightAttempt(journal, effect));
   if (executing) return blocked(executing.id, "attempt-in-flight");
   if (complete()) return { state: retired.size ? "retired" : invalidated ? "invalidated" : "complete", reason: null, journal, objects };
   // This also establishes native contents visibility before any 404 is treated as ref absence.
@@ -285,7 +285,7 @@ export async function reconcileAbsent(options: {
   const result = (state: PublishResult["state"], reason: string | null): PublishResult => ({ state, reason, journal, objects });
   const blocked = (reason: string) => result("pending", reason);
   if (ids.includes(receipt.id) || isRetired(receipt.id)) return blocked("receipt-retention-required");
-  const executing = plan.manifest.effects.find(effect => pendingAttempt(journal, effect, true) === "attempt-in-flight");
+  const executing = plan.manifest.effects.find(effect => hasInFlightAttempt(journal, effect));
   if (executing) return blocked("attempt-in-flight");
   if (finished()) return result(journal.events.some(event => event.kind === "retired-absence") ? "retired" : "complete", null);
   try {

@@ -12,11 +12,24 @@ export class PublicationExecutionError extends Error {
   constructor(readonly sent: boolean, readonly reaped: boolean, readonly rejection?: RejectionEvidence, readonly execution?: ExecutionResult) { super("native publication execution unavailable"); }
 }
 
-export function pendingAttempt(journal: Journal, effect: Effect, retirement = false): string | null {
+function attemptEvents(journal: Journal, effect: Effect) {
   const paired = new Set(journal.events.filter(event => event.kind === "attempt" && "atomic_receipt_id" in event.payload
     && event.payload.atomic_receipt_id === effect.id).map(event => "attempt_id" in event.payload ? event.payload.attempt_id : ""));
-  const events = journal.events.filter(event => event.effect_id === effect.id
+  return journal.events.filter(event => event.effect_id === effect.id
     || (["attempt", "attempt-ended"].includes(event.kind) && "attempt_id" in event.payload && paired.has(event.payload.attempt_id)));
+}
+
+/** Liveness is independent of earlier attempts' delivery or settlement results. */
+export function hasInFlightAttempt(journal: Journal, effect: Effect): boolean {
+  const events = attemptEvents(journal, effect);
+  return events.some(attempt => attempt.kind === "attempt" && "attempt_id" in attempt.payload
+    && !events.some(ending => ending.kind === "attempt-ended" && "attempt_id" in ending.payload
+      && "attempt_id" in attempt.payload && ending.payload.attempt_id === attempt.payload.attempt_id
+      && ending.revision > attempt.revision));
+}
+
+export function pendingAttempt(journal: Journal, effect: Effect, retirement = false): string | null {
+  const events = attemptEvents(journal, effect);
   const attempts = events.filter(event => event.kind === "attempt");
   for (const attempt of retirement ? attempts : attempts.slice(-1)) {
     const attemptId = (attempt.payload as { attempt_id: string }).attempt_id;
