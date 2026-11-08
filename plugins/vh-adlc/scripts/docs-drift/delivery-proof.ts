@@ -182,7 +182,7 @@ export function readAppliedDelivery(options: {
     settlement.push(sha256(canonicalJSON(ending)));
     if (!ending.payload.sent) continue;
     const scope = { artifact_root: dirname(journal.directory), source_repo: journal.source_repo, plan, effect, attempt_id: attemptId };
-    if (ending.payload.rejection) { readRejection({ ...scope, evidence: ending.payload.rejection }); continue; }
+    if (ending.payload.rejection) { readRejection({ ...scope, header: journal.header, evidence: ending.payload.rejection }); continue; }
     const execution = ending.payload.execution;
     if (ending.payload.capture_unverified || !execution || !execution.commands || execution.commands !== execution.successes.length) throw Error("delivery-command-settlement-unproved");
     const captures = execution.successes.map(evidence => {

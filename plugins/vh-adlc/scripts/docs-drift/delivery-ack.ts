@@ -43,7 +43,7 @@ function settled(options: Options, journal: Journal, objects: PlanObjects): stri
     if (!ending || !("sent" in ending.payload) || !ending.payload.reaped || ending.payload.capture_unverified) throw Error("acknowledgement-request-unsettled");
     const scope = { artifact_root: options.transport.artifact_root, source_repo: options.source_repo, plan: journal.plan, effect, attempt_id: attemptId };
     if (ending.payload.sent) {
-      if (ending.payload.rejection) readRejection({ ...scope, evidence: ending.payload.rejection });
+      if (ending.payload.rejection) readRejection({ ...scope, header: journal.header, evidence: ending.payload.rejection });
       else if (["lease-acquire", "receipt-retain", "push", "branch-refresh"].includes(effect.kind)) {
         const captured = ending.payload.execution;
         if (!captured || captured.commands !== 1 || captured.successes.length !== 1) throw Error("acknowledgement-ref-request-unproved");
@@ -71,7 +71,7 @@ function releaseSettlement(options: Options, journal: Journal, objects: PlanObje
     if (!ending || !("sent" in ending.payload) || !ending.payload.reaped || ending.payload.capture_unverified) throw Error("acknowledgement-release-request-unsettled");
     const scope = { artifact_root: options.transport.artifact_root, source_repo: options.source_repo, plan: journal.plan, effect: release, attempt_id: attemptId };
     if (ending.payload.sent) {
-      if (ending.payload.rejection) readRejection({ ...scope, evidence: ending.payload.rejection });
+      if (ending.payload.rejection) readRejection({ ...scope, header: journal.header, evidence: ending.payload.rejection });
       else {
         const captured = ending.payload.execution;
         if (!captured || captured.commands !== 1 || captured.successes.length !== 1) throw Error("acknowledgement-release-request-unsettled");

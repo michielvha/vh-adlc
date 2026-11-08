@@ -140,7 +140,7 @@ export function collectorRequest(effect: Effect, repository: string) {
   if (effect.kind === "pr-close") return { method: "PATCH", endpoint: `${prefix}/pulls/${positive(p.number)}`, input: { state: "closed" } };
   throw Error("unsupported collector request");
 }
-function expectedRequest(effect: Effect, repository: string, index: number, endpoint?: string, transport: "native" | "collector" = "native") {
+export function expectedRequest(effect: Effect, repository: string, index: number, endpoint?: string, transport: "native" | "collector" = "native") {
   if (transport === "collector") {
     if (index !== 0) throw Error("unsupported collector command index");
     return collectorRequest(effect, repository);

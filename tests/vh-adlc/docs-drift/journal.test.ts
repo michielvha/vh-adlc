@@ -2,7 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { appendIntent, appendAttempt, appendAttemptEnd, appendRetirement, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendIntent, appendAttempt, appendAttemptEnd, appendRetirement, appendOutcome, createJournal, readJournal, readVerifiedPlan, sealPlan, writePlanObject, writePublicationObjects, publicationObjectIDs } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore, captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -14,12 +14,12 @@ import { fixture, hash, role, bindings } from "./manifest-fixture";
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 
-function setup() {
+function setup(format: "sha1" | "sha256" = "sha1") {
   const root = realpathSync(mkdtempSync(join(realpathSync(tmpdir()), "vh-drift-journal-")));
   roots.push(root);
   const repo = join(root, "source"), artifacts = join(root, "artifacts");
   mkdirSync(repo, { mode: 0o700 }); mkdirSync(artifacts, { mode: 0o700 });
-  readGit(repo, "init", "--template=", "-b", "main");
+  readGit(repo, "init", "--template=", "--object-format=" + format, "-b", "main");
   writeFileSync(join(repo, "README.md"), "Synthetic journal fixture\n");
   readGit(repo, "add", "--", "README.md");
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture");
@@ -321,3 +321,21 @@ test("pending capture serializes its known reference subset", () => {
   expect(readJournal(journal.directory, f.repo).events.at(-1)?.payload).toEqual({ attempt_id: "capture-attempt", sent: true,
     reaped: true, execution, capture_unverified: true });
 });
+
+for (const format of ["sha1", "sha256"] as const) {
+  test(`read-only metadata reconstruction matches actual Git ${format} objects`, () => {
+    const f = setup(format), parent = join(f.root, "metadata-stores"), evidence = join(f.root, "evidence");
+    mkdirSync(parent, { mode: 0o700 }); mkdirSync(evidence, { mode: 0o700 });
+    const store = createOwnedObjectStore({ parent, evidence_directory: evidence, source_repo: f.repo,
+      source_commit: f.commit, repository: f.plan.manifest.repository, owner: "fixture", run: "metadata-identity" });
+    const journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+    const written = writePublicationObjects(store, f.plan, journal.header);
+    const before = captureRepositoryState(f.repo);
+    expect(publicationObjectIDs(f.plan, journal.header)).toEqual(written);
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+    const legacy = { ...journal.header }; delete legacy.observed_receipt_object;
+    expect(publicationObjectIDs(f.plan, legacy)).toEqual(writePublicationObjects(store, f.plan, legacy));
+    expect(publicationObjectIDs(f.plan, legacy).receipt_object).toBe(written.object);
+    expect(written.receipt_object).toBe(written.lease_object);
+  });
+}

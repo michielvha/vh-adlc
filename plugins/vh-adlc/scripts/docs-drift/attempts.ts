@@ -45,7 +45,7 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
         const dispatched = journal.plan.manifest.effects.find(item => item.id === attempt.effect_id);
         if (!dispatched) return "rejection-proof-unavailable";
         readRejection({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo, plan: journal.plan,
-          effect: dispatched, attempt_id: attemptId, evidence: status.rejection });
+          effect: dispatched, attempt_id: attemptId, header: journal.header, evidence: status.rejection });
         continue;
       } catch { return "rejection-proof-unavailable"; }
     }

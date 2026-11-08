@@ -1,3 +1,5 @@
+import { nativePushArguments } from "../../../plugins/vh-adlc/scripts/docs-drift/git-success";
+import { nativeMutationArguments } from "../../../plugins/vh-adlc/scripts/docs-drift/success";
 import { readSuccess, retainSuccess } from "../../../plugins/vh-adlc/scripts/docs-drift/success";
 import * as journalArtifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { retainRejection, readRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
@@ -29,7 +31,9 @@ function setup() {
   for (const path of [repo, artifacts, parent, evidence, bin]) mkdirSync(path, { mode: 0o700 });
   readGit(repo, "init", "--template=", "-b", "main");
   writeFileSync(join(repo, "README.md"), "Synthetic native boundary fixture\n");
-  readGit(repo, "add", "--", "README.md");
+  mkdirSync(join(repo, ".vh-adlc"));
+  writeFileSync(join(repo, ".vh-adlc/docs-drift.yaml"), canonicalJSON(settingsFixture()));
+  readGit(repo, "add", "--", "README.md", ".vh-adlc/docs-drift.yaml");
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture");
   const commit = readGit(repo, "rev-parse", "HEAD").toString().trim(), tree = readGit(repo, "rev-parse", "HEAD^{tree}").toString().trim();
   const settings = parseSettings(settingsFixture());
@@ -51,7 +55,9 @@ function setup() {
     metadata_tree: { sha: objects.tree, truncated: false, tree: [{ path: "plan.json", mode: "100644", type: "blob", sha: objects.blob }] },
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
-    tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
+    tree_response: { sha: tree, truncated: false, tree: [
+      { path: ".vh-adlc", mode: "040000", type: "tree", sha: readGit(repo, "rev-parse", "HEAD:.vh-adlc").toString().trim() },
+      { path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
     issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, reject_labels: false, response_creator_id: null as number | null, response_labels_missing: false, drop_labels: false, reject_ready: false, response_canary: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
@@ -636,7 +642,7 @@ test("positive native Git rejection permits a new attempt while damaged proof st
   writeFileSync(join(commandDirectory, "stdout"), "To https://github.com/fixture/docs.git\n"
     + updates.map(item => `!\t${item.head ?? ""}:${item.ref}\t[rejected] (stale info)\n`).join("") + "Done\n", { mode: 0o600 });
   const scope = { artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"),
-    plan: journal.plan, effect: selected.effect, attempt_id: retained.attempt_id };
+    plan: journal.plan, effect: selected.effect, attempt_id: retained.attempt_id, header: journal.header };
   const legacy = retainRejection({ ...scope, command_directory: commandDirectory, protocol: retained.protocol });
   expect(readRejection({ ...scope, evidence: legacy })).toEqual(legacy);
   // Restore the new command's immutable bytes before using the original journal again.
@@ -2015,4 +2021,86 @@ test("native acknowledgement cleanup preserves a later PR edit and its immutable
   expect(f.inspect().refs[f.settings.publication.lease_ref]).toBeUndefined();
   expect(f.inspect().refs[f.settings.publication.receipt_ref_prefix + "operation-1"]).toBe(selected.objects.receipt_object!);
   expect(result.journal.events.filter(event => event.kind === "acknowledged-delivery")).toHaveLength(1);
+});
+
+for (const change of ["atomic-subset", "atomic-head", "push-head", "http-target", "http-method", "http-input"] as const) {
+  test(`rejection request binding refuses internally consistent ${change} evidence`, async () => {
+    const f = setup(); await f.transport.identity();
+    const atomic = change.startsWith("atomic"), http = change.startsWith("http");
+    const effect: Effect = http
+      ? { id: "close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } }
+      : atomic ? f.plan.manifest.effects[0] : f.plan.manifest.effects[2];
+    if (http) f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+      head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+    const selected = atomic ? { ...acquisition(f), repo: join(f.root, "source") } : await startCleanupJournal(f, [effect]);
+    const attemptId = "bound-rejected-request";
+    let journal = appendIntent(selected.journal, effect.id);
+    journal = journalArtifacts.appendAttempt(journal, effect.id, attemptId);
+    f.update(state => { state.reject_git = !http; state.reject_http = http ? 403 : 0; });
+    const failure = await f.transport.execute(selected.plan, effect, selected.objects, attemptId).then(() => null, error => error);
+    if (!(failure instanceof PublicationExecutionError) || !failure.rejection) throw Error("missing actual native rejection");
+    const evidence = failure.rejection;
+    expect(readRejection({ source_repo: selected.repo, artifact_root: f.transport.artifact_root, plan: selected.plan,
+      effect, attempt_id: attemptId, header: journal.header, evidence })).toEqual(evidence);
+    const proof = JSON.parse(readFileSync(evidence.path, "utf8"));
+    const ownerPath = join(f.transport.artifact_root, proof.command_directory.split("native-command-").at(-1) + ".native-command.json");
+    const owner = JSON.parse(readFileSync(ownerPath, "utf8"));
+    const projectionPath = join(proof.command_directory, "rejection-response.json");
+    const projection = JSON.parse(readFileSync(projectionPath, "utf8"));
+    if (http) {
+      const endpoint = `repos/${selected.plan.manifest.repository}/pulls/${change === "http-target" ? 78 : 77}`;
+      owner.argv_sha256 = sha256(canonicalJSON(nativeMutationArguments(f.settings.hostname, change === "http-method" ? "DELETE" : "PATCH", endpoint)));
+      if (change === "http-input") writeFileSync(join(proof.command_directory, "payload.json"), canonicalJSON({ state: "open" }));
+    } else {
+      if (change === "atomic-subset") proof.protocol.updates.pop();
+      else proof.protocol.updates[0].head = "e".repeat(40);
+      projection.protocol = proof.protocol;
+      projection.observed.refs = proof.protocol.updates.map((update: { ref: string }) => update.ref);
+      projection.observed.statuses = proof.protocol.updates.map(() => ({ kind: "rejected", reason: "stale info" }));
+      owner.argv_sha256 = sha256(canonicalJSON(nativePushArguments(f.settings.hostname, selected.plan.manifest.repository, proof.protocol.updates)));
+    }
+    writeFileSync(ownerPath, canonicalJSON(owner));
+    writeFileSync(projectionPath, canonicalJSON(projection));
+    proof.command.owner_sha256 = sha256(canonicalJSON(owner));
+    proof.command.stdout_sha256 = sha256(canonicalJSON(projection));
+    proof.command.observed = projection.observed;
+    const bytes = canonicalJSON(proof); writeFileSync(evidence.path, bytes);
+    journal = journalArtifacts.appendAttemptEnd(journal, effect.id, { attempt_id: attemptId, sent: true, reaped: true,
+      rejection: { path: evidence.path, sha256: sha256(bytes) } });
+    expect(pendingAttempt(journal, effect, true)).toBe("rejection-proof-unavailable");
+    if (!atomic) {
+      f.update(state => { state.reject_git = false; state.reject_http = 0;
+        if (http) (state.prs[0].base as { ref: string }).ref = "release"; });
+      let approvals = 0;
+      const recovered = await reconcileAbsent({ source_repo: selected.repo, journal_directory: journal.directory,
+        object_store: f.store, settings: f.settings, transport: f.transport, retire_effect_ids: [effect.id],
+        authorize: async scope => { approvals++; return { scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("synthetic exact retirement request") }; } });
+      expect(recovered.state).toBe("pending");
+      expect(approvals).toBe(1);
+      expect(recovered.journal.events.some(event => event.kind === "retired-absence")).toBe(false);
+      expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object);
+    }
+  });
+}
+
+test("legacy HTTP rejection keeps its exact suppressed-output request binding", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.reject_http = 403;
+    state.prs.push({ number: 77, state: "open", user: { login: "legacy-bot", id: 90 },
+      head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  const effect: Effect = { id: "legacy-comment", kind: "comment-create", payload: { number: 77, prior_ids: [], body: "exact legacy body" } };
+  const attempt_id = "legacy-http-rejection";
+  const failure = await f.transport.execute(f.plan, effect, f.objects, attempt_id).then(() => null, error => error);
+  if (!(failure instanceof PublicationExecutionError) || !failure.rejection) throw Error("missing native rejection");
+  const proof = JSON.parse(readFileSync(failure.rejection.path, "utf8"));
+  const ownerPath = join(f.transport.artifact_root, proof.command_directory.split("native-command-").at(-1) + ".native-command.json");
+  const owner = JSON.parse(readFileSync(ownerPath, "utf8"));
+  delete owner.capture;
+  owner.argv_sha256 = sha256(canonicalJSON(["gh", "api", "--hostname", f.settings.hostname, "--method", "POST", "--include", "--jq", "empty",
+    `repos/${f.plan.manifest.repository}/issues/77/comments`]));
+  writeFileSync(ownerPath, canonicalJSON(owner));
+  writeFileSync(join(proof.command_directory, "stdout"), 'HTTP/2.0 403 Forbidden\r\n\r\n{"message":"denied"}', { mode: 0o600 });
+  const scope = { source_repo: join(f.root, "source"), artifact_root: f.transport.artifact_root, plan: f.plan, effect, attempt_id };
+  const legacy = retainRejection({ ...scope, command_directory: proof.command_directory, protocol: { protocol: "http" } });
+  expect(readRejection({ ...scope, evidence: legacy })).toEqual(legacy);
 });

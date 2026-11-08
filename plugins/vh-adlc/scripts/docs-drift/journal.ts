@@ -1,5 +1,5 @@
 import type { ExecutionEvidence } from "./success";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { authorizeEffects, effectDigest, manifestDigest, modelMatches, parseActionManifest, requireReviewedManifest, workerInputDigest } from "./manifests";
@@ -420,17 +420,37 @@ export function appendHandoff(journal: Journal, effectId: string, reason: string
 
 export function appendInvalidation(journal: Journal, effectId: string, reason: string): Journal { return append(journal, "invalidation", effectId, { reason: identifier(reason) }); }
 
+type MetadataHash = (kind: "blob" | "tree" | "commit", bytes: Buffer) => string;
+function planMetadata(plan: SealedPlan, hash: MetadataHash) {
+  const bytes = canonicalJSON(plan);
+  const blob = hash("blob", bytes);
+  const tree = hash("tree", Buffer.concat([Buffer.from("100644 plan.json\0"), Buffer.from(blob, "hex")]));
+  const commit = Buffer.from(`tree ${tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift operation ${plan.manifest.operation_id}\n`);
+  return { object: hash("commit", commit), tree, blob, plan_sha256: sha256(bytes) };
+}
+function runMetadata(plan: SealedPlan, header: Header, hash: MetadataHash) {
+  const objects = planMetadata(plan, hash);
+  const commit = Buffer.from(`tree ${objects.tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift lease ${plan.manifest.operation_id} ${header.run_id}\n`);
+  const lease_object = header.observed_lease_object ?? hash("commit", commit);
+  const receipt_object = Object.hasOwn(header, "observed_receipt_object") ? header.observed_receipt_object ?? (header.recovery_mode === "observation-only" ? objects.object : lease_object) : objects.object;
+  return { ...objects, lease_object, receipt_object };
+}
+
+/** Recompute original metadata identities without writing objects or touching repository state. */
+export function publicationObjectIDs(plan: SealedPlan, header: Header) {
+  const checked = parsePlan(plan);
+  if (header.plan_sha256 !== sha256(canonicalJSON(checked)) || header.operation_id !== checked.manifest.operation_id) fail("metadata header scope");
+  const algorithm = checked.manifest.bindings.source_commit.length === 64 ? "sha256" : "sha1";
+  return runMetadata(checked, header, (kind, bytes) => createHash(algorithm)
+    .update(Buffer.from(`${kind} ${bytes.length}\0`)).update(bytes).digest("hex"));
+}
+
 /** Content-addressed objects add no refs, parents, workflow files or application tree entries. */
 export function writePlanObject(store: OwnedObjectStore, value: SealedPlan) {
   const plan = parsePlan(value);
   requireOwnedStore(store, plan.manifest.repository);
   if (store.source_commit !== plan.manifest.bindings.source_commit) fail("object store source binding");
-  const bytes = canonicalJSON(plan);
-  const blob = writeMetadataObject(store.root, "blob", bytes);
-  const tree = writeMetadataObject(store.root, "tree", Buffer.concat([Buffer.from("100644 plan.json\0"), Buffer.from(blob, "hex")]));
-  const commit = Buffer.from(`tree ${tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift operation ${plan.manifest.operation_id}\n`);
-  const object = writeMetadataObject(store.root, "commit", commit);
-  return { object, tree, blob, plan_sha256: sha256(bytes) };
+  return planMetadata(plan, (kind, bytes) => writeMetadataObject(store.root, kind, bytes));
 }
 
 export function appendRetirement(journal: Journal, effectId: string, retirement: Retirement): Journal {
@@ -450,11 +470,9 @@ export function appendAttemptEnd(journal: Journal, effectId: string, status: Att
 
 /** Canonical plan bytes stay stable across per-run acquisition objects. */
 export function writePublicationObjects(store: OwnedObjectStore, plan: SealedPlan, header: Header) {
-  const objects = writePlanObject(store, plan);
-  const commit = Buffer.from(`tree ${objects.tree}\nauthor vh-adlc <noreply@vhco.pro> 0 +0000\ncommitter vh-adlc <noreply@vhco.pro> 0 +0000\n\nDocs-drift lease ${plan.manifest.operation_id} ${header.run_id}\n`);
-  const lease_object = header.observed_lease_object ?? writeMetadataObject(store.root, "commit", commit);
-  const receipt_object = Object.hasOwn(header, "observed_receipt_object") ? header.observed_receipt_object ?? (header.recovery_mode === "observation-only" ? objects.object : lease_object) : objects.object;
-  return { ...objects, lease_object, receipt_object };
+  requireOwnedStore(store, plan.manifest.repository);
+  if (store.source_commit !== plan.manifest.bindings.source_commit) fail("object store source binding");
+  return runMetadata(parsePlan(plan), header, (kind, bytes) => writeMetadataObject(store.root, kind, bytes));
 }
 
 export function appendRecoveryOnly(journal: Journal, effectId: string, reason: string): Journal {

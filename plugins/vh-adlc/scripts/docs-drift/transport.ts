@@ -23,7 +23,7 @@ import type { Settings } from "./settings";
 export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string; receipt_object?: string };
 export type RefObservation = { state: "absent" } | { state: "present"; object: string };
 export type EffectObservation = { state: "done"; outcome: Outcome } | { state: "absent"; evidence?: AbsenceEvidence } | { state: "unknown"; reason: string } | { state: "conflict"; reason: string; evidence?: AbsenceEvidence };
-type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; commands: number; before?: ExecutionResult["before"]; successes: ExecutionResult["successes"]; capture_unverified: boolean; identity?: PublicationIdentity; rejection?: RejectionEvidence };
+type NativeDelivery = { objects: PlanObjects; sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; commands: number; before?: ExecutionResult["before"]; successes: ExecutionResult["successes"]; capture_unverified: boolean; identity?: PublicationIdentity; rejection?: RejectionEvidence };
 export type PublicationIdentity = { repository: string; repository_id: number; default_branch: string; actor: string; actor_id: number };
 
 /** The production entry constructs its native transport. Only the separate trial entry injects a collector. */
@@ -345,7 +345,7 @@ export function createNativeTransport(options: {
       if (protocol && delivery.attempt_id !== null && delivery.completed_commands === 0 && delivery.effect.kind !== "pr-update") {
         try {
           delivery.rejection = retainRejection({ artifact_root: root, source_repo: options.source_repo, plan,
-            effect: delivery.effect, attempt_id: delivery.attempt_id, command_directory: directory, protocol });
+            effect: delivery.effect, attempt_id: delivery.attempt_id, command_directory: directory, protocol, objects: delivery.objects });
         } catch { /* An incomplete or ambiguous response supplies no rejection proof. */ }
       }
       throw Error("native publication command incomplete; inspect owned artifacts");
@@ -544,7 +544,7 @@ export function createNativeTransport(options: {
       } catch { return { state: "unknown", reason: "native-publication-observation-unavailable" }; }
     },
     async execute(plan, effect, objects, attempt_id) {
-      const delivery: NativeDelivery = { sent: false, reaped: true, effect_id: effect.id, attempt_id: attempt_id ?? null, effect, completed_commands: 0, commands: 0, successes: [], capture_unverified: false };
+      const delivery: NativeDelivery = { objects, sent: false, reaped: true, effect_id: effect.id, attempt_id: attempt_id ?? null, effect, completed_commands: 0, commands: 0, successes: [], capture_unverified: false };
       const execution = (): ExecutionResult => ({ successes: delivery.successes, commands: delivery.commands,
         ...(delivery.before ? { before: delivery.before } : {}),
         ...(delivery.capture_unverified ? { capture_unverified: true } : {}) });
