@@ -1,3 +1,4 @@
+import * as adoption from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -102,4 +103,115 @@ test("cutover rejects a second changed path even when the selected record is pre
   write(f.repo, "README.md", "unrelated change\n");
   const delivery = commit(f.repo, "mixed cutover child");
   expect(() => verifyCutoverAssembly({ repo: f.repo, source_candidate: f.candidate, delivery_commit: delivery, record_path: path })).toThrow();
+});
+
+test("production adoption requires a committed record and adopted current-default policy", () => {
+  const f = source();
+  expect(typeof adoption.verifyRuntimeAdoption).toBe("function");
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: f.candidate })).toThrow("record");
+  write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...f.configured,
+    publication: { ...f.configured.publication, mode: "staged" } }));
+  const staged = commit(f.repo, "synthetic rolled-back publication policy");
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: staged })).toThrow("not adopted");
+});
+
+const runtimeIdentity = { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20, default_branch: "main" };
+
+// Observed-shaped owner-attestation parser fixtures only. They establish no native host execution.
+function portableRecord(f: ReturnType<typeof source>) {
+  const bindings = collectAdoptionBindings(f.repo, f.candidate);
+  const target = hash(canonicalJSON({ schema_version: 1, repository: f.configured.repository,
+    source_candidate: f.candidate, protected_sha256: bindings.protected_sha256,
+    component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity }).toString());
+  const requirements = {
+    hosted_advisory: ["collection_complete", "independent_review", "reviewed_draft_payload", "report_uploaded", "lease_complete"],
+    history_read: ["native_history_read", "producer_verified", "permissions_bound"],
+    quiescence: ["schedule_disabled", "runs_drained", "interactive_frozen", "no_legacy_owners"],
+    copilot_entry: ["audit", "resolve", "closure", "issue", "acknowledgement", "ownership_denials", "settlement_denials", "retained_loader", "role_dispatch"],
+    claude_entry: ["audit", "resolve", "closure", "issue", "acknowledgement", "ownership_denials", "settlement_denials", "retained_loader", "role_dispatch", "forwarded_arguments", "command_binding"],
+    paired_review: ["shared_target", "consumer_target", "no_blocking_findings", "owner_acceptance"],
+    codex_install: ["fresh_install", "upgrade", "discovery", "helper_preservation"],
+    claude_install: ["fresh_install", "upgrade", "discovery", "helper_preservation"],
+    copilot_install: ["fresh_install", "upgrade", "discovery", "helper_preservation"],
+  };
+  const receipts = Object.fromEntries(Object.entries(requirements).map(([name, observations]) => {
+    const entry = name === "hosted_advisory" ? f.configured.execution.entries.hosted
+      : name === "claude_entry" ? f.configured.execution.entries.claude
+      : name === "copilot_entry" || name === "paired_review" ? f.configured.execution.entries.copilot : null;
+    return [name, { schema_version: 1, kind: name, evidence_kind: "observed", source_commit: f.candidate,
+      artifact_sha256: hash(name + " synthetic original bytes"), bindings_sha256: target, outcome: "passed", native_conclusion: "success",
+      worker_model: name === "paired_review" ? null : entry?.worker.model ?? null, reviewer_model: entry?.reviewer.model ?? null,
+      observations: Object.fromEntries(observations.map(observation => [observation, true])),
+      ...(name === "quiescence" ? { workflow_id: f.configured.reports.workflow_id,
+        workflow_path: f.configured.execution.scheduled_workflow, observed_at: "2026-11-08T10:00:00Z",
+        queued_run_ids: [], in_progress_run_ids: [], interactive_request_sha256: hash("synthetic explicit freeze") } : {}) }];
+  }));
+  return { schema_version: 1, kind: "docs-drift-adoption", source_candidate: f.candidate,
+    protected_sha256: bindings.protected_sha256, protected_manifest: bindings.protected_manifest,
+    component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity, receipts, predecessor: null };
+}
+function deliverRecord(f: ReturnType<typeof source>, record: ReturnType<typeof portableRecord>) {
+  write(f.repo, f.configured.publication.adoption_record, canonicalJSON(record));
+  return commit(f.repo, "synthetic portable attestation child");
+}
+
+test("portable owner attestation validates a non-circular record-only child without private artifacts", () => {
+  const f = source(), record = portableRecord(f), delivery = deliverRecord(f, record), before = captureRepositoryState(f.repo);
+  const checked = adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity });
+  expect(checked.evidence).toBe("owner-attestation");
+  expect(checked.source_candidate).toBe(f.candidate);
+  expect(checked.delivery_commit).toBe(delivery);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery })).toThrow("native adoption identity");
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery,
+    identity: { ...runtimeIdentity, repository_id: 11 } })).toThrow("native adoption identity");
+});
+
+for (const invalid of ["test-only", "missing-history", "incomplete-entry", "changed-model", "unknown-observation", "active-run", "missing-freeze", "predecessor"] as const) {
+  test(`portable adoption refuses ${invalid} evidence despite a passing outer claim`, () => {
+    const f = source(), record = portableRecord(f);
+    if (invalid === "test-only") record.receipts.copilot_entry!.evidence_kind = "test-only";
+    if (invalid === "missing-history") delete record.receipts.history_read;
+    if (invalid === "incomplete-entry") record.receipts.claude_entry!.observations.closure = false;
+    if (invalid === "changed-model") record.receipts.copilot_entry!.reviewer_model = "different-model";
+    if (invalid === "unknown-observation") record.receipts.hosted_advisory!.observations.silent_override = true;
+    if (invalid === "active-run") Object.assign(record.receipts.quiescence!, { queued_run_ids: [7] });
+    if (invalid === "missing-freeze") record.receipts.quiescence!.observations.interactive_frozen = false;
+    if (invalid === "predecessor") Object.assign(record, { predecessor: { evidence_kind: "test-only", source_candidate: f.candidate } });
+    const delivery = deliverRecord(f, record);
+    expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity })).toThrow();
+  });
+}
+
+test("ordinary source and dormant trial changes preserve the selected portable attestation", () => {
+  const f = source(), delivery = deliverRecord(f, portableRecord(f));
+  write(f.repo, "docs/guide.md", "Ordinary document advance\n");
+  write(f.repo, f.configured.scanner.script, "Ordinary detector advance\n");
+  write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...f.configured,
+    detector_options: { ...f.configured.detector_options, links: { check_history: false } },
+    trial: { definition_path: ".vh-adlc/docs-drift-trials/later.yaml", definition_sha256: hash("dormant later definition") } }));
+  const current = commit(f.repo, "ordinary assessment inputs and dormant setup");
+  expect(adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: current, identity: runtimeIdentity }).delivery_commit).toBe(delivery);
+  write(f.repo, f.configured.runtime_loader.launcher, "Changed protected loader\n");
+  const protectedAdvance = commit(f.repo, "protected execution change");
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: protectedAdvance, identity: runtimeIdentity })).toThrow("protected record bindings");
+});
+
+test("a historical adoption-record edit remains invalid after its bytes are restored", () => {
+  const f = source(), record = portableRecord(f);
+  deliverRecord(f, record);
+  write(f.repo, f.configured.publication.adoption_record, canonicalJSON({ ...record, kind: "changed" }));
+  commit(f.repo, "historical record modification");
+  const current = deliverRecord(f, record);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: current, identity: runtimeIdentity })).toThrow("immutable adoption record");
+});
+
+test("a red advisory trial can retain only its declared expected attention failure", () => {
+  const f = source(), record = portableRecord(f), trial = record.receipts.hosted_advisory!;
+  trial.outcome = "trial-passed-expected-new-attention"; trial.native_conclusion = "failure";
+  trial.observations.only_attention_step_failed = true;
+  const delivery = deliverRecord(f, record);
+  const checked = adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity });
+  expect(checked.receipts).toEqual(record.receipts);
+  expect(trial.native_conclusion).toBe("failure");
 });
