@@ -3,6 +3,7 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { collectAdoptionBindings, parseComponentPin, verifyCutoverAssembly } from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
+import { readGitWithEnvironment as gitWithInput } from "../../../plugins/vh-adlc/scripts/git-read";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -145,6 +146,9 @@ function portableRecord(f: ReturnType<typeof source>) {
       artifact_sha256: hash(name + " synthetic original bytes"), bindings_sha256: target, outcome: "passed", native_conclusion: "success",
       worker_model: name === "paired_review" ? null : entry?.worker.model ?? null, reviewer_model: entry?.reviewer.model ?? null, client_bindings,
       observations: Object.fromEntries(observations.map(observation => [observation, true])),
+      ...(name === "history_read" ? { producer_workflow_id: f.configured.reports.workflow_id,
+        producer_workflow_path: f.configured.execution.scheduled_workflow, reader_workflow_id: 222,
+        reader_workflow_path: f.configured.execution.worker_workflow } : {}),
       ...(name === "quiescence" ? { workflow_id: f.configured.reports.workflow_id,
         workflow_path: f.configured.execution.scheduled_workflow, observed_at: "2000-01-01T00:00:00Z",
         workflow_state: "disabled_manually", drained_runs: [],
@@ -281,7 +285,7 @@ for (const invalid of ["false-flag", "missing-flag", "success-conclusion", "non-
   });
 }
 
-for (const timestamp of ["2026-11-08", "2026-11-08T10:00:00", "2026-02-30T10:00:00Z", "2000-01-01T00:00:00+01:00"]) {
+for (const timestamp of ["2999-01-01T00:00:00Z", "2026-11-08", "2026-11-08T10:00:00", "2026-02-30T10:00:00Z", "2000-01-01T00:00:00+01:00"]) {
   test(`quiescence rejects an invalid verification timestamp ${timestamp}`, () => {
     const f = source(), record = portableRecord(f);
     record.receipts.quiescence!.observed_at = timestamp;
@@ -337,3 +341,29 @@ test("quiescence preserves completed native cancellation results", () => {
   expect(checked.receipts).toMatchObject({ quiescence: { workflow_state: "disabled_manually",
     drained_runs: [{ run_id: 7, status: "completed", conclusion: "cancelled" }] } });
 });
+
+
+test("ordinary long-lived consumer history keeps the original adoption valid", () => {
+  const f = source(), delivery = deliverRecord(f, portableRecord(f));
+  const commands: string[] = [];
+  for (let index = 1; index <= 4100; index += 1) {
+    commands.push(`commit refs/heads/main\nmark :${index}\ncommitter Fixture <fixture@example.invalid> ${1700000000 + index} +0000\ndata 8\nordinary\nfrom ${index === 1 ? delivery : ":" + (index - 1)}\n\n`);
+  }
+  gitWithInput(f.repo, ["-c", "core.hooksPath=/dev/null", "fast-import", "--quiet"], { PATH: process.env.PATH }, Buffer.from(commands.join("")));
+  const current = readGit(f.repo, "rev-parse", "main").toString().trim();
+  expect(adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: current, identity: runtimeIdentity }).delivery_commit).toBe(delivery);
+});
+
+for (const field of ["producer_workflow_id", "producer_workflow_path", "reader_workflow_id", "reader_workflow_path"]) {
+  test(`history-read receipt rejects a changed ${field}`, () => {
+    const f = source(), record = portableRecord(f), receipt = record.receipts.history_read!;
+    Object.assign(receipt, { producer_workflow_id: f.configured.reports.workflow_id,
+      producer_workflow_path: f.configured.execution.scheduled_workflow, reader_workflow_id: 222,
+      reader_workflow_path: f.configured.execution.worker_workflow });
+    if (field === "producer_workflow_id") Object.assign(receipt, { [field]: 999 });
+    else if (field === "reader_workflow_id") Object.assign(receipt, { [field]: 0 });
+    else Object.assign(receipt, { [field]: ".github/workflows/unrelated.yml" });
+    const delivery = deliverRecord(f, record);
+    expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity })).toThrow();
+  });
+}

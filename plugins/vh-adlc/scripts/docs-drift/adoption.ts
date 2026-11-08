@@ -100,10 +100,10 @@ function adoptionDigest(value: unknown): string {
   return value;
 }
 
-function verificationTime(value: unknown): string {
+function verificationTime(value: unknown, deliveryTime: number): string {
   const when = typeof value === "string" ? Date.parse(value) : NaN;
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)
-    || !Number.isFinite(when)
+    || !Number.isFinite(when) || when > deliveryTime
     || new Date(when).toISOString().replace(/\.000Z$/u, "Z") !== value.replace(/\.000Z$/u, "Z")) fail("verification time");
   return value;
 }
@@ -118,13 +118,14 @@ function nativeIdentity(value: unknown): PublicationIdentity {
     actor_id: identity.actor_id, default_branch: identity.default_branch };
 }
 
-function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity): void {
+function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number): void {
   const receipts = object(value, Object.keys(receiptRequirements));
   const target = canonicalDigest({ schema_version: 1, repository: bindings.settings.repository,
     source_candidate: candidate, protected_sha256: bindings.protected_sha256, component_pin_sha256: bindings.component_pin.sha256, identity });
   for (const name of Object.keys(receiptRequirements) as (keyof typeof receiptRequirements)[]) {
     const receipt = object(receipts[name], ["schema_version", "kind", "evidence_kind", "source_commit", "artifact_sha256",
       "bindings_sha256", "outcome", "native_conclusion", "worker_model", "reviewer_model", "client_bindings", "observations",
+      ...(name === "history_read" ? ["producer_workflow_id", "producer_workflow_path", "reader_workflow_id", "reader_workflow_path"] : []),
       ...(name === "quiescence" ? ["workflow_id", "workflow_path", "observed_at", "queued_run_ids", "in_progress_run_ids", "interactive_request_sha256", "workflow_state", "drained_runs"] : [])], "receipt " + name);
     if (receipt.schema_version !== 1 || receipt.kind !== name || receipt.evidence_kind !== "observed"
       || adoptionDigest(receipt.bindings_sha256) !== target) fail("observed record receipt " + name);
@@ -132,8 +133,14 @@ function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof coll
     const source = name.endsWith("_install") ? bindings.component_pin.value.source_commit : candidate;
     if (immutable(receipt.source_commit) !== source) fail("recorded source target " + name);
     adoptionDigest(receipt.artifact_sha256);
+    if (name === "history_read") {
+      if (bindings.settings.reports.workflow_id === null || receipt.producer_workflow_id !== bindings.settings.reports.workflow_id
+        || receipt.producer_workflow_path !== bindings.settings.execution.scheduled_workflow
+        || typeof receipt.reader_workflow_id !== "number" || !Number.isSafeInteger(receipt.reader_workflow_id) || receipt.reader_workflow_id < 1
+        || receipt.reader_workflow_path !== bindings.settings.execution.worker_workflow) fail("history producer/reader workflow");
+    }
     if (name === "quiescence") {
-      verificationTime(receipt.observed_at);
+      verificationTime(receipt.observed_at, deliveryTime);
       if (bindings.settings.reports.workflow_id === null || receipt.workflow_id !== bindings.settings.reports.workflow_id
         || receipt.workflow_path !== bindings.settings.execution.scheduled_workflow || receipt.workflow_state !== "disabled_manually"
         || !Array.isArray(receipt.drained_runs) || !Array.isArray(receipt.queued_run_ids) || receipt.queued_run_ids.length
@@ -168,11 +175,16 @@ function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof coll
   }
 }
 
-function ancestry(repo: string, ancestor: string, descendant: string, parents = false): string[] {
-  const bytes = readGit(repo, "rev-list", "--ancestry-path", "--max-count=4096", ...(parents ? ["--parents"] : []), `${ancestor}..${descendant}`, "--");
-  const lines = decodeUTF8(bytes).trim().split("\n").filter(Boolean);
-  if (lines.length === 4096) fail("record ancestry exceeds verification bound");
-  return lines;
+/** Full history follows both merge parents. Path filtering excludes ordinary content advances.
+ * Parent identities are read separately because path-limited --parents rewrites them.
+ */
+function recordHistory(repo: string, ancestor: string, descendant: string, path: string) {
+  const bytes = readGit(repo, "rev-list", "--full-history", "--ancestry-path", `${ancestor}..${descendant}`, "--", path);
+  return decodeUTF8(bytes).trim().split("\n").filter(Boolean).map(value => {
+    const commit = immutable(value);
+    const parents = readGit(repo, "show", "-s", "--format=%P", commit).toString().trim().split(" ").filter(Boolean);
+    return { commit, parents, record: committedInput(repo, commit, path) };
+  });
 }
 
 /** Validate the portable owner attestation at a freshly observed immutable default revision.
@@ -205,11 +217,7 @@ export function verifyRuntimeAdoption(options: { repo: string; current_default: 
   if (identity.repository.toLowerCase() !== bindings.settings.repository || identity.actor.toLowerCase() !== bindings.settings.publication.actor.toLowerCase()
     || identity.default_branch !== bindings.settings.default_branch
     || !canonicalJSON(normalized(identity)).equals(canonicalJSON(normalized(observed)))) fail("current native adoption identity");
-  verifyRecordedReceipts(record.receipts, original, candidate, identity);
-  const history = ancestry(repo, candidate, current, true).map(line => {
-    const [commit, ...parents] = line.split(" ");
-    return { commit: immutable(commit), parents, record: committedInput(repo, immutable(commit), path) };
-  });
+  const history = recordHistory(repo, candidate, current, path);
   if (history.some(item => item.record !== null && (item.record.mode !== "100644" || item.record.sha256 !== input.sha256))) {
     fail("immutable adoption record changed");
   }
@@ -217,9 +225,11 @@ export function verifyRuntimeAdoption(options: { repo: string; current_default: 
   if (deliveries.length !== 1) fail("unique record-only cutover child required");
   const delivery = deliveries[0].commit;
   verifyCutoverAssembly({ repo, source_candidate: candidate, delivery_commit: delivery, record_path: path });
-  for (const commit of ancestry(repo, delivery, current)) {
-    const historical = committedInput(repo, immutable(commit), path);
-    if (historical?.mode !== "100644" || historical.sha256 !== input.sha256) fail("immutable adoption record changed");
+  const deliveryTime = Number(readGit(repo, "show", "-s", "--format=%ct", delivery).toString().trim()) * 1000;
+  if (!Number.isSafeInteger(deliveryTime)) fail("cutover delivery time");
+  verifyRecordedReceipts(record.receipts, original, candidate, identity, deliveryTime);
+  for (const historical of recordHistory(repo, delivery, current, path)) {
+    if (historical.record?.mode !== "100644" || historical.record.sha256 !== input.sha256) fail("immutable adoption record changed");
   }
   return freezeJSON({ kind: "docs-drift-runtime-adoption", evidence: "owner-attestation", current_default: current,
     source_candidate: candidate, delivery_commit: delivery, record_path: path, adoption_sha256: input.sha256,
