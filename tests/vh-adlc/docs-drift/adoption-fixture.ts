@@ -36,7 +36,8 @@ export function source(roots: string[], options: { pin?: ReturnType<typeof pin>;
 export const runtimeIdentity = { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20, default_branch: "main" };
 
 // Observed-shaped owner-attestation parser fixtures only. They establish no native host execution.
-export function portableRecord(f: ReturnType<typeof source>) {
+export type AdoptionSourceFixture = Pick<ReturnType<typeof source>, "repo" | "configured" | "candidate">;
+export function portableRecord(f: AdoptionSourceFixture) {
   const bindings = collectAdoptionBindings(f.repo, f.candidate);
   const target = hash(canonicalJSON({ schema_version: 1, repository: f.configured.repository,
     source_candidate: f.candidate, protected_sha256: bindings.protected_sha256,

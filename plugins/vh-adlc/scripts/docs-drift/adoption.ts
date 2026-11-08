@@ -119,17 +119,21 @@ function nativeIdentity(value: unknown): PublicationIdentity {
     actor_id: identity.actor_id, default_branch: identity.default_branch };
 }
 
-function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number): void {
+type AdoptionBoundary = { kind: "observed" } | { kind: "test-only"; fixture_id: string };
+
+function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary): void {
   const receipts = object(value, Object.keys(receiptRequirements));
   const target = canonicalDigest({ schema_version: 1, repository: bindings.settings.repository,
     source_candidate: candidate, protected_sha256: bindings.protected_sha256, component_pin_sha256: bindings.component_pin.sha256, identity });
   for (const name of Object.keys(receiptRequirements) as (keyof typeof receiptRequirements)[]) {
     const receipt = object(receipts[name], ["schema_version", "kind", "evidence_kind", "source_commit", "artifact_sha256",
       "bindings_sha256", "outcome", "native_conclusion", "worker_model", "reviewer_model", "client_bindings", "observations",
+      ...(boundary.kind === "test-only" ? ["fixture_id"] : []),
       ...(name === "history_read" ? ["producer_workflow_id", "producer_workflow_path", "reader_workflow_id", "reader_workflow_path"] : []),
       ...(name === "quiescence" ? ["workflow_id", "workflow_path", "observed_at", "queued_run_ids", "in_progress_run_ids", "interactive_request_sha256", "workflow_state", "drained_runs"] : [])], "receipt " + name);
-    if (receipt.schema_version !== 1 || receipt.kind !== name || receipt.evidence_kind !== "observed"
-      || adoptionDigest(receipt.bindings_sha256) !== target) fail("observed record receipt " + name);
+    if (receipt.schema_version !== 1 || receipt.kind !== name || receipt.evidence_kind !== boundary.kind
+      || (boundary.kind === "test-only" && receipt.fixture_id !== boundary.fixture_id)
+      || adoptionDigest(receipt.bindings_sha256) !== target) fail(boundary.kind + " record receipt " + name);
     // Consumer receipts target C. Install receipts target the pinned shared component source.
     const source = name.endsWith("_install") ? bindings.component_pin.value.source_commit : candidate;
     if (immutable(receipt.source_commit) !== source) fail("recorded source target " + name);
@@ -192,7 +196,7 @@ function recordHistory(repo: string, ancestor: string, descendant: string, path:
  * Historical native execution and artifact contents are verified separately by the operator.
  * This read-only result supplies no publication, cleanup, workflow or merge authority.
  */
-export function verifyRuntimeAdoption(options: { repo: string; current_default: string; identity?: PublicationIdentity }) {
+function verifyAdoptionRecord(options: { repo: string; current_default: string; identity?: PublicationIdentity }, boundary: AdoptionBoundary) {
   const { repo, current_default: current } = options;
   immutable(current);
   if (loadCommittedSettings(repo, current).settings.publication.mode !== "adopted") fail("consumer is not adopted");
@@ -200,7 +204,8 @@ export function verifyRuntimeAdoption(options: { repo: string; current_default: 
   const input = committedInput(repo, current, path);
   if (!input || input.mode !== "100644") fail("committed adoption record missing");
   const record = object(collectionReaders().yaml(input.bytes), ["schema_version", "kind", "source_candidate", "protected_sha256",
-    "protected_manifest", "component_pin_sha256", "identity", "receipts", "predecessor"]);
+    "protected_manifest", "component_pin_sha256", "identity", "receipts", "predecessor", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])]);
+  if (boundary.kind === "test-only" && record.fixture_id !== boundary.fixture_id) fail("synthetic adoption fixture identity");
   if (record.schema_version !== 1 || record.kind !== "docs-drift-adoption") fail("record schema");
   const candidate = immutable(record.source_candidate);
   if (candidate === current) fail("circular source candidate record");
@@ -228,13 +233,36 @@ export function verifyRuntimeAdoption(options: { repo: string; current_default: 
   verifyCutoverAssembly({ repo, source_candidate: candidate, delivery_commit: delivery, record_path: path });
   const deliveryTime = Number(readGit(repo, "show", "-s", "--format=%ct", delivery).toString().trim()) * 1000;
   if (!Number.isSafeInteger(deliveryTime)) fail("cutover delivery time");
-  verifyRecordedReceipts(record.receipts, original, candidate, identity, deliveryTime);
+  verifyRecordedReceipts(record.receipts, original, candidate, identity, deliveryTime, boundary);
   for (const historical of recordHistory(repo, delivery, current, path)) {
     if (historical.record?.mode !== "100644" || historical.record.sha256 !== input.sha256) fail("immutable adoption record changed");
   }
-  return freezeJSON({ kind: "docs-drift-runtime-adoption", evidence: "owner-attestation", current_default: current,
+  return freezeJSON({ kind: "docs-drift-runtime-adoption", current_default: current,
     source_candidate: candidate, delivery_commit: delivery, record_path: path, adoption_sha256: input.sha256,
     protected_sha256: bindings.protected_sha256, component_pin: bindings.component_pin.value, identity, receipts: record.receipts });
+}
+
+/** Production always requires observed owner-attested receipts. */
+export function verifyRuntimeAdoption(options: { repo: string; current_default: string; identity?: PublicationIdentity }) {
+  return freezeJSON({ ...verifyAdoptionRecord(options, { kind: "observed" }), evidence: "owner-attestation" as const });
+}
+
+/** Only the separate synthetic driver constructs this test-only gate from its owned context. */
+export async function createTrialAdoptionGate(options: { root: string; context_commit: string; runtime_directory: string }) {
+  const { loadTrialContext, TRIAL_IDENTITY } = await import("./trial-context");
+  const setup = Object.freeze({ ...options }), context = loadTrialContext(setup);
+  return Object.freeze({ fixture_id: context.fixture_id, verify(input: { current_default: string }) {
+    loadTrialContext(setup);
+    const current = immutable(input.current_default);
+    try { readGit(context.source, "merge-base", "--is-ancestor", context.source_commit, current); }
+    catch { fail("synthetic adoption default outside owned source"); }
+    const { settings } = loadCommittedSettings(context.source, current);
+    if (settings.hostname !== "docs-drift.invalid" || settings.repository !== TRIAL_IDENTITY.repository
+      || settings.default_branch !== TRIAL_IDENTITY.default_branch || settings.publication.actor !== TRIAL_IDENTITY.actor) fail("synthetic adoption namespace");
+    const result = verifyAdoptionRecord({ repo: context.source, current_default: current, identity: TRIAL_IDENTITY },
+      { kind: "test-only", fixture_id: context.fixture_id });
+    return freezeJSON({ ...result, evidence: "test-only" as const, fixture_id: context.fixture_id });
+  } });
 }
 
 const componentSignalPath = ".vh-adlc/docs-drift-upgrade-signal.yaml";
