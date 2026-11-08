@@ -131,12 +131,17 @@ function readRuntimeFile(path: string, limit = 16 * 1024 * 1024): Buffer {
     return readFileSync(fd);
   } finally { closeSync(fd); }
 }
-export type ClientProfileScope = { repository_id: number; actor_id: number; entry: "hosted" | "copilot" | "claude" };
+export type ClientProfileScope = { hostname: string; repository_id: number; actor_id: number; entry: "hosted" | "copilot" | "claude" };
 
 function inspectCacheLocation(cache: string, repo?: string): void {
   privateRuntimeDirectory(cache);
   const inside = (path: string) => cache === path || cache.startsWith(path + "/");
-  if (repo && inside(realpathSync(repo))) fail("cache must be outside source and consumer worktrees");
+  if (repo) {
+    const common = realpathSync(readGit(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").toString().trim());
+    const bare = readGit(repo, "rev-parse", "--is-bare-repository").toString().trim() === "true";
+    const root = bare ? common : realpathSync(readGit(repo, "rev-parse", "--show-toplevel").toString().trim());
+    if (inside(root) || inside(common)) fail("cache must be outside source and consumer worktrees");
+  }
   for (const path of [process.env.COPILOT_HOME ?? join(homedir(), ".copilot"),
     process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude"), process.env.CODEX_HOME ?? join(homedir(), ".codex")]) {
     const native = resolve(path);
@@ -144,17 +149,18 @@ function inspectCacheLocation(cache: string, repo?: string): void {
   }
 }
 
-function clientPaths(cache: string, id: string, client: ClientBinding, scope: ClientProfileScope) {
-  inspectCacheLocation(cache);
-  const selected = runtimeObject(scope, ["repository_id", "actor_id", "entry"]);
-  if (typeof selected.repository_id !== "number" || !Number.isSafeInteger(selected.repository_id) || selected.repository_id < 1
+function clientPaths(cache: string, id: string, client: ClientBinding, scope: ClientProfileScope, repo: string) {
+  inspectCacheLocation(cache, repo);
+  const selected = runtimeObject(scope, ["hostname", "repository_id", "actor_id", "entry"]);
+  if (typeof selected.hostname !== "string" || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/u.test(selected.hostname)
+    || typeof selected.repository_id !== "number" || !Number.isSafeInteger(selected.repository_id) || selected.repository_id < 1
     || typeof selected.actor_id !== "number" || !Number.isSafeInteger(selected.actor_id) || selected.actor_id < 1
     || typeof selected.entry !== "string" || !["hosted", "copilot", "claude"].includes(selected.entry)) fail("native consumer profile scope required");
   if (protocolPath(id).includes("/")) fail("single client ID required");
   if (client.platform !== process.platform + "-" + process.arch) fail("client platform differs from host");
   const binding = sha256(canonicalJSON(client));
   return { index: join(cache, "clients", id, binding + ".json"),
-    profile: join(cache, "profiles", String(scope.repository_id), String(scope.actor_id), scope.entry, id, binding) };
+    profile: join(cache, "profiles", scope.hostname, String(scope.repository_id), String(scope.actor_id), scope.entry, id, binding) };
 }
 
 function runtimeObject(value: unknown, fields: string[]): Record<string, unknown> {
@@ -216,8 +222,8 @@ function nativeClientVersion(stdout: Uint8Array, client: ClientBinding): string 
 }
 
 /** Read the checksum-bound cache entry selected by the protected client binding. */
-export async function inspectRetainedClient(options: { cache_directory: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope }) {
-  const client = parseClientBinding(options.client), paths = clientPaths(options.cache_directory, options.client_id, client, options.profile_scope);
+export async function inspectRetainedClient(options: { cache_directory: string; consumer_repo: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope }) {
+  const client = parseClientBinding(options.client), paths = clientPaths(options.cache_directory, options.client_id, client, options.profile_scope, options.consumer_repo);
   privateRuntimeDirectory(dirname(paths.index)); privateRuntimeDirectory(paths.profile);
   const record = clientRecord(readRuntimeFile(paths.index), options.client_id, client), root = join(options.cache_directory, record.build);
   privateRuntimeDirectory(root);
@@ -254,9 +260,9 @@ export async function inspectRetainedClient(options: { cache_directory: string; 
 
 /** Authorized setup supplies a pinned distribution. Only its files enter the retained package. */
 export async function retainClientDistribution(options: {
-  cache_directory: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope; distribution: Uint8Array; format: ClientFormat; executable: string;
+  cache_directory: string; consumer_repo: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope; distribution: Uint8Array; format: ClientFormat; executable: string;
 }) {
-  const client = parseClientBinding(options.client), paths = clientPaths(options.cache_directory, options.client_id, client, options.profile_scope);
+  const client = parseClientBinding(options.client), paths = clientPaths(options.cache_directory, options.client_id, client, options.profile_scope, options.consumer_repo);
   const executable = protocolPath(options.executable), files = await clientFiles(options.distribution, client, options.format, executable);
   privateRuntimeDirectory(dirname(paths.index), true); privateRuntimeDirectory(paths.profile, true);
   async function selectedClient() {
@@ -425,9 +431,9 @@ export async function selectApprovedRuntime(options: {
   const component = inspectRetainedComponent({ cache_directory: options.cache_directory, pin: adopted.component_pin });
   const entry = settings.execution.entries[options.entry];
   async function role(selected: typeof entry.worker) {
-    const retained = await inspectRetainedClient({ cache_directory: options.cache_directory,
+    const retained = await inspectRetainedClient({ cache_directory: options.cache_directory, consumer_repo: options.repo,
       client_id: selected.client, client: settings.clients[selected.client],
-      profile_scope: { repository_id: adopted.identity.repository_id, actor_id: adopted.identity.actor_id, entry: options.entry } });
+      profile_scope: { hostname: settings.hostname, repository_id: adopted.identity.repository_id, actor_id: adopted.identity.actor_id, entry: options.entry } });
     return { ...retained, model: selected.model, argv: selected.argv, identity_source: selected.identity_source };
   }
   const worker = await role(entry.worker), reviewer = await role(entry.reviewer);

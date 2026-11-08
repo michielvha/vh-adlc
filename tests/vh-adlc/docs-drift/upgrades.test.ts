@@ -66,5 +66,8 @@ test.each(["missing-component", "missing-client", "extra-client", "unknown-compo
   if (scenario === "unknown-component-field") { Object.assign(values.component, { runtime_directory: "/tmp/untrusted" }); writeSignals(f, values); }
   if (scenario === "invalid-source") { values.component.source_commit = "main"; writeSignals(f, values); }
   const current = scenario === "test-only-record" ? delivered : commit(f.repo, "synthetic invalid signals");
-  expect(() => adoption.checkUpgradeSignals({ repo: f.repo, source: current, identity: runtimeIdentity })).toThrow();
+  const reasons = { "missing-component": "regular required upgrade signals", "missing-client": "regular required upgrade signals",
+    "extra-client": "client signal inventory", "unknown-component-field": "component signal fields",
+    "invalid-source": "immutable commit required", "test-only-record": "observed record receipt copilot_entry" };
+  expect(() => adoption.checkUpgradeSignals({ repo: f.repo, source: current, identity: runtimeIdentity })).toThrow(reasons[scenario]);
 });
