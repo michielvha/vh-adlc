@@ -99,6 +99,6 @@ test.each(["missing", "actor", "repository"] as const)("candidate selection requ
   if (scenario === "missing") Reflect.deleteProperty(selection, "identity");
   if (scenario === "actor") selection.identity.actor_id += 1;
   if (scenario === "repository") selection.identity.repository_id += 1;
-  const reason = scenario === "missing" ? "current native trial identity required" : "current native trial identity";
+  const reason = scenario === "missing" ? "current native trial identity required" : "incomplete docs-drift adoption current native trial identity";
   await expect(bootstrap.selectCandidateRuntime(selection)).rejects.toThrow(reason);
 });

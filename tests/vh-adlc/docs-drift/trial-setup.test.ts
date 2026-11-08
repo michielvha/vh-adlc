@@ -111,7 +111,8 @@ test("trial setup compares the bundle tree with the declared file map", () => {
 
 test("trial setup refuses another native actor before creating an owned fixture", () => {
   const { options } = input(); options.identity = { ...runtimeIdentity, actor_id: runtimeIdentity.actor_id + 1 };
-  expect(() => setup.prepareTrialFixture(options)).toThrow("current native trial identity");
+  expect(() => setup.prepareTrialFixture(options)).toThrow("incomplete docs-drift adoption current native trial identity");
+  expect(readdirSync(options.directory)).toEqual([]);
 });
 
 test("trial setup requires a native identity from an untyped caller", () => {
