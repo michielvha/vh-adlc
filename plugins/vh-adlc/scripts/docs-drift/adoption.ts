@@ -13,11 +13,11 @@ function immutable(value: unknown): string {
   if (typeof value !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value)) fail("immutable commit required");
   return value;
 }
-function object(value: unknown, keys: string[]): Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) fail("invalid pin object");
+function object(value: unknown, keys: string[], label = "object"): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) fail("invalid " + label);
   canonicalJSON(value);
   const input = value as Record<string, unknown>;
-  if (Object.keys(input).sort().join(",") !== [...keys].sort().join(",")) fail("pin fields");
+  if (Object.keys(input).sort().join(",") !== [...keys].sort().join(",")) fail(label + " fields");
   return input;
 }
 export function parseComponentPin(value: unknown): ComponentPin {
@@ -100,6 +100,24 @@ function adoptionDigest(value: unknown): string {
   return value;
 }
 
+function verificationTime(value: unknown): string {
+  const when = typeof value === "string" ? Date.parse(value) : NaN;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)
+    || !Number.isFinite(when)
+    || new Date(when).toISOString().replace(/\.000Z$/u, "Z") !== value.replace(/\.000Z$/u, "Z")) fail("verification time");
+  return value;
+}
+
+function nativeIdentity(value: unknown): PublicationIdentity {
+  const identity = object(value, ["repository", "repository_id", "actor", "actor_id", "default_branch"], "native identity");
+  if (typeof identity.repository !== "string" || !identity.repository || typeof identity.actor !== "string" || !identity.actor
+    || typeof identity.default_branch !== "string" || !identity.default_branch || typeof identity.repository_id !== "number"
+    || !Number.isSafeInteger(identity.repository_id) || identity.repository_id < 1 || typeof identity.actor_id !== "number"
+    || !Number.isSafeInteger(identity.actor_id) || identity.actor_id < 1) fail("native identity values");
+  return { repository: identity.repository, repository_id: identity.repository_id, actor: identity.actor,
+    actor_id: identity.actor_id, default_branch: identity.default_branch };
+}
+
 function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity): void {
   const receipts = object(value, Object.keys(receiptRequirements));
   const target = canonicalDigest({ schema_version: 1, repository: bindings.settings.repository,
@@ -107,15 +125,27 @@ function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof coll
   for (const name of Object.keys(receiptRequirements) as (keyof typeof receiptRequirements)[]) {
     const receipt = object(receipts[name], ["schema_version", "kind", "evidence_kind", "source_commit", "artifact_sha256",
       "bindings_sha256", "outcome", "native_conclusion", "worker_model", "reviewer_model", "client_bindings", "observations",
-      ...(name === "quiescence" ? ["workflow_id", "workflow_path", "observed_at", "queued_run_ids", "in_progress_run_ids", "interactive_request_sha256"] : [])]);
+      ...(name === "quiescence" ? ["workflow_id", "workflow_path", "observed_at", "queued_run_ids", "in_progress_run_ids", "interactive_request_sha256", "workflow_state", "drained_runs"] : [])], "receipt " + name);
     if (receipt.schema_version !== 1 || receipt.kind !== name || receipt.evidence_kind !== "observed"
       || adoptionDigest(receipt.bindings_sha256) !== target) fail("observed record receipt " + name);
-    immutable(receipt.source_commit); adoptionDigest(receipt.artifact_sha256);
+    // Consumer receipts target C. Install receipts target the pinned shared component source.
+    const source = name.endsWith("_install") ? bindings.component_pin.value.source_commit : candidate;
+    if (immutable(receipt.source_commit) !== source) fail("recorded source target " + name);
+    adoptionDigest(receipt.artifact_sha256);
     if (name === "quiescence") {
+      verificationTime(receipt.observed_at);
       if (bindings.settings.reports.workflow_id === null || receipt.workflow_id !== bindings.settings.reports.workflow_id
-        || receipt.workflow_path !== bindings.settings.execution.scheduled_workflow || typeof receipt.observed_at !== "string"
-        || !Number.isFinite(Date.parse(receipt.observed_at)) || !Array.isArray(receipt.queued_run_ids) || receipt.queued_run_ids.length
+        || receipt.workflow_path !== bindings.settings.execution.scheduled_workflow || receipt.workflow_state !== "disabled_manually"
+        || !Array.isArray(receipt.drained_runs) || !Array.isArray(receipt.queued_run_ids) || receipt.queued_run_ids.length
         || !Array.isArray(receipt.in_progress_run_ids) || receipt.in_progress_run_ids.length) fail("legacy quiescence receipt");
+      const runs = new Set<number>();
+      for (const value of receipt.drained_runs) {
+        const run = object(value, ["run_id", "status", "conclusion"], "drained run");
+        if (typeof run.run_id !== "number" || !Number.isSafeInteger(run.run_id) || run.run_id < 1 || runs.has(run.run_id)
+          || run.status !== "completed" || typeof run.conclusion !== "string"
+          || !["success", "failure", "neutral", "cancelled", "skipped", "stale", "timed_out", "action_required", "startup_failure"].includes(run.conclusion)) fail("drained run result");
+        runs.add(run.run_id);
+      }
       adoptionDigest(receipt.interactive_request_sha256);
     }
     const expectedAttention = name === "hosted_advisory" && receipt.outcome === "trial-passed-expected-new-attention";
@@ -133,7 +163,7 @@ function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof coll
     const clients = Object.fromEntries(Object.entries(bindings.settings.clients).filter(([id]) => clientNames.includes(id)));
     if (!canonicalJSON(receipt.client_bindings).equals(canonicalJSON(clients))) fail("recorded client identity " + name);
 
-    const observations = object(receipt.observations, [...receiptRequirements[name], ...(expectedAttention ? ["only_attention_step_failed"] : [])]);
+    const observations = object(receipt.observations, [...receiptRequirements[name], ...(expectedAttention ? ["only_attention_step_failed"] : [])], "incomplete recorded observations " + name);
     if (Object.values(observations).some(observed => observed !== true)) fail("incomplete recorded observations " + name);
   }
 }
@@ -168,20 +198,24 @@ export function verifyRuntimeAdoption(options: { repo: string; current_default: 
     || adoptionDigest(record.component_pin_sha256) !== original.component_pin.sha256
     || !canonicalJSON(record.protected_manifest).equals(canonicalJSON(original.protected_manifest))
     || bindings.protected_sha256 !== original.protected_sha256) fail("protected record bindings changed");
-  const identity = object(record.identity, ["repository", "repository_id", "actor", "actor_id", "default_branch"]);
-  if (identity.repository !== bindings.settings.repository || identity.actor !== bindings.settings.publication.actor
-    || identity.default_branch !== bindings.settings.default_branch || typeof identity.repository_id !== "number"
-    || !Number.isSafeInteger(identity.repository_id) || identity.repository_id < 1 || typeof identity.actor_id !== "number"
-    || !Number.isSafeInteger(identity.actor_id) || identity.actor_id < 1 || !options.identity
-    || !canonicalJSON(identity).equals(canonicalJSON(options.identity))) fail("current native adoption identity");
-  verifyRecordedReceipts(record.receipts, original, candidate, options.identity);
-  const deliveries = ancestry(repo, candidate, current, true).map(line => line.split(" ")).filter(parts => {
-    if (parts.length !== 2 || parts[1] !== candidate) return false;
-    const recordAtChild = committedInput(repo, immutable(parts[0]), path);
-    return recordAtChild?.mode === "100644" && recordAtChild.sha256 === input.sha256;
+  const identity = nativeIdentity(record.identity);
+  if (!options.identity) fail("current native adoption identity");
+  const observed = nativeIdentity(options.identity);
+  const normalized = (value: PublicationIdentity) => ({ ...value, repository: value.repository.toLowerCase(), actor: value.actor.toLowerCase() });
+  if (identity.repository.toLowerCase() !== bindings.settings.repository || identity.actor.toLowerCase() !== bindings.settings.publication.actor.toLowerCase()
+    || identity.default_branch !== bindings.settings.default_branch
+    || !canonicalJSON(normalized(identity)).equals(canonicalJSON(normalized(observed)))) fail("current native adoption identity");
+  verifyRecordedReceipts(record.receipts, original, candidate, identity);
+  const history = ancestry(repo, candidate, current, true).map(line => {
+    const [commit, ...parents] = line.split(" ");
+    return { commit: immutable(commit), parents, record: committedInput(repo, immutable(commit), path) };
   });
+  if (history.some(item => item.record !== null && (item.record.mode !== "100644" || item.record.sha256 !== input.sha256))) {
+    fail("immutable adoption record changed");
+  }
+  const deliveries = history.filter(item => item.parents.length === 1 && item.parents[0] === candidate && item.record !== null);
   if (deliveries.length !== 1) fail("unique record-only cutover child required");
-  const delivery = deliveries[0][0];
+  const delivery = deliveries[0].commit;
   verifyCutoverAssembly({ repo, source_candidate: candidate, delivery_commit: delivery, record_path: path });
   for (const commit of ancestry(repo, delivery, current)) {
     const historical = committedInput(repo, immutable(commit), path);

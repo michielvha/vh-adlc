@@ -141,12 +141,13 @@ function portableRecord(f: ReturnType<typeof source>) {
     const clientNames = entry === null ? [] : name === "paired_review" ? [entry.reviewer.client]
       : [entry.worker.client, entry.reviewer.client];
     const client_bindings = Object.fromEntries(Object.entries(f.configured.clients).filter(([id]) => clientNames.includes(id)));
-    return [name, { schema_version: 1, kind: name, evidence_kind: "observed", source_commit: f.candidate,
+    return [name, { schema_version: 1, kind: name, evidence_kind: "observed", source_commit: name.endsWith("_install") ? pin().source_commit : f.candidate,
       artifact_sha256: hash(name + " synthetic original bytes"), bindings_sha256: target, outcome: "passed", native_conclusion: "success",
       worker_model: name === "paired_review" ? null : entry?.worker.model ?? null, reviewer_model: entry?.reviewer.model ?? null, client_bindings,
       observations: Object.fromEntries(observations.map(observation => [observation, true])),
       ...(name === "quiescence" ? { workflow_id: f.configured.reports.workflow_id,
-        workflow_path: f.configured.execution.scheduled_workflow, observed_at: "2026-11-08T10:00:00Z",
+        workflow_path: f.configured.execution.scheduled_workflow, observed_at: "2000-01-01T00:00:00Z",
+        workflow_state: "disabled_manually", drained_runs: [],
         queued_run_ids: [], in_progress_run_ids: [], interactive_request_sha256: hash("synthetic explicit freeze") } : {}) }];
   }));
   return { schema_version: 1, kind: "docs-drift-adoption", source_candidate: f.candidate,
@@ -218,7 +219,7 @@ test("a red advisory trial can retain only its declared expected attention failu
   const delivery = deliverRecord(f, record);
   const checked = adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity });
   expect(checked.receipts).toEqual(record.receipts);
-  expect(trial.native_conclusion).toBe("failure");
+  expect(checked.receipts).toMatchObject({ hosted_advisory: { native_conclusion: "failure" } });
 });
 
 test("an observed entry receipt must retain its protected native client identities", () => {
@@ -226,4 +227,113 @@ test("an observed entry receipt must retain its protected native client identiti
   Reflect.deleteProperty(record.receipts.copilot_entry!, "client_bindings");
   const delivery = deliverRecord(f, record);
   expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity })).toThrow();
+});
+
+test("an alternate C child cannot hide an earlier adopted record and its later edit", () => {
+  const f = source(), original = portableRecord(f);
+  deliverRecord(f, original);
+  const replacement = portableRecord(f);
+  replacement.receipts.paired_review!.artifact_sha256 = hash("different original review");
+  deliverRecord(f, replacement);
+  readGit(f.repo, "switch", "-c", "alternate-cutover", f.candidate);
+  deliverRecord(f, replacement);
+  readGit(f.repo, "switch", "main");
+  readGit(f.repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "merge", "--no-ff", "--no-edit", "alternate-cutover");
+  const current = readGit(f.repo, "rev-parse", "HEAD").toString().trim();
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: current, identity: runtimeIdentity })).toThrow();
+});
+
+test("an unrelated receipt commit cannot replace its bound source target", () => {
+  const f = source(), record = portableRecord(f);
+  record.receipts.copilot_entry!.source_commit = "e".repeat(40);
+  const delivery = deliverRecord(f, record);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity })).toThrow();
+});
+
+test("quiescence retains native workflow state and the observed drained run results", () => {
+  const f = source(), record = portableRecord(f);
+  Reflect.deleteProperty(record.receipts.quiescence!, "workflow_state");
+  Reflect.deleteProperty(record.receipts.quiescence!, "drained_runs");
+  const delivery = deliverRecord(f, record);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity })).toThrow();
+});
+
+test("native repository and actor casing preserves authoritative numeric identities", () => {
+  const f = source(), delivery = deliverRecord(f, portableRecord(f));
+  const checked = adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery,
+    identity: { ...runtimeIdentity, repository: "Fixture/Docs", actor: "Fixture-Bot" } });
+  expect(checked.identity.repository_id).toBe(runtimeIdentity.repository_id);
+  expect(checked.identity.actor_id).toBe(runtimeIdentity.actor_id);
+});
+
+for (const invalid of ["false-flag", "missing-flag", "success-conclusion", "non-hosted"] as const) {
+  test(`expected red attention refuses ${invalid}`, () => {
+    const f = source(), record = portableRecord(f), trial = record.receipts.hosted_advisory!;
+    trial.outcome = "trial-passed-expected-new-attention"; trial.native_conclusion = "failure";
+    trial.observations.only_attention_step_failed = true;
+    if (invalid === "false-flag") trial.observations.only_attention_step_failed = false;
+    if (invalid === "missing-flag") delete trial.observations.only_attention_step_failed;
+    if (invalid === "success-conclusion") trial.native_conclusion = "success";
+    if (invalid === "non-hosted") record.receipts.claude_entry!.outcome = "trial-passed-expected-new-attention";
+    const delivery = deliverRecord(f, record);
+    expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity }))
+      .toThrow(invalid === "false-flag" || invalid === "missing-flag" ? "incomplete recorded observations hosted_advisory" : "recorded native outcome");
+  });
+}
+
+for (const timestamp of ["2026-11-08", "2026-11-08T10:00:00", "2026-02-30T10:00:00Z", "2000-01-01T00:00:00+01:00"]) {
+  test(`quiescence rejects an invalid verification timestamp ${timestamp}`, () => {
+    const f = source(), record = portableRecord(f);
+    record.receipts.quiescence!.observed_at = timestamp;
+    const delivery = deliverRecord(f, record);
+    expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity })).toThrow();
+  });
+}
+
+test("two distinct record-only children remain ambiguous even with identical record bytes", () => {
+  const f = source(), record = portableRecord(f);
+  const first = deliverRecord(f, record);
+  readGit(f.repo, "switch", "-c", "duplicate-cutover", f.candidate);
+  write(f.repo, f.configured.publication.adoption_record, canonicalJSON(record));
+  const second = commit(f.repo, "a distinct record-only delivery");
+  expect(second).not.toBe(first);
+  readGit(f.repo, "switch", "main");
+  readGit(f.repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "merge", "--no-ff", "--no-edit", "duplicate-cutover");
+  const current = readGit(f.repo, "rev-parse", "HEAD").toString().trim();
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: current, identity: runtimeIdentity })).toThrow("unique record-only");
+});
+
+test("mixed-case configured actors can retain the same native numeric identity", () => {
+  const f = source();
+  f.configured.publication.actor = "Fixture-Bot";
+  write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(f.configured));
+  f.candidate = commit(f.repo, "mixed-case configured native actor");
+  const delivery = deliverRecord(f, portableRecord(f));
+  expect(adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity }).identity.actor_id)
+    .toBe(runtimeIdentity.actor_id);
+});
+
+for (const invalid of ["active-workflow", "pending-run", "missing-conclusion", "duplicate-run", "unknown-conclusion"] as const) {
+  test(`quiescence refuses invalid native state ${invalid}`, () => {
+    const f = source(), record = portableRecord(f), quiescence = record.receipts.quiescence!;
+    const runs: { run_id: number; status: string; conclusion: string | null }[] = [{ run_id: 7, status: "completed", conclusion: "cancelled" }];
+    if (invalid === "active-workflow") quiescence.workflow_state = "active";
+    if (invalid === "pending-run") runs[0]!.status = "queued";
+    if (invalid === "missing-conclusion") runs[0]!.conclusion = null;
+    if (invalid === "duplicate-run") runs.push({ ...runs[0]! });
+    if (invalid === "unknown-conclusion") runs[0]!.conclusion = "unknown";
+    Object.assign(quiescence, { drained_runs: runs });
+    const delivery = deliverRecord(f, record);
+    expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity }))
+      .toThrow(invalid === "active-workflow" ? "legacy quiescence receipt" : "drained run result");
+  });
+}
+
+test("quiescence preserves completed native cancellation results", () => {
+  const f = source(), record = portableRecord(f);
+  Object.assign(record.receipts.quiescence!, { drained_runs: [{ run_id: 7, status: "completed", conclusion: "cancelled" }] });
+  const delivery = deliverRecord(f, record);
+  const checked = adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity });
+  expect(checked.receipts).toMatchObject({ quiescence: { workflow_state: "disabled_manually",
+    drained_runs: [{ run_id: 7, status: "completed", conclusion: "cancelled" }] } });
 });
