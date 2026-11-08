@@ -235,3 +235,40 @@ export function verifyRuntimeAdoption(options: { repo: string; current_default: 
     source_candidate: candidate, delivery_commit: delivery, record_path: path, adoption_sha256: input.sha256,
     protected_sha256: bindings.protected_sha256, component_pin: bindings.component_pin.value, identity, receipts: record.receipts });
 }
+
+const componentSignalPath = ".vh-adlc/docs-drift-upgrade-signal.yaml";
+const clientSignalPath = ".vh-adlc/docs-drift-client-upgrade-signals.yaml";
+const clientPackages = { copilot: "@github/copilot", claude: "@anthropic-ai/claude-code", codex: "@openai/codex" } as const;
+
+/** Signals are non-executing intake. Their mismatch never selects or replaces a runtime. */
+export function checkUpgradeSignals(options: { repo: string; source: string; identity?: PublicationIdentity }) {
+  const source = immutable(options.source), { settings } = loadCommittedSettings(options.repo, source);
+  if (settings.publication.mode === "staged") {
+    if (settings.trial !== null) fail("current-default trial signal target verification required");
+    return freezeJSON({ status: "staged-no-target", source_commit: source, matches: null });
+  }
+  const adopted = verifyRuntimeAdoption({ repo: options.repo, current_default: source, identity: options.identity });
+  const input = committedInput(options.repo, source, componentSignalPath), clientInput = committedInput(options.repo, source, clientSignalPath);
+  if (!input || input.mode !== "100644" || !clientInput || clientInput.mode !== "100644") fail("regular required upgrade signals");
+  const component = object(collectionReaders().yaml(input.bytes), ["schema_version", "source_repository", "source_commit", "source_release"], "component signal");
+  if (component.schema_version !== 1 || typeof component.source_repository !== "string"
+    || !/^[A-Za-z0-9-]+\/[A-Za-z0-9_.-]+$/u.test(component.source_repository)
+    || component.source_repository.split("/").some(part => part === "." || part === "..")
+    || typeof component.source_release !== "string" || !/^(?:v)?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(component.source_release)) fail("component signal identity");
+  const actual = { source_repository: component.source_repository.toLowerCase(), source_commit: immutable(component.source_commit), source_release: component.source_release };
+  const expected = { source_repository: adopted.component_pin.source_repository, source_commit: adopted.component_pin.source_commit,
+    source_release: adopted.component_pin.source_release };
+  const clients = object(collectionReaders().yaml(clientInput.bytes), ["schema_version", "clients"], "client signals");
+  if (clients.schema_version !== 1) fail("client signals schema");
+  const signals = object(clients.clients, Object.keys(settings.clients), "client signal inventory");
+  const clientResults = Object.entries(settings.clients).sort(([a], [b]) => compareUTF8(a, b)).map(([id, client]) => {
+    const row = object(signals[id], ["provider", "package", "version", "platform"], "client signal " + id);
+    if (!["copilot", "claude", "codex"].includes(String(row.provider)) || typeof row.package !== "string"
+      || typeof row.version !== "string" || !row.version || typeof row.platform !== "string") fail("client signal identity");
+    const selected = { provider: client.provider, package: clientPackages[client.provider], version: client.version, platform: client.platform };
+    return { client_id: id, expected: selected, actual: row, matches: canonicalJSON(selected).equals(canonicalJSON(row)) };
+  });
+  const matches = canonicalJSON(expected).equals(canonicalJSON(actual)) && clientResults.every(result => result.matches);
+  return freezeJSON({ status: matches ? "signal-match" : "signal-mismatch", source_commit: source, matches,
+    component: { expected, actual }, clients: clientResults });
+}
