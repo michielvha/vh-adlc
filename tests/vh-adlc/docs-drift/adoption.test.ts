@@ -3,7 +3,7 @@ import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstra
 import * as adoption from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { afterAll, expect, test } from "bun:test";
 import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { collectAdoptionBindings, parseComponentPin, verifyCutoverAssembly } from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { readGitWithEnvironment as gitWithInput } from "../../../plugins/vh-adlc/scripts/git-read";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
@@ -306,7 +306,7 @@ for (const field of ["producer_workflow_id", "producer_workflow_path", "reader_w
 
 
 // Synthetic native processes and observed-shaped attestations exercise selection, never actual adoption.
-async function runtimeFixture() {
+async function runtimeFixture(options: { cache_inside?: boolean } = {}) {
   const shared = publicationFixture(roots), prefix = "plugins/vh-adlc/";
   write(shared.repo, prefix + ".claude-plugin/plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');
   write(shared.repo, prefix + "scripts/runner.ts", "// Synthetic retained worker\n");
@@ -318,10 +318,10 @@ async function runtimeFixture() {
   const client = parseClientBinding({ ...settingsFixture().clients["copilot-linux"], platform: process.platform + "-" + process.arch,
     distribution_sha256: hash(distribution.toString()) });
   const f = source({ pin: selectedPin, client }), delivery = deliverRecord(f, portableRecord(f));
-  const cache = join(f.root, "approved-runtime"); mkdirSync(cache, { mode: 0o700 });
+  const cache = join(options.cache_inside ? f.repo : f.root, "approved-runtime"); mkdirSync(cache, { mode: 0o700 });
   const retained = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: shared.repo, pin: selectedPin });
   const native = await bootstrap.retainClientDistribution({ cache_directory: cache, client_id: "copilot-linux", client,
-    distribution, format: "executable", executable: "copilot" });
+    profile_scope: { repository_id: 10, actor_id: 20, entry: "copilot" }, distribution, format: "executable", executable: "copilot" });
   const selection = { repo: f.repo, current_default: delivery, identity: runtimeIdentity, cache_directory: cache,
     entry: "copilot" as const, launcher_path: join(f.repo, f.configured.runtime_loader.launcher),
     settings_path: join(f.repo, ".vh-adlc/docs-drift.yaml") };
@@ -372,4 +372,21 @@ test("ordinary corpus and dormant-trial updates keep approved roles while a prot
   f.selection.current_default = commit(f.repo, "unadopted native client update");
   await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow("protected record bindings changed");
   expect(readFileSync(f.native.executable, "utf8")).toContain("fixture-1.0.0");
+});
+
+
+test("approved entry preflight supports clean group-writable Git checkouts", async () => {
+  const f = await runtimeFixture(); chmodSync(f.selection.launcher_path, 0o664); chmodSync(f.selection.settings_path, 0o664);
+  const selected = await bootstrap.selectApprovedRuntime(f.selection);
+  expect(selected.worker.executable).toBe(f.native.executable);
+});
+
+test("approved runtime cache must stay outside its consumer worktree", async () => {
+  const f = await runtimeFixture({ cache_inside: true });
+  await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow("outside source and consumer worktrees");
+});
+
+test("approved entry preflight refuses world-writable inputs with matching committed bytes", async () => {
+  const f = await runtimeFixture(); chmodSync(f.selection.launcher_path, 0o666);
+  await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow("regular committed entry input required");
 });

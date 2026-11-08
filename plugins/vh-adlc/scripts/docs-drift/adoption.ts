@@ -263,7 +263,7 @@ export function checkUpgradeSignals(options: { repo: string; source: string; ide
   const signals = object(clients.clients, Object.keys(settings.clients), "client signal inventory");
   const clientResults = Object.entries(settings.clients).sort(([a], [b]) => compareUTF8(a, b)).map(([id, client]) => {
     const row = object(signals[id], ["provider", "package", "version", "platform"], "client signal " + id);
-    if (!["copilot", "claude", "codex"].includes(String(row.provider)) || typeof row.package !== "string"
+    if (typeof row.provider !== "string" || !["copilot", "claude", "codex"].includes(row.provider) || typeof row.package !== "string"
       || typeof row.version !== "string" || !row.version || typeof row.platform !== "string") fail("client signal identity");
     const selected = { provider: client.provider, package: clientPackages[client.provider], version: client.version, platform: client.platform };
     return { client_id: id, expected: selected, actual: row, matches: canonicalJSON(selected).equals(canonicalJSON(row)) };

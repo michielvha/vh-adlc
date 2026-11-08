@@ -13,6 +13,7 @@ import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-dri
 import { publicationFixture } from "./publication-fixture";
 
 const roots: string[] = [];
+const profileScope = { repository_id: 10, actor_id: 20, entry: "copilot" as const };
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 function commit(repo: string) {
   readGit(repo, "add", "--", ".");
@@ -91,8 +92,8 @@ async function clientFixture(options: { cache?: string; provider?: "copilot" | "
   const configured = settingsFixture(); Object.assign(configured.clients["copilot-linux"], {
     provider, version, platform: process.platform + "-" + process.arch, distribution_sha256: sha256(distribution) });
   const client = parseSettings(configured).clients["copilot-linux"];
-  const setup = { cache_directory: cache, client_id: "copilot-linux", client, distribution, format, executable };
-  return { cache, client, setup, program, index: join(cache, "clients/copilot-linux", client.distribution_sha256 + ".json") };
+  const setup = { cache_directory: cache, client_id: "copilot-linux", client, profile_scope: profileScope, distribution, format, executable };
+  return { cache, client, setup, program, index: join(cache, "clients/copilot-linux", sha256(canonicalJSON(client)) + ".json") };
 }
 
 test("approved client distribution remains selected after an unrelated host client changes", async () => {
@@ -103,11 +104,11 @@ test("approved client distribution remains selected after an unrelated host clie
   const configured = settingsFixture(); Object.assign(configured.clients["copilot-linux"], {
     platform: process.platform + "-" + process.arch, distribution_sha256: sha256(distribution) });
   const client = parseSettings(configured).clients["copilot-linux"];
-  const selected = await bootstrap.retainClientDistribution({ cache_directory: cache, client_id: "copilot-linux", client,
+  const selected = await bootstrap.retainClientDistribution({ cache_directory: cache, client_id: "copilot-linux", client, profile_scope: profileScope,
     distribution, format: "tar", executable: "bin/copilot" });
   expect(readFileSync(selected.executable, "utf8")).toBe(program);
   const unrelated = join(cache, "host-client"); writeFileSync(unrelated, "unrelated newer global client\n");
-  const checked = await bootstrap.inspectRetainedClient({ cache_directory: cache, client_id: "copilot-linux", client });
+  const checked = await bootstrap.inspectRetainedClient({ cache_directory: cache, client_id: "copilot-linux", client, profile_scope: profileScope });
   expect(checked.executable).toBe(selected.executable);
   expect(checked.client).toEqual(client);
   expect(checked.version).toBe(client.version);
@@ -122,7 +123,7 @@ test("retained setup refuses linked cache parents before writing outside its nam
   const configured = settingsFixture(); Object.assign(configured.clients["copilot-linux"], {
     platform: process.platform + "-" + process.arch, distribution_sha256: sha256(distribution) });
   const client = parseSettings(configured).clients["copilot-linux"];
-  await expect(bootstrap.retainClientDistribution({ cache_directory: cache, client_id: "copilot-linux", client,
+  await expect(bootstrap.retainClientDistribution({ cache_directory: cache, client_id: "copilot-linux", client, profile_scope: profileScope,
     distribution, format: "executable", executable: "copilot" })).rejects.toThrow("private owned runtime directory required");
   expect(readdirSync(outside)).toEqual([]);
   expect(readdirSync(cache)).toEqual(["clients"]);
@@ -350,7 +351,7 @@ test.each(["missing", "replaced", "linked", "hardlinked", "ambient", "metadata",
   if (scenario === "ambient") writeFileSync(join(selected.directory, "extra.ts"), "Unrecorded helper\n");
   if (scenario === "executable") chmodSync(path, 0o700);
   if (scenario === "metadata") {
-    const index = join(cache, "components", pin.component_sha256, pin.source_commit + ".json");
+    const index = join(cache, "components", sha256(canonicalJSON(pin)) + ".json");
     const record = JSON.parse(readFileSync(index, "utf8")); record.pin.source_release = "v0.14.0";
     writeFileSync(index, canonicalJSON(record));
   }
@@ -402,6 +403,64 @@ test("complete archive inventory accepts harmless root directories and preserves
   const selected = await bootstrap.retainClientDistribution(f.setup);
   expect(lstatSync(join(selected.directory, "bin/helper")).mode & 0o777).toBe(0o500);
   expect(lstatSync(selected.executable).mode & 0o777).toBe(0o500);
-  const checked = await bootstrap.inspectRetainedClient({ cache_directory: f.cache, client_id: f.setup.client_id, client: f.client });
+  const checked = await bootstrap.inspectRetainedClient({ cache_directory: f.cache, client_id: f.setup.client_id, client: f.client, profile_scope: profileScope });
   expect(checked.payload_sha256).toBe(selected.payload_sha256);
+});
+
+test("identical component bytes with a distinct complete approved pin coexist for rollback", () => {
+  const f = component(), cache = join(f.root, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  const original = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin });
+  const alternate = { ...pin, source_release: "0.13.0" };
+  const next = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin: alternate });
+  expect(next.pin).toEqual(alternate);
+  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, pin }).directory).toBe(original.directory);
+  expect(next.directory).not.toBe(original.directory);
+});
+
+test("identical client distributions with changed approved metadata keep both selections", async () => {
+  const f = await clientFixture(), original = await bootstrap.retainClientDistribution(f.setup);
+  const client = { ...f.client, distribution_url: "https://example.invalid/moved-client.tgz" };
+  const next = await bootstrap.retainClientDistribution({ ...f.setup, client });
+  expect(next.client).toEqual(client);
+  expect(next.directory).not.toBe(original.directory);
+  expect((await bootstrap.inspectRetainedClient(f.setup)).directory).toBe(original.directory);
+});
+
+test("native profiles are isolated by consumer, actor and execution entry", async () => {
+  const f = await clientFixture();
+  const first = await bootstrap.retainClientDistribution({ ...f.setup, profile_scope: { repository_id: 10, actor_id: 20, entry: "copilot" as const } });
+  for (const scope of [{ repository_id: 11, actor_id: 20, entry: "copilot" as const },
+    { repository_id: 10, actor_id: 21, entry: "copilot" as const }, { repository_id: 10, actor_id: 20, entry: "claude" as const }]) {
+    const next = await bootstrap.retainClientDistribution({ ...f.setup, profile_scope: scope });
+    expect(next.executable).toBe(first.executable);
+    expect(next.profile_directory).not.toBe(first.profile_directory);
+    expect(readdirSync(next.profile_directory)).toEqual([]);
+  }
+});
+
+test("component setup refuses a retained cache inside its source worktree", () => {
+  const f = component(), cache = join(f.repo, "nested-runtime-cache"); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin })).toThrow("outside source and consumer worktrees");
+  expect(readdirSync(cache)).toEqual([]);
+});
+
+test("retained client setup excludes native provider profiles before writing setup state", async () => {
+  const f = await clientFixture(), previous = process.env.COPILOT_HOME; process.env.COPILOT_HOME = f.cache;
+  try {
+    await expect(bootstrap.retainClientDistribution(f.setup)).rejects.toThrow("outside native provider profiles");
+    expect(readdirSync(f.cache)).toEqual([]);
+  } finally { if (previous === undefined) delete process.env.COPILOT_HOME; else process.env.COPILOT_HOME = previous; }
+});
+
+test.each(["repository", "actor", "entry"] as const)("native profile selection refuses an invalid %s identity", async scenario => {
+  const f = await clientFixture(), profile_scope = { ...profileScope };
+  if (scenario === "repository") profile_scope.repository_id = 0;
+  if (scenario === "actor") profile_scope.actor_id = -1;
+  if (scenario === "entry") Object.assign(profile_scope, { entry: "unknown" });
+  await expect(bootstrap.retainClientDistribution({ ...f.setup, profile_scope })).rejects.toThrow("native consumer profile scope required");
+  expect(readdirSync(f.cache)).toEqual([]);
 });

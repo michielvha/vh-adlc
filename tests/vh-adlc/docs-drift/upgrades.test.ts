@@ -53,3 +53,18 @@ test.each(["component", "client", "package", "platform"] as const)("an intake-on
   expect(after.component_pin).toEqual(before.component_pin);
   expect(after.adoption_sha256).toBe(before.adoption_sha256);
 });
+
+test.each(["missing-component", "missing-client", "extra-client", "unknown-component-field", "invalid-source", "test-only-record"] as const)("signal checks refuse %s inputs", scenario => {
+  const f = source(roots); writeSignals(f); f.candidate = commit(f.repo, "synthetic curated signal source");
+  const record = portableRecord(f);
+  if (scenario === "test-only-record") record.receipts.copilot_entry!.evidence_kind = "test-only";
+  const delivered = deliverRecord(f, record);
+  const values = signals(f);
+  if (scenario === "missing-component") rmSync(f.repo + "/.vh-adlc/docs-drift-upgrade-signal.yaml");
+  if (scenario === "missing-client") rmSync(f.repo + "/.vh-adlc/docs-drift-client-upgrade-signals.yaml");
+  if (scenario === "extra-client") { Object.assign(values.clients.clients, { unexpected: values.clients.clients["copilot-linux"] }); writeSignals(f, values); }
+  if (scenario === "unknown-component-field") { Object.assign(values.component, { runtime_directory: "/tmp/untrusted" }); writeSignals(f, values); }
+  if (scenario === "invalid-source") { values.component.source_commit = "main"; writeSignals(f, values); }
+  const current = scenario === "test-only-record" ? delivered : commit(f.repo, "synthetic invalid signals");
+  expect(() => adoption.checkUpgradeSignals({ repo: f.repo, source: current, identity: runtimeIdentity })).toThrow();
+});
