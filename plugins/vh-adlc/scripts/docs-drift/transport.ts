@@ -1,4 +1,4 @@
-import { retainRejection, type RejectionEvidence, type RejectedUpdate } from "./rejections";
+import { projectRejection, retainRejection, type RejectionEvidence, type RejectedUpdate } from "./rejections";
 import { PublicationExecutionError } from "./attempts";
 import type { Effect } from "./manifests";
 import type { Outcome, SealedPlan, writePlanObject } from "./journal";
@@ -275,10 +275,9 @@ export function createNativeTransport(options: {
   async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }): Promise<void> {
     const id = randomUUID(), directory = join(root, "native-command-" + id);
     writeFileSync(join(root, id + ".native-command.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-native-command", operation_id: plan.manifest.operation_id,
-      root: directory, effect_id: delivery.effect_id, attempt_id: delivery.attempt_id, argv_sha256: sha256(canonicalJSON(argv)) }), { flag: "wx", mode: 0o600 });
+      root: directory, capture: "projected-v1", effect_id: delivery.effect_id, attempt_id: delivery.attempt_id, argv_sha256: sha256(canonicalJSON(argv)) }), { flag: "wx", mode: 0o600 });
     mkdirSync(directory, { mode: 0o700 });
     const stdout = join(directory, "stdout"), stderr = join(directory, "stderr");
-    for (const file of [stdout, stderr]) writeFileSync(file, "", { flag: "wx", mode: 0o600 });
     const command = [...argv];
     if (input !== null) {
       const payload = join(directory, "payload.json");
@@ -286,10 +285,15 @@ export function createNativeTransport(options: {
       command.push("--input", payload);
     }
     const result = await executeOwnedProcess({ argv: command, cwd: store.root, env: Object.fromEntries(Object.entries(gitEnvironment(environment)).filter((entry): entry is [string, string] => entry[1] !== undefined)),
-      watched_outputs: [], stdout, stderr, timeout_ms: options.timeout_ms ?? 30000,
+      watched_outputs: [], stdout, stderr, capture: "memory", timeout_ms: options.timeout_ms ?? 30000,
       started: pid => { delivery.sent = true; delivery.reaped = false; writeFileSync(join(directory, "started.json"), canonicalJSON({ pid }), { flag: "wx", mode: 0o600 }); } });
     delivery.reaped = result.reaped;
-    writeFileSync(join(directory, "process.json"), canonicalJSON(result), { flag: "wx", mode: 0o600 });
+    const { captured, ...processStatus } = result;
+    writeFileSync(join(directory, "process.json"), canonicalJSON(processStatus), { flag: "wx", mode: 0o600 });
+    if (protocol && captured && !result.output_limit) {
+      const projection = projectRejection(captured.stdout, protocol);
+      if (projection) writeFileSync(join(directory, "rejection-response.json"), projection, { flag: "wx", mode: 0o600 });
+    }
     if (result.exit_code !== 0 || !result.reaped || result.timed_out || result.cancelled !== null || result.output_limit) {
       if (protocol && delivery.attempt_id !== null && delivery.completed_commands === 0 && delivery.effect.kind !== "pr-update") {
         try {

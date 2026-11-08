@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { gitRejection, httpRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
+import { gitRejection, httpRejection, projectRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
 
 const updates = [{ ref: "refs/heads/docs-drift/one", head: "a".repeat(40) },
   { ref: "refs/heads/docs-drift/receipt/one", head: "b".repeat(40) }];
@@ -22,4 +22,16 @@ test("only a complete non-retryable 4xx API response proves non-application", ()
     'HTTP/2.0 403 Forbidden\r\nContent-Length: 100\r\n\r\n{}', 'HTTP/2.0 201 Created\r\n\r\n{}']) {
     expect(httpRejection(Buffer.from(text))).toBeNull();
   }
+});
+
+test("rejection projections omit response bodies and secret-bearing headers", () => {
+  const bytes = Buffer.from('HTTP/2.0 403 Forbidden\r\nX-Secret: header-canary\r\n\r\n{"message":"body-canary"}');
+  const projected = projectRejection(bytes, { protocol: "http" });
+  expect(projected).not.toBeNull();
+  const text = projected!.toString();
+  expect(text).not.toContain("header-canary");
+  expect(text).not.toContain("body-canary");
+  expect(JSON.parse(text).observed).toEqual({ protocol: "http", status: 403 });
+  expect(projectRejection(Buffer.from(rejected()), { protocol: "git", updates })).not.toBeNull();
+  expect(projectRejection(Buffer.from(rejected().replace("!\t", "*\t")), { protocol: "git", updates })).toBeNull();
 });

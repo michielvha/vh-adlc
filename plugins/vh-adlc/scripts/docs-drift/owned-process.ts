@@ -2,6 +2,7 @@ import { lstatSync } from "node:fs";
 
 export type OwnedProcess = {
   pid: number; exit_code: number | null; timed_out: boolean; cancelled: string | null; output_limit: boolean; reaped: boolean;
+  captured?: { stdout: Uint8Array; stderr: Uint8Array };
 };
 
 export const OUTPUT_LIMIT = 16 * 1024 * 1024;
@@ -20,12 +21,12 @@ export function outputSize(path: string): number {
 /** Own one process group, including helpers left behind after its parent exits. */
 export async function executeOwnedProcess(options: {
   argv: string[]; cwd: string; env: Record<string, string>; watched_outputs: string[];
-  stdout: string; stderr: string; timeout_ms: number; max_output_bytes?: number; started: (pid: number) => void;
+  stdout: string; stderr: string; capture?: "memory"; timeout_ms: number; max_output_bytes?: number; started: (pid: number) => void;
 }): Promise<OwnedProcess> {
   const { argv, cwd, env, watched_outputs, stdout, stderr, timeout_ms: timeout, started } = options;
   const limit = options.max_output_bytes ?? OUTPUT_LIMIT;
   if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(timeout) || timeout < 1) throw new Error("invalid owned process bounds");
-  const child = Bun.spawn(argv, { cwd, env, stdin: "ignore", stdout: Bun.file(stdout), stderr: Bun.file(stderr), detached: true });
+  const child = Bun.spawn(argv, { cwd, env, stdin: "ignore", stdout: options.capture === "memory" ? "pipe" : Bun.file(stdout), stderr: options.capture === "memory" ? "pipe" : Bun.file(stderr), detached: true });
   const result: OwnedProcess = { pid: child.pid, exit_code: null, timed_out: false, cancelled: null, output_limit: false, reaped: false };
   const signal = (value: "SIGTERM" | "SIGKILL") => {
     try { process.kill(-child.pid, value); return true; } catch { return false; }
@@ -35,6 +36,26 @@ export async function executeOwnedProcess(options: {
     signal("SIGTERM");
     escalation ??= setTimeout(() => signal("SIGKILL"), 200);
   };
+  let capturedBytes = 0;
+  async function drain(stream: ReadableStream<Uint8Array>): Promise<Uint8Array> {
+    const chunks: Uint8Array[] = [];
+    const reader = stream.getReader();
+    try {
+      while (true) {
+        const next = await reader.read();
+        if (next.done) break;
+        capturedBytes += next.value.byteLength;
+        if (capturedBytes > limit) { result.output_limit = true; stop(); }
+        else chunks.push(next.value);
+      }
+      return Buffer.concat(chunks);
+    } finally { reader.releaseLock(); }
+  }
+  const captured = options.capture === "memory"
+    ? Promise.all([drain(child.stdout as ReadableStream<Uint8Array>), drain(child.stderr as ReadableStream<Uint8Array>)])
+    : null;
+  // Attach rejection handling immediately while process termination is still being awaited.
+  const capturedResult = captured?.then(value => ({ value }), () => ({ value: null }));
   const interrupt = () => { result.cancelled = "SIGINT"; stop(); };
   const terminate = () => { result.cancelled = "SIGTERM"; stop(); };
   process.once("SIGINT", interrupt);
@@ -73,6 +94,11 @@ export async function executeOwnedProcess(options: {
     catch { result.output_limit = true; }
     process.off("SIGINT", interrupt);
     process.off("SIGTERM", terminate);
+  }
+  if (capturedResult) {
+    const { value } = await capturedResult;
+    if (value === null) result.output_limit = true;
+    else result.captured = { stdout: value[0], stderr: value[1] };
   }
   return result;
 }

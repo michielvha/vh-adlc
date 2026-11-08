@@ -1,3 +1,4 @@
+import { retainRejection, readRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
 import { executeAttempt, pendingAttempt, PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -602,6 +603,31 @@ test("positive native Git rejection permits a new attempt while damaged proof st
   writeFileSync(ended.payload.rejection.path, "{}");
   expect(pendingAttempt(journal, selected.effect)).toBe("rejection-proof-unavailable");
   writeFileSync(ended.payload.rejection.path, proof);
+  const retained = JSON.parse(proof.toString());
+  const commandDirectory = retained.command_directory;
+  expect(existsSync(join(commandDirectory, "stdout"))).toBe(false);
+  expect(existsSync(join(commandDirectory, "stderr"))).toBe(false);
+  const projectionPath = join(commandDirectory, "rejection-response.json");
+  const projection = readFileSync(projectionPath);
+  writeFileSync(projectionPath, "{}");
+  expect(pendingAttempt(journal, selected.effect)).toBe("rejection-proof-unavailable");
+  writeFileSync(projectionPath, projection);
+  expect(pendingAttempt(journal, selected.effect)).toBeNull();
+  // Exercise the old file-backed format independently of the new journal record.
+  const ownerPath = join(f.root, "artifacts", commandDirectory.split("native-command-").pop() + ".native-command.json");
+  const owner = JSON.parse(readFileSync(ownerPath, "utf8"));
+  delete owner.capture;
+  writeFileSync(ownerPath, canonicalJSON(owner));
+  const updates = retained.protocol.updates as { ref: string; head: string | null }[];
+  writeFileSync(join(commandDirectory, "stdout"), "To https://github.com/fixture/docs.git\n"
+    + updates.map(item => `!\t${item.head ?? ""}:${item.ref}\t[rejected] (stale info)\n`).join("") + "Done\n", { mode: 0o600 });
+  const scope = { artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"),
+    plan: journal.plan, effect: selected.effect, attempt_id: retained.attempt_id };
+  const legacy = retainRejection({ ...scope, command_directory: commandDirectory, protocol: retained.protocol });
+  expect(readRejection({ ...scope, evidence: legacy })).toEqual(legacy);
+  // Restore the new command's immutable bytes before using the original journal again.
+  owner.capture = "projected-v1";
+  writeFileSync(ownerPath, canonicalJSON(owner));
   f.update(state => { state.reject_git = false; });
   journal = await executeAttempt({ journal, effect: selected.effect, objects: selected.objects, transport: f.transport });
   expect((await f.transport.observe(journal.plan, selected.effect, selected.objects)).state).toBe("done");
