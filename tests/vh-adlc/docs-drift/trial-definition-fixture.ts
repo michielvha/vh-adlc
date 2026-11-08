@@ -8,9 +8,9 @@ import { canonicalDigest, canonicalJSON, protocolPath, sha256 } from "../../../p
 import { commit, portableRecord, runtimeIdentity, source, write } from "./adoption-fixture";
 
 function fixtureBundle(roots: string[], repo: string, source: string,
-  manifest: { files: { target: string; source: string; mode: string; sha256: string }[] }, path: string) {
+  manifest: { files: { target: string; source: string; mode: string; sha256: string }[] }, path: string, format: "sha1" | "sha256" = "sha1") {
   const scratch = mkdtempSync(join(tmpdir(), "vh-trial-bundle-")); roots.push(scratch);
-  readGit(scratch, "init", "--template=", "-b", "fixture");
+  readGit(scratch, "init", "--template=", "--object-format=" + format, "-b", "fixture");
   readGit(scratch, "config", "gc.auto", "0"); readGit(scratch, "config", "maintenance.auto", "false");
   for (const row of manifest.files) {
     const target = protocolPath(row.target), input = protocolPath(row.source);
@@ -29,6 +29,7 @@ export function trialDefinitionFixture(roots: string[], options: {
   candidate_client?: ReturnType<typeof source>["configured"]["clients"]["copilot-linux"];
   caller?: "extra-job-permission" | "different-secret" | "missing-permissions" | "job-only-permissions";
   history_job_write?: boolean; worker_cron?: boolean;
+  bundle_format?: "sha1" | "sha256";
 } = {}) {
   const f = source(roots, options.approved), settings = structuredClone(f.configured);
   // Detached maintenance from fixture commits must settle before read-only preservation checks.
@@ -73,7 +74,7 @@ export function trialDefinitionFixture(roots: string[], options: {
   ] };
   const manifestPath = bundle + "/manifest.json";
   write(f.repo, manifestPath, canonicalJSON(manifest));
-  const packed = fixtureBundle(roots, f.repo, staged, manifest, bundle + "/source.bundle");
+  const packed = fixtureBundle(roots, f.repo, staged, manifest, bundle + "/source.bundle", options.bundle_format);
   const definition = { schema_version: 1, kind: "docs-drift-trial",
     identity: { ...runtimeIdentity, hostname: settings.hostname },
     candidate_settings: blob(candidatePath), candidate_component: blob(settings.component_pin),
@@ -100,7 +101,8 @@ export function commitTrialDefinition(f: ReturnType<typeof trialDefinitionFixtur
   write(f.repo, f.definition.fixture.manifest.path, canonicalJSON(f.manifest));
   const inputs = readGit(f.repo, "status", "--porcelain").length ? commit(f.repo, "synthetic revised trial inputs")
     : readGit(f.repo, "rev-parse", "HEAD").toString().trim();
-  Object.assign(f.definition.fixture, fixtureBundle(f.roots, f.repo, inputs, f.manifest, f.definition.fixture.bundle.path));
+  Object.assign(f.definition.fixture, fixtureBundle(f.roots, f.repo, inputs, f.manifest, f.definition.fixture.bundle.path,
+    f.definition.fixture.source_commit.length === 64 ? "sha256" : "sha1"));
   f.trial.definition_sha256 = sha256(canonicalJSON(f.definition));
   write(f.repo, f.trial.definition_path, canonicalJSON(f.definition));
   write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...f.configured,

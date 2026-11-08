@@ -478,6 +478,7 @@ export async function selectCandidateRuntime(input: {
   entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string; definition_sha256: string;
 }) {
   const options = { ...input };
+  if (!options.identity) fail("current native trial identity required");
   inspectCacheLocation(options.cache_directory, options.repo);
   const policy = collectTrialBindings(options), settings = policy.candidate.settings;
   if (options.definition_sha256 !== policy.definition_sha256) fail("candidate trial definition changed");

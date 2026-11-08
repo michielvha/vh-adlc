@@ -1,6 +1,7 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 import { chmodSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
+import * as artifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import * as setup from "../../../plugins/vh-adlc/scripts/docs-drift/trial-setup";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
@@ -11,8 +12,8 @@ import { commit, runtimeIdentity, write } from "./adoption-fixture";
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 
-function input() {
-  const f = trialDefinitionFixture(roots), parent = join(f.root, "trial-output"); mkdirSync(parent, { mode: 0o700 });
+function input(bundleFormat: "sha1" | "sha256" = "sha1") {
+  const f = trialDefinitionFixture(roots, { bundle_format: bundleFormat }), parent = join(f.root, "trial-output"); mkdirSync(parent, { mode: 0o700 });
   return { f, options: { repo: f.repo, current_default: f.staged, identity: runtimeIdentity, directory: parent } };
 }
 
@@ -32,6 +33,15 @@ test("trial setup imports the exact portable fixture without touching the consum
   expect(JSON.parse(readFileSync(join(result.root, "preparation.json"), "utf8"))).toEqual(result);
   expect(readGit(result.source, "status", "--porcelain").length).toBe(0);
   expect(readFileSync(join(result.source, "docs/guide.md"), "utf8")).toBe("Synthetic fixture document\n");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
+test("trial setup materializes a SHA-256 fixture independently of the consumer object format", () => {
+  const { f, options } = input("sha256"), before = captureRepositoryState(f.repo);
+  const result = setup.prepareTrialFixture(options);
+  expect(result.fixture.source_commit).toHaveLength(64);
+  expect(readGit(result.source, "rev-parse", "--show-object-format").toString().trim()).toBe("sha256");
+  expect(result.fixture.tree).toBe(f.definition.fixture.tree);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
@@ -68,11 +78,14 @@ test("a failure to retain diagnostics preserves the original setup error", () =>
   const wrapper = join(bin, "git");
   writeFileSync(wrapper, '#!/bin/sh\ncase " $* " in\n  *" bundle verify "*) umask 077; printf synthetic > "$PWD/../setup-failed.json"; exit 17 ;;\nesac\nexec /usr/bin/git "$@"\n');
   chmodSync(wrapper, 0o700);
-  const original = process.env.PATH; process.env.PATH = bin + ":" + original;
+  const original = process.env.PATH; process.env.PATH = bin + ":" + (original ?? "/usr/bin:/bin");
   let captured: unknown;
   try { setup.prepareTrialFixture(options); }
   catch (error) { captured = error; }
-  finally { process.env.PATH = original; }
+  finally {
+    if (original === undefined) delete process.env.PATH;
+    else process.env.PATH = original;
+  }
   expect(captured).toBeInstanceOf(AggregateError);
   if (!(captured instanceof AggregateError)) throw Error("missing combined setup/recording failure");
   expect(captured.message).toContain("Git collection failed");
@@ -99,6 +112,31 @@ test("trial setup compares the bundle tree with the declared file map", () => {
 test("trial setup refuses another native actor before creating an owned fixture", () => {
   const { options } = input(); options.identity = { ...runtimeIdentity, actor_id: runtimeIdentity.actor_id + 1 };
   expect(() => setup.prepareTrialFixture(options)).toThrow("current native trial identity");
+});
+
+test("trial setup requires a native identity from an untyped caller", () => {
+  const { options } = input(); Reflect.deleteProperty(options, "identity");
+  expect(() => setup.prepareTrialFixture(options)).toThrow("current native trial identity required");
+  expect(readdirSync(options.directory)).toEqual([]);
+});
+
+test("allocated setup failures retain a Unicode-safe bounded reason", () => {
+  const { options } = input(), failure = Error("x".repeat(2047) + "🚀" + "continued reason");
+  const original = artifacts.publishArtifact;
+  const fault = spyOn(artifacts, "publishArtifact").mockImplementation((path, bytes) => {
+    if (basename(path) === "preparation.json") throw failure;
+    original(path, bytes);
+  });
+  let captured: unknown;
+  try { setup.prepareTrialFixture(options); }
+  catch (error) { captured = error; }
+  finally { fault.mockRestore(); }
+  expect(captured).toBe(failure);
+  const directories = readdirSync(options.directory);
+  expect(directories).toHaveLength(1);
+  const record = JSON.parse(readFileSync(join(options.directory, directories[0]!, "setup-failed.json"), "utf8"));
+  expect(record.reason).toBe("x".repeat(2047) + "🚀");
+  expect(record.phase).toBe("finalize");
 });
 
 test("repeated setup keeps independently owned exact fixture imports", () => {

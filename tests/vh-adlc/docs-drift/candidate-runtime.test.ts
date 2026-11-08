@@ -88,6 +88,17 @@ test.each(["definition", "settings", "launcher", "profile", "component"] as cons
   if (scenario === "launcher") writeFileSync(f.selection.launcher_path, "Changed candidate launcher\n");
   if (scenario === "profile") rmSync(f.native.profile_directory, { recursive: true });
   if (scenario === "component") rmSync(f.retained.directory, { recursive: true });
-  await expect(bootstrap.selectCandidateRuntime(f.selection)).rejects.toThrow();
+  const reason = { definition: "candidate trial definition changed", settings: "invoked entry bytes differ from committed policy",
+    launcher: "invoked entry bytes differ from committed policy", profile: f.native.profile_directory, component: f.retained.directory }[scenario];
+  await expect(bootstrap.selectCandidateRuntime(f.selection)).rejects.toThrow(reason);
   expect((await bootstrap.inspectRetainedClient(f.setup)).profile_directory).toBe(f.approved.profile_directory);
+});
+
+test.each(["missing", "actor", "repository"] as const)("candidate selection requires the current native %s identity", async scenario => {
+  const f = await fixture(), selection = { ...f.selection, identity: { ...runtimeIdentity } };
+  if (scenario === "missing") Reflect.deleteProperty(selection, "identity");
+  if (scenario === "actor") selection.identity.actor_id += 1;
+  if (scenario === "repository") selection.identity.repository_id += 1;
+  const reason = scenario === "missing" ? "current native trial identity required" : "current native trial identity";
+  await expect(bootstrap.selectCandidateRuntime(selection)).rejects.toThrow(reason);
 });

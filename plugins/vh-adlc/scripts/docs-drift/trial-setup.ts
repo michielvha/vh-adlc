@@ -13,6 +13,7 @@ function fail(reason: string): never { throw Error("docs-drift trial setup " + r
 export function prepareTrialFixture(options: {
   repo: string; current_default: string; identity: PublicationIdentity; directory: string;
 }) {
+  if (!options?.identity) fail("current native trial identity required");
   const policy = collectTrialBindings({ repo: options.repo, current_default: options.current_default, identity: options.identity });
   const parent = externalArtifactDirectory(options.directory, options.repo);
   const bundle = readAdoptionInput(options.repo, options.current_default, policy.fixture.bundle.path);
@@ -23,7 +24,8 @@ export function prepareTrialFixture(options: {
   try {
     mkdirSync(source, { mode: 0o700 });
     writeFileSync(bundlePath, bundle.bytes, { flag: "wx", mode: 0o600 });
-    readGit(source, "init", "--template=", "-b", "fixture");
+    const objectFormat = policy.fixture.source_commit.length === 64 ? "sha256" : "sha1";
+    readGit(source, "init", "--template=", "--object-format=" + objectFormat, "-b", "fixture");
     readGit(source, "config", "gc.auto", "0"); readGit(source, "config", "maintenance.auto", "false");
     phase = "verify-bundle";
     readGit(source, "bundle", "verify", bundlePath);
@@ -59,7 +61,7 @@ export function prepareTrialFixture(options: {
     publishArtifact(join(root, "preparation.json"), canonicalJSON(result));
     return result;
   } catch (error) {
-    const reason = (error instanceof Error ? error.message : "unknown setup failure").slice(0, 2048);
+    const reason = Array.from(error instanceof Error ? error.message : "unknown setup failure").slice(0, 2048).join("");
     try {
       publishArtifact(join(root, "setup-failed.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-trial-setup-failure",
         authority: "none", phase, reason, fixture_id: policy.fixture.id, bundle_sha256: bundle.sha256,
