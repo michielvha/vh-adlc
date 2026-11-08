@@ -271,10 +271,14 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
       if (unverified && (payload.capture_unverified !== true || rejected || payload.sent !== true)) fail("invalid unverified capture");
       if (executed && rejected) fail("contradictory execution and rejection");
       if (executed) {
-        const execution = exact(payload.execution, ["successes"]);
+        if (payload.execution === null || typeof payload.execution !== "object" || Array.isArray(payload.execution)) fail("invalid execution metadata");
+        const hasBefore = Object.hasOwn(payload.execution, "before"), hasCommands = Object.hasOwn(payload.execution, "commands");
+        const execution = exact(payload.execution, ["successes", ...(hasBefore ? ["before"] : []), ...(hasCommands ? ["commands"] : [])]);
         if (!Array.isArray(execution.successes) || execution.successes.length > 16 || payload.sent !== true) fail("invalid success references");
+        if (hasCommands && (typeof execution.commands !== "number" || !Number.isSafeInteger(execution.commands)
+          || execution.commands < execution.successes.length || execution.commands > 16)) fail("invalid execution command count");
         const paths = new Set<string>();
-        for (const item of execution.successes) {
+        for (const item of [...execution.successes, ...(hasBefore ? [execution.before] : [])]) {
           const evidence = exact(item, ["path", "sha256"]);
           hash(evidence.sha256);
           if (typeof evidence.path !== "string" || !evidence.path.startsWith("/") || evidence.path.includes("\0") || resolve(evidence.path) !== evidence.path || dirname(evidence.path) !== dirname(header.directory) || paths.has(evidence.path)) fail("invalid success reference");

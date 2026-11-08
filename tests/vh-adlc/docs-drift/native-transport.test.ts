@@ -52,7 +52,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, reject_labels: false, response_creator_id: null as number | null, response_labels_missing: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, reject_labels: false, response_creator_id: null as number | null, response_labels_missing: false, drop_labels: false, reject_ready: false, response_canary: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -62,6 +62,7 @@ appendFileSync(log, JSON.stringify({ program: process.argv[1].split('/').at(-1),
 const save = () => writeFileSync(statePath, JSON.stringify(state));
 const option = name => args[args.indexOf(name) + 1];
 const applyLabels = names => {
+    if (state.drop_labels) return [];
     const seen = new Set();
     return names.map(name => state.labels[name] ?? { name }).filter(label => {
         const key = label.id ?? label.name;
@@ -104,14 +105,6 @@ if (process.argv[1].endsWith('/git')) {
     save();
     process.exit(0);
 }
-if (args[0] === 'pr' && args[1] === 'create') {
-    const branch = option('--head'), body = readFileSync(option('--body-file'), 'utf8');
-    state.prs.push({ number: 501, state: 'open', merged_at: null, title: args.find(a => a.startsWith('--title=')).slice(8), body, draft: args.includes('--draft'),
-        labels: applyLabels(args.filter(a => a.startsWith('--label=')).map(a => a.slice(8))), user: { login: 'fixture-bot', id: 20 },
-        base: { ref: 'main', repo: { id: 10 } }, head: { ref: branch, sha: state.refs['refs/heads/' + branch], repo: { id: 10 } } });
-    save();
-    process.exit(state.partial_pr_error ? 1 : 0);
-}
 if (args.includes('graphql')) {
     const response = { data: { viewer: { login: 'fixture-bot', databaseId: 20 } } };
     if (state.graphql_errors)
@@ -120,6 +113,7 @@ if (args.includes('graphql')) {
     process.exit(0);
 }
 if (args[0] === 'pr' && args[1] === 'ready') {
+    if (state.reject_ready) process.exit(1);
     state.prs.find(pr => pr.number === Number(args[2])).draft = args.includes('--undo');
     save();
     process.exit(0);
@@ -134,7 +128,13 @@ if (method !== 'GET') {
     }
     const payload = JSON.parse(readFileSync(option('--input'), 'utf8'));
     let returned;
-    if (method === 'POST' && endpoint === 'repos/fixture/docs/issues') {
+    if (method === 'POST' && endpoint === 'repos/fixture/docs/pulls') {
+        returned = { id: 901, number: 501, state: 'open', merged_at: null, title: payload.title, body: payload.body, draft: payload.draft,
+            labels: [], user: { login: 'fixture-bot', id: state.response_creator_id ?? 20 },
+            base: { ref: payload.base, sha: state.commit, repo: { id: 10 } },
+            head: { ref: payload.head, sha: state.refs['refs/heads/' + payload.head], repo: { id: 10 } } };
+        state.prs.push(returned);
+    } else if (method === 'POST' && endpoint === 'repos/fixture/docs/issues') {
         returned = { ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: state.response_creator_id ?? 20 }, labels: applyLabels(payload.labels) };
         state.issues.push(returned);
     } else if (method === 'POST' && endpoint.endsWith('/comments')) {
@@ -148,7 +148,9 @@ if (method !== 'GET') {
         state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-2))).labels = returned;
     } else process.exit(1);
     save();
-    process.stdout.write(args.includes('--jq') ? '{}' : 'HTTP/2.0 ' + (method === 'POST' ? 201 : 200) + ' OK\\r\\n\\r\\n' + JSON.stringify(state.response_labels_missing && method === 'PUT' ? {} : returned));
+    if (state.partial_pr_error && method === 'POST' && endpoint.endsWith('/pulls')) process.exit(1);
+    const output = state.response_canary && !Array.isArray(returned) ? { ...returned, opaque: 'response-body-canary' } : returned;
+    process.stdout.write(args.includes('--jq') ? '{}' : 'HTTP/2.0 ' + (method === 'POST' ? 201 : 200) + ' OK\\r\\n' + (state.response_canary ? 'X-Secret: response-header-canary\\r\\n' : '') + '\\r\\n' + JSON.stringify(state.response_labels_missing && method === 'PUT' ? {} : output));
     process.exit(0);
 }
 let status = 200, value;
@@ -1053,8 +1055,7 @@ test.each(["pr-create", "issue-create", "pr-update"] as const)("server-canonical
   await f.transport.execute(f.plan, effect, f.objects);
   expect((await f.transport.observe(f.plan, effect, f.objects)).state).toBe("done");
   expect(canonicalJSON(effect)).toEqual(reviewed);
-  if (kind === "pr-create") expect(readFileSync(f.calls, "utf8")).toContain("--label=Documentation");
-  else {
+  {
     let sentLabels: unknown;
     for (const name of readdirSync(join(f.root, "artifacts"))) {
       if (!name.startsWith("native-command-")) continue;
@@ -1629,3 +1630,207 @@ test("native comment capture binds its complete parent destination", async () =>
     expect(() => readSuccess({ ...scope, evidence: { path: evidence.path, sha256: sha256(bytes) } })).toThrow();
   }
 });
+
+test("native PR creation links application evidence for the resource and its labels", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect = f.plan.manifest.effects.find(item => item.kind === "pr-create")!;
+  const selected = await startCleanupJournal(f, [effect]);
+  const journal = await executeAttempt({ journal: appendIntent(selected.journal, effect.id), effect,
+    objects: selected.objects, transport: f.transport });
+  const ending = journal.events.at(-1);
+  if (!ending || !("execution" in ending.payload) || !ending.payload.execution || !("attempt_id" in ending.payload)) throw Error("missing complete creation captures");
+  const attemptId = ending.payload.attempt_id;
+  expect(ending.payload.execution.successes).toHaveLength(2);
+  expect(ending.payload.execution).toHaveProperty("before");
+  expect(ending.payload.execution).toHaveProperty("commands", 2);
+  const captures = ending.payload.execution.successes.map(evidence => {
+    readSuccess({ artifact_root: f.transport.artifact_root, source_repo: selected.repo,
+      plan: selected.plan, effect, attempt_id: attemptId, evidence });
+    return JSON.parse(readFileSync(evidence.path, "utf8"));
+  });
+  expect(captures.map(value => value.command_index)).toEqual([0, 1]);
+  expect(captures[0].facts).toMatchObject({ number: 501, state: "open", draft: true,
+    head_sha: f.commit, head_ref: "docs-drift/one", base_ref: "main", user_id: 20 });
+  expect(captures[1].facts.labels).toEqual([101]);
+  expect(captures[1].endpoint).toBe("repos/fixture/docs/issues/501/labels");
+  const { readAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof");
+  const applied = readAppliedDelivery({ source_repo: selected.repo, journal_directory: journal.directory,
+    effect_id: effect.id, settings: f.settings });
+  expect(applied).toMatchObject({ resource_id: 901, number: 501, head_sha: f.commit });
+  expect((await f.transport.observe(selected.plan, effect, selected.objects)).state).toBe("done");
+  f.update(state => { state.prs[0].title = "Later owner edit"; });
+  expect((await f.transport.observe(selected.plan, effect, selected.objects)).state).toBe("conflict");
+  expect(readAppliedDelivery({ source_repo: selected.repo, journal_directory: journal.directory,
+    effect_id: effect.id, settings: f.settings }).proof_sha256).toBe(applied.proof_sha256);
+});
+
+for (const kind of ["issue-create", "comment-create", "pr-update", "pr-close"] as const) {
+test(`captured ${kind} proof survives a later edit without inferring application from that edit`, async () => {
+  const { readAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof");
+  const f = setup(); await f.transport.identity();
+  const original = { title: "Original title", body: "Original body", labels: ["old"], draft: true };
+  if (kind !== "issue-create") f.update(state => { state.prs.push({ ...original, id: 901, number: 77, state: "open", merged_at: null,
+    labels: [{ id: 102, name: "old" }], user: { login: kind === "pr-close" ? "legacy-bot" : "fixture-bot", id: kind === "pr-close" ? 90 : 20 },
+    head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", sha: f.commit, repo: { id: 10 } } }); });
+  const body = publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("delivered");
+  const effect: Effect = kind === "issue-create" ? { id: "delivered", kind, payload: { title: "Reviewed issue", body: body + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+    labels: ["documentation"], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } }
+    : kind === "comment-create" ? { id: "delivered", kind, payload: { number: 77, body, prior_ids: [] } }
+      : kind === "pr-close" ? { id: "delivered", kind, payload: { number: 77, expected_head: f.commit } }
+        : { id: "delivered", kind, payload: { number: 77, expected_head: f.commit, expected_payload: original,
+          expected_payload_sha256: sha256(canonicalJSON(original)), title: "Reviewed title", body, labels: ["documentation"], draft: true } };
+  const explanation: Effect = { id: "explain", kind: "comment-create", payload: { number: 77, prior_ids: [],
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("explain") } };
+  const selected = await startCleanupJournal(f, kind === "pr-close" ? [explanation, effect] : [effect]);
+  let journal = selected.journal;
+  if (kind === "pr-close") {
+    journal = await executeAttempt({ journal: appendIntent(journal, explanation.id), effect: explanation, objects: selected.objects, transport: f.transport });
+    const observed = await f.transport.observe(selected.plan, explanation, selected.objects);
+    if (observed.state !== "done") throw Error("missing proven current explanation");
+    journal = appendOutcome(journal, explanation.id, observed.outcome);
+  }
+  journal = await executeAttempt({ journal: appendIntent(journal, effect.id), effect, objects: selected.objects, transport: f.transport });
+  const scope = { source_repo: selected.repo, journal_directory: journal.directory, effect_id: effect.id, settings: f.settings };
+  const applied = readAppliedDelivery(scope);
+  expect(applied).toMatchObject({ context: "trial", transport: "native", effect_id: effect.id,
+    resource_id: kind === "issue-create" ? 801 : kind === "comment-create" ? 701 : 901 });
+  if (kind === "pr-close") expect(applied.explanation_effect_id).toBe(explanation.id);
+  f.update(state => {
+    if (kind === "issue-create") state.issues[0].title = "Later owner edit";
+    else if (kind === "comment-create") state.comments["77"][0].body += "\nLater owner edit";
+    else if (kind === "pr-close") state.prs[0].state = "open";
+    else state.prs[0].title = "Later owner edit";
+  });
+  expect((await f.transport.observe(selected.plan, effect, selected.objects)).state).toBe(kind === "pr-close" ? "absent" : "conflict");
+  expect(readAppliedDelivery(scope).proof_sha256).toBe(applied.proof_sha256);
+});
+}
+
+for (const kind of ["pr-create", "issue-create", "pr-update"] as const) {
+test(`settled ${kind} responses with missing approved labels cannot prove full application`, async () => {
+  const { readAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof");
+  const f = setup(); await f.transport.identity();
+  const original = { title: "Original title", body: "Original body", labels: ["old"], draft: true };
+  f.update(state => {
+    state.refs["refs/heads/docs-drift/one"] = f.commit;
+    if (kind === "pr-update") state.prs.push({ ...original, id: 901, number: 77, state: "open", merged_at: null,
+      labels: [{ id: 102, name: "old" }], user: { login: "fixture-bot", id: 20 },
+      head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", sha: f.commit, repo: { id: 10 } } });
+  });
+  const common = { title: "Reviewed title", body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("partial"), labels: ["documentation"], draft: true };
+  const effect: Effect = kind === "pr-create" ? { id: "partial", kind, payload: { ...common, base: "main", branch: "docs-drift/one" } }
+    : kind === "pr-update" ? { id: "partial", kind, payload: { ...common, number: 77, expected_head: f.commit,
+      expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)) } }
+      : { id: "partial", kind, payload: { title: common.title, body: common.body + "\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+        labels: common.labels, prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme) } };
+  const selected = await startCleanupJournal(f, [effect]);
+  f.update(state => { state.drop_labels = true; });
+  await executeAttempt({ journal: appendIntent(selected.journal, effect.id), effect, objects: selected.objects, transport: f.transport })
+    .catch(error => { expect(error).toBeInstanceOf(PublicationExecutionError); });
+  const journal = readJournal(selected.journal.directory, selected.repo);
+  const ending = journal.events.at(-1);
+  if (!ending || !("sent" in ending.payload) || !ending.payload.execution) throw Error("missing settled native captures");
+  expect(ending.payload.reaped).toBe(true);
+  expect(ending.payload.capture_unverified).toBeUndefined();
+  expect(ending.payload.execution.commands).toBe(ending.payload.execution.successes.length);
+  f.update(state => { (kind === "issue-create" ? state.issues[0] : state.prs[0]).title = "Later owner edit"; });
+  expect(() => readAppliedDelivery({ source_repo: selected.repo, journal_directory: journal.directory,
+    effect_id: effect.id, settings: f.settings })).toThrow("delivery-payload-incomplete");
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object);
+});
+}
+
+test("an unapplied draft component cannot be hidden by successful text and label captures", async () => {
+  const { readAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof");
+  const f = setup(); await f.transport.identity();
+  const original = { title: "Original title", body: "Original body", labels: ["old"], draft: false };
+  f.update(state => { state.prs.push({ ...original, id: 901, number: 77, state: "open", merged_at: null,
+    labels: [{ id: 102, name: "old" }], user: { login: "fixture-bot", id: 20 },
+    head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", sha: f.commit, repo: { id: 10 } } }); state.reject_ready = true; });
+  const effect: Effect = { id: "update", kind: "pr-update", payload: { number: 77, expected_head: f.commit,
+    expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)), title: "Reviewed title",
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("update"), labels: ["documentation"], draft: true } };
+  const selected = await startCleanupJournal(f, [effect]);
+  await expect(executeAttempt({ journal: appendIntent(selected.journal, effect.id), effect, objects: selected.objects, transport: f.transport })).rejects.toThrow();
+  const journal = readJournal(selected.journal.directory, selected.repo), ending = journal.events.at(-1);
+  if (!ending || !("sent" in ending.payload) || !ending.payload.execution) throw Error("missing partial update captures");
+  expect(ending.payload.reaped).toBe(true);
+  expect(ending.payload.execution.commands).toBe(3);
+  expect(ending.payload.execution.successes).toHaveLength(2);
+  expect(f.inspect().prs[0].draft).toBe(false);
+  expect(() => readAppliedDelivery({ source_repo: selected.repo, journal_directory: journal.directory,
+    effect_id: effect.id, settings: f.settings })).toThrow("delivery-command-settlement-unproved");
+});
+
+test("capture persistence failure retains no raw response canaries and supplies no application proof", async () => {
+  const { readAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof");
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; state.response_canary = true; });
+  const effect = f.plan.manifest.effects.find(item => item.kind === "pr-create")!;
+  const selected = await startCleanupJournal(f, [effect]);
+  const publish = journalArtifacts.publishArtifact;
+  const capture = spyOn(journalArtifacts, "publishArtifact").mockImplementation((path, bytes) => {
+    if (/\/success-[a-f0-9-]+\.json$/u.test(path)) throw Error("simulated projection persistence failure");
+    publish(path, bytes);
+  });
+  try {
+    await expect(executeAttempt({ journal: appendIntent(selected.journal, effect.id), effect,
+      objects: selected.objects, transport: f.transport })).rejects.toThrow();
+  } finally { capture.mockRestore(); }
+  expect(f.inspect().prs).toHaveLength(1);
+  expect(() => readAppliedDelivery({ source_repo: selected.repo, journal_directory: selected.journal.directory,
+    effect_id: effect.id, settings: f.settings })).toThrow("delivery-command-settlement-unproved");
+  const artifactRoot = f.transport.artifact_root;
+  for (const entry of readdirSync(artifactRoot, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const path = join(entry.parentPath, entry.name), bytes = readFileSync(path, "utf8");
+    expect(bytes).not.toContain("response-header-canary");
+    expect(bytes).not.toContain("response-body-canary");
+    expect(entry.name).not.toBe("stdout");
+    expect(entry.name).not.toBe("stderr");
+  }
+});
+
+for (const mode of ["missing-before", "missing-success", "foreign-before", "missing-file", "oversized", "tampered", "extra-command", "unreaped", "pre-capture", "changed-host"] as const) {
+test(`original captured delivery refuses ${mode} proof`, async () => {
+  const { readAppliedDelivery, readBefore, retainBefore } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof");
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const effect = f.plan.manifest.effects.find(item => item.kind === "pr-create")!;
+  const selected = await startCleanupJournal(f, [effect]), execute = f.transport.execute;
+  f.transport.execute = async (...args) => {
+    const captured = await execute(...args);
+    if (!captured?.before || captured.commands !== 2 || captured.successes.length !== 2 || !args[3]) throw Error("incomplete native test fixture capture");
+    if (mode === "missing-before") { delete captured.before; }
+    if (mode === "missing-success") captured.successes = captured.successes.slice(0, 1);
+    if (mode === "foreign-before") {
+      const scope = { artifact_root: f.transport.artifact_root, source_repo: selected.repo, plan: selected.plan, effect, attempt_id: args[3] };
+      const data = readBefore({ ...scope, evidence: captured.before! });
+      captured.before = retainBefore({ ...scope, attempt_id: "foreign-attempt", data });
+    }
+    if (mode === "missing-file") rmSync(captured.successes[0].path);
+    if (mode === "oversized") {
+      const bytes = Buffer.alloc(65537, " "); writeFileSync(captured.successes[0].path, bytes);
+      captured.successes[0].sha256 = sha256(bytes);
+    }
+    if (mode === "tampered") {
+      const value = JSON.parse(readFileSync(captured.before!.path, "utf8")); value.data.identity.actor_id = 21;
+      const bytes = canonicalJSON(value); writeFileSync(captured.before!.path, bytes);
+      captured.before!.sha256 = sha256(bytes);
+    }
+    if (mode === "extra-command") captured.commands++;
+    if (mode === "unreaped") throw new PublicationExecutionError(true, false, undefined, captured);
+    if (mode === "pre-capture") return;
+    return captured;
+  };
+  await executeAttempt({ journal: appendIntent(selected.journal, effect.id), effect, objects: selected.objects, transport: f.transport })
+    .catch(error => { expect(error).toBeInstanceOf(Error); });
+  expect(f.inspect().prs).toHaveLength(1);
+  f.update(state => { state.prs[0].title = "Later owner edit"; });
+  const settings = mode === "changed-host" ? { ...f.settings, hostname: "other.example" } : f.settings;
+  expect(() => readAppliedDelivery({ source_repo: selected.repo, journal_directory: selected.journal.directory,
+    effect_id: effect.id, settings })).toThrow();
+  expect(f.inspect().refs[f.settings.publication.lease_ref]).toBe(selected.objects.lease_object);
+});
+}

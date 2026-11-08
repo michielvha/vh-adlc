@@ -8,11 +8,11 @@ import { externalArtifactDirectory } from "./snapshot";
 import type { PublicationIdentity } from "./transport";
 
 export type SuccessEvidence = { path: string; sha256: string };
-/** Individually verified command facts, without a whole-effect completeness claim. */
-export type ExecutionEvidence = { successes: SuccessEvidence[] };
+/** Captured command facts and pre-dispatch context, without a whole-effect completeness claim. */
+export type ExecutionEvidence = { successes: SuccessEvidence[]; commands?: number; before?: SuccessEvidence };
 export type ExecutionResult = ExecutionEvidence & { capture_unverified?: true };
 type Scope = { artifact_root: string; source_repo: string; plan: SealedPlan; effect: Effect; attempt_id: string };
-type Facts = {
+export type Facts = {
   id: number | null; number: number | null; title_sha256: string | null; body_sha256: string | null;
   state: "open" | "closed" | null; draft: boolean | null; labels: number[] | null;
   head_sha: string | null; base_sha: string | null; merged: boolean | null; head_ref: string | null; base_ref: string | null;
@@ -126,8 +126,16 @@ export function projectSuccess(bytes: Uint8Array): { status: number; facts: Fact
 export function nativeMutationArguments(hostname: string, method: string, endpoint: string): string[] {
   return ["gh", "api", "--hostname", hostname, "--method", method, "--include", endpoint];
 }
-function expectedRequest(effect: Effect, repository: string, index: number) {
+function expectedRequest(effect: Effect, repository: string, index: number, endpoint?: string) {
   const p = effect.payload, prefix = "repos/" + repository;
+  if (effect.kind === "pr-create") {
+    if (index === 0) return { method: "POST", endpoint: prefix + "/pulls", input: { title: p.title, body: p.body, base: p.base, head: p.branch, draft: p.draft } };
+    if (index === 1) {
+      const start = prefix + "/issues/", target = /^([1-9][0-9]*)\/labels$/u.exec(endpoint?.slice(start.length) ?? "");
+      if (!endpoint?.startsWith(start) || !target) throw Error("invalid creation label target");
+      return { method: "PUT", endpoint: `${start}${positive(Number(target[1]))}/labels`, input: { labels: p.labels } };
+    }
+  }
   if (index === 0 && effect.kind === "issue-create") return { method: "POST", endpoint: prefix + "/issues", input: { title: p.title, body: p.body, labels: p.labels } };
   if (index === 0 && effect.kind === "comment-create") return { method: "POST", endpoint: `${prefix}/issues/${positive(p.number)}/comments`, input: { body: p.body } };
   if (index === 0 && effect.kind === "pr-close") return { method: "PATCH", endpoint: `${prefix}/pulls/${positive(p.number)}`, input: { state: "closed" } };
@@ -142,19 +150,19 @@ function identityScope(plan: SealedPlan, identity: PublicationIdentity): void {
     || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("success identity scope changed");
 }
 function responseScope(effect: Effect, index: number, repository: string, repositoryId: number, actor: string, actorId: number, hostname: string, status: number, facts: Facts): void {
-  const request = expectedRequest(effect, repository, index);
-  if (status !== (request.method === "POST" ? 201 : 200)) throw Error("unsupported native success status");
+  const method = effect.kind === "pr-create" && index === 1 ? "PUT" : expectedRequest(effect, repository, index).method;
+  if (status !== (method === "POST" ? 201 : 200)) throw Error("unsupported native success status");
   const parents = [facts.parent_repository, facts.parent_number, facts.parent_url_sha256, facts.parent_host, facts.parent_path];
   if (parents.some(value => value !== null) && parents.some(value => value === null)) throw Error("incomplete success parent binding");
-  if (request.method === "PUT") {
+  if (method === "PUT") {
     if (facts.labels === null || Object.entries(facts).some(([key, value]) => key !== "labels" && value !== null)) throw Error("invalid label response shape");
   } else if (facts.id === null) throw Error("missing success resource identity");
-  if ((effect.kind === "pr-update" || effect.kind === "pr-close") && index === 0) {
+  if (["pr-create", "pr-update", "pr-close"].includes(effect.kind) && index === 0) {
     if (facts.base_repository_id !== null && facts.base_repository_id !== repositoryId) throw Error("success base repository changed");
-    if (effect.kind === "pr-update" && facts.head_repository_id !== null && facts.head_repository_id !== repositoryId) throw Error("success head repository changed");
+    if (effect.kind !== "pr-close" && facts.head_repository_id !== null && facts.head_repository_id !== repositoryId) throw Error("success head repository changed");
   }
   if ((facts.user_id === null) !== (facts.user_login_sha256 === null)) throw Error("incomplete success creator binding");
-  if (effect.kind === "issue-create" && facts.number === null || effect.kind === "comment-create" && facts.number !== null) throw Error("invalid creation response shape");
+  if ((effect.kind === "issue-create" || effect.kind === "pr-create" && index === 0) && facts.number === null || effect.kind === "comment-create" && facts.number !== null) throw Error("invalid creation response shape");
   if (facts.parent_number !== null && facts.number !== null && facts.parent_number !== facts.number) throw Error("inconsistent native parent number");
   if (facts.parent_url_sha256 !== null) {
     const host = hostname === "github.com" ? "api.github.com" : hostname;
@@ -163,7 +171,7 @@ function responseScope(effect: Effect, index: number, repository: string, reposi
     if (facts.parent_host !== host || facts.parent_path === null || !paths.includes(facts.parent_path.toLowerCase())) throw Error("success parent destination changed");
   }
   if ((effect.kind === "pr-update" || effect.kind === "pr-close") && index === 0 && facts.number !== effect.payload.number) throw Error("success target changed");
-  if (effect.kind === "issue-create" || effect.kind === "comment-create") {
+  if (effect.kind === "issue-create" || effect.kind === "comment-create" || effect.kind === "pr-create" && index === 0) {
     if (facts.user_id !== actorId || facts.user_login_sha256 !== sha256(Buffer.from(actor))) throw Error("success creator changed");
   }
   if (effect.kind === "comment-create" && (facts.parent_number !== effect.payload.number || facts.parent_repository !== repository)) throw Error("success parent changed");
@@ -184,7 +192,7 @@ function commandScope(options: Scope, directory: string, hostname: string, metho
   if (process.exit_code !== 0 || process.reaped !== true || process.timed_out !== false
     || process.cancelled !== null || process.output_limit !== false) throw Error("incomplete successful command");
   const input = readArtifact(join(directory, "payload.json"));
-  const expected = expectedRequest(options.effect, options.plan.manifest.repository, index);
+  const expected = expectedRequest(options.effect, options.plan.manifest.repository, index, endpoint);
   if (typeof hostname !== "string" || !hostname || /[\r\n\0]/u.test(hostname) || method !== expected.method || endpoint !== expected.endpoint
     || owner.argv_sha256 !== sha256(canonicalJSON(nativeMutationArguments(hostname, method, endpoint)))
     || !input.equals(canonicalJSON(expected.input))) throw Error("success request scope changed");

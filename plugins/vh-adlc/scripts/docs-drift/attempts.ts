@@ -1,4 +1,5 @@
 import { readSuccess, type ExecutionResult, type SuccessEvidence } from "./success";
+import { readBefore } from "./delivery-proof";
 import { dirname } from "node:path";
 import { canonicalJSON } from "./protocol";
 import { readRejection, type RejectionEvidence } from "./rejections";
@@ -121,11 +122,11 @@ export async function executeAttempt(options: {
   }
   if (status.execution) {
     const verified: SuccessEvidence[] = [];
+    const metadata: Pick<ExecutionResult, "commands" | "before"> = {};
     const paths = new Set<string>();
     let unverified = Object.hasOwn(status.execution, "capture_unverified");
     try {
-      const keys = Object.keys(status.execution).sort().join(",");
-      if (keys !== "successes" && keys !== "capture_unverified,successes") unverified = true;
+      if (Object.keys(status.execution).some(key => !["successes", "capture_unverified", "commands", "before"].includes(key))) unverified = true;
       const successes = status.execution.successes;
       if (!Array.isArray(successes)) throw Error("invalid captured execution");
       if (successes.length > 16) unverified = true;
@@ -140,10 +141,26 @@ export async function executeAttempt(options: {
         } catch { unverified = true; }
       }
     } catch { unverified = true; }
+    if (Object.hasOwn(status.execution, "commands")) {
+      const count = status.execution.commands;
+      if (typeof count !== "number" || !Number.isSafeInteger(count) || count < verified.length || count > 16) unverified = true;
+      else metadata.commands = count;
+    }
+    if (Object.hasOwn(status.execution, "before")) {
+      try {
+        const evidence = status.execution.before;
+        if (!evidence) throw Error("missing delivery baseline");
+        const retained = { path: evidence.path, sha256: evidence.sha256 };
+        readBefore({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo,
+          plan: journal.plan, effect: options.effect, attempt_id: id, evidence: retained });
+        metadata.before = retained;
+      } catch { unverified = true; }
+    }
     if (status.rejection && verified.length > 0) unverified = true;
     const rejection = status.rejection;
     status = { sent: status.sent, reaped: status.reaped,
-      ...(verified.length > 0 || !unverified && !rejection ? { execution: { successes: verified } } : {}),
+      ...(verified.length > 0 || !rejection && (!unverified || metadata.before !== undefined || metadata.commands !== undefined)
+        ? { execution: { successes: verified, ...metadata } } : {}),
       ...(unverified ? { capture_unverified: true } : rejection ? { rejection } : {}) };
     if (unverified) failure ??= Error("success-proof-unavailable");
   }

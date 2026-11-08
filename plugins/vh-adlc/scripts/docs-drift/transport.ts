@@ -1,10 +1,11 @@
-import { nativeMutationArguments, retainSuccess, type ExecutionResult } from "./success";
+import { nativeMutationArguments, projectSuccess, retainSuccess, type ExecutionResult } from "./success";
+import { retainBefore, type BeforeData } from "./delivery-proof";
 import { projectRejection, retainRejection, type RejectionEvidence, type RejectedUpdate } from "./rejections";
 import { PublicationExecutionError } from "./attempts";
 import type { Effect } from "./manifests";
 import { publishArtifact, syncDirectory, type Outcome, type SealedPlan, type writePlanObject } from "./journal";
 import { randomUUID } from "node:crypto";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createGitHubReader, createRepositoryReader, GitHubReadError } from "../github-read";
 import { gitEnvironment, gitReadArguments } from "../git-read";
@@ -20,7 +21,7 @@ import type { Settings } from "./settings";
 export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string; receipt_object?: string };
 export type RefObservation = { state: "absent" } | { state: "present"; object: string };
 export type EffectObservation = { state: "done"; outcome: Outcome } | { state: "absent"; evidence?: AbsenceEvidence } | { state: "unknown"; reason: string } | { state: "conflict"; reason: string; evidence?: AbsenceEvidence };
-type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; successes: ExecutionResult["successes"]; capture_unverified: boolean; rejection?: RejectionEvidence };
+type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; commands: number; before?: ExecutionResult["before"]; successes: ExecutionResult["successes"]; capture_unverified: boolean; rejection?: RejectionEvidence };
 export type PublicationIdentity = { repository: string; repository_id: number; default_branch: string; actor: string; actor_id: number };
 
 /** The production entry constructs its native transport. Only the separate trial entry injects a collector. */
@@ -211,6 +212,53 @@ export function createNativeTransport(options: {
     if (effect.kind === "pr-update" && !updateTransitions(effect).some(fields => fieldsMatch(pr.input, fields))) throw Error("native mutable PR payload changed");
     return pr;
   }
+  async function captureBefore(plan: SealedPlan, effect: Effect): Promise<BeforeData> {
+    const started = reader.trace().length, p = effect.payload;
+    const identity = await nativeIdentity();
+    let source: BeforeData["source"] = null, creation: BeforeData["creation"] = null;
+    if (["pr-update", "pr-close", "comment-create"].includes(effect.kind)) {
+      const input = pull(positive(p.number), plan, false, false).input;
+      try {
+        const projected = projectSuccess(Buffer.from("HTTP/2.0 200 OK\r\n\r\n" + JSON.stringify(input)));
+        const facts = projected?.facts;
+        if (!facts || facts.state === null || typeof facts.draft !== "boolean" || facts.labels === null) throw Error("incomplete baseline source");
+        source = { id: positive(facts.id), number: positive(facts.number), state: facts.state, draft: facts.draft,
+          head_sha: text(facts.head_sha), head_ref: text(facts.head_ref), head_repository_id: facts.head_repository_id,
+          base_ref: text(facts.base_ref), base_repository_id: positive(facts.base_repository_id),
+          title_sha256: text(facts.title_sha256), body_sha256: text(facts.body_sha256), labels: facts.labels,
+          payload_sha256: sha256(canonicalJSON(submittedFields(input))) };
+      } catch { /* Incomplete legacy reads cannot establish a delivery baseline. */ }
+    }
+    if (["pr-create", "issue-create", "comment-create"].includes(effect.kind)) {
+      const surface = effect.kind === "pr-create" ? "pulls" : effect.kind === "issue-create" ? "issues" : "comments";
+      const endpoint = surface === "comments" ? `${prefix}/issues/${positive(p.number)}/comments?per_page=100`
+        : `${prefix}/${surface}?state=all&per_page=100`;
+      const inventory = list(endpoint);
+      const seen = new Set<number>();
+      const items = inventory.map(value => {
+        const item = record(value), id = positive(item.id ?? item.number);
+        if (seen.has(id) || item.body !== null && typeof item.body !== "string") throw Error("incomplete native baseline inventory");
+        seen.add(id);
+        return item;
+      });
+      const marker_ids = items.filter(item => markerMatches(item.body, plan, effect))
+        .map(item => positive(item.id ?? item.number)).sort((left, right) => left - right);
+      creation = { surface, inventory_sha256: sha256(canonicalJSON(inventory)), marker_ids };
+    }
+    const resolveLabels = (names: unknown): number[] | null => {
+      try {
+        const selected = reviewedLabels(names).map(name => {
+          const endpoint = `${prefix}/labels/${encodeURIComponent(name).replaceAll(".", "%2E")}`;
+          return positive(repositoryLabel(reader.get(endpoint)).id);
+        });
+        return [...new Set(selected)].sort((left, right) => left - right);
+      } catch { return null; }
+    };
+    const label_ids = ["pr-create", "issue-create", "pr-update"].includes(effect.kind) ? resolveLabels(p.labels) : null;
+    const original_label_ids = effect.kind === "pr-update" ? resolveLabels(record(p.expected_payload).labels) : null;
+    return { hostname: settings.hostname, identity, source, creation, label_ids, original_label_ids,
+      requests_sha256: sha256(canonicalJSON(reader.trace().slice(started))) };
+  }
   function observed(input: unknown, resourceId: string | null, object: string | null): EffectObservation {
     return { state: "done", outcome: { state: "observed", observation_sha256: sha256(canonicalJSON(input)), resource_id: resourceId, object } };
   }
@@ -273,7 +321,8 @@ export function createNativeTransport(options: {
     const permalink = `https://${settings.hostname}/${name}/blob/${commit}/${parts.map(encodeURIComponent).join("/")}`;
     if (!text(p.body).includes(permalink)) changed("missing-evidence-permalink");
   }
-  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }, successRequest?: { hostname: string; method: string; endpoint: string; identity: PublicationIdentity }): Promise<void> {
+  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }, successRequest?: { hostname: string; method: string; endpoint: string; identity: PublicationIdentity }): Promise<ReturnType<typeof projectSuccess>> {
+    delivery.commands++;
     const id = randomUUID(), directory = join(root, "native-command-" + id);
     publishArtifact(join(root, id + ".native-command.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-native-command", operation_id: plan.manifest.operation_id,
       root: directory, capture: "projected-v2", effect_id: delivery.effect_id, attempt_id: delivery.attempt_id, argv_sha256: sha256(canonicalJSON(argv)) }));
@@ -316,12 +365,13 @@ export function createNativeTransport(options: {
       } catch { delivery.capture_unverified = true; }
     }
     delivery.completed_commands++;
+    return successRequest && captured ? projectSuccess(captured.stdout) : null;
   }
-  async function mutation(plan: SealedPlan, method: string, endpoint: string, input: unknown, delivery: NativeDelivery): Promise<void> {
+  async function mutation(plan: SealedPlan, method: string, endpoint: string, input: unknown, delivery: NativeDelivery): Promise<ReturnType<typeof projectSuccess>> {
     if (!endpoint.startsWith(prefix + "/")) throw Error("foreign mutation destination");
     const identity = await nativeIdentity();
     if (identity.repository_id !== plan.manifest.repository_id || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("native mutation identity changed");
-    await run(plan, nativeMutationArguments(settings.hostname, method, endpoint), canonicalJSON(input), delivery, { protocol: "http" }, { hostname: settings.hostname, method, endpoint, identity });
+    return run(plan, nativeMutationArguments(settings.hostname, method, endpoint), canonicalJSON(input), delivery, { protocol: "http" }, { hostname: settings.hostname, method, endpoint, identity });
   }
   async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string, delivery: NativeDelivery, companion?: { ref: string; head: string; expected: string }): Promise<void> {
     requireOwnedStore(store, settings.repository);
@@ -476,10 +526,18 @@ export function createNativeTransport(options: {
       } catch { return { state: "unknown", reason: "native-publication-observation-unavailable" }; }
     },
     async execute(plan, effect, objects, attempt_id) {
-      const delivery: NativeDelivery = { sent: false, reaped: true, effect_id: effect.id, attempt_id: attempt_id ?? null, effect, completed_commands: 0, successes: [], capture_unverified: false };
-      const execution = (): ExecutionResult => ({ successes: delivery.successes,
+      const delivery: NativeDelivery = { sent: false, reaped: true, effect_id: effect.id, attempt_id: attempt_id ?? null, effect, completed_commands: 0, commands: 0, successes: [], capture_unverified: false };
+      const execution = (): ExecutionResult => ({ successes: delivery.successes, commands: delivery.commands,
+        ...(delivery.before ? { before: delivery.before } : {}),
         ...(delivery.capture_unverified ? { capture_unverified: true } : {}) });
       try {
+        if (attempt_id && ["pr-create", "issue-create", "comment-create", "pr-update", "pr-close"].includes(effect.kind)
+          && plan.manifest.effects.some(selected => selected.id === effect.id && sha256(canonicalJSON(selected)) === sha256(canonicalJSON(effect)))) {
+          const data = await captureBefore(plan, effect);
+          if (data.creation?.marker_ids.length) throw Error("creation marker predates native dispatch");
+          try { delivery.before = retainBefore({ artifact_root: root, source_repo: options.source_repo, plan, effect, attempt_id, data }); }
+          catch { /* An incomplete baseline supplies no acknowledgement proof. */ }
+        }
         const p = effect.payload;
         if (effect.kind === "lease-acquire") {
           const receipt = plan.manifest.effects[1];
@@ -506,12 +564,18 @@ export function createNativeTransport(options: {
           const branch = getRef("refs/heads/" + text(p.branch));
           if (branch.state !== "present" || branch.object !== plan.manifest.bindings.candidate_commit
             || repository.commit(branch.object).tree_sha !== plan.manifest.bindings.candidate_tree) throw Error("native candidate branch changed");
-          const body = join(root, "body-" + randomUUID() + ".md");
-          writeFileSync(body, text(p.body), { flag: "wx", mode: 0o600 });
-          const argv = ["gh", "pr", "create", "--repo", settings.repository, "--base", text(p.base), "--head", text(p.branch), `--title=${text(p.title)}`, "--body-file", body];
-          if (p.draft === true) argv.push("--draft");
-          for (const label of p.labels as string[]) argv.push("--label=" + label);
-          await run(plan, argv, null, delivery); return execution();
+          const created = await mutation(plan, "POST", `${prefix}/pulls`, {
+            title: p.title, body: p.body, base: p.base, head: p.branch, draft: p.draft,
+          }, delivery);
+          const facts = created?.facts;
+          if (created?.status !== 201 || !facts || facts.number === null || facts.user_id !== plan.manifest.actor_id
+            || facts.user_login_sha256 !== sha256(Buffer.from(plan.manifest.actor))
+            || facts.head_repository_id !== plan.manifest.repository_id || facts.base_repository_id !== plan.manifest.repository_id
+            || facts.head_sha !== plan.manifest.bindings.candidate_commit || facts.head_ref !== p.branch || facts.base_ref !== p.base
+            || facts.title_sha256 !== sha256(Buffer.from(text(p.title))) || facts.body_sha256 !== sha256(Buffer.from(text(p.body)))
+            || facts.draft !== p.draft || facts.state !== "open") throw Error("created native PR response unverified");
+          await mutation(plan, "PUT", `${prefix}/issues/${facts.number}/labels`, { labels: p.labels }, delivery);
+          return execution();
         }
         if (effect.kind === "pr-update") {
           mutablePull(effect, plan);
