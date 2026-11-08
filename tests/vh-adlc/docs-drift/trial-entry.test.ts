@@ -1,7 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
-import { readdirSync, rmSync, symlinkSync, renameSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, symlinkSync, renameSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { executeCollectorEffect } from "../../../plugins/vh-adlc/scripts/docs-drift/collector-proof";
+import { GitHubReadError } from "../../../plugins/vh-adlc/scripts/github-read";
 import { executeCollectorRefs } from "../../../plugins/vh-adlc/scripts/docs-drift/collector-refs";
 import { createJournal, sealPlan, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { publicationFixture } from "./publication-fixture";
@@ -17,6 +18,8 @@ import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
+import { acknowledgeDeliveries } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-ack";
+import { readAppliedDelivery } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -54,7 +57,7 @@ test("the trial context verifies actual committed setup, retained bytes and loca
   expect(Object.isFrozen(context)).toBe(true);
 });
 
-test.each(["identity", "path", "grant", "component", "client", "launcher"])("trial refuses forged %s context", fault => {
+test.each(["identity", "path", "grant", "component", "client", "launcher"] as const)("trial refuses forged %s context", fault => {
   const f = syntheticTrialFixture(roots);
   const selected = reviseTrialManifest(f, manifest => {
     if (fault === "identity") Object.assign(manifest, { identity: { ...manifest.identity, repository: "real/consumer" } });
@@ -64,20 +67,28 @@ test.each(["identity", "path", "grant", "component", "client", "launcher"])("tri
     if (fault === "client") manifest.clients_sha256 = "a".repeat(64);
     if (fault === "launcher") manifest.launcher.sha256 = "a".repeat(64);
   });
-  expect(() => loadTrialContext({ root: f.root, context_commit: selected, runtime_directory: f.runtime })).toThrow();
+  const reason = { identity: "synthetic context identity", path: "synthetic context identity", grant: "synthetic grant required",
+    component: "selected runtime identity", client: "synthetic settings identity", launcher: "launcher identity" }[fault];
+  expect(() => loadTrialContext({ root: f.root, context_commit: selected, runtime_directory: f.runtime })).toThrow(reason);
 });
 
-test.each(["remote", "symlink", "runtime", "alternate"])("trial refuses %s escape before a collector effect", fault => {
-  const f = syntheticTrialFixture(roots);
+test.each(["remote", "symlink", "runtime", "alternate"] as const)("trial refuses %s escape before a collector effect", async fault => {
+  const { f, context, options } = persistentPublication();
+  const journal = createJournal({ source_repo: f.source, artifact_root: context.artifacts, plan: options.plan });
+  const objects = writePublicationObjects(context.store, options.plan, journal.header);
+  const trackerBefore = git(f.tracker, "rev-parse", "refs/heads/state");
   if (fault === "remote") git(f.source, "remote", "set-url", "origin", "https://github.com/real/consumer");
   if (fault === "symlink") {
-    renameSync(join(f.root, "artifacts"), join(f.root, "original-artifacts"));
-    symlinkSync(join(f.root, "original-artifacts"), join(f.root, "artifacts"));
+    renameSync(join(f.root, "artifacts"), join(f.root, "evidence/original-artifacts"));
+    symlinkSync(join(f.root, "evidence/original-artifacts"), join(f.root, "artifacts"));
   }
   if (fault === "runtime") writeFileSync(join(f.runtime, "knowledge.md"), "changed retained bytes");
   if (fault === "alternate") writeFileSync(join(f.origin, "objects/info/alternates"), "/outside/objects\n");
-  expect(() => loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime })).toThrow();
+  const reason = { remote: "only the owned local fixture origin", symlink: "foreign or linked fixture input",
+    runtime: "unexpected or changed runtime input", alternate: "fixture Git layout" }[fault];
+  await expect((async () => createTrialTransport(context).execute(options.plan, options.plan.manifest.effects[0], objects, "escape-attempt"))()).rejects.toThrow(reason);
   expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
+  expect(git(f.tracker, "rev-parse", "refs/heads/state")).toBe(trackerBefore);
 });
 
 test("tracker resources survive a fresh reader and concurrent stale writers cannot overwrite them", () => {
@@ -114,8 +125,8 @@ test("the persistent transport reads actual fixture refs and refuses production 
   expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
 });
 
-function persistentPublication() {
-  const f = syntheticTrialFixture(roots);
+function persistentPublication(legacy = false) {
+  const f = syntheticTrialFixture(roots, { legacy });
   const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
   const settings = context.settings, operation = "persistent-one";
   const effects: Effect[] = [
@@ -126,6 +137,12 @@ function persistentPublication() {
       body: publicationMarker(settings, operation) + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } },
     { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } },
   ];
+  if (legacy) {
+    const original = { title: "Legacy title", body: "Legacy body", labels: ["documentation"], draft: false };
+    effects[3] = { id: "pr", kind: "pr-update", payload: { number: 77, expected_head: f.sourceCommit,
+      expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)),
+      title: "Reviewed legacy update", body: publicationMarker(settings, operation) + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } };
+  }
   const input = manifestFixture({ ...bindings, source_commit: f.sourceCommit, candidate_commit: f.sourceCommit,
     candidate_tree: git(f.source, "rev-parse", f.sourceCommit + "^{tree}"), settings_sha256: sha256(canonicalJSON(f.settings)) }, effects, operation);
   const policy = { adoption_sha256: hash("synthetic-only"), publication_kind: "advisory" as const,
@@ -166,13 +183,176 @@ test("a lost tracker response resumes from persistent resources without repeatin
 }, 60000);
 
 test("the fixture reader feeds committed PR data through the unchanged shared read parser", async () => {
-  const { createTrialReader } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-reader");
+  const { createTrialReader, fetchTrialProposalObjects } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-reader");
   const { collectProposals } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
-  const { context, options } = persistentPublication();
+  const { f, context, options } = persistentPublication();
   await publish(options);
   const reader = createTrialReader(context), collected = collectProposals(reader, context.settings);
   expect(collected.complete).toBe(true);
   expect(collected.proposals.map(proposal => proposal.number)).toEqual([501]);
   expect(reader.pull(501).head_sha).toBe(context.source_commit);
   expect(reader.trace().every(item => item.hostname === "docs-drift.invalid")).toBe(true);
+  expect((await fetchTrialProposalObjects(context, reader.pull(501))).complete).toBe(true);
+  const installed = invokeTrial(f, "collect-proposals");
+  if (installed.result.exitCode !== 0) throw Error(JSON.stringify(installed.report) + "\n" + installed.result.stderr.toString());
+  expect(installed.result.exitCode).toBe(0);
+  expect(installed.report.data.objects).toHaveLength(1);
+}, 60000);
+
+function invokeTrial(f: ReturnType<typeof syntheticTrialFixture>, command: string, extras: string[] = []) {
+  const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), command,
+    "--synthetic-trial", f.root, "--context-commit", f.contextCommit, ...extras], { stdout: "pipe", stderr: "pipe", timeout: 30000 });
+  const report = result.stdout.length ? JSON.parse(result.stdout.toString()) : null;
+  return { result, report };
+}
+
+test("the exported installed entry verifies its own runtime and emits a bound synthetic receipt", () => {
+  const f = syntheticTrialFixture(roots), { result, report } = invokeTrial(f, "inspect");
+  expect(result.exitCode).toBe(0);
+  expect(report.evidence_kind).toBe("synthetic");
+  expect(report.transport).toBe("collector");
+  expect(report.context_sha256).toHaveLength(64);
+  expect(report.component_sha256).toBe(f.manifest.component.component_sha256);
+  expect(report.entry_sha256).toBe(sha256(readFileSync(join(f.runtime, "scripts/docs-drift/trial-entry.ts"))));
+  expect(JSON.parse(readFileSync(report.receipt_path, "utf8"))).toEqual(report);
+});
+
+test("the installed synthetic scan uses the common scanner without caller mutations", () => {
+  const f = syntheticTrialFixture(roots), before = git(f.source, "status", "--porcelain");
+  const { result, report } = invokeTrial(f, "scan");
+  expect(result.exitCode).toBe(0);
+  expect(report.data.complete).toBe(true);
+  expect(report.source_commit).toBe(f.sourceCommit);
+  expect(git(f.source, "status", "--porcelain")).toBe(before);
+});
+
+test.each([["--repo", "/"], ["--transport", "native"], ["--approved", "true"]])("installed trial rejects extra authority selectors %j", (flag, value) => {
+  const f = syntheticTrialFixture(roots), { result, report } = invokeTrial(f, "inspect", [flag, value]);
+  expect(result.exitCode).toBe(2);
+  expect(report.outcome).toBe("refused");
+  expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
+});
+
+test.each(["approved", "standing-procedure", "missing-proof"] as const)("persistent delivery acknowledgement preserves owner edits (%s)", async approval => {
+  const { context, options } = persistentPublication(), execute = options.transport.execute;
+  options.transport.execute = async (...args) => {
+    const result = await execute(...args);
+    if (args[1].kind === "pr-create") throw new PublicationExecutionError(true, true, undefined, result ?? undefined);
+    return result;
+  };
+  const pending = await publish(options);
+  expect(pending.state).toBe("pending");
+  const state = readTrialTracker(context), resource = state.resources.get("pulls/501")!;
+  resource.body += "\nPreserved owner edit"; persistTrialTracker(context, state);
+  if (approval === "missing-proof") {
+    const evidence = readAppliedDelivery({ source_repo: context.source, journal_directory: pending.journal.directory,
+      effect_id: "pr", settings: context.settings, transport: "collector" });
+    rmSync(evidence.successes[0].path);
+  }
+  let authorizations = 0;
+  const result = await acknowledgeDeliveries({ source_repo: context.source, journal_directory: pending.journal.directory,
+    object_store: context.store, settings: context.settings, transport: createTrialTransport(context),
+    acknowledge_effect_ids: ["pr"], retire_effect_ids: [], authorize: async scope => {
+      authorizations += 1;
+      return { kind: "owner-delivery-acknowledgement", source: approval === "standing-procedure" ? "adopted-procedure" : "owner-current-request",
+        scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("synthetic exact owner approval") };
+    } });
+  expect(result.state).toBe(approval === "approved" ? "acknowledged" : "pending");
+  const lease = await createTrialTransport(context).ref(context.settings.publication.lease_ref);
+  expect(lease.state).toBe(approval === "approved" ? "absent" : "present");
+  expect(readTrialTracker(context).resources.get("pulls/501")?.body).toBe(resource.body);
+  expect(result.journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(approval === "approved");
+  if (approval === "approved") expect(authorizations).toBeGreaterThanOrEqual(2);
+  else expect(authorizations).toBe(approval === "missing-proof" ? 0 : 1);
+}, 60000);
+
+test("failed fixture reads preserve actual status and shared error shape", async () => {
+  const { createTrialReader } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-reader");
+  const f = syntheticTrialFixture(roots), context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
+  const reader = createTrialReader(context);
+  let missing: unknown;
+  try { reader.pull(999); } catch (error) { missing = error; }
+  expect(missing).toBeInstanceOf(GitHubReadError);
+  expect(reader.trace().at(-1)?.status).toBe(404);
+  expect(() => reader.ref("refs/heads/missing")).toThrow();
+  expect(reader.trace().at(-1)?.status).toBe(404);
+  expect(() => reader.workflow(1)).toThrow();
+  expect(reader.trace().at(-1)?.status).toBeNull();
+});
+
+test("the fixture reader exposes actual ref object types to the shared validator", async () => {
+  const { createTrialReader } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-reader");
+  const f = syntheticTrialFixture(roots);
+  git(f.source, "-c", "tag.gpgSign=false", "tag", "-a", "synthetic-tag", "-m", "Synthetic tag", f.sourceCommit);
+  git(f.origin, "fetch", "--no-tags", "--no-write-fetch-head", f.source, "refs/tags/synthetic-tag");
+  mkdirSync(join(f.origin, "refs/heads/docs-drift"), { recursive: true });
+  writeFileSync(join(f.origin, "refs/heads/docs-drift/tag-object"), git(f.source, "rev-parse", "refs/tags/synthetic-tag") + "\n");
+  const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
+  const reader = createTrialReader(context);
+  expect(() => reader.ref("refs/heads/docs-drift/tag-object")).toThrow("github-git-ref-changed");
+  expect(reader.trace().at(-1)?.status).toBe(200);
+});
+
+test.each(["main", "foreign-ref", "extra-root"])("context refuses an undeclared origin/resource change (%s)", fault => {
+  const f = syntheticTrialFixture(roots);
+  if (fault === "main") git(f.source, "push", f.origin, "main");
+  if (fault === "foreign-ref") git(f.origin, "update-ref", "refs/heads/foreign", f.sourceCommit);
+  if (fault === "extra-root") writeFileSync(join(f.root, "unlisted"), "outside declared context");
+  expect(() => loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime }))
+    .toThrow(fault === "main" ? "origin source binding" : fault === "foreign-ref" ? "origin ref outside" : "fixture paths");
+});
+
+test("a full collector inventory refuses creation before dispatch and persistence", async () => {
+  const f = publicationFixture(roots, { owned_resources: true });
+  for (let index = 1; index <= 1000; index += 1) f.resources.set("issues/" + index, { id: 1000 + index, number: index });
+  const effect = f.plan.manifest.effects.find(item => item.kind === "pr-create")!;
+  let persisted = false, failure: unknown;
+  try {
+    executeCollectorEffect({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan, effect, attempt_id: "full-inventory",
+      settings: f.settings, identity: await f.transport.identity(), resources: f.resources, labels: f.resourceLabels,
+      persist: () => { persisted = true; throw Error("too late"); } });
+  } catch (error) { failure = error; }
+  expect(failure).toMatchObject({ sent: false, reaped: true });
+  expect(persisted).toBe(false);
+  expect(f.resources.size).toBe(1000);
+});
+
+test("a legacy-authored PR update and acknowledgement bind the mutator separately", async () => {
+  const { context, options } = persistentPublication(true), execute = options.transport.execute;
+  options.transport.execute = async (...args) => {
+    const result = await execute(...args);
+    if (args[1].kind === "pr-update") throw new PublicationExecutionError(true, true, undefined, result ?? undefined);
+    return result;
+  };
+  const pending = await publish(options);
+  const proof = readAppliedDelivery({ source_repo: context.source, journal_directory: pending.journal.directory,
+    effect_id: "pr", settings: context.settings, transport: "collector" });
+  expect(proof.resource_id).toBe(1001);
+  const state = readTrialTracker(context), resource = state.resources.get("pulls/77")!;
+  expect(resource.title).toBe("Reviewed legacy update");
+  resource.body += "\nPreserved legacy author's later edit"; persistTrialTracker(context, state);
+  const result = await acknowledgeDeliveries({ source_repo: context.source, journal_directory: pending.journal.directory,
+    object_store: context.store, settings: context.settings, transport: createTrialTransport(context),
+    acknowledge_effect_ids: ["pr"], retire_effect_ids: [], authorize: async scope => ({ kind: "owner-delivery-acknowledgement",
+      source: "owner-current-request", scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("synthetic legacy update acknowledgement") }) });
+  expect(result.state).toBe("acknowledged");
+  expect(readTrialTracker(context).resources.get("pulls/77")?.user).toEqual({ id: 90, login: "legacy-bot", type: "Bot" });
+  expect(readTrialTracker(context).resources.get("pulls/77")?.body).toBe(resource.body);
+}, 60000);
+
+test.each(["changed-head", "wrong-base", "missing-head"] as const)("fixture object fetch remains incomplete for %s", async fault => {
+  const { createTrialReader, fetchTrialProposalObjects } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-reader");
+  const { f, context, options } = persistentPublication(); await publish(options);
+  const original = createTrialReader(context).pull(501);
+  if (fault === "changed-head") git(f.source, "push", f.origin, f.contextCommit + ":refs/heads/docs-drift/persistent");
+  if (fault === "missing-head") git(f.origin, "update-ref", "-d", "refs/heads/docs-drift/persistent");
+  if (fault === "wrong-base") {
+    const state = readTrialTracker(context), resource = state.resources.get("pulls/501")!;
+    (resource.base as { ref: string }).ref = "release"; persistTrialTracker(context, state);
+    expect(createTrialReader(context).pulls("main").items).toEqual([]);
+  }
+  const result = await fetchTrialProposalObjects(context, original);
+  expect(result.complete).toBe(false);
+  expect(result.diagnostics).toHaveLength(1);
+  expect(git(f.origin, "rev-parse", "main")).toBe(f.sourceCommit);
 }, 60000);

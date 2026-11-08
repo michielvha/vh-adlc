@@ -310,6 +310,21 @@ test("native permission errors are unknown and never become complete absence", a
   expect((await f.transport.observe(f.plan, lease, f.objects)).state).toBe("unknown");
 });
 
+test("configured legacy PR updates preserve the author while using the current mutation actor", async () => {
+  const f = setup(); await f.transport.identity();
+  const original = { title: "Legacy title", body: "Legacy body", labels: ["documentation"], draft: false };
+  f.update(state => { state.prs.push({ ...original, labels: [{ id: 101, name: "documentation" }], number: 77, state: "open", merged_at: null,
+    user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/legacy", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });
+  const update: Effect = { id: "legacy-update", kind: "pr-update", payload: { number: 77, expected_head: f.commit,
+    expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)), title: "Reviewed legacy update",
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("legacy-update"), labels: ["documentation"], draft: true } };
+  expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("absent");
+  await f.transport.execute(f.plan, update, f.objects);
+  expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("done");
+  f.update(state => { (state.prs[0].base as { ref: string }).ref = "release"; });
+  expect((await f.transport.observe(f.plan, update, f.objects)).state).toBe("conflict");
+});
+
 test("explicit legacy targets stay available for explanation and post-merge closure", async () => {
   const f = setup(); await f.transport.identity();
   f.update(state => { state.prs.push({ number: 77, state: "closed", merged_at: null, user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } }); });

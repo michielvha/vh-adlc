@@ -33,6 +33,7 @@ function inspectFixture(root: string): void {
   if (owner === undefined || realpathSync(root) !== root || !stat.isDirectory() || stat.isSymbolicLink()
     || stat.uid !== owner || (stat.mode & 0o077) !== 0) fail("private owned fixture required");
   let entries = 0;
+  if (!canonicalJSON(readdirSync(root).sort()).equals(canonicalJSON([...paths].sort()))) fail("fixture paths differ from setup");
   function visit(path: string): void {
     if (++entries > 50000) fail("fixture inventory bound");
     const item = lstatSync(path);
@@ -70,7 +71,7 @@ export function loadTrialContext(options: { root: string; context_commit: string
   const bytes = readGit(source, "show", contextCommit + ":" + TRIAL_CONTEXT_PATH);
   if (bytes.length > 1024 * 1024) fail("context size bound");
   const manifest = object(JSON.parse(decodeUTF8(bytes)), ["schema_version", "kind", "fixture_id", "source_commit",
-    "paths", "identity", "component", "launcher", "clients_sha256", "test_grant", "tracker_initial_commit", "object_store"]);
+    "paths", "identity", "component", "launcher", "clients_sha256", "test_grant", "tracker_initial_commit", "origin_initial_refs", "object_store"]);
   if (!canonicalJSON(manifest).equals(bytes) || manifest.schema_version !== 1 || manifest.kind !== "docs-drift-synthetic-context"
     || typeof manifest.fixture_id !== "string" || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(manifest.fixture_id)
     || !canonicalJSON(manifest.paths).equals(canonicalJSON(paths))
@@ -83,6 +84,27 @@ export function loadTrialContext(options: { root: string; context_commit: string
     || settings.default_branch !== TRIAL_IDENTITY.default_branch || settings.publication.actor !== TRIAL_IDENTITY.actor
     || settings.publication.repository !== TRIAL_IDENTITY.repository || settings.pr_discovery.repository !== TRIAL_IDENTITY.repository
     || digest(manifest.clients_sha256) !== sha256(canonicalJSON(settings.clients))) fail("synthetic settings identity");
+  const defaultRef = "refs/heads/" + settings.default_branch;
+  if (!Array.isArray(manifest.origin_initial_refs) || !manifest.origin_initial_refs.length || manifest.origin_initial_refs.length > 1000) fail("initial origin inventory");
+  const initialRefs = new Map<string, string>();
+  for (const row of manifest.origin_initial_refs) {
+    if (!Array.isArray(row) || row.length !== 2 || typeof row[0] !== "string" || initialRefs.has(row[0])) fail("initial origin ref fields");
+    const ref = row[0], target = commit(row[1]);
+    readGit(origin, "check-ref-format", ref);
+    if (ref !== defaultRef && !settings.legacy_proposals.branch_prefixes.some(prefix => ref.startsWith("refs/heads/" + prefix))) fail("initial origin ref scope");
+    initialRefs.set(ref, target);
+  }
+  if (initialRefs.get(defaultRef) !== sourceCommit) fail("initial origin source binding");
+  const originRefs = readGit(origin, "for-each-ref", "--format=%(refname) %(objectname)").toString().trim().split("\n");
+  for (const [ref, target] of initialRefs) {
+    if (!originRefs.includes(ref + " " + target)
+      || readGit(origin, "rev-parse", "--verify", "--end-of-options", target + "^{commit}").toString().trim() !== target) fail("origin source binding changed");
+  }
+  for (const line of originRefs) {
+    const [ref] = line.split(" ");
+    if (!initialRefs.has(ref) && ref !== settings.publication.lease_ref
+      && !ref.startsWith(settings.publication.receipt_ref_prefix) && !ref.startsWith("refs/heads/" + settings.publication.branch_prefix)) fail("origin ref outside declared fixture scope");
+  }
   const grant = object(manifest.test_grant, ["context", "transport", "scope"]);
   if (grant.context !== "trial" || grant.transport !== "collector" || grant.scope !== "synthetic-only") fail("synthetic grant required");
   const component = object(manifest.component, ["source_commit", "component_sha256"]);

@@ -6,6 +6,7 @@ import { effectDigest, effectMarker, type Effect } from "./manifests";
 import { retainAbsence, retainLookup } from "./observations";
 import { canonicalJSON, sha256 } from "./protocol";
 import { publicationMarker } from "./report-history";
+import { isRefreshTarget } from "./proposals";
 import type { SealedPlan } from "./journal";
 import { loadTrialContext, TRIAL_IDENTITY, type TrialContext } from "./trial-context";
 import { persistTrialTracker, readTrialTracker } from "./trial-tracker";
@@ -72,12 +73,16 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
     if (["pr-create", "pr-update"].includes(effect.kind)) matchesTarget = fieldsMatch({ title: p.title, body: p.body, labels: p.labels, draft: p.draft });
     if (effect.kind === "issue-create") matchesTarget = item.title === p.title && item.body === p.body && same(labels, [...p.labels as string[]].sort())
       && item.state === "open" && !Object.hasOwn(item, "pull_request");
-    if (creation || effect.kind === "pr-update") matchesTarget &&= user.id === TRIAL_IDENTITY.actor_id && user.login === TRIAL_IDENTITY.actor;
+    if (creation) matchesTarget &&= user.id === TRIAL_IDENTITY.actor_id && user.login === TRIAL_IDENTITY.actor;
     if (surface === "pulls") {
       const source = projectBeforeSource(item);
       const wantedHead = effect.kind === "pr-create" ? plan.manifest.bindings.candidate_commit : p.expected_head;
       const validPull = source.head_sha === wantedHead && source.base_ref === settings.default_branch && source.base_repository_id === TRIAL_IDENTITY.repository_id
         && source.head_repository_id === TRIAL_IDENTITY.repository_id && item.merged_at === null && item.merged !== true;
+      if (effect.kind === "pr-update" && !isRefreshTarget(settings, TRIAL_IDENTITY, { number: source.number, actor: String(user.login),
+        actor_id: Number(user.id), head_ref: source.head_ref, head_repository_id: source.head_repository_id })) {
+        return { state: "conflict", reason: "synthetic PR outside configured refresh scope", evidence: retainLookup({ ...observation, state: "conflict" }) };
+      }
       matchesTarget &&= validPull;
       if (effect.kind === "pr-create" && (source.head_ref !== p.branch || source.state !== "open")) matchesTarget = false;
       if (effect.kind === "pr-close") matchesTarget = validPull && source.state === "closed";

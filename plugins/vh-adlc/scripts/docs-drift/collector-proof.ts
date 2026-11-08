@@ -12,7 +12,9 @@ import { collectorMutationArguments, collectorRequest, projectSuccess, retainSuc
 import type { Settings } from "./settings";
 import type { PublicationIdentity } from "./transport";
 import { readGit } from "./git";
+import { isRefreshTarget } from "./proposals";
 
+export const COLLECTOR_RESOURCE_LIMIT = 1000;
 export type CollectorResources = Map<string, Record<string, unknown>>;
 export type CollectorLabel = { id: number; name: string };
 type Options = {
@@ -45,7 +47,8 @@ function labels(value: unknown, known: Options["labels"]): CollectorLabel[] {
 function prepare(options: Options) {
   const { plan, effect, settings, resources, identity } = options, p = effect.payload;
   const request = collectorRequest(effect, plan.manifest.repository);
-  if (resources.size > 1000) throw Error("fixture inventory exceeds bound");
+  if (resources.size > COLLECTOR_RESOURCE_LIMIT || resources.size === COLLECTOR_RESOURCE_LIMIT
+    && ["pr-create", "issue-create", "comment-create"].includes(effect.kind)) throw Error("fixture inventory exceeds bound");
   const parent = ["pr-update", "pr-close", "comment-create"].includes(effect.kind) ? record(resources.get("pulls/" + positive(p.number))) : null;
   const source = parent ? projectBeforeSource(parent) : null;
   if (source && source.base_ref !== settings.publication.base) throw Error("fixture parent destination changed");
@@ -54,8 +57,8 @@ function prepare(options: Options) {
   if (source && ["pr-update", "pr-close"].includes(effect.kind) && (source.state !== "open" || source.head_sha !== p.expected_head)) throw Error("fixture mutable target changed");
   if (effect.kind === "pr-update") {
     const original = record(p.expected_payload), author = record(parent!.user);
-    if (author.id !== identity.actor_id || author.login !== identity.actor || source!.head_repository_id !== identity.repository_id
-      || !source!.head_ref.startsWith(settings.publication.branch_prefix)
+    if (!isRefreshTarget(settings, identity, { number: source!.number, actor: String(author.login), actor_id: Number(author.id),
+      head_ref: source!.head_ref, head_repository_id: source!.head_repository_id })
       || source!.title_sha256 !== sha256(Buffer.from(String(original.title))) || source!.body_sha256 !== sha256(Buffer.from(String(original.body)))
       || source!.draft !== original.draft || !canonicalJSON(source!.labels).equals(canonicalJSON(originalLabels!.map(label => label.id)))) throw Error("fixture original payload changed");
   }

@@ -17,7 +17,7 @@ import { publicationMarker } from "./report-history";
 import { retainAbsence, retainLookup, type AbsenceEvidence } from "./observations";
 import { executeOwnedProcess } from "./owned-process";
 import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
-import { requireOwnedStore } from "./proposals";
+import { isRefreshTarget, requireOwnedStore } from "./proposals";
 import { readGit } from "./git";
 import type { Settings } from "./settings";
 export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string; receipt_object?: string };
@@ -186,12 +186,17 @@ export function createNativeTransport(options: {
     const identity = actor(input);
     return identity.actor === plan.manifest.actor && identity.actor_id === plan.manifest.actor_id;
   }
+  function refreshTarget(input: Record<string, unknown>, plan: SealedPlan): boolean {
+    const head = record(input.head), author = actor(input.user);
+    return isRefreshTarget(settings, { actor: plan.manifest.actor, actor_id: plan.manifest.actor_id, repository_id: plan.manifest.repository_id },
+      { number: positive(input.number), actor: author.actor, actor_id: author.actor_id, head_ref: text(head.ref),
+        head_repository_id: head.repo === null ? null : positive(record(head.repo).id) });
+  }
   function pull(number: number, plan: SealedPlan, requireOwner = true, requireBase = true) {
     const input = record(reader.get(`${prefix}/pulls/${positive(number)}`));
-    if (positive(input.number) !== number || (requireOwner && !ownedActor(input.user, plan))) throw Error("foreign native PR");
+    if (positive(input.number) !== number || (requireOwner && !refreshTarget(input, plan))) throw Error("foreign native PR");
     const base = record(input.base), head = record(input.head);
     if (positive(record(base.repo).id) !== plan.manifest.repository_id || (requireBase && text(base.ref) !== settings.publication.base)) throw Error("native PR destination changed");
-    if (requireOwner && (positive(record(head.repo).id) !== plan.manifest.repository_id || !text(head.ref).startsWith(settings.publication.branch_prefix))) throw Error("foreign native PR branch");
     if (input.state !== "open" && input.state !== "closed") throw Error("unknown native PR state");
     return { input, head: text(head.sha), branch: text(head.ref) };
   }
@@ -496,8 +501,7 @@ export function createNativeTransport(options: {
         }
         if (effect.kind === "pr-update" || effect.kind === "pr-close") {
           const pr = pull(positive(p.number), plan, false, false);
-          if (effect.kind === "pr-update" && (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
-            || !pr.branch.startsWith(settings.publication.branch_prefix))) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
+          if (effect.kind === "pr-update" && !refreshTarget(pr.input, plan)) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
           if (effect.kind === "pr-close" && pr.input.state === "closed") {
             if (pr.input.merged_at === null) return observed(pr.input, String(p.number), pr.head);
@@ -505,9 +509,9 @@ export function createNativeTransport(options: {
               return conflicted("native-PR-merged", { number: p.number, head: pr.head, merged_at: pr.input.merged_at });
             throw Error("incomplete native PR merge state");
           }
-          if (effect.kind === "pr-update" && fieldsMatch(pr.input, expectedFields(effect), comparisons)) return observedLookup(pr.input, String(p.number), pr.head);
           const base = text(record(pr.input.base).ref);
           if (base !== settings.publication.base) return conflicted("native-PR-destination-changed", { number: p.number, base, head: pr.head, state: pr.input.state });
+          if (effect.kind === "pr-update" && fieldsMatch(pr.input, expectedFields(effect), comparisons)) return observedLookup(pr.input, String(p.number), pr.head);
           if (effect.kind === "pr-close") return absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           const transitions = updateTransitions(effect);
           return pr.input.state === "open" && transitions.some(fields => fieldsMatch(pr.input, fields, comparisons))

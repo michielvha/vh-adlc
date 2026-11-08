@@ -1,6 +1,6 @@
 import { readGit, writeMetadataObject } from "./git";
 import { canonicalJSON, decodeUTF8, sha256 } from "./protocol";
-import type { CollectorLabel, CollectorResources } from "./collector-proof";
+import { COLLECTOR_RESOURCE_LIMIT, type CollectorLabel, type CollectorResources } from "./collector-proof";
 import type { TrialContext } from "./trial-context";
 
 type State = { schema_version: 1; kind: "docs-drift-synthetic-tracker"; fixture_id: string;
@@ -15,7 +15,7 @@ function parseState(bytes: Uint8Array, fixtureID: string): State {
   if (!value || typeof value !== "object" || !canonicalJSON(value).equals(Buffer.from(bytes))
     || Object.keys(value).sort().join(",") !== "fixture_id,kind,labels,resources,schema_version"
     || value.schema_version !== 1 || value.kind !== "docs-drift-synthetic-tracker" || value.fixture_id !== fixtureID
-    || !Array.isArray(value.resources) || value.resources.length > 1000 || !Array.isArray(value.labels)
+    || !Array.isArray(value.resources) || value.resources.length > COLLECTOR_RESOURCE_LIMIT || !Array.isArray(value.labels)
     || value.labels.length > 1000) fail("state schema or fixture binding");
   const keys = new Set<string>(), ids = new Set<number>();
   for (const row of value.resources) {

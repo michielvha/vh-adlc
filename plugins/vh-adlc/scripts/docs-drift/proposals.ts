@@ -8,6 +8,16 @@ import { canonicalDigest, canonicalJSON, decodeUTF8, protocolPath, sha256 } from
 import type { Settings } from "./settings";
 import type { OwnedObjectStore } from "./snapshot";
 
+/** Refreshing a configured legacy target preserves its author. The executing actor stays separate. */
+export function isRefreshTarget(settings: Settings, identity: { actor: string; actor_id: number; repository_id: number },
+  target: { number: number; actor: string; actor_id: number; head_ref: string; head_repository_id: number | null }): boolean {
+  const shared = target.actor === identity.actor && target.actor_id === identity.actor_id
+    && target.head_ref.startsWith(settings.publication.branch_prefix);
+  const legacy = settings.legacy_proposals.ids.includes(target.number) || settings.legacy_proposals.authors.includes(target.actor)
+    && settings.legacy_proposals.branch_prefixes.some(prefix => target.head_ref.startsWith(prefix));
+  return target.head_repository_id === identity.repository_id && (shared || legacy);
+}
+
 export function collectProposals(reader: RepositoryReader, settings: Settings) {
   const proposals: PullRequestInput[] = [], diagnostics: string[] = [];
   try {
