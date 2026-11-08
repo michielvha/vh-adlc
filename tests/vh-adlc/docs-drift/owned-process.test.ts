@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -32,6 +32,13 @@ for (const oversized of [false, true]) {
 test("memory capture returns when an escaped helper holds a pipe open", async () => {
   const root = mkdtempSync(join(tmpdir(), "docs-drift-held-pipe-"));
   const begin = Date.now();
+  let returned = false;
+  let signalledAfterReturn = false;
+  const kill = process.kill.bind(process);
+  const signals = spyOn(process, "kill").mockImplementation((pid, signal) => {
+    if (returned) signalledAfterReturn = true;
+    return kill(pid, signal);
+  });
   try {
     const result = await executeOwnedProcess({
       argv: [process.execPath, "-e", `
@@ -47,7 +54,10 @@ test("memory capture returns when an escaped helper holds a pipe open", async ()
     expect(Date.now() - begin).toBeLessThan(4000);
     expect(result.output_limit).toBe(true);
     expect(existsSync(join(root, "stdout"))).toBe(false);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+    returned = true;
+    await Bun.sleep(300);
+    expect(signalledAfterReturn).toBe(false);
+  } finally { signals.mockRestore(); rmSync(root, { recursive: true, force: true }); }
 }, 10000);
 
 test("memory capture keeps the owned child timeout", async () => {

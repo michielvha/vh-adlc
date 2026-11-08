@@ -60,7 +60,6 @@ export async function executeOwnedProcess(options: {
   const capturedResult = captured?.then(value => ({ value }), () => ({ value: null }));
   const captureDeadline = capturedResult ? setTimeout(() => {
     result.output_limit = true;
-    stop();
     for (const reader of readers) reader.cancel().catch(() => {});
   }, timeout + 2500) : undefined;
   const interrupt = () => { result.cancelled = "SIGINT"; stop(); };

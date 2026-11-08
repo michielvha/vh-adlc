@@ -1,6 +1,7 @@
+import * as journalArtifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { retainRejection, readRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
 import { executeAttempt, pendingAttempt, PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -1326,4 +1327,27 @@ test.each(["merged", "unmerged", "missing", "malformed"] as const)("closure reco
   const result = await f.transport.observe(f.plan, effect, f.objects);
   expect(result.state).toBe(state === "merged" ? "conflict" : state === "unmerged" ? "done" : "unknown");
   if (state === "merged") expect(result).toMatchObject({ reason: "native-PR-merged" });
+});
+
+test("native rejection proof links only after durable command artifacts", async () => {
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f);
+  f.update(state => { state.reject_git = true; });
+  const paths: string[] = [];
+  const publish = journalArtifacts.publishArtifact;
+  const observed = spyOn(journalArtifacts, "publishArtifact").mockImplementation((path, bytes) => {
+    paths.push(path);
+    publish(path, bytes);
+  });
+  try {
+    await expect(f.transport.execute(selected.plan, selected.effect, selected.objects, "durable-attempt")).rejects.toBeInstanceOf(PublicationExecutionError);
+    const owner = paths.findIndex(path => path.endsWith(".native-command.json"));
+    const status = paths.findIndex(path => path.endsWith("/process.json"));
+    const projection = paths.findIndex(path => path.endsWith("/rejection-response.json"));
+    const proof = paths.findIndex(path => /\/rejection-[a-f0-9-]+\.json$/u.test(path));
+    expect(owner).toBeGreaterThanOrEqual(0);
+    expect(status).toBeGreaterThan(owner);
+    expect(projection).toBeGreaterThan(status);
+    expect(proof).toBeGreaterThan(projection);
+  } finally { observed.mockRestore(); }
 });

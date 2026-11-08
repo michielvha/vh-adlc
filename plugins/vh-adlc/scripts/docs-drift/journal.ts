@@ -148,7 +148,7 @@ export function readVerifiedPlan(bytes: Uint8Array, verifyPolicy: (plan: SealedP
   return plan;
 }
 
-function syncDirectory(directory: string): void {
+export function syncDirectory(directory: string): void {
   const fd = openSync(directory, "r");
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
