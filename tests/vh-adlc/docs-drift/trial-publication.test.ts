@@ -1,10 +1,11 @@
 import { afterAll, expect, test } from "bun:test";
 import { cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { readJournal, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { readAppliedDelivery } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
+import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { readTrialPublication } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-publication";
 import { loadTrialContext } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-context";
 import { persistTrialTracker, readTrialTracker } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-tracker";
@@ -25,9 +26,13 @@ test("a report flag cannot authorize synthetic publication", () => {
   expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
 });
 
-async function publicationRequest() {
-  const fixture = persistentTrialPublication(roots, { bound_roles: true }), { context, options } = fixture;
-  const { review } = await options.gate();
+async function publicationRequest(kind: "advisory" | "resolve" = "advisory") {
+  const fixture = persistentTrialPublication(roots, { bound_roles: true }), { context } = fixture;
+  const { review, policy: originalPolicy } = await fixture.options.gate();
+  const policy = { ...originalPolicy, publication_kind: kind };
+  const options = { ...fixture.options,
+    plan: sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy, corrections: [], attention: [] }),
+    gate: async () => ({ review, policy }) };
   function retain(name: string, bytes: Uint8Array) {
     writeFileSync(join(context.artifacts, name), bytes, { mode: 0o600 });
     return { path: name, sha256: sha256(bytes) };
@@ -37,10 +42,10 @@ async function publicationRequest() {
     return { native: retain(name + ".jsonl", selected.native), returned: retain(name + ".txt", selected.returned), process };
   }
   const request = { schema_version: 1, kind: "docs-drift-synthetic-publication", context_sha256: context.context_sha256,
-    entry: "copilot", publication_kind: "advisory", plan: retain("plan.json", canonicalJSON(options.plan)), worker: role("worker"), reviewer: role("reviewer") };
+    entry: "copilot", publication_kind: kind, plan: retain("plan.json", canonicalJSON(options.plan)), worker: role("worker"), reviewer: role("reviewer") };
   const path = join(context.artifacts, "request.json");
   writeFileSync(path, canonicalJSON(request), { mode: 0o600 });
-  return { ...fixture, request, path };
+  return { ...fixture, options, request, path };
 }
 
 test("a synthetic request revalidates original role artifacts before every common publisher step", async () => {
@@ -135,8 +140,9 @@ test("the installed synthetic entry resumes an interrupted applied creation with
 }, 90000);
 
 test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "foreign-lease"] as const)("installed recovery presents an exact scope and preserves an edited delivery (%s)", async approval => {
-  const { f, context, options, path } = await publicationRequest();
+  const { f, context, options, path } = await publicationRequest("resolve");
   const publication = readTrialPublication(context, path), execute = publication.transport.execute;
+  expect(publication.plan.publication_kind).toBe("resolve");
   publication.transport.execute = async (...args) => {
     const captured = await execute(...args);
     if (args[1].id === "pr") throw new PublicationExecutionError(true, true, undefined, captured ?? undefined);
@@ -199,6 +205,7 @@ test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "
     expect(result.data.scope).toBeNull();
   }
   const journal = readJournal(interrupted.journal.directory, context.source);
+  expect(journal.plan.publication_kind).toBe("resolve");
   expect(journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(approval === "approved");
   expect(journal.events.filter(event => event.effect_id === "release" && event.kind === "attempt").length).toBe(approval === "approved" ? 1 : 0);
   expect(readTrialTracker(context).commit).toBe(preserved);
