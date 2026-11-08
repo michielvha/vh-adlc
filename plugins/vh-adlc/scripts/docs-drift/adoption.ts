@@ -106,7 +106,7 @@ function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof coll
     source_candidate: candidate, protected_sha256: bindings.protected_sha256, component_pin_sha256: bindings.component_pin.sha256, identity });
   for (const name of Object.keys(receiptRequirements) as (keyof typeof receiptRequirements)[]) {
     const receipt = object(receipts[name], ["schema_version", "kind", "evidence_kind", "source_commit", "artifact_sha256",
-      "bindings_sha256", "outcome", "native_conclusion", "worker_model", "reviewer_model", "observations",
+      "bindings_sha256", "outcome", "native_conclusion", "worker_model", "reviewer_model", "client_bindings", "observations",
       ...(name === "quiescence" ? ["workflow_id", "workflow_path", "observed_at", "queued_run_ids", "in_progress_run_ids", "interactive_request_sha256"] : [])]);
     if (receipt.schema_version !== 1 || receipt.kind !== name || receipt.evidence_kind !== "observed"
       || adoptionDigest(receipt.bindings_sha256) !== target) fail("observed record receipt " + name);
@@ -128,6 +128,11 @@ function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof coll
     const worker = name === "paired_review" || name === "history_read" ? null : roles?.worker.model ?? null;
     const reviewer = name === "history_read" ? null : roles?.reviewer.model ?? null;
     if (receipt.worker_model !== worker || receipt.reviewer_model !== reviewer) fail("recorded role identity " + name);
+    const clientNames = roles === null || name === "history_read" ? []
+      : name === "paired_review" ? [roles.reviewer.client] : [roles.worker.client, roles.reviewer.client];
+    const clients = Object.fromEntries(Object.entries(bindings.settings.clients).filter(([id]) => clientNames.includes(id)));
+    if (!canonicalJSON(receipt.client_bindings).equals(canonicalJSON(clients))) fail("recorded client identity " + name);
+
     const observations = object(receipt.observations, [...receiptRequirements[name], ...(expectedAttention ? ["only_attention_step_failed"] : [])]);
     if (Object.values(observations).some(observed => observed !== true)) fail("incomplete recorded observations " + name);
   }

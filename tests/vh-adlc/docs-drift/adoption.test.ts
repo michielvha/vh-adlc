@@ -138,9 +138,12 @@ function portableRecord(f: ReturnType<typeof source>) {
     const entry = name === "hosted_advisory" ? f.configured.execution.entries.hosted
       : name === "claude_entry" ? f.configured.execution.entries.claude
       : name === "copilot_entry" || name === "paired_review" ? f.configured.execution.entries.copilot : null;
+    const clientNames = entry === null ? [] : name === "paired_review" ? [entry.reviewer.client]
+      : [entry.worker.client, entry.reviewer.client];
+    const client_bindings = Object.fromEntries(Object.entries(f.configured.clients).filter(([id]) => clientNames.includes(id)));
     return [name, { schema_version: 1, kind: name, evidence_kind: "observed", source_commit: f.candidate,
       artifact_sha256: hash(name + " synthetic original bytes"), bindings_sha256: target, outcome: "passed", native_conclusion: "success",
-      worker_model: name === "paired_review" ? null : entry?.worker.model ?? null, reviewer_model: entry?.reviewer.model ?? null,
+      worker_model: name === "paired_review" ? null : entry?.worker.model ?? null, reviewer_model: entry?.reviewer.model ?? null, client_bindings,
       observations: Object.fromEntries(observations.map(observation => [observation, true])),
       ...(name === "quiescence" ? { workflow_id: f.configured.reports.workflow_id,
         workflow_path: f.configured.execution.scheduled_workflow, observed_at: "2026-11-08T10:00:00Z",
@@ -167,13 +170,15 @@ test("portable owner attestation validates a non-circular record-only child with
     identity: { ...runtimeIdentity, repository_id: 11 } })).toThrow("native adoption identity");
 });
 
-for (const invalid of ["test-only", "missing-history", "incomplete-entry", "changed-model", "unknown-observation", "active-run", "missing-freeze", "predecessor"] as const) {
+for (const invalid of ["test-only", "missing-history", "incomplete-entry", "changed-model", "changed-client", "unknown-observation", "active-run", "missing-freeze", "predecessor"] as const) {
   test(`portable adoption refuses ${invalid} evidence despite a passing outer claim`, () => {
     const f = source(), record = portableRecord(f);
     if (invalid === "test-only") record.receipts.copilot_entry!.evidence_kind = "test-only";
     if (invalid === "missing-history") delete record.receipts.history_read;
     if (invalid === "incomplete-entry") record.receipts.claude_entry!.observations.closure = false;
     if (invalid === "changed-model") record.receipts.copilot_entry!.reviewer_model = "different-model";
+    if (invalid === "changed-client") record.receipts.copilot_entry!.client_bindings["copilot-linux"] = {
+      ...f.configured.clients["copilot-linux"], distribution_sha256: "b".repeat(64) };
     if (invalid === "unknown-observation") record.receipts.hosted_advisory!.observations.silent_override = true;
     if (invalid === "active-run") Object.assign(record.receipts.quiescence!, { queued_run_ids: [7] });
     if (invalid === "missing-freeze") record.receipts.quiescence!.observations.interactive_frozen = false;
@@ -214,4 +219,11 @@ test("a red advisory trial can retain only its declared expected attention failu
   const checked = adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity });
   expect(checked.receipts).toEqual(record.receipts);
   expect(trial.native_conclusion).toBe("failure");
+});
+
+test("an observed entry receipt must retain its protected native client identities", () => {
+  const f = source(), record = portableRecord(f);
+  Reflect.deleteProperty(record.receipts.copilot_entry!, "client_bindings");
+  const delivery = deliverRecord(f, record);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity })).toThrow();
 });
