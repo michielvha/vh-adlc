@@ -1,3 +1,4 @@
+import { readGitSuccess } from "./git-success";
 import { randomUUID } from "node:crypto";
 import { dirname, join } from "node:path";
 import { realpathSync } from "node:fs";
@@ -269,6 +270,10 @@ export function retainSuccess(options: Scope & {
 
 /** The journal links these private attestations to its original run and attempt. */
 export function readSuccess(options: Scope & { evidence: SuccessEvidence }): SuccessEvidence {
+  if (["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(options.effect.kind)) {
+    readGitSuccess(options);
+    return options.evidence;
+  }
   const selected = options.plan.manifest.effects.find(effect => effect.id === options.effect.id);
   if (!selected || effectDigest([selected]) !== effectDigest([options.effect])) throw Error("foreign success effect");
   const root = externalArtifactDirectory(options.artifact_root, options.source_repo);

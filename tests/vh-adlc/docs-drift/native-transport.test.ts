@@ -103,6 +103,7 @@ if (process.argv[1].endsWith('/git')) {
         } else delete state.refs[ref];
     }
     save();
+    process.stdout.write('To https://github.com/fixture/docs.git\\n' + updates.map(item => (item.head ? '*' : '-') + '\\t' + item.head + ':' + item.ref + '\\t[fixture applied]\\n').join('') + 'Done\\n');
     process.exit(0);
 }
 if (args.includes('graphql')) {
@@ -135,7 +136,7 @@ if (method !== 'GET') {
             head: { ref: payload.head, sha: state.refs['refs/heads/' + payload.head], repo: { id: 10 } } };
         state.prs.push(returned);
     } else if (method === 'POST' && endpoint === 'repos/fixture/docs/issues') {
-        returned = { ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: state.response_creator_id ?? 20 }, labels: applyLabels(payload.labels) };
+        returned = { ...payload, id: 801, number: 601, state: 'open', user: { login: 'fixture-bot', id: state.response_creator_id ?? 20 }, labels: applyLabels(payload.labels) };
         state.issues.push(returned);
     } else if (method === 'POST' && endpoint.endsWith('/comments')) {
         const number = endpoint.split('/').at(-2);
@@ -1663,6 +1664,11 @@ test("native PR creation links application evidence for the resource and its lab
   expect((await f.transport.observe(selected.plan, effect, selected.objects)).state).toBe("conflict");
   expect(readAppliedDelivery({ source_repo: selected.repo, journal_directory: journal.directory,
     effect_id: effect.id, settings: f.settings }).proof_sha256).toBe(applied.proof_sha256);
+  const { lookupAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-lookup");
+  const lookup = await lookupAppliedDelivery({ source_repo: selected.repo, journal_directory: journal.directory,
+    effect_id: effect.id, settings: f.settings, transport: f.transport });
+  expect(lookup.differences).toEqual(["title_sha256"]);
+  expect(lookup.resource_id).toBe(applied.resource_id);
 });
 
 for (const kind of ["issue-create", "comment-create", "pr-update", "pr-close"] as const) {
@@ -1705,6 +1711,10 @@ test(`captured ${kind} proof survives a later edit (null parent body=${nullBody}
   });
   expect((await f.transport.observe(selected.plan, effect, selected.objects)).state).toBe(kind === "pr-close" ? "absent" : "conflict");
   expect(readAppliedDelivery(scope).proof_sha256).toBe(applied.proof_sha256);
+  const { lookupAppliedDelivery } = await import("../../../plugins/vh-adlc/scripts/docs-drift/delivery-lookup");
+  const lookup = await lookupAppliedDelivery({ ...scope, transport: f.transport });
+  expect(lookup.resource_id).toBe(applied.resource_id);
+  expect(lookup.differences).toEqual([kind === "pr-close" ? "state" : kind === "comment-create" ? "body_sha256" : "title_sha256"]);
 });
 }
 
@@ -1875,3 +1885,78 @@ test(`acknowledgement journal rejects a proven ${mode}-only native history`, asy
     application_sha256: hash("contradictory schema application"), settlement_sha256: hash("native settled requests") })).toThrow("invalid delivery acknowledgement");
 });
 }
+
+test("native atomic metadata dispatch retains complete terminal ref application evidence", async () => {
+  const f = setup(); await f.transport.identity();
+  const repo = join(f.root, "source");
+  const journal = createJournal({ source_repo: repo, artifact_root: f.transport.artifact_root, plan: f.plan });
+  const objects = writePublicationObjects(f.store, f.plan, journal.header), effect = f.plan.manifest.effects[0];
+  const ended = await executeAttempt({ journal: appendIntent(journal, effect.id), effect, objects, transport: f.transport });
+  const ending = ended.events.at(-1);
+  if (!ending || !("execution" in ending.payload) || !ending.payload.execution) throw Error("missing metadata execution");
+  expect(ending.payload.execution.successes).toHaveLength(1);
+  const { readGitSuccess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git-success");
+  const proof = readGitSuccess({ source_repo: repo, artifact_root: f.transport.artifact_root, plan: f.plan, effect,
+    attempt_id: ending.payload.attempt_id, evidence: ending.payload.execution.successes[0] });
+  expect(proof.updates).toEqual([{ ref: f.settings.publication.lease_ref, head: objects.lease_object, expected: "" },
+    { ref: f.settings.publication.receipt_ref_prefix + f.plan.manifest.operation_id, head: objects.receipt_object, expected: "" }]);
+});
+
+test("real Git application evidence covers atomic acquisition and exact owned deletion", async () => {
+  const { readGitSuccess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git-success");
+  const f = setup(); await f.transport.identity();
+  const release: Effect = { id: "release", kind: "lease-release", payload: { ref: f.settings.publication.lease_ref } };
+  const input = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects, release]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: hash("adoption"),
+    publication_kind: "advisory", context: "trial", transport: "native", corrections: [], attention: [] });
+  const journal = createJournal({ source_repo: join(f.root, "source"), artifact_root: f.transport.artifact_root, plan });
+  const selected = { journal, effect: plan.manifest.effects[0], objects: writePublicationObjects(f.store, plan, journal.header) };
+  const server = realGitServer(f);
+  const captured = await f.transport.execute(plan, selected.effect, selected.objects, "real-acquire");
+  if (!captured?.successes[0]) throw Error("missing actual Git application response");
+  const scope = { source_repo: selected.journal.source_repo, artifact_root: f.transport.artifact_root, plan };
+  const acquired = readGitSuccess({ ...scope, effect: selected.effect, attempt_id: "real-acquire", evidence: captured.successes[0] });
+  expect(acquired.updates.map(update => update.ref)).toEqual([f.settings.publication.lease_ref, f.settings.publication.receipt_ref_prefix + "operation-1"]);
+  expect(readGit(server, "rev-parse", f.settings.publication.lease_ref).toString().trim()).toBe(selected.objects.lease_object!);
+  const result = await f.transport.execute(plan, release, selected.objects, "real-release");
+  if (!result?.successes[0]) throw Error("missing actual Git deletion response");
+  expect(readGitSuccess({ ...scope, effect: release, attempt_id: "real-release", evidence: result.successes[0] }).updates)
+    .toEqual([{ ref: f.settings.publication.lease_ref, head: null, expected: selected.objects.lease_object! }]);
+  expect(readGit(server, "for-each-ref", f.settings.publication.lease_ref).toString()).toBe("");
+  expect(readGit(server, "rev-parse", f.settings.publication.receipt_ref_prefix + "operation-1").toString().trim()).toBe(selected.objects.receipt_object!);
+});
+
+for (const mode of ["actor", "hostname", "request-head", "process", "missing-owner", "projection-extra", "wrong-status", "collector", "oversized", "tampered"] as const) {
+test(`native ref proof refuses ${mode} changes`, async () => {
+  const { readGitSuccess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/git-success");
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f);
+  const captured = await f.transport.execute(f.plan, selected.effect, selected.objects, "bound-acquire");
+  if (!captured?.successes[0]) throw Error("missing bound Git proof");
+  const evidence = captured.successes[0], value = JSON.parse(readFileSync(evidence.path, "utf8"));
+  const scope = { source_repo: selected.journal.source_repo, artifact_root: f.transport.artifact_root, plan: f.plan,
+    effect: selected.effect, attempt_id: "bound-acquire" };
+  readGitSuccess({ ...scope, evidence });
+  if (mode === "actor") value.identity.actor_id = 99;
+  if (mode === "hostname") value.hostname = "other.example";
+  if (mode === "request-head") value.projection.updates[0].head = "e".repeat(40);
+  if (mode === "projection-extra") value.projection.secret = "excluded-canary";
+  if (mode === "wrong-status") value.projection.statuses[0] = "!";
+  if (mode === "collector") value.transport = "collector";
+  if (mode === "process") writeFileSync(join(value.command_directory, "process.json"), canonicalJSON({ exit_code: 0, reaped: false, timed_out: false, cancelled: null, output_limit: false }));
+  if (mode === "missing-owner") rmSync(join(f.transport.artifact_root, value.command_directory.split("native-command-").at(-1) + ".native-command.json"));
+  const bytes = mode === "oversized" ? Buffer.alloc(65537, " ") : canonicalJSON(value);
+  writeFileSync(evidence.path, bytes);
+  expect(() => readGitSuccess({ ...scope, evidence: { path: evidence.path, sha256: mode === "tampered" ? hash("different digest") : sha256(bytes) } })).toThrow();
+});
+}
+
+test("a zero-exit Git child without a complete terminal response supplies no success proof", async () => {
+  const f = setup(); await f.transport.identity();
+  const selected = acquisition(f);
+  writeFileSync(join(f.root, "bin/git"), `#!${process.execPath}\nprocess.exit(0);\n`, { mode: 0o700 });
+  await expect(executeAttempt({ journal: appendIntent(selected.journal, selected.effect.id), effect: selected.effect,
+    objects: selected.objects, transport: f.transport })).rejects.toThrow("success-proof-unavailable");
+  const ending = readJournal(selected.journal.directory, selected.journal.source_repo).events.at(-1);
+  expect(ending?.payload).toMatchObject({ sent: true, reaped: true, capture_unverified: true, execution: { successes: [], commands: 1 } });
+});

@@ -1,3 +1,6 @@
+import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
+import type { ExecutionResult } from "../../../plugins/vh-adlc/scripts/docs-drift/success";
+import { executeCollectorRefs } from "../../../plugins/vh-adlc/scripts/docs-drift/collector-refs";
 import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -16,7 +19,8 @@ import { executeCollectorEffect, type CollectorResources, type CollectorLabel } 
 import { projectBeforeSource } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof";
 
 
-export function publicationFixture(roots: string[]) {
+// Older orchestration tests use abstract observations. Owned-resource tests execute the collector.
+export function publicationFixture(roots: string[], options: { owned_resources?: boolean } = {}) {
   const root = realpathSync(mkdtempSync(join(realpathSync(tmpdir()), "vh-drift-publish-")));
   roots.push(root);
   const repo = join(root, "source"), artifacts = join(root, "artifacts"), parent = join(root, "objects"), evidence = join(root, "evidence");
@@ -57,6 +61,16 @@ export function publicationFixture(roots: string[]) {
       const bytes = readGit(store.root, "cat-file", "blob", blob);
       return { bytes, objects: { object, tree, blob, plan_sha256: sha256(bytes) } };
     },
+    async readDelivery(plan, effect, application) {
+      const surface = effect.kind === "comment-create" ? "comments" : effect.kind === "issue-create" ? "issues" : "pulls";
+      const inventory = [...resources.entries()].filter(([key, value]) => key.startsWith(surface + "/")
+        && (surface !== "comments" || value.parent_number === effect.payload.number)).map(([, value]) => value);
+      const resource = inventory.find(value => value.id === application.resource_id);
+      const parent = effect.kind === "comment-create" ? resources.get("pulls/" + effect.payload.number) : null;
+      const explanation = effect.kind === "pr-close" ? [...resources.entries()].filter(([key, value]) => key.startsWith("comments/")
+        && value.parent_number === effect.payload.number).map(([, value]) => value) : [];
+      return { resource, inventory, parent, explanation, requests_sha256: sha256(canonicalJSON({ surface, inventory, parent: parent ?? null, explanation })) };
+    },
     async observe(plan, effect, objects) {
       observed.push(effect.id);
       const leaseObject = objects.lease_object ?? objects.object;
@@ -81,22 +95,31 @@ export function publicationFixture(roots: string[]) {
     async execute(plan, effect, objects, attempt_id) {
       executed.push(effect.id);
       if (effect.kind === "lease-release" && refs.get(String(effect.payload.ref)) !== (objects.lease_object ?? objects.object)) throw Error("changed fixture lease");
-      const captured = attempt_id && ["pr-create", "issue-create", "comment-create", "pr-update", "pr-close"].includes(effect.kind)
-        ? executeCollectorEffect({ source_repo: repo, artifact_root: artifacts, plan, effect, attempt_id, settings,
-          identity: await transport.identity(), resources, labels: resourceLabels }) : null;
-      done.add(effect.id);
-      if (effect.kind === "lease-acquire") {
-        const receipt = plan.manifest.effects[1];
-        if (receipt?.kind !== "receipt-retain") throw Error("missing fixture metadata envelope");
-        const lease = objects.lease_object ?? objects.object, retained = objects.receipt_object ?? objects.object;
-        if ((refs.has(String(effect.payload.ref)) && refs.get(String(effect.payload.ref)) !== lease)
-          || (refs.has(String(receipt.payload.ref)) && refs.get(String(receipt.payload.ref)) !== retained)) throw new Error("fixture atomic metadata conflict");
-        refs.set(String(effect.payload.ref), lease);
-        refs.set(String(receipt.payload.ref), retained);
-        done.add(receipt.id); executed.push(receipt.id);
+      let captured: ExecutionResult | undefined;
+      if (options.owned_resources && !attempt_id) throw new PublicationExecutionError(false, true);
+      if (options.owned_resources && attempt_id) {
+        const scope = { source_repo: repo, artifact_root: artifacts, plan, effect, attempt_id, settings, identity: await transport.identity() };
+        captured = ["pr-create", "issue-create", "comment-create", "pr-update", "pr-close"].includes(effect.kind)
+          ? executeCollectorEffect({ ...scope, resources, labels: resourceLabels })
+          : executeCollectorRefs({ ...scope, objects, refs });
       }
-      if (effect.kind === "receipt-retain") refs.set(String(effect.payload.ref), objects.receipt_object ?? objects.object);
-      if (effect.kind === "lease-release") refs.delete(String(effect.payload.ref));
+      done.add(effect.id);
+      if (options.owned_resources) {
+        if (effect.kind === "lease-acquire") done.add(plan.manifest.effects[1].id);
+      } else {
+        if (effect.kind === "lease-acquire") {
+          const receipt = plan.manifest.effects[1];
+          if (receipt?.kind !== "receipt-retain") throw Error("missing fixture metadata envelope");
+          const lease = objects.lease_object ?? objects.object, retained = objects.receipt_object ?? objects.object;
+          if ((refs.has(String(effect.payload.ref)) && refs.get(String(effect.payload.ref)) !== lease)
+            || (refs.has(String(receipt.payload.ref)) && refs.get(String(receipt.payload.ref)) !== retained)) throw new Error("fixture atomic metadata conflict");
+          refs.set(String(effect.payload.ref), lease);
+          refs.set(String(receipt.payload.ref), retained);
+          done.add(receipt.id); executed.push(receipt.id);
+        }
+        if (effect.kind === "receipt-retain") refs.set(String(effect.payload.ref), objects.receipt_object ?? objects.object);
+        if (effect.kind === "lease-release") refs.delete(String(effect.payload.ref));
+      }
       return captured ?? undefined;
     },
   };

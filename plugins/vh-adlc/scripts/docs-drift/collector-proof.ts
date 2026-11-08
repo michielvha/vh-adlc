@@ -120,8 +120,8 @@ function prepare(options: Options) {
   return { request, data, key, after };
 }
 
-/** A null result leaves the fixture resources unchanged. */
-export function executeCollectorEffect(options: Options): ExecutionResult | null {
+/** Pre-dispatch refusals leave resources unchanged and are recorded as unsent. */
+export function executeCollectorEffect(options: Options): ExecutionResult {
   const { plan, effect, identity } = options;
   if (plan.transport !== "collector" || plan.context !== "trial" || identity.repository !== plan.manifest.repository
     || identity.repository_id !== plan.manifest.repository_id || identity.actor !== plan.manifest.actor
@@ -130,7 +130,7 @@ export function executeCollectorEffect(options: Options): ExecutionResult | null
   const selected = plan.manifest.effects.find(item => item.id === effect.id);
   if (!selected || effectDigest([selected]) !== effectDigest([effect])) throw new PublicationExecutionError(false, true);
   let prepared: ReturnType<typeof prepare>;
-  try { prepared = prepare(options); } catch { return null; }
+  try { prepared = prepare(options); } catch { throw new PublicationExecutionError(false, true); }
   let sent = false, before: ExecutionResult["before"];
   try {
     before = retainBefore({ ...options, data: prepared.data });

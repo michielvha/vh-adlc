@@ -1,6 +1,8 @@
+import { nativePushArguments, retainGitSuccess, type GitUpdate } from "./git-success";
+import type { DeliveryReader } from "./delivery-lookup";
 import { nativeMutationArguments, projectSuccess, retainSuccess, type ExecutionResult } from "./success";
 import { projectBeforeSource, retainBefore, type BeforeData } from "./delivery-proof";
-import { projectRejection, retainRejection, type RejectionEvidence, type RejectedUpdate } from "./rejections";
+import { projectRejection, retainRejection, type RejectionEvidence } from "./rejections";
 import { PublicationExecutionError } from "./attempts";
 import type { Effect } from "./manifests";
 import { publishArtifact, syncDirectory, type Outcome, type SealedPlan, type writePlanObject } from "./journal";
@@ -8,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { createGitHubReader, createRepositoryReader, GitHubReadError } from "../github-read";
-import { gitEnvironment, gitReadArguments } from "../git-read";
+import { gitEnvironment } from "../git-read";
 import { canonicalJSON, protocolPath, sha256 } from "./protocol";
 import { effectMarker } from "./manifests";
 import { publicationMarker } from "./report-history";
@@ -21,7 +23,7 @@ import type { Settings } from "./settings";
 export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string; receipt_object?: string };
 export type RefObservation = { state: "absent" } | { state: "present"; object: string };
 export type EffectObservation = { state: "done"; outcome: Outcome } | { state: "absent"; evidence?: AbsenceEvidence } | { state: "unknown"; reason: string } | { state: "conflict"; reason: string; evidence?: AbsenceEvidence };
-type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; commands: number; before?: ExecutionResult["before"]; successes: ExecutionResult["successes"]; capture_unverified: boolean; rejection?: RejectionEvidence };
+type NativeDelivery = { sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; commands: number; before?: ExecutionResult["before"]; successes: ExecutionResult["successes"]; capture_unverified: boolean; identity?: PublicationIdentity; rejection?: RejectionEvidence };
 export type PublicationIdentity = { repository: string; repository_id: number; default_branch: string; actor: string; actor_id: number };
 
 /** The production entry constructs its native transport. Only the separate trial entry injects a collector. */
@@ -30,6 +32,7 @@ export interface PublicationTransport {
   object_store: string;
   artifact_root: string;
   identity(): Promise<PublicationIdentity>;
+  readDelivery?: DeliveryReader;
   ref(ref: string): Promise<RefObservation>;
   readPlanObject(object: string): Promise<{ bytes: Uint8Array; objects: PlanObjects }>;
   observe(plan: SealedPlan, effect: Effect, objects: PlanObjects): Promise<EffectObservation>;
@@ -314,7 +317,7 @@ export function createNativeTransport(options: {
     const permalink = `https://${settings.hostname}/${name}/blob/${commit}/${parts.map(encodeURIComponent).join("/")}`;
     if (!text(p.body).includes(permalink)) changed("missing-evidence-permalink");
   }
-  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }, successRequest?: { hostname: string; method: string; endpoint: string; identity: PublicationIdentity }): Promise<ReturnType<typeof projectSuccess>> {
+  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: GitUpdate[] }, successRequest?: { hostname: string; method: string; endpoint: string; identity: PublicationIdentity }): Promise<ReturnType<typeof projectSuccess>> {
     delivery.commands++;
     const id = randomUUID(), directory = join(root, "native-command-" + id);
     publishArtifact(join(root, id + ".native-command.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-native-command", operation_id: plan.manifest.operation_id,
@@ -347,6 +350,15 @@ export function createNativeTransport(options: {
       }
       throw Error("native publication command incomplete; inspect owned artifacts");
     }
+    if (protocol?.protocol === "git" && delivery.attempt_id !== null) {
+      try {
+        const proof = captured && delivery.identity ? retainGitSuccess({ source_repo: options.source_repo, artifact_root: root, plan,
+          effect: delivery.effect, attempt_id: delivery.attempt_id, command_directory: directory, hostname: settings.hostname,
+          identity: delivery.identity, response: captured.stdout, updates: protocol.updates }) : null;
+        if (proof) delivery.successes.push(proof);
+        else delivery.capture_unverified = true;
+      } catch { delivery.capture_unverified = true; }
+    }
     if (successRequest && delivery.attempt_id !== null) {
       try {
         const proof = captured ? retainSuccess({ artifact_root: root, source_repo: options.source_repo, plan, effect: delivery.effect,
@@ -369,9 +381,10 @@ export function createNativeTransport(options: {
   async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string, delivery: NativeDelivery, companion?: { ref: string; head: string; expected: string }): Promise<void> {
     requireOwnedStore(store, settings.repository);
     const updates = [{ ref, head, expected }, ...(companion ? [companion] : [])];
-    const argv = gitReadArguments(["--no-lazy-fetch", "--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=",
-      "-c", "credential.helper=!gh auth git-credential", "-c", "http.extraHeader=", "push", "--porcelain", ...(companion ? ["--atomic"] : []), ...updates.map(update => `--force-with-lease=${update.ref}:${update.expected}`),
-      "--", `https://${settings.hostname}/${settings.repository}.git`, ...updates.map(update => `${update.head ?? ""}:${update.ref}`)]);
+    delivery.identity = await nativeIdentity();
+    if (delivery.identity.repository_id !== plan.manifest.repository_id || delivery.identity.actor !== plan.manifest.actor
+      || delivery.identity.actor_id !== plan.manifest.actor_id) throw Error("native Git mutation identity changed");
+    const argv = nativePushArguments(settings.hostname, settings.repository, updates);
     await run(plan, argv, null, delivery, { protocol: "git", updates });
   }
 
@@ -399,6 +412,18 @@ export function createNativeTransport(options: {
         || tree.entries[0].mode !== "100644" || tree.entries[0].type !== "blob") throw Error("invalid retained operation metadata object");
       const blob = tree.entries[0].sha, bytes = repository.blob(blob, settings.reports.max_entry_bytes);
       return { bytes, objects: { object, tree: commit.tree_sha, blob, plan_sha256: sha256(bytes) } };
+    },
+    async readDelivery(plan, effect, application) {
+      const start = reader.trace().length;
+      const isComment = effect.kind === "comment-create", isIssue = effect.kind === "issue-create";
+      const endpoint = isComment ? `${prefix}/issues/${positive(effect.payload.number)}/comments?per_page=100`
+        : isIssue ? `${prefix}/issues?state=all&per_page=100` : `${prefix}/pulls?state=all&per_page=100`;
+      const inventory = list(endpoint);
+      const resource = isComment || isIssue ? inventory.map(record).find(item => item.id === application.resource_id)
+        : pull(positive(application.number), plan, false, false).input;
+      const parent = isComment ? pull(positive(effect.payload.number), plan, false, false).input : null;
+      const explanation = effect.kind === "pr-close" ? list(`${prefix}/issues/${positive(effect.payload.number)}/comments?per_page=100`) : [];
+      return { resource, inventory, parent, explanation, requests_sha256: sha256(canonicalJSON(reader.trace().slice(start).map(({ method, hostname, endpoint, status }) => ({ method, hostname, endpoint, status })))) };
     },
     async observe(plan, effect, objects) {
       const p = effect.payload;
