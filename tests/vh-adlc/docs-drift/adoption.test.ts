@@ -2,7 +2,7 @@ import { source as adoptionSource, pin, write, commit, runtimeIdentity, portable
 import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import * as adoption from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { afterAll, expect, test } from "bun:test";
-import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { collectAdoptionBindings, parseComponentPin, verifyCutoverAssembly } from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { readGitWithEnvironment as gitWithInput } from "../../../plugins/vh-adlc/scripts/git-read";
@@ -400,5 +400,19 @@ test("approved entry derives the native profile host from committed consumer set
 
 test("a profile provisioned for github.com cannot stand in for a committed enterprise host", async () => {
   const f = await runtimeFixture({ hostname: "enterprise.example.invalid", provision_hostname: "github.com" });
-  await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow("ENOENT");
+  const profile = f.native.profile_directory, expected = profile.replace("/github.com/", "/enterprise.example.invalid/");
+  expect(readdirSync(profile)).toEqual([]);
+  await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow(expected);
+  expect(readdirSync(profile)).toEqual([]);
+});
+
+test.each([".vh-adlc/docs-drift-adoptions/[literal].yaml", ":(literal)adoptions/record.yaml"])("immutable adoption history reads literal path %s", path => {
+  const f = source(); f.configured.publication.adoption_record = path;
+  write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(f.configured)); f.candidate = commit(f.repo, "synthetic literal adoption path");
+  const record = portableRecord(f), delivered = deliverRecord(f, record);
+  expect(adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivered, identity: runtimeIdentity }).record_path).toBe(f.configured.publication.adoption_record);
+  write(f.repo, f.configured.publication.adoption_record, canonicalJSON({ ...record, kind: "changed" }));
+  commit(f.repo, "synthetic literal-path historical modification");
+  const restored = deliverRecord(f, record);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: restored, identity: runtimeIdentity })).toThrow("immutable adoption record changed");
 });

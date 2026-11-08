@@ -1,7 +1,8 @@
+import { verifyCompatibleWorkerCaller } from "./worker-callers";
 import type { PublicationIdentity } from "./transport";
 import { readGit, collectionReaders } from "./git";
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
-import { loadCommittedSettings, settingsProjections } from "./settings";
+import { classifySettingsLeaves, loadCommittedSettings, settingsProjections } from "./settings";
 
 type ComponentPin = {
   schema_version: 1; source_repository: string; source_commit: string; source_release: string;
@@ -271,4 +272,79 @@ export function checkUpgradeSignals(options: { repo: string; source: string; ide
   const matches = canonicalJSON(expected).equals(canonicalJSON(actual)) && clientResults.every(result => result.matches);
   return freezeJSON({ status: matches ? "signal-match" : "signal-mismatch", source_commit: source, matches,
     component: { expected, actual }, clients: clientResults });
+}
+
+
+/** Collect mechanical execution changes. Component semantics require independent review.
+ * This read-only comparison supplies no adoption or effect authority.
+ */
+export function collectUpgradeChanges(options: {
+  repo: string; approved_default: string; source_candidate: string; identity: PublicationIdentity;
+}) {
+  const { repo } = options, base = immutable(options.approved_default), candidate = immutable(options.source_candidate);
+  const adopted = verifyRuntimeAdoption({ repo, current_default: base, identity: options.identity });
+  try { readGit(repo, "merge-base", "--is-ancestor", base, candidate); }
+  catch { fail("successor source must descend from approved default"); }
+  const previous = collectAdoptionBindings(repo, base);
+  for (const [path, digest] of [[adopted.record_path, adopted.adoption_sha256], [previous.component_pin.path, previous.component_pin.sha256]]) {
+    const selected = committedInput(repo, candidate, path);
+    if (!selected || selected.mode !== "100644" || selected.sha256 !== digest
+      || recordHistory(repo, base, candidate, path).some(row => row.record?.mode !== "100644" || row.record.sha256 !== digest)) fail("immutable predecessor input changed " + path);
+  }
+  const next = collectAdoptionBindings(repo, candidate);
+  if (previous.settings.repository !== next.settings.repository || previous.settings.hostname !== next.settings.hostname
+    || previous.settings.default_branch !== next.settings.default_branch) fail("successor consumer identity differs");
+  const leaves = (settings: typeof previous.settings) => new Map(classifySettingsLeaves(settings)
+    .filter(row => row.classification === "protected").map(row => [canonicalJSON(row.path).toString(), row] as const));
+  const before = leaves(previous.settings), after = leaves(next.settings);
+  const changedSettings = [...new Map([...before, ...after])].sort(([a], [b]) => compareUTF8(a, b)).filter(([key]) => {
+    const old = before.get(key), current = after.get(key);
+    return !old || !current || !canonicalJSON(old.value).equals(canonicalJSON(current.value));
+  }).map(([, row]) => row.path);
+  const entries = ["hosted", "copilot", "claude"] as const;
+  type Entry = typeof entries[number];
+  const affected = new Set<Entry>();
+  const mark = (...selected: Entry[]) => { for (const entry of selected) affected.add(entry); };
+  for (const path of changedSettings) {
+    if (path[0] === "component_pin" || (path[0] === "publication" && path[1] === "adoption_record")) continue;
+    if (path[0] === "clients") {
+      const selected = entries.filter(name => [previous.settings.execution.entries[name], next.settings.execution.entries[name]]
+        .some(entry => entry.worker.client === path[1] || entry.reviewer.client === path[1]));
+      mark(...(selected.length ? selected : entries));
+    } else if (path[0] === "runtime_loader") mark("copilot", "claude");
+    else if (path[0] === "execution" && path[1] === "entries" && (path[2] === "hosted" || path[2] === "copilot" || path[2] === "claude")) mark(path[2]);
+    else if (path[0] === "execution" && path[1] === "claude_command") mark("claude");
+    else if (path[0] === "execution") mark("hosted");
+    else mark(...entries);
+  }
+  const oldBlobs = new Map(previous.protected_manifest.blobs.map(row => [row[0], row] as const));
+  const newBlobs = new Map(next.protected_manifest.blobs.map(row => [row[0], row] as const));
+  const changedBlobs = [...new Set([...oldBlobs.keys(), ...newBlobs.keys()])].sort(compareUTF8)
+    .filter(path => !canonicalJSON(oldBlobs.get(path) ?? null).equals(canonicalJSON(newBlobs.get(path) ?? null)));
+  let callerProof: ReturnType<typeof verifyCompatibleWorkerCaller> | null = null, callerFailure: string | null = null;
+  const scheduled = previous.settings.execution.scheduled_workflow;
+  if (changedBlobs.includes(scheduled) && scheduled === next.settings.execution.scheduled_workflow
+    && previous.component_pin.path !== next.component_pin.path) {
+    const old = committedInput(repo, base, scheduled), current = committedInput(repo, candidate, scheduled);
+    if (old && current && old.mode === current.mode) {
+      try { callerProof = verifyCompatibleWorkerCaller({ previous: old.bytes, next: current.bytes,
+        worker_path: previous.settings.execution.worker_workflow, previous_component_pin: previous.component_pin.path,
+        next_component_pin: next.component_pin.path }); }
+      catch (error) { callerFailure = error instanceof Error ? error.message : "caller comparison unavailable"; }
+    }
+  }
+  for (const path of changedBlobs) {
+    if (path === scheduled && callerProof) continue;
+    if ([previous.settings.execution.claude_command, next.settings.execution.claude_command].includes(path)) mark("claude");
+    else if ([previous.settings.runtime_loader.launcher, next.settings.runtime_loader.launcher].includes(path)) mark("copilot", "claude");
+    else if ([previous.settings.execution.worker_workflow, next.settings.execution.worker_workflow,
+      previous.settings.execution.scheduled_workflow, next.settings.execution.scheduled_workflow].includes(path)) mark("hosted");
+    else mark(...entries);
+  }
+  const componentChanged = !canonicalJSON(previous.component_pin.value).equals(canonicalJSON(next.component_pin.value));
+  return freezeJSON({ kind: "docs-drift-upgrade-bindings", approved_default: base, source_candidate: candidate,
+    predecessor_adoption_sha256: adopted.adoption_sha256, changed_settings: changedSettings, changed_blobs: changedBlobs,
+    component: { previous: previous.component_pin.value, next: next.component_pin.value, changed: componentChanged,
+      classification: componentChanged ? "pending-independent-review" : "unchanged" },
+    known_affected_entries: entries.filter(entry => affected.has(entry)), caller_pin_exception: callerProof, caller_failure: callerFailure });
 }
