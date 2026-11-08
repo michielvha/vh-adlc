@@ -499,6 +499,23 @@ test("an exact created PR awaiting its approved labels stays unknown without mat
   expect(await f.transport.observe(f.plan, pr, f.objects)).toEqual({ state: "unknown", reason: "native-PR-labels-incomplete" });
 });
 
+test.each(["visible", "unavailable"] as const)("a created PR with a removed label distinguishes %s label metadata", async visibility => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.refs["refs/heads/docs-drift/one"] = f.commit; });
+  const pr: Effect = { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/one", title: "Reviewed title",
+    body: publicationMarker(f.settings, "operation-1") + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } };
+  await f.transport.execute(f.plan, pr, f.objects);
+  f.update(state => {
+    state.prs[0].labels = [];
+    delete state.labels.documentation;
+    if (visibility === "unavailable") state.label_list_status = 403;
+  });
+  const result = await f.transport.observe(f.plan, pr, f.objects);
+  expect(result.state).toBe(visibility === "visible" ? "conflict" : "unknown");
+  if (result.state !== "conflict" && result.state !== "unknown") throw Error("expected label conflict or unavailable metadata");
+  expect(result.reason).toBe(visibility === "visible" ? "native-PR-payload-changed" : "native-publication-observation-unavailable");
+});
+
 test("an owned refresh waits for PR head propagation instead of claiming foreign change", async () => {
   const f = setup(); await f.transport.identity();
   f.update(state => {

@@ -10,7 +10,7 @@ function objectBase(item: Record<string, unknown>): Record<string, unknown> {
 }
 
 /** Inject at the caller boundary. The production GET-only client and its parsers stay unchanged. */
-export function createTrialReader(selected: TrialContext) {
+export function createTrialGitHubReader(selected: TrialContext): GitHubReader {
   const context = loadTrialContext({ root: selected.root, context_commit: selected.context_commit, runtime_directory: selected.root + "/runtime" });
   const prefix = "repos/" + TRIAL_IDENTITY.repository, observations: ReadObservation[] = [];
   function response<T>(endpoint: string, read: (state: ReturnType<typeof readTrialTracker>) => T): T {
@@ -41,6 +41,20 @@ export function createTrialReader(selected: TrialContext) {
           if (!resource) throw new GitHubReadError(404, "synthetic PR absent");
           return structuredClone(resource);
         }
+        const issue = new RegExp("^" + prefix + "/issues/([1-9][0-9]*)$").exec(endpoint);
+        if (issue) {
+          const resource = state.resources.get("issues/" + issue[1]);
+          if (resource) return structuredClone(resource);
+          const pull = state.resources.get("pulls/" + issue[1]);
+          if (pull) return { ...structuredClone(pull), pull_request: { url: "https://docs-drift.invalid/" + endpoint } };
+          throw new GitHubReadError(404, "synthetic issue absent");
+        }
+        const label = new RegExp("^" + prefix + "/labels/(.+)$").exec(endpoint);
+        if (label) {
+          const resource = state.labels.get(decodeURIComponent(label[1]).toLowerCase());
+          if (!resource) throw new GitHubReadError(404, "synthetic label absent");
+          return { ...resource, color: "000000", default: false };
+        }
         if (endpoint.startsWith(prefix + "/git/ref/heads/")) {
           const ref = "refs/heads/" + endpoint.slice((prefix + "/git/ref/heads/").length).split("/").map(decodeURIComponent).join("/");
           readGit(context.origin, "check-ref-format", ref);
@@ -50,6 +64,24 @@ export function createTrialReader(selected: TrialContext) {
           const sha = row.slice(ref.length + 1), type = readGit(context.origin, "cat-file", "-t", sha).toString().trim();
           return { ref, object: { type, sha } };
         }
+        const gitObject = new RegExp("^" + prefix + "/git/(commits|trees|blobs)/([a-f0-9]{40}(?:[a-f0-9]{24})?)$").exec(endpoint);
+        if (gitObject) {
+          const [, kind, sha] = gitObject;
+          if (kind === "commits") return { sha, tree: { sha: readGit(context.origin, "rev-parse", sha + "^{tree}").toString().trim() },
+            parents: readGit(context.origin, "show", "-s", "--format=%P", sha).toString().trim().split(" ").filter(Boolean).map(sha => ({ sha })),
+            message: readGit(context.origin, "show", "-s", "--format=%B", sha).toString() };
+          if (kind === "trees") {
+            const entries = readGit(context.origin, "ls-tree", "-z", sha).toString().split("\0");
+            if (entries.pop() !== "") throw Error("incomplete synthetic tree");
+            return { sha, truncated: false, tree: entries.map(entry => {
+              const tab = entry.indexOf("\t"), [mode, type, oid] = entry.slice(0, tab).split(" ");
+              if (tab < 0) throw Error("malformed synthetic tree entry");
+              return { path: entry.slice(tab + 1), mode, type, sha: oid };
+            }) };
+          }
+          const bytes = readGit(context.origin, "cat-file", "blob", sha);
+          return { sha, encoding: "base64", content: bytes.toString("base64"), size: bytes.length };
+        }
         throw Error("unsupported synthetic fixture read");
       });
     },
@@ -57,12 +89,26 @@ export function createTrialReader(selected: TrialContext) {
       try {
         return response(endpoint, state => {
           if (expected.repositoryId !== undefined && expected.repositoryId !== TRIAL_IDENTITY.repository_id) throw Error("synthetic repository ID changed");
-          const pulls = endpoint === prefix + "/pulls?state=open&base=" + encodeURIComponent(TRIAL_IDENTITY.default_branch) + "&per_page=100";
+          const url = new URL("https://docs-drift.invalid/" + endpoint);
+          if (url.searchParams.get("per_page") !== "100" || [...url.searchParams.keys()].some(key => !["per_page", "state", "base", "head"].includes(key))) throw Error("unsupported synthetic list options");
+          const pulls = url.pathname === "/" + prefix + "/pulls", issues = url.pathname === "/" + prefix + "/issues";
           const comments = new RegExp("^" + prefix + "/issues/([1-9][0-9]*)/comments\\?per_page=100$").exec(endpoint);
-          if (!pulls && !comments) throw Error("unsupported synthetic fixture list");
-          const items = [...state.resources.entries()].filter(([key, item]) => pulls
-            ? key.startsWith("pulls/") && item.state === "open" && objectBase(item).ref === TRIAL_IDENTITY.default_branch : key.startsWith("comments/") && item.parent_number === Number(comments![1]))
-            .map(([, item]) => structuredClone(item));
+          const labels = url.pathname === "/" + prefix + "/labels";
+          if (!pulls && !issues && !comments && !labels) throw Error("unsupported synthetic fixture list");
+          const items: unknown[] = labels ? [...state.labels.values()].map(label => ({ ...label, color: "000000", default: false }))
+            : [...state.resources.entries()].filter(([key, item]) => {
+              if (comments) return key.startsWith("comments/") && item.parent_number === Number(comments[1]);
+              if (!(key.startsWith("pulls/") || issues && key.startsWith("issues/"))) return false;
+              if (!["open", "closed"].includes(String(item.state))) throw Error("incomplete synthetic resource state");
+              if (url.searchParams.get("state") !== "all" && item.state !== url.searchParams.get("state")) return false;
+              if (pulls && url.searchParams.has("base") && objectBase(item).ref !== url.searchParams.get("base")) return false;
+              if (pulls && url.searchParams.has("head")) {
+                const head = item.head as { ref: string; repo: { full_name: string } };
+                if (head.repo.full_name.split("/")[0] + ":" + head.ref !== url.searchParams.get("head")) return false;
+              }
+              return true;
+            }).map(([key, item]) => issues && key.startsWith("pulls/")
+              ? { ...structuredClone(item), pull_request: { url: "https://docs-drift.invalid/" + prefix + "/pulls/" + item.number } } : structuredClone(item));
           if (expected.key !== undefined || expected.sha !== undefined || expected.max_items !== undefined && items.length > expected.max_items) {
             return { items: [], pages: 1, complete: false, error: { status: null, message: "unsupported or incomplete fixture list bound" } };
           }
@@ -74,7 +120,11 @@ export function createTrialReader(selected: TrialContext) {
       }
     },
   };
-  return createRepositoryReader(reader, TRIAL_IDENTITY.repository);
+  return reader;
+}
+
+export function createTrialReader(selected: TrialContext) {
+  return createRepositoryReader(createTrialGitHubReader(selected), TRIAL_IDENTITY.repository);
 }
 
 /** Fetch only from the declared owned bare origin into the recorded owned object store. */

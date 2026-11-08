@@ -101,42 +101,22 @@ function updateTransitions(effect: Effect) {
 }
 function same(left: unknown, right: unknown): boolean { return canonicalJSON(left).equals(canonicalJSON(right)); }
 
-/** Fixed native destinations, explicit credentials and owned subprocess groups. No collector selector. */
-export function createNativeTransport(options: {
-  settings: Settings; object_store: OwnedObjectStore; artifact_root: string; source_repo: string;
-  credential: string; path?: string; timeout_ms?: number;
-}): PublicationTransport {
-  const { settings, object_store: store } = options;
-  requireOwnedStore(store, settings.repository);
-  const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
-  if (!options.credential || /[\r\n\0]/u.test(options.credential)) throw Error("missing selected publication credential");
-  const environment = {
-    PATH: options.path ?? process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME,
-    LANG: "C", LC_ALL: "C", GH_TOKEN: options.credential, GH_HOST: settings.hostname, GH_PROMPT_DISABLED: "1",
-    GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
-  };
-  const reader = createGitHubReader(settings.hostname, { inherit_env: false, env: environment, timeout_ms: options.timeout_ms ?? 30000 });
-  const repository = createRepositoryReader(reader, settings.repository);
-  const prefix = "repos/" + settings.repository;
+function contentsAccess(selected: ReturnType<typeof createRepositoryReader>) {
+  const current = selected.repository();
+  const head = selected.ref("refs/heads/" + current.default_branch);
+  selected.commit(head.sha);
+  return current;
+}
 
-  let contentsObserved = false;
-  function contentsAccess(selected: ReturnType<typeof createRepositoryReader>) {
-    const current = selected.repository();
-    const head = selected.ref("refs/heads/" + current.default_branch);
-    selected.commit(head.sha);
-    return current;
-  }
-  function getRef(ref: string): RefObservation {
-    try { return { state: "present", object: repository.ref(ref).sha }; }
-    catch (error) {
-      if (error instanceof GitHubReadError && error.status === 404 && contentsObserved) {
-        // Identity preflight is not proof of current access. A hidden ref also returns 404.
-        contentsAccess(repository);
-        return { state: "absent" };
-      }
-      throw error;
-    }
-  }
+/** Shared observation rules operate on the entry's explicitly selected read adapter. */
+export function createPublicationReader(options: {
+  settings: Settings; source_repo: string; artifact_root: string; transport: PublicationTransport["kind"];
+  reader: ReturnType<typeof createGitHubReader>; repository: ReturnType<typeof createRepositoryReader>;
+  ref: (ref: string) => RefObservation;
+}) {
+  const { settings, reader, repository } = options;
+  const root = externalArtifactDirectory(options.artifact_root, options.source_repo), prefix = "repos/" + settings.repository;
+  const getRef = options.ref;
   function list(endpoint: string): unknown[] {
     const page = reader.pages(endpoint, { repositoryId: repository.repository().id });
     if (!page.complete) throw Error("incomplete native publication collection");
@@ -145,7 +125,7 @@ export function createNativeTransport(options: {
   function labelsMatch(value: unknown, expected: string[], comparisons?: LabelComparison[]): boolean {
     const actual = nativeLabels(value);
     const namesMatch = same(actual.map(label => label.name), expected);
-    if (namesMatch || actual.length === 0 || expected.length === 0) {
+    if (namesMatch || expected.length === 0) {
       const expectedLabels = expected.map(requested => {
         const label = actual.find(item => item.name === requested);
         return { requested, id: label?.id ?? null, canonical: label?.name ?? null };
@@ -220,46 +200,6 @@ export function createNativeTransport(options: {
     if (effect.kind === "pr-update" && !updateTransitions(effect).some(fields => fieldsMatch(pr.input, fields))) throw Error("native mutable PR payload changed");
     return pr;
   }
-  async function captureBefore(plan: SealedPlan, effect: Effect): Promise<BeforeData> {
-    const started = reader.trace().length, p = effect.payload;
-    const identity = await nativeIdentity();
-    let source: BeforeData["source"] = null, creation: BeforeData["creation"] = null;
-    if (["pr-update", "pr-close", "comment-create"].includes(effect.kind)) {
-      const input = pull(positive(p.number), plan, false, false).input;
-      try {
-        source = projectBeforeSource(input);
-      } catch { /* Incomplete legacy reads cannot establish a delivery baseline. */ }
-    }
-    if (["pr-create", "issue-create", "comment-create"].includes(effect.kind)) {
-      const surface = effect.kind === "pr-create" ? "pulls" : effect.kind === "issue-create" ? "issues" : "comments";
-      const endpoint = surface === "comments" ? `${prefix}/issues/${positive(p.number)}/comments?per_page=100`
-        : `${prefix}/${surface}?state=all&per_page=100`;
-      const inventory = list(endpoint);
-      const seen = new Set<number>();
-      const items = inventory.map(value => {
-        const item = record(value), id = positive(item.id ?? item.number);
-        if (seen.has(id) || item.body !== null && typeof item.body !== "string") throw Error("incomplete native baseline inventory");
-        seen.add(id);
-        return item;
-      });
-      const marker_ids = items.filter(item => markerMatches(item.body, plan, effect))
-        .map(item => positive(item.id ?? item.number)).sort((left, right) => left - right);
-      creation = { surface, inventory_sha256: sha256(canonicalJSON(inventory)), marker_ids };
-    }
-    const resolveLabels = (names: unknown): number[] | null => {
-      try {
-        const selected = reviewedLabels(names).map(name => {
-          const endpoint = `${prefix}/labels/${encodeURIComponent(name).replaceAll(".", "%2E")}`;
-          return positive(repositoryLabel(reader.get(endpoint)).id);
-        });
-        return [...new Set(selected)].sort((left, right) => left - right);
-      } catch { return null; }
-    };
-    const label_ids = ["pr-create", "issue-create", "pr-update"].includes(effect.kind) ? resolveLabels(p.labels) : null;
-    const original_label_ids = effect.kind === "pr-update" ? resolveLabels(record(p.expected_payload).labels) : null;
-    return { hostname: settings.hostname, identity, source, creation, label_ids, original_label_ids,
-      requests_sha256: sha256(canonicalJSON(reader.trace().slice(started))) };
-  }
   function observed(input: unknown, resourceId: string | null, object: string | null): EffectObservation {
     return { state: "done", outcome: { state: "observed", observation_sha256: sha256(canonicalJSON(input)), resource_id: resourceId, object } };
   }
@@ -321,6 +261,213 @@ export function createNativeTransport(options: {
     }
     const permalink = `https://${settings.hostname}/${name}/blob/${commit}/${parts.map(encodeURIComponent).join("/")}`;
     if (!text(p.body).includes(permalink)) changed("missing-evidence-permalink");
+  }
+  const readDelivery: DeliveryReader = async (plan, effect, application) => {
+    const start = reader.trace().length;
+    const isComment = effect.kind === "comment-create", isIssue = effect.kind === "issue-create";
+    const endpoint = isComment ? `${prefix}/issues/${positive(effect.payload.number)}/comments?per_page=100`
+      : isIssue ? `${prefix}/issues?state=all&per_page=100` : `${prefix}/pulls?state=all&per_page=100`;
+    const inventory = list(endpoint);
+    const resource = isComment || isIssue ? inventory.map(record).find(item => item.id === application.resource_id)
+      : pull(positive(application.number), plan, false, false).input;
+    const parent = isComment ? pull(positive(effect.payload.number), plan, false, false).input : null;
+    const explanation = effect.kind === "pr-close" ? list(`${prefix}/issues/${positive(effect.payload.number)}/comments?per_page=100`) : [];
+    return { resource, inventory, parent, explanation, requests_sha256: sha256(canonicalJSON(reader.trace().slice(start).map(({ method, hostname, endpoint, status }) => ({ method, hostname, endpoint, status })))) };
+  };
+  async function observe(plan: SealedPlan, effect: Effect, objects: PlanObjects): Promise<EffectObservation> {
+    const p = effect.payload;
+    const requestStart = reader.trace().length;
+    const comparisons: LabelComparison[] = [];
+    try {
+      const absent = (lookup: unknown): EffectObservation => ({ state: "absent", evidence: retainAbsence({
+        artifact_root: root, source_repo: options.source_repo, plan, effect, transport: options.transport, lookup: { result: lookup, label_comparisons: comparisons, requests: reader.trace().slice(requestStart) },
+      }) });
+      const conflicted = (reason: string, lookup: unknown): EffectObservation => ({ state: "conflict", reason,
+        evidence: retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: options.transport,
+          state: "conflict", lookup: { reason, result: lookup, label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } }) });
+      const observedLookup = (input: unknown, resourceId: string, object: string | null): EffectObservation => {
+        const lookup = retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: options.transport, state: "done",
+          lookup: { resource_sha256: sha256(canonicalJSON(input)), label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } });
+        return { state: "done", outcome: { state: "observed", observation_sha256: lookup.sha256, resource_id: resourceId, object, lookup } };
+      };
+      if (["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(effect.kind)) {
+        const target = getRef(text(p.ref));
+        if (effect.kind === "push" && (target.state === "absent" || target.object !== p.head)) {
+          const owner = settings.repository.split("/")[0], branch = text(p.ref).slice("refs/heads/".length);
+          const candidates = list(`${prefix}/pulls?state=all&head=${encodeURIComponent(owner + ":" + branch)}&per_page=100`);
+          for (const value of candidates) {
+            const candidate = record(value);
+            if (!ownedActor(candidate.user, plan)) continue;
+            const pr = pull(positive(candidate.number), plan, false, false);
+            if (headRepository(pr) === plan.manifest.repository_id && pr.branch === branch && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
+          }
+        }
+        if (effect.kind === "branch-refresh") {
+          const pr = pull(positive(p.number), plan, false, false);
+          if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
+            || !pr.branch.startsWith(settings.publication.branch_prefix)) return conflicted("native-refresh-scope-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
+          if ("refs/heads/" + pr.branch === p.ref && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
+          if (text(record(pr.input.base).ref) !== settings.publication.base || pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
+          if (target.object === p.head && pr.head === p.expected_head) return { state: "unknown", reason: "native-PR-head-sync-pending" };
+          if (pr.head !== target.object) return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
+        }
+        const expected = effect.kind === "push" || effect.kind === "branch-refresh" ? text(p.head)
+          : effect.kind === "receipt-retain" ? objects.receipt_object ?? objects.object : objects.lease_object ?? objects.object;
+        if (effect.kind === "lease-release") {
+          if (target.state === "absent") return observedLookup({ ref: p.ref, state: "absent" }, text(p.ref), null);
+          if (target.object === expected) return absent({ ref: p.ref, target });
+          if (objects.lease_object && objects.lease_object !== objects.object)
+            return observed({ ref: p.ref, state: "not-owned", object: target.object }, text(p.ref), target.object);
+          return conflicted("foreign-lease-object", { ref: p.ref, target });
+        }
+        if (target.state === "absent") return absent({ ref: p.ref, target });
+        if (target.object === expected) return observed({ ref: p.ref, object: target.object }, text(p.ref), target.object);
+        if (effect.kind === "branch-refresh" && target.object === p.expected_head) return absent({ ref: p.ref, target });
+        return conflicted("native-ref-changed", { ref: p.ref, target });
+      }
+      if (effect.kind === "pr-create") {
+        const owner = settings.repository.split("/")[0];
+        const candidates = list(`${prefix}/pulls?state=all&head=${encodeURIComponent(owner + ":" + text(p.branch))}&per_page=100`);
+        if (candidates.length === 0) return absent({ candidates });
+        const inventory = pullInventory(candidates);
+        const matches = candidates.map(record).filter(item => markerMatches(item.body, plan, effect));
+        if (matches.length !== 1) return conflicted("ambiguous-or-changed-native-PR", { candidates: inventory });
+        const candidate = matches[0], pr = pull(positive(candidate.number), plan, false, false);
+        const actual = submittedFields(pr.input), expected = expectedFields(effect);
+        if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
+          || !pr.branch.startsWith(settings.publication.branch_prefix) || pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
+        if (!fieldsMatch(pr.input, expected, comparisons)) {
+          if (actual.labels.length === 0 && same({ ...actual, labels: expected.labels }, expected)
+            && comparisons.at(-1)?.expected.every(label => label.id !== null))
+            return { state: "unknown", reason: "native-PR-labels-incomplete" };
+          return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
+        }
+        return observedLookup(pr.input, String(candidate.number), pr.head);
+      }
+      if (effect.kind === "pr-update" || effect.kind === "pr-close") {
+        const pr = pull(positive(p.number), plan, false, false);
+        if (effect.kind === "pr-update" && !refreshTarget(pr.input, plan)) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
+        if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
+        if (effect.kind === "pr-close" && pr.input.state === "closed") {
+          if (pr.input.merged_at === null) return observed(pr.input, String(p.number), pr.head);
+          if (typeof pr.input.merged_at === "string" && Number.isFinite(Date.parse(pr.input.merged_at)))
+            return conflicted("native-PR-merged", { number: p.number, head: pr.head, merged_at: pr.input.merged_at });
+          throw Error("incomplete native PR merge state");
+        }
+        const base = text(record(pr.input.base).ref);
+        if (base !== settings.publication.base) return conflicted("native-PR-destination-changed", { number: p.number, base, head: pr.head, state: pr.input.state });
+        if (effect.kind === "pr-update" && fieldsMatch(pr.input, expectedFields(effect), comparisons)) return observedLookup(pr.input, String(p.number), pr.head);
+        if (effect.kind === "pr-close") return absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
+        const transitions = updateTransitions(effect);
+        return pr.input.state === "open" && transitions.some(fields => fieldsMatch(pr.input, fields, comparisons))
+          ? absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user),
+            source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
+      }
+      if (effect.kind === "issue-create") {
+        const inventory = list(`${prefix}/issues?state=all&per_page=100`);
+        const { candidates, conflict } = creationCandidates(inventory, plan, effect);
+        if (conflict) return conflicted("native-issue-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
+        if (candidates.length === 0) {
+          try { checkIssueEvidence(effect); }
+          catch (error) {
+            if (error instanceof IssueEvidenceConflict) return conflicted("native-issue-evidence-changed", error.lookup);
+            throw error;
+          }
+          return absent({ inventory: inventoryEvidence(inventory), candidates });
+        }
+        if (candidates.length !== 1) return conflicted("ambiguous-native-issue", { inventory: inventoryEvidence(inventory) });
+        const issue = candidates[0];
+        if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !labelsMatch(issue.labels, reviewedLabels(p.labels), comparisons)) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
+        return observedLookup(issue, String(positive(issue.number)), null);
+      }
+      if (effect.kind === "comment-create") {
+        const pr = pull(positive(p.number), plan, false, false);
+        const inventory = list(`${prefix}/issues/${p.number}/comments?per_page=100`);
+        const { candidates, conflict } = creationCandidates(inventory, plan, effect);
+        if (conflict) return conflicted("native-comment-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
+        if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
+        if (candidates.length !== 1 || !ownedActor(candidates[0].user, plan) || candidates[0].body !== p.body) return conflicted("native-comment-payload-changed", { inventory: inventoryEvidence(inventory) });
+        return observed(candidates[0], String(positive(candidates[0].id)), pr.head);
+      }
+      throw Error("unsupported native effect");
+    } catch { return { state: "unknown", reason: "native-publication-observation-unavailable" }; }
+  }
+  return { list, pull, mutablePull, markerMatches, checkIssueEvidence, readDelivery, observe };
+}
+
+/** Fixed native destinations, explicit credentials and owned subprocess groups. No collector selector. */
+export function createNativeTransport(options: {
+  settings: Settings; object_store: OwnedObjectStore; artifact_root: string; source_repo: string;
+  credential: string; path?: string; timeout_ms?: number;
+}): PublicationTransport {
+  const { settings, object_store: store } = options;
+  requireOwnedStore(store, settings.repository);
+  const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
+  if (!options.credential || /[\r\n\0]/u.test(options.credential)) throw Error("missing selected publication credential");
+  const environment = {
+    PATH: options.path ?? process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME,
+    LANG: "C", LC_ALL: "C", GH_TOKEN: options.credential, GH_HOST: settings.hostname, GH_PROMPT_DISABLED: "1",
+    GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+  };
+  const reader = createGitHubReader(settings.hostname, { inherit_env: false, env: environment, timeout_ms: options.timeout_ms ?? 30000 });
+  const repository = createRepositoryReader(reader, settings.repository);
+  const prefix = "repos/" + settings.repository;
+
+  let contentsObserved = false;
+  function getRef(ref: string): RefObservation {
+    try { return { state: "present", object: repository.ref(ref).sha }; }
+    catch (error) {
+      if (error instanceof GitHubReadError && error.status === 404 && contentsObserved) {
+        // Identity preflight is not proof of current access. A hidden ref also returns 404.
+        contentsAccess(repository);
+        return { state: "absent" };
+      }
+      throw error;
+    }
+  }
+  const { list, pull, mutablePull, markerMatches, checkIssueEvidence, readDelivery, observe } = createPublicationReader({
+    settings, source_repo: options.source_repo, artifact_root: root, transport: "native", reader, repository,
+    ref: getRef,
+  });
+  async function captureBefore(plan: SealedPlan, effect: Effect): Promise<BeforeData> {
+    const started = reader.trace().length, p = effect.payload;
+    const identity = await nativeIdentity();
+    let source: BeforeData["source"] = null, creation: BeforeData["creation"] = null;
+    if (["pr-update", "pr-close", "comment-create"].includes(effect.kind)) {
+      const input = pull(positive(p.number), plan, false, false).input;
+      try {
+        source = projectBeforeSource(input);
+      } catch { /* Incomplete legacy reads cannot establish a delivery baseline. */ }
+    }
+    if (["pr-create", "issue-create", "comment-create"].includes(effect.kind)) {
+      const surface = effect.kind === "pr-create" ? "pulls" : effect.kind === "issue-create" ? "issues" : "comments";
+      const endpoint = surface === "comments" ? `${prefix}/issues/${positive(p.number)}/comments?per_page=100`
+        : `${prefix}/${surface}?state=all&per_page=100`;
+      const inventory = list(endpoint);
+      const seen = new Set<number>();
+      const items = inventory.map(value => {
+        const item = record(value), id = positive(item.id ?? item.number);
+        if (seen.has(id) || item.body !== null && typeof item.body !== "string") throw Error("incomplete native baseline inventory");
+        seen.add(id);
+        return item;
+      });
+      const marker_ids = items.filter(item => markerMatches(item.body, plan, effect))
+        .map(item => positive(item.id ?? item.number)).sort((left, right) => left - right);
+      creation = { surface, inventory_sha256: sha256(canonicalJSON(inventory)), marker_ids };
+    }
+    const resolveLabels = (names: unknown): number[] | null => {
+      try {
+        const selected = reviewedLabels(names).map(name => {
+          const endpoint = `${prefix}/labels/${encodeURIComponent(name).replaceAll(".", "%2E")}`;
+          return positive(repositoryLabel(reader.get(endpoint)).id);
+        });
+        return [...new Set(selected)].sort((left, right) => left - right);
+      } catch { return null; }
+    };
+    const label_ids = ["pr-create", "issue-create", "pr-update"].includes(effect.kind) ? resolveLabels(p.labels) : null;
+    const original_label_ids = effect.kind === "pr-update" ? resolveLabels(record(p.expected_payload).labels) : null;
+    return { hostname: settings.hostname, identity, source, creation, label_ids, original_label_ids,
+      requests_sha256: sha256(canonicalJSON(reader.trace().slice(started))) };
   }
   async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: GitUpdate[] }, successRequest?: { hostname: string; method: string; endpoint: string; identity: PublicationIdentity }): Promise<ReturnType<typeof projectSuccess>> {
     delivery.commands++;
@@ -418,135 +565,8 @@ export function createNativeTransport(options: {
       const blob = tree.entries[0].sha, bytes = repository.blob(blob, settings.reports.max_entry_bytes);
       return { bytes, objects: { object, tree: commit.tree_sha, blob, plan_sha256: sha256(bytes) } };
     },
-    async readDelivery(plan, effect, application) {
-      const start = reader.trace().length;
-      const isComment = effect.kind === "comment-create", isIssue = effect.kind === "issue-create";
-      const endpoint = isComment ? `${prefix}/issues/${positive(effect.payload.number)}/comments?per_page=100`
-        : isIssue ? `${prefix}/issues?state=all&per_page=100` : `${prefix}/pulls?state=all&per_page=100`;
-      const inventory = list(endpoint);
-      const resource = isComment || isIssue ? inventory.map(record).find(item => item.id === application.resource_id)
-        : pull(positive(application.number), plan, false, false).input;
-      const parent = isComment ? pull(positive(effect.payload.number), plan, false, false).input : null;
-      const explanation = effect.kind === "pr-close" ? list(`${prefix}/issues/${positive(effect.payload.number)}/comments?per_page=100`) : [];
-      return { resource, inventory, parent, explanation, requests_sha256: sha256(canonicalJSON(reader.trace().slice(start).map(({ method, hostname, endpoint, status }) => ({ method, hostname, endpoint, status })))) };
-    },
-    async observe(plan, effect, objects) {
-      const p = effect.payload;
-      const requestStart = reader.trace().length;
-      const comparisons: LabelComparison[] = [];
-      try {
-        const absent = (lookup: unknown): EffectObservation => ({ state: "absent", evidence: retainAbsence({
-          artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", lookup: { result: lookup, label_comparisons: comparisons, requests: reader.trace().slice(requestStart) },
-        }) });
-        const conflicted = (reason: string, lookup: unknown): EffectObservation => ({ state: "conflict", reason,
-          evidence: retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native",
-            state: "conflict", lookup: { reason, result: lookup, label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } }) });
-        const observedLookup = (input: unknown, resourceId: string, object: string | null): EffectObservation => {
-          const lookup = retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: "native", state: "done",
-            lookup: { resource_sha256: sha256(canonicalJSON(input)), label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } });
-          return { state: "done", outcome: { state: "observed", observation_sha256: lookup.sha256, resource_id: resourceId, object, lookup } };
-        };
-        if (["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(effect.kind)) {
-          const target = getRef(text(p.ref));
-          if (effect.kind === "push" && (target.state === "absent" || target.object !== p.head)) {
-            const owner = settings.repository.split("/")[0], branch = text(p.ref).slice("refs/heads/".length);
-            const candidates = list(`${prefix}/pulls?state=all&head=${encodeURIComponent(owner + ":" + branch)}&per_page=100`);
-            for (const value of candidates) {
-              const candidate = record(value);
-              if (!ownedActor(candidate.user, plan)) continue;
-              const pr = pull(positive(candidate.number), plan, false, false);
-              if (headRepository(pr) === plan.manifest.repository_id && pr.branch === branch && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
-            }
-          }
-          if (effect.kind === "branch-refresh") {
-            const pr = pull(positive(p.number), plan, false, false);
-            if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
-              || !pr.branch.startsWith(settings.publication.branch_prefix)) return conflicted("native-refresh-scope-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
-            if ("refs/heads/" + pr.branch === p.ref && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
-            if (text(record(pr.input.base).ref) !== settings.publication.base || pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
-            if (target.object === p.head && pr.head === p.expected_head) return { state: "unknown", reason: "native-PR-head-sync-pending" };
-            if (pr.head !== target.object) return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
-          }
-          const expected = effect.kind === "push" || effect.kind === "branch-refresh" ? text(p.head)
-            : effect.kind === "receipt-retain" ? objects.receipt_object ?? objects.object : objects.lease_object ?? objects.object;
-          if (effect.kind === "lease-release") {
-            if (target.state === "absent") return observedLookup({ ref: p.ref, state: "absent" }, text(p.ref), null);
-            if (target.object === expected) return absent({ ref: p.ref, target });
-            if (objects.lease_object && objects.lease_object !== objects.object)
-              return observed({ ref: p.ref, state: "not-owned", object: target.object }, text(p.ref), target.object);
-            return conflicted("foreign-lease-object", { ref: p.ref, target });
-          }
-          if (target.state === "absent") return absent({ ref: p.ref, target });
-          if (target.object === expected) return observed({ ref: p.ref, object: target.object }, text(p.ref), target.object);
-          if (effect.kind === "branch-refresh" && target.object === p.expected_head) return absent({ ref: p.ref, target });
-          return conflicted("native-ref-changed", { ref: p.ref, target });
-        }
-        if (effect.kind === "pr-create") {
-          const owner = settings.repository.split("/")[0];
-          const candidates = list(`${prefix}/pulls?state=all&head=${encodeURIComponent(owner + ":" + text(p.branch))}&per_page=100`);
-          if (candidates.length === 0) return absent({ candidates });
-          const inventory = pullInventory(candidates);
-          const matches = candidates.map(record).filter(item => markerMatches(item.body, plan, effect));
-          if (matches.length !== 1) return conflicted("ambiguous-or-changed-native-PR", { candidates: inventory });
-          const candidate = matches[0], pr = pull(positive(candidate.number), plan, false, false);
-          const actual = submittedFields(pr.input), expected = expectedFields(effect);
-          if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
-            || !pr.branch.startsWith(settings.publication.branch_prefix) || pr.head !== plan.manifest.bindings.candidate_commit || pr.branch !== p.branch) return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
-          if (!fieldsMatch(pr.input, expected, comparisons)) {
-            if (actual.labels.length === 0 && same({ ...actual, labels: expected.labels }, expected))
-              return { state: "unknown", reason: "native-PR-labels-incomplete" };
-            return conflicted("native-PR-payload-changed", { number: p.number ?? pr.input.number, head: pr.head, branch: pr.branch, payload_sha256: sha256(canonicalJSON(actual)) });
-          }
-          return observedLookup(pr.input, String(candidate.number), pr.head);
-        }
-        if (effect.kind === "pr-update" || effect.kind === "pr-close") {
-          const pr = pull(positive(p.number), plan, false, false);
-          if (effect.kind === "pr-update" && !refreshTarget(pr.input, plan)) return conflicted("native-PR-owner-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
-          if (pr.head !== p.expected_head) return conflicted("native-PR-head-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
-          if (effect.kind === "pr-close" && pr.input.state === "closed") {
-            if (pr.input.merged_at === null) return observed(pr.input, String(p.number), pr.head);
-            if (typeof pr.input.merged_at === "string" && Number.isFinite(Date.parse(pr.input.merged_at)))
-              return conflicted("native-PR-merged", { number: p.number, head: pr.head, merged_at: pr.input.merged_at });
-            throw Error("incomplete native PR merge state");
-          }
-          const base = text(record(pr.input.base).ref);
-          if (base !== settings.publication.base) return conflicted("native-PR-destination-changed", { number: p.number, base, head: pr.head, state: pr.input.state });
-          if (effect.kind === "pr-update" && fieldsMatch(pr.input, expectedFields(effect), comparisons)) return observedLookup(pr.input, String(p.number), pr.head);
-          if (effect.kind === "pr-close") return absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
-          const transitions = updateTransitions(effect);
-          return pr.input.state === "open" && transitions.some(fields => fieldsMatch(pr.input, fields, comparisons))
-            ? absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user),
-              source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
-        }
-        if (effect.kind === "issue-create") {
-          const inventory = list(`${prefix}/issues?state=all&per_page=100`);
-          const { candidates, conflict } = creationCandidates(inventory, plan, effect);
-          if (conflict) return conflicted("native-issue-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
-          if (candidates.length === 0) {
-            try { checkIssueEvidence(effect); }
-            catch (error) {
-              if (error instanceof IssueEvidenceConflict) return conflicted("native-issue-evidence-changed", error.lookup);
-              throw error;
-            }
-            return absent({ inventory: inventoryEvidence(inventory), candidates });
-          }
-          if (candidates.length !== 1) return conflicted("ambiguous-native-issue", { inventory: inventoryEvidence(inventory) });
-          const issue = candidates[0];
-          if (Object.hasOwn(issue, "pull_request") || !ownedActor(issue.user, plan) || issue.title !== p.title || issue.body !== p.body || !labelsMatch(issue.labels, reviewedLabels(p.labels), comparisons)) return conflicted("native-issue-payload-changed", { inventory: inventoryEvidence(inventory) });
-          return observedLookup(issue, String(positive(issue.number)), null);
-        }
-        if (effect.kind === "comment-create") {
-          const pr = pull(positive(p.number), plan, false, false);
-          const inventory = list(`${prefix}/issues/${p.number}/comments?per_page=100`);
-          const { candidates, conflict } = creationCandidates(inventory, plan, effect);
-          if (conflict) return conflicted("native-comment-baseline-marker-changed", { inventory: inventoryEvidence(inventory) });
-          if (candidates.length === 0) return absent({ inventory: inventoryEvidence(inventory), candidates });
-          if (candidates.length !== 1 || !ownedActor(candidates[0].user, plan) || candidates[0].body !== p.body) return conflicted("native-comment-payload-changed", { inventory: inventoryEvidence(inventory) });
-          return observed(candidates[0], String(positive(candidates[0].id)), pr.head);
-        }
-        throw Error("unsupported native effect");
-      } catch { return { state: "unknown", reason: "native-publication-observation-unavailable" }; }
-    },
+    readDelivery,
+    observe,
     async execute(plan, effect, objects, attempt_id) {
       const delivery: NativeDelivery = { objects, sent: false, reaped: true, effect_id: effect.id, attempt_id: attempt_id ?? null, effect, completed_commands: 0, commands: 0, successes: [], capture_unverified: false };
       const execution = (): ExecutionResult => ({ successes: delivery.successes, commands: delivery.commands,

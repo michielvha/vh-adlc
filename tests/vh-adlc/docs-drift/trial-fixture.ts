@@ -5,9 +5,14 @@ import { join, relative } from "node:path";
 import { computeComponentIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
-import { TRIAL_CONTEXT_PATH, TRIAL_IDENTITY } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-context";
+import { loadTrialContext, TRIAL_CONTEXT_PATH, TRIAL_IDENTITY } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-context";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 import { settingsFixture } from "./settings-fixture";
+import { fixture as manifestFixture, bindings, hash, role } from "./manifest-fixture";
+import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
+import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
+import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
 
 /** This creates no native-provider or historical observed-execution evidence. */
 export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean } = {}) {
@@ -66,4 +71,31 @@ export function reviseTrialManifest(f: ReturnType<typeof syntheticTrialFixture>,
   put(f.source, TRIAL_CONTEXT_PATH, canonicalJSON(f.manifest).toString());
   git(f.source, "add", "--", TRIAL_CONTEXT_PATH); git(f.source, "commit", "--amend", "--no-edit");
   return git(f.source, "rev-parse", "HEAD");
+}
+
+export function persistentTrialPublication(roots: string[], fixtureOptions: { legacy?: boolean } = {}) {
+  const f = syntheticTrialFixture(roots, fixtureOptions);
+  const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
+  const settings = context.settings, operation = "persistent-one";
+  const effects: Effect[] = [
+    { id: "lease", kind: "lease-acquire", payload: { ref: settings.publication.lease_ref } },
+    { id: "receipt", kind: "receipt-retain", payload: { ref: settings.publication.receipt_ref_prefix + operation } },
+    { id: "push", kind: "push", payload: { ref: "refs/heads/docs-drift/persistent", head: f.sourceCommit } },
+    { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/persistent", title: "Synthetic docs trial",
+      body: publicationMarker(settings, operation) + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } },
+    { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } },
+  ];
+  if (fixtureOptions.legacy) {
+    const original = { title: "Legacy title", body: "Legacy body", labels: ["documentation"], draft: false };
+    effects[3] = { id: "pr", kind: "pr-update", payload: { number: 77, expected_head: f.sourceCommit,
+      expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)),
+      title: "Reviewed legacy update", body: publicationMarker(settings, operation) + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } };
+  }
+  const input = manifestFixture({ ...bindings, source_commit: f.sourceCommit, candidate_commit: f.sourceCommit,
+    candidate_tree: git(f.source, "rev-parse", f.sourceCommit + "^{tree}"), settings_sha256: sha256(canonicalJSON(f.settings)) }, effects, operation);
+  const policy = { adoption_sha256: hash("synthetic-only"), publication_kind: "advisory" as const,
+    context: "trial" as const, transport: "collector" as const, pr_draft: true, worker: role, reviewer: role };
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
+  return { f, context, options: { source_repo: f.source, artifact_root: context.artifacts, object_store: context.store,
+    settings, plan, transport: createTrialTransport(context), gate: async () => ({ review: input, policy }) } };
 }
