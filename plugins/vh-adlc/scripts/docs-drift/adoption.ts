@@ -121,6 +121,14 @@ function nativeIdentity(value: unknown): PublicationIdentity {
 
 type AdoptionBoundary = { kind: "observed" } | { kind: "test-only"; fixture_id: string };
 
+function parseAdoptionRecord(bytes: Uint8Array, boundary: AdoptionBoundary) {
+  const record = object(collectionReaders().yaml(bytes), ["schema_version", "kind", "source_candidate", "protected_sha256",
+    "protected_manifest", "component_pin_sha256", "identity", "receipts", "predecessor", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])]);
+  if (boundary.kind === "test-only" && record.fixture_id !== boundary.fixture_id) fail("synthetic adoption fixture identity");
+  if (record.schema_version !== 1 || record.kind !== "docs-drift-adoption") fail("record schema");
+  return record;
+}
+
 function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary, carried?: { names: string[]; receipts: unknown }): void {
   const receipts = object(value, Object.keys(receiptRequirements));
   const target = canonicalDigest({ schema_version: 1, repository: bindings.settings.repository,
@@ -208,10 +216,7 @@ function readAdoptionFrame(options: { repo: string; current_default: string; ide
   const bindings = collectAdoptionBindings(repo, current), path = bindings.settings.publication.adoption_record;
   const input = committedInput(repo, current, path);
   if (!input || input.mode !== "100644") fail("committed adoption record missing");
-  const record = object(collectionReaders().yaml(input.bytes), ["schema_version", "kind", "source_candidate", "protected_sha256",
-    "protected_manifest", "component_pin_sha256", "identity", "receipts", "predecessor", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])]);
-  if (boundary.kind === "test-only" && record.fixture_id !== boundary.fixture_id) fail("synthetic adoption fixture identity");
-  if (record.schema_version !== 1 || record.kind !== "docs-drift-adoption") fail("record schema");
+  const record = parseAdoptionRecord(input.bytes, boundary);
   const candidate = immutable(record.source_candidate);
   if (candidate === current) fail("circular source candidate record");
   const original = collectAdoptionBindings(repo, candidate);
@@ -377,6 +382,42 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
   return carried;
 }
 
+/** Rollback can select an earlier record while later delivered records still need retention. */
+function verifyHistoricalAdoptionInputs(repo: string, current: string, boundary: AdoptionBoundary): void {
+  const settingsByBlob = new Map<string, ReturnType<typeof loadCommittedSettings>["settings"]>(), checked = new Set<string>();
+  const revisions = readGit(repo, "log", "--full-history", "--format=%H", current, "--", ".vh-adlc/docs-drift.yaml")
+    .toString().trim().split("\n").filter(Boolean);
+  for (const revision of revisions) {
+    const settingsInput = committedInput(repo, revision, ".vh-adlc/docs-drift.yaml");
+    if (!settingsInput) continue;
+    let settings = settingsByBlob.get(settingsInput.blob);
+    if (!settings) {
+      settings = loadCommittedSettings(repo, revision).settings;
+      settingsByBlob.set(settingsInput.blob, settings);
+    }
+    if (settings.publication.mode !== "adopted") continue;
+    const path = settings.publication.adoption_record;
+    const inputs = [committedInput(repo, revision, path), ...recordHistory(repo, revision, current, path).map(row => row.record)];
+    for (const input of inputs) {
+      if (input === null) continue;
+      const key = canonicalJSON([path, input.sha256]).toString();
+      if (checked.has(key)) continue;
+      checked.add(key);
+      const retained = committedInput(repo, current, path);
+      if (input.mode !== "100644" || retained?.mode !== "100644" || retained.sha256 !== input.sha256) fail("historical adoption input changed " + path);
+      const record = parseAdoptionRecord(input.bytes, boundary), candidate = immutable(record.source_candidate);
+      const bindings = collectAdoptionBindings(repo, candidate);
+      if (bindings.settings.publication.adoption_record !== path) fail("historical adoption record selection");
+      const deliveries = recordHistory(repo, candidate, current, path)
+        .filter(row => row.parents.length === 1 && row.parents[0] === candidate && row.record?.sha256 === input.sha256);
+      if (deliveries.length !== 1) fail("historical adoption cutover child");
+      const delivery = deliveries[0].commit;
+      verifyCutoverAssembly({ repo, source_candidate: candidate, delivery_commit: delivery, record_path: path });
+      verifyRetainedInputs(repo, delivery, current, [[path, input.sha256], [bindings.component_pin.path, bindings.component_pin.sha256]]);
+    }
+  }
+}
+
 /** Walk immutable predecessor defaults before accepting any carried observation. */
 function verifyAdoptionRecord(options: { repo: string; current_default: string; identity?: PublicationIdentity }, boundary: AdoptionBoundary): AdoptionResult {
   const frames: ReturnType<typeof readAdoptionFrame>[] = [], seen = new Set<string>();
@@ -411,6 +452,7 @@ function verifyAdoptionRecord(options: { repo: string; current_default: string; 
     previous = frame.result;
   }
   if (previous === null) fail("missing adoption record");
+  verifyHistoricalAdoptionInputs(options.repo, options.current_default, boundary);
   return previous;
 }
 

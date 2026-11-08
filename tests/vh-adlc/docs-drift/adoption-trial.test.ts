@@ -296,3 +296,20 @@ test("an interactive-only client trial carries unchanged hosted and Claude recei
   expect(result.receipts).toMatchObject({ hosted_advisory: f.record.receipts.hosted_advisory, claude_entry: f.record.receipts.claude_entry });
   expect(result.source_candidate).toBe(upgrade.candidate);
 });
+
+
+test.each(["record", "pin", "record-restored", "pin-restored"] as const)("rollback preserves later %s evidence after selecting an earlier runtime", async scenario => {
+  const f = trialAdoptionFixture(roots), successor = compatibleTrialUpgrade(f), gate = await adoption.createTrialAdoptionGate(f.boundary);
+  git(f.source, "switch", "--detach", successor.delivered);
+  put(f.source, ".vh-adlc/docs-drift.yaml", canonicalJSON(f.configured).toString());
+  put(f.source, f.configured.execution.scheduled_workflow, readGit(f.source, "show", f.candidate + ":" + f.configured.execution.scheduled_workflow).toString());
+  const rollback = commitAll(f.source);
+  expect(gate.verify({ current_default: rollback }).component_pin).toEqual(f.record.protected_manifest.component.value);
+  const path = scenario.startsWith("record") ? successor.configured.publication.adoption_record : successor.configured.component_pin;
+  const original = readGit(f.source, "show", rollback + ":" + path).toString();
+  if (scenario.endsWith("restored")) {
+    put(f.source, path, "Changed after rollback"); commitAll(f.source); put(f.source, path, original);
+  } else rmSync(join(f.source, path));
+  const changed = commitAll(f.source); git(f.source, "switch", "main");
+  expect(() => gate.verify({ current_default: changed })).toThrow(scenario === "record" ? "historical adoption input changed" : "immutable predecessor input changed");
+});
