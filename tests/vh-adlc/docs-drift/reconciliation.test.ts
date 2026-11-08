@@ -236,7 +236,7 @@ test("two absences past a client timeout cannot retire a server-side request tha
   let lateCommit: (() => Promise<void>) | null = null;
   f.transport.execute = async (plan, effect, objects) => {
     if (effect.kind === "pr-create") {
-      lateCommit = () => execute(plan, effect, objects);
+      lateCommit = async () => { await execute(plan, effect, objects); };
       throw new PublicationExecutionError(true, true);
     }
     await execute(plan, effect, objects);

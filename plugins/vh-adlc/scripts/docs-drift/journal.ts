@@ -1,3 +1,4 @@
+import type { ExecutionEvidence } from "./success";
 import { randomUUID } from "node:crypto";
 import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -26,7 +27,7 @@ export type Retirement = { scope_sha256: string; request_sha256: string; lookup:
 export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
 type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant; atomic_receipt_id?: string };
 type Intent = { effect_sha256: string; atomic_acquisition?: string };
-type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean; rejection?: { path: string; sha256: string } };
+type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean; rejection?: { path: string; sha256: string }; execution?: ExecutionEvidence };
 type Event = {
   schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended" | "recovery-only";
   effect_id: string; payload: Intent | Outcome | { reason: string } | Retirement | Attempt | AttemptEnd;
@@ -258,12 +259,24 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
     }
     else if (event.kind === "attempt-ended") {
       const rejected = Object.hasOwn(event.payload, "rejection");
-      const payload = exact(event.payload, ["attempt_id", "sent", "reaped", ...(rejected ? ["rejection"] : [])]);
+      const executed = Object.hasOwn(event.payload, "execution");
+      const payload = exact(event.payload, ["attempt_id", "sent", "reaped", ...(rejected ? ["rejection"] : []), ...(executed ? ["execution"] : [])]);
       if (rejected) {
         const evidence = exact(payload.rejection, ["path", "sha256"]);
         hash(evidence.sha256);
         if (payload.sent !== true || payload.reaped !== true || typeof evidence.path !== "string"
           || !evidence.path.startsWith("/") || evidence.path.includes("\0")) fail("invalid rejection evidence");
+      }
+      if (executed) {
+        const execution = exact(payload.execution, ["successes"]);
+        if (!Array.isArray(execution.successes) || execution.successes.length > 16 || payload.sent !== true) fail("invalid success references");
+        const paths = new Set<string>();
+        for (const item of execution.successes) {
+          const evidence = exact(item, ["path", "sha256"]);
+          hash(evidence.sha256);
+          if (typeof evidence.path !== "string" || !evidence.path.startsWith("/") || evidence.path.includes("\0") || paths.has(evidence.path)) fail("invalid success reference");
+          paths.add(evidence.path);
+        }
       }
       identifier(payload.attempt_id);
       const attempt = prior.findLast(item => item.kind === "attempt");

@@ -1,3 +1,4 @@
+import { readSuccess, type ExecutionEvidence } from "./success";
 import { dirname } from "node:path";
 import { canonicalJSON } from "./protocol";
 import { readRejection, type RejectionEvidence } from "./rejections";
@@ -8,7 +9,7 @@ import type { PlanObjects, PublicationTransport } from "./transport";
 
 /** Only the native executor's process/preflight observations supply this status. */
 export class PublicationExecutionError extends Error {
-  constructor(readonly sent: boolean, readonly reaped: boolean, readonly rejection?: RejectionEvidence) { super("native publication execution unavailable"); }
+  constructor(readonly sent: boolean, readonly reaped: boolean, readonly rejection?: RejectionEvidence, readonly execution?: ExecutionEvidence) { super("native publication execution unavailable"); }
 }
 
 export function pendingAttempt(journal: Journal, effect: Effect, retirement = false): string | null {
@@ -96,12 +97,24 @@ export async function executeAttempt(options: {
     throw error;
   }
   let failure: unknown;
-  let status: { sent: boolean; reaped: boolean; rejection?: RejectionEvidence } = { sent: true, reaped: true };
+  let status: { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; execution?: ExecutionEvidence } = { sent: true, reaped: true };
   try {
-    await options.transport.execute(journal.plan, options.effect, options.objects, id);
+    const execution = await options.transport.execute(journal.plan, options.effect, options.objects, id);
+    if (execution) status.execution = execution;
   } catch (error) {
     failure = error;
-    status = error instanceof PublicationExecutionError ? { sent: error.sent, reaped: error.reaped, ...(error.rejection ? { rejection: error.rejection } : {}) } : { sent: true, reaped: false };
+    status = error instanceof PublicationExecutionError ? { sent: error.sent, reaped: error.reaped, ...(error.rejection ? { rejection: error.rejection } : {}), ...(error.execution ? { execution: error.execution } : {}) } : { sent: true, reaped: false };
+  }
+  if (status.execution) {
+    try {
+      const successes = status.execution.successes;
+      if (!Array.isArray(successes) || successes.length > 16 || new Set(successes.map(item => item.path)).size !== successes.length) throw Error("invalid captured execution");
+      for (const evidence of successes) readSuccess({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo,
+        plan: journal.plan, effect: options.effect, attempt_id: id, evidence });
+    } catch (error) {
+      failure ??= error;
+      status = { sent: status.sent, reaped: false };
+    }
   }
   // An observer may already have recorded an actual outcome. Keep its receipt and our process status.
   const ended = await recordEnding(journal, options.effect.id, { attempt_id: id, ...status }, "executed");

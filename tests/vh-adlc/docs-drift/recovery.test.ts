@@ -517,7 +517,7 @@ test("a delayed nonce acquisition can outlive a replayed run's release", async (
   let lateAcquire: (() => Promise<void>) | null = null, calls = 0;
   f.transport.execute = async (plan, effect, objects) => {
     if (effect.kind === "lease-acquire" && ++calls === 1) {
-      lateAcquire = () => execute(plan, effect, objects);
+      lateAcquire = async () => { await execute(plan, effect, objects); };
       throw new PublicationExecutionError(true, true);
     }
     await execute(plan, effect, objects);

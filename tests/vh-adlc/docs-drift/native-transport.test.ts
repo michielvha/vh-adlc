@@ -1,3 +1,4 @@
+import { readSuccess } from "../../../plugins/vh-adlc/scripts/docs-drift/success";
 import * as journalArtifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { retainRejection, readRejection } from "../../../plugins/vh-adlc/scripts/docs-drift/rejections";
 import { executeAttempt, pendingAttempt, PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
@@ -131,20 +132,22 @@ if (method !== 'GET') {
         process.exit(1);
     }
     const payload = JSON.parse(readFileSync(option('--input'), 'utf8'));
-    if (method === 'POST' && endpoint === 'repos/fixture/docs/issues')
-        state.issues.push({ ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: 20 }, labels: applyLabels(payload.labels) });
-    else if (method === 'POST' && endpoint.endsWith('/comments')) {
+    let returned;
+    if (method === 'POST' && endpoint === 'repos/fixture/docs/issues') {
+        returned = { ...payload, id: 801, number: 601, user: { login: 'fixture-bot', id: 20 }, labels: applyLabels(payload.labels) };
+        state.issues.push(returned);
+    } else if (method === 'POST' && endpoint.endsWith('/comments')) {
         const number = endpoint.split('/').at(-2);
-        (state.comments[number] ??= []).push({ id: 701, body: payload.body, user: { login: 'fixture-bot', id: 20 } });
-    }
-    else if (method === 'PATCH' && endpoint.includes('/pulls/'))
-        Object.assign(state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-1))), payload);
-    else if (method === 'PUT' && endpoint.endsWith('/labels'))
-        state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-2))).labels = applyLabels(payload.labels);
-    else
-        process.exit(1);
+        returned = { id: 701, body: payload.body, user: { login: 'fixture-bot', id: 20 } };
+        (state.comments[number] ??= []).push(returned);
+    } else if (method === 'PATCH' && endpoint.includes('/pulls/')) {
+        returned = Object.assign(state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-1))), payload);
+    } else if (method === 'PUT' && endpoint.endsWith('/labels')) {
+        returned = applyLabels(payload.labels);
+        state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-2))).labels = returned;
+    } else process.exit(1);
     save();
-    process.stdout.write('{}');
+    process.stdout.write(args.includes('--jq') ? '{}' : 'HTTP/2.0 200 OK\\r\\n\\r\\n' + JSON.stringify(returned));
     process.exit(0);
 }
 let status = 200, value;
@@ -1350,4 +1353,87 @@ test("native rejection proof links only after durable command artifacts", async 
     expect(projection).toBeGreaterThan(status);
     expect(proof).toBeGreaterThan(projection);
   } finally { observed.mockRestore(); }
+});
+
+test("successful native issue delivery returns attempt-bound private evidence", async () => {
+  const f = setup(); await f.transport.identity();
+  const effect: Effect = { id: "captured-issue", kind: "issue-create", payload: {
+    title: "Captured title", body: "Captured body\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+    labels: ["documentation"], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md",
+    evidence_commit: f.commit, evidence_sha256: sha256(f.readme),
+  } };
+  const reviewed = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects.slice(0, 2), effect, f.plan.manifest.effects.at(-1)!]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(reviewed), grants: reviewed.grants, adoption_sha256: hash("adoption"),
+    publication_kind: "advisory", context: "trial", transport: "native", corrections: [], attention: [] });
+  const objects = writePlanObject(f.store, plan);
+  const result = await f.transport.execute(plan, effect, objects, "captured-attempt");
+  expect(result).toBeDefined();
+  if (!result) throw Error("missing captured execution");
+  expect(result.successes).toHaveLength(1);
+  const proof = result.successes[0];
+  const bytes = readFileSync(proof.path);
+  expect(sha256(bytes)).toBe(proof.sha256);
+  const projection = JSON.parse(bytes.toString()) as {
+    attempt_id: string; status: number; command_index: number; context: string; command_directory: string;
+    identity: { actor_id: number }; facts: { body_sha256: string; labels: number[] }; extra?: boolean;
+  };
+  expect(projection.attempt_id).toBe("captured-attempt");
+  expect(projection.facts.body_sha256).toBe(sha256(Buffer.from(String(effect.payload.body))));
+  expect(projection.facts.labels).toEqual([101]);
+  expect(projection.identity.actor_id).toBe(20);
+  expect(bytes.toString()).not.toContain("Captured title");
+  expect(bytes.toString()).not.toContain("Captured body");
+  const scope = { artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan, effect, attempt_id: "captured-attempt" };
+  expect(readSuccess({ ...scope, evidence: proof })).toEqual(proof);
+  const invalid: Array<(value: typeof projection) => void> = [
+    value => { value.status = 500; }, value => { value.command_index = -1; },
+    value => { value.identity.actor_id = 0; }, value => { value.facts.labels = [101, 101]; },
+    value => { value.facts.body_sha256 = "unhashed"; }, value => { value.extra = true; },
+    value => { value.context = "production"; },
+  ];
+  for (const change of invalid) {
+    const changed = JSON.parse(bytes.toString()); change(changed);
+    const changedBytes = canonicalJSON(changed);
+    writeFileSync(proof.path, changedBytes);
+    expect(() => readSuccess({ ...scope, evidence: { path: proof.path, sha256: sha256(changedBytes) } })).toThrow();
+  }
+  writeFileSync(proof.path, bytes);
+  for (const path of [join(projection.command_directory, "payload.json"), join(projection.command_directory, "process.json")]) {
+    const original = readFileSync(path);
+    writeFileSync(path, "{}");
+    expect(() => readSuccess({ ...scope, evidence: proof })).toThrow();
+    writeFileSync(path, original);
+  }
+
+  writeFileSync(proof.path, "{}");
+  expect(() => readSuccess({ ...scope, evidence: proof })).toThrow();
+});
+
+test("the original journal retains captured success without inventing an exact outcome", async () => {
+  const f = setup(); await f.transport.identity();
+  const effect: Effect = { id: "captured-issue", kind: "issue-create", payload: {
+    title: "Captured title", body: "Captured body\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
+    labels: ["documentation"], prior_ids: [], evidence_repository: "fixture/docs", evidence_path: "README.md",
+    evidence_commit: f.commit, evidence_sha256: sha256(f.readme),
+  } };
+  const reviewed = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects.slice(0, 2), effect, f.plan.manifest.effects.at(-1)!]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(reviewed), grants: reviewed.grants, adoption_sha256: hash("adoption"),
+    publication_kind: "advisory", context: "trial", transport: "native", corrections: [], attention: [] });
+  let journal = createJournal({ source_repo: join(f.root, "source"), artifact_root: join(f.root, "artifacts"), plan });
+  const objects = writePublicationObjects(f.store, plan, journal.header);
+  // Seed the prior metadata outcomes as fixture preconditions for this isolated business attempt.
+  for (const metadata of plan.manifest.effects.slice(0, 2)) {
+    journal = appendIntent(journal, metadata.id);
+    journal = appendOutcome(journal, metadata.id, { state: "observed", observation_sha256: hash("fixture-metadata"),
+      resource_id: String(metadata.payload.ref), object: objects.lease_object });
+  }
+  journal = appendIntent(journal, effect.id);
+  journal = await executeAttempt({ journal, effect, objects, transport: f.transport });
+  const restored = readJournal(journal.directory, join(f.root, "source"));
+  const ending = restored.events.at(-1);
+  if (!ending || !("execution" in ending.payload) || !ending.payload.execution) throw Error("missing linked success evidence");
+  expect(ending.payload.execution.successes).toHaveLength(1);
+  expect(restored.header.run_id).toBe(journal.header.run_id);
+  expect(pendingAttempt(restored, effect)).toBe("dispatch-outcome-unknown");
+  expect(f.inspect().issues).toHaveLength(1);
 });
