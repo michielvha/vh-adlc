@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as setup from "../../../plugins/vh-adlc/scripts/docs-drift/trial-setup";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -29,6 +29,7 @@ test("trial setup imports the exact portable fixture without touching the consum
   expect(result.authority).toBe("none");
   expect(result.fixture.source_commit).toBe(f.definition.fixture.source_commit);
   expect(result.fixture.tree).toBe(f.definition.fixture.tree);
+  expect(JSON.parse(readFileSync(join(result.root, "preparation.json"), "utf8"))).toEqual(result);
   expect(readGit(result.source, "status", "--porcelain").length).toBe(0);
   expect(readFileSync(join(result.source, "docs/guide.md"), "utf8")).toBe("Synthetic fixture document\n");
   expect(captureRepositoryState(f.repo)).toEqual(before);
@@ -55,6 +56,28 @@ test("trial setup refuses a declared tree absent from the bundle", () => {
   const { f, options } = input(); f.definition.fixture.tree = "0".repeat(40);
   options.current_default = commitMetadata(f);
   expect(() => setup.prepareTrialFixture(options)).toThrow("fixture tree");
+  const directories = readdirSync(options.directory);
+  expect(directories).toHaveLength(1);
+  const failed = JSON.parse(readFileSync(join(options.directory, directories[0]!, "setup-failed.json"), "utf8"));
+  expect(failed).toMatchObject({ authority: "none", phase: "fixture-tree", reason: "docs-drift trial setup fixture tree",
+    fixture_id: f.definition.fixture.id, bundle_sha256: f.definition.fixture.bundle.sha256 });
+});
+
+test("a failure to retain diagnostics preserves the original setup error", () => {
+  const { f, options } = input(), bin = join(f.root, "git-wrapper"); mkdirSync(bin, { mode: 0o700 });
+  const wrapper = join(bin, "git");
+  writeFileSync(wrapper, '#!/bin/sh\ncase " $* " in\n  *" bundle verify "*) umask 077; printf synthetic > "$PWD/../setup-failed.json"; exit 17 ;;\nesac\nexec /usr/bin/git "$@"\n');
+  chmodSync(wrapper, 0o700);
+  const original = process.env.PATH; process.env.PATH = bin + ":" + original;
+  let captured: unknown;
+  try { setup.prepareTrialFixture(options); }
+  catch (error) { captured = error; }
+  finally { process.env.PATH = original; }
+  expect(captured).toBeInstanceOf(AggregateError);
+  if (!(captured instanceof AggregateError)) throw Error("missing combined setup/recording failure");
+  expect(captured.message).toContain("Git collection failed");
+  expect(captured.errors).toHaveLength(2);
+  expect(captured.cause).toMatchObject({ message: "Git collection failed" });
 });
 
 test("trial setup refuses output inside a consumer checkout", () => {

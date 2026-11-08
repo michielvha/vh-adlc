@@ -372,8 +372,8 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
   let componentEntries: string[] | null = null;
   if (Object.hasOwn(definition, "component_entries")) {
     const selected = definition.component_entries;
-    if (!changes.component.changed || definition.classification === "uncertain" || !Array.isArray(selected)
-      || selected.length >= all.length || selected.some(entry => !all.includes(entry))
+    if (!changes.component.changed || definition.classification !== "execution" || !Array.isArray(definition.changed_rules) || definition.changed_rules.length
+      || !Array.isArray(selected) || !selected.length || selected.length >= all.length || selected.some(entry => !all.includes(entry))
       || !canonicalJSON(selected).equals(canonicalJSON(all.filter(entry => selected.includes(entry))))) fail("component affected entry scope");
     componentEntries = selected;
   }

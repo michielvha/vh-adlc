@@ -355,7 +355,7 @@ test("uncertain trial-route candidates remain usable when their mapped scenarios
   expect(gate.verify({ current_default: upgrade.delivered }).source_candidate).toBe(upgrade.candidate);
 });
 
-function componentScopeFixture(mixed = false) {
+function componentScopeFixture(mixed = false, componentEntries = ["claude"], execution = true) {
   const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, {
     prepare_candidate: mixed ? (repo, settings) => {
       Object.assign(settings.clients, { "copilot-new": { ...settings.clients["copilot-linux"], version: "fixture-2.0.0" } });
@@ -364,18 +364,32 @@ function componentScopeFixture(mixed = false) {
       put(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
     } : undefined,
     change_definition(definition) {
-      definition.component_entries = ["claude"];
-      definition.affected_entries = mixed ? ["copilot", "claude"] : ["claude"];
+      definition.component_entries = componentEntries;
+      definition.affected_entries = mixed ? ["copilot", ...componentEntries] : componentEntries;
+      if (execution) { definition.classification = "execution"; definition.changed_rules = []; }
     },
   });
   return { f, upgrade };
 }
 
-test.each([false, true])("reviewed component influence carries only unaffected entries with mixed client change %s", async mixed => {
+test.each([{ name: "component-only", mixed: false }, { name: "mixed-client", mixed: true }])("reviewed component influence carries only unaffected entries for $name", async ({ mixed }) => {
   const { f, upgrade } = componentScopeFixture(mixed), gate = await adoption.createTrialAdoptionGate(f.boundary);
   const result = gate.verify({ current_default: upgrade.delivered });
   expect(result.receipts).toMatchObject({ hosted_advisory: f.record.receipts.hosted_advisory });
   expect(result.source_candidate).toBe(upgrade.candidate);
+});
+
+test.each(["assessment", "scan", "status", "attention", "history"])("changed %s rules cannot carry hosted evidence through a narrow component scope", async surface => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, { surface, change_definition(definition) {
+    definition.component_entries = ["claude"]; definition.affected_entries = ["claude"];
+  } });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(() => gate.verify({ current_default: upgrade.delivered })).toThrow("component affected entry scope");
+});
+
+test("an empty component scope cannot narrow a mixed client upgrade", async () => {
+  const { f, upgrade } = componentScopeFixture(true, [], true), gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(() => gate.verify({ current_default: upgrade.delivered })).toThrow("component affected entry scope");
 });
 
 test.each(["missing-review", "wrong-source", "missing-entry", "test-kind", "failed-check"] as const)("component scope refuses %s", async scenario => {
@@ -396,6 +410,7 @@ test.each(["missing-review", "wrong-source", "missing-entry", "test-kind", "fail
 
 test.each(["uncertain", "duplicate", "unknown", "unordered"] as const)("component mapping refuses %s scope", async scenario => {
   const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, { change_definition(definition) {
+    definition.classification = "execution"; definition.changed_rules = [];
     definition.component_entries = scenario === "duplicate" ? ["claude", "claude"]
       : scenario === "unknown" ? ["unknown"] : scenario === "unordered" ? ["claude", "copilot"] : ["claude"];
     definition.affected_entries = ["claude"];
