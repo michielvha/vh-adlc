@@ -549,10 +549,10 @@ function compareUpgradeBindings(options: { repo: string; approved_default: strin
   const { repo } = options, base = immutable(options.approved_default), candidate = immutable(options.source_candidate);
   try { readGit(repo, "merge-base", "--is-ancestor", base, candidate); }
   catch { fail("successor source must descend from approved default"); }
-  verifyPriorSelection(repo, base, candidate, adopted);
   const previous = collectAdoptionBindings(repo, base);
   verifyRetainedInputs(repo, base, candidate,
     [[adopted.record_path, adopted.adoption_sha256], [previous.component_pin.path, previous.component_pin.sha256]]);
+  verifyPriorSelection(repo, base, candidate, adopted);
   const next = collectAdoptionBindings(repo, candidate);
   if (previous.settings.repository !== next.settings.repository || previous.settings.hostname !== next.settings.hostname
     || previous.settings.default_branch !== next.settings.default_branch) fail("successor consumer identity differs");
