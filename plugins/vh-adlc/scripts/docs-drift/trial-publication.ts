@@ -1,10 +1,11 @@
+import { acknowledgeDeliveries, type AcknowledgementScope } from "./delivery-ack";
 import { realpathSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { readGit } from "./git";
-import { readArtifact, readVerifiedPlan, sealPlan, type PlanPolicy, type SealedPlan } from "./journal";
+import { readArtifact, readJournal, readVerifiedPlan, sealPlan, type PlanPolicy, type SealedPlan } from "./journal";
 import { effectDigest, manifestDigest, validateReviewedManifest, type NativeRoleEvidence } from "./manifests";
 import { canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
-import { type PublicationGate, type PublishOptions } from "./publish";
+import { PublicationScopeChanged, type PublicationGate, type PublishOptions, type PublishResult } from "./publish";
 import { loadTrialContext, type TrialContext } from "./trial-context";
 import { createTrialTransport } from "./trial-transport";
 import { loadCommittedSettings } from "./settings";
@@ -46,11 +47,14 @@ function nativeRole(context: TrialContext, value: unknown, binding: SealedPlan["
 }
 
 /** Only the immutable setup test grant supplies collector authority. Request/report flags supply none. */
-export function readTrialPublication(selected: TrialContext, requestPath: string): PublishOptions {
+export function readTrialPublication(selected: TrialContext, requestPath: string): PublishOptions & { request_sha256: string } {
   const context = loadTrialContext({ root: selected.root, context_commit: selected.context_commit, runtime_directory: selected.root + "/runtime" });
-  const request = exact(json(ownedArtifact(context, requestPath)), ["schema_version", "kind", "context_sha256", "entry", "plan", "worker", "reviewer"]);
+  const requestBytes = ownedArtifact(context, requestPath), requestHash = sha256(requestBytes);
+  const request = exact(json(requestBytes), ["schema_version", "kind", "context_sha256", "entry", "publication_kind", "plan", "worker", "reviewer"]);
   if (request.schema_version !== 1 || request.kind !== "docs-drift-synthetic-publication" || request.context_sha256 !== context.context_sha256
     || !["copilot", "claude"].includes(String(request.entry))) throw Error("synthetic publication context or entry changed");
+  const publicationKind = request.publication_kind;
+  if (publicationKind !== "advisory" && publicationKind !== "resolve") throw Error("synthetic publication kind unavailable");
   const entry = context.settings.execution.entries[String(request.entry)];
   const rolePolicy = (name: "worker" | "reviewer") => {
     const selected = entry[name];
@@ -58,11 +62,11 @@ export function readTrialPublication(selected: TrialContext, requestPath: string
     return { requested_model: selected.model, adopted_model: selected.model, identity_source: selected.identity_source };
   };
   const workerPolicy = rolePolicy("worker"), reviewerPolicy = rolePolicy("reviewer");
-  const plan = readVerifiedPlan(retained(context, request.plan), original => ({ adoption_sha256: context.context_sha256,
-    context: "trial", transport: "collector", publication_kind: original.publication_kind, pr_draft: true,
+  const plan = readVerifiedPlan(retained(context, request.plan), () => ({ adoption_sha256: context.context_sha256,
+    context: "trial", transport: "collector", publication_kind: publicationKind, pr_draft: true,
     worker: workerPolicy, reviewer: reviewerPolicy }));
   const policy: PlanPolicy = { adoption_sha256: context.context_sha256, context: "trial", transport: "collector",
-    publication_kind: plan.publication_kind, pr_draft: true, worker: workerPolicy, reviewer: reviewerPolicy };
+    publication_kind: publicationKind, pr_draft: true, worker: workerPolicy, reviewer: reviewerPolicy };
   const manifest = plan.manifest, candidate = manifest.bindings.candidate_commit;
   if (manifest.bindings.source_commit !== context.source_commit || manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256
     || readGit(context.store.root, "rev-parse", "--verify", "--end-of-options", candidate + "^{commit}").toString().trim() !== candidate
@@ -75,9 +79,43 @@ export function readTrialPublication(selected: TrialContext, requestPath: string
     corrections: plan.corrections, attention: plan.attention });
   if (!canonicalJSON(checked).equals(canonicalJSON(plan))) throw Error("synthetic publication original review changed");
   return { source_repo: context.source, artifact_root: context.artifacts, object_store: context.store, settings: context.settings,
-    plan, transport: createTrialTransport(context), gate: async () => {
+    plan, request_sha256: requestHash, transport: createTrialTransport(context), gate: async () => {
       const current = readTrialPublication(context, requestPath);
-      if (!canonicalJSON(current.plan).equals(canonicalJSON(plan))) throw Error("synthetic publication request changed");
+      if (current.request_sha256 !== requestHash || !canonicalJSON(current.plan).equals(canonicalJSON(plan))) throw new PublicationScopeChanged("synthetic publication request changed");
       return { review, policy };
     } };
+}
+
+/** The optional owner request is distinct from the setup's standing synthetic publication grant. */
+export async function runTrialAcknowledgement(selected: TrialContext, selectionPath: string, ownerRequestPath?: string): Promise<{
+  result: PublishResult; scope: AcknowledgementScope | null; scope_sha256: string | null;
+}> {
+  const context = loadTrialContext({ root: selected.root, context_commit: selected.context_commit, runtime_directory: selected.root + "/runtime" });
+  const selection = exact(json(ownedArtifact(context, selectionPath)), ["schema_version", "kind", "context_sha256", "journal_directory", "acknowledge_effect_ids", "retire_effect_ids"]);
+  if (selection.schema_version !== 1 || selection.kind !== "docs-drift-synthetic-acknowledgement-selection" || selection.context_sha256 !== context.context_sha256
+    || typeof selection.journal_directory !== "string" || dirname(resolve(selection.journal_directory)) !== context.artifacts
+    || realpathSync(selection.journal_directory) !== resolve(selection.journal_directory)) throw Error("synthetic acknowledgement context or journal changed");
+  function ids(value: unknown): string[] {
+    if (!Array.isArray(value) || value.length > 1000 || value.some(id => typeof id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/u.test(id))
+      || new Set(value).size !== value.length) throw Error("synthetic acknowledgement effect IDs");
+    return value;
+  }
+  const journal = readJournal(selection.journal_directory, context.source), plan = journal.plan;
+  if (plan.context !== "trial" || plan.transport !== "collector" || plan.adoption_sha256 !== context.context_sha256
+    || plan.manifest.bindings.source_commit !== context.source_commit
+    || plan.manifest.bindings.settings_sha256 !== loadCommittedSettings(context.source, context.source_commit).settings_sha256) throw Error("synthetic acknowledgement original context changed");
+  let scope: AcknowledgementScope | null = null;
+  const result = await acknowledgeDeliveries({ source_repo: context.source, journal_directory: journal.directory,
+    object_store: context.store, settings: context.settings, transport: createTrialTransport(context),
+    acknowledge_effect_ids: ids(selection.acknowledge_effect_ids), retire_effect_ids: ids(selection.retire_effect_ids),
+    authorize: async current => {
+      scope = current;
+      if (!ownerRequestPath) return null;
+      const bytes = ownedArtifact(context, ownerRequestPath);
+      const owner = exact(json(bytes), ["schema_version", "kind", "context_sha256", "source", "scope_sha256"]);
+      if (owner.schema_version !== 1 || owner.kind !== "docs-drift-synthetic-owner-request" || owner.context_sha256 !== context.context_sha256
+        || owner.source !== "owner-current-request" || owner.scope_sha256 !== sha256(canonicalJSON(current))) throw Error("synthetic acknowledgement exact current owner request required");
+      return { kind: "owner-delivery-acknowledgement", source: "owner-current-request", scope_sha256: owner.scope_sha256, request_sha256: sha256(bytes) };
+    } });
+  return { result, scope, scope_sha256: scope === null ? null : sha256(canonicalJSON(scope)) };
 }
