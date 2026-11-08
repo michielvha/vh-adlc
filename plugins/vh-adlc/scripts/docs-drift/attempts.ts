@@ -23,7 +23,8 @@ export function pendingAttempt(journal: Journal, effect: Effect, retirement = fa
     const ended = events.findLast(event => event.kind === "attempt-ended"
       && "attempt_id" in event.payload && event.payload.attempt_id === attemptId);
     if (!ended || ended.revision < attempt.revision) return "attempt-in-flight";
-    const status = ended.payload as { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; attempt_id: string };
+    const status = ended.payload as { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; attempt_id: string; capture_unverified?: true };
+    if (status.capture_unverified) return "success-proof-unavailable";
     if (!status.reaped) return "attempt-not-reaped";
     if (status.rejection) {
       try {
@@ -97,7 +98,7 @@ export async function executeAttempt(options: {
     throw error;
   }
   let failure: unknown;
-  let status: { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; execution?: ExecutionEvidence } = { sent: true, reaped: true };
+  let status: { sent: boolean; reaped: boolean; rejection?: RejectionEvidence; execution?: ExecutionEvidence; capture_unverified?: true } = { sent: true, reaped: true };
   try {
     const execution = await options.transport.execute(journal.plan, options.effect, options.objects, id);
     if (execution) status.execution = execution;
@@ -107,13 +108,15 @@ export async function executeAttempt(options: {
   }
   if (status.execution) {
     try {
+      if (status.rejection) throw Error("contradictory execution and rejection");
       const successes = status.execution.successes;
       if (!Array.isArray(successes) || successes.length > 16 || new Set(successes.map(item => item.path)).size !== successes.length) throw Error("invalid captured execution");
       for (const evidence of successes) readSuccess({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo,
         plan: journal.plan, effect: options.effect, attempt_id: id, evidence });
     } catch (error) {
       failure ??= error;
-      status = { sent: status.sent, reaped: false };
+      const { execution: unverifiedExecution, ...observedStatus } = status;
+      status = { ...observedStatus, capture_unverified: true };
     }
   }
   // An observer may already have recorded an actual outcome. Keep its receipt and our process status.

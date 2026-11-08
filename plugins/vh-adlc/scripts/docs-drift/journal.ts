@@ -27,7 +27,7 @@ export type Retirement = { scope_sha256: string; request_sha256: string; lookup:
 export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
 type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant; atomic_receipt_id?: string };
 type Intent = { effect_sha256: string; atomic_acquisition?: string };
-type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean; rejection?: { path: string; sha256: string }; execution?: ExecutionEvidence };
+type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean; rejection?: { path: string; sha256: string }; execution?: ExecutionEvidence; capture_unverified?: true };
 type Event = {
   schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended" | "recovery-only";
   effect_id: string; payload: Intent | Outcome | { reason: string } | Retirement | Attempt | AttemptEnd;
@@ -213,7 +213,7 @@ function attemptsUnapplied(events: Event[], effectId: string): boolean {
     const id = attempt.payload.attempt_id;
     const ended = events.find(event => event.kind === "attempt-ended" && event.effect_id === attempt.effect_id
       && "attempt_id" in event.payload && event.payload.attempt_id === id);
-    return ended !== undefined && "sent" in ended.payload && ended.payload.reaped
+    return ended !== undefined && "sent" in ended.payload && !("capture_unverified" in ended.payload) && ended.payload.reaped
       && (!ended.payload.sent || "rejection" in ended.payload);
   });
 }
@@ -260,13 +260,16 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
     else if (event.kind === "attempt-ended") {
       const rejected = Object.hasOwn(event.payload, "rejection");
       const executed = Object.hasOwn(event.payload, "execution");
-      const payload = exact(event.payload, ["attempt_id", "sent", "reaped", ...(rejected ? ["rejection"] : []), ...(executed ? ["execution"] : [])]);
+      const unverified = Object.hasOwn(event.payload, "capture_unverified");
+      const payload = exact(event.payload, ["attempt_id", "sent", "reaped", ...(rejected ? ["rejection"] : []), ...(executed ? ["execution"] : []), ...(unverified ? ["capture_unverified"] : [])]);
       if (rejected) {
         const evidence = exact(payload.rejection, ["path", "sha256"]);
         hash(evidence.sha256);
         if (payload.sent !== true || payload.reaped !== true || typeof evidence.path !== "string"
           || !evidence.path.startsWith("/") || evidence.path.includes("\0")) fail("invalid rejection evidence");
       }
+      if (unverified && (payload.capture_unverified !== true || executed)) fail("invalid unverified capture");
+      if (executed && rejected) fail("contradictory execution and rejection");
       if (executed) {
         const execution = exact(payload.execution, ["successes"]);
         if (!Array.isArray(execution.successes) || execution.successes.length > 16 || payload.sent !== true) fail("invalid success references");
@@ -274,7 +277,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
         for (const item of execution.successes) {
           const evidence = exact(item, ["path", "sha256"]);
           hash(evidence.sha256);
-          if (typeof evidence.path !== "string" || !evidence.path.startsWith("/") || evidence.path.includes("\0") || paths.has(evidence.path)) fail("invalid success reference");
+          if (typeof evidence.path !== "string" || !evidence.path.startsWith("/") || evidence.path.includes("\0") || resolve(evidence.path) !== evidence.path || dirname(evidence.path) !== dirname(header.directory) || paths.has(evidence.path)) fail("invalid success reference");
           paths.add(evidence.path);
         }
       }

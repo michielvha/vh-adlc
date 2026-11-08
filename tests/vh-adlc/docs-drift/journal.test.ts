@@ -240,13 +240,14 @@ test("retained publication operation cannot change between advisory and resolve"
 });
 
 
-test.each(["in-flight", "sent", "unreaped", "unsent"] as const)("unapplied retirement cannot fabricate negative dispatch proof (%s)", state => {
+test.each(["in-flight", "sent", "unreaped", "unsent", "capture-unverified"] as const)("unapplied retirement cannot fabricate negative dispatch proof (%s)", state => {
   const f = setup();
   let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
   const effect = f.plan.manifest.effects[0];
   journal = appendIntent(journal, effect.id);
   journal = appendAttempt(journal, effect.id, "owned-negative-proof");
-  if (state !== "in-flight") journal = appendAttemptEnd(journal, effect.id, { attempt_id: "owned-negative-proof", sent: state !== "unsent", reaped: state !== "unreaped" });
+  if (state !== "in-flight") journal = appendAttemptEnd(journal, effect.id, { attempt_id: "owned-negative-proof", sent: state !== "unsent", reaped: state !== "unreaped",
+    ...(state === "capture-unverified" ? { capture_unverified: true as const, rejection: { path: join(f.artifacts, "rejection.json"), sha256: hash("rejection") } } : {}) });
   const retirement = { scope_sha256: hash("scope"), request_sha256: hash("request"), unapplied: true as const,
     lookup: { path: join(f.artifacts, "lookup.json"), sha256: hash("lookup") } };
   if (state === "unsent") expect(appendRetirement(journal, effect.id, retirement).revision).toBe(journal.revision + 1);
@@ -284,3 +285,21 @@ test("supported outcomes retain scoped lookup digests while historical journal r
   expect(readJournal(journal.directory, f.repo).events.at(-1)?.payload).toEqual(receipt);
   expect(() => readLookup({ evidence: lookup, artifact_root: f.artifacts, source_repo: f.repo, plan: f.plan, effect, transport: "native", state: "done" })).toThrow();
 });
+
+test.each(["duplicate", "oversized", "unsent", "foreign", "unnormalized", "rejected", "unverified"] as const)(
+  "attempt success references reject %s payloads", kind => {
+    const f = setup();
+    let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+    const effect = f.plan.manifest.effects[0];
+    journal = appendIntent(journal, effect.id);
+    journal = appendAttempt(journal, effect.id, "captured-attempt");
+    const reference = { path: join(f.artifacts, "success-fixture.json"), sha256: hash("success") };
+    const successes = kind === "duplicate" ? [reference, reference]
+      : kind === "oversized" ? Array.from({ length: 17 }, (_, index) => ({ ...reference, path: join(f.artifacts, `success-${index}.json`) }))
+      : [{ ...reference, path: kind === "foreign" ? join(f.root, "foreign.json")
+        : kind === "unnormalized" ? f.artifacts + "/child/../success-fixture.json" : reference.path }];
+    const status = { attempt_id: "captured-attempt", sent: kind !== "unsent", reaped: true, execution: { successes },
+      ...(kind === "unverified" ? { capture_unverified: true as const } : {}),
+      ...(kind === "rejected" ? { rejection: { path: join(f.artifacts, "rejection-fixture.json"), sha256: hash("rejection") } } : {}) };
+    expect(() => appendAttemptEnd(journal, effect.id, status)).toThrow();
+  });

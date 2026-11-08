@@ -52,7 +52,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, reject_labels: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -127,8 +127,9 @@ if (args[0] === 'pr' && args[1] === 'ready') {
 const endpoint = args.find(a => a === 'user' || a.startsWith('repos/'));
 const method = option('--method');
 if (method !== 'GET') {
-    if (state.reject_http) {
-        process.stdout.write('HTTP/2.0 ' + state.reject_http + ' rejected\\r\\nX-Secret: header-canary\\r\\n\\r\\n{"message":"body-canary"}');
+    const rejection = state.reject_http || (state.reject_labels && method === 'PUT' && endpoint.endsWith('/labels') ? 403 : 0);
+    if (rejection) {
+        process.stdout.write('HTTP/2.0 ' + rejection + ' rejected\\r\\nX-Secret: header-canary\\r\\n\\r\\n{"message":"body-canary"}');
         process.exit(1);
     }
     const payload = JSON.parse(readFileSync(option('--input'), 'utf8'));
@@ -138,7 +139,7 @@ if (method !== 'GET') {
         state.issues.push(returned);
     } else if (method === 'POST' && endpoint.endsWith('/comments')) {
         const number = endpoint.split('/').at(-2);
-        returned = { id: 701, body: payload.body, user: { login: 'fixture-bot', id: 20 } };
+        returned = { id: 701, body: payload.body, issue_url: 'https://api.github.com/repos/fixture/docs/issues/' + number, user: { login: 'fixture-bot', id: 20 } };
         (state.comments[number] ??= []).push(returned);
     } else if (method === 'PATCH' && endpoint.includes('/pulls/')) {
         returned = Object.assign(state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-1))), payload);
@@ -1375,7 +1376,7 @@ test("successful native issue delivery returns attempt-bound private evidence", 
   expect(sha256(bytes)).toBe(proof.sha256);
   const projection = JSON.parse(bytes.toString()) as {
     attempt_id: string; status: number; command_index: number; context: string; command_directory: string;
-    identity: { actor_id: number }; facts: { body_sha256: string; labels: number[] }; extra?: boolean;
+    identity: { actor_id: number; actor: string; repository_id: number }; facts: { body_sha256: string; labels: number[] }; method: string; endpoint: string; extra?: boolean;
   };
   expect(projection.attempt_id).toBe("captured-attempt");
   expect(projection.facts.body_sha256).toBe(sha256(Buffer.from(String(effect.payload.body))));
@@ -1385,9 +1386,14 @@ test("successful native issue delivery returns attempt-bound private evidence", 
   expect(bytes.toString()).not.toContain("Captured body");
   const scope = { artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan, effect, attempt_id: "captured-attempt" };
   expect(readSuccess({ ...scope, evidence: proof })).toEqual(proof);
+  expect(() => readSuccess({ ...scope, attempt_id: "foreign-attempt", evidence: proof })).toThrow();
+  expect(() => readSuccess({ ...scope, effect: { ...effect, id: "foreign-effect" }, evidence: proof })).toThrow();
   const invalid: Array<(value: typeof projection) => void> = [
     value => { value.status = 500; }, value => { value.command_index = -1; },
-    value => { value.identity.actor_id = 0; }, value => { value.facts.labels = [101, 101]; },
+    value => { value.identity.actor_id = 0; }, value => { value.identity.actor_id = 21; },
+    value => { value.identity.actor = "foreign-bot"; }, value => { value.identity.repository_id = 11; },
+    value => { value.endpoint = "repos/fixture/docs/pulls/44"; }, value => { value.method = "PATCH"; },
+    value => { value.facts.labels = [101, 101]; },
     value => { value.facts.body_sha256 = "unhashed"; }, value => { value.extra = true; },
     value => { value.context = "production"; },
   ];
@@ -1409,7 +1415,8 @@ test("successful native issue delivery returns attempt-bound private evidence", 
   expect(() => readSuccess({ ...scope, evidence: proof })).toThrow();
 });
 
-test("the original journal retains captured success without inventing an exact outcome", async () => {
+for (const corrupt of [false, true]) {
+test(`the original journal retains honest process status (corrupt=${corrupt})`, async () => {
   const f = setup(); await f.transport.identity();
   const effect: Effect = { id: "captured-issue", kind: "issue-create", payload: {
     title: "Captured title", body: "Captured body\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md",
@@ -1428,12 +1435,122 @@ test("the original journal retains captured success without inventing an exact o
       resource_id: String(metadata.payload.ref), object: objects.lease_object });
   }
   journal = appendIntent(journal, effect.id);
-  journal = await executeAttempt({ journal, effect, objects, transport: f.transport });
+  if (corrupt) {
+    const execute = f.transport.execute;
+    f.transport.execute = async (...args) => {
+      const captured = await execute(...args);
+      if (captured?.successes[0]) writeFileSync(captured.successes[0].path, "{}");
+      return captured;
+    };
+    await expect(executeAttempt({ journal, effect, objects, transport: f.transport })).rejects.toThrow();
+  } else journal = await executeAttempt({ journal, effect, objects, transport: f.transport });
   const restored = readJournal(journal.directory, join(f.root, "source"));
   const ending = restored.events.at(-1);
+  if (corrupt) {
+    if (!ending || !("sent" in ending.payload)) throw Error("missing ended process facts");
+    expect(ending.payload.sent).toBe(true);
+    expect(ending.payload.reaped).toBe(true);
+    expect("capture_unverified" in ending.payload && ending.payload.capture_unverified).toBe(true);
+    expect(pendingAttempt(restored, effect)).toBe("success-proof-unavailable");
+    return;
+  }
   if (!ending || !("execution" in ending.payload) || !ending.payload.execution) throw Error("missing linked success evidence");
   expect(ending.payload.execution.successes).toHaveLength(1);
   expect(restored.header.run_id).toBe(journal.header.run_id);
   expect(pendingAttempt(restored, effect)).toBe("dispatch-outcome-unknown");
   expect(f.inspect().issues).toHaveLength(1);
+});
+}
+
+test("partial native update retains its first success while cleanup remains pending", async () => {
+  const f = setup(); await f.transport.identity();
+  const original = { title: "Old title", body: "Old body", labels: ["old"], draft: false };
+  f.update(state => {
+    state.reject_labels = true;
+    state.prs.push({ ...original, id: 5010, number: 501, labels: [{ id: 102, name: "old" }], state: "open",
+      user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } },
+      base: { ref: "main", repo: { id: 10 } } });
+  });
+  const effect: Effect = { id: "captured-update", kind: "pr-update", payload: { title: "New title", body: "New body",
+    labels: ["documentation"], draft: false, number: 501, expected_head: f.commit,
+    expected_payload: original, expected_payload_sha256: sha256(canonicalJSON(original)) } };
+  const reviewed = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects.slice(0, 2), effect, f.plan.manifest.effects.at(-1)!]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(reviewed), grants: reviewed.grants, adoption_sha256: hash("adoption"),
+    publication_kind: "advisory", context: "trial", transport: "native", corrections: [], attention: [] });
+  let journal = createJournal({ source_repo: join(f.root, "source"), artifact_root: join(f.root, "artifacts"), plan });
+  const objects = writePublicationObjects(f.store, plan, journal.header);
+  for (const metadata of plan.manifest.effects.slice(0, 2)) {
+    journal = appendIntent(journal, metadata.id);
+    journal = appendOutcome(journal, metadata.id, { state: "observed", observation_sha256: hash("fixture-metadata"),
+      resource_id: String(metadata.payload.ref), object: objects.lease_object });
+  }
+  journal = appendIntent(journal, effect.id);
+  const error = await executeAttempt({ journal, effect, objects, transport: f.transport }).then(() => null, (error: unknown) => error);
+  expect(error).toBeInstanceOf(PublicationExecutionError);
+  if (!(error instanceof PublicationExecutionError) || !error.execution) throw Error("missing partial native execution");
+  expect(error.execution.successes).toHaveLength(1);
+  const projection = JSON.parse(readFileSync(error.execution.successes[0].path, "utf8")) as {
+    command_index: number; attempt_id: string; facts: { number: number; head_sha: string; user_id: number }; identity: { actor_id: number };
+  };
+  expect(projection.command_index).toBe(0);
+  const wrongTarget = { ...projection, facts: { ...projection.facts, number: 502 } };
+  const changedBytes = canonicalJSON(wrongTarget);
+  const proof = error.execution.successes[0];
+  const originalBytes = readFileSync(proof.path);
+  writeFileSync(proof.path, changedBytes);
+  expect(() => readSuccess({ artifact_root: join(f.root, "artifacts"), source_repo: join(f.root, "source"), plan, effect,
+    attempt_id: projection.attempt_id, evidence: { path: proof.path, sha256: sha256(changedBytes) } })).toThrow();
+  writeFileSync(proof.path, originalBytes);
+  expect(projection.facts.head_sha).toBe(f.commit);
+  expect(projection.facts.user_id).toBe(20);
+  expect(projection.identity.actor_id).toBe(20);
+  const restored = readJournal(journal.directory, join(f.root, "source"));
+  const ending = restored.events.at(-1);
+  if (!ending || !("execution" in ending.payload) || !ending.payload.execution || !("sent" in ending.payload)) throw Error("missing partial execution record");
+  expect(ending.payload.sent).toBe(true);
+  expect(ending.payload.reaped).toBe(true);
+  expect(ending.payload.execution.successes).toHaveLength(1);
+  expect(pendingAttempt(restored, effect, true)).not.toBeNull();
+  // Preserve the existing idempotent update path after the native target is rechecked.
+  f.update(state => { state.reject_labels = false; });
+  const retried = await executeAttempt({ journal: restored, effect, objects, transport: f.transport });
+  const completed = retried.events.at(-1);
+  if (!completed || !("execution" in completed.payload) || !completed.payload.execution) throw Error("missing completed capture");
+  expect(completed.payload.execution.successes.map(reference => JSON.parse(readFileSync(reference.path, "utf8")).command_index)).toEqual([0, 1]);
+  expect((await f.transport.observe(plan, effect, objects)).state).toBe("done");
+});
+
+test("native closure capture keeps the legacy creator distinct from the mutating actor", async () => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.prs.push({ id: 7700, number: 77, state: "open", title: "Legacy", body: "Old proposal", draft: false,
+    labels: [], user: { login: "legacy-bot", id: 90 }, head: { ref: "docs-audit/old", sha: f.commit, repo: { id: 10 } },
+    base: { ref: "main", repo: { id: 10 } } }); });
+  const effect: Effect = { id: "captured-close", kind: "pr-close", payload: { number: 77, expected_head: f.commit } };
+  const reviewed = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects.slice(0, 2), effect, f.plan.manifest.effects.at(-1)!]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(reviewed), grants: reviewed.grants, adoption_sha256: hash("adoption"),
+    publication_kind: "advisory", context: "trial", transport: "native", corrections: [], attention: [] });
+  const result = await f.transport.execute(plan, effect, writePlanObject(f.store, plan), "close-attempt");
+  if (!result?.successes[0]) throw Error("missing closure capture");
+  const projection = JSON.parse(readFileSync(result.successes[0].path, "utf8"));
+  expect(projection.facts.user_id).toBe(90);
+  expect(projection.identity.actor_id).toBe(20);
+  expect(projection.facts.head_sha).toBe(f.commit);
+  expect(projection.facts.state).toBe("closed");
+});
+
+test("a same-name replacement repository is refused before native mutation dispatch", async () => {
+  const f = setup(); await f.transport.identity();
+  const effect: Effect = { id: "scoped-issue", kind: "issue-create", payload: {
+    title: "Scoped", body: "Scope proof\nhttps://github.com/fixture/docs/blob/" + f.commit + "/README.md", labels: [], prior_ids: [],
+    evidence_repository: "fixture/docs", evidence_path: "README.md", evidence_commit: f.commit, evidence_sha256: sha256(f.readme),
+  } };
+  const reviewed = fixture(f.plan.manifest.bindings, [...f.plan.manifest.effects.slice(0, 2), effect, f.plan.manifest.effects.at(-1)!]);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(reviewed), grants: reviewed.grants, adoption_sha256: hash("adoption"),
+    publication_kind: "advisory", context: "trial", transport: "native", corrections: [], attention: [] });
+  f.update(state => { state.repository_id = 11; });
+  const error = await f.transport.execute(plan, effect, writePlanObject(f.store, plan), "scoped-attempt").then(() => null, (error: unknown) => error);
+  if (!(error instanceof PublicationExecutionError)) throw Error("missing scoped execution refusal");
+  expect(error.sent).toBe(false);
+  expect(error.reaped).toBe(true);
+  expect(f.inspect().issues).toHaveLength(0);
 });

@@ -1,4 +1,4 @@
-import { retainSuccess, type ExecutionEvidence } from "./success";
+import { nativeMutationArguments, retainSuccess, type ExecutionEvidence } from "./success";
 import { projectRejection, retainRejection, type RejectionEvidence, type RejectedUpdate } from "./rejections";
 import { PublicationExecutionError } from "./attempts";
 import type { Effect } from "./manifests";
@@ -273,7 +273,7 @@ export function createNativeTransport(options: {
     const permalink = `https://${settings.hostname}/${name}/blob/${commit}/${parts.map(encodeURIComponent).join("/")}`;
     if (!text(p.body).includes(permalink)) changed("missing-evidence-permalink");
   }
-  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }, successRequest?: { method: string; endpoint: string; identity: PublicationIdentity }): Promise<void> {
+  async function run(plan: SealedPlan, argv: string[], input: Uint8Array | null, delivery: NativeDelivery, protocol?: { protocol: "http" } | { protocol: "git"; updates: RejectedUpdate[] }, successRequest?: { hostname: string; method: string; endpoint: string; identity: PublicationIdentity }): Promise<void> {
     const id = randomUUID(), directory = join(root, "native-command-" + id);
     publishArtifact(join(root, id + ".native-command.json"), canonicalJSON({ schema_version: 1, kind: "docs-drift-native-command", operation_id: plan.manifest.operation_id,
       root: directory, capture: "projected-v2", effect_id: delivery.effect_id, attempt_id: delivery.attempt_id, argv_sha256: sha256(canonicalJSON(argv)) }));
@@ -308,7 +308,7 @@ export function createNativeTransport(options: {
     if (successRequest && captured && delivery.attempt_id !== null) {
       const proof = retainSuccess({ artifact_root: root, source_repo: options.source_repo, plan, effect: delivery.effect,
         attempt_id: delivery.attempt_id, command_directory: directory, command_index: delivery.completed_commands,
-        method: successRequest.method, endpoint: successRequest.endpoint, identity: successRequest.identity, response: captured.stdout });
+        hostname: successRequest.hostname, method: successRequest.method, endpoint: successRequest.endpoint, identity: successRequest.identity, response: captured.stdout });
       if (proof) delivery.successes.push(proof);
     }
     delivery.completed_commands++;
@@ -316,7 +316,8 @@ export function createNativeTransport(options: {
   async function mutation(plan: SealedPlan, method: string, endpoint: string, input: unknown, delivery: NativeDelivery): Promise<void> {
     if (!endpoint.startsWith(prefix + "/")) throw Error("foreign mutation destination");
     const identity = await nativeIdentity();
-    await run(plan, ["gh", "api", "--hostname", settings.hostname, "--method", method, "--include", endpoint], canonicalJSON(input), delivery, { protocol: "http" }, { method, endpoint, identity });
+    if (identity.repository_id !== plan.manifest.repository_id || identity.actor !== plan.manifest.actor || identity.actor_id !== plan.manifest.actor_id) throw Error("native mutation identity changed");
+    await run(plan, nativeMutationArguments(settings.hostname, method, endpoint), canonicalJSON(input), delivery, { protocol: "http" }, { hostname: settings.hostname, method, endpoint, identity });
   }
   async function pushRef(plan: SealedPlan, ref: string, head: string | null, expected: string, delivery: NativeDelivery, companion?: { ref: string; head: string; expected: string }): Promise<void> {
     requireOwnedStore(store, settings.repository);
