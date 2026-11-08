@@ -183,3 +183,13 @@ test("upgrade comparison requires a descendant of the approved default", () => {
   expect(() => changes(f, earlier)).toThrow("successor source must descend from approved default");
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
+
+test("a settings-only pin change retains hosted impact when the scheduled caller still selects its predecessor", () => {
+  const f = upgradeFixture(), nextPin = ".vh-adlc/docs-drift-components/successor.yaml";
+  f.proposed.component_pin = nextPin;
+  write(f.repo, nextPin, canonicalJSON({ ...pin(), source_commit: "b".repeat(40), component_sha256: "b".repeat(64) }));
+  const result = changes(f);
+  expect(result.known_affected_entries).toEqual(["hosted"]);
+  expect(result.caller_pin_exception).toBeNull();
+  expect(result.caller_failure).toContain("compatible selected pin differs");
+});

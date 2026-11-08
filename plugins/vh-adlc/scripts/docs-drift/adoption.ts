@@ -323,15 +323,15 @@ export function collectUpgradeChanges(options: {
     .filter(path => !canonicalJSON(oldBlobs.get(path) ?? null).equals(canonicalJSON(newBlobs.get(path) ?? null)));
   let callerProof: ReturnType<typeof verifyCompatibleWorkerCaller> | null = null, callerFailure: string | null = null;
   const scheduled = previous.settings.execution.scheduled_workflow;
-  if (changedBlobs.includes(scheduled) && scheduled === next.settings.execution.scheduled_workflow
-    && previous.component_pin.path !== next.component_pin.path) {
+  if (previous.component_pin.path !== next.component_pin.path) {
     const old = committedInput(repo, base, scheduled), current = committedInput(repo, candidate, scheduled);
-    if (old && current && old.mode === current.mode) {
+    if (scheduled === next.settings.execution.scheduled_workflow && old && current && old.mode === current.mode) {
       try { callerProof = verifyCompatibleWorkerCaller({ previous: old.bytes, next: current.bytes,
         worker_path: previous.settings.execution.worker_workflow, previous_component_pin: previous.component_pin.path,
         next_component_pin: next.component_pin.path }); }
       catch (error) { callerFailure = error instanceof Error ? error.message : "caller comparison unavailable"; }
-    }
+    } else callerFailure = "scheduled caller path, mode or committed input changed";
+    if (!callerProof) mark("hosted");
   }
   for (const path of changedBlobs) {
     if (path === scheduled && callerProof) continue;
