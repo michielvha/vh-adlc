@@ -131,7 +131,10 @@ function readRuntimeFile(path: string, limit = 16 * 1024 * 1024): Buffer {
     return readFileSync(fd);
   } finally { closeSync(fd); }
 }
-export type ClientProfileScope = { hostname: string; repository_id: number; actor_id: number; entry: "hosted" | "copilot" | "claude" };
+export type ClientProfileScope = {
+  hostname: string; repository_id: number; actor_id: number; entry: "hosted" | "copilot" | "claude";
+  trial?: { definition_sha256: string; fixture_id: string };
+};
 
 function inspectCacheLocation(cache: string, repo?: string): void {
   privateRuntimeDirectory(cache);
@@ -153,21 +156,29 @@ function inspectCacheLocation(cache: string, repo?: string): void {
 
 function clientPaths(cache: string, id: string, client: ClientBinding, scope: ClientProfileScope, repo: string) {
   inspectCacheLocation(cache, repo);
-  const selected = runtimeObject(scope, ["hostname", "repository_id", "actor_id", "entry"]);
+  const selected = runtimeObject(scope, ["hostname", "repository_id", "actor_id", "entry", ...(Object.hasOwn(scope, "trial") ? ["trial"] : [])]);
   if (typeof selected.hostname !== "string" || !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/u.test(selected.hostname)
     || typeof selected.repository_id !== "number" || !Number.isSafeInteger(selected.repository_id) || selected.repository_id < 1
     || typeof selected.actor_id !== "number" || !Number.isSafeInteger(selected.actor_id) || selected.actor_id < 1
     || typeof selected.entry !== "string" || !["hosted", "copilot", "claude"].includes(selected.entry)) fail("native consumer profile scope required");
   if (protocolPath(id).includes("/")) fail("single client ID required");
   if (client.platform !== process.platform + "-" + process.arch) fail("client platform differs from host");
+  let profileRoot = join(cache, "profiles");
+  if (Object.hasOwn(scope, "trial")) {
+    const trial = runtimeObject(selected.trial, ["definition_sha256", "fixture_id"]);
+    if (typeof trial.definition_sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(trial.definition_sha256)
+      || typeof trial.fixture_id !== "string" || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(trial.fixture_id)) fail("trial profile scope required");
+    profileRoot = join(cache, "trial-profiles", sha256(canonicalJSON(trial)));
+  }
   const binding = sha256(canonicalJSON(client));
   return { index: join(cache, "clients", id, binding + ".json"),
-    profile: join(cache, "profiles", scope.hostname, String(scope.repository_id), String(scope.actor_id), scope.entry, id, binding) };
+    profile: join(profileRoot, scope.hostname, String(scope.repository_id), String(scope.actor_id), scope.entry, id, binding) };
 }
 
 function runtimeObject(value: unknown, fields: string[]): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)
-    || Object.keys(value).sort().join(",") !== [...fields].sort().join(",")) fail("retained runtime evidence fields");
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail("retained runtime evidence fields");
+  const actual = Object.keys(value).sort(), expected = [...fields].sort();
+  if (actual.length !== expected.length || actual.some((name, index) => name !== expected[index])) fail("retained runtime evidence fields");
   return value as Record<string, unknown>;
 }
 function runtimeJSON(bytes: Uint8Array, fields: string[]): Record<string, unknown> {

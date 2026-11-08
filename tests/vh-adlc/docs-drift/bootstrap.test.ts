@@ -518,3 +518,28 @@ test("component setup supports a bare published source and refuses storage insid
   expect(() => bootstrap.retainComponentSnapshot({ cache_directory: nested, source_repo: bare, consumer_repo: f.repo, pin })).toThrow("outside source and consumer worktrees");
   expect(readdirSync(nested)).toEqual([]);
 });
+
+test("candidate profiles stay separate from approved sessions and other trial definitions", async () => {
+  const f = await clientFixture(), original = await bootstrap.retainClientDistribution(f.setup);
+  writeFileSync(join(original.profile_directory, "session-marker"), "Synthetic approved-session state\n");
+  const trial = { definition_sha256: "a".repeat(64), fixture_id: "00000000-0000-0000-0000-000000000001" };
+  const candidate = await bootstrap.retainClientDistribution({ ...f.setup, profile_scope: { ...profileScope, trial } });
+  expect(candidate.executable).toBe(original.executable);
+  expect(candidate.profile_directory).not.toBe(original.profile_directory);
+  expect(readdirSync(candidate.profile_directory)).toEqual([]);
+  for (const selected of [{ ...trial, definition_sha256: "b".repeat(64) }, { ...trial, fixture_id: "00000000-0000-0000-0000-000000000002" }]) {
+    const next = await bootstrap.retainClientDistribution({ ...f.setup, profile_scope: { ...profileScope, trial: selected } });
+    expect(next.profile_directory).not.toBe(candidate.profile_directory);
+  }
+  const checked = await bootstrap.inspectRetainedClient(f.setup);
+  expect(checked.profile_directory).toBe(original.profile_directory);
+  expect(readFileSync(join(checked.profile_directory, "session-marker"), "utf8")).toBe("Synthetic approved-session state\n");
+});
+
+test.each(["definition", "fixture", "extra"] as const)("candidate profile scope refuses invalid %s metadata", async field => {
+  const f = await clientFixture(), trial = { definition_sha256: "a".repeat(64), fixture_id: "00000000-0000-0000-0000-000000000001" };
+  if (field === "definition") trial.definition_sha256 = "../approved";
+  if (field === "fixture") trial.fixture_id = "../approved";
+  if (field === "extra") Object.assign(trial, { approved: true });
+  await expect(bootstrap.retainClientDistribution({ ...f.setup, profile_scope: { ...profileScope, trial } })).rejects.toThrow();
+});
