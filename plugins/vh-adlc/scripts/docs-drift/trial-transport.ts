@@ -70,7 +70,7 @@ export function createTrialTransport(selected: TrialContext): PublicationTranspo
       const common = { source_repo: context.source, artifact_root: context.artifacts, plan, effect, attempt_id, settings, identity: TRIAL_IDENTITY };
       if (!refKinds.has(effect.kind)) {
         const state = readTrialTracker(context);
-        return executeCollectorEffect({ ...common, resources: state.resources, labels: state.labels,
+        return executeCollectorEffect({ ...common, object_store: context.store, resources: state.resources, labels: state.labels,
           persist: () => { persistTrialTracker(context, state); } });
       }
       const rows = readGit(context.origin, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads/").toString().trim().split("\n").filter(Boolean);

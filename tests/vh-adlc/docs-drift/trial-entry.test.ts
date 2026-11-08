@@ -1,6 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, readdirSync, rmSync, symlinkSync, renameSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { writeMetadataObject } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { executeCollectorEffect } from "../../../plugins/vh-adlc/scripts/docs-drift/collector-proof";
 import { GitHubReadError } from "../../../plugins/vh-adlc/scripts/github-read";
 import { executeCollectorRefs } from "../../../plugins/vh-adlc/scripts/docs-drift/collector-refs";
@@ -14,7 +15,7 @@ import { fixture as manifestFixture, hash } from "./manifest-fixture";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
-import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
+import { publish, type PublishOptions, type PublicationGate } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
@@ -125,9 +126,9 @@ test("the persistent transport reads actual fixture refs and refuses production 
   expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
 });
 
-async function reviewedTrialEffects(options: ReturnType<typeof persistentTrialPublication>["options"], effects: Effect[], kind: "advisory" | "resolve" = "advisory") {
+async function reviewedTrialEffects(options: Omit<PublishOptions, "gate"> & { gate: () => Promise<PublicationGate> }, effects: Effect[], kind: "advisory" | "resolve" = "advisory") {
   const original = await options.gate();
-  const input = manifestFixture(original.review.manifest.bindings, effects, original.review.manifest.operation_id);
+  const input = manifestFixture(original.review.current.bindings, effects, original.review.current.operation_id);
   const policy = { ...original.policy, publication_kind: kind };
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
   return { ...options, plan, gate: async () => ({ review: input, policy }) };
@@ -150,6 +151,24 @@ async function labeledTrialPublication(kind: "pr-create" | "pr-update" | "issue-
   const scoped = await reviewedTrialEffects(options, effects);
   return { f, context, options: scoped };
 }
+
+test("persistent issue publication reads immutable evidence from the owned object store", async () => {
+  const { f, context, options } = await labeledTrialPublication("issue-create", ["documentation"]);
+  const tree = git(context.store.root, "rev-parse", f.sourceCommit + "^{tree}");
+  const evidenceCommit = writeMetadataObject(context.store.root, "commit", Buffer.from("tree " + tree + "\nparent " + f.sourceCommit
+    + "\nauthor Fixture <fixture@example.invalid> 1700000000 +0000\ncommitter Fixture <fixture@example.invalid> 1700000000 +0000\n\nOwned evidence checkpoint\n"));
+  git(context.store.root, "push", f.origin, evidenceCommit + ":refs/heads/docs-drift/evidence");
+  expect(() => git(f.source, "cat-file", "-e", evidenceCommit)).toThrow();
+  const effects = structuredClone(options.plan.manifest.effects), selected = effects[3];
+  selected.payload.evidence_commit = evidenceCommit;
+  selected.payload.body = String(selected.payload.body).replace(f.sourceCommit, evidenceCommit);
+  const scoped = await reviewedTrialEffects(options, effects);
+  const result = await publish(scoped);
+  expect(result.state).toBe("complete");
+  expect(readTrialTracker(context).resources.get("issues/501")?.body).toContain(evidenceCommit);
+  expect(git(f.origin, "rev-parse", "refs/heads/docs-drift/evidence")).toBe(evidenceCommit);
+  expect(git(f.source, "status", "--porcelain")).toBe("");
+}, 60000);
 
 test.each(["pr-create", "pr-update", "issue-create"] as const)("persistent %s accepts canonical label aliases", async kind => {
   const { context, options } = await labeledTrialPublication(kind, ["Documentation", "documentation"]);

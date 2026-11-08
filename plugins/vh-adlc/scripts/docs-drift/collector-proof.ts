@@ -7,12 +7,12 @@ import { publishArtifact, syncDirectory, type SealedPlan } from "./journal";
 import { effectDigest, effectMarker, type Effect } from "./manifests";
 import { canonicalJSON, sha256 } from "./protocol";
 import { publicationMarker } from "./report-history";
-import { externalArtifactDirectory } from "./snapshot";
+import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
 import { collectorMutationArguments, collectorRequest, projectSuccess, retainSuccess, type ExecutionResult } from "./success";
 import type { Settings } from "./settings";
 import type { PublicationIdentity } from "./transport";
 import { readGit } from "./git";
-import { isRefreshTarget } from "./proposals";
+import { isRefreshTarget, requireOwnedStore } from "./proposals";
 
 export const COLLECTOR_RESOURCE_LIMIT = 1000;
 export type CollectorResources = Map<string, Record<string, unknown>>;
@@ -20,7 +20,7 @@ export type CollectorLabel = { id: number; name: string };
 type Options = {
   source_repo: string; artifact_root: string; plan: SealedPlan; effect: Effect; attempt_id: string;
   settings: Settings; identity: PublicationIdentity; resources: CollectorResources; labels: ReadonlyMap<string, CollectorLabel>;
-  persist?: () => void;
+  persist?: () => void; object_store?: OwnedObjectStore;
 };
 
 function positive(value: unknown): number {
@@ -83,8 +83,13 @@ function prepare(options: Options) {
     creation = { surface, inventory_sha256: sha256(canonicalJSON(selected)), marker_ids: markerIds };
   }
   if (effect.kind === "issue-create") {
+    if (options.object_store) {
+      requireOwnedStore(options.object_store, plan.manifest.repository);
+      if (options.object_store.source_commit !== plan.manifest.bindings.source_commit) throw Error("fixture evidence source changed");
+    }
+    const evidenceRepo = options.object_store?.root ?? options.source_repo;
     if (p.evidence_repository !== plan.manifest.repository
-      || sha256(readGit(options.source_repo, "show", String(p.evidence_commit) + ":" + String(p.evidence_path))) !== p.evidence_sha256) throw Error("fixture issue evidence changed");
+      || sha256(readGit(evidenceRepo, "show", String(p.evidence_commit) + ":" + String(p.evidence_path))) !== p.evidence_sha256) throw Error("fixture issue evidence changed");
   }
   if (effect.kind === "pr-close") {
     const prior = plan.manifest.effects.slice(0, plan.manifest.effects.indexOf(effect));

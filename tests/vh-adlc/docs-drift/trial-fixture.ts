@@ -8,14 +8,14 @@ import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-dr
 import { loadTrialContext, TRIAL_CONTEXT_PATH, TRIAL_IDENTITY } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-context";
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 import { settingsFixture } from "./settings-fixture";
-import { fixture as manifestFixture, bindings, hash, role } from "./manifest-fixture";
+import { fixture as manifestFixture, bindings, hash, role, source as roleIdentitySource } from "./manifest-fixture";
 import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
 
 /** This creates no native-provider or historical observed-execution evidence. */
-export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean } = {}) {
+export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-docs-trial-"))); roots.push(root);
   const names = ["source", "origin.git", "tracker.git", "artifacts", "objects", "evidence", "component-source", "runtime"];
   for (const name of names) mkdirSync(join(root, name), { mode: 0o700 });
@@ -24,6 +24,11 @@ export function syntheticTrialFixture(roots: string[], options: { legacy?: boole
     .replace("__FIXTURE_CASE__", JSON.stringify("none")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
   populateRepository(source, false, scanner);
   const settings = settingsFixture(); settings.hostname = "docs-drift.invalid";
+  if (options.bound_roles) {
+    for (const entry of Object.values(settings.execution.entries)) {
+      for (const selected of [entry.worker, entry.reviewer]) Object.assign(selected, { model: "claude-opus-5.5", identity_source: roleIdentitySource });
+    }
+  }
   put(source, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
   const sourceCommit = commitAll(source);
   git(origin, "init", "--bare", "--template=", "-b", "main");
@@ -73,7 +78,7 @@ export function reviseTrialManifest(f: ReturnType<typeof syntheticTrialFixture>,
   return git(f.source, "rev-parse", "HEAD");
 }
 
-export function persistentTrialPublication(roots: string[], fixtureOptions: { legacy?: boolean } = {}) {
+export function persistentTrialPublication(roots: string[], fixtureOptions: { legacy?: boolean; bound_roles?: boolean } = {}) {
   const f = syntheticTrialFixture(roots, fixtureOptions);
   const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
   const settings = context.settings, operation = "persistent-one";
@@ -93,8 +98,11 @@ export function persistentTrialPublication(roots: string[], fixtureOptions: { le
   }
   const input = manifestFixture({ ...bindings, source_commit: f.sourceCommit, candidate_commit: f.sourceCommit,
     candidate_tree: git(f.source, "rev-parse", f.sourceCommit + "^{tree}"), settings_sha256: sha256(canonicalJSON(f.settings)) }, effects, operation);
-  const policy = { adoption_sha256: hash("synthetic-only"), publication_kind: "advisory" as const,
-    context: "trial" as const, transport: "collector" as const, pr_draft: true, worker: role, reviewer: role };
+  const configured = { requested_model: "claude-opus-5.5", adopted_model: "claude-opus-5.5", identity_source: roleIdentitySource };
+  const selectedRole = fixtureOptions.bound_roles ? configured : role;
+  input.policy = { worker: selectedRole, reviewer: selectedRole };
+  const policy = { adoption_sha256: fixtureOptions.bound_roles ? context.context_sha256 : hash("synthetic-only"), publication_kind: "advisory" as const,
+    context: "trial" as const, transport: "collector" as const, pr_draft: true, worker: selectedRole, reviewer: selectedRole };
   const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
   return { f, context, options: { source_repo: f.source, artifact_root: context.artifacts, object_store: context.store,
     settings, plan, transport: createTrialTransport(context), gate: async () => ({ review: input, policy }) } };
