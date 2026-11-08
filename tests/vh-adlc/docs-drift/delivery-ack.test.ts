@@ -920,3 +920,31 @@ test("a proven deletion cannot be repeated after the same old lease object is re
   expect(f.executed.filter(id => id === "release")).toHaveLength(1);
   expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
 });
+
+for (const when of ["before selection", "during approval"] as const) {
+test(`an exact outcome recorded ${when} cannot be silently skipped as acknowledged`, async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, effect } = await collectorDeliveryFixture("pr-create");
+  const interrupted = await publish(publicationOptions(f));
+  const exact = await f.transport.observe(f.plan, effect, interrupted.objects);
+  if (exact.state !== "done") throw Error("missing exact original observation");
+  let recorded = interrupted.journal;
+  if (when === "before selection") recorded = appendOutcome(recorded, effect.id, exact.outcome);
+  const resource = [...f.resources.values()][0]; resource.body = String(resource.body) + "\nLater owner edit";
+  let approvals = 0;
+  const result = await acknowledgeDeliveries({ source_repo: f.repo, journal_directory: recorded.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, acknowledge_effect_ids: [effect.id], retire_effect_ids: [],
+    authorize: async scope => {
+      approvals++;
+      if (when === "during approval" && approvals === 1) recorded = appendOutcome(readJournal(recorded.directory, f.repo), effect.id, exact.outcome);
+      return { kind: "owner-delivery-acknowledgement", source: "owner-current-request",
+        scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("current owner cannot replace a recorded outcome") };
+    } });
+  expect(result.state).toBe("pending");
+  expect(result.reason).toBe("acknowledgement-selection-invalid");
+  expect(approvals).toBe(when === "before selection" ? 0 : 1);
+  expect(result.journal.events).toEqual(recorded.events);
+  expect(f.refs.get(f.settings.publication.lease_ref)).toBe(interrupted.objects.lease_object);
+  expect(f.executed.includes("release")).toBe(false);
+});
+}

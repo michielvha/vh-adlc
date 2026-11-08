@@ -102,6 +102,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
   const result = (state: PublishResult["state"], reason: string | null): PublishResult => ({ state, reason, journal, objects });
   const acquire = plan.manifest.effects[0], receipt = plan.manifest.effects[1], release = plan.manifest.effects.at(-1)!;
   const ids = options.acknowledge_effect_ids, retireIds = options.retire_effect_ids;
+  const selectionConflict = () => journal.events.some(event => ids.includes(event.effect_id) && ["outcome", "retired-absence"].includes(event.kind));
   if (dirname(journal.directory) !== externalArtifactDirectory(options.transport.artifact_root, options.source_repo)
     || options.transport.object_store !== options.object_store.root || plan.transport !== options.transport.kind
     || journal.header.recovery_mode !== "original" || journal.events.some(event => event.kind === "recovery-only")
@@ -112,11 +113,13 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
   if (!Array.isArray(ids) || !ids.length || new Set(ids).size !== ids.length || !Array.isArray(retireIds) || new Set(retireIds).size !== retireIds.length
     || ids.some(id => retireIds.includes(id) || !plan.manifest.effects.some(effect => effect.id === id && ["pr-create", "issue-create", "comment-create", "pr-update", "pr-close"].includes(effect.kind)))
     || retireIds.some(id => !plan.manifest.effects.some(effect => effect.id === id && !["lease-acquire", "receipt-retain", "lease-release"].includes(effect.kind)))
-    || journal.events.some(event => event.kind === "acknowledged-delivery" && !ids.includes(event.effect_id))) return result("pending", "acknowledgement-selection-invalid");
+    || journal.events.some(event => event.kind === "acknowledged-delivery" && !ids.includes(event.effect_id))
+    || selectionConflict()) return result("pending", "acknowledgement-selection-invalid");
   const hasAcquisition = journal.events.some(event => event.kind === "attempt" && event.effect_id === acquire.id);
   if (!hasAcquisition) return result("pending", "acknowledgement-original-acquisition-required");
   const refresh = () => {
     journal = readJournal(options.journal_directory, options.source_repo);
+    if (selectionConflict()) throw Error("acknowledgement-selection-invalid");
     if (journal.events.some(event => event.kind === "recovery-only" || event.kind === "attempt-ended" && "reaped" in event.payload && !event.payload.reaped)
       || plan.manifest.effects.some(effect => hasInFlightAttempt(journal, effect))) throw Error("acknowledgement-executor-unsettled");
   };
@@ -205,6 +208,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
     try { publishArtifact(authorityPath, authorityBytes); }
     catch (error) { if (!(error instanceof Error) || error.message !== "docs-drift journal revision conflict" || !readArtifact(authorityPath).equals(authorityBytes)) throw error; }
     const revalidate = async () => {
+      refresh();
       await authorize(grant);
       const fresh = await collect();
       if (!canonicalJSON(fresh.scope).equals(canonicalJSON(initial.scope))) throw Error("acknowledgement-approved-scope-changed");

@@ -114,7 +114,47 @@ if [[ "$offline" == true ]]; then
 fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/vh-adlc-ensure.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-curl -fsSL --retry 2 -o "$work/asset.tar.gz" "$url" || die "binary unavailable: downloading $url failed"
+if ! curl -fsSL --retry 2 -o "$work/asset.tar.gz" "$url"; then
+  asset_name=$(field name)
+  [[ "$asset_name" == "vh-adlc_${version}_${platform}.tar.gz" &&
+     "$url" == "https://github.com/michielvha/vh-adlc/releases/download/v${version}/${asset_name}" ]] ||
+    die "binary unavailable: downloading $url failed"
+  command -v python3 >/dev/null 2>&1 || die "binary unavailable: the release API fallback requires python3"
+  repo_api=https://api.github.com/repos/michielvha/vh-adlc
+  echo "vh-adlc: trying the locked release through the GitHub asset API" >&2
+  curl -fsSL --retry 2 --max-filesize 1048576 -o "$work/release.json" "$repo_api/releases/tags/v$version" ||
+    die "binary unavailable: reading the locked release metadata failed"
+  # Bind the API object to the canonical lock URL, asset name and release tag.
+  api_asset_url=$(python3 -I - "$work/release.json" "$version" "$asset_name" "$url" "$repo_api" 2>/dev/null <<'PY'
+import json
+import sys
+with open(sys.argv[1], "rb") as source:
+    data = source.read(1048577)
+if len(data) > 1048576:
+    sys.exit(1)
+release = json.loads(data)
+if not isinstance(release, dict) or release.get("tag_name") != "v" + sys.argv[2]:
+    sys.exit(1)
+assets = release.get("assets")
+if not isinstance(assets, list) or len(assets) > 1000:
+    sys.exit(1)
+matches = [asset for asset in assets if isinstance(asset, dict)
+           and asset.get("name") == sys.argv[3] and asset.get("browser_download_url") == sys.argv[4]]
+if len(matches) != 1:
+    sys.exit(1)
+asset = matches[0]
+identifier = asset.get("id")
+if type(identifier) is not int or not 0 < identifier < 2**63:
+    sys.exit(1)
+expected = sys.argv[5] + "/releases/assets/" + str(identifier)
+if asset.get("url") != expected:
+    sys.exit(1)
+print(expected)
+PY
+  ) || die "binary unavailable: the release API did not identify the locked asset"
+  curl -fsSL --retry 2 -H 'Accept: application/octet-stream' -o "$work/asset.tar.gz" "$api_asset_url" ||
+    die "binary unavailable: downloading the locked API asset failed"
+fi
 [[ "$(sha256 "$work/asset.tar.gz")" == "$asset_sha" ]] ||
   die "the downloaded asset's digest does not match the lock; nothing was installed"
 mkdir "$work/extract"

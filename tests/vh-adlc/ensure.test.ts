@@ -311,3 +311,54 @@ test("installs the released binary from the real lock", () => {
   expect({ exit: read.exitCode, result: report.result, value: report.data?.value })
     .toEqual({ exit: 0, result: "answered", value: { schema_version: 1, source_roots: ["src"] } });
 }, 120_000);
+
+function apiFallbackFixture(mode: "valid" | "wrong-host" | "wrong-browser" | "duplicate" | "wrong-archive" | "wrong-binary") {
+  const f = fixture(mode === "wrong-binary" ? { binarySha: "0".repeat(64) } : {});
+  const assets = f.lock.assets as Record<string, Record<string, string>>;
+  const selected = assets[platform()];
+  selected.url = `https://github.com/michielvha/vh-adlc/releases/download/v${VERSION}/${selected.name}`;
+  writeFileSync(join(f.plugin, "vh-adlc.lock.json"), `${JSON.stringify(f.lock, null, 2)}\n`);
+  const endpoint = "https://api.github.com/repos/michielvha/vh-adlc/releases/assets/42";
+  const asset = { id: 42, name: selected.name, browser_download_url: mode === "wrong-browser" ? "https://other.invalid/file" : selected.url,
+    url: mode === "wrong-host" ? "https://other.invalid/42" : endpoint };
+  const release = { tag_name: "v" + VERSION, assets: mode === "duplicate" ? [asset, asset] : [asset] };
+  const bin = join(f.dir, "download-bin"), calls = join(f.dir, "downloads.log"); mkdirSync(bin);
+  writeFileSync(join(bin, "curl"), `#!${process.execPath}
+import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
+const args = process.argv.slice(2), url = args.at(-1), output = args[args.indexOf('-o') + 1];
+appendFileSync(${JSON.stringify(calls)}, url + '\\n');
+if (url === ${JSON.stringify(selected.url)}) process.exit(22);
+if (url === ${JSON.stringify("https://api.github.com/repos/michielvha/vh-adlc/releases/tags/v" + VERSION)}) {
+  writeFileSync(output, JSON.stringify(${JSON.stringify(release)}));
+} else if (url === ${JSON.stringify(endpoint)} && args.includes('Accept: application/octet-stream')) {
+  writeFileSync(output, ${mode === "wrong-archive" ? "Buffer.from('unverified archive')" : "readFileSync(" + JSON.stringify(f.asset) + ")"});
+} else process.exit(90);
+`, { mode: 0o755 });
+  return { f, bin, calls };
+}
+
+test("a failed canonical download can use the same locked public asset through the GitHub API", () => {
+  const { f, bin, calls } = apiFallbackFixture("valid"), r = run(f, [], [bin]);
+  expect(r.code).toBe(0);
+  expect(r.out).toBe(cached(f));
+  expect(sha256(readFileSync(cached(f)))).toBe(sha256(f.binary));
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+});
+
+for (const mode of ["wrong-host", "wrong-browser", "duplicate", "wrong-archive", "wrong-binary"] as const) {
+  test(`public asset API fallback rejects ${mode} without executing or caching it`, () => {
+    const { f, bin, calls } = apiFallbackFixture(mode), r = run(f, [], [bin]);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(mode === "wrong-archive" || mode === "wrong-binary" ? 3 : 2);
+    expect(r.code).toBe(1);
+    expect(existsSync(cached(f))).toBe(false);
+    expect(existsSync(f.marker)).toBe(false);
+  });
+}
+
+test("release metadata parsing cannot import code from the caller's checkout", () => {
+  const { f, bin } = apiFallbackFixture("valid"), marker = join(f.dir, "unverified-import-ran");
+  writeFileSync(join(f.dir, "json.py"), `open(${JSON.stringify(marker)}, "w").write("unverified checkout code ran")\nraise RuntimeError("shadowed json")\n`);
+  const r = run(f, [], [bin]);
+  expect(r.code).toBe(0);
+  expect(existsSync(marker)).toBe(false);
+});
