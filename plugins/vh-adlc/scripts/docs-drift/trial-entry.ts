@@ -12,18 +12,19 @@ import { collectProposals } from "./proposals";
 import { runScan } from "./scan";
 import { captureSnapshot } from "./snapshot";
 import { loadTrialContext } from "./trial-context";
-import { createTrialReader, fetchTrialProposalObjects } from "./trial-reader";
+import { collectTrialClosureInputs, createTrialReader, fetchTrialProposalObjects } from "./trial-reader";
 import { readTrialTracker } from "./trial-tracker";
 
 function inputs(argv: string[]) {
   const command = argv[0];
-  if (!["inspect", "scan", "collect-proposals", "publish", "resume-effects", "prepare-acknowledgement", "acknowledge-delivery"].includes(command)) throw Error("unknown synthetic command");
+  if (!["inspect", "scan", "collect-proposals", "publish", "resume-effects", "prepare-acknowledgement", "acknowledge-delivery", "collect-closure"].includes(command)) throw Error("unknown synthetic command");
   const allowed = ["--synthetic-trial", "--context-commit"];
   if (["publish", "resume-effects"].includes(command)) allowed.push("--request");
   if (command === "resume-effects") allowed.push("--journal");
   if (command === "publish") allowed.push("--interrupt-after");
   if (["prepare-acknowledgement", "acknowledge-delivery"].includes(command)) allowed.push("--selection");
   if (command === "acknowledge-delivery") allowed.push("--owner-request");
+  if (command === "collect-closure") allowed.push("--consolidation");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const key = argv[index], value = argv[index + 1];
@@ -37,7 +38,9 @@ function inputs(argv: string[]) {
   const selection = values.get("--selection"), ownerRequest = values.get("--owner-request");
   if (["prepare-acknowledgement", "acknowledge-delivery"].includes(command) && !selection
     || command === "acknowledge-delivery" && !ownerRequest) throw Error("synthetic acknowledgement selection or owner request required");
-  return { command, root, contextCommit, request, journal, selection, ownerRequest, interrupt: values.get("--interrupt-after") };
+  const consolidation = values.get("--consolidation");
+  if (command === "collect-closure" && (!consolidation || !/^[1-9][0-9]*$/u.test(consolidation) || !Number.isSafeInteger(Number(consolidation)))) throw Error("synthetic consolidation ID required");
+  return { command, root, contextCommit, request, journal, selection, ownerRequest, consolidation, interrupt: values.get("--interrupt-after") };
 }
 
 /** This executable is confined to explicit setup-owned synthetic contexts by its constructor. */
@@ -80,6 +83,9 @@ export async function main(argv: string[]): Promise<number> {
       data = { state: result.state, reason: result.reason, operation_id: result.journal.plan.manifest.operation_id,
         plan_sha256: result.objects.plan_sha256, journal_directory: result.journal.directory, revision: result.journal.revision,
         request_sha256: requestHash, interruption_effect_id: options.interrupt ?? null };
+    } else if (options.command === "collect-closure") {
+      const closure = await collectTrialClosureInputs(context, Number(options.consolidation));
+      complete = closure.complete; data = closure;
     } else if (options.command === "scan") {
       const assessment = await runScan(captureSnapshot(context.source, context.source_commit), {
         artifact_root: context.artifacts, owner: "synthetic", run: randomUUID(),

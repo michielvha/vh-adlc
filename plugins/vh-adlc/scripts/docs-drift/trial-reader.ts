@@ -1,3 +1,4 @@
+import { collectClosureInputs } from "./closure-inputs";
 import { createRepositoryReader, GitHubReadError, type GitHubReader, type PullRequestInput, type ReadObservation } from "../github-read";
 import { readGit } from "./git";
 import { readProposalDiff } from "./proposals";
@@ -147,5 +148,43 @@ export async function fetchTrialProposalObjects(selected: TrialContext, proposal
   } catch {
     return { complete: false, diagnostics: ["Fixed-ref synthetic proposal fetch unavailable or source changed"], base_sha: proposal.base_sha,
       head_sha: proposal.head_sha, merge_base: null, patch_bytes: Buffer.alloc(0), patch_sha256: null, files: [], inputs_sha256: null };
+  }
+}
+
+/** Read actual committed fixture merge objects through the common fresh-session closure collector. */
+export async function collectTrialClosureInputs(selected: TrialContext, consolidationID: number) {
+  try {
+    const context = loadTrialContext({ root: selected.root, context_commit: selected.context_commit, runtime_directory: selected.root + "/runtime" });
+    const reader = createTrialReader(context);
+    const collection = { source_repo: context.source, store: context.store, settings: context.settings, reader,
+      consolidation_id: consolidationID, required_inputs: [] };
+    function fetchObjects(ids: string[]): void {
+      const wanted = [...new Set(ids)];
+      if (!wanted.length || wanted.length > 1000 || wanted.some(id => !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(id))) throw Error("synthetic immutable closure objects required");
+      readGit(context.store.root, "-c", "protocol.allow=never", "-c", "protocol.file.allow=always", "-c", "gc.auto=0",
+        "fetch", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance", "--", context.origin, ...wanted);
+      for (const id of wanted) {
+        if (readGit(context.store.root, "rev-parse", "--verify", "--end-of-options", id + "^{commit}").toString().trim() !== id) throw Error("synthetic closure object changed");
+      }
+    }
+    function selectedRepository(proposal: PullRequestInput): void {
+      if (proposal.head_repository?.id !== TRIAL_IDENTITY.repository_id || proposal.base_repository.id !== TRIAL_IDENTITY.repository_id
+        || proposal.head_repository.full_name !== TRIAL_IDENTITY.repository || proposal.base_repository.full_name !== TRIAL_IDENTITY.repository
+        || proposal.base_ref !== context.settings.default_branch) throw Error("synthetic closure repository changed");
+    }
+    const consolidation = reader.mergedPull(consolidationID);
+    selectedRepository(consolidation);
+    if (!consolidation.merged || consolidation.merge_commit_sha === null) throw Error("synthetic consolidation is not merged");
+    fetchObjects([consolidation.head_sha, consolidation.merge_commit_sha, reader.ref("refs/heads/" + context.settings.default_branch).sha]);
+    const located = collectClosureInputs(collection);
+    if (!located.record) return located;
+    for (const original of located.record.value.originals) {
+      const proposal = reader.pull(original.number);
+      selectedRepository(proposal);
+      fetchObjects([proposal.head_sha, original.base_sha]);
+    }
+    return collectClosureInputs(collection);
+  } catch {
+    return { complete: false, diagnostics: ["Fixed-object synthetic closure fetch unavailable or inputs changed"] };
   }
 }

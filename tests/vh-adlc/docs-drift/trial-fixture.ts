@@ -15,15 +15,20 @@ import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/r
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
 
 /** This creates no native-provider or historical observed-execution evidence. */
-export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean } = {}) {
+export function syntheticTrialFixture(roots: string[], options: { legacy?: boolean; bound_roles?: boolean; seed?: { repo: string; commit: string; objects: string[]; resources: [string, Record<string, unknown>][]; settings: ReturnType<typeof settingsFixture> } } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-docs-trial-"))); roots.push(root);
   const names = ["source", "origin.git", "tracker.git", "artifacts", "objects", "evidence", "component-source", "runtime"];
   for (const name of names) mkdirSync(join(root, name), { mode: 0o700 });
   const source = join(root, "source"), origin = join(root, "origin.git"), tracker = join(root, "tracker.git");
   const scanner = readFileSync(join(import.meta.dir, "fixtures/scanner.js"), "utf8")
     .replace("__FIXTURE_CASE__", JSON.stringify("none")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
-  populateRepository(source, false, scanner);
-  const settings = settingsFixture(); settings.hostname = "docs-drift.invalid";
+  if (options.seed) {
+    git(source, "init", "--template=", "-b", "main");
+    git(source, "fetch", "--no-tags", "--no-write-fetch-head", options.seed.repo, options.seed.commit, ...options.seed.objects);
+    git(source, "checkout", "--detach", options.seed.commit);
+    git(source, "switch", "-c", "main");
+  } else populateRepository(source, false, scanner);
+  const settings = structuredClone(options.seed?.settings ?? settingsFixture()); settings.hostname = "docs-drift.invalid";
   if (options.bound_roles) {
     for (const entry of Object.values(settings.execution.entries)) {
       for (const selected of [entry.worker, entry.reviewer]) Object.assign(selected, { model: "claude-opus-5.5", identity_source: roleIdentitySource });
@@ -34,6 +39,7 @@ export function syntheticTrialFixture(roots: string[], options: { legacy?: boole
   git(origin, "init", "--bare", "--template=", "-b", "main");
   git(source, "remote", "add", "origin", origin);
   git(source, "push", "origin", "main");
+  if (options.seed?.objects.length) git(origin, "fetch", "--no-tags", "--no-write-fetch-head", source, ...options.seed.objects);
   if (options.legacy) git(source, "push", "origin", sourceCommit + ":refs/heads/docs-audit/legacy");
   const componentSource = join(root, "component-source"), runtime = join(root, "runtime");
   const pluginSource = join(import.meta.dir, "../../../plugins/vh-adlc");
@@ -45,11 +51,11 @@ export function syntheticTrialFixture(roots: string[], options: { legacy?: boole
   const seed = join(root, "tracker-seed"); mkdirSync(seed, { mode: 0o700 });
   const fixtureID = randomUUID();
   const initialState = { schema_version: 1, kind: "docs-drift-synthetic-tracker", fixture_id: fixtureID,
-    resources: options.legacy ? [["pulls/77", { id: 1001, number: 77, title: "Legacy title", body: "Legacy body", draft: false,
+    resources: options.seed?.resources ?? (options.legacy ? [["pulls/77", { id: 1001, number: 77, title: "Legacy title", body: "Legacy body", draft: false,
       state: "open", merged: false, merged_at: null, merge_commit_sha: null, labels: [{ id: 101, name: "documentation" }],
       user: { id: 90, login: "legacy-bot", type: "Bot" },
       head: { ref: "docs-audit/legacy", sha: sourceCommit, repo: { id: 10, full_name: "fixture/docs" } },
-      base: { ref: "main", sha: sourceCommit, repo: { id: 10, full_name: "fixture/docs" } } }]] : [],
+      base: { ref: "main", sha: sourceCommit, repo: { id: 10, full_name: "fixture/docs" } } }]] : []),
     labels: [{ id: 101, name: "documentation" }] };
   put(seed, "state.json", canonicalJSON(initialState).toString());
   git(seed, "init", "--template=", "-b", "state");

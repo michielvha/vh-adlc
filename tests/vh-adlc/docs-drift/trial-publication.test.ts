@@ -1,6 +1,7 @@
 import { afterAll, expect, test } from "bun:test";
 import { cpSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { readAppliedDelivery } from "../../../plugins/vh-adlc/scripts/docs-drift/delivery-proof";
 import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
 import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
@@ -169,10 +170,12 @@ test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "
     changed.body += "\nLater owner edit"; resource.body = changed.body;
     persistTrialTracker(context, current);
   }
+  let missingProof: string | null = null;
   if (approval === "missing-proof") {
     const captured = readAppliedDelivery({ source_repo: context.source, journal_directory: interrupted.journal.directory,
       effect_id: "pr", settings: context.settings, transport: "collector" });
-    rmSync(captured.successes[0].path);
+    missingProof = captured.successes[0].path;
+    rmSync(missingProof);
   }
   if (approval === "foreign-lease") git(f.origin, "update-ref", context.settings.publication.lease_ref, f.sourceCommit);
   const preserved = readTrialTracker(context).commit;
@@ -185,6 +188,19 @@ test.each(["approved", "standing-procedure", "changed-scope", "missing-proof", "
   expect(acknowledged.exitCode).toBe(2);
   expect(result.outcome).toBe("incomplete");
   expect(result.data.state).toBe(approval === "approved" ? "acknowledged" : "pending");
+  if (approval === "approved") expect(result.data.reason).toBeNull();
+  else if (approval === "standing-procedure" || approval === "changed-scope") {
+    expect(result.data.reason).toBe("synthetic acknowledgement exact current owner request required");
+    expect(result.data.scope?.kind).toBe("docs-drift-delivery-acknowledgement");
+    if (approval === "standing-procedure") expect(result.data.scope_sha256).toBe(report.data.scope_sha256);
+    else expect(result.data.scope_sha256).not.toBe(report.data.scope_sha256);
+  } else {
+    expect(result.data.reason).toContain(approval === "foreign-lease" ? "acknowledgement-owned-lease-changed" : missingProof);
+    expect(result.data.scope).toBeNull();
+  }
+  const journal = readJournal(interrupted.journal.directory, context.source);
+  expect(journal.events.some(event => event.kind === "acknowledged-delivery")).toBe(approval === "approved");
+  expect(journal.events.filter(event => event.effect_id === "release" && event.kind === "attempt").length).toBe(approval === "approved" ? 1 : 0);
   expect(readTrialTracker(context).commit).toBe(preserved);
   expect(readTrialTracker(context).resources.get("pulls/501")?.body).toBe(resource.body);
   const transport = createTrialTransport(context);
@@ -219,7 +235,7 @@ test("a request publication kind must match its sealed plan", async () => {
   expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
 });
 
-test("installed resume refuses outside, nested and linked journals without changing fixture state", async () => {
+test("installed recovery entries refuse outside, nested and linked journals without changing fixture state", async () => {
   const { f, context, path } = await publicationRequest();
   const publication = await publish(readTrialPublication(context, path));
   expect(publication.state).toBe("complete");
@@ -230,14 +246,27 @@ test("installed resume refuses outside, nested and linked journals without chang
       : scenario === "nested" ? join(nested, "journal") : join(context.artifacts, "linked-journal");
     if (scenario === "linked") symlinkSync(publication.journal.directory, journal);
     else cpSync(publication.journal.directory, journal, { recursive: true });
-    const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), "resume-effects",
-      "--synthetic-trial", f.root, "--context-commit", f.contextCommit, "--request", path, "--journal", journal],
-      { stdout: "pipe", stderr: "pipe", timeout: 45000 });
-    const report = JSON.parse(result.stdout.toString());
-    expect(result.exitCode).toBe(2);
-    expect(report.outcome).toBe("refused");
-    // The context rejects every linked fixture input before the entry reads a journal.
-    expect(report.diagnostics[0].message).toContain(scenario === "linked" ? "foreign or linked fixture input" : "synthetic journal outside owned artifacts");
+    const selection = join(context.artifacts, "confined-selection.json"), owner = join(context.artifacts, "confined-owner-request.json");
+    writeFileSync(selection, canonicalJSON({ schema_version: 1, kind: "docs-drift-synthetic-acknowledgement-selection",
+      context_sha256: context.context_sha256, journal_directory: journal, acknowledge_effect_ids: ["pr"], retire_effect_ids: [] }), { mode: 0o600 });
+    writeFileSync(owner, canonicalJSON({ schema_version: 1, kind: "docs-drift-synthetic-owner-request",
+      context_sha256: context.context_sha256, source: "owner-current-request", scope_sha256: "f".repeat(64) }), { mode: 0o600 });
+    for (const command of ["resume-effects", "prepare-acknowledgement", "acknowledge-delivery"] as const) {
+      const args = command === "resume-effects" ? ["--request", path, "--journal", journal]
+        : ["--selection", selection, ...(command === "acknowledge-delivery" ? ["--owner-request", owner] : [])];
+      const result = Bun.spawnSync([process.execPath, join(f.runtime, "scripts/docs-drift/trial-entry.ts"), command,
+        "--synthetic-trial", f.root, "--context-commit", f.contextCommit, ...args],
+        { stdout: "pipe", stderr: "pipe", timeout: 45000 });
+      const report = JSON.parse(result.stdout.toString());
+      expect(result.exitCode).toBe(2);
+      expect(report.outcome).toBe("refused");
+      // The context rejects every linked fixture input before any entry reads a journal.
+      const reason = scenario === "linked" ? "foreign or linked fixture input" : command === "resume-effects"
+        ? "synthetic journal outside owned artifacts" : "synthetic acknowledgement context or journal changed";
+      expect(report.diagnostics[0].message).toContain(reason);
+      expect(readTrialTracker(context).commit).toBe(tracker);
+      expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
+    }
     rmSync(journal, { recursive: true });
     expect(readTrialTracker(context).commit).toBe(tracker);
     expect(git(f.origin, "for-each-ref", "--format=%(refname) %(objectname)")).toBe(refs);
