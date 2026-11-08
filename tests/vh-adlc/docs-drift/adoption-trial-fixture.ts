@@ -4,7 +4,7 @@ import { join, relative } from "node:path";
 import { collectAdoptionBindings } from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { computeComponentIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
-import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { TRIAL_CONTEXT_PATH } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-context";
 import { portableRecord, type AdoptionSourceFixture } from "./adoption-fixture";
@@ -42,7 +42,7 @@ export function trialAdoptionFixture(roots: string[]) {
     boundary: { root: f.root, context_commit: contextCommit, runtime_directory: f.runtime } };
 }
 
-export function trialAdoptionDelivery(f: Omit<ReturnType<typeof trialAdoptionFixture>, "record"> & { record: unknown }, record: unknown = f.record) {
+export function trialAdoptionDelivery(f: Pick<ReturnType<typeof trialAdoptionFixture>, "source" | "candidate" | "configured"> & { record: unknown }, record: unknown = f.record) {
   git(f.source, "switch", "--detach", f.candidate);
   put(f.source, f.configured.publication.adoption_record, canonicalJSON(record).toString());
   const delivered = commitAll(f.source);
@@ -51,13 +51,17 @@ export function trialAdoptionDelivery(f: Omit<ReturnType<typeof trialAdoptionFix
 }
 
 
-export function compatibleTrialUpgrade(f: Omit<ReturnType<typeof trialAdoptionFixture>, "record"> & { record: { receipts: ReturnType<typeof portableRecord>["receipts"] } },
-  options: { suffix?: string; prepare?: (repo: string, settings: ReturnType<typeof trialAdoptionFixture>["configured"]) => void } = {}) {
+type UpgradeSource = Pick<ReturnType<typeof trialAdoptionFixture>, "source" | "candidate" | "configured"> & {
+  manifest: { fixture_id: string }; record: { receipts: ReturnType<typeof portableRecord>["receipts"] };
+};
+
+export function compatibleTrialUpgrade(f: UpgradeSource,
+  options: { suffix?: string; component?: ReturnType<typeof collectAdoptionBindings>["component_pin"]["value"]; prepare?: (repo: string, settings: ReturnType<typeof trialAdoptionFixture>["configured"]) => void } = {}) {
   const suffix = options.suffix ?? "successor";
   const previousDefault = trialAdoptionDelivery(f), previous = collectAdoptionBindings(f.source, f.candidate);
-  const configured = { ...f.configured, component_pin: ".vh-adlc/docs-drift-components/" + suffix + ".yaml",
+  const configured = { ...structuredClone(f.configured), component_pin: ".vh-adlc/docs-drift-components/" + suffix + ".yaml",
     publication: { ...f.configured.publication, adoption_record: ".vh-adlc/docs-drift-adoptions/" + suffix + ".yaml" } };
-  const component = { ...previous.component_pin.value, source_commit: sha256(Buffer.from(f.candidate + suffix)).slice(0, 40), source_release: "v1.1.0",
+  const component = options.component ?? { ...previous.component_pin.value, source_commit: sha256(Buffer.from(f.candidate + suffix)).slice(0, 40), source_release: "v1.1.0",
     plugin_version: "0.13.0", component_sha256: sha256(Buffer.from("Synthetic compatible component")) };
   git(f.source, "switch", "--detach", previousDefault);
   put(f.source, configured.component_pin, canonicalJSON(component).toString());
@@ -92,4 +96,62 @@ export function compatibleTrialUpgrade(f: Omit<ReturnType<typeof trialAdoptionFi
         artifact_sha256: sha256(Buffer.from("Synthetic regression capture")) }] } } };
   const delivered = trialAdoptionDelivery({ ...f, configured, candidate }, record);
   return { configured, candidate, record, delivered, previousDefault };
+}
+
+
+export type TrialUpgradeDefinition = {
+  schema_version: number; kind: string; predecessor_adoption_sha256: string;
+  candidate_component: ReturnType<typeof collectAdoptionBindings>["component_pin"]["value"];
+  candidate_protected_sha256: string; classification: string; affected_entries: string[];
+  changed_rules: { id: string; surface: string; scenario: string; fixture_sha256: string; old_contract_sha256: string;
+    new_contract_sha256: string; old_expected_sha256: string; new_expected_sha256: string }[];
+};
+
+export function trialUpgradeFixture(f: UpgradeSource, options: {
+  surface?: string; change_definition?: (definition: TrialUpgradeDefinition) => void;
+  component?: ReturnType<typeof collectAdoptionBindings>["component_pin"]["value"];
+  prepare_candidate?: (repo: string, settings: ReturnType<typeof trialAdoptionFixture>["configured"]) => void;
+} = {}) {
+  const surface = options.surface ?? "assessment";
+  const prototype = compatibleTrialUpgrade(f, { component: options.component, prepare: options.prepare_candidate }), prospective = collectAdoptionBindings(f.source, prototype.candidate);
+  const predecessorHash = sha256(readGit(f.source, "show", prototype.previousDefault + ":" + f.configured.publication.adoption_record));
+  const definition: TrialUpgradeDefinition = { schema_version: 1, kind: "docs-drift-upgrade-trial", predecessor_adoption_sha256: predecessorHash,
+    candidate_component: prospective.component_pin.value, candidate_protected_sha256: prospective.protected_sha256,
+    classification: "contract", affected_entries: ["hosted", "copilot", "claude"],
+    changed_rules: [{ id: "changed-contract", surface, scenario: "Synthetic changed contract scenario",
+      fixture_sha256: sha256(Buffer.from("Synthetic changed-rule fixture")), old_contract_sha256: sha256(Buffer.from("Synthetic old contract")),
+      new_contract_sha256: sha256(Buffer.from("Synthetic new contract")), old_expected_sha256: sha256(Buffer.from("Synthetic old expected outcome")),
+      new_expected_sha256: sha256(Buffer.from("Synthetic new expected outcome")) }] };
+  options.change_definition?.(definition);
+  const trial = { definition_path: ".vh-adlc/docs-drift-trials/upgrade.yaml", definition_sha256: canonicalDigest(definition) };
+  git(f.source, "switch", "--detach", prototype.previousDefault);
+  put(f.source, trial.definition_path, canonicalJSON(definition).toString());
+  put(f.source, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...f.configured, trial }).toString());
+  put(f.source, prototype.configured.component_pin, readGit(f.source, "show", prototype.candidate + ":" + prototype.configured.component_pin).toString());
+  const previousDefault = commitAll(f.source);
+  const configured = { ...prototype.configured, trial };
+  put(f.source, ".vh-adlc/docs-drift.yaml", canonicalJSON(configured).toString());
+  put(f.source, configured.execution.scheduled_workflow, readGit(f.source, "show", prototype.candidate + ":" + configured.execution.scheduled_workflow).toString());
+  const candidate = commitAll(f.source); git(f.source, "switch", "main");
+  const fresh = portableRecord({ repo: f.source, configured, candidate });
+  for (const receipt of Object.values(fresh.receipts)) Object.assign(receipt, { evidence_kind: "test-only", fixture_id: f.manifest.fixture_id });
+  const affected = definition.affected_entries;
+  const carried = ["hosted_advisory", "history_read", "quiescence", "copilot_entry", "claude_entry"].filter(name => name === "quiescence"
+    || (name === "hosted_advisory" || name === "history_read" ? !affected.includes("hosted")
+      : name === "copilot_entry" ? !affected.includes("copilot") : !affected.includes("claude")));
+  for (const name of carried) fresh.receipts[name] = structuredClone(f.record.receipts[name]!);
+  const record = { ...fresh, fixture_id: f.manifest.fixture_id, predecessor: { schema_version: 1, evidence_kind: "test-only",
+    fixture_id: f.manifest.fixture_id, route: "trial", default_commit: previousDefault, record_path: f.configured.publication.adoption_record,
+    record_sha256: predecessorHash, carry_receipts: carried, trial: { schema_version: 1, evidence_kind: "test-only",
+      fixture_id: f.manifest.fixture_id, definition_path: trial.definition_path, definition_sha256: trial.definition_sha256,
+      source_candidate: candidate, predecessor_adoption_sha256: predecessorHash, reviewer_model: configured.execution.entries.copilot.reviewer.model,
+      artifact_sha256: sha256(Buffer.from("Synthetic upgraded-trial artifact")),
+      observations: { definition_reviewed: true, prospective_bindings_matched: true, affected_roles_exercised: true,
+        complete_native_results: true, no_blocking_findings: true, no_should_fix_findings: true },
+      cases: definition.changed_rules.map(rule => ({ id: rule.id, evidence_kind: "test-only", fixture_id: f.manifest.fixture_id, source_candidate: candidate,
+        rule_sha256: canonicalDigest(rule), outcome_sha256: rule.new_expected_sha256,
+        artifact_sha256: sha256(Buffer.from("Synthetic changed-rule observed artifact")), result: "passed",
+        ...(["status", "attention", "history"].includes(rule.surface) ? { history_read: true, unchanged_carried: true, changed_new_attention: true } : {}) })) } } };
+  const delivered = trialAdoptionDelivery({ ...f, configured, candidate, record });
+  return { configured, candidate, previousDefault, definition, record, delivered };
 }

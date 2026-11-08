@@ -5,6 +5,7 @@ import { DOCS_DRIFT_KNOWLEDGE_PAGES, parseSettings } from "../../../plugins/vh-a
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { compatibleTrialUpgrade, trialUpgradeFixture, trialAdoptionDelivery } from "./adoption-trial-fixture";
 import { source, pin, write, commit, runtimeIdentity, portableRecord, deliverRecord } from "./adoption-fixture";
 
 const roots: string[] = [];
@@ -192,4 +193,68 @@ test("a settings-only pin change retains hosted impact when the scheduled caller
   expect(result.known_affected_entries).toEqual(["hosted"]);
   expect(result.caller_pin_exception).toBeNull();
   expect(result.caller_failure).toContain("compatible selected pin differs");
+});
+
+
+// These observed-shaped records test parser consistency, without claiming historical native runs.
+test.each(["compatibility", "regression", "install"] as const)("production refuses test-only %s in an otherwise valid compatible successor", scenario => {
+  const f = source(roots);
+  write(f.repo, f.configured.execution.scheduled_workflow, canonicalJSON({ on: { schedule: [{ cron: "0 6 * * *" }], workflow_dispatch: null },
+    permissions: f.configured.execution.permissions, jobs: { worker: { uses: "./" + f.configured.execution.worker_workflow,
+      with: { component_pin: f.configured.component_pin, pr_draft: f.configured.publication.pr_state.advisory === "draft" },
+      secrets: { COPILOT_GITHUB_TOKEN: "${{ secrets.COPILOT_GITHUB_TOKEN }}" } } } }));
+  f.candidate = commit(f.repo, "synthetic ordinary-host compatible predecessor");
+  const original = { source: f.repo, configured: f.configured, candidate: f.candidate, record: portableRecord(f),
+    manifest: { fixture_id: "00000000-0000-0000-0000-000000000001" } };
+  const successor = compatibleTrialUpgrade(original), record = successor.record;
+  Reflect.deleteProperty(record, "fixture_id");
+  Reflect.deleteProperty(record.predecessor, "fixture_id");
+  record.predecessor.evidence_kind = "observed";
+  const compatibility = record.predecessor.compatibility;
+  Reflect.deleteProperty(compatibility, "fixture_id"); compatibility.evidence_kind = "observed";
+  for (const regression of compatibility.regressions) { Reflect.deleteProperty(regression, "fixture_id"); regression.evidence_kind = "observed"; }
+  for (const receipt of Object.values(record.receipts)) { Reflect.deleteProperty(receipt, "fixture_id"); receipt.evidence_kind = "observed"; }
+  const selected = { ...original, configured: successor.configured, candidate: successor.candidate, record };
+  const valid = trialAdoptionDelivery(selected);
+  expect(adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: valid, identity: runtimeIdentity }).evidence).toBe("owner-attestation");
+  if (scenario === "compatibility") compatibility.evidence_kind = "test-only";
+  if (scenario === "regression") compatibility.regressions[0]!.evidence_kind = "test-only";
+  if (scenario === "install") record.receipts.codex_install!.evidence_kind = "test-only";
+  const copied = trialAdoptionDelivery(selected);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: copied, identity: runtimeIdentity })).toThrow(
+    scenario === "compatibility" ? "compatibility receipt bindings" : scenario === "regression" ? "compatibility regression bindings" : "observed record receipt codex_install");
+});
+
+
+// The baseline is an observed-shaped parser fixture, without native execution or adoption authority.
+test.each(["trial", "case", "entry", "history", "ancestor"] as const)("production refuses test-only %s in a trial-route successor", scenario => {
+  const f = source(roots);
+  write(f.repo, f.configured.execution.scheduled_workflow, canonicalJSON({ on: { schedule: [{ cron: "0 6 * * *" }], workflow_dispatch: null },
+    permissions: f.configured.execution.permissions, jobs: { worker: { uses: "./" + f.configured.execution.worker_workflow,
+      with: { component_pin: f.configured.component_pin, pr_draft: f.configured.publication.pr_state.advisory === "draft" },
+      secrets: { COPILOT_GITHUB_TOKEN: "${{ secrets.COPILOT_GITHUB_TOKEN }}" } } } }));
+  f.candidate = commit(f.repo, "synthetic ordinary-host trial predecessor");
+  const original = { source: f.repo, configured: f.configured, candidate: f.candidate, record: portableRecord(f),
+    manifest: { fixture_id: "00000000-0000-0000-0000-000000000001" } };
+  if (scenario === "ancestor") original.record.receipts.hosted_advisory!.evidence_kind = "test-only";
+  const upgrade = trialUpgradeFixture(original), record = upgrade.record;
+  Reflect.deleteProperty(record, "fixture_id");
+  Reflect.deleteProperty(record.predecessor, "fixture_id"); record.predecessor.evidence_kind = "observed";
+  const trial = record.predecessor.trial;
+  Reflect.deleteProperty(trial, "fixture_id"); trial.evidence_kind = "observed";
+  for (const result of trial.cases) { Reflect.deleteProperty(result, "fixture_id"); result.evidence_kind = "observed"; }
+  for (const receipt of Object.values(record.receipts)) { Reflect.deleteProperty(receipt, "fixture_id"); receipt.evidence_kind = "observed"; }
+  const selected = { ...original, configured: upgrade.configured, candidate: upgrade.candidate, record };
+  if (scenario !== "ancestor") {
+    const valid = trialAdoptionDelivery(selected);
+    expect(adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: valid, identity: runtimeIdentity }).evidence).toBe("owner-attestation");
+  }
+  if (scenario === "trial") trial.evidence_kind = "test-only";
+  if (scenario === "case") trial.cases[0]!.evidence_kind = "test-only";
+  if (scenario === "entry") record.receipts.copilot_entry!.evidence_kind = "test-only";
+  if (scenario === "history") record.receipts.history_read!.evidence_kind = "test-only";
+  const copied = trialAdoptionDelivery(selected);
+  const reason = scenario === "trial" ? "trial receipt bindings" : scenario === "case" ? "changed rule observation binding"
+    : scenario === "entry" ? "observed record receipt copilot_entry" : scenario === "history" ? "observed record receipt history_read" : "observed record receipt hosted_advisory";
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: copied, identity: runtimeIdentity })).toThrow(reason);
 });

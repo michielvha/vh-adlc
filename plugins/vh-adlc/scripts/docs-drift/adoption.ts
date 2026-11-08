@@ -258,15 +258,15 @@ type AdoptionResult = ReturnType<typeof readAdoptionFrame>["result"];
 const compatibleCarriedReceipts = ["hosted_advisory", "history_read", "quiescence", "copilot_entry", "claude_entry"];
 
 function predecessorLink(value: unknown, boundary: AdoptionBoundary) {
+  const route = value !== null && typeof value === "object" && !Array.isArray(value) ? Reflect.get(value, "route") : null;
+  if (route !== "compatible" && route !== "trial") fail("successor route required");
   const link = object(value, ["schema_version", "evidence_kind", "route", "default_commit", "record_path", "record_sha256",
-    "carry_receipts", "compatibility", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "successor predecessor");
+    "carry_receipts", route === "trial" ? "trial" : "compatibility", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "successor predecessor");
   if (link.schema_version !== 1 || link.evidence_kind !== boundary.kind
     || (boundary.kind === "test-only" && link.fixture_id !== boundary.fixture_id)) fail("predecessor evidence kind or fixture");
-  // Trial-route activation remains unavailable until its affected-surface verifier is implemented.
-  if (link.route !== "compatible") fail("successor trial evidence unavailable");
-  if (!canonicalJSON(link.carry_receipts).equals(canonicalJSON(compatibleCarriedReceipts))) fail("compatible carried receipt inventory");
-  return { default_commit: immutable(link.default_commit), record_sha256: adoptionDigest(link.record_sha256),
-    record_path: link.record_path, compatibility: link.compatibility };
+  if (route === "compatible" && !canonicalJSON(link.carry_receipts).equals(canonicalJSON(compatibleCarriedReceipts))) fail("compatible carried receipt inventory");
+  return { route, default_commit: immutable(link.default_commit), record_sha256: adoptionDigest(link.record_sha256),
+    record_path: link.record_path, carry_receipts: link.carry_receipts, compatibility: link.compatibility, trial: link.trial };
 }
 
 function verifyCompatibility(repo: string, value: unknown, previous: AdoptionResult, next: ReturnType<typeof readAdoptionFrame>, boundary: AdoptionBoundary) {
@@ -312,6 +312,71 @@ function verifyCompatibility(repo: string, value: unknown, previous: AdoptionRes
   if (receipt.classification === "contract-restoring" && !restored) fail("contract restoration regression required");
 }
 
+/** Verify portable upgrade-trial observations against the definition at the approved predecessor.
+ * Original native artifacts and actual trial authorization remain operator checks.
+ */
+function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorLink>, previous: AdoptionResult,
+  next: ReturnType<typeof readAdoptionFrame>, boundary: AdoptionBoundary): string[] {
+  const changes = compareUpgradeBindings({ repo, approved_default: previous.current_default,
+    source_candidate: next.result.source_candidate, identity: next.result.identity }, previous);
+  const policy = loadCommittedSettings(repo, previous.current_default).settings.trial;
+  if (policy === null) fail("upgrade trial definition missing");
+  const definitionInput = committedInput(repo, previous.current_default, policy.definition_path);
+  if (!definitionInput || definitionInput.mode !== "100644" || definitionInput.sha256 !== policy.definition_sha256) fail("upgrade trial definition binding");
+  const definition = object(collectionReaders().yaml(definitionInput.bytes), ["schema_version", "kind", "predecessor_adoption_sha256",
+    "candidate_component", "candidate_protected_sha256", "classification", "affected_entries", "changed_rules"], "upgrade trial definition");
+  if (definition.schema_version !== 1 || definition.kind !== "docs-drift-upgrade-trial"
+    || definition.predecessor_adoption_sha256 !== previous.adoption_sha256
+    || definition.candidate_protected_sha256 !== next.result.protected_sha256
+    || !canonicalJSON(definition.candidate_component).equals(canonicalJSON(next.result.component_pin))) fail("upgrade trial prospective binding");
+  if (typeof definition.classification !== "string" || !["execution", "contract", "uncertain"].includes(definition.classification)) fail("upgrade trial classification");
+  if (definition.classification === "execution" && changes.component.changed) fail("component contract coverage required");
+  const all = ["hosted", "copilot", "claude"] as const;
+  const affected = changes.component.changed || definition.classification !== "execution" ? [...all] : changes.known_affected_entries;
+  if (!affected.length || !canonicalJSON(definition.affected_entries).equals(canonicalJSON(affected))) fail("upgrade affected surface inventory");
+  const carried = compatibleCarriedReceipts.filter(name => name === "quiescence"
+    || (name === "hosted_advisory" || name === "history_read" ? !affected.includes("hosted")
+      : name === "copilot_entry" ? !affected.includes("copilot") : !affected.includes("claude")));
+  if (!canonicalJSON(link.carry_receipts).equals(canonicalJSON(carried))) fail("trial carried receipt inventory");
+  if (!Array.isArray(definition.changed_rules) || (definition.classification === "contract" && !definition.changed_rules.length)) fail("changed rule coverage required");
+  const receipt = object(link.trial, ["schema_version", "evidence_kind", "definition_path", "definition_sha256", "source_candidate",
+    "predecessor_adoption_sha256", "reviewer_model", "artifact_sha256", "observations", "cases", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "upgrade trial receipt");
+  if (receipt.schema_version !== 1 || receipt.evidence_kind !== boundary.kind
+    || (boundary.kind === "test-only" && receipt.fixture_id !== boundary.fixture_id)
+    || receipt.definition_path !== policy.definition_path || receipt.definition_sha256 !== definitionInput.sha256
+    || receipt.source_candidate !== next.result.source_candidate || receipt.predecessor_adoption_sha256 !== previous.adoption_sha256
+    || receipt.reviewer_model !== next.original.settings.execution.entries.copilot.reviewer.model) fail("upgrade trial receipt bindings");
+  adoptionDigest(receipt.artifact_sha256);
+  const observations = object(receipt.observations, ["definition_reviewed", "prospective_bindings_matched", "affected_roles_exercised",
+    "complete_native_results", "no_blocking_findings", "no_should_fix_findings"], "upgrade trial observations");
+  if (Object.values(observations).some(value => value !== true)) fail("incomplete upgrade trial observations");
+  if (!Array.isArray(receipt.cases) || receipt.cases.length !== definition.changed_rules.length) fail("changed rule case inventory");
+  const ids = new Set<string>();
+  let historyCovered = false;
+  for (const [index, value] of definition.changed_rules.entries()) {
+    const rule = object(value, ["id", "surface", "scenario", "fixture_sha256", "old_contract_sha256", "new_contract_sha256",
+      "old_expected_sha256", "new_expected_sha256"], "changed rule definition");
+    if (typeof rule.id !== "string" || !rule.id || ids.has(rule.id) || typeof rule.scenario !== "string" || !rule.scenario
+      || typeof rule.surface !== "string" || !["assessment", "scan", "status", "attention", "history", "resolve", "publication", "lease"].includes(rule.surface)) fail("changed rule identity");
+    ids.add(rule.id);
+    for (const field of ["fixture_sha256", "old_contract_sha256", "new_contract_sha256", "old_expected_sha256", "new_expected_sha256"]) adoptionDigest(rule[field]);
+    if (rule.old_contract_sha256 === rule.new_contract_sha256 || rule.old_expected_sha256 === rule.new_expected_sha256) fail("changed rule case does not discriminate");
+    const history = ["status", "attention", "history"].includes(rule.surface);
+    historyCovered ||= history;
+    const result = object(receipt.cases[index], ["id", "evidence_kind", "source_candidate", "rule_sha256", "outcome_sha256", "artifact_sha256",
+      "result", ...(boundary.kind === "test-only" ? ["fixture_id"] : []), ...(history ? ["history_read", "unchanged_carried", "changed_new_attention"] : [])], "changed rule result");
+    if (result.id !== rule.id || result.evidence_kind !== boundary.kind || (boundary.kind === "test-only" && result.fixture_id !== boundary.fixture_id)
+      || result.source_candidate !== next.result.source_candidate || result.rule_sha256 !== canonicalDigest(rule)
+      || result.outcome_sha256 !== rule.new_expected_sha256 || result.result !== "passed") fail("changed rule observation binding");
+    adoptionDigest(result.artifact_sha256);
+    if (history && (result.history_read !== true || result.unchanged_carried !== true || result.changed_new_attention !== true)) fail("changed history observations required");
+  }
+  const historyPolicyChanged = changes.changed_settings.some(path => path[0] === "reports"
+    || (path[0] === "execution" && path[1] === "permissions" && path[2] === "actions"));
+  if (historyPolicyChanged && !historyCovered) fail("changed history coverage required");
+  return carried;
+}
+
 /** Walk immutable predecessor defaults before accepting any carried observation. */
 function verifyAdoptionRecord(options: { repo: string; current_default: string; identity?: PublicationIdentity }, boundary: AdoptionBoundary): AdoptionResult {
   const frames: ReturnType<typeof readAdoptionFrame>[] = [], seen = new Set<string>();
@@ -338,9 +403,10 @@ function verifyAdoptionRecord(options: { repo: string; current_default: string; 
       const link = predecessorLink(frame.record.predecessor, boundary);
       if (link.default_commit !== previous.current_default || link.record_path !== previous.record_path
         || link.record_sha256 !== previous.adoption_sha256) fail("predecessor adoption binding");
-      verifyCompatibility(options.repo, link.compatibility, previous, frame, boundary);
+      const carried = link.route === "compatible" ? compatibleCarriedReceipts : verifyTrialSuccessor(options.repo, link, previous, frame, boundary);
+      if (link.route === "compatible") verifyCompatibility(options.repo, link.compatibility, previous, frame, boundary);
       verifyRecordedReceipts(frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity,
-        frame.deliveryTime, boundary, { names: compatibleCarriedReceipts, receipts: previous.receipts });
+        frame.deliveryTime, boundary, { names: carried, receipts: previous.receipts });
     }
     previous = frame.result;
   }
@@ -419,10 +485,29 @@ export function collectUpgradeChanges(options: {
   return compareUpgradeBindings(options, adopted);
 }
 
+/** A new C selects its absent successor record. Earlier delivered selections remain authoritative. */
+function verifyPriorSelection(repo: string, base: string, candidate: string, adopted: AdoptionResult): void {
+  const settingsByBlob = new Map<string, ReturnType<typeof loadCommittedSettings>["settings"]>();
+  const commits = readGit(repo, "rev-list", `${base}..${candidate}`).toString().trim().split("\n").filter(Boolean);
+  for (const commit of commits) {
+    const input = committedInput(repo, commit, ".vh-adlc/docs-drift.yaml");
+    if (!input) continue;
+    let settings = settingsByBlob.get(input.blob);
+    if (!settings) {
+      settings = loadCommittedSettings(repo, commit).settings;
+      settingsByBlob.set(input.blob, settings);
+    }
+    if (settings.publication.mode !== "adopted") continue;
+    const path = settings.publication.adoption_record, record = committedInput(repo, commit, path);
+    if (record !== null && (path !== adopted.record_path || record.sha256 !== adopted.adoption_sha256)) fail("intervening adopted selection");
+  }
+}
+
 function compareUpgradeBindings(options: { repo: string; approved_default: string; source_candidate: string; identity: PublicationIdentity }, adopted: AdoptionResult) {
   const { repo } = options, base = immutable(options.approved_default), candidate = immutable(options.source_candidate);
   try { readGit(repo, "merge-base", "--is-ancestor", base, candidate); }
   catch { fail("successor source must descend from approved default"); }
+  verifyPriorSelection(repo, base, candidate, adopted);
   const previous = collectAdoptionBindings(repo, base);
   verifyRetainedInputs(repo, base, candidate,
     [[adopted.record_path, adopted.adoption_sha256], [previous.component_pin.path, previous.component_pin.sha256]]);

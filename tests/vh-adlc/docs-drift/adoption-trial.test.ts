@@ -7,7 +7,7 @@ import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { commitAll, git, put } from "./repository-fixture";
 import { TRIAL_IDENTITY } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-context";
-import { compatibleTrialUpgrade, trialAdoptionDelivery, trialAdoptionFixture } from "./adoption-trial-fixture";
+import { type TrialUpgradeDefinition, compatibleTrialUpgrade, trialUpgradeFixture, trialAdoptionDelivery, trialAdoptionFixture } from "./adoption-trial-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -120,7 +120,7 @@ const compatibilityRefusals: { name: string; change: (upgrade: ReturnType<typeof
   { name: "restoration without failing baseline", change: u => { u.record.predecessor.compatibility.classification = "contract-restoring";
       u.record.predecessor.compatibility.regressions[0]!.category = "restoration"; }, reason: "restoration regression" },
   { name: "restoration without restoration case", change: u => { u.record.predecessor.compatibility.classification = "contract-restoring"; }, reason: "restoration regression required" },
-  { name: "unsupported trial route", change: u => { u.record.predecessor.route = "trial"; }, reason: "successor trial evidence unavailable" },
+  { name: "trial route without required metadata", change: u => { u.record.predecessor.route = "trial"; }, reason: "successor predecessor fields" },
 ];
 
 test.each(compatibilityRefusals)("compatible successors refuse $name", async ({ change, reason }) => {
@@ -195,4 +195,104 @@ test("selected component pins stay immutable throughout later default history", 
   put(f.source, f.configured.component_pin, original); const restored = commitAll(f.source);
   git(f.source, "switch", "main");
   expect(() => gate.verify({ current_default: restored })).toThrow("immutable predecessor input changed");
+});
+
+
+test("a contract-changing upgrade binds its definition and discriminating synthetic observations", async () => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f), gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(gate.verify({ current_default: upgrade.previousDefault }).component_pin).toEqual(f.record.protected_manifest.component.value);
+  const result = gate.verify({ current_default: upgrade.delivered });
+  expect(result.evidence).toBe("test-only");
+  expect(result.source_candidate).toBe(upgrade.candidate);
+  expect(result.receipts).toMatchObject({ quiescence: f.record.receipts.quiescence });
+});
+
+
+const trialDefinitionRefusals: { name: string; change: (definition: TrialUpgradeDefinition) => void; reason: string }[] = [
+  { name: "vacuous changed-rule coverage", change: d => { d.changed_rules = []; }, reason: "changed rule coverage required" },
+  { name: "identical old and new outcome", change: d => { d.changed_rules[0]!.old_expected_sha256 = d.changed_rules[0]!.new_expected_sha256; }, reason: "does not discriminate" },
+  { name: "identical old and new contract", change: d => { d.changed_rules[0]!.old_contract_sha256 = d.changed_rules[0]!.new_contract_sha256; }, reason: "does not discriminate" },
+  { name: "missing fixture digest", change: d => { d.changed_rules[0]!.fixture_sha256 = ""; }, reason: "record digest" },
+  { name: "duplicate changed rule", change: d => { d.changed_rules.push(structuredClone(d.changed_rules[0]!)); }, reason: "changed rule identity" },
+  { name: "omitted affected surface", change: d => { d.affected_entries.pop(); }, reason: "affected surface inventory" },
+  { name: "component change called execution-only", change: d => { d.classification = "execution"; }, reason: "component contract coverage required" },
+];
+
+test.each(trialDefinitionRefusals)("trial successors refuse $name", async ({ change, reason }) => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, { change_definition: change });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(() => gate.verify({ current_default: upgrade.delivered })).toThrow(reason);
+});
+
+test.each(["status", "attention", "history"])("a changed %s trial requires carried and new-attention history observations", async surface => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, { surface }), gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(gate.verify({ current_default: upgrade.delivered }).evidence).toBe("test-only");
+  const scenario = upgrade.record.predecessor.trial.cases[0]!;
+  scenario.unchanged_carried = false;
+  const changed = trialAdoptionDelivery({ ...f, ...upgrade }, upgrade.record);
+  expect(() => gate.verify({ current_default: changed })).toThrow("changed history observations required");
+});
+
+const trialReceiptRefusals: { name: string; change: (upgrade: ReturnType<typeof trialUpgradeFixture>) => void; reason: string }[] = [
+  { name: "missing changed-rule observation", change: u => { u.record.predecessor.trial.cases = []; }, reason: "case inventory" },
+  { name: "wrong definition digest", change: u => { u.record.predecessor.trial.definition_sha256 = "0".repeat(64); }, reason: "trial receipt bindings" },
+  { name: "mixed trial evidence", change: u => { u.record.predecessor.trial.evidence_kind = "observed"; }, reason: "trial receipt bindings" },
+  { name: "mixed scenario evidence", change: u => { u.record.predecessor.trial.cases[0]!.evidence_kind = "observed"; }, reason: "observation binding" },
+  { name: "old expected outcome", change: u => { u.record.predecessor.trial.cases[0]!.outcome_sha256 = u.definition.changed_rules[0]!.old_expected_sha256; }, reason: "observation binding" },
+  { name: "skipped scenario", change: u => { u.record.predecessor.trial.cases[0]!.result = "skipped"; }, reason: "observation binding" },
+  { name: "unexercised changed roles", change: u => { u.record.predecessor.trial.observations.affected_roles_exercised = false; }, reason: "incomplete upgrade trial observations" },
+  { name: "carried changed hosted entry", change: u => { u.record.predecessor.carry_receipts.push("hosted_advisory"); }, reason: "trial carried receipt inventory" },
+];
+
+test.each(trialReceiptRefusals)("trial successors refuse $name", async ({ change, reason }) => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f), gate = await adoption.createTrialAdoptionGate(f.boundary);
+  change(upgrade);
+  const changed = trialAdoptionDelivery({ ...f, ...upgrade }, upgrade.record);
+  expect(() => gate.verify({ current_default: changed })).toThrow(reason);
+});
+
+
+test("a successor cannot skip an intervening adoption to hide its deleted record", async () => {
+  const f = trialAdoptionFixture(roots), first = compatibleTrialUpgrade(f);
+  const second = compatibleTrialUpgrade({ ...f, configured: first.configured, candidate: first.candidate, record: first.record },
+    { suffix: "second", prepare(repo) { rmSync(join(repo, first.configured.publication.adoption_record)); } });
+  const link = second.record.predecessor, original = first.record.predecessor;
+  link.default_commit = original.default_commit; link.record_path = original.record_path; link.record_sha256 = original.record_sha256;
+  Object.assign(link.compatibility, { predecessor_adoption_sha256: original.record_sha256,
+    previous_component: original.compatibility.previous_component, previous_protected_sha256: original.compatibility.previous_protected_sha256 });
+  link.compatibility.regressions[0]!.previous_source = original.compatibility.previous_component.source_commit;
+  const delivered = trialAdoptionDelivery({ ...f, ...second }, second.record), gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(() => gate.verify({ current_default: delivered })).toThrow("intervening adopted selection");
+});
+
+
+test("protected report-policy changes require history-case coverage even with fresh entry receipts", async () => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, {
+    component: f.record.protected_manifest.component.value,
+    prepare_candidate(repo, settings) {
+      settings.reports.max_age_seconds -= 1;
+      put(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
+    },
+    change_definition(definition) { definition.classification = "execution"; definition.changed_rules = []; },
+  });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(() => gate.verify({ current_default: upgrade.delivered })).toThrow("changed history coverage required");
+});
+
+test("an interactive-only client trial carries unchanged hosted and Claude receipts", async () => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, {
+    component: f.record.protected_manifest.component.value,
+    prepare_candidate(repo, settings) {
+      Object.assign(settings.clients, { "copilot-new": { ...settings.clients["copilot-linux"], version: "fixture-2.0.0" } });
+      const old = settings.execution.entries.copilot;
+      settings.execution.entries.copilot = { ...old, worker: { ...old.worker, client: "copilot-new" }, reviewer: { ...old.reviewer, client: "copilot-new" } };
+      put(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
+    },
+    change_definition(definition) { definition.classification = "execution"; definition.affected_entries = ["copilot"]; definition.changed_rules = []; },
+  });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(gate.verify({ current_default: upgrade.previousDefault }).component_pin).toEqual(f.record.protected_manifest.component.value);
+  const result = gate.verify({ current_default: upgrade.delivered });
+  expect(result.receipts).toMatchObject({ hosted_advisory: f.record.receipts.hosted_advisory, claude_entry: f.record.receipts.claude_entry });
+  expect(result.source_candidate).toBe(upgrade.candidate);
 });
