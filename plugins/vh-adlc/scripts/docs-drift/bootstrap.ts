@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { clientArchivePath, inspectClientArchive } from "./client-archive";
 import { executeOwnedProcess, type OwnedProcess } from "./owned-process";
 import { parseClientBinding } from "./settings";
+import { collectAdoptionBindings, parseComponentPin, verifyRuntimeAdoption } from "./adoption";
+import type { PublicationIdentity } from "./transport";
 import { publishArtifact, syncDirectory } from "./journal";
-import { chmodSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
+import { chmodSync, closeSync, constants, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { readGit } from "./git";
 import { canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
@@ -111,7 +114,7 @@ const clientPayloadLimit = 1024 * 1024 * 1024;
 function privateRuntimeDirectory(path: string, create = false): void {
   if (create && !existsSync(path)) {
     privateRuntimeDirectory(dirname(path), true);
-    try { mkdirSync(path, { mode: 0o700 }); syncDirectory(dirname(path)); }
+    try { mkdirSync(path, { mode: 0o700 }); chmodSync(path, 0o700); syncDirectory(dirname(path)); }
     catch (error) { if (!(error instanceof Error) || !("code" in error) || error.code !== "EEXIST") throw error; }
   }
   const item = lstatSync(path), owner = process.getuid?.();
@@ -164,17 +167,21 @@ function clientRecord(bytes: Uint8Array, id: string, client: ClientBinding): Cli
 async function clientFiles(distribution: Uint8Array, client: ClientBinding, format: ClientFormat, executable: string) {
   if (distribution.byteLength > clientArchiveLimit || sha256(distribution) !== client.distribution_sha256) fail("client distribution checksum");
   if (format !== "tar" && format !== "executable") fail("client distribution format");
+  const inventory = format === "tar" ? inspectClientArchive(distribution, { file: clientArchiveLimit, total: clientPayloadLimit, entries: 50000 }) : null;
   const archiveFiles = format === "tar" ? await new Bun.Archive(distribution).files()
     : new Map([[executable, new File([Buffer.from(distribution)], executable)]]);
   if (!archiveFiles.size || archiveFiles.size > 50000) fail("client distribution executable or inventory");
-  const files = new Map<string, File>();
+  const files = new Map<string, { file: File; executable: boolean }>();
   let total = 0;
   for (const [path, file] of archiveFiles) {
-    const selected = protocolPath(path.replace(/^(?:\.\/)+/u, ""));
+    const selected = clientArchivePath(path);
     if (files.has(selected)) fail("client distribution path collision");
     if (file.size > clientArchiveLimit || (total += file.size) > clientPayloadLimit) fail("client distribution size bound");
-    files.set(selected, file);
+    const original = inventory?.get(selected);
+    if (inventory && (!original || original.size !== file.size || original.sha256 !== sha256(new Uint8Array(await file.arrayBuffer())))) fail("client archive regular inventory mismatch");
+    files.set(selected, { file, executable: selected === executable || (original?.executable ?? false) });
   }
+  if (inventory && inventory.size !== files.size) fail("client archive incomplete inventory");
   if (!files.has(executable)) fail("client distribution executable or inventory");
   return files;
 }
@@ -196,12 +203,13 @@ export async function inspectRetainedClient(options: { cache_directory: string; 
   privateRuntimeDirectory(root);
   const distribution = readRuntimeFile(join(root, "distribution"), clientArchiveLimit);
   const files = await clientFiles(distribution, client, record.format, record.executable);
-  const archiveRows = await Promise.all([...files].map(async ([path, file]) => ({ path, size: file.size, sha256: sha256(new Uint8Array(await file.arrayBuffer())) })));
-  const retainedRows = record.files.map(({ path, size, sha256 }) => ({ path, size, sha256 }));
+  const archiveRows = await Promise.all([...files].map(async ([path, { file, executable }]) => ({ path, mode: executable ? "100755" : "100644", size: file.size, sha256: sha256(new Uint8Array(await file.arrayBuffer())) })));
+  const retainedRows = [...record.files];
   const byPath = (left: { path: string }, right: { path: string }) => compareUTF8(left.path, right.path);
   if (!canonicalJSON(archiveRows.sort(byPath)).equals(canonicalJSON(retainedRows.sort(byPath)))) fail("client payload differs from verified distribution");
   const directory = join(root, "package"), executable = join(directory, record.executable);
   const inspected = inspectRetainedFiles(directory, { files: record.files, component_sha256: componentDigest(record.files) });
+  inspectReadOnlyFiles(directory, record.files);
   if (!(lstatSync(executable).mode & 0o100)) fail("client executable mode");
   const nativeBytes = readRuntimeFile(join(root, "version-process.json"));
   const native = runtimeJSON(nativeBytes, ["schema_version", "kind", "client_id", "distribution_sha256", "executable_sha256",
@@ -241,16 +249,12 @@ export async function retainClientDistribution(options: {
   privateRuntimeDirectory(join(options.cache_directory, "builds"), true); privateRuntimeDirectory(root, true); privateRuntimeDirectory(directory, true);
   publishArtifact(join(root, "distribution"), Buffer.from(options.distribution));
   const retained: PayloadFile[] = [];
-  for (const [path, file] of files) {
+  for (const [path, { file, executable: runs }] of files) {
     const target = join(directory, path), bytes = new Uint8Array(await file.arrayBuffer());
-    privateRuntimeDirectory(dirname(target), true);
-    // Private package files retain owner execution so bundled native helpers can run.
-    const fd = openSync(target, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o700);
-    try { writeFileSync(fd, bytes); fsyncSync(fd); } finally { closeSync(fd); }
-    syncDirectory(dirname(target));
+    // Preserve declared helper execution with an explicit read-only retained mode.
+    writeRuntimeFile(target, bytes, runs ? 0o500 : 0o400);
     const item = lstatSync(target);
     if (!item.isFile() || item.isSymbolicLink() || item.nlink !== 1 || item.uid !== process.getuid?.()) fail("regular retained client file required");
-    chmodSync(target, (item.mode & 0o777 & ~0o022) | (path === executable ? 0o500 : 0o400));
     retained.push({ path, mode: (lstatSync(target).mode & 0o100) ? "100755" : "100644", size: file.size,
       sha256: sha256(bytes) });
   }
@@ -299,4 +303,122 @@ export async function retainClientDistribution(options: {
   try { publishArtifact(paths.index, recordBytes); }
   catch (error) { if (!(error instanceof Error) || error.message !== "docs-drift journal revision conflict") throw error; }
   return selectedClient();
+}
+
+
+type ComponentPin = ReturnType<typeof parseComponentPin>;
+
+function writeRuntimeFile(path: string, bytes: Uint8Array, mode: number): void {
+  privateRuntimeDirectory(dirname(path), true);
+  const fd = openSync(path, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, mode);
+  try { writeFileSync(fd, bytes); fchmodSync(fd, mode); fsyncSync(fd); } finally { closeSync(fd); }
+  syncDirectory(dirname(path));
+}
+
+function componentPaths(cache: string, pin: ComponentPin) {
+  privateRuntimeDirectory(cache);
+  const base = join(cache, "components", pin.component_sha256);
+  return { base, index: join(base, pin.source_commit + ".json") };
+}
+
+/** Inspect only the exact published pin selected by committed consumer policy. */
+export function inspectRetainedComponent(options: { cache_directory: string; pin: ComponentPin }) {
+  const pin = parseComponentPin(options.pin), paths = componentPaths(options.cache_directory, pin);
+  privateRuntimeDirectory(paths.base);
+  const record = runtimeJSON(readRuntimeFile(paths.index), ["schema_version", "kind", "pin", "build", "identity"]);
+  if (record.schema_version !== 1 || record.kind !== "docs-drift-retained-component"
+    || !canonicalJSON(parseComponentPin(record.pin)).equals(canonicalJSON(pin))
+    || typeof record.build !== "string" || !/^component-builds\/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(record.build)) fail("retained component selection");
+  const value = runtimeObject(record.identity, ["schema_version", "source_commit", "plugin_version", "component_sha256", "files"]);
+  if (value.schema_version !== 1 || value.source_commit !== pin.source_commit || value.plugin_version !== pin.plugin_version
+    || value.component_sha256 !== pin.component_sha256 || !Array.isArray(value.files) || !value.files.length || value.files.length > 50000) fail("retained component identity");
+  const files = value.files.map((row: unknown): PayloadFile => {
+    const file = runtimeObject(row, ["path", "mode", "sha256", "size"]);
+    if (typeof file.path !== "string" || (file.mode !== "100644" && file.mode !== "100755")
+      || typeof file.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(file.sha256)
+      || typeof file.size !== "number" || !Number.isSafeInteger(file.size) || file.size < 0 || file.size > clientArchiveLimit) fail("retained component file");
+    return { path: protocolPath(file.path), mode: file.mode, sha256: file.sha256, size: file.size };
+  });
+  const identity: ComponentIdentity = { schema_version: 1, source_commit: pin.source_commit,
+    plugin_version: pin.plugin_version, component_sha256: pin.component_sha256, files };
+  const directory = join(options.cache_directory, record.build, "package");
+  privateRuntimeDirectory(dirname(directory));
+  const selected = inspectRetainedPayload({ directory, expected: identity });
+  inspectReadOnlyFiles(directory, identity.files);
+  return freezeJSON({ ...selected, pin });
+}
+
+/** Setup receives an independently verified published source and its protected pin. */
+export function retainComponentSnapshot(options: { cache_directory: string; source_repo: string; pin: ComponentPin }) {
+  const pin = parseComponentPin(options.pin), paths = componentPaths(options.cache_directory, pin);
+  const identity = computeComponentIdentity(options.source_repo, pin.source_commit);
+  if (identity.plugin_version !== pin.plugin_version || identity.component_sha256 !== pin.component_sha256) fail("published component pin mismatch");
+  privateRuntimeDirectory(paths.base, true);
+  if (existsSync(paths.index)) return inspectRetainedComponent(options);
+  const build = "component-builds/" + randomUUID(), directory = join(options.cache_directory, build, "package");
+  privateRuntimeDirectory(directory, true);
+  for (const file of identity.files) {
+    const bytes = readGit(options.source_repo, "show", pin.source_commit + ":plugins/vh-adlc/" + file.path);
+    writeRuntimeFile(join(directory, file.path), bytes, file.mode === "100755" ? 0o500 : 0o400);
+  }
+  inspectRetainedPayload({ directory, expected: identity });
+  try { publishArtifact(paths.index, canonicalJSON({ schema_version: 1, kind: "docs-drift-retained-component", pin, build, identity })); }
+  catch (error) { if (!existsSync(paths.index)) throw error; }
+  return inspectRetainedComponent(options);
+}
+
+
+function inspectEntryInput(repo: string, commit: string, path: string, invokedPath: string): string {
+  const root = realpathSync(repo), expectedPath = join(root, protocolPath(path));
+  if (invokedPath !== expectedPath || realpathSync(invokedPath) !== expectedPath) fail("invoked entry path differs from committed policy");
+  const item = lstatSync(invokedPath), entry = readGit(repo, "--literal-pathspecs", "ls-tree", "-z", commit, "--", path).toString();
+  const mode = (item.mode & 0o100) ? "100755" : "100644";
+  if (!item.isFile() || item.isSymbolicLink() || item.nlink !== 1 || item.uid !== process.getuid?.()
+    || (item.mode & 0o022) !== 0 || !entry.startsWith(mode + " blob ") || item.size > 16 * 1024 * 1024) fail("regular committed entry input required");
+  const expected = readGit(repo, "show", commit + ":" + path);
+  const fd = openSync(invokedPath, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const opened = fstatSync(fd);
+    if (!opened.isFile() || opened.dev !== item.dev || opened.ino !== item.ino || opened.mode !== item.mode
+      || opened.size !== item.size || opened.nlink !== 1 || opened.uid !== item.uid) fail("entry input changed during inspection");
+    const bytes = readFileSync(fd);
+    if (!bytes.equals(expected)) fail("invoked entry bytes differ from committed policy");
+    return sha256(bytes);
+  } finally { closeSync(fd); }
+}
+
+/** Preflight an approved entry at the caller's freshly observed immutable default.
+ * The portable result remains an owner attestation. Effects require their separate current gates.
+ */
+export async function selectApprovedRuntime(options: {
+  repo: string; current_default: string; identity: PublicationIdentity; cache_directory: string;
+  entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string;
+}) {
+  const adopted = verifyRuntimeAdoption(options);
+  const bindings = collectAdoptionBindings(options.repo, options.current_default), settings = bindings.settings;
+  if (!["hosted", "copilot", "claude"].includes(options.entry)) fail("protected execution entry required");
+  const launcherSHA = inspectEntryInput(options.repo, options.current_default, settings.runtime_loader.launcher, options.launcher_path);
+  const settingsSHA = inspectEntryInput(options.repo, options.current_default, ".vh-adlc/docs-drift.yaml", options.settings_path);
+  if (settingsSHA !== bindings.settings_sha256) fail("invoked settings changed");
+  const component = inspectRetainedComponent({ cache_directory: options.cache_directory, pin: adopted.component_pin });
+  const entry = settings.execution.entries[options.entry];
+  async function role(selected: typeof entry.worker) {
+    const retained = await inspectRetainedClient({ cache_directory: options.cache_directory,
+      client_id: selected.client, client: settings.clients[selected.client] });
+    return { ...retained, model: selected.model, argv: selected.argv, identity_source: selected.identity_source };
+  }
+  const worker = await role(entry.worker), reviewer = await role(entry.reviewer);
+  if (worker.client.provider !== settings.runtime_loader.provider) fail("loader provider differs from selected worker client");
+  const argv = settings.runtime_loader.argv.map(arg => arg.replaceAll("{plugin_dir}", component.directory).replaceAll("{profile_root}", worker.profile_directory));
+  return freezeJSON({ kind: "docs-drift-approved-runtime", evidence: adopted.evidence, current_default: options.current_default,
+    adoption_sha256: adopted.adoption_sha256, protected_sha256: adopted.protected_sha256, entry: options.entry, component, worker, reviewer,
+    loader: { ...settings.runtime_loader, argv, launcher_sha256: launcherSHA, settings_sha256: settingsSHA, profile_root: worker.profile_directory } });
+}
+
+
+function inspectReadOnlyFiles(directory: string, files: PayloadFile[]): void {
+  for (const file of files) {
+    const mode = lstatSync(join(directory, file.path)).mode & 0o777;
+    if (mode !== (file.mode === "100755" ? 0o500 : 0o400)) fail("retained file read-only mode changed");
+  }
 }

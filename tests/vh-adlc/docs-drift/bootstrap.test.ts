@@ -3,6 +3,7 @@ import { chmodSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, r
 import { tmpdir } from "node:os";
 import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
+import { inspectClientArchive } from "../../../plugins/vh-adlc/scripts/docs-drift/client-archive";
 import { settingsFixture } from "./settings-fixture";
 import { dirname, join } from "node:path";
 import { computeComponentIdentity, inspectRetainedPayload } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
@@ -160,12 +161,12 @@ test.each(["missing-package", "replaced-executable", "ambient-file", "linked-exe
   const f = await clientFixture(), selected = await bootstrap.retainClientDistribution(f.setup), root = dirname(selected.directory);
   const global = join(f.cache, "global-client"); writeFileSync(global, "unrelated available host client\n");
   if (scenario === "missing-package") rmSync(join(root, "distribution"));
-  if (scenario === "replaced-executable") writeFileSync(selected.executable, Buffer.alloc(readFileSync(selected.executable).length, 120));
+  if (scenario === "replaced-executable") { chmodSync(selected.executable, 0o500 | 0o200); writeFileSync(selected.executable, Buffer.alloc(readFileSync(selected.executable).length, 120)); chmodSync(selected.executable, 0o500); }
   if (scenario === "ambient-file") writeFileSync(join(selected.directory, "ambient-plugin.js"), "unexpected active input\n");
   if (scenario === "linked-executable") { rmSync(selected.executable); symlinkSync(global, selected.executable); }
   if (scenario === "hardlinked-executable") linkSync(selected.executable, join(f.cache, "other-hardlink"));
   if (scenario === "forged-file-manifest") {
-    writeFileSync(selected.executable, "forged build\n");
+    chmodSync(selected.executable, 0o700); writeFileSync(selected.executable, "forged build\n"); chmodSync(selected.executable, 0o500);
     const record = JSON.parse(readFileSync(f.index, "utf8")) as { files: Array<{ path: string; sha256: string; size: number }> };
     const row = record.files.find(item => item.path === f.setup.executable);
     if (!row) throw Error("missing retained executable");
@@ -266,20 +267,26 @@ function syntheticTar(entries: Array<{ name: string; type: "0" | "1" | "2" | "5"
   return Buffer.concat([...blocks, Buffer.alloc(1024)]);
 }
 
-test("retention materializes regular tar files while link and directory entries create no outside writes", async () => {
+test.each(["link", "duplicate"] as const)("client archive rejects %s members before setup writes", async scenario => {
   const f = await clientFixture(), outside = realpathSync(mkdtempSync("/tmp/vh20-outside-")); roots.push(outside); chmodSync(outside, 0o700);
-  f.setup.distribution = syntheticTar([
-    { name: "bin", type: "2", link: outside },
-    { name: f.setup.executable, type: "0", body: f.program },
-    { name: "hardlink", type: "1", link: outside + "/absent" },
-    { name: outside + "/directory", type: "5" },
-  ]);
+  f.setup.distribution = syntheticTar(scenario === "link" ? [
+    { name: "bin", type: "2", link: outside }, { name: f.setup.executable, type: "0", body: f.program },
+  ] : [{ name: f.setup.executable, type: "0", body: f.program }, { name: f.setup.executable, type: "0", body: f.program }]);
   f.client.distribution_sha256 = sha256(f.setup.distribution);
-  const selected = await bootstrap.retainClientDistribution(f.setup);
-  expect(readFileSync(selected.executable, "utf8")).toBe(f.program);
-  expect(lstatSync(join(selected.directory, "bin")).isSymbolicLink()).toBe(false);
-  expect(readdirSync(selected.directory)).toEqual(["bin"]);
+  await expect(bootstrap.retainClientDistribution(f.setup)).rejects.toThrow("client archive");
+  expect(readdirSync(f.cache)).toEqual([]);
   expect(readdirSync(outside)).toEqual([]);
+});
+
+test("retained native files have explicit read-only modes independent of the setup umask", async () => {
+  const f = await clientFixture(), previous = process.umask(0o177);
+  let selected: Awaited<ReturnType<typeof bootstrap.retainClientDistribution>>;
+  try { selected = await bootstrap.retainClientDistribution(f.setup); } finally { process.umask(previous); }
+  expect(lstatSync(selected.executable).mode & 0o777).toBe(0o500);
+  const license = join(selected.directory, "LICENSE");
+  expect(lstatSync(license).mode & 0o777).toBe(0o400);
+  expect(() => writeFileSync(selected.executable, "Implicit native package replacement")).toThrow("EACCES");
+  expect(() => writeFileSync(license, "Implicit data replacement")).toThrow("EACCES");
 });
 
 test("an exec-format startup failure retains a diagnostic record and no selected client", async () => {
@@ -302,4 +309,99 @@ test("a tar current-directory prefix retains the canonical client location", asy
   const selected = await bootstrap.retainClientDistribution(f.setup);
   expect(selected.executable_relative).toBe(f.setup.executable);
   expect(readFileSync(selected.executable, "utf8")).toBe(f.program);
+});
+
+test("verified component setup keeps an exact approved snapshot through a host upgrade", () => {
+  const f = component(), cache = join(f.root, "retained-runtime"); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  expect(typeof bootstrap.retainComponentSnapshot).toBe("function");
+  const selected = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin });
+  expect(selected.component_sha256).toBe(pin.component_sha256);
+  expect(readFileSync(join(selected.directory, "guide.md"), "utf8")).toBe("Synthetic complete payload\n");
+  writeFileSync(join(f.plugin, "guide.md"), "New unrelated host installation\n");
+  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, pin }).directory).toBe(selected.directory);
+  expect(bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin }).directory).toBe(selected.directory);
+  expect(readFileSync(join(f.plugin, "guide.md"), "utf8")).toBe("New unrelated host installation\n");
+});
+
+
+test.each(["source", "version", "digest"] as const)("component setup refuses a mismatched published %s before creating selection", scenario => {
+  const f = component(), cache = join(f.root, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  if (scenario === "source") pin.source_commit = "f".repeat(40);
+  if (scenario === "version") pin.plugin_version = "0.14.0";
+  if (scenario === "digest") pin.component_sha256 = "f".repeat(64);
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin })).toThrow();
+  expect(readdirSync(cache)).toEqual([]);
+});
+
+test.each(["missing", "replaced", "linked", "hardlinked", "ambient", "metadata", "executable"] as const)("selected component refuses %s retained inputs", scenario => {
+  const f = component(), cache = join(f.root, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  const selected = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin });
+  const path = join(selected.directory, "guide.md");
+  if (scenario === "missing") rmSync(path);
+  if (scenario === "replaced") { chmodSync(path, 0o600); writeFileSync(path, "Changed retained payload bytes\n"); chmodSync(path, 0o400); }
+  if (scenario === "linked") { rmSync(path); symlinkSync(join(f.plugin, "guide.md"), path); }
+  if (scenario === "hardlinked") { rmSync(path); linkSync(join(f.plugin, "guide.md"), path); }
+  if (scenario === "ambient") writeFileSync(join(selected.directory, "extra.ts"), "Unrecorded helper\n");
+  if (scenario === "executable") chmodSync(path, 0o700);
+  if (scenario === "metadata") {
+    const index = join(cache, "components", pin.component_sha256, pin.source_commit + ".json");
+    const record = JSON.parse(readFileSync(index, "utf8")); record.pin.source_release = "v0.14.0";
+    writeFileSync(index, canonicalJSON(record));
+  }
+  expect(() => bootstrap.inspectRetainedComponent({ cache_directory: cache, pin })).toThrow();
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin })).toThrow();
+});
+
+test("separate component snapshots preserve rollback while a linked cache parent is refused", () => {
+  const f = component(), cache = join(f.root, "runtime-cache"); mkdirSync(cache, { mode: 0o700 });
+  const pin = { schema_version: 1 as const, source_repository: "fixture/shared", source_commit: f.source,
+    source_release: "v0.13.0", plugin_version: f.identity.plugin_version, component_sha256: f.identity.component_sha256 };
+  const original = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo, pin });
+  writeFileSync(join(f.plugin, "guide.md"), "New component payload\n");
+  const nextSource = commit(f.repo), nextIdentity = computeComponentIdentity(f.repo, nextSource);
+  const next = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: f.repo,
+    pin: { ...pin, source_commit: nextSource, component_sha256: nextIdentity.component_sha256 } });
+  expect(next.directory).not.toBe(original.directory);
+  expect(bootstrap.inspectRetainedComponent({ cache_directory: cache, pin }).directory).toBe(original.directory);
+  const other = join(f.root, "other-cache"), outside = join(f.root, "outside-cache");
+  mkdirSync(other, { mode: 0o700 }); mkdirSync(outside, { mode: 0o700 }); symlinkSync(outside, join(other, "components"));
+  expect(() => bootstrap.retainComponentSnapshot({ cache_directory: other, source_repo: f.repo, pin })).toThrow("private owned runtime directory required");
+  expect(readdirSync(outside)).toEqual([]);
+});
+
+
+test.each(["hardlink", "parent", "absolute", "canonical-duplicate", "file-parent", "checksum", "truncated", "trailing", "member-bound", "total-bound", "count-bound", "gzip-bound"] as const)("complete archive inventory refuses %s", scenario => {
+  const limits = { file: 32, total: 64, entries: 8 };
+  let bytes = syntheticTar([{ name: "copilot", type: "0", body: "native" }]);
+  if (scenario === "hardlink") bytes = syntheticTar([{ name: "alias", type: "1", link: "copilot" }]);
+  if (scenario === "parent") bytes = syntheticTar([{ name: "../copilot", type: "0", body: "native" }]);
+  if (scenario === "absolute") bytes = syntheticTar([{ name: "/copilot", type: "0", body: "native" }]);
+  if (scenario === "canonical-duplicate") bytes = syntheticTar([{ name: "copilot", type: "0" }, { name: "./copilot", type: "0" }]);
+  if (scenario === "file-parent") bytes = syntheticTar([{ name: "bin", type: "0" }, { name: "bin/copilot", type: "0" }]);
+  if (scenario === "checksum") bytes[0] = 120;
+  if (scenario === "truncated") bytes = bytes.subarray(0, 1024);
+  if (scenario === "trailing") bytes = Buffer.concat([bytes, syntheticTar([{ name: "hidden", type: "0" }])]);
+  if (scenario === "member-bound") limits.file = 5;
+  if (scenario === "total-bound") limits.total = 5;
+  if (scenario === "count-bound") limits.entries = 0;
+  if (scenario === "gzip-bound") bytes = Buffer.from(Bun.gzipSync(Buffer.alloc(16384)));
+  expect(() => inspectClientArchive(bytes, limits)).toThrow();
+});
+
+test("complete archive inventory accepts harmless root directories and preserves regular helper modes", async () => {
+  const f = await clientFixture();
+  f.setup.distribution = syntheticTar([{ name: "./", type: "5" }, { name: "bin/", type: "5" },
+    { name: f.setup.executable, type: "0", body: f.program }, { name: "bin/helper", type: "0", body: "#!/bin/sh\nexit 0\n" }]);
+  f.client.distribution_sha256 = sha256(f.setup.distribution);
+  const selected = await bootstrap.retainClientDistribution(f.setup);
+  expect(lstatSync(join(selected.directory, "bin/helper")).mode & 0o777).toBe(0o500);
+  expect(lstatSync(selected.executable).mode & 0o777).toBe(0o500);
+  const checked = await bootstrap.inspectRetainedClient({ cache_directory: f.cache, client_id: f.setup.client_id, client: f.client });
+  expect(checked.payload_sha256).toBe(selected.payload_sha256);
 });

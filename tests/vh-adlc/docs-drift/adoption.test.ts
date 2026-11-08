@@ -1,6 +1,7 @@
+import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import * as adoption from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { collectAdoptionBindings, parseComponentPin, verifyCutoverAssembly } from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { readGitWithEnvironment as gitWithInput } from "../../../plugins/vh-adlc/scripts/git-read";
@@ -8,6 +9,7 @@ import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { publicationFixture } from "./publication-fixture";
+import { parseClientBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { settingsFixture } from "./settings-fixture";
 import { hash } from "./manifest-fixture";
 
@@ -23,12 +25,13 @@ function commit(repo: string, message: string) {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
   return readGit(repo, "rev-parse", "HEAD").toString().trim();
 }
-function source() {
+function source(options: { pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"] } = {}) {
   const f = publicationFixture(roots), settings = { ...settingsFixture(),
     component_pin: ".vh-adlc/docs-drift-components/shared.yaml", publication: { ...settingsFixture().publication, mode: "adopted" },
     reports: { ...settingsFixture().reports, workflow_id: 19 } };
+  if (options.client) settings.clients["copilot-linux"] = options.client;
   write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings));
-  write(f.repo, settings.component_pin, canonicalJSON(pin()));
+  write(f.repo, settings.component_pin, canonicalJSON(options.pin ?? pin()));
   for (const path of [settings.project_procedure, settings.execution.worker_workflow, settings.execution.scheduled_workflow,
     settings.execution.claude_command, settings.runtime_loader.launcher]) write(f.repo, path, "Synthetic protected input " + path + "\n");
   write(f.repo, settings.scanner.script, "Synthetic ordinary detector implementation\n");
@@ -142,7 +145,7 @@ function portableRecord(f: ReturnType<typeof source>) {
     const clientNames = entry === null ? [] : name === "paired_review" ? [entry.reviewer.client]
       : [entry.worker.client, entry.reviewer.client];
     const client_bindings = Object.fromEntries(Object.entries(f.configured.clients).filter(([id]) => clientNames.includes(id)));
-    return [name, { schema_version: 1, kind: name, evidence_kind: "observed", source_commit: name.endsWith("_install") ? pin().source_commit : f.candidate,
+    return [name, { schema_version: 1, kind: name, evidence_kind: "observed", source_commit: name.endsWith("_install") ? bindings.component_pin.value.source_commit : f.candidate,
       artifact_sha256: hash(name + " synthetic original bytes"), bindings_sha256: target, outcome: "passed", native_conclusion: "success",
       worker_model: name === "paired_review" ? null : entry?.worker.model ?? null, reviewer_model: entry?.reviewer.model ?? null, client_bindings,
       observations: Object.fromEntries(observations.map(observation => [observation, true])),
@@ -367,3 +370,73 @@ for (const field of ["producer_workflow_id", "producer_workflow_path", "reader_w
     expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivery, identity: runtimeIdentity })).toThrow();
   });
 }
+
+
+// Synthetic native processes and observed-shaped attestations exercise selection, never actual adoption.
+async function runtimeFixture() {
+  const shared = publicationFixture(roots), prefix = "plugins/vh-adlc/";
+  write(shared.repo, prefix + ".claude-plugin/plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');
+  write(shared.repo, prefix + "scripts/runner.ts", "// Synthetic retained worker\n");
+  const sharedSource = commit(shared.repo, "synthetic published shared component");
+  const component = bootstrap.computeComponentIdentity(shared.repo, sharedSource);
+  const selectedPin = { ...pin(), source_commit: sharedSource, plugin_version: component.plugin_version,
+    component_sha256: component.component_sha256 };
+  const distribution = Buffer.from("#!/bin/sh\nprintf '%s\\n' 'GitHub Copilot CLI fixture-1.0.0.'\n");
+  const client = parseClientBinding({ ...settingsFixture().clients["copilot-linux"], platform: process.platform + "-" + process.arch,
+    distribution_sha256: hash(distribution.toString()) });
+  const f = source({ pin: selectedPin, client }), delivery = deliverRecord(f, portableRecord(f));
+  const cache = join(f.root, "approved-runtime"); mkdirSync(cache, { mode: 0o700 });
+  const retained = bootstrap.retainComponentSnapshot({ cache_directory: cache, source_repo: shared.repo, pin: selectedPin });
+  const native = await bootstrap.retainClientDistribution({ cache_directory: cache, client_id: "copilot-linux", client,
+    distribution, format: "executable", executable: "copilot" });
+  const selection = { repo: f.repo, current_default: delivery, identity: runtimeIdentity, cache_directory: cache,
+    entry: "copilot" as const, launcher_path: join(f.repo, f.configured.runtime_loader.launcher),
+    settings_path: join(f.repo, ".vh-adlc/docs-drift.yaml") };
+  return { ...f, delivery, retained, native, cache, selection };
+}
+
+test("approved runtime selection binds committed policy, retained component and exact role clients", async () => {
+  const f = await runtimeFixture(), before = captureRepositoryState(f.repo);
+  expect(typeof bootstrap.selectApprovedRuntime).toBe("function");
+  const selected = await bootstrap.selectApprovedRuntime(f.selection);
+  expect(selected.component.directory).toBe(f.retained.directory);
+  expect(selected.worker.executable).toBe(f.native.executable);
+  expect(selected.reviewer.client).toEqual(f.native.client);
+  expect(selected.worker.model).toBe(f.configured.execution.entries.copilot.worker.model);
+  expect(selected.loader.argv).toEqual(["--plugin-dir", f.retained.directory]);
+  expect(selected.evidence).toBe("owner-attestation");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
+
+test.each(["launcher-bytes", "launcher-path", "settings-bytes", "missing-component", "missing-client", "client-mode", "staged", "identity"] as const)("approved runtime preflight refuses %s", async scenario => {
+  const f = await runtimeFixture();
+  if (scenario === "launcher-bytes") writeFileSync(f.selection.launcher_path, "Uncommitted alternate launcher\n");
+  if (scenario === "launcher-path") { f.selection.launcher_path = join(f.repo, "other-launcher.ts"); writeFileSync(f.selection.launcher_path, "Alternate launcher\n"); }
+  if (scenario === "settings-bytes") writeFileSync(f.selection.settings_path, "Uncommitted alternate settings\n");
+  if (scenario === "missing-component") rmSync(join(f.retained.directory, ".claude-plugin/plugin.json"));
+  if (scenario === "missing-client") rmSync(f.native.executable);
+  if (scenario === "client-mode") chmodSync(f.native.executable, 0o700);
+  if (scenario === "staged") {
+    writeFileSync(f.selection.settings_path, canonicalJSON({ ...f.configured, publication: { ...f.configured.publication, mode: "staged" } }));
+    f.selection.current_default = commit(f.repo, "synthetic rollback to staged policy");
+  }
+  if (scenario === "identity") f.selection.identity = { ...runtimeIdentity, actor_id: 99 };
+  await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow();
+});
+
+test("ordinary corpus and dormant-trial updates keep approved roles while a protected client update is denied", async () => {
+  const f = await runtimeFixture();
+  writeFileSync(join(f.repo, "docs/guide.md"), "New ordinary corpus input\n");
+  writeFileSync(f.selection.settings_path, canonicalJSON({ ...f.configured,
+    trial: { definition_path: ".vh-adlc/docs-drift-trials/candidate.yaml", definition_sha256: hash("dormant candidate") } }));
+  f.selection.current_default = commit(f.repo, "ordinary input and unselected trial");
+  const selected = await bootstrap.selectApprovedRuntime(f.selection);
+  expect(selected.component.directory).toBe(f.retained.directory);
+  expect(selected.worker.executable).toBe(f.native.executable);
+  writeFileSync(f.selection.settings_path, canonicalJSON({ ...f.configured, clients: { ...f.configured.clients,
+    "copilot-linux": { ...f.configured.clients["copilot-linux"], version: "fixture-2.0.0", distribution_sha256: "b".repeat(64) } } }));
+  f.selection.current_default = commit(f.repo, "unadopted native client update");
+  await expect(bootstrap.selectApprovedRuntime(f.selection)).rejects.toThrow("protected record bindings changed");
+  expect(readFileSync(f.native.executable, "utf8")).toContain("fixture-1.0.0");
+});
