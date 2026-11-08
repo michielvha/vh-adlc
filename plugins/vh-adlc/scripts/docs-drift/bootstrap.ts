@@ -272,11 +272,15 @@ export async function inspectRetainedClient(options: { cache_directory: string; 
 }
 
 /** Authorized setup supplies a pinned distribution. Only its files enter the retained package. */
-export async function retainClientDistribution(options: {
+export async function retainClientDistribution(input: {
   cache_directory: string; consumer_repo: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope; distribution: Uint8Array; format: ClientFormat; executable: string;
 }) {
-  const client = parseClientBinding(options.client), paths = clientPaths(options.cache_directory, options.client_id, client, options.profile_scope, options.consumer_repo);
-  const executable = protocolPath(options.executable), files = await clientFiles(options.distribution, client, options.format, executable);
+  const options = { ...input, client: parseClientBinding(input.client), profile_scope: structuredClone(input.profile_scope) };
+  const client = options.client, paths = clientPaths(options.cache_directory, options.client_id, client, options.profile_scope, options.consumer_repo);
+  const executable = protocolPath(options.executable);
+  if (options.distribution.byteLength > clientArchiveLimit) fail("client distribution checksum");
+  options.distribution = Buffer.from(options.distribution);
+  const files = await clientFiles(options.distribution, client, options.format, executable);
   privateRuntimeDirectory(dirname(paths.index), true); privateRuntimeDirectory(paths.profile, true);
   async function selectedClient() {
     const selected = await inspectRetainedClient(options);

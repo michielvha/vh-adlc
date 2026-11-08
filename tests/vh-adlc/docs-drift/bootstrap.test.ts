@@ -1,5 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
-import { chmodSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
@@ -542,4 +542,34 @@ test.each(["definition", "fixture", "extra"] as const)("candidate profile scope 
   if (field === "fixture") trial.fixture_id = "../approved";
   if (field === "extra") Object.assign(trial, { approved: true });
   await expect(bootstrap.retainClientDistribution({ ...f.setup, profile_scope: { ...profileScope, trial } })).rejects.toThrow();
+});
+
+test("retained client setup snapshots caller-owned distribution bytes before awaiting", async () => {
+  const f = await clientFixture({ format: "executable" }), original = Buffer.from(f.setup.distribution);
+  const pending = bootstrap.retainClientDistribution(f.setup);
+  f.setup.distribution.fill(0);
+  const selected = await pending.catch(error => {
+    throw new Error("Setup failed with selected cache pointer present=" + existsSync(f.index), { cause: error });
+  });
+  expect(readFileSync(join(dirname(selected.directory), "distribution"))).toEqual(original);
+  expect((await bootstrap.inspectRetainedClient(f.setup)).directory).toBe(selected.directory);
+});
+
+test("retained client setup keeps its original paths and nested profile scope during asynchronous work", async () => {
+  const f = await clientFixture({ format: "executable" }), other = realpathSync(mkdtempSync(join(tmpdir(), "vh-unused-runtime-")));
+  roots.push(other); chmodSync(other, 0o700);
+  const setup = { ...f.setup, profile_scope: { ...profileScope,
+    trial: { definition_sha256: "a".repeat(64), fixture_id: "00000000-0000-0000-0000-000000000001" } } };
+  const expected = { ...setup, profile_scope: structuredClone(setup.profile_scope) };
+  const pending = bootstrap.retainClientDistribution(setup);
+  setup.cache_directory = other; setup.client_id = "changed-client"; setup.executable = "changed-executable"; setup.format = "tar";
+  setup.client = { ...setup.client, version: "fixture-2.0.0" };
+  setup.profile_scope.actor_id += 1;
+  setup.profile_scope.trial.definition_sha256 = "b".repeat(64);
+  setup.profile_scope.trial.fixture_id = "00000000-0000-0000-0000-000000000002";
+  const selected = await pending;
+  expect(selected.client_id).toBe(expected.client_id);
+  expect(selected.client).toEqual(expected.client);
+  expect(readdirSync(other)).toEqual([]);
+  expect((await bootstrap.inspectRetainedClient(expected)).profile_directory).toBe(selected.profile_directory);
 });
