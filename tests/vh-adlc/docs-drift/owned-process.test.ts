@@ -85,3 +85,23 @@ test("memory capture keeps the owned child timeout", async () => {
     expect(existsSync(join(root, "stderr"))).toBe(false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test("a throwing startup callback leaves no timer keeping its worker alive", async () => {
+  const root = mkdtempSync(join(tmpdir(), "docs-drift-startup-error-"));
+  const modulePath = new URL("../../../plugins/vh-adlc/scripts/docs-drift/owned-process.ts", import.meta.url).href;
+  const code = `import { executeOwnedProcess } from ${JSON.stringify(modulePath)};
+    try { await executeOwnedProcess({ argv: ["/bin/sleep", "10"], cwd: ${JSON.stringify(root)},
+      env: { PATH: "/usr/bin:/bin" }, watched_outputs: [], capture: "memory",
+      stdout: ${JSON.stringify(join(root, "stdout"))}, stderr: ${JSON.stringify(join(root, "stderr"))},
+      timeout_ms: 10000, started: () => { throw Error("fixture startup persistence failed"); } }); }
+    catch {}`;
+  const worker = Bun.spawn([process.execPath, "-e", code], { stdout: "ignore", stderr: "ignore" });
+  try {
+    const outcome = await Promise.race([worker.exited, Bun.sleep(3500).then(() => null)]);
+    expect(outcome).toBe(0);
+  } finally {
+    if (worker.exitCode === null) worker.kill();
+    await worker.exited;
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 10000);

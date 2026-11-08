@@ -74,43 +74,51 @@ export async function executeOwnedProcess(options: {
       if ([...watched_outputs, stdout, stderr].some(path => outputSize(path) > limit)) { result.output_limit = true; stop(); }
     } catch { result.output_limit = true; stop(); }
   }, 50);
-  let reap: ReturnType<typeof setTimeout> | undefined;
   try {
-    started(child.pid);
-    result.exit_code = await Promise.race([
-      child.exited,
-      new Promise<null>(resolve => { reap = setTimeout(() => resolve(null), timeout + 2500); }),
-    ]);
-    result.reaped = result.exit_code !== null;
-  } finally {
-    groupCleanupStarted = true;
-    clearTimeout(timer);
-    clearTimeout(reap);
-    clearInterval(monitor);
-    clearTimeout(escalation);
-    if (signal("SIGTERM")) { await Bun.sleep(200); signal("SIGKILL"); }
-    if (!result.reaped) {
-      let finalTimer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        result.exit_code = await Promise.race([
-          child.exited,
-          new Promise<null>(resolve => { finalTimer = setTimeout(() => resolve(null), 2000); }),
-        ]);
-        result.reaped = result.exit_code !== null;
-      } finally { clearTimeout(finalTimer); }
+    let reap: ReturnType<typeof setTimeout> | undefined;
+    try {
+      started(child.pid);
+      result.exit_code = await Promise.race([
+        child.exited,
+        new Promise<null>(resolve => { reap = setTimeout(() => resolve(null), timeout + 2500); }),
+      ]);
+      result.reaped = result.exit_code !== null;
+    } finally {
+      groupCleanupStarted = true;
+      clearTimeout(timer);
+      clearTimeout(reap);
+      clearInterval(monitor);
+      clearTimeout(escalation);
+      if (signal("SIGTERM")) { await Bun.sleep(200); signal("SIGKILL"); }
+      if (!result.reaped) {
+        let finalTimer: ReturnType<typeof setTimeout> | undefined;
+        try {
+          result.exit_code = await Promise.race([
+            child.exited,
+            new Promise<null>(resolve => { finalTimer = setTimeout(() => resolve(null), 2000); }),
+          ]);
+          result.reaped = result.exit_code !== null;
+        } finally { clearTimeout(finalTimer); }
+      }
+      try { result.output_limit ||= [...watched_outputs, stdout, stderr].some(path => outputSize(path) > limit); }
+      catch { result.output_limit = true; }
+      process.off("SIGINT", interrupt);
+      process.off("SIGTERM", terminate);
     }
-    try { result.output_limit ||= [...watched_outputs, stdout, stderr].some(path => outputSize(path) > limit); }
-    catch { result.output_limit = true; }
-    process.off("SIGINT", interrupt);
-    process.off("SIGTERM", terminate);
-  }
-  if (capturedResult) {
-    const { value } = await capturedResult;
+    if (capturedResult) {
+      const { value } = await capturedResult;
+      clearTimeout(captureDeadline);
+      clearTimeout(escalation);
+      if (value === null) result.output_limit = true;
+      else result.captured = { stdout: value[0], stderr: value[1] };
+    }
+    return result;
+  } finally {
     clearTimeout(captureDeadline);
     clearTimeout(escalation);
-    if (value === null) result.output_limit = true;
-    else result.captured = { stdout: value[0], stderr: value[1] };
+    for (const reader of readers) reader.cancel().catch(() => {});
+    await capturedResult;
   }
-  return result;
+
 }
 
