@@ -354,3 +354,53 @@ test("uncertain trial-route candidates remain usable when their mapped scenarios
   expect(gate.verify({ current_default: upgrade.previousDefault }).component_pin).toEqual(f.record.protected_manifest.component.value);
   expect(gate.verify({ current_default: upgrade.delivered }).source_candidate).toBe(upgrade.candidate);
 });
+
+function componentScopeFixture(mixed = false) {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, {
+    prepare_candidate: mixed ? (repo, settings) => {
+      Object.assign(settings.clients, { "copilot-new": { ...settings.clients["copilot-linux"], version: "fixture-2.0.0" } });
+      const old = settings.execution.entries.copilot;
+      settings.execution.entries.copilot = { ...old, worker: { ...old.worker, client: "copilot-new" }, reviewer: { ...old.reviewer, client: "copilot-new" } };
+      put(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
+    } : undefined,
+    change_definition(definition) {
+      definition.component_entries = ["claude"];
+      definition.affected_entries = mixed ? ["copilot", "claude"] : ["claude"];
+    },
+  });
+  return { f, upgrade };
+}
+
+test.each([false, true])("reviewed component influence carries only unaffected entries with mixed client change %s", async mixed => {
+  const { f, upgrade } = componentScopeFixture(mixed), gate = await adoption.createTrialAdoptionGate(f.boundary);
+  const result = gate.verify({ current_default: upgrade.delivered });
+  expect(result.receipts).toMatchObject({ hosted_advisory: f.record.receipts.hosted_advisory });
+  expect(result.source_candidate).toBe(upgrade.candidate);
+});
+
+test.each(["missing-review", "wrong-source", "missing-entry", "test-kind", "failed-check"] as const)("component scope refuses %s", async scenario => {
+  const { f, upgrade } = componentScopeFixture(), trial = upgrade.record.predecessor.trial;
+  const review = Reflect.get(trial, "component_review");
+  if (scenario === "missing-review") Reflect.deleteProperty(trial, "component_review");
+  if (scenario === "wrong-source") review.source_candidate = f.candidate;
+  if (scenario === "missing-entry") review.regressions.pop();
+  if (scenario === "test-kind") review.evidence_kind = "observed";
+  if (scenario === "failed-check") review.observations.installed_contract_checks = false;
+  const delivered = trialAdoptionDelivery({ ...f, configured: upgrade.configured, candidate: upgrade.candidate, record: upgrade.record });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary);
+  const reason = scenario === "missing-review" ? "upgrade trial receipt fields"
+    : scenario === "missing-entry" ? "component preservation regression coverage"
+    : scenario === "failed-check" ? "incomplete compatibility observations" : "compatibility receipt bindings";
+  expect(() => gate.verify({ current_default: delivered })).toThrow(reason);
+});
+
+test.each(["uncertain", "duplicate", "unknown", "unordered"] as const)("component mapping refuses %s scope", async scenario => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, { change_definition(definition) {
+    definition.component_entries = scenario === "duplicate" ? ["claude", "claude"]
+      : scenario === "unknown" ? ["unknown"] : scenario === "unordered" ? ["claude", "copilot"] : ["claude"];
+    definition.affected_entries = ["claude"];
+    if (scenario === "uncertain") definition.classification = "uncertain";
+  } });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(() => gate.verify({ current_default: upgrade.delivered })).toThrow("component affected entry scope");
+});

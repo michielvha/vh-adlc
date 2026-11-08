@@ -103,6 +103,7 @@ export type TrialUpgradeDefinition = {
   schema_version: number; kind: string; predecessor_adoption_sha256: string;
   candidate_component: ReturnType<typeof collectAdoptionBindings>["component_pin"]["value"];
   candidate_protected_sha256: string; classification: string; affected_entries: string[];
+  component_entries?: string[];
   changed_rules: { id: string; surface: string; scenario: string; fixture_sha256: string; old_contract_sha256: string;
     new_contract_sha256: string; old_expected_sha256: string; new_expected_sha256: string }[];
 };
@@ -163,6 +164,13 @@ export function trialUpgradeFixture(f: UpgradeSource, options: {
         rule_sha256: canonicalDigest(rule), outcome_sha256: rule.new_expected_sha256,
         artifact_sha256: sha256(Buffer.from("Synthetic changed-rule observed artifact")), result: "passed",
         ...(["status", "attention", "history"].includes(rule.surface) ? { history_read: true, unchanged_carried: true, changed_new_attention: true } : {}) })) } } };
+  if (definition.component_entries) {
+    const selected = definition.component_entries;
+    const preserved = ["hosted", "copilot", "claude"].filter(entry => !selected.includes(entry));
+    const review = structuredClone(prototype.record.predecessor.compatibility);
+    Object.assign(record.predecessor.trial, { component_review: { ...review, source_candidate: candidate, preserved_entries: preserved,
+      regressions: preserved.map(entry => ({ ...review.regressions[0]!, id: entry + "-preservation", entry })) } });
+  }
   const delivered = trialAdoptionDelivery({ ...f, configured, candidate, record });
   return { configured, candidate, previousDefault, definition, record, delivered };
 }

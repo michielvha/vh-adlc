@@ -286,9 +286,14 @@ function verifyCompatibility(repo: string, value: unknown, previous: AdoptionRes
   const changes = compareUpgradeBindings({ repo, approved_default: previous.current_default,
     source_candidate: next.result.source_candidate, identity: next.result.identity }, previous);
   if (changes.known_affected_entries.length) fail("compatible upgrade changes execution bindings");
+  verifyComponentReview(value, previous, next, boundary);
+}
+
+function verifyComponentReview(value: unknown, previous: AdoptionResult, next: ReturnType<typeof readAdoptionFrame>,
+  boundary: AdoptionBoundary, preservedEntries?: string[]) {
   const receipt = object(value, ["schema_version", "evidence_kind", "source_candidate", "predecessor_adoption_sha256",
     "previous_component", "next_component", "previous_protected_sha256", "classification", "reviewer_model", "artifact_sha256",
-    "diff_sha256", "dependencies_sha256", "observations", "regressions", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "compatibility receipt");
+    "diff_sha256", "dependencies_sha256", "observations", "regressions", ...(preservedEntries ? ["preserved_entries"] : []), ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "compatibility receipt");
   if (receipt.schema_version !== 1 || receipt.evidence_kind !== boundary.kind
     || (boundary.kind === "test-only" && receipt.fixture_id !== boundary.fixture_id)
     || receipt.source_candidate !== next.result.source_candidate || receipt.predecessor_adoption_sha256 !== previous.adoption_sha256
@@ -296,6 +301,7 @@ function verifyCompatibility(repo: string, value: unknown, previous: AdoptionRes
     || !canonicalJSON(receipt.previous_component).equals(canonicalJSON(previous.component_pin))
     || !canonicalJSON(receipt.next_component).equals(canonicalJSON(next.result.component_pin))
     || receipt.reviewer_model !== next.original.settings.execution.entries.copilot.reviewer.model) fail("compatibility receipt bindings");
+  if (preservedEntries && !canonicalJSON(receipt.preserved_entries).equals(canonicalJSON(preservedEntries))) fail("component preservation inventory");
   if (receipt.classification !== "contract-preserving" && receipt.classification !== "contract-restoring") fail("compatibility classification");
   for (const field of ["artifact_sha256", "diff_sha256", "dependencies_sha256"]) adoptionDigest(receipt[field]);
   const observations = object(receipt.observations, ["full_diff_reviewed", "dependencies_complete", "no_blocking_findings",
@@ -304,15 +310,20 @@ function verifyCompatibility(repo: string, value: unknown, previous: AdoptionRes
   if (!Array.isArray(receipt.regressions) || !receipt.regressions.length) fail("compatibility regressions required");
   const ids = new Set<string>();
   let restored = false;
+  const coveredEntries = new Set<string>();
   for (const value of receipt.regressions) {
     const regression = object(value, ["id", "evidence_kind", "category", "previous_source", "next_source", "command_sha256",
       "accepted_rule_sha256", "expected_sha256", "before_sha256", "after_sha256", "before_result", "after_result", "artifact_sha256",
-      ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "compatibility regression");
+      ...(preservedEntries ? ["entry"] : []), ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "compatibility regression");
     if (typeof regression.id !== "string" || !regression.id || ids.has(regression.id)
       || regression.evidence_kind !== boundary.kind || (boundary.kind === "test-only" && regression.fixture_id !== boundary.fixture_id)
       || regression.previous_source !== previous.component_pin.source_commit
       || regression.next_source !== next.result.component_pin.source_commit) fail("compatibility regression bindings");
     ids.add(regression.id);
+    if (preservedEntries) {
+      if (typeof regression.entry !== "string" || !preservedEntries.includes(regression.entry)) fail("component preservation entry");
+      coveredEntries.add(regression.entry);
+    }
     for (const field of ["command_sha256", "accepted_rule_sha256", "expected_sha256", "before_sha256", "after_sha256", "artifact_sha256"]) adoptionDigest(regression[field]);
     if (regression.after_result !== "passed" || regression.after_sha256 !== regression.expected_sha256) fail("compatibility regression after result");
     if (regression.category === "preservation") {
@@ -322,6 +333,7 @@ function verifyCompatibility(repo: string, value: unknown, previous: AdoptionRes
       restored = true;
     } else fail("compatibility regression category");
   }
+  if (preservedEntries?.some(entry => !coveredEntries.has(entry))) fail("component preservation regression coverage");
   if (receipt.classification === "contract-restoring" && !restored) fail("contract restoration regression required");
 }
 
@@ -346,15 +358,26 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
     value = policy.upgrade;
   }
   const definition = object(value, ["schema_version", "kind", "predecessor_adoption_sha256",
-    "candidate_component", "candidate_protected_sha256", "classification", "affected_entries", "changed_rules"], "upgrade trial definition");
+    "candidate_component", "candidate_protected_sha256", "classification", "affected_entries", "changed_rules",
+    ...(value !== null && typeof value === "object" && Object.hasOwn(value, "component_entries") ? ["component_entries"] : [])], "upgrade trial definition");
   if (definition.schema_version !== 1 || definition.kind !== "docs-drift-upgrade-trial"
     || definition.predecessor_adoption_sha256 !== previous.adoption_sha256
     || definition.candidate_protected_sha256 !== next.result.protected_sha256
     || !canonicalJSON(definition.candidate_component).equals(canonicalJSON(next.result.component_pin))) fail("upgrade trial prospective binding");
   if (typeof definition.classification !== "string" || !["execution", "contract", "uncertain"].includes(definition.classification)) fail("upgrade trial classification");
-  if (definition.classification === "execution" && changes.component.changed) fail("component contract coverage required");
   const all = ["hosted", "copilot", "claude"] as const;
-  const affected = changes.component.changed || definition.classification !== "execution" ? [...all] : changes.known_affected_entries;
+  let componentEntries: string[] | null = null;
+  if (Object.hasOwn(definition, "component_entries")) {
+    const selected = definition.component_entries;
+    if (!changes.component.changed || definition.classification === "uncertain" || !Array.isArray(selected)
+      || selected.length >= all.length || selected.some(entry => !all.includes(entry))
+      || !canonicalJSON(selected).equals(canonicalJSON(all.filter(entry => selected.includes(entry))))) fail("component affected entry scope");
+    componentEntries = selected;
+  }
+  if (definition.classification === "execution" && changes.component.changed && componentEntries === null) fail("component contract coverage required");
+  const affected = componentEntries !== null
+    ? all.filter(entry => componentEntries.includes(entry) || changes.known_affected_entries.includes(entry))
+    : changes.component.changed || definition.classification !== "execution" ? [...all] : changes.known_affected_entries;
   if (!affected.length || !canonicalJSON(definition.affected_entries).equals(canonicalJSON(affected))) fail("upgrade affected surface inventory");
   const carried = compatibleCarriedReceipts.filter(name => name === "quiescence"
     || (name === "hosted_advisory" || name === "history_read" ? !affected.includes("hosted")
@@ -370,12 +393,14 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
   if (!definition.changed_rules.length && historyPolicyChanged) fail("changed history coverage required");
   if (!definition.changed_rules.length && (definition.classification !== "execution" || policyChanged)) fail("changed rule coverage required");
   const receipt = object(link.trial, ["schema_version", "evidence_kind", "definition_path", "definition_sha256", "source_candidate",
-    "predecessor_adoption_sha256", "reviewer_model", "artifact_sha256", "observations", "cases", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "upgrade trial receipt");
+    "predecessor_adoption_sha256", "reviewer_model", "artifact_sha256", "observations", "cases",
+    ...(componentEntries !== null ? ["component_review"] : []), ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "upgrade trial receipt");
   if (receipt.schema_version !== 1 || receipt.evidence_kind !== boundary.kind
     || (boundary.kind === "test-only" && receipt.fixture_id !== boundary.fixture_id)
     || receipt.definition_path !== policy.definition_path || receipt.definition_sha256 !== definitionInput.sha256
     || receipt.source_candidate !== next.result.source_candidate || receipt.predecessor_adoption_sha256 !== previous.adoption_sha256
     || receipt.reviewer_model !== next.original.settings.execution.entries.copilot.reviewer.model) fail("upgrade trial receipt bindings");
+  if (componentEntries !== null) verifyComponentReview(receipt.component_review, previous, next, boundary, all.filter(entry => !componentEntries.includes(entry)));
   adoptionDigest(receipt.artifact_sha256);
   const observations = object(receipt.observations, ["definition_reviewed", "prospective_bindings_matched", "affected_roles_exercised",
     "complete_native_results", "no_blocking_findings", "no_should_fix_findings"], "upgrade trial observations");

@@ -135,7 +135,8 @@ export function readTrialDefinition(options: { repo: string; source: string; set
     return { id: row.id, fixture_sha256: digest(row.fixture_sha256), outcome_sha256: digest(row.outcome_sha256) };
   });
   const upgrade = root.upgrade === null ? null : object(root.upgrade, ["schema_version", "kind", "predecessor_adoption_sha256",
-    "candidate_component", "candidate_protected_sha256", "classification", "affected_entries", "changed_rules"]);
+    "candidate_component", "candidate_protected_sha256", "classification", "affected_entries", "changed_rules",
+    ...(typeof root.upgrade === "object" && Object.hasOwn(root.upgrade, "component_entries") ? ["component_entries"] : [])]);
   if (upgrade !== null && (upgrade.schema_version !== 1 || upgrade.kind !== "docs-drift-upgrade-trial")) fail("upgrade schema");
   return freezeJSON({ definition_path: definition.path, definition_sha256: definition.sha256, identity: nativeIdentity,
     candidate_settings: { path: candidateSettings.path, sha256: candidateSettings.sha256, value: candidate },
