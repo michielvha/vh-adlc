@@ -3,7 +3,7 @@ import type { PublicationIdentity } from "./transport";
 import { readGit, collectionReaders, readAdoptionInput as committedInput } from "./git";
 import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
 import { classifySettingsLeaves, loadCommittedSettings, parseSettings, settingsProjections } from "./settings";
-import { readTrialDefinition } from "./trial-definition";
+import { readTrialDefinition, readTrialHistoryBindings } from "./trial-definition";
 
 type ComponentPin = {
   schema_version: 1; source_repository: string; source_commit: string; source_release: string;
@@ -137,7 +137,7 @@ function parseAdoptionRecord(bytes: Uint8Array, boundary: AdoptionBoundary) {
   return record;
 }
 
-function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary, carried?: { names: string[]; receipts: unknown }): void {
+function verifyRecordedReceipts(repo: string, value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary, carried?: { names: string[]; receipts: unknown }): void {
   const receipts = object(value, Object.keys(receiptRequirements));
   const target = canonicalDigest({ schema_version: 1, repository: bindings.settings.repository,
     source_candidate: candidate, protected_sha256: bindings.protected_sha256, component_pin_sha256: bindings.component_pin.sha256, identity });
@@ -160,7 +160,10 @@ function verifyRecordedReceipts(value: unknown, bindings: ReturnType<typeof coll
     if (immutable(receipt.source_commit) !== source) fail("recorded source target " + name);
     adoptionDigest(receipt.artifact_sha256);
     if (name === "history_read") {
-      if (bindings.settings.reports.workflow_id === null || receipt.producer_workflow_id !== bindings.settings.reports.workflow_id
+      const history = readTrialHistoryBindings({ repo, source: candidate, settings: bindings.settings });
+      if (history) {
+        if (Object.entries(history).some(([field, value]) => receipt[field] !== value)) fail("history producer/reader workflow");
+      } else if (bindings.settings.reports.workflow_id === null || receipt.producer_workflow_id !== bindings.settings.reports.workflow_id
         || receipt.producer_workflow_path !== bindings.settings.execution.scheduled_workflow
         || typeof receipt.reader_workflow_id !== "number" || !Number.isSafeInteger(receipt.reader_workflow_id) || receipt.reader_workflow_id < 1
         || receipt.reader_workflow_path !== bindings.settings.execution.worker_workflow) fail("history producer/reader workflow");
@@ -491,14 +494,14 @@ function verifyAdoptionRecord(options: { repo: string; current_default: string; 
   let previous: AdoptionResult | null = null;
   for (const frame of frames.reverse()) {
     if (previous === null) {
-      verifyRecordedReceipts(frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity, frame.deliveryTime, boundary);
+      verifyRecordedReceipts(options.repo, frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity, frame.deliveryTime, boundary);
     } else {
       const link = predecessorLink(frame.record.predecessor, boundary);
       if (link.default_commit !== previous.current_default || link.record_path !== previous.record_path
         || link.record_sha256 !== previous.adoption_sha256) fail("predecessor adoption binding");
       const carried = link.route === "compatible" ? compatibleCarriedReceipts : verifyTrialSuccessor(options.repo, link, previous, frame, boundary);
       if (link.route === "compatible") verifyCompatibility(options.repo, link.compatibility, previous, frame, boundary);
-      verifyRecordedReceipts(frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity,
+      verifyRecordedReceipts(options.repo, frame.record.receipts, frame.original, frame.result.source_candidate, frame.result.identity,
         frame.deliveryTime, boundary, { names: carried, receipts: previous.receipts });
     }
     previous = frame.result;

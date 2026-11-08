@@ -117,6 +117,12 @@ export function fullDefinitionUpgradeFixture(roots: string[], options: { changed
   const candidateSettings = structuredClone(f.configured);
   candidateSettings.publication.adoption_record = ".vh-adlc/docs-drift-adoptions/full-successor.yaml";
   candidateSettings.clients["copilot-linux"].version = "fixture-2.0.0";
+  candidateSettings.execution.worker_workflow = ".github/workflows/docs-drift-candidate-worker.yml";
+  const workerBytes = readGit(repo, "show", originalCandidate + ":" + f.configured.execution.worker_workflow);
+  write(repo, candidateSettings.execution.worker_workflow, workerBytes);
+  const futureCaller = JSON.parse(readGit(repo, "show", originalCandidate + ":" + f.configured.execution.scheduled_workflow).toString());
+  futureCaller.jobs.worker.uses = "./" + candidateSettings.execution.worker_workflow;
+  write(repo, candidateSettings.execution.scheduled_workflow, canonicalJSON(futureCaller));
   write(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(candidateSettings));
   const prototype = commit(repo, "synthetic prospective client update"), prospective = collectAdoptionBindings(repo, prototype);
   readGit(repo, "switch", "--detach", originalDelivery);
@@ -124,6 +130,13 @@ export function fullDefinitionUpgradeFixture(roots: string[], options: { changed
     f.definition.history.reader.path, f.definition.fixture.manifest.path, f.definition.fixture.settings.path,
     ...f.manifest.files.map(row => row.source)];
   for (const path of new Set(paths)) write(repo, path, readGit(repo, "show", f.staged + ":" + path));
+  write(repo, candidateSettings.execution.worker_workflow, workerBytes);
+  f.definition.worker = { path: candidateSettings.execution.worker_workflow, sha256: sha256(workerBytes) };
+  for (const role of ["trial", "prospective"] as const) {
+    const selected = f.definition.callers[role], caller = JSON.parse(readGit(repo, "show", f.staged + ":" + selected.path).toString());
+    caller.jobs.worker.uses = "./" + candidateSettings.execution.worker_workflow;
+    write(repo, selected.path, canonicalJSON(caller)); selected.sha256 = sha256(canonicalJSON(caller));
+  }
   write(repo, f.definition.candidate_settings.path, canonicalJSON(candidateSettings));
   f.definition.candidate_settings.sha256 = sha256(canonicalJSON(candidateSettings));
   write(repo, f.definition.fixture.settings.path, canonicalJSON(candidateSettings));
@@ -150,6 +163,7 @@ export function fullDefinitionUpgradeFixture(roots: string[], options: { changed
   write(repo, f.trial.definition_path, canonicalJSON(f.definition));
   write(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...f.configured, trial: f.trial }));
   const policySource = commit(repo, "synthetic full trial policy with predecessor active");
+  write(repo, candidateSettings.execution.scheduled_workflow, canonicalJSON(futureCaller));
   write(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...candidateSettings, trial: f.trial }));
   const candidate = commit(repo, "synthetic tested successor selection");
   const fresh = portableRecord({ repo, configured: candidateSettings, candidate });

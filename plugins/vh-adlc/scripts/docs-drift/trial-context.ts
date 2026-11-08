@@ -14,8 +14,9 @@ const paths = ["source", "origin.git", "tracker.git", "artifacts", "objects", "e
 
 function fail(reason: string): never { throw Error("docs-drift synthetic trial " + reason); }
 function object(value: unknown, fields: string[]): Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)
-    || Object.keys(value).sort().join(",") !== [...fields].sort().join(",")) fail("context fields");
+  if (value === null || typeof value !== "object" || Array.isArray(value)) fail("context fields");
+  const actual = Object.keys(value).sort(), expected = [...fields].sort();
+  if (actual.length !== expected.length || actual.some((name, index) => name !== expected[index])) fail("context fields");
   return value as Record<string, unknown>;
 }
 function commit(value: unknown): string {

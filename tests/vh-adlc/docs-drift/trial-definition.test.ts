@@ -12,6 +12,69 @@ import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 
+test("history receipts name the actual dispatch producer and separate read-check workflow", () => {
+  const f = fullDefinitionUpgradeFixture(roots), receipt = f.record.receipts.history_read!;
+  Object.assign(receipt, { producer_workflow_id: f.definition.history.producer_workflow_id,
+    producer_workflow_path: f.definition.callers.trial.path, reader_workflow_id: f.definition.history.reader_workflow_id,
+    reader_workflow_path: f.definition.history.reader.path });
+  readGit(f.repo, "switch", "--detach", f.candidate);
+  write(f.repo, f.candidate_settings.publication.adoption_record, canonicalJSON(f.record));
+  const delivered = commit(f.repo, "synthetic honest read-check receipt");
+  expect(adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivered, identity: runtimeIdentity }).source_candidate).toBe(f.candidate);
+});
+
+test.each(["same-ids", "scheduled-id", "scheduled-path", "active-caller", "credential-step"] as const)("trial setup refuses %s history or workflow overlap", scenario => {
+  const f = trialDefinitionFixture(roots);
+  if (scenario === "same-ids") f.definition.history.reader_workflow_id = f.definition.history.producer_workflow_id;
+  if (scenario === "scheduled-id") f.definition.history.producer_workflow_id = f.configured.reports.workflow_id;
+  if (scenario === "scheduled-path") {
+    f.candidate_settings.execution.scheduled_workflow = ".github/workflows/another-schedule.yml";
+    f.candidate_settings.reports.workflow_path = f.candidate_settings.execution.scheduled_workflow;
+    write(f.repo, f.definition.candidate_settings.path, canonicalJSON(f.candidate_settings));
+    f.definition.candidate_settings.sha256 = sha256(canonicalJSON(f.candidate_settings));
+  }
+  if (scenario === "active-caller") {
+    const bytes = readGit(f.repo, "show", f.staged + ":" + f.definition.callers.trial.path);
+    f.definition.callers.trial = { path: f.configured.execution.scheduled_workflow, sha256: sha256(bytes) };
+    write(f.repo, f.definition.callers.trial.path, bytes);
+  }
+  if (scenario === "credential-step") {
+    const workflow = { on: { workflow_dispatch: null }, permissions: { actions: "read", contents: "read" },
+      jobs: { read: { "runs-on": "ubuntu-latest", steps: [{ run: "bun report-history.ts --trial-read-check", env: { COPILOT_GITHUB_TOKEN: "${{ secrets.COPILOT_GITHUB_TOKEN }}" } }] } } };
+    write(f.repo, f.definition.history.reader.path, canonicalJSON(workflow));
+    f.definition.history.reader.sha256 = sha256(canonicalJSON(workflow));
+  }
+  const current = commitTrialDefinition(f);
+  const reason = scenario === "same-ids" || scenario === "scheduled-id" ? "history workflow identities"
+    : scenario === "scheduled-path" ? "existing scheduled caller" : scenario === "active-caller" ? "active protected input" : "history read-only invocation";
+  expect(() => adoption.collectTrialBindings({ repo: f.repo, current_default: current })).toThrow(reason);
+});
+
+test.each(["producer_workflow_id", "producer_workflow_path", "reader_workflow_id", "reader_workflow_path"] as const)("full trial history refuses a mismatched %s receipt", field => {
+  const f = fullDefinitionUpgradeFixture(roots), receipt = f.record.receipts.history_read!;
+  Object.assign(receipt, { [field]: field.endsWith("_id") ? 999 : ".github/workflows/unrelated.yml" });
+  readGit(f.repo, "switch", "--detach", f.candidate);
+  write(f.repo, f.candidate_settings.publication.adoption_record, canonicalJSON(f.record));
+  const delivered = commit(f.repo, "synthetic mismatched history receipt");
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivered, identity: runtimeIdentity })).toThrow("history producer/reader workflow");
+});
+
+test("upgrade setup retains the approved gate and refuses reusing its active worker", () => {
+  const f = fullDefinitionUpgradeFixture(roots);
+  readGit(f.repo, "switch", "--detach", f.policySource);
+  f.candidate_settings.execution.worker_workflow = f.configured.execution.worker_workflow;
+  write(f.repo, f.definition.candidate_settings.path, canonicalJSON(f.candidate_settings));
+  f.definition.candidate_settings.sha256 = sha256(canonicalJSON(f.candidate_settings));
+  f.definition.worker = { path: f.configured.execution.worker_workflow,
+    sha256: sha256(readGit(f.repo, "show", f.policySource + ":" + f.configured.execution.worker_workflow)) };
+  f.trial.definition_sha256 = sha256(canonicalJSON(f.definition));
+  write(f.repo, f.trial.definition_path, canonicalJSON(f.definition));
+  write(f.repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...f.configured, trial: f.trial }));
+  const current = commit(f.repo, "synthetic invalid dormant worker selection");
+  expect(adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: current, identity: runtimeIdentity }).evidence).toBe("owner-attestation");
+  expect(() => adoption.collectTrialBindings({ repo: f.repo, current_default: current })).toThrow("distinct candidate worker required");
+});
+
 test("a current-default trial binds its candidate, callers and synthetic input namespace", () => {
   const f = trialDefinitionFixture(roots);
   expect(typeof adoption.collectTrialBindings).toBe("function");

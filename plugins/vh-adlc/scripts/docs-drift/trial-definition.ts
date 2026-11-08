@@ -26,6 +26,41 @@ function positive(value: unknown): number {
 }
 function overlaps(left: string, right: string): boolean { return withinPrefix(left, right) || withinPrefix(right, left); }
 
+function selectedDefinition(repo: string, source: string, settings: Settings) {
+  const selected = settings.trial;
+  if (selected === null) fail("selector missing");
+  const definition = readAdoptionInput(repo, source, selected.definition_path);
+  if (!definition || definition.mode !== "100644" || definition.sha256 !== selected.definition_sha256) fail("committed trial selector");
+  return { definition, value: collectionReaders().yaml(definition.bytes) };
+}
+
+/** Bind historical receipts to the definition at C, independently of later active trial setup. */
+export function readTrialHistoryBindings(options: { repo: string; source: string; settings: Settings }) {
+  if (options.settings.trial === null) return null;
+  const { value } = selectedDefinition(options.repo, options.source, options.settings);
+  if (value !== null && typeof value === "object" && !Array.isArray(value)
+    && Reflect.get(value, "schema_version") === 1 && Reflect.get(value, "kind") === "docs-drift-upgrade-trial") return null;
+  const root = trialRoot(value), history = object(root.history, ["reader", "reader_workflow_id", "producer_workflow_id"]);
+  const callers = object(root.callers, ["trial", "prospective", "production_pr_draft", "input_differences"]);
+  const path = (value: unknown) => {
+    const row = object(value, ["path", "sha256"]), path = protocolPath(row.path);
+    const input = readAdoptionInput(options.repo, options.source, path);
+    if (!input || input.mode !== "100644" || input.sha256 !== digest(row.sha256)) fail("history committed workflow");
+    return path;
+  };
+  const reader = positive(history.reader_workflow_id), producer = positive(history.producer_workflow_id);
+  if (reader === producer || [reader, producer].includes(options.settings.reports.workflow_id ?? 0)) fail("history workflow identities");
+  return { producer_workflow_id: producer, producer_workflow_path: path(callers.trial),
+    reader_workflow_id: reader, reader_workflow_path: path(history.reader) };
+}
+
+function trialRoot(value: unknown) {
+  const root = object(value, ["schema_version", "kind", "identity", "candidate_settings", "candidate_component", "prospective_protected_sha256",
+    "worker", "callers", "history", "fixture", "namespace", "expected", "upgrade"]);
+  if (root.schema_version !== 1 || root.kind !== "docs-drift-trial") fail("schema");
+  return root;
+}
+
 /** Read and compare committed policy. This performs no trial, publication or authorization. */
 export function readTrialDefinition(options: { repo: string; source: string; settings: Settings }) {
   const { repo, source, settings } = options, selected = settings.trial;
@@ -36,10 +71,7 @@ export function readTrialDefinition(options: { repo: string; source: string; set
     if (!input || (mode !== null && input.mode !== mode) || input.sha256 !== digest(binding.sha256)) fail("committed blob " + path);
     return input;
   };
-  const definition = blob({ path: selected.definition_path, sha256: selected.definition_sha256 });
-  const root = object(collectionReaders().yaml(definition.bytes), ["schema_version", "kind", "identity", "candidate_settings",
-    "candidate_component", "prospective_protected_sha256", "worker", "callers", "history", "fixture", "namespace", "expected", "upgrade"]);
-  if (root.schema_version !== 1 || root.kind !== "docs-drift-trial") fail("schema");
+  const { definition, value } = selectedDefinition(repo, source, settings), root = trialRoot(value);
   const identity = object(root.identity, ["hostname", "repository", "repository_id", "actor", "actor_id", "default_branch"]);
   if (identity.hostname !== settings.hostname || identity.repository !== settings.repository
     || identity.actor !== settings.publication.actor || identity.default_branch !== settings.default_branch) fail("consumer identity");
@@ -50,6 +82,10 @@ export function readTrialDefinition(options: { repo: string; source: string; set
   if (candidate.repository !== settings.repository || candidate.hostname !== settings.hostname
     || candidate.default_branch !== settings.default_branch || candidate.publication.actor !== settings.publication.actor
     || candidate.publication.mode !== "adopted" || candidate.component_pin !== candidateComponent.path) fail("candidate consumer selection");
+  if (candidate.execution.scheduled_workflow !== settings.execution.scheduled_workflow) fail("existing scheduled caller");
+  const activeInputs = ["AGENTS.md", ".vh-adlc/docs-drift.yaml", settings.project_procedure, settings.execution.scheduled_workflow,
+    settings.execution.worker_workflow, settings.execution.claude_command, settings.runtime_loader.launcher];
+  if (settings.scanner.adapter !== null) activeInputs.push(settings.scanner.adapter);
   const worker = blob(root.worker), callers = object(root.callers, ["trial", "prospective", "production_pr_draft", "input_differences"]);
   if (worker.path !== candidate.execution.worker_workflow || worker.path === candidate.execution.scheduled_workflow
     || typeof callers.production_pr_draft !== "boolean") fail("candidate worker");
@@ -57,6 +93,8 @@ export function readTrialDefinition(options: { repo: string; source: string; set
   if (workerDefinition === null || typeof workerDefinition !== "object" || Array.isArray(workerDefinition)) fail("reusable worker");
   object(Reflect.get(workerDefinition, "on"), ["workflow_call"]);
   const trial = blob(callers.trial), prospective = blob(callers.prospective);
+  if ([trial.path, prospective.path, candidateSettings.path].some(path => activeInputs.includes(path))) fail("active protected input");
+  if (settings.publication.mode === "adopted" && worker.path === settings.execution.worker_workflow) fail("distinct candidate worker required");
   if (!/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(trial.path)
     || withinPrefix(prospective.path, ".github/workflows")) fail("dormant prospective caller selection");
   const differences = callers.input_differences;
@@ -75,8 +113,10 @@ export function readTrialDefinition(options: { repo: string; source: string; set
   const history = object(root.history, ["reader", "reader_workflow_id", "producer_workflow_id"]), reader = blob(history.reader);
   if (!/^\.github\/workflows\/[^/]+\.ya?ml$/u.test(reader.path)
     || new Set([reader.path, trial.path, worker.path, candidate.execution.scheduled_workflow]).size !== 4) fail("distinct history reader");
+  if (activeInputs.includes(reader.path)) fail("active protected input");
   const historyWorkflow = collectionReaders().yaml(reader.bytes);
   if (historyWorkflow === null || typeof historyWorkflow !== "object" || Array.isArray(historyWorkflow)) fail("history workflow");
+  object(historyWorkflow, ["on", "permissions", "jobs", ...(Object.hasOwn(historyWorkflow, "name") ? ["name"] : [])]);
   const trigger = Reflect.get(historyWorkflow, "on");
   const triggers = object(trigger, ["workflow_dispatch"]);
   if (triggers.workflow_dispatch !== null) object(triggers.workflow_dispatch, []);
@@ -86,14 +126,22 @@ export function readTrialDefinition(options: { repo: string; source: string; set
   if (jobs === null || typeof jobs !== "object" || Array.isArray(jobs) || !Object.keys(jobs).length) fail("history reader jobs");
   for (const job of Object.values(jobs)) {
     if (job === null || typeof job !== "object" || Array.isArray(job)) fail("history reader job");
+    const keys = Object.keys(job);
+    if (keys.some(key => !["runs-on", "steps", "permissions", "name"].includes(key))) fail("history read-only invocation");
+    const runner = Reflect.get(job, "runs-on"), steps = Reflect.get(job, "steps");
+    if (typeof runner !== "string" || !/^[A-Za-z0-9_.-]+$/u.test(runner) || !Array.isArray(steps) || steps.length !== 1
+      || !canonicalJSON(steps[0]).equals(canonicalJSON({ run: "bun report-history.ts --trial-read-check" }))) fail("history read-only invocation");
     const override = Reflect.get(job, "permissions");
     if (override !== undefined && !canonicalJSON(override).equals(canonicalJSON(permissions))) fail("history read permissions");
   }
+  const historyBindings = readTrialHistoryBindings({ repo, source, settings });
+  if (!historyBindings || [historyBindings.reader_workflow_id, historyBindings.producer_workflow_id].includes(candidate.reports.workflow_id ?? 0)) fail("history workflow identities");
   const fixture = object(root.fixture, ["id", "source_commit", "tree", "bundle", "bundle_root", "manifest", "scanner", "dependencies", "settings"]);
   if (typeof fixture.id !== "string" || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u.test(fixture.id)) fail("fixture identity");
   const bundleRoot = protocolPath(fixture.bundle_root), bundle = blob(fixture.bundle), manifest = blob(fixture.manifest), scanner = blob(fixture.scanner, null), fixtureSettings = blob(fixture.settings);
   if (!withinPrefix(bundle.path, bundleRoot) || !withinPrefix(manifest.path, bundleRoot) || !withinPrefix(fixtureSettings.path, bundleRoot)
     || scanner.path !== candidate.scanner.script || !Array.isArray(fixture.dependencies)) fail("fixture bundle selection");
+  if (activeInputs.some(path => overlaps(path, bundleRoot))) fail("fixture overlaps active protected input");
   const dependencies = fixture.dependencies.map(value => blob(value, null)), copies = object(collectionReaders().yaml(manifest.bytes), ["schema_version", "files"]);
   if (copies.schema_version !== 1 || !Array.isArray(copies.files) || !copies.files.length) fail("fixture manifest");
   const targets = new Map<string, { source: string; sha256: string; mode: string }>(), allowedSource = new Set([scanner.path, ...dependencies.map(row => row.path)]);

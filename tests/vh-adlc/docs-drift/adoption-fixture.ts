@@ -1,6 +1,7 @@
 /** Synthetic consumer and observed-shaped attestation fixtures. No native acceptance is claimed. */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { readTrialHistoryBindings } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-definition";
 import { collectAdoptionBindings } from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -39,6 +40,7 @@ export const runtimeIdentity = { repository: "fixture/docs", repository_id: 10, 
 export type AdoptionSourceFixture = Pick<ReturnType<typeof source>, "repo" | "configured" | "candidate">;
 export function portableRecord(f: AdoptionSourceFixture) {
   const bindings = collectAdoptionBindings(f.repo, f.candidate);
+  const trialHistory = readTrialHistoryBindings({ repo: f.repo, source: f.candidate, settings: bindings.settings });
   const target = hash(canonicalJSON({ schema_version: 1, repository: f.configured.repository,
     source_candidate: f.candidate, protected_sha256: bindings.protected_sha256,
     component_pin_sha256: bindings.component_pin.sha256, identity: runtimeIdentity }).toString());
@@ -64,7 +66,7 @@ export function portableRecord(f: AdoptionSourceFixture) {
       artifact_sha256: hash(name + " synthetic original bytes"), bindings_sha256: target, outcome: "passed", native_conclusion: "success",
       worker_model: name === "paired_review" ? null : entry?.worker.model ?? null, reviewer_model: entry?.reviewer.model ?? null, client_bindings,
       observations: Object.fromEntries(observations.map(observation => [observation, true])),
-      ...(name === "history_read" ? { producer_workflow_id: f.configured.reports.workflow_id,
+      ...(name === "history_read" ? trialHistory ?? { producer_workflow_id: f.configured.reports.workflow_id,
         producer_workflow_path: f.configured.execution.scheduled_workflow, reader_workflow_id: 222,
         reader_workflow_path: f.configured.execution.worker_workflow } : {}),
       ...(name === "quiescence" ? { workflow_id: f.configured.reports.workflow_id,
