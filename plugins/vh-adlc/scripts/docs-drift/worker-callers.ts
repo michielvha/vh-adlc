@@ -19,7 +19,7 @@ function literal(value: unknown): Literal {
 }
 function permissions(value: unknown): void {
   if (value === undefined) return;
-  for (const permission of Object.values(record(value))) if (!["read", "write", "none"].includes(String(permission))) fail("permissions mapping");
+  for (const permission of Object.values(record(value))) if (typeof permission !== "string" || !["read", "write", "none"].includes(permission)) fail("permissions mapping");
 }
 function caller(bytes: Uint8Array, worker: string) {
   const root = record(collectionReaders().yaml(bytes));
@@ -93,6 +93,7 @@ export function verifyCompatibleWorkerCaller(options: {
     || previousPin === nextPin) fail("distinct immutable component pins required");
   const previous = caller(options.previous, worker), next = caller(options.next, worker);
   scheduledTriggers(previous.triggers); scheduledTriggers(next.triggers);
+  if (typeof previous.inputs.pr_draft !== "boolean" || typeof next.inputs.pr_draft !== "boolean") fail("typed compatible PR state required");
   if (previous.inputs.component_pin !== previousPin || next.inputs.component_pin !== nextPin) fail("compatible selected pin differs");
   delete previous.inputs.component_pin; delete next.inputs.component_pin;
   if (!canonicalJSON(previous.root).equals(canonicalJSON(next.root))) fail("compatible caller fields changed");

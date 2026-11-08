@@ -124,3 +124,18 @@ test("compatible caller checks refuse in-place pin mutation and a mismatched sel
   expect(() => workerCallers.verifyCompatibleWorkerCaller(options)).toThrow("distinct immutable component pins required");
   expect(() => workerCallers.verifyCompatibleWorkerCaller({ ...options, next_component_pin: ".vh-adlc/components/successor.yaml" })).toThrow("compatible selected pin differs");
 });
+
+test("compatible callers require actual boolean PR state", () => {
+  const previous = callers().scheduled, next = structuredClone(previous);
+  previous.jobs.worker.with.pr_draft = next.jobs.worker.with.pr_draft = "false";
+  next.jobs.worker.with.component_pin = ".vh-adlc/components/successor.yaml";
+  expect(() => workerCallers.verifyCompatibleWorkerCaller({ previous: canonicalJSON(previous), next: canonicalJSON(next),
+    worker_path: ".github/workflows/docs-drift-worker.yml", previous_component_pin: ".vh-adlc/components/fixture.yaml",
+    next_component_pin: ".vh-adlc/components/successor.yaml" })).toThrow("typed compatible PR state required");
+});
+
+test("matching array-valued permissions cannot pass the shared caller parser", () => {
+  const value = callers();
+  Object.assign(value.trial.permissions, { actions: ["read"] }); Object.assign(value.scheduled.permissions, { actions: ["read"] });
+  expect(() => check(value)).toThrow("permissions mapping");
+});
