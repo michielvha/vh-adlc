@@ -100,9 +100,9 @@ function prepare(options: Options) {
     if (p.base !== settings.publication.base || typeof p.branch !== "string" || !p.branch.startsWith(settings.publication.branch_prefix)) throw Error("fixture PR destination changed");
     key = "pulls/" + nextNumber;
     after = { id: nextId, number: nextNumber, title: p.title, body: p.body, draft: p.draft, labels: wanted,
-      state: "open", merged_at: null, user: { id: identity.actor_id, login: identity.actor },
-      head: { sha: plan.manifest.bindings.candidate_commit, ref: p.branch, repo: { id: identity.repository_id } },
-      base: { ref: p.base, repo: { id: identity.repository_id } } };
+      state: "open", merged: false, merged_at: null, merge_commit_sha: null, user: { id: identity.actor_id, login: identity.actor, type: "Bot" },
+      head: { sha: plan.manifest.bindings.candidate_commit, ref: p.branch, repo: { id: identity.repository_id, full_name: identity.repository } },
+      base: { ref: p.base, sha: plan.manifest.bindings.source_commit, repo: { id: identity.repository_id, full_name: identity.repository } } };
   } else if (effect.kind === "issue-create") {
     key = "issues/" + nextNumber;
     after = { id: nextId, number: nextNumber, title: p.title, body: p.body, labels: wanted, state: "open",

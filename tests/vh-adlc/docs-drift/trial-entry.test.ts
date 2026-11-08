@@ -3,12 +3,20 @@ import { readdirSync, rmSync, symlinkSync, renameSync, writeFileSync } from "nod
 import { join } from "node:path";
 import { executeCollectorEffect } from "../../../plugins/vh-adlc/scripts/docs-drift/collector-proof";
 import { executeCollectorRefs } from "../../../plugins/vh-adlc/scripts/docs-drift/collector-refs";
-import { createJournal, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { createJournal, sealPlan, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { publicationFixture } from "./publication-fixture";
 import { loadTrialContext } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-context";
 import { reviseTrialManifest, syntheticTrialFixture } from "./trial-fixture";
 import { git } from "./repository-fixture";
 import { persistTrialTracker, readTrialTracker } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-tracker";
+import { fixture as manifestFixture, bindings, hash, role } from "./manifest-fixture";
+import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
+import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
+import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
+import { createTrialTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-transport";
+import { PublicationExecutionError } from "../../../plugins/vh-adlc/scripts/docs-drift/attempts";
+import { resumeEffects } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -92,3 +100,79 @@ test("a different fixture tracker cannot replace the manifest-bound initial stat
   git(f.tracker, "update-ref", "refs/heads/state", git(other.tracker, "rev-parse", "refs/heads/state"));
   expect(() => readTrialTracker(context)).toThrow("fixture binding");
 });
+
+test("the persistent transport reads actual fixture refs and refuses production plans", async () => {
+  const f = syntheticTrialFixture(roots);
+  const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
+  const transport = createTrialTransport(context);
+  expect(await transport.ref("refs/heads/main")).toEqual({ state: "present", object: f.sourceCommit });
+  expect(await transport.ref("refs/heads/absent")).toEqual({ state: "absent" });
+  const other = publicationFixture(roots);
+  const plan = { ...other.plan, context: "production" as const, transport: "native" as const };
+  await expect(transport.execute(plan, plan.manifest.effects[0], { object: "a".repeat(40), tree: "b".repeat(40),
+    blob: "c".repeat(40), plan_sha256: "d".repeat(64) }, "denied-native")).rejects.toThrow("trial collector plan");
+  expect(git(f.origin, "for-each-ref", "--format=%(refname)")).toBe("refs/heads/main");
+});
+
+function persistentPublication() {
+  const f = syntheticTrialFixture(roots);
+  const context = loadTrialContext({ root: f.root, context_commit: f.contextCommit, runtime_directory: f.runtime });
+  const settings = context.settings, operation = "persistent-one";
+  const effects: Effect[] = [
+    { id: "lease", kind: "lease-acquire", payload: { ref: settings.publication.lease_ref } },
+    { id: "receipt", kind: "receipt-retain", payload: { ref: settings.publication.receipt_ref_prefix + operation } },
+    { id: "push", kind: "push", payload: { ref: "refs/heads/docs-drift/persistent", head: f.sourceCommit } },
+    { id: "pr", kind: "pr-create", payload: { base: "main", branch: "docs-drift/persistent", title: "Synthetic docs trial",
+      body: publicationMarker(settings, operation) + "\n" + effectMarker("pr"), labels: ["documentation"], draft: true } },
+    { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } },
+  ];
+  const input = manifestFixture({ ...bindings, source_commit: f.sourceCommit, candidate_commit: f.sourceCommit,
+    candidate_tree: git(f.source, "rev-parse", f.sourceCommit + "^{tree}"), settings_sha256: sha256(canonicalJSON(f.settings)) }, effects, operation);
+  const policy = { adoption_sha256: hash("synthetic-only"), publication_kind: "advisory" as const,
+    context: "trial" as const, transport: "collector" as const, pr_draft: true, worker: role, reviewer: role };
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, ...policy, corrections: [], attention: [] });
+  return { f, context, options: { source_repo: f.source, artifact_root: context.artifacts, object_store: context.store,
+    settings, plan, transport: createTrialTransport(context), gate: async () => ({ review: input, policy }) } };
+}
+
+test("the common publisher persists branches, receipts and tracker resources across fresh transports", async () => {
+  const { f, context, options } = persistentPublication();
+  const result = await publish(options);
+  expect(result.state).toBe("complete");
+  const fresh = createTrialTransport(context);
+  expect(await fresh.ref(options.settings.publication.lease_ref)).toEqual({ state: "absent" });
+  expect((await fresh.ref("refs/heads/docs-drift/persistent")).state).toBe("present");
+  expect((await fresh.ref(options.settings.publication.receipt_ref_prefix + "persistent-one")).state).toBe("present");
+  const resource = readTrialTracker(context).resources.get("pulls/501");
+  expect(resource?.title).toBe("Synthetic docs trial");
+  expect(resource?.draft).toBe(true);
+  expect(git(f.origin, "rev-parse", "main")).toBe(f.sourceCommit);
+  expect((await fresh.observe(options.plan, options.plan.manifest.effects[3], result.objects)).state).toBe("done");
+}, 60000);
+
+test("a lost tracker response resumes from persistent resources without repeating the PR", async () => {
+  const { context, options } = persistentPublication(), execute = options.transport.execute;
+  options.transport.execute = async (...args) => {
+    const result = await execute(...args);
+    if (args[1].kind === "pr-create") throw new PublicationExecutionError(true, true, undefined, result ?? undefined);
+    return result;
+  };
+  const pending = await publish(options);
+  expect(pending.state).toBe("pending");
+  expect(readTrialTracker(context).resources.size).toBe(1);
+  const restored = await resumeEffects({ ...options, transport: createTrialTransport(context), journal_directory: pending.journal.directory });
+  expect(restored.state).toBe("complete");
+  expect(readTrialTracker(context).resources.size).toBe(1);
+}, 60000);
+
+test("the fixture reader feeds committed PR data through the unchanged shared read parser", async () => {
+  const { createTrialReader } = await import("../../../plugins/vh-adlc/scripts/docs-drift/trial-reader");
+  const { collectProposals } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
+  const { context, options } = persistentPublication();
+  await publish(options);
+  const reader = createTrialReader(context), collected = collectProposals(reader, context.settings);
+  expect(collected.complete).toBe(true);
+  expect(collected.proposals.map(proposal => proposal.number)).toEqual([501]);
+  expect(reader.pull(501).head_sha).toBe(context.source_commit);
+  expect(reader.trace().every(item => item.hostname === "docs-drift.invalid")).toBe(true);
+}, 60000);
