@@ -573,3 +573,11 @@ test("retained client setup keeps its original paths and nested profile scope du
   expect(readdirSync(other)).toEqual([]);
   expect((await bootstrap.inspectRetainedClient(expected)).profile_directory).toBe(selected.profile_directory);
 });
+
+test("retained client inspection preserves the original client ID while awaiting", async () => {
+  const f = await clientFixture(); await bootstrap.retainClientDistribution(f.setup);
+  const input = { ...f.setup }, pending = bootstrap.inspectRetainedClient(input);
+  input.client_id = "changed-client";
+  const selected = await pending;
+  expect(selected.client_id).toBe(f.setup.client_id);
+});

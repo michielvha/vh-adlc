@@ -235,7 +235,8 @@ function nativeClientVersion(stdout: Uint8Array, client: ClientBinding): string 
 }
 
 /** Read the checksum-bound cache entry selected by the protected client binding. */
-export async function inspectRetainedClient(options: { cache_directory: string; consumer_repo: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope }) {
+export async function inspectRetainedClient(input: { cache_directory: string; consumer_repo: string; client_id: string; client: ClientBinding; profile_scope: ClientProfileScope }) {
+  const options = { ...input };
   const client = parseClientBinding(options.client), paths = clientPaths(options.cache_directory, options.client_id, client, options.profile_scope, options.consumer_repo);
   privateRuntimeDirectory(dirname(paths.index)); privateRuntimeDirectory(paths.profile);
   const record = clientRecord(readRuntimeFile(paths.index), options.client_id, client), root = join(options.cache_directory, record.build);
