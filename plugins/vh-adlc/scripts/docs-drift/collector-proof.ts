@@ -18,6 +18,7 @@ export type CollectorLabel = { id: number; name: string };
 type Options = {
   source_repo: string; artifact_root: string; plan: SealedPlan; effect: Effect; attempt_id: string;
   settings: Settings; identity: PublicationIdentity; resources: CollectorResources; labels: ReadonlyMap<string, CollectorLabel>;
+  persist?: () => void;
 };
 
 function positive(value: unknown): number {
@@ -144,6 +145,8 @@ export function executeCollectorEffect(options: Options): ExecutionResult {
     publishArtifact(join(directory, "payload.json"), input);
     sent = true;
     options.resources.set(prepared.key, prepared.after);
+    // A persistent trial must settle its owned storage before recording application proof.
+    options.persist?.();
     const actual = options.resources.get(prepared.key);
     const status = prepared.request.method === "POST" ? 201 : 200;
     const response = Buffer.from(`HTTP/2.0 ${status} fixture\r\n\r\n` + JSON.stringify(actual));

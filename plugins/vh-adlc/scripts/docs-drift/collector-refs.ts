@@ -11,10 +11,11 @@ import type { Settings } from "./settings";
 import type { ExecutionResult } from "./success";
 import type { PlanObjects, PublicationIdentity } from "./transport";
 
-/** An owned in-memory fixture transaction. It has no endpoint or subprocess. */
+/** The trial supplies any owned durable transaction. This helper has no native endpoint. */
 export function executeCollectorRefs(options: {
   source_repo: string; artifact_root: string; plan: SealedPlan; effect: Effect; attempt_id: string;
   settings: Settings; identity: PublicationIdentity; objects: PlanObjects; refs: Map<string, string>;
+  persist?: () => void;
 }): ExecutionResult {
   const { plan, effect, objects, identity, refs } = options, p = effect.payload;
   const selected = plan.manifest.effects.find(item => item.id === effect.id);
@@ -49,6 +50,7 @@ export function executeCollectorRefs(options: {
       if (update.head === null) refs.delete(update.ref);
       else refs.set(update.ref, update.head);
     }
+    options.persist?.();
     if (updates.some(update => (refs.get(update.ref) ?? null) !== update.head)) throw Error("incomplete fixture ref transaction");
     const response = Buffer.from("To owned-collector-fixture\n" + updates.map((update, index) => `${update.head === null ? "-" : previous[index] === null ? "*" : "+"}\t${update.head ?? ""}:${update.ref}\t[fixture applied]\n`).join("") + "Done\n");
     const projected = projectGitSuccess(response, updates);
