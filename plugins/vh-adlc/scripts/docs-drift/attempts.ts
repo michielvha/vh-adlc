@@ -1,4 +1,4 @@
-import { readSuccess, type ExecutionResult } from "./success";
+import { readSuccess, type ExecutionResult, type SuccessEvidence } from "./success";
 import { dirname } from "node:path";
 import { canonicalJSON } from "./protocol";
 import { readRejection, type RejectionEvidence } from "./rejections";
@@ -107,17 +107,32 @@ export async function executeAttempt(options: {
     status = error instanceof PublicationExecutionError ? { sent: error.sent, reaped: error.reaped, ...(error.rejection ? { rejection: error.rejection } : {}), ...(error.execution ? { execution: error.execution } : {}) } : { sent: true, reaped: false };
   }
   if (status.execution) {
+    const verified: SuccessEvidence[] = [];
+    const paths = new Set<string>();
+    let unverified = Object.hasOwn(status.execution, "capture_unverified");
     try {
-      if (Object.hasOwn(status.execution, "capture_unverified")) throw Error("success-proof-unavailable");
-      if (Object.keys(status.execution).join(",") !== "successes" || status.rejection) throw Error("contradictory execution and rejection");
+      const keys = Object.keys(status.execution).sort().join(",");
+      if (keys !== "successes" && keys !== "capture_unverified,successes") unverified = true;
       const successes = status.execution.successes;
-      if (!Array.isArray(successes) || successes.length > 16 || new Set(successes.map(item => item.path)).size !== successes.length) throw Error("invalid captured execution");
-      for (const evidence of successes) readSuccess({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo,
-        plan: journal.plan, effect: options.effect, attempt_id: id, evidence });
-    } catch (error) {
-      failure ??= error;
-      status = { sent: status.sent, reaped: status.reaped, ...(status.sent ? { capture_unverified: true } : {}) };
-    }
+      if (!Array.isArray(successes)) throw Error("invalid captured execution");
+      if (successes.length > 16) unverified = true;
+      for (const evidence of successes.slice(0, 16)) {
+        try {
+          const retained = { path: evidence.path, sha256: evidence.sha256 };
+          if (paths.has(retained.path)) throw Error("duplicate captured success");
+          readSuccess({ artifact_root: dirname(journal.directory), source_repo: journal.source_repo,
+            plan: journal.plan, effect: options.effect, attempt_id: id, evidence: retained });
+          paths.add(retained.path);
+          verified.push(retained);
+        } catch { unverified = true; }
+      }
+    } catch { unverified = true; }
+    if (status.rejection && verified.length > 0) unverified = true;
+    const rejection = status.rejection;
+    status = { sent: status.sent, reaped: status.reaped,
+      ...(verified.length > 0 || !unverified && !rejection ? { execution: { successes: verified } } : {}),
+      ...(unverified ? { capture_unverified: true } : rejection ? { rejection } : {}) };
+    if (unverified) failure ??= Error("success-proof-unavailable");
   }
   // An observer may already have recorded an actual outcome. Keep its receipt and our process status.
   const ended = await recordEnding(journal, options.effect.id, { attempt_id: id, ...status }, "executed");

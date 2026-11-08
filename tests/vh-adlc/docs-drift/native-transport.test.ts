@@ -52,7 +52,7 @@ function setup() {
     metadata_blob: { sha: objects.blob, encoding: "base64", size: planBytes.length, content: planBytes.toString("base64") },
     blob: { sha: blobSha, encoding: "base64", size: readme.length, content: readme.toString("base64") },
     tree_response: { sha: tree, truncated: false, tree: [{ path: "README.md", mode: "100644", type: "blob", sha: blobSha }] },
-    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, reject_labels: false, response_creator_id: null as number | null, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
+    issues: [] as Array<Record<string, unknown>>, comments: {} as Record<string, Array<Record<string, unknown>>>, refs: { "refs/heads/main": commit } as Record<string, string>, prs: [] as Array<Record<string, unknown>>, race: false, forbidden: false, app_token: false, graphql_errors: false, reject_git: false, reject_http: 0, partial_pr_error: false, reject_labels: false, response_creator_id: null as number | null, response_labels_missing: false, evidence_commit: null as string | null, evidence_status: 0, source_status: 0, ref_status: 0, labels_unavailable: false, label_lookup_status: 0, label_list_status: 0, label_race: "none" as "none" | "rename" | "replace", label_race_done: false, label_non_label_response: false, labels: { documentation: { id: 101, name: "documentation" }, old: { id: 102, name: "old" }, other: { id: 103, name: "other" } } as Record<string, { id: number; name: string }> };
   writeFileSync(statePath, JSON.stringify(state));
   const program = `#!${process.execPath}
 import { readFileSync, writeFileSync, appendFileSync } from 'node:fs';
@@ -148,7 +148,7 @@ if (method !== 'GET') {
         state.prs.find(pr => pr.number === Number(endpoint.split('/').at(-2))).labels = returned;
     } else process.exit(1);
     save();
-    process.stdout.write(args.includes('--jq') ? '{}' : 'HTTP/2.0 ' + (method === 'POST' ? 201 : 200) + ' OK\\r\\n\\r\\n' + JSON.stringify(returned));
+    process.stdout.write(args.includes('--jq') ? '{}' : 'HTTP/2.0 ' + (method === 'POST' ? 201 : 200) + ' OK\\r\\n\\r\\n' + JSON.stringify(state.response_labels_missing && method === 'PUT' ? {} : returned));
     process.exit(0);
 }
 let status = 200, value;
@@ -1463,11 +1463,13 @@ test(`the original journal retains honest process status (corrupt=${corrupt})`, 
 });
 }
 
-test("partial native update retains its first success while cleanup remains pending", async () => {
+for (const failure of ["request", "capture"] as const) {
+test(`partial native update retains its first success (failure=${failure})`, async () => {
   const f = setup(); await f.transport.identity();
   const original = { title: "Old title", body: "Old body", labels: ["old"], draft: false };
   f.update(state => {
-    state.reject_labels = true;
+    state.reject_labels = failure === "request";
+    state.response_labels_missing = failure === "capture";
     state.prs.push({ ...original, id: 5010, number: 501, labels: [{ id: 102, name: "old" }], state: "open",
       user: { login: "fixture-bot", id: 20 }, head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } },
       base: { ref: "main", repo: { id: 10 } } });
@@ -1487,14 +1489,19 @@ test("partial native update retains its first success while cleanup remains pend
   }
   journal = appendIntent(journal, effect.id);
   const error = await executeAttempt({ journal, effect, objects, transport: f.transport }).then(() => null, (error: unknown) => error);
-  expect(error).toBeInstanceOf(PublicationExecutionError);
-  if (!(error instanceof PublicationExecutionError) || !error.execution) throw Error("missing partial native execution");
-  expect(error.execution.successes).toHaveLength(1);
-  const projection = JSON.parse(readFileSync(error.execution.successes[0].path, "utf8")) as {
+  expect(error).toBeInstanceOf(Error);
+  if (failure === "request") {
+    if (!(error instanceof PublicationExecutionError) || !error.execution) throw Error("missing native failure evidence");
+    expect(error.execution.successes).toHaveLength(1);
+  }
+  const restored = readJournal(journal.directory, join(f.root, "source"));
+  const ending = restored.events.at(-1);
+  if (!ending || !("execution" in ending.payload) || !ending.payload.execution || !("sent" in ending.payload)) throw Error("missing partial execution record");
+  const projection = JSON.parse(readFileSync(ending.payload.execution.successes[0].path, "utf8")) as {
     command_index: number; attempt_id: string; facts: { number: number; head_sha: string; user_id: number }; identity: { actor_id: number };
   };
   expect(projection.command_index).toBe(0);
-  const proof = error.execution.successes[0];
+  const proof = ending.payload.execution.successes[0];
   const originalBytes = readFileSync(proof.path);
   for (const field of ["number", "head_repository_id", "base_repository_id"]) {
     const changed = { ...projection, facts: { ...projection.facts, [field]: field === "number" ? 502 : 11 } };
@@ -1506,13 +1513,15 @@ test("partial native update retains its first success while cleanup remains pend
   expect(projection.facts.head_sha).toBe(f.commit);
   expect(projection.facts.user_id).toBe(20);
   expect(projection.identity.actor_id).toBe(20);
-  const restored = readJournal(journal.directory, join(f.root, "source"));
-  const ending = restored.events.at(-1);
-  if (!ending || !("execution" in ending.payload) || !ending.payload.execution || !("sent" in ending.payload)) throw Error("missing partial execution record");
   expect(ending.payload.sent).toBe(true);
   expect(ending.payload.reaped).toBe(true);
   expect(ending.payload.execution.successes).toHaveLength(1);
   expect(pendingAttempt(restored, effect, true)).not.toBeNull();
+  if (failure === "capture") {
+    expect("capture_unverified" in ending.payload && ending.payload.capture_unverified).toBe(true);
+    expect(pendingAttempt(restored, effect)).toBe("success-proof-unavailable");
+    return;
+  }
   // Preserve the existing idempotent update path after the native target is rechecked.
   f.update(state => { state.reject_labels = false; });
   const retried = await executeAttempt({ journal: restored, effect, objects, transport: f.transport });
@@ -1528,6 +1537,7 @@ test("partial native update retains its first success while cleanup remains pend
     attempt_id: invalid.attempt_id, evidence: { path: labels.path, sha256: sha256(malformed) } })).toThrow();
   writeFileSync(labels.path, bytes);
 });
+}
 
 test("native closure capture keeps the legacy creator distinct from the mutating actor", async () => {
   const f = setup(); await f.transport.identity();

@@ -286,7 +286,7 @@ test("supported outcomes retain scoped lookup digests while historical journal r
   expect(() => readLookup({ evidence: lookup, artifact_root: f.artifacts, source_repo: f.repo, plan: f.plan, effect, transport: "native", state: "done" })).toThrow();
 });
 
-test.each(["duplicate", "oversized", "unsent", "foreign", "unnormalized", "rejected", "unverified"] as const)(
+test.each(["duplicate", "oversized", "unsent", "foreign", "unnormalized", "rejected"] as const)(
   "attempt success references reject %s payloads", kind => {
     const f = setup();
     let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
@@ -299,7 +299,6 @@ test.each(["duplicate", "oversized", "unsent", "foreign", "unnormalized", "rejec
       : [{ ...reference, path: kind === "foreign" ? join(f.root, "foreign.json")
         : kind === "unnormalized" ? f.artifacts + "/child/../success-fixture.json" : reference.path }];
     const status = { attempt_id: "captured-attempt", sent: kind !== "unsent", reaped: true, execution: { successes },
-      ...(kind === "unverified" ? { capture_unverified: true as const } : {}),
       ...(kind === "rejected" ? { rejection: { path: join(f.artifacts, "rejection-fixture.json"), sha256: hash("rejection") } } : {}) };
     expect(() => appendAttemptEnd(journal, effect.id, status)).toThrow();
   });
@@ -310,4 +309,15 @@ test.each(["unsent", "rejected"] as const)("unverified capture rejects a contrad
   journal = appendIntent(journal, effect.id); journal = appendAttempt(journal, effect.id, "capture-attempt");
   expect(() => appendAttemptEnd(journal, effect.id, { attempt_id: "capture-attempt", sent: kind !== "unsent", reaped: true,
     capture_unverified: true, ...(kind === "rejected" ? { rejection: { path: join(f.artifacts, "rejection.json"), sha256: hash("rejection") } } : {}) })).toThrow();
+});
+
+test("pending capture serializes its known reference subset", () => {
+  const f = setup(); let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan });
+  const effect = f.plan.manifest.effects[0];
+  journal = appendIntent(journal, effect.id); journal = appendAttempt(journal, effect.id, "capture-attempt");
+  // Schema fixture only. Native proof verification is exercised through executeAttempt.
+  const execution = { successes: [{ path: join(f.artifacts, "success-fixture.json"), sha256: hash("success") }] };
+  journal = appendAttemptEnd(journal, effect.id, { attempt_id: "capture-attempt", sent: true, reaped: true, execution, capture_unverified: true });
+  expect(readJournal(journal.directory, f.repo).events.at(-1)?.payload).toEqual({ attempt_id: "capture-attempt", sent: true,
+    reaped: true, execution, capture_unverified: true });
 });

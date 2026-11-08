@@ -268,7 +268,7 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
         if (payload.sent !== true || payload.reaped !== true || typeof evidence.path !== "string"
           || !evidence.path.startsWith("/") || evidence.path.includes("\0")) fail("invalid rejection evidence");
       }
-      if (unverified && (payload.capture_unverified !== true || executed || rejected || payload.sent !== true)) fail("invalid unverified capture");
+      if (unverified && (payload.capture_unverified !== true || rejected || payload.sent !== true)) fail("invalid unverified capture");
       if (executed && rejected) fail("contradictory execution and rejection");
       if (executed) {
         const execution = exact(payload.execution, ["successes"]);

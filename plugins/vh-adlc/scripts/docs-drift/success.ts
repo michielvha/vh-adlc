@@ -8,6 +8,7 @@ import { externalArtifactDirectory } from "./snapshot";
 import type { PublicationIdentity } from "./transport";
 
 export type SuccessEvidence = { path: string; sha256: string };
+/** Individually verified command facts, without a whole-effect completeness claim. */
 export type ExecutionEvidence = { successes: SuccessEvidence[] };
 export type ExecutionResult = ExecutionEvidence & { capture_unverified?: true };
 type Scope = { artifact_root: string; source_repo: string; plan: SealedPlan; effect: Effect; attempt_id: string };
