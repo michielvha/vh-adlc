@@ -2,7 +2,6 @@ import { expect, test } from "bun:test";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { nativePushArguments } from "../../../plugins/vh-adlc/scripts/docs-drift/git-success";
 import { createJournal, sealPlan, writePublicationObjects } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { fixture } from "./manifest-fixture";
 import { effectDigest, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
@@ -27,8 +26,11 @@ for (const kind of ["git", "http"] as const) {
       const objects = writePublicationObjects(f.store, plan, journal.header);
       const effect = kind === "git" ? effects.at(-1)! : comment;
       const ref = f.settings.publication.lease_ref;
-      const argv = kind === "git" ? nativePushArguments(f.settings.hostname, plan.manifest.repository,
-        [{ ref, head: null, expected: objects.lease_object }])
+      const argv = kind === "git"
+        ? ["git", "--no-pager", "--literal-pathspecs", "-c", "core.fsmonitor=false",
+          "--no-lazy-fetch", "--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=",
+          "-c", "credential.helper=!gh auth git-credential", "-c", "http.extraHeader=", "push", "--porcelain",
+          `--force-with-lease=${ref}:${objects.lease_object}`, "--", `https://${f.settings.hostname}/${plan.manifest.repository}.git`, `:${ref}`]
         : ["gh", "api", "--hostname", f.settings.hostname, "--method", "POST", "--include", "--jq", "empty",
           `repos/${plan.manifest.repository}/issues/77/comments`];
       const id = "11111111-1111-4111-8111-111111111111";
