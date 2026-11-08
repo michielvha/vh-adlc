@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { clientArchivePath, inspectClientArchive } from "./client-archive";
 import { executeOwnedProcess, type OwnedProcess } from "./owned-process";
 import { parseClientBinding } from "./settings";
-import { collectAdoptionBindings, parseComponentPin, verifyRuntimeAdoption } from "./adoption";
+import { collectAdoptionBindings, collectTrialBindings, parseComponentPin, verifyRuntimeAdoption } from "./adoption";
 import type { PublicationIdentity } from "./transport";
 import { publishArtifact, syncDirectory } from "./journal";
 import { chmodSync, closeSync, constants, existsSync, fchmodSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
@@ -430,31 +430,66 @@ function inspectEntryInput(repo: string, commit: string, path: string, invokedPa
 /** Preflight an approved entry at the caller's freshly observed immutable default.
  * The portable result remains an owner attestation. Effects require their separate current gates.
  */
-export async function selectApprovedRuntime(options: {
-  repo: string; current_default: string; identity: PublicationIdentity; cache_directory: string;
-  entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string;
-}) {
-  inspectCacheLocation(options.cache_directory, options.repo);
-  const adopted = verifyRuntimeAdoption(options);
-  const bindings = collectAdoptionBindings(options.repo, options.current_default), settings = bindings.settings;
+type RuntimeEntryOptions = {
+  repo: string; cache_directory: string; entry: "hosted" | "copilot" | "claude";
+  settings: ReturnType<typeof collectAdoptionBindings>["settings"]; pin: ComponentPin; identity: PublicationIdentity;
+  launcher_sha256: string; settings_sha256: string; trial?: ClientProfileScope["trial"];
+};
+
+async function retainedRuntimeEntry(options: RuntimeEntryOptions) {
+  const { settings } = options;
   if (!["hosted", "copilot", "claude"].includes(options.entry)) fail("protected execution entry required");
-  const launcherSHA = inspectEntryInput(options.repo, options.current_default, settings.runtime_loader.launcher, options.launcher_path);
-  const settingsSHA = inspectEntryInput(options.repo, options.current_default, ".vh-adlc/docs-drift.yaml", options.settings_path);
-  if (settingsSHA !== bindings.settings_sha256) fail("invoked settings changed");
-  const component = inspectRetainedComponent({ cache_directory: options.cache_directory, consumer_repo: options.repo, pin: adopted.component_pin });
+  const component = inspectRetainedComponent({ cache_directory: options.cache_directory, consumer_repo: options.repo, pin: options.pin });
   const entry = settings.execution.entries[options.entry];
   async function role(selected: typeof entry.worker) {
     const retained = await inspectRetainedClient({ cache_directory: options.cache_directory, consumer_repo: options.repo,
       client_id: selected.client, client: settings.clients[selected.client],
-      profile_scope: { hostname: settings.hostname, repository_id: adopted.identity.repository_id, actor_id: adopted.identity.actor_id, entry: options.entry } });
+      profile_scope: { hostname: settings.hostname, repository_id: options.identity.repository_id, actor_id: options.identity.actor_id,
+        entry: options.entry, ...(options.trial ? { trial: options.trial } : {}) } });
     return { ...retained, model: selected.model, argv: selected.argv, identity_source: selected.identity_source };
   }
   const worker = await role(entry.worker), reviewer = await role(entry.reviewer);
   if (worker.client.provider !== settings.runtime_loader.provider) fail("loader provider differs from selected worker client");
   const argv = settings.runtime_loader.argv.map(arg => arg.replaceAll("{plugin_dir}", component.directory).replaceAll("{profile_root}", worker.profile_directory));
+  return { component, worker, reviewer, loader: { ...settings.runtime_loader, argv,
+    launcher_sha256: options.launcher_sha256, settings_sha256: options.settings_sha256, profile_root: worker.profile_directory } };
+}
+
+export async function selectApprovedRuntime(input: {
+  repo: string; current_default: string; identity: PublicationIdentity; cache_directory: string;
+  entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string;
+}) {
+  const options = { ...input };
+  inspectCacheLocation(options.cache_directory, options.repo);
+  const adopted = verifyRuntimeAdoption(options);
+  const bindings = collectAdoptionBindings(options.repo, options.current_default), settings = bindings.settings;
+  const launcherSHA = inspectEntryInput(options.repo, options.current_default, settings.runtime_loader.launcher, options.launcher_path);
+  const settingsSHA = inspectEntryInput(options.repo, options.current_default, ".vh-adlc/docs-drift.yaml", options.settings_path);
+  if (settingsSHA !== bindings.settings_sha256) fail("invoked settings changed");
+  const runtime = await retainedRuntimeEntry({ ...options, settings, pin: adopted.component_pin, identity: adopted.identity,
+    launcher_sha256: launcherSHA, settings_sha256: settingsSHA });
   return freezeJSON({ kind: "docs-drift-approved-runtime", evidence: adopted.evidence, current_default: options.current_default,
-    adoption_sha256: adopted.adoption_sha256, protected_sha256: adopted.protected_sha256, entry: options.entry, component, worker, reviewer,
-    loader: { ...settings.runtime_loader, argv, launcher_sha256: launcherSHA, settings_sha256: settingsSHA, profile_root: worker.profile_directory } });
+    adoption_sha256: adopted.adoption_sha256, protected_sha256: adopted.protected_sha256, entry: options.entry, ...runtime });
+}
+
+/** Inspect a declared candidate only. An actual trial still needs its separately scoped authority. */
+export async function selectCandidateRuntime(input: {
+  repo: string; current_default: string; identity: PublicationIdentity; cache_directory: string;
+  entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string; definition_sha256: string;
+}) {
+  const options = { ...input };
+  inspectCacheLocation(options.cache_directory, options.repo);
+  const policy = collectTrialBindings(options), settings = policy.candidate.settings;
+  if (options.definition_sha256 !== policy.definition_sha256) fail("candidate trial definition changed");
+  const launcherSHA = inspectEntryInput(options.repo, options.current_default, settings.runtime_loader.launcher, options.launcher_path);
+  const settingsSHA = inspectEntryInput(options.repo, options.current_default, policy.candidate_settings.path, options.settings_path);
+  if (settingsSHA !== policy.candidate_settings.sha256) fail("candidate settings changed");
+  const runtime = await retainedRuntimeEntry({ ...options, settings, pin: policy.candidate.component_pin.value, identity: policy.identity,
+    launcher_sha256: launcherSHA, settings_sha256: settingsSHA,
+    trial: { definition_sha256: policy.definition_sha256, fixture_id: policy.fixture.id } });
+  return freezeJSON({ kind: "docs-drift-candidate-runtime", authority: "none", current_default: options.current_default,
+    definition_sha256: policy.definition_sha256, protected_sha256: policy.candidate.protected_sha256,
+    fixture_id: policy.fixture.id, namespace: policy.namespace, entry: options.entry, ...runtime });
 }
 
 

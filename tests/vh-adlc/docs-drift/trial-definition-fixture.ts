@@ -25,11 +25,12 @@ function fixtureBundle(roots: string[], repo: string, source: string,
 }
 
 export function trialDefinitionFixture(roots: string[], options: {
+  approved?: Parameters<typeof source>[1];
   candidate_client?: ReturnType<typeof source>["configured"]["clients"]["copilot-linux"];
   caller?: "extra-job-permission" | "different-secret" | "missing-permissions" | "job-only-permissions";
   history_job_write?: boolean; worker_cron?: boolean;
 } = {}) {
-  const f = source(roots), settings = structuredClone(f.configured);
+  const f = source(roots, options.approved), settings = structuredClone(f.configured);
   // Detached maintenance from fixture commits must settle before read-only preservation checks.
   readGit(f.repo, "config", "gc.auto", "0"); readGit(f.repo, "config", "maintenance.auto", "false");
   if (options.candidate_client) settings.clients["copilot-linux"] = options.candidate_client;
@@ -108,15 +109,18 @@ export function commitTrialDefinition(f: ReturnType<typeof trialDefinitionFixtur
 }
 
 /** Observed-shaped portable records exercise parsing without claiming native trial execution. */
-export function fullDefinitionUpgradeFixture(roots: string[], options: { changed_rule?: "mapped" | "unmapped" } = {}) {
-  const f = trialDefinitionFixture(roots), repo = f.repo, originalCandidate = f.bindings.source_commit;
+export function fullDefinitionUpgradeFixture(roots: string[], options: {
+  changed_rule?: "mapped" | "unmapped"; approved?: Parameters<typeof source>[1];
+  candidate_client?: ReturnType<typeof source>["configured"]["clients"]["copilot-linux"];
+} = {}) {
+  const f = trialDefinitionFixture(roots, { approved: options.approved }), repo = f.repo, originalCandidate = f.bindings.source_commit;
   readGit(repo, "switch", "--detach", originalCandidate);
   const original = portableRecord({ repo, configured: f.configured, candidate: originalCandidate });
   write(repo, f.configured.publication.adoption_record, canonicalJSON(original));
   const originalDelivery = commit(repo, "synthetic full-definition predecessor"), predecessorHash = sha256(canonicalJSON(original));
   const candidateSettings = structuredClone(f.configured);
   candidateSettings.publication.adoption_record = ".vh-adlc/docs-drift-adoptions/full-successor.yaml";
-  candidateSettings.clients["copilot-linux"].version = "fixture-2.0.0";
+  candidateSettings.clients["copilot-linux"] = options.candidate_client ?? { ...candidateSettings.clients["copilot-linux"], version: "fixture-2.0.0" };
   candidateSettings.execution.worker_workflow = ".github/workflows/docs-drift-candidate-worker.yml";
   const workerBytes = readGit(repo, "show", originalCandidate + ":" + f.configured.execution.worker_workflow);
   write(repo, candidateSettings.execution.worker_workflow, workerBytes);
