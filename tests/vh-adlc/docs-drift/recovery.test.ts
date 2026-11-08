@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node
 import { join } from "node:path";
 import { publish } from "../../../plugins/vh-adlc/scripts/docs-drift/publish";
 import { inspectRetainedOperation, restoreRetainedOperation, resumeEffects, reconcileAbsent } from "../../../plugins/vh-adlc/scripts/docs-drift/recovery";
-import { appendIntent, appendAttempt, appendAttemptEnd, readJournal, sealPlan, appendRecoveryOnly, createJournal, writePublicationObjects, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { appendIntent, appendAttempt, appendAttemptEnd, appendOutcome, readJournal, sealPlan, appendRecoveryOnly, createJournal, writePublicationObjects, writePlanObject } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { effectMarker, validateReviewedManifest, type Effect } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { publicationMarker } from "../../../plugins/vh-adlc/scripts/docs-drift/report-history";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -848,4 +848,44 @@ test("a canonical legacy receipt retains ambiguous-run fencing", async () => {
   expect(result.journal.events.some(event => event.kind === "recovery-only")).toBe(true);
   expect(result.journal.events.some(event => event.kind === "invalidation")).toBe(false);
   expect(f.executed).toEqual([]);
+});
+
+for (const route of ["resume", "cleanup"] as const) for (const recorded of [false, true])
+test(`recovery retains its lease until an observed write's executor settles (${route}, recorded=${recorded})`, async () => {
+  const f = setup(), execute = f.transport.execute;
+  let entered!: () => void, release!: () => void;
+  const started = new Promise<void>(resolve => { entered = resolve; });
+  const finish = new Promise<void>(resolve => { release = resolve; });
+  f.transport.execute = async (plan, effect, objects) => {
+    await execute(plan, effect, objects);
+    if (effect.id === "pr") { entered(); await finish; }
+  };
+  const running = publish(options(f));
+  await started;
+  try {
+    const directory = join(f.artifacts, "docs-drift-operation-1");
+    if (recorded) {
+      const journal = readJournal(directory, f.repo);
+      const effect = f.plan.manifest.effects.find(item => item.id === "pr")!;
+      const observation = await f.transport.observe(f.plan, effect, writePublicationObjects(f.store, f.plan, journal.header));
+      if (observation.state !== "done") throw Error("missing synthetic applied state");
+      appendOutcome(journal, effect.id, observation.outcome);
+    }
+    const result = route === "resume"
+      ? await resumeEffects({ ...options(f), journal_directory: directory })
+      : await reconcileAbsent({ source_repo: f.repo, journal_directory: directory, object_store: f.store,
+        settings: f.settings, transport: f.transport, retire_effect_ids: [],
+        authorize: async scope => ({ scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("current cleanup request") }) });
+    expect(result.state).toBe("pending");
+    expect(result.reason).toBe("attempt-in-flight");
+    expect(result.journal.events.some(event => event.effect_id === "pr" && event.kind === "outcome")).toBe(recorded);
+    expect(f.refs.has(f.settings.publication.lease_ref)).toBe(true);
+    expect(f.executed.includes("release")).toBe(false);
+  } finally { release(); }
+  const settled = await running;
+  // A legacy observer may have recorded the outcome before the executor's ending.
+  const recovered = await resumeEffects({ ...options(f), journal_directory: settled.journal.directory });
+  expect(recovered.state).toBe("complete");
+  expect(f.executed.filter(id => id === "pr")).toHaveLength(1);
+  expect(f.executed.filter(id => id === "release")).toHaveLength(1);
 });

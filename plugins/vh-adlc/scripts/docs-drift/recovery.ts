@@ -38,6 +38,8 @@ export async function resumeEffects(options: PublishOptions & { journal_director
     journal = appendHandoff(journal, effectId, reason);
     return { state: "pending", reason, journal, objects };
   };
+  const executing = journal.plan.manifest.effects.find(effect => pendingAttempt(journal, effect, true) === "attempt-in-flight");
+  if (executing) return blocked(executing.id, "attempt-in-flight");
   if (complete()) return { state: retired.size ? "retired" : invalidated ? "invalidated" : "complete", reason: null, journal, objects };
   // This also establishes native contents visibility before any 404 is treated as ref absence.
   const firstPending = journal.plan.manifest.effects.find(effect => !terminal(journal, effect.id) && !retired.has(effect.id));
@@ -82,7 +84,7 @@ export async function resumeEffects(options: PublishOptions & { journal_director
       const observation = await options.transport.observe(journal.plan, effect, objects);
       journal = readJournal(journal.directory, options.source_repo);
       const active = pendingAttempt(journal, effect);
-      if (observation.state !== "done" && (active === "attempt-in-flight" || active === "attempt-not-reaped")) return blocked(effect.id, active);
+      if (active === "attempt-in-flight" || observation.state !== "done" && active === "attempt-not-reaped") return blocked(effect.id, active);
       if (observation.state === "conflict" && effect.kind === "lease-acquire" && !terminal(journal, effect.id) && !isObservationOnly(journal)) {
         const lease = await options.transport.ref(options.settings.publication.lease_ref);
         if (lease.state === "absent" || lease.object !== objects.lease_object) {
@@ -283,6 +285,8 @@ export async function reconcileAbsent(options: {
   const result = (state: PublishResult["state"], reason: string | null): PublishResult => ({ state, reason, journal, objects });
   const blocked = (reason: string) => result("pending", reason);
   if (ids.includes(receipt.id) || isRetired(receipt.id)) return blocked("receipt-retention-required");
+  const executing = plan.manifest.effects.find(effect => pendingAttempt(journal, effect, true) === "attempt-in-flight");
+  if (executing) return blocked("attempt-in-flight");
   if (finished()) return result(journal.events.some(event => event.kind === "retired-absence") ? "retired" : "complete", null);
   try {
     const identity = await options.transport.identity();
@@ -339,7 +343,7 @@ export async function reconcileAbsent(options: {
       const observation = await options.transport.observe(plan, effect, objects);
       journal = readJournal(journal.directory, options.source_repo);
       const active = pendingAttempt(journal, effect);
-      if (observation.state !== "done" && (active === "attempt-in-flight" || active === "attempt-not-reaped")) return blocked(active);
+      if (active === "attempt-in-flight" || observation.state !== "done" && active === "attempt-not-reaped") return blocked(active);
       if (observation.state === "unknown" || observation.state === "conflict" && ["lease-acquire", "receipt-retain"].includes(effect.kind)) return blocked(observation.reason);
       if (!intended(journal, effect.id)) journal = appendIntent(journal, effect.id);
       if (observation.state === "done") { journal = appendOutcome(journal, effect.id, observation.outcome); continue; }
