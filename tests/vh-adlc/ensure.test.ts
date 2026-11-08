@@ -1,3 +1,4 @@
+import { runOwnedClient } from "../../plugins/vh-adlc/scripts/triage/owned-process";
 // Tests for plugins/vh-adlc/scripts/ensure-vh-adlc.sh (scenario S15). Each case
 // copies the real installer into a throwaway plugin directory with its own lock,
 // so no production flag or URL override exists to bypass verification.
@@ -12,6 +13,7 @@ const ROOT = resolve(import.meta.dir, "..", "..");
 const INSTALLER = join(ROOT, "plugins", "vh-adlc", "scripts", "ensure-vh-adlc.sh");
 const REAL_LOCK = join(ROOT, "plugins", "vh-adlc", "vh-adlc.lock.json");
 const VERSION = "9.9.9";
+const DOWNLOAD_BOUNDS = { connection: 5, archive: 25, metadata: 10, retryWindow: 2, retries: 1 };
 const PLATFORMS = ["darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"];
 
 // Every throwaway directory a case makes, removed when the file's tests end.
@@ -312,7 +314,7 @@ test("installs the released binary from the real lock", () => {
     .toEqual({ exit: 0, result: "answered", value: { schema_version: 1, source_roots: ["src"] } });
 }, 120_000);
 
-function apiFallbackFixture(mode: "valid" | "bounded" | "wrong-host" | "wrong-browser" | "duplicate" | "wrong-archive" | "wrong-binary") {
+function apiFallbackFixture(mode: "valid" | "bounded" | "retry-after" | "missing-download" | "wrong-host" | "wrong-browser" | "duplicate" | "wrong-archive" | "wrong-binary", canonicalProxy?: string) {
   const f = fixture(mode === "wrong-binary" ? { binarySha: "0".repeat(64) } : {});
   const assets = f.lock.assets as Record<string, Record<string, string>>;
   const selected = assets[platform()];
@@ -331,11 +333,19 @@ if (${JSON.stringify(mode)} === 'bounded') {
   const connect = Number(args[args.indexOf('--connect-timeout') + 1]);
   const total = Number(args[args.indexOf('--max-time') + 1]);
   const retries = Number(args[args.indexOf('--retry') + 1]);
-  if (!args.includes('--connect-timeout') || !args.includes('--max-time') || !args.includes('--retry')
-    || !Number.isFinite(connect) || connect <= 0 || connect > 5
-    || !Number.isFinite(total) || total <= 0 || total > 25 || retries > 1) process.exit(91);
+  const retryTime = Number(args[args.indexOf('--retry-max-time') + 1]);
+  const bounds = ${JSON.stringify(DOWNLOAD_BOUNDS)};
+  const metadata = url === ${JSON.stringify("https://api.github.com/repos/michielvha/vh-adlc/releases/tags/v" + VERSION)};
+  if (!args.includes('--connect-timeout') || !args.includes('--max-time') || !args.includes('--retry') || !args.includes('--retry-max-time')
+    || connect !== bounds.connection || total !== (metadata ? bounds.metadata : bounds.archive) || retryTime !== bounds.retryWindow
+    || !Number.isInteger(retries) || retries < 0 || retries > bounds.retries) process.exit(91);
 }
-if (url === ${JSON.stringify(selected.url)}) process.exit(22);
+if (url === ${JSON.stringify(selected.url)} && ${JSON.stringify(canonicalProxy ?? null)} !== null) {
+  const result = Bun.spawnSync([${JSON.stringify(Bun.which("curl", { PATH: "/usr/local/bin:/usr/bin:/bin" }))}, ...args.slice(0, -1), ${JSON.stringify(canonicalProxy ?? "")}], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
+  process.stdout.write(result.stdout); process.stderr.write(result.stderr);
+  process.exit(result.exitCode ?? 1);
+}
+if (url === ${JSON.stringify(selected.url)}) process.exit(${mode === "missing-download" ? 0 : 22});
 if (url === ${JSON.stringify("https://api.github.com/repos/michielvha/vh-adlc/releases/tags/v" + VERSION)}) {
   writeFileSync(output, JSON.stringify(${JSON.stringify(release)}));
 } else if (url === ${JSON.stringify(endpoint)} && args.includes('Accept: application/octet-stream')) {
@@ -372,7 +382,40 @@ test("release metadata parsing cannot import code from the caller's checkout", (
 });
 
 test("every download has bounded connection, transfer and retry attempts", () => {
+  const maximumTransferTime = 2 * (DOWNLOAD_BOUNDS.archive + DOWNLOAD_BOUNDS.retryWindow)
+    + DOWNLOAD_BOUNDS.metadata + DOWNLOAD_BOUNDS.retryWindow;
+  expect(maximumTransferTime).toBeLessThan(120);
   const { f, bin, calls } = apiFallbackFixture("bounded");
+  const result = run(f, [], [bin]);
+  expect(result.code).toBe(0);
+  expect(result.out).toBe(cached(f));
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+});
+
+test("a server Retry-After cannot keep the installer waiting past its fallback budget", async () => {
+  let requests = 0;
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch() {
+    requests++; return new Response("synthetic temporary outage", { status: 503, headers: { "Retry-After": "120" } });
+  } });
+  try {
+    const { f, bin, calls } = apiFallbackFixture("retry-after", server.url.toString());
+    const outcome = await runOwnedClient(["bash", join(f.plugin, "scripts", "ensure-vh-adlc.sh")], {
+      cwd: f.dir, env: { HOME: f.home, XDG_CACHE_HOME: join(f.home, "cache"),
+        PATH: [bin, "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LC_ALL: "C", NO_PROXY: "127.0.0.1" },
+      stdout: join(f.dir, "installer.stdout"), stderr: join(f.dir, "installer.stderr"),
+    }, { timeout_ms: 8000, grace_ms: 100, reap_ms: 2000 });
+    expect(outcome.timed_out).toBe(false);
+    expect(outcome.reaped).toBe(true);
+    if (outcome.exit_code !== 0) throw new Error(readFileSync(join(f.dir, "installer.stderr"), "utf8"));
+    expect(readFileSync(join(f.dir, "installer.stdout"), "utf8").trim()).toBe(cached(f));
+    expect(requests).toBeGreaterThan(0);
+    expect(requests).toBeLessThanOrEqual(2);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+  } finally { await server.stop(true); }
+}, 15000);
+
+test("a successful curl exit without an archive still takes the verified fallback", () => {
+  const { f, bin, calls } = apiFallbackFixture("missing-download");
   const result = run(f, [], [bin]);
   expect(result.code).toBe(0);
   expect(result.out).toBe(cached(f));
