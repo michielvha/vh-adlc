@@ -1,14 +1,14 @@
 import { verifyCompatibleWorkerCaller } from "./worker-callers";
 import type { PublicationIdentity } from "./transport";
-import { readGit, collectionReaders } from "./git";
-import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
-import { classifySettingsLeaves, loadCommittedSettings, settingsProjections } from "./settings";
+import { readGit, collectionReaders, readAdoptionInput as committedInput } from "./git";
+import { canonicalDigest, canonicalJSON, compareUTF8, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
+import { classifySettingsLeaves, loadCommittedSettings, parseSettings, settingsProjections } from "./settings";
+import { readTrialDefinition } from "./trial-definition";
 
 type ComponentPin = {
   schema_version: 1; source_repository: string; source_commit: string; source_release: string;
   plugin_version: string; component_sha256: string;
 };
-type CommittedInput = { path: string; mode: string; blob: string; bytes: Buffer; sha256: string };
 function fail(reason: string): never { throw Error("incomplete docs-drift adoption " + reason); }
 function immutable(value: unknown): string {
   if (typeof value !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value)) fail("immutable commit required");
@@ -18,7 +18,8 @@ function object(value: unknown, keys: string[], label = "object"): Record<string
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail("invalid " + label);
   canonicalJSON(value);
   const input = value as Record<string, unknown>;
-  if (Object.keys(input).sort().join(",") !== [...keys].sort().join(",")) fail(label + " fields");
+  const actual = Object.keys(input).sort(), expected = [...keys].sort();
+  if (actual.length !== expected.length || actual.some((name, index) => name !== expected[index])) fail(label + " fields");
   return input;
 }
 export function parseComponentPin(value: unknown): ComponentPin {
@@ -35,21 +36,14 @@ export function parseComponentPin(value: unknown): ComponentPin {
     source_release: input.source_release as string, plugin_version: input.plugin_version as string, component_sha256: input.component_sha256 });
 }
 
-/** Read only the literal path's Git blob. Links, submodules and checkout overlays cannot supply policy. */
-function committedInput(repo: string, commit: string, path: string): CommittedInput | null {
-  protocolPath(path);
-  const raw = readGit(repo, "--literal-pathspecs", "ls-tree", "-z", immutable(commit), "--", path);
-  if (raw.length === 0) return null;
-  const tab = raw.indexOf(9);
-  const metadata = /^(100644|100755) blob ([a-f0-9]{40}(?:[a-f0-9]{24})?)$/u.exec(raw.subarray(0, tab).toString("ascii"));
-  if (tab < 0 || !metadata || raw.at(-1) !== 0 || decodeUTF8(raw.subarray(tab + 1, -1)) !== path) fail("regular committed input " + path);
-  const bytes = readGit(repo, "cat-file", "blob", metadata[2]);
-  return { path, mode: metadata[1], blob: metadata[2], bytes, sha256: sha256(bytes) };
-}
-
 /** Collect bindings only. Trial evidence, operator acceptance and effect authority are separate gates. */
 export function collectAdoptionBindings(repo: string, sourceCommit: string) {
-  const committed = loadCommittedSettings(repo, sourceCommit), { settings } = committed;
+  return collectSelectedBindings(repo, sourceCommit, loadCommittedSettings(repo, sourceCommit));
+}
+
+function collectSelectedBindings(repo: string, sourceCommit: string, committed: ReturnType<typeof loadCommittedSettings>,
+  scheduled?: { path: string; mode: string; sha256: string }) {
+  const { settings } = committed;
   if (settings.component_pin === null) fail("selected component pin missing");
   const pin = committedInput(repo, sourceCommit, settings.component_pin);
   if (!pin || pin.mode !== "100644") fail("selected component pin missing or nonregular");
@@ -58,7 +52,7 @@ export function collectAdoptionBindings(repo: string, sourceCommit: string) {
     settings.execution.scheduled_workflow, settings.execution.claude_command, settings.runtime_loader.launcher,
     ...(settings.scanner.adapter === null ? [] : [settings.scanner.adapter])])].sort(compareUTF8);
   const blobs = paths.map(path => {
-    const input = committedInput(repo, sourceCommit, path);
+    const input = scheduled?.path === path ? scheduled : committedInput(repo, sourceCommit, path);
     if (input === null && path !== "AGENTS.md") fail("protected input missing " + path);
     return [path, input?.mode ?? null, input?.sha256 ?? null] as const;
   });
@@ -66,6 +60,20 @@ export function collectAdoptionBindings(repo: string, sourceCommit: string) {
   const protectedManifest = { settings: settingsProjections(settings).protected, component, blobs };
   return freezeJSON({ source_commit: sourceCommit, settings_sha256: committed.settings_sha256, settings,
     component_pin: component, protected_manifest: protectedManifest, protected_sha256: canonicalDigest(protectedManifest) });
+}
+
+/** Committed setup is non-granting. Actual fixture ownership and trial permission are separate. */
+export function collectTrialBindings(options: { repo: string; current_default: string; identity?: PublicationIdentity }) {
+  const source = immutable(options.current_default), current = loadCommittedSettings(options.repo, source).settings;
+  const policy = readTrialDefinition({ repo: options.repo, source, settings: current });
+  const candidate = collectSelectedBindings(options.repo, source, { settings: policy.candidate_settings.value,
+    settings_sha256: policy.candidate_settings.sha256, source_commit: source }, policy.scheduled_contract);
+  if (candidate.protected_sha256 !== policy.prospective_protected_sha256
+    || candidate.component_pin.path !== policy.candidate_component.path
+    || candidate.component_pin.sha256 !== policy.candidate_component.sha256) fail("prospective trial bindings changed");
+  const normalized = (identity: PublicationIdentity) => ({ ...identity, repository: identity.repository.toLowerCase(), actor: identity.actor.toLowerCase() });
+  if (options.identity && !canonicalJSON(normalized(nativeIdentity(options.identity))).equals(canonicalJSON(normalized(policy.identity)))) fail("current native trial identity");
+  return freezeJSON({ ...policy, source_commit: source, candidate, authority: "none" as const });
 }
 
 /** Check structural C/D assembly. The evidence verifier separately validates the record contents. */
@@ -324,11 +332,20 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
   next: ReturnType<typeof readAdoptionFrame>, boundary: AdoptionBoundary): string[] {
   const changes = compareUpgradeBindings({ repo, approved_default: previous.current_default,
     source_candidate: next.result.source_candidate, identity: next.result.identity }, previous);
-  const policy = loadCommittedSettings(repo, previous.current_default).settings.trial;
+  const previousSettings = loadCommittedSettings(repo, previous.current_default).settings, policy = previousSettings.trial;
   if (policy === null) fail("upgrade trial definition missing");
   const definitionInput = committedInput(repo, previous.current_default, policy.definition_path);
   if (!definitionInput || definitionInput.mode !== "100644" || definitionInput.sha256 !== policy.definition_sha256) fail("upgrade trial definition binding");
-  const definition = object(collectionReaders().yaml(definitionInput.bytes), ["schema_version", "kind", "predecessor_adoption_sha256",
+  let value = collectionReaders().yaml(definitionInput.bytes);
+  let expectedCases: ReturnType<typeof readTrialDefinition>["expected"]["cases"] | null = null;
+  if (value !== null && typeof value === "object" && !Array.isArray(value) && Reflect.get(value, "kind") === "docs-drift-trial") {
+    const policy = collectTrialBindings({ repo, current_default: previous.current_default, identity: previous.identity });
+    if (policy.candidate.protected_sha256 !== next.result.protected_sha256
+      || (boundary.kind === "test-only" && policy.fixture.id !== boundary.fixture_id)) fail("full upgrade trial binding");
+    expectedCases = policy.expected.cases;
+    value = policy.upgrade;
+  }
+  const definition = object(value, ["schema_version", "kind", "predecessor_adoption_sha256",
     "candidate_component", "candidate_protected_sha256", "classification", "affected_entries", "changed_rules"], "upgrade trial definition");
   if (definition.schema_version !== 1 || definition.kind !== "docs-drift-upgrade-trial"
     || definition.predecessor_adoption_sha256 !== previous.adoption_sha256
@@ -343,7 +360,15 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
     || (name === "hosted_advisory" || name === "history_read" ? !affected.includes("hosted")
       : name === "copilot_entry" ? !affected.includes("copilot") : !affected.includes("claude")));
   if (!canonicalJSON(link.carry_receipts).equals(canonicalJSON(carried))) fail("trial carried receipt inventory");
-  if (!Array.isArray(definition.changed_rules) || (definition.classification === "contract" && !definition.changed_rules.length)) fail("changed rule coverage required");
+  const policyBlobs = ["AGENTS.md", previousSettings.project_procedure, next.original.settings.project_procedure,
+    previousSettings.scanner.adapter, next.original.settings.scanner.adapter];
+  const policyChanged = changes.changed_settings.some(path => !["clients", "execution", "runtime_loader", "component_pin"].includes(String(path[0]))
+    && !(path[0] === "publication" && path[1] === "adoption_record")) || changes.changed_blobs.some(path => policyBlobs.includes(path));
+  const historyPolicyChanged = changes.changed_settings.some(path => path[0] === "reports"
+    || (path[0] === "execution" && path[1] === "permissions" && path[2] === "actions"));
+  if (!Array.isArray(definition.changed_rules)) fail("changed rule coverage required");
+  if (!definition.changed_rules.length && historyPolicyChanged) fail("changed history coverage required");
+  if (!definition.changed_rules.length && (definition.classification !== "execution" || policyChanged)) fail("changed rule coverage required");
   const receipt = object(link.trial, ["schema_version", "evidence_kind", "definition_path", "definition_sha256", "source_candidate",
     "predecessor_adoption_sha256", "reviewer_model", "artifact_sha256", "observations", "cases", ...(boundary.kind === "test-only" ? ["fixture_id"] : [])], "upgrade trial receipt");
   if (receipt.schema_version !== 1 || receipt.evidence_kind !== boundary.kind
@@ -365,6 +390,10 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
       || typeof rule.surface !== "string" || !["assessment", "scan", "status", "attention", "history", "resolve", "publication", "lease"].includes(rule.surface)) fail("changed rule identity");
     ids.add(rule.id);
     for (const field of ["fixture_sha256", "old_contract_sha256", "new_contract_sha256", "old_expected_sha256", "new_expected_sha256"]) adoptionDigest(rule[field]);
+    if (expectedCases !== null) {
+      const expected = expectedCases.find(row => row.id === rule.id);
+      if (!expected || expected.fixture_sha256 !== rule.fixture_sha256 || expected.outcome_sha256 !== rule.new_expected_sha256) fail("changed rule missing from full trial expectations");
+    }
     if (rule.old_contract_sha256 === rule.new_contract_sha256 || rule.old_expected_sha256 === rule.new_expected_sha256) fail("changed rule case does not discriminate");
     const history = ["status", "attention", "history"].includes(rule.surface);
     historyCovered ||= history;
@@ -376,8 +405,6 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
     adoptionDigest(result.artifact_sha256);
     if (history && (result.history_read !== true || result.unchanged_carried !== true || result.changed_new_attention !== true)) fail("changed history observations required");
   }
-  const historyPolicyChanged = changes.changed_settings.some(path => path[0] === "reports"
-    || (path[0] === "execution" && path[1] === "permissions" && path[2] === "actions"));
   if (historyPolicyChanged && !historyCovered) fail("changed history coverage required");
   return carried;
 }
@@ -486,11 +513,17 @@ const clientPackages = { copilot: "@github/copilot", claude: "@anthropic-ai/clau
 /** Signals are non-executing intake. Their mismatch never selects or replaces a runtime. */
 export function checkUpgradeSignals(options: { repo: string; source: string; identity?: PublicationIdentity }) {
   const source = immutable(options.source), { settings } = loadCommittedSettings(options.repo, source);
+  let selectedPin: ComponentPin, selectedSettings = settings, target: "candidate-trial" | "adopted";
   if (settings.publication.mode === "staged") {
-    if (settings.trial !== null) fail("current-default trial signal target verification required");
-    return freezeJSON({ status: "staged-no-target", source_commit: source, matches: null });
+    if (settings.trial === null) return freezeJSON({ status: "staged-no-target", source_commit: source, matches: null });
+    const trial = collectTrialBindings({ repo: options.repo, current_default: source, identity: options.identity });
+    selectedPin = trial.candidate.component_pin.value;
+    selectedSettings = trial.candidate.settings;
+    target = "candidate-trial";
+  } else {
+    selectedPin = verifyRuntimeAdoption({ repo: options.repo, current_default: source, identity: options.identity }).component_pin;
+    target = "adopted";
   }
-  const adopted = verifyRuntimeAdoption({ repo: options.repo, current_default: source, identity: options.identity });
   const input = committedInput(options.repo, source, componentSignalPath), clientInput = committedInput(options.repo, source, clientSignalPath);
   if (!input || input.mode !== "100644" || !clientInput || clientInput.mode !== "100644") fail("regular required upgrade signals");
   const component = object(collectionReaders().yaml(input.bytes), ["schema_version", "source_repository", "source_commit", "source_release"], "component signal");
@@ -499,12 +532,12 @@ export function checkUpgradeSignals(options: { repo: string; source: string; ide
     || component.source_repository.split("/").some(part => part === "." || part === "..")
     || typeof component.source_release !== "string" || !/^(?:v)?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/u.test(component.source_release)) fail("component signal identity");
   const actual = { source_repository: component.source_repository.toLowerCase(), source_commit: immutable(component.source_commit), source_release: component.source_release };
-  const expected = { source_repository: adopted.component_pin.source_repository, source_commit: adopted.component_pin.source_commit,
-    source_release: adopted.component_pin.source_release };
+  const expected = { source_repository: selectedPin.source_repository, source_commit: selectedPin.source_commit,
+    source_release: selectedPin.source_release };
   const clients = object(collectionReaders().yaml(clientInput.bytes), ["schema_version", "clients"], "client signals");
   if (clients.schema_version !== 1) fail("client signals schema");
-  const signals = object(clients.clients, Object.keys(settings.clients), "client signal inventory");
-  const clientResults = Object.entries(settings.clients).sort(([a], [b]) => compareUTF8(a, b)).map(([id, client]) => {
+  const signals = object(clients.clients, Object.keys(selectedSettings.clients), "client signal inventory");
+  const clientResults = Object.entries(selectedSettings.clients).sort(([a], [b]) => compareUTF8(a, b)).map(([id, client]) => {
     const row = object(signals[id], ["provider", "package", "version", "platform"], "client signal " + id);
     if (typeof row.provider !== "string" || !["copilot", "claude", "codex"].includes(row.provider) || typeof row.package !== "string"
       || typeof row.version !== "string" || !row.version || typeof row.platform !== "string") fail("client signal identity");
@@ -512,7 +545,7 @@ export function checkUpgradeSignals(options: { repo: string; source: string; ide
     return { client_id: id, expected: selected, actual: row, matches: canonicalJSON(selected).equals(canonicalJSON(row)) };
   });
   const matches = canonicalJSON(expected).equals(canonicalJSON(actual)) && clientResults.every(result => result.matches);
-  return freezeJSON({ status: matches ? "signal-match" : "signal-mismatch", source_commit: source, matches,
+  return freezeJSON({ status: matches ? "signal-match" : "signal-mismatch", source_commit: source, matches, target,
     component: { expected, actual }, clients: clientResults });
 }
 
@@ -528,7 +561,7 @@ export function collectUpgradeChanges(options: {
 }
 
 /** A new C selects its absent successor record. Earlier delivered selections remain authoritative. */
-function verifyPriorSelection(repo: string, base: string, candidate: string, adopted: AdoptionResult): void {
+function verifyPriorSelection(repo: string, base: string, candidate: string): void {
   const settingsByBlob = new Map<string, ReturnType<typeof loadCommittedSettings>["settings"]>();
   const commits = readGit(repo, "rev-list", `${base}..${candidate}`).toString().trim().split("\n").filter(Boolean);
   for (const commit of commits) {
@@ -541,7 +574,9 @@ function verifyPriorSelection(repo: string, base: string, candidate: string, ado
     }
     if (settings.publication.mode !== "adopted") continue;
     const path = settings.publication.adoption_record, record = committedInput(repo, commit, path);
-    if (record !== null && (path !== adopted.record_path || record.sha256 !== adopted.adoption_sha256)) fail("intervening adopted selection");
+    if (record === null) continue;
+    const retained = committedInput(repo, base, path);
+    if (record.mode !== "100644" || retained?.mode !== "100644" || retained.sha256 !== record.sha256) fail("intervening adopted selection");
   }
 }
 
@@ -552,7 +587,7 @@ function compareUpgradeBindings(options: { repo: string; approved_default: strin
   const previous = collectAdoptionBindings(repo, base);
   verifyRetainedInputs(repo, base, candidate,
     [[adopted.record_path, adopted.adoption_sha256], [previous.component_pin.path, previous.component_pin.sha256]]);
-  verifyPriorSelection(repo, base, candidate, adopted);
+  verifyPriorSelection(repo, base, candidate);
   const next = collectAdoptionBindings(repo, candidate);
   if (previous.settings.repository !== next.settings.repository || previous.settings.hostname !== next.settings.hostname
     || previous.settings.default_branch !== next.settings.default_branch) fail("successor consumer identity differs");

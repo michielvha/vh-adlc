@@ -416,3 +416,13 @@ test.each([".vh-adlc/docs-drift-adoptions/[literal].yaml", ":(literal)adoptions/
   const restored = deliverRecord(f, record);
   expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: restored, identity: runtimeIdentity })).toThrow("immutable adoption record changed");
 });
+
+
+test("combined observation names cannot substitute for required adoption observations", () => {
+  const f = source(), record = portableRecord(f), observations = record.receipts.hosted_advisory!.observations;
+  Reflect.deleteProperty(observations, "collection_complete"); Reflect.deleteProperty(observations, "independent_review");
+  Object.assign(observations, { "collection_complete,independent_review": true });
+  const delivered = deliverRecord(f, record);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivered, identity: runtimeIdentity }))
+    .toThrow("incomplete recorded observations hosted_advisory fields");
+});

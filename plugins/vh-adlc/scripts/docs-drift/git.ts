@@ -1,6 +1,7 @@
 import { gitEnvironment, readGitWithEnvironment as nativeGit } from "../git-read";
 import { createYAMLReader } from "../settings-file";
 import type { CollectionReaders } from "../docs-impact/collection";
+import { decodeUTF8, protocolPath, sha256 } from "./protocol";
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -22,6 +23,23 @@ export function readGitWithEnvironment(repo: string, args: string[], environment
     "--no-lazy-fetch", "--no-replace-objects", "-c", "credential.helper=", "-c", "http.extraHeader=",
     "-c", "core.hooksPath=/dev/null", ...args,
   ], ordinaryGitEnvironment(environment));
+}
+
+export type CommittedInput = { path: string; mode: string; blob: string; bytes: Buffer; sha256: string };
+
+/** Read literal adoption-policy blobs without checkout filters, links or submodules. */
+export function readAdoptionInput(repo: string, commit: string, path: string): CommittedInput | null {
+  protocolPath(path);
+  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(commit)) throw Error("incomplete docs-drift adoption immutable commit required");
+  const raw = readGit(repo, "--literal-pathspecs", "ls-tree", "-z", commit, "--", path);
+  if (raw.length === 0) return null;
+  const tab = raw.indexOf(9);
+  const metadata = /^(100644|100755) blob ([a-f0-9]{40}(?:[a-f0-9]{24})?)$/u.exec(raw.subarray(0, tab).toString("ascii"));
+  if (tab < 0 || !metadata || raw.at(-1) !== 0 || decodeUTF8(raw.subarray(tab + 1, -1)) !== path) {
+    throw Error("incomplete docs-drift adoption regular committed input " + path);
+  }
+  const bytes = readGit(repo, "cat-file", "blob", metadata[2]);
+  return { path, mode: metadata[1], blob: metadata[2], bytes, sha256: sha256(bytes) };
 }
 
 /** The verified binary needs its normal cache location. Credential values and hooks stay excluded. */

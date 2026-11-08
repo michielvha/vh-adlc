@@ -313,3 +313,44 @@ test.each(["record", "pin", "record-restored", "pin-restored"] as const)("rollba
   const changed = commitAll(f.source); git(f.source, "switch", "main");
   expect(() => gate.verify({ current_default: changed })).toThrow(scenario === "record" ? "historical adoption input changed" : "immutable predecessor input changed");
 });
+
+test.each(["uncertain", "scanner", "publication", "procedure", "instructions"] as const)("trial successors require coverage for %s changes despite execution labels", async scenario => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, {
+    component: scenario === "uncertain" ? undefined : f.record.protected_manifest.component.value,
+    prepare_candidate(repo, settings) {
+      if (scenario === "scanner") settings.scanner.argv.push("--alternate");
+      if (scenario === "publication") settings.publication.merge_methods = ["merge"];
+      if (scenario === "procedure") put(repo, settings.project_procedure, "Synthetic changed project policy");
+      if (scenario === "instructions") put(repo, "AGENTS.md", "Synthetic changed instructions");
+      put(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
+    },
+    change_definition(definition) { definition.classification = scenario === "uncertain" ? "uncertain" : "execution"; definition.changed_rules = []; },
+  });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(() => gate.verify({ current_default: upgrade.delivered })).toThrow("changed rule coverage required");
+});
+
+test("a compatible successor preserves an unrelated merged branch from an older adoption", async () => {
+  const f = trialAdoptionFixture(roots), first = compatibleTrialUpgrade(f);
+  git(f.source, "switch", "--detach", first.record.predecessor.default_commit);
+  put(f.source, "docs/older-branch.md", "Synthetic unrelated work\n");
+  const olderBranch = commitAll(f.source); git(f.source, "switch", "main");
+  const second = compatibleTrialUpgrade({ ...f, configured: first.configured, candidate: first.candidate, record: first.record }, {
+    suffix: "merged", prepare(repo) {
+      commitAll(repo);
+      git(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "merge", "--no-ff", "--no-edit", olderBranch);
+      put(repo, "docs/after-merge.md", "Synthetic candidate work\n");
+    },
+  });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary), result = gate.verify({ current_default: second.delivered });
+  expect(result.source_candidate).toBe(second.candidate);
+  expect(readGit(f.source, "show", second.candidate + ":docs/older-branch.md").toString()).toBe("Synthetic unrelated work\n");
+});
+
+
+test("uncertain trial-route candidates remain usable when their mapped scenarios pass", async () => {
+  const f = trialAdoptionFixture(roots), upgrade = trialUpgradeFixture(f, { change_definition(definition) { definition.classification = "uncertain"; } });
+  const gate = await adoption.createTrialAdoptionGate(f.boundary);
+  expect(gate.verify({ current_default: upgrade.previousDefault }).component_pin).toEqual(f.record.protected_manifest.component.value);
+  expect(gate.verify({ current_default: upgrade.delivered }).source_candidate).toBe(upgrade.candidate);
+});

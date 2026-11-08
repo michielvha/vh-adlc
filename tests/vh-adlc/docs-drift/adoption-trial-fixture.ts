@@ -1,13 +1,13 @@
 /** Owned synthetic adoption sources and explicitly test-only receipt metadata. */
-import { readFileSync } from "node:fs";
+import { chmodSync, readFileSync, rmSync } from "node:fs";
 import { join, relative } from "node:path";
 import { collectAdoptionBindings } from "../../../plugins/vh-adlc/scripts/docs-drift/adoption";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { computeComponentIdentity } from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
-import { canonicalDigest, canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
+import { canonicalDigest, canonicalJSON, decodeUTF8, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { createOwnedObjectStore, readCommittedTree } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { TRIAL_CONTEXT_PATH } from "../../../plugins/vh-adlc/scripts/docs-drift/trial-context";
-import { portableRecord, type AdoptionSourceFixture } from "./adoption-fixture";
+import { portableRecord, write, type AdoptionSourceFixture } from "./adoption-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 import { syntheticTrialFixture } from "./trial-fixture";
 
@@ -131,7 +131,18 @@ export function trialUpgradeFixture(f: UpgradeSource, options: {
   const previousDefault = commitAll(f.source);
   const configured = { ...prototype.configured, trial };
   put(f.source, ".vh-adlc/docs-drift.yaml", canonicalJSON(configured).toString());
-  put(f.source, configured.execution.scheduled_workflow, readGit(f.source, "show", prototype.candidate + ":" + configured.execution.scheduled_workflow).toString());
+  const entries = new Map(readCommittedTree(f.source, prototype.candidate).map(entry => [entry.path, entry]));
+  const changed = decodeUTF8(readGit(f.source, "diff", "--no-ext-diff", "--no-textconv", "--no-renames", "--name-only", "-z",
+    prototype.previousDefault, prototype.candidate, "--")).split("\0").filter(Boolean);
+  for (const path of changed) {
+    if (path === ".vh-adlc/docs-drift.yaml") continue;
+    const entry = entries.get(path);
+    if (!entry) rmSync(join(f.source, path), { force: true });
+    else {
+      if (entry.mode !== "100644" && entry.mode !== "100755") throw Error("unsupported synthetic candidate entry");
+      write(f.source, path, entry.bytes); chmodSync(join(f.source, path), entry.mode === "100755" ? 0o755 : 0o644);
+    }
+  }
   const candidate = commitAll(f.source); git(f.source, "switch", "main");
   const fresh = portableRecord({ repo: f.source, configured, candidate });
   for (const receipt of Object.values(fresh.receipts)) Object.assign(receipt, { evidence_kind: "test-only", fixture_id: f.manifest.fixture_id });

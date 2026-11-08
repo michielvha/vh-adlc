@@ -53,6 +53,21 @@ function scheduledTriggers(triggers: Record<string, unknown>): void {
   }
 }
 
+/** Matching callers must also agree with the configured effective permissions and secret names. */
+export function verifyConfiguredWorkerCaller(options: {
+  bytes: Uint8Array; worker_path: string; permissions: Record<string, string>; secret_mappings: Record<string, string>;
+}): void {
+  const selected = caller(options.bytes, protocolPath(options.worker_path));
+  const effective = selected.job.permissions ?? selected.root.permissions;
+  if (effective === undefined || !canonicalJSON(effective).equals(canonicalJSON(options.permissions))) fail("configured caller permissions differ");
+  const mappings = Object.fromEntries(Object.entries(record(selected.job.secrets ?? {})).map(([name, value]) => {
+    const match = typeof value === "string" && /^\$\{\{\s*secrets\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}$/u.exec(value);
+    if (!match) fail("configured caller secret mapping");
+    return [name, match[1]];
+  }));
+  if (!canonicalJSON(mappings).equals(canonicalJSON(options.secret_mappings))) fail("configured caller secret names differ");
+}
+
 /** Compare complete committed callers. This proof grants no effect or adoption readiness. */
 export function verifyWorkerCallers(options: {
   trial: Uint8Array; scheduled: Uint8Array; worker_path: string; component_pin: string; production_pr_draft: boolean;
