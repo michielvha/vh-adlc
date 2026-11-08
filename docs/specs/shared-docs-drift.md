@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Copilot Opus5.5 R-57 returned NO FINDINGS. The revised recovery spec awaits renewed owner acceptance."
+status: planned
+status_description: "The owner accepted clean R-57. Ready to resume evidence-capture and recovery implementation."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
@@ -688,6 +688,7 @@ None.
 | 2026-11-07 | R-55 | spec | `6deccdcf4b8921e58a6bc7dc48e63b3090ddbb54` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-56 | spec | `6caabfb632d3c4255eb475b8983c332d737644c7` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-57 | spec | `b9342ea91e2e4549febd9f37ca6d2a90d5ca3479` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
+| 2026-11-08 | R-57 | spec | `b9342ea91e2e4549febd9f37ca6d2a90d5ca3479` | n/a | n/a | accepted by owner |
 
 ### R-1
 
