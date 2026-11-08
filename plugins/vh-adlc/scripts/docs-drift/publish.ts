@@ -14,7 +14,7 @@ export type PublishOptions = {
   plan: SealedPlan; transport: PublicationTransport;
   gate: (journal: Journal | null) => Promise<PublicationGate>;
 };
-export type PublishResult = { state: "complete" | "pending" | "retired" | "invalidated"; reason: string | null; journal: Journal; objects: PlanObjects };
+export type PublishResult = { state: "complete" | "pending" | "retired" | "acknowledged" | "invalidated"; reason: string | null; journal: Journal; objects: PlanObjects };
 function fail(reason: string): never { throw Error(`docs-drift publication ${reason}`); }
 
 export class PublicationScopeChanged extends Error {}

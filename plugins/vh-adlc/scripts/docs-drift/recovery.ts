@@ -12,7 +12,7 @@ import type { PublicationTransport, PlanObjects, EffectObservation } from "./tra
 import { PublicationScopeChanged, verifyPublicationGate, type PublishOptions, type PublishResult } from "./publish";
 
 function terminal(journal: Journal, effectId: string): boolean {
-  return journal.events.some(event => event.effect_id === effectId && event.kind === "outcome");
+  return journal.events.some(event => event.effect_id === effectId && (event.kind === "outcome" || event.kind === "acknowledged-delivery"));
 }
 function intended(journal: Journal, effectId: string): boolean {
   return journal.events.some(event => event.effect_id === effectId && event.kind === "intent");
@@ -29,6 +29,7 @@ export async function resumeEffects(options: PublishOptions & { journal_director
   const retired = new Set(journal.events.filter(event => event.kind === "retired-absence").map(event => event.effect_id));
   const complete = () => journal.plan.manifest.effects.every(effect => terminal(journal, effect.id) || retired.has(effect.id));
   const invalidated = journal.events.some(event => event.kind === "invalidation");
+  const acknowledged = journal.events.some(event => event.kind === "acknowledged-delivery");
   const blocked = (effectId: string, reason: string, invalidate = false, recoveryOnly = false): PublishResult => {
     // An acknowledgement can be lost after a local event was published too. Never overwrite it.
     journal = readJournal(options.journal_directory, options.source_repo);
@@ -40,10 +41,25 @@ export async function resumeEffects(options: PublishOptions & { journal_director
   };
   const executing = journal.plan.manifest.effects.find(effect => hasInFlightAttempt(journal, effect));
   if (executing) return blocked(executing.id, "attempt-in-flight");
-  if (complete()) return { state: retired.size ? "retired" : invalidated ? "invalidated" : "complete", reason: null, journal, objects };
+  if (complete()) return { state: acknowledged ? "acknowledged" : retired.size ? "retired" : invalidated ? "invalidated" : "complete", reason: null, journal, objects };
   // This also establishes native contents visibility before any 404 is treated as ref absence.
   const firstPending = journal.plan.manifest.effects.find(effect => !terminal(journal, effect.id) && !retired.has(effect.id));
   if (!firstPending) throw Error("recovery pending-effect invariant");
+  if (acknowledged) {
+    const release = journal.plan.manifest.effects.at(-1)!;
+    if (firstPending.id === release.id && release.kind === "lease-release") {
+      try {
+        await options.transport.identity();
+        const observation = await options.transport.observe(journal.plan, release, objects);
+        if (observation.state === "done") {
+          if (!intended(journal, release.id)) journal = appendIntent(journal, release.id);
+          journal = appendOutcome(journal, release.id, observation.outcome);
+          return { state: "acknowledged", reason: null, journal, objects };
+        }
+      } catch { return blocked(firstPending.id, "acknowledgement-release-observation-unavailable"); }
+    }
+    return blocked(firstPending.id, "acknowledgement-cleanup-required");
+  }
   try { await options.transport.identity(); }
   catch { return blocked(firstPending.id, "native-recovery-observation-unavailable"); }
 
@@ -287,6 +303,8 @@ export async function reconcileAbsent(options: {
   if (ids.includes(receipt.id) || isRetired(receipt.id)) return blocked("receipt-retention-required");
   const executing = plan.manifest.effects.find(effect => hasInFlightAttempt(journal, effect));
   if (executing) return blocked("attempt-in-flight");
+  if (journal.events.some(event => event.kind === "acknowledged-delivery")) return finished()
+    ? result("acknowledged", null) : blocked("acknowledgement-cleanup-required");
   if (finished()) return result(journal.events.some(event => event.kind === "retired-absence") ? "retired" : "complete", null);
   try {
     const identity = await options.transport.identity();

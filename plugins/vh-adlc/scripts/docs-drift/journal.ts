@@ -24,13 +24,17 @@ export type PlanPolicy = {
 };
 export type Outcome = { state: "observed"; observation_sha256: string; resource_id: string | null; object: string | null; lookup?: { path: string; sha256: string } };
 export type Retirement = { scope_sha256: string; request_sha256: string; lookup: { path: string; sha256: string }; never_dispatched?: true; unapplied?: true };
-export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256">;
+export type ReconciliationGrant = Pick<Retirement, "scope_sha256" | "request_sha256"> & { kind?: "owner-delivery-acknowledgement" };
+export type DeliveryAcknowledgement = ReconciliationGrant & {
+  kind: "owner-delivery-acknowledgement"; lookup: { path: string; sha256: string };
+  application_sha256: string; settlement_sha256: string;
+};
 type Attempt = { attempt_id: string; reconciliation?: ReconciliationGrant; atomic_receipt_id?: string };
 type Intent = { effect_sha256: string; atomic_acquisition?: string };
 type AttemptEnd = { attempt_id: string; sent: boolean; reaped: boolean; rejection?: { path: string; sha256: string }; execution?: ExecutionEvidence; capture_unverified?: true };
 type Event = {
-  schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "invalidation" | "attempt" | "attempt-ended" | "recovery-only";
-  effect_id: string; payload: Intent | Outcome | { reason: string } | Retirement | Attempt | AttemptEnd;
+  schema_version: 1; revision: number; previous_sha256: string; kind: "intent" | "outcome" | "handoff" | "retired-absence" | "acknowledged-delivery" | "invalidation" | "attempt" | "attempt-ended" | "recovery-only";
+  effect_id: string; payload: Intent | Outcome | { reason: string } | Retirement | DeliveryAcknowledgement | Attempt | AttemptEnd;
 };
 type Header = {
   schema_version: 1; kind: "docs-drift-journal"; operation_id: string; repository: string;
@@ -205,14 +209,17 @@ function outcome(value: unknown, artifactRoot: string): Outcome {
   if (receipt.object !== null && (typeof receipt.object !== "string" || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(receipt.object))) fail("outcome object");
   return receipt as Outcome;
 }
+function attemptEnding(events: Event[], attempt: Event): Event | undefined {
+  if (!("attempt_id" in attempt.payload)) return undefined;
+  const id = attempt.payload.attempt_id;
+  return events.findLast(event => event.kind === "attempt-ended" && event.effect_id === attempt.effect_id
+    && "attempt_id" in event.payload && event.payload.attempt_id === id && event.revision > attempt.revision);
+}
 function attemptsUnapplied(events: Event[], effectId: string): boolean {
   const attempts = events.filter(event => event.kind === "attempt" && (event.effect_id === effectId
     || "atomic_receipt_id" in event.payload && event.payload.atomic_receipt_id === effectId));
   return attempts.every(attempt => {
-    if (!("attempt_id" in attempt.payload)) return false;
-    const id = attempt.payload.attempt_id;
-    const ended = events.find(event => event.kind === "attempt-ended" && event.effect_id === attempt.effect_id
-      && "attempt_id" in event.payload && event.payload.attempt_id === id);
+    const ended = attemptEnding(events, attempt);
     return ended !== undefined && "sent" in ended.payload && ended.payload.reaped
       && (!ended.payload.sent || "rejection" in ended.payload);
   });
@@ -229,11 +236,12 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
       || payload.atomic_acquisition !== acquisition.id || !previous.some(item => item.kind === "intent" && item.effect_id === acquisition.id))) fail("invalid paired metadata intent");
     if (payload.effect_sha256 !== effectDigest([effect]) || prior.length !== 0) fail("changed or repeated intent");
     for (const earlier of plan.manifest.effects.slice(0, plan.manifest.effects.indexOf(effect))) {
-      if (!(paired && earlier === acquisition) && !previous.some(item => item.effect_id === earlier.id && (item.kind === "outcome" || item.kind === "retired-absence"))) fail("effect order has pending earlier effect");
+      if (!(paired && earlier === acquisition) && !previous.some(item => item.effect_id === earlier.id
+        && ["outcome", "retired-absence", "acknowledged-delivery"].includes(item.kind))) fail("effect order has pending earlier effect");
     }
   } else {
     if (!prior.some(item => item.kind === "intent")) fail("outcome or handoff without intent");
-    if (["outcome", "retired-absence"].includes(event.kind) && prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")) fail("effect already terminal");
+    if (["outcome", "retired-absence"].includes(event.kind) && prior.some(item => ["outcome", "retired-absence", "acknowledged-delivery"].includes(item.kind))) fail("effect already terminal");
     if (event.kind === "attempt") {
       const scoped = Object.hasOwn(event.payload, "reconciliation");
       const paired = Object.hasOwn(event.payload, "atomic_receipt_id");
@@ -246,13 +254,19 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
             && "atomic_acquisition" in item.payload && item.payload.atomic_acquisition === effect.id)) fail("invalid atomic metadata attempt");
       }
       identifier(payload.attempt_id);
+      let acknowledgementAuthority = false;
       if (scoped) {
-        const grant = exact(payload.reconciliation, ["scope_sha256", "request_sha256"]);
+        if (payload.reconciliation === null || typeof payload.reconciliation !== "object") fail("invalid cleanup authority");
+        const tagged = Object.hasOwn(payload.reconciliation, "kind");
+        const grant = exact(payload.reconciliation, ["scope_sha256", "request_sha256", ...(tagged ? ["kind"] : [])]);
+        if (tagged && grant.kind !== "owner-delivery-acknowledgement") fail("invalid acknowledgement authority");
+        acknowledgementAuthority = tagged;
         hash(grant.scope_sha256); hash(grant.request_sha256);
         if (effect.kind !== "receipt-retain" && effect.kind !== "lease-release") fail("cleanup cannot replay business effects");
       }
+      if (previous.some(item => item.kind === "acknowledged-delivery") && !acknowledgementAuthority) fail("acknowledgement cleanup authority required");
       const latest = prior.findLast(item => item.kind === "attempt");
-      if (prior.some(item => item.kind === "outcome" || item.kind === "retired-absence")
+      if (prior.some(item => ["outcome", "retired-absence", "acknowledged-delivery"].includes(item.kind))
         || (!scoped && effect.kind !== "lease-release" && previous.some(item => item.kind === "invalidation" || item.kind === "recovery-only"))
         || (latest && !prior.some(item => item.kind === "attempt-ended" && item.revision > latest.revision))) fail("attempt already pending or operation terminal");
       if (prior.some(item => item.kind === "attempt" && (item.payload as { attempt_id: string }).attempt_id === (event.payload as { attempt_id: string }).attempt_id)) fail("repeated attempt identity");
@@ -292,6 +306,22 @@ function validateEvent(event: Event, plan: SealedPlan, previous: Event[], header
         || typeof payload.sent !== "boolean" || typeof payload.reaped !== "boolean") fail("invalid attempt ending");
     }
     else if (event.kind === "outcome") outcome(event.payload, dirname(header.directory));
+    else if (event.kind === "acknowledged-delivery") {
+      const payload = exact(event.payload, ["kind", "scope_sha256", "request_sha256", "lookup", "application_sha256", "settlement_sha256"]);
+      if (payload.kind !== "owner-delivery-acknowledgement" || header.recovery_mode !== "original"
+        || !["pr-create", "issue-create", "comment-create", "pr-update", "pr-close"].includes(effect.kind)
+        || !prior.some(item => item.kind === "attempt") || prior.some(item => item.kind === "acknowledged-delivery" || item.kind === "retired-absence")
+        || previous.some(item => item.kind === "recovery-only")) fail("invalid delivery acknowledgement");
+      for (const attempt of previous.filter(item => item.kind === "attempt")) {
+        const ended = attemptEnding(previous, attempt);
+        if (!ended || !("sent" in ended.payload) || ended.payload.reaped !== true) fail("acknowledgement executor unsettled");
+      }
+      for (const key of ["scope_sha256", "request_sha256", "application_sha256", "settlement_sha256"]) hash(payload[key]);
+      const lookup = exact(payload.lookup, ["path", "sha256"]);
+      hash(lookup.sha256);
+      if (typeof lookup.path !== "string" || resolve(lookup.path) !== lookup.path || lookup.path.includes("\0")
+        || dirname(lookup.path) !== dirname(header.directory)) fail("invalid acknowledgement lookup");
+    }
     else if (event.kind === "retired-absence") {
       const undispatched = Object.hasOwn(event.payload, "never_dispatched"), unapplied = Object.hasOwn(event.payload, "unapplied");
       if (undispatched && unapplied) fail("contradictory retirement proof");
@@ -406,6 +436,10 @@ export function appendRetirement(journal: Journal, effectId: string, retirement:
   return append(journal, "retired-absence", effectId, retirement);
 }
 
+export function appendAcknowledgement(journal: Journal, effectId: string, acknowledgement: DeliveryAcknowledgement): Journal {
+  return append(journal, "acknowledged-delivery", effectId, acknowledgement);
+}
+
 export function appendAttempt(journal: Journal, effectId: string, attemptId: string, reconciliation?: ReconciliationGrant, atomicReceiptId?: string): Journal {
   return append(journal, "attempt", effectId, { attempt_id: identifier(attemptId), ...(reconciliation ? { reconciliation } : {}), ...(atomicReceiptId ? { atomic_receipt_id: atomicReceiptId } : {}) });
 }
@@ -426,5 +460,5 @@ export function appendRecoveryOnly(journal: Journal, effectId: string, reason: s
   return append(journal, "recovery-only", effectId, { reason: identifier(reason) });
 }
 export function isObservationOnly(journal: Journal): boolean {
-  return journal.header.recovery_mode === "observation-only" || journal.events.some(event => event.kind === "recovery-only");
+  return journal.header.recovery_mode === "observation-only" || journal.events.some(event => event.kind === "recovery-only" || event.kind === "acknowledged-delivery");
 }
