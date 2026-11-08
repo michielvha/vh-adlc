@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "The owner accepted clean R-57. Ready to resume evidence-capture and recovery implementation."
+status: in-progress
+status_description: "Implementing the accepted R-57 evidence-capture and recovery contract."
 issue: https://github.com/michielvha/vh-adlc/issues/59
 branch: feat/shared-docs-drift
 goal: "Repositories can find accumulated documentation drift and resolve verified proposals through a shared workflow while retaining their own scanner, documentation rules and delivery policy."
