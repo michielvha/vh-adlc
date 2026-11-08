@@ -13,7 +13,7 @@ const ROOT = resolve(import.meta.dir, "..", "..");
 const INSTALLER = join(ROOT, "plugins", "vh-adlc", "scripts", "ensure-vh-adlc.sh");
 const REAL_LOCK = join(ROOT, "plugins", "vh-adlc", "vh-adlc.lock.json");
 const VERSION = "9.9.9";
-const DOWNLOAD_BOUNDS = { connection: 5, archive: 25, metadata: 10, retryWindow: 2, retries: 1 };
+const DOWNLOAD_BOUNDS = { connection: 5, archive: 25, metadata: 10, retries: 0 };
 const PLATFORMS = ["darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64"];
 
 // Every throwaway directory a case makes, removed when the file's tests end.
@@ -333,12 +333,11 @@ if (${JSON.stringify(mode)} === 'bounded') {
   const connect = Number(args[args.indexOf('--connect-timeout') + 1]);
   const total = Number(args[args.indexOf('--max-time') + 1]);
   const retries = Number(args[args.indexOf('--retry') + 1]);
-  const retryTime = Number(args[args.indexOf('--retry-max-time') + 1]);
   const bounds = ${JSON.stringify(DOWNLOAD_BOUNDS)};
   const metadata = url === ${JSON.stringify("https://api.github.com/repos/michielvha/vh-adlc/releases/tags/v" + VERSION)};
-  if (!args.includes('--connect-timeout') || !args.includes('--max-time') || !args.includes('--retry') || !args.includes('--retry-max-time')
-    || connect !== bounds.connection || total !== (metadata ? bounds.metadata : bounds.archive) || retryTime !== bounds.retryWindow
-    || !Number.isInteger(retries) || retries < 0 || retries > bounds.retries) process.exit(91);
+  if (!args.includes('--connect-timeout') || !args.includes('--max-time') || !args.includes('--retry') || args[0] !== '-q' || args.includes('--retry-max-time')
+    || connect !== bounds.connection || total !== (metadata ? bounds.metadata : bounds.archive)
+    || !Number.isInteger(retries) || retries !== bounds.retries) process.exit(91);
 }
 if (url === ${JSON.stringify(selected.url)} && ${JSON.stringify(canonicalProxy ?? null)} !== null) {
   const result = Bun.spawnSync([${JSON.stringify(Bun.which("curl", { PATH: "/usr/local/bin:/usr/bin:/bin" }))}, ...args.slice(0, -1), ${JSON.stringify(canonicalProxy ?? "")}], { stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });
@@ -389,8 +388,7 @@ test("release metadata parsing cannot import code from the caller's checkout", (
 });
 
 test("every download has bounded connection, transfer and retry attempts", () => {
-  const maximumTransferTime = 2 * (DOWNLOAD_BOUNDS.archive + DOWNLOAD_BOUNDS.retryWindow)
-    + DOWNLOAD_BOUNDS.metadata + DOWNLOAD_BOUNDS.retryWindow;
+  const maximumTransferTime = 2 * DOWNLOAD_BOUNDS.archive + DOWNLOAD_BOUNDS.metadata;
   expect(maximumTransferTime).toBeLessThan(120);
   const { f, bin, calls } = apiFallbackFixture("bounded");
   const result = run(f, [], [bin]);
@@ -415,6 +413,7 @@ test("a server Retry-After cannot keep the installer waiting past its fallback b
     }, { timeout_ms: 8000, grace_ms: 100, reap_ms: 2000 });
     expect(outcome.timed_out).toBe(false);
     expect(outcome.reaped).toBe(true);
+    expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: false });
     expect(processGroup).toBeGreaterThan(0);
     let groupEmpty = false;
     try { process.kill(-processGroup, 0); }
@@ -423,7 +422,7 @@ test("a server Retry-After cannot keep the installer waiting past its fallback b
     if (outcome.exit_code !== 0) throw new Error(readFileSync(join(f.dir, "installer.stderr"), "utf8"));
     expect(readFileSync(join(f.dir, "installer.stdout"), "utf8").trim()).toBe(cached(f));
     expect(requests).toBeGreaterThan(0);
-    expect(requests).toBeLessThanOrEqual(2);
+    expect(requests).toBe(1);
     expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
   } finally { await server.stop(true); }
 }, 15000);
@@ -464,3 +463,38 @@ for (const mode of ["missing-metadata", "empty-metadata", "missing-api-archive",
     expect(existsSync(f.marker)).toBe(false);
   });
 }
+
+
+test("the owned-process signal record detects a helper left alive after leader exit", async () => {
+  const f = fixture();
+  const outcome = await runOwnedClient(["sh", "-c", "sleep 30 </dev/null >/dev/null 2>&1 &"], {
+    cwd: f.dir, env: { PATH: "/usr/bin:/bin" }, stdout: join(f.dir, "straggler.stdout"), stderr: join(f.dir, "straggler.stderr"),
+  }, { timeout_ms: 2000, grace_ms: 100, reap_ms: 2000 });
+  expect(outcome.exit_code).toBe(0);
+  expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: true });
+});
+
+test("a native partial transfer times out and falls back to the verified archive", async () => {
+  let requests = 0;
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, idleTimeout: 60, fetch() {
+    requests += 1;
+    return new Response(new ReadableStream({ start(controller) { controller.enqueue(new TextEncoder().encode("partial archive")); } }),
+      { headers: { "Content-Length": "1000000" } });
+  } });
+  try {
+    const { f, bin, calls } = apiFallbackFixture("retry-after", server.url.toString());
+    writeFileSync(join(f.home, ".curlrc"), "retry = 99\nretry-all-errors\nretry-delay = 120\n");
+    const outcome = await runOwnedClient(["bash", join(f.plugin, "scripts", "ensure-vh-adlc.sh")], {
+      cwd: f.dir, env: { HOME: f.home, XDG_CACHE_HOME: join(f.home, "cache"),
+        PATH: [bin, "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LC_ALL: "C", NO_PROXY: "127.0.0.1" },
+      stdout: join(f.dir, "partial.stdout"), stderr: join(f.dir, "partial.stderr"),
+    }, { timeout_ms: 35000, grace_ms: 100, reap_ms: 2000 });
+    expect(outcome.timed_out).toBe(false);
+    expect(outcome.exit_code).toBe(0);
+    expect(outcome.signals[0]).toEqual({ signal: "SIGTERM", accepted: false });
+    expect(readFileSync(join(f.dir, "partial.stdout"), "utf8").trim()).toBe(cached(f));
+    expect(readFileSync(join(f.dir, "partial.stderr"), "utf8")).toContain("curl: (28)");
+    expect(requests).toBe(1);
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+  } finally { await server.stop(true); }
+}, 40000);
