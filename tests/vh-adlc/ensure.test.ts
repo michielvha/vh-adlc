@@ -314,7 +314,7 @@ test("installs the released binary from the real lock", () => {
     .toEqual({ exit: 0, result: "answered", value: { schema_version: 1, source_roots: ["src"] } });
 }, 120_000);
 
-function apiFallbackFixture(mode: "valid" | "bounded" | "retry-after" | "missing-download" | "wrong-host" | "wrong-browser" | "duplicate" | "wrong-archive" | "wrong-binary", canonicalProxy?: string) {
+function apiFallbackFixture(mode: "valid" | "bounded" | "retry-after" | "missing-download" | "empty-primary" | "wrong-primary" | "missing-metadata" | "empty-metadata" | "missing-api-archive" | "empty-api-archive" | "partial-primary-missing-api" | "wrong-host" | "wrong-browser" | "duplicate" | "wrong-archive" | "wrong-binary", canonicalProxy?: string) {
   const f = fixture(mode === "wrong-binary" ? { binarySha: "0".repeat(64) } : {});
   const assets = f.lock.assets as Record<string, Record<string, string>>;
   const selected = assets[platform()];
@@ -345,11 +345,18 @@ if (url === ${JSON.stringify(selected.url)} && ${JSON.stringify(canonicalProxy ?
   process.stdout.write(result.stdout); process.stderr.write(result.stderr);
   process.exit(result.exitCode ?? 1);
 }
-if (url === ${JSON.stringify(selected.url)}) process.exit(${mode === "missing-download" ? 0 : 22});
+if (url === ${JSON.stringify(selected.url)}) {
+  if (${JSON.stringify(mode)} === 'empty-primary') { writeFileSync(output, ''); process.exit(0); }
+  if (${JSON.stringify(mode)} === 'wrong-primary') { writeFileSync(output, 'nonempty wrong primary bytes'); process.exit(0); }
+  if (${JSON.stringify(mode)} === 'partial-primary-missing-api') writeFileSync(output, 'partial primary bytes');
+  process.exit(${mode === "missing-download" ? 0 : 22});
+}
 if (url === ${JSON.stringify("https://api.github.com/repos/michielvha/vh-adlc/releases/tags/v" + VERSION)}) {
-  writeFileSync(output, JSON.stringify(${JSON.stringify(release)}));
+  if (${JSON.stringify(mode)} === 'missing-metadata') process.exit(0);
+  writeFileSync(output, ${mode === "empty-metadata" ? "''" : "JSON.stringify(" + JSON.stringify(release) + ")"});
 } else if (url === ${JSON.stringify(endpoint)} && args.includes('Accept: application/octet-stream')) {
-  writeFileSync(output, ${mode === "wrong-archive" ? "Buffer.from('unverified archive')" : "readFileSync(" + JSON.stringify(f.asset) + ")"});
+  if (${JSON.stringify(mode)} === 'missing-api-archive' || ${JSON.stringify(mode)} === 'partial-primary-missing-api') process.exit(0);
+  writeFileSync(output, ${mode === "empty-api-archive" ? "Buffer.alloc(0)" : mode === "wrong-archive" ? "Buffer.from('unverified archive')" : "readFileSync(" + JSON.stringify(f.asset) + ")"});
 } else process.exit(90);
 `, { mode: 0o755 });
   return { f, bin, calls };
@@ -399,13 +406,20 @@ test("a server Retry-After cannot keep the installer waiting past its fallback b
   } });
   try {
     const { f, bin, calls } = apiFallbackFixture("retry-after", server.url.toString());
+    let processGroup = 0;
     const outcome = await runOwnedClient(["bash", join(f.plugin, "scripts", "ensure-vh-adlc.sh")], {
+      started: pid => { processGroup = pid; },
       cwd: f.dir, env: { HOME: f.home, XDG_CACHE_HOME: join(f.home, "cache"),
         PATH: [bin, "/usr/local/bin", "/usr/bin", "/bin"].join(":"), LC_ALL: "C", NO_PROXY: "127.0.0.1" },
       stdout: join(f.dir, "installer.stdout"), stderr: join(f.dir, "installer.stderr"),
     }, { timeout_ms: 8000, grace_ms: 100, reap_ms: 2000 });
     expect(outcome.timed_out).toBe(false);
     expect(outcome.reaped).toBe(true);
+    expect(processGroup).toBeGreaterThan(0);
+    let groupEmpty = false;
+    try { process.kill(-processGroup, 0); }
+    catch (error) { groupEmpty = error instanceof Error && "code" in error && error.code === "ESRCH"; }
+    expect(groupEmpty).toBe(true);
     if (outcome.exit_code !== 0) throw new Error(readFileSync(join(f.dir, "installer.stderr"), "utf8"));
     expect(readFileSync(join(f.dir, "installer.stdout"), "utf8").trim()).toBe(cached(f));
     expect(requests).toBeGreaterThan(0);
@@ -421,3 +435,32 @@ test("a successful curl exit without an archive still takes the verified fallbac
   expect(result.out).toBe(cached(f));
   expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
 });
+
+test("an empty primary archive takes the locked fallback", () => {
+  const { f, bin, calls } = apiFallbackFixture("empty-primary"), result = run(f, [], [bin]);
+  expect(result.code).toBe(0);
+  expect(result.out).toBe(cached(f));
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(3);
+});
+
+test("nonempty wrong primary bytes fail integrity without contacting the API", () => {
+  const { f, bin, calls } = apiFallbackFixture("wrong-primary"), result = run(f, [], [bin]);
+  expect(result.code).toBe(1);
+  expect(result.err).toContain("digest does not match the lock");
+  expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(1);
+  expect(existsSync(cached(f))).toBe(false);
+  expect(existsSync(f.marker)).toBe(false);
+});
+
+for (const mode of ["missing-metadata", "empty-metadata", "missing-api-archive", "empty-api-archive", "partial-primary-missing-api"] as const) {
+  test(`missing download data reports unavailable for ${mode}`, () => {
+    const { f, bin, calls } = apiFallbackFixture(mode), result = run(f, [], [bin]);
+    const metadata = mode === "missing-metadata" || mode === "empty-metadata";
+    expect(result.code).toBe(1);
+    expect(result.err).toContain(metadata ? "binary unavailable: reading the locked release metadata failed"
+      : "binary unavailable: downloading the locked API asset failed");
+    expect(readFileSync(calls, "utf8").trim().split("\n")).toHaveLength(metadata ? 2 : 3);
+    expect(existsSync(cached(f))).toBe(false);
+    expect(existsSync(f.marker)).toBe(false);
+  });
+}

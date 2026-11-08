@@ -122,8 +122,9 @@ if ! curl -fsSL --connect-timeout 5 --max-time 25 --retry 1 --retry-max-time 2 -
   command -v python3 >/dev/null 2>&1 || die "binary unavailable: the release API fallback requires python3"
   repo_api=https://api.github.com/repos/michielvha/vh-adlc
   echo "vh-adlc: trying the locked release through the GitHub asset API" >&2
-  curl -fsSL --connect-timeout 5 --max-time 10 --retry 1 --retry-max-time 2 --max-filesize 1048576 -o "$work/release.json" "$repo_api/releases/tags/v$version" ||
+  if ! curl -fsSL --connect-timeout 5 --max-time 10 --retry 1 --retry-max-time 2 --max-filesize 1048576 -o "$work/release.json" "$repo_api/releases/tags/v$version" || [[ ! -s "$work/release.json" ]]; then
     die "binary unavailable: reading the locked release metadata failed"
+  fi
   # Bind the API object to the canonical lock URL, asset name and release tag.
   api_asset_url=$(python3 -I - "$work/release.json" "$version" "$asset_name" "$url" "$repo_api" 2>/dev/null <<'PY'
 import json
@@ -152,8 +153,10 @@ if asset.get("url") != expected:
 print(expected)
 PY
   ) || die "binary unavailable: the release API did not identify the locked asset"
-  curl -fsSL --connect-timeout 5 --max-time 25 --retry 1 --retry-max-time 2 -H 'Accept: application/octet-stream' -o "$work/asset.tar.gz" "$api_asset_url" ||
+  rm -f "$work/asset.tar.gz"
+  if ! curl -fsSL --connect-timeout 5 --max-time 25 --retry 1 --retry-max-time 2 -H 'Accept: application/octet-stream' -o "$work/asset.tar.gz" "$api_asset_url" || [[ ! -s "$work/asset.tar.gz" ]]; then
     die "binary unavailable: downloading the locked API asset failed"
+  fi
 fi
 [[ "$(sha256 "$work/asset.tar.gz")" == "$asset_sha" ]] ||
   die "the downloaded asset's digest does not match the lock; nothing was installed"
