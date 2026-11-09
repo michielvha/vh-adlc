@@ -1054,6 +1054,7 @@ None.
 | 2026-11-07 | R-57 | spec | `b9342ea91e2e4549febd9f37ca6d2a90d5ca3479` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
 | 2026-11-08 | R-57 | spec | `b9342ea91e2e4549febd9f37ca6d2a90d5ca3479` | n/a | n/a | accepted by owner |
 | 2026-11-09 | R-58 | spec | `63eefe743ffd8823fdfea7a1a8af52fb8a83bf29` | claude-opus-5.5 | procedural | 1 should-fix and 1 nit. Full 167-chunk read coverage. |
+| 2026-11-09 | R-59 | spec | `1798b2b3f2af026c406a75a22d0bd7753591749f` | claude-opus-5.5 | procedural | 1 should-fix summary correction and 1 archive-reference nit. Full 168-chunk read coverage. |
 
 ### R-1
 
@@ -2140,6 +2141,22 @@ SEVERITY: nit
 WHERE: shared-docs-drift.md Context (00071 line 29); T23 "Main freshness" (00929 line 12)
 EVIDENCE: Context says T40 integrated 837ebc4 "with candidate plugin 0.13.0" and that "On 2026-11-09, the branch integrated main `53b62fa72040ce0f6f9c88c75fd0f18385833a24` at `63eefe743ffd8823fdfea7a1a8af52fb8a83bf29`. The current manifests and workflow/compatibility guides use that merged source. Both candidate manifests advance the published plugin version to 0.15.0. The binary lock inherited from main is 0.19.0." The reviewed commit includes main 53b62fa, which changes the covered README, installation, compatibility, marketplace, workflows, authority, lifecycle, loop, lock, manifests, CI and check/discovery tests (main-drift.patch 00001 to 00421). The lock is now 0.19.0 and the guides now count fifteen skills. T23 still describes integrating that default as future work. The documentation convention says to keep current version readings in configuration or dated measurements, not in prose that goes stale (documentation.md 00071 lines 25-26).
 PROPOSAL: Rewrite the Context sentence as dated history. State that the manifests and guides are now reviewed at the 53b62fa integration, and name the resulting candidate version, or point to the manifests instead of stating a version. Change the T23 entry to past tense and record the merge commit.
+
+### R-59
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: docs/specs/shared-docs-drift.md, Context, Owner summary, final paragraph (line 81, chunk 00071 line 11)
+EVIDENCE: The Owner summary says "Exact checkpoint `1b7e8bc` passed 607 tests and every repository partition. Copilot component review 69 returned two nits, addressed locally." It then lists "Normal effect execution, recovery/acknowledgement and post-merge closure assembly ... remain open". The detailed T23 evidence has moved past that point. Commit `70a164b` passed 632 cases and actual component review 73 returned one nit (line 925, chunk 00912 line 14). The normal `publish` and `resume` routes are wired to the native controller (line 932). Synthetic native publication, resume after injected failure, and concurrency controls pass (line 936). The most recent committed gate, at clean `b49154e`, "failed two sixty-second CLI cases" and "still needs a new clean committed gate" (line 934, chunk 00929 line 6). Main freshness records that R-57 is stale for covered default-branch drift and that R-58 led to the 0.15.0 version correction (line 942). The frontmatter status_description already reports the b491 failure and the spec-review refresh. The summary still presents a passing checkpoint and review 69 as the latest proof. feature-documents.md (00071 lines 16-19) requires the summary to agree with the detailed sections, distinguish planned checks from observed proof, and be refreshed when proof changes.
+PROPOSAL: Refresh the final Owner summary paragraph so it matches the current evidence. Name the latest passing checkpoint (`70a164b`, review 73) and the failed `b49154e` committed gate with its pending re-gate. Say that native publish/resume are now wired and pass synthetic local controls, while actual provider/model/installed execution stays open. Note that main `53b62fa` was integrated with candidate 0.15.0 and that spec freshness review is pending on an unchanged accepted baseline. This is a summary-only prose correction, so the normative baseline does not change.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: docs/specs/shared-docs-drift.md, T23 "Main freshness" paragraph (line 942, chunk 00929 line 14)
+EVIDENCE: The paragraph says "The successful refresh uses a fresh `spec-copilot-r62` archive." The spec review of this exact commit, 1798b2b, runs from the packet archive `spec-copilot-r63`. No R-59 Review Log row or stored records for an r62 review exist (the Review Log ends at R-58, chunks 01040 and 02123). The archive name recorded as the successful refresh therefore does not match the review that actually examines this commit.
+PROPOSAL: When recording this review, give the archive that actually produced it (`spec-copilot-r63`). If r62 was prepared but not used, state that briefly instead of calling it the successful refresh.
 
 ## Sources
 
