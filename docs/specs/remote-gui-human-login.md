@@ -188,7 +188,15 @@ Existing running sessions retain the executable and mode they started with until
 
 ## Tasks
 
-None yet; written once the document is planned.
+- [ ] T1 `plugins/remote-gui/internal/config/config_test.go`, `plugins/remote-gui/internal/app/app_test.go` - add phase/command and legacy-default regressions, then observe failure because human mode and handoff are absent (AC-01, AC-05).
+- [ ] T2 `plugins/remote-gui/internal/config/config.go`, `plugins/remote-gui/internal/app/app.go`, `plugins/remote-gui/internal/state/` - implement validated browser-mode inputs, required handoff mode, secret-free phase fields and legacy record defaults; pass the T1 checks (AC-01, AC-05).
+- [ ] T3 `plugins/remote-gui/internal/browser/browser_test.go`, `plugins/remote-gui/internal/browser/lifecycle_test.go`, `tests/remote-gui/browser.e2e.test.ts` - add owned-marker/VNC human-mode and native session-restoration fixtures, including session-only HttpOnly cookies and tab storage, then observe the unsupported-phase failures (AC-01, AC-02).
+- [ ] T4 `plugins/remote-gui/internal/browser/`, `plugins/remote-gui/internal/session/` - implement the owned human browser launch, connection probe, native tab restoration and bounded browser transition handle, then pass the T3 checks with debugging absent during human mode (AC-01, AC-02).
+- [ ] T5 `plugins/remote-gui/internal/session/`, `plugins/remote-gui/cmd/remote-gui/main_test.go` - add failing supervisor-control and lifecycle regressions for handoff, duplicate/concurrent requests, foreign identities, profile locks, lost state, stop and expiry (AC-02, AC-03, AC-05).
+- [ ] T6 `plugins/remote-gui/internal/session/`, `plugins/remote-gui/cmd/remote-gui/main.go` - connect the handoff command to serialized supervisor transitions and truthful status, then pass the T5 checks without duplicate browsers or unrelated process/Serve changes (AC-02, AC-03, AC-05).
+- [ ] T7 `tests/remote-gui/`, `plugins/remote-gui/internal/config/config_test.go` - add installed-agent routing and packaging regressions for authentication phases, provider rejection, bounded initial navigation and legacy operations, then observe the current skill's failures (AC-04, AC-05, AC-06).
+- [ ] T8 `plugins/remote-gui/skills/remote-gui/SKILL.md`, `plugins/remote-gui/README.md`, `plugins/remote-gui/.claude-plugin/plugin.json`, `docs/reference/marketplace.md`, `tests/remote-gui/README.md` - update canonical routing, phase definitions, supported-host setup and plugin version through the existing packaging path, then pass T7 (AC-04, AC-05, AC-06).
+- [ ] T9 `docs/specs/remote-gui-human-login.md`, `tests/remote-gui/` - run required Go/Bun/lint/build checks, installed-package fixtures under both dependency configurations, owner Google/Tailscale sign-in and confirmed hand-back, then record actual results and any unavailable acceptance check (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06).
 
 ## Open Questions
 
