@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -96,6 +97,13 @@ func TestBrowserPhaseArguments(t *testing.T) {
 				t.Fatal("legacy agent control missing")
 			}
 		})
+	}
+}
+
+func TestVNCArgumentsLeaveSelectionsToTheHelper(t *testing.T) {
+	want := []string{"-display", ":123", "-localhost", "-rfbport", "5901", "-rfbauth", "/owned/session/vnc.passwd", "-forever", "-shared", "-noxdamage", "-nosel", "-quiet"}
+	if got := vncArgs(":123", "5901", "/owned/session/vnc.passwd"); !slices.Equal(got, want) {
+		t.Fatalf("x11vnc arguments: %q", got)
 	}
 }
 
