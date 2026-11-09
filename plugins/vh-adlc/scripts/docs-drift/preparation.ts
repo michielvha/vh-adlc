@@ -223,12 +223,21 @@ export function inspectCandidate(options: {
     requireOwnedStore(store, source.settings.repository);
     if (store.source_commit !== candidate.source_commit) throw Error("Retained candidate object store source changed");
     result.object_store = store;
-    const emptyTree = writeMetadataObject(store.root, "tree", Buffer.alloc(0));
-    result.diff_sha256 = sha256(readGit(store.root, "--attr-source=" + emptyTree, "-c", "core.attributesFile=/dev/null", "-c", "core.quotePath=true",
-      "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "-c", "diff.indentHeuristic=true", "-c", "diff.suppressBlankEmpty=false",
-      "diff", "--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--diff-algorithm=myers",
-      "--src-prefix=a/", "--dst-prefix=b/", "-O/dev/null", "--unified=3", "--inter-hunk-context=0", source.source_commit, candidate.source_commit, "--"));
+    result.diff_sha256 = sha256(readCandidatePatch(store, source.settings.repository, source.source_commit, candidate.source_commit));
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Candidate inspection unavailable"); }
   return result;
+}
+
+
+/** Use the same fixed raw Git diff for the complete checkpoint and each correction projection. */
+export function readCandidatePatch(store: OwnedObjectStore, repository: string, source: string, candidate: string, paths: string[] = []): Buffer {
+  requireOwnedStore(store, repository);
+  if (store.source_commit !== candidate || ![source, candidate].every(value => /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(value)))
+    throw Error("Candidate patch requires exact retained commits");
+  const emptyTree = writeMetadataObject(store.root, "tree", Buffer.alloc(0));
+  return readGit(store.root, "--attr-source=" + emptyTree, "-c", "core.attributesFile=/dev/null", "-c", "core.quotePath=true",
+    "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "-c", "diff.indentHeuristic=true", "-c", "diff.suppressBlankEmpty=false",
+    "diff", "--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--diff-algorithm=myers",
+    "--src-prefix=a/", "--dst-prefix=b/", "-O/dev/null", "--unified=3", "--inter-hunk-context=0", source, candidate, "--", ...paths.map(protocolPath));
 }

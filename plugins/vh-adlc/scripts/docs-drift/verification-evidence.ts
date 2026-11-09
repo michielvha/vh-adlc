@@ -1,4 +1,4 @@
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 import { artifactDirectoryScope, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { inspectCandidate } from "./preparation";
 import { assessScan } from "./scan";
@@ -61,6 +61,13 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
       || p.cancelled !== null || p.output_limit !== false || p.reaped !== true) fail("successful reaped process required");
   }
   complete(process);
+  const scannerStart = json(read(originals.start));
+  if (scannerStart === null || typeof scannerStart !== "object" || Array.isArray(scannerStart)) fail("original scanner start required");
+  const launched = scannerStart as Record<string, unknown>, argv = launched.argv, configured = snapshot.settings.scanner.argv;
+  if (launched.pid !== process.pid || launched.source_commit !== options.candidate || !Array.isArray(argv) || typeof argv[0] !== "string"
+    || !same(argv.slice(1), [...configured.slice(1), "--protocol-bindings", join(dirname(scan.checkout), "bindings.json"), "--protocol-json", scan.output_path])
+    || (configured[0].includes("/") ? argv[0] !== (isAbsolute(configured[0]) ? configured[0] : join(scan.checkout, configured[0])) : basename(argv[0]) !== configured[0]))
+    fail("original scanner launch binding changed");
   const allocation = json(read(originals.record));
   if (allocation === null || typeof allocation !== "object" || Array.isArray(allocation)
     || (allocation as Record<string, unknown>).kind !== "assessment-checkout"
@@ -73,7 +80,8 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
   if (scan.output_path !== join(scanRoot, "scan.json")
     || relative(scope.directory, scan.output_path) !== originals.report.path || relative(scope.directory, scan.record_path) !== originals.record.path
     || relative(scope.directory, join(scanRoot, "bindings.json")) !== originals.bindings.path
-    || relative(scope.directory, join(scanRoot, "process-result.json")) !== originals.process.path) fail("original scanner artifact location changed");
+    || relative(scope.directory, join(scanRoot, "process-result.json")) !== originals.process.path
+    || relative(scope.directory, join(scanRoot, "process-start.json")) !== originals.start.path) fail("original scanner artifact location changed");
   if (!Array.isArray(value.commands) || value.commands.length !== snapshot.settings.verification_commands.length) fail("complete configured verification required");
   for (const [index, command] of value.commands.entries()) {
     if (!same(command.argv, snapshot.settings.verification_commands[index])) fail("configured verification vector changed");

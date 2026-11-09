@@ -7,7 +7,7 @@ import type { CLIReport } from "../../../plugins/vh-adlc/scripts/docs-drift/cli"
 import { commitAll, git, populateRepository, put } from "./repository-fixture";
 import { source, pin, write, commit, portableRecord, deliverRecord } from "./adoption-fixture";
 import { trialDefinitionFixture } from "./trial-definition-fixture";
-import { runtimeFixture } from "./runtime-fixture";
+import { nativeReader, runtimeFixture } from "./runtime-fixture";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
 const roots: string[] = [];
@@ -26,32 +26,6 @@ function invoke(argv: string[], environment = process.env) {
   return { result, report: JSON.parse(result.stdout.toString()) as CLIReport };
 }
 
-function nativeReader(f: { root: string; candidate: string }, actor = "fixture-bot", errors = false, incompleteInventory = false) {
-  const bin = join(f.root, "native-bin"), trace = join(f.root, "native-reads.jsonl");
-  mkdirSync(bin, { mode: 0o700 });
-  writeFileSync(join(bin, "gh"), `#!${process.execPath}
-import { appendFileSync } from "node:fs";
-const args = process.argv.slice(2), endpoint = args.find(value => value.startsWith("repos/"));
-appendFileSync(${JSON.stringify(trace)}, JSON.stringify({ args, provider: process.env.COPILOT_GITHUB_TOKEN ?? null,
-  credential: process.env.GH_TOKEN === "synthetic-read-token", enterprise: process.env.GH_ENTERPRISE_TOKEN === "synthetic-read-token" }) + "\\n");
-if (args.includes("graphql")) {
-  console.log(JSON.stringify({ data: { viewer: { login: ${JSON.stringify(actor)}, databaseId: 20 } },
-    ...(${errors} ? { errors: [{ message: "Synthetic incomplete viewer" }] } : {}) }));
-} else {
-  if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
-  const sha = ${JSON.stringify(f.candidate)};
-  const value = endpoint === "repos/fixture/docs" ? { id: 10, full_name: "fixture/docs", default_branch: "main" }
-    : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha } }
-    : endpoint === "repos/fixture/docs/git/commits/" + sha ? { sha, tree: { sha: "a".repeat(40) }, parents: [], message: "Synthetic source" }
-    : endpoint === "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1" ? (${incompleteInventory} ? { message: "Synthetic missing inventory" } : [])
-    : null;
-  if (!value) process.exit(92);
-  console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
-}
-`, { mode: 0o700 });
-  return { trace, environment: { ...process.env, PATH: bin + ":" + process.env.PATH,
-    GH_TOKEN: "synthetic-read-token", COPILOT_GITHUB_TOKEN: "synthetic-provider-canary" } };
-}
 
 test("normal signal checks report an unselected staged runtime without changing caller state", () => {
   const f = source(roots);
@@ -287,6 +261,8 @@ test.each([
   ["check-upgrade-signals", "--repo", "x", "--source", "main"], ["trial-bindings", "--fixture", "yes"],
   ["prepare-trial-fixture", "--repo", "x", "--source", "a".repeat(40)],
   ["collect-publication-inputs", "--trial-definition", "a".repeat(64)],
+  ["bind-publication", "--trial-definition", "a".repeat(64)],
+  ["check-verification", "--repo", "x", "--source", "a".repeat(40), "--artifact-root", "x"],
 ].map(argv => [argv]))("unknown, duplicate or unsafe CLI inputs return a structured refusal %j", argv => {
   const { result, report } = invoke(argv);
   expect(result.exitCode).toBe(2);
@@ -294,12 +270,15 @@ test.each([
   expect(report.diagnostics.length).toBeGreaterThan(0);
 });
 
-test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
+test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
   const f = fixture(), before = captureRepositoryState(f.repo), native = nativeReader({ ...f, candidate: f.commit });
   let artifacts = kind === "caller" ? f.repo : f.artifacts;
   if (kind === "shared") chmodSync(artifacts, 0o755);
   if (kind === "symlink") { artifacts = join(f.root, "artifact-alias"); symlinkSync(f.artifacts, artifacts); }
-  const { result, report } = invoke([command, "--repo", f.repo, "--source", f.commit, "--artifact-root", artifacts], native.environment);
+  const required = command === "check-verification" ? ["--verification", "proof.json", "--verification-sha256", "a".repeat(64)]
+    : command === "bind-publication" ? ["--source-verification", "source.json", "--source-verification-sha256", "a".repeat(64),
+      "--candidate-verification", "candidate.json", "--candidate-verification-sha256", "a".repeat(64), "--decisions", "decisions.json", "--decisions-sha256", "a".repeat(64)] : [];
+  const { result, report } = invoke([command, "--repo", f.repo, "--source", f.commit, "--artifact-root", artifacts, ...required], native.environment);
   expect(result.exitCode).toBe(2);
   expect(report.outcome).toBe("incomplete");
   expect(report.diagnostics[0].message).toContain(kind === "caller" ? "owned resource overlaps" : "private artifact directory required");

@@ -14,7 +14,7 @@ type CandidateVerification = {
   schema_version: 1; kind: "docs-drift-candidate-verification"; authority: "none";
   source_commit: string; candidate_commit: string; complete: boolean; diagnostics: string[];
   inspection: ReturnType<typeof inspectCandidate> | null; scan: ScanRun | null;
-  scan_artifacts: { report: Reference; process: Reference; bindings: Reference; record: Reference } | null; checkout_state_sha256: string | null; commands: CommandResult[]; record_path: string | null; evidence: Reference | null;
+  scan_artifacts: { report: Reference; start: Reference; process: Reference; bindings: Reference; record: Reference } | null; checkout_state_sha256: string | null; commands: CommandResult[]; record_path: string | null; evidence: Reference | null;
 };
 
 /** Run the committed scanner and allowed verification vectors in a fresh owned candidate copy. */
@@ -34,7 +34,7 @@ export async function verifyCandidate(input: Parameters<typeof inspectCandidate>
     result.scan = await runScan(snapshot, { artifact_root: root, owner: options.owner, run: options.run, timeout_ms: options.timeout_ms });
     if (!result.scan.complete) { result.diagnostics.push(...result.scan.diagnostics.map(item => item.message)); throw Error("Candidate scan incomplete"); }
     const scanRoot = dirname(result.scan.output_path);
-    result.scan_artifacts = { report: reference(result.scan.output_path), process: reference(join(scanRoot, "process-result.json")),
+    result.scan_artifacts = { report: reference(result.scan.output_path), start: reference(join(scanRoot, "process-start.json")), process: reference(join(scanRoot, "process-result.json")),
       bindings: reference(join(scanRoot, "bindings.json")), record: reference(result.scan.record_path) };
     result.checkout_state_sha256 = canonicalDigest(captureRepositoryState(result.scan.checkout));
     const checkout = result.scan.checkout, directory = join(root, "candidate-checks-" + randomUUID());

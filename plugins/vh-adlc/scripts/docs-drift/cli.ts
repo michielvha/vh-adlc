@@ -13,6 +13,7 @@ import { collectProposals } from "./proposals";
 import { inspectPreparation, inspectCandidate, prepareEdits, PreparationEvidenceError } from "./preparation";
 import { readCandidateVerificationArtifacts } from "./verification-evidence";
 import { verifyCandidate } from "./candidate-verification";
+import { collectPublicationBindings } from "./publication-bindings";
 import { collectPublicationInputs } from "./publication-inputs";
 import { collectNativeResolution, collectNativeClosure } from "./resolution-entry";
 import { readBoundArtifact } from "./evidence-input";
@@ -28,6 +29,7 @@ export type CLIReport = {
   runtime?: Awaited<ReturnType<typeof selectApprovedRuntime> | ReturnType<typeof selectCandidateRuntime>>;
   proposals?: ReturnType<typeof collectProposals>;
   edit_inspection?: ReturnType<typeof inspectPreparation>;
+  publication_bindings?: Awaited<ReturnType<typeof collectPublicationBindings>>;
   publication_inputs?: Awaited<ReturnType<typeof collectPublicationInputs>>;
   verification?: Awaited<ReturnType<typeof verifyCandidate>>;
   candidate_inspection?: ReturnType<typeof inspectCandidate>;
@@ -57,6 +59,15 @@ bun <plugin>/scripts/docs-drift/cli.ts collect-publication-inputs --repo <assess
   --launcher <invoked-launcher> --settings <invoked-settings>
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
+  [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
+bun <plugin>/scripts/docs-drift/cli.ts bind-publication --repo <assessment-repo> --source <full-commit>
+  --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
+  --artifact-root <private-external-directory> --selection <relative-packet-path>
+  --selection-sha256 <sha256> --cache-root <retained-cache>
+  --entry <hosted|copilot|claude> --launcher <invoked-launcher> --settings <invoked-settings>
+  --source-verification <relative-record-path> --source-verification-sha256 <sha256>
+  --candidate-verification <relative-record-path> --candidate-verification-sha256 <sha256>
+  --decisions <relative-packet-path> --decisions-sha256 <sha256>
   [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
 bun <plugin>/scripts/docs-drift/cli.ts check-verification --repo <assessment-repo> --source <full-commit>
   --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
@@ -123,22 +134,26 @@ Candidate verification reruns the committed scanner and configured verification
 vectors in a fresh credential-free owned copy and retains original process/output
 artifacts. Verification checks re-read those original bytes and current bindings.
 Generators and semantic review follow their separately selected steps.
-Original role evidence, current required observations and actual effect grants
+Publication binding collection rechecks source and candidate verification artifacts,
+current native proposals and the decision packet before deriving review bindings.
+Source verification selects the assessment commit with an empty edit selection.
+Bindings have authority none. Original role evidence, current required observations and actual effect grants
 follow in the controller. This collection has authority none.
 Verification, review and publication follow their own fresh owned-checkout gates.
 `;
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification"].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification"].includes(command);
+  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
-  if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification"].includes(command)) flags.push("--selection", "--selection-sha256");
-  if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification"].includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
+  if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) flags.push("--selection", "--selection-sha256");
+  if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
   if (command === "check-verification") flags.push("--verification", "--verification-sha256");
-  if (command === "collect-publication-inputs") flags.push("--cache-root", "--entry", "--launcher", "--settings");
+  if (["collect-publication-inputs", "bind-publication"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
+  if (command === "bind-publication") flags.push("--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const flag = argv[index], value = argv[index + 1];
@@ -150,9 +165,18 @@ function argumentsForCommand(argv: string[]) {
   const repo = values.get("--repo"), source = values.get("--source"), artifacts = values.get("--artifact-root");
   if (!repo || !source || (needsArtifacts && !artifacts)) throw Error(command + " requires " + flags.join(", "));
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) throw Error(command + " requires a full immutable source commit");
+  const requiredReferences: Record<string, string[]> = {
+    "check-verification": ["--verification", "--verification-sha256"],
+    "bind-publication": ["--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256"],
+  };
+  const missing = (requiredReferences[command] ?? []).filter(flag => !values.has(flag));
+  if (missing.length) throw Error(command + " requires " + missing.join(", "));
   return { command, repo, source, artifacts, cache: values.get("--cache-root"), entry: values.get("--entry"),
     launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition"),
-    selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256"), verification: values.get("--verification"), verification_sha256: values.get("--verification-sha256") };
+    selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256"), verification: values.get("--verification"), verification_sha256: values.get("--verification-sha256"),
+    source_verification: values.get("--source-verification"), source_verification_sha256: values.get("--source-verification-sha256"),
+    candidate_verification: values.get("--candidate-verification"), candidate_verification_sha256: values.get("--candidate-verification-sha256"),
+    decisions: values.get("--decisions"), decisions_sha256: values.get("--decisions-sha256") };
 }
 
 function nativeCredential(hostname: string): string {
@@ -192,10 +216,10 @@ export async function main(argv: string[]): Promise<number> {
   let report: CLIReport;
   try {
     const options = argumentsForCommand(argv), repo = realpathSync(options.repo);
-    if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification"].includes(options.command)) {
+    if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo);
       let candidate: { repo: string; commit: string } | null = null;
-      if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification"].includes(options.command)) {
+      if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(options.command)) {
         if (!options.candidate_repo || !options.candidate) throw Error("candidate inspection requires candidate-repo and candidate");
         candidate = { repo: realpathSync(options.candidate_repo), commit: options.candidate };
         artifactDirectoryScope(artifacts.root, candidate.repo).assertExternal(join(artifacts.root, protocolPath(options.selection)));
@@ -211,16 +235,26 @@ export async function main(argv: string[]): Promise<number> {
         if ((options.resolution_record === undefined) !== (options.resolution_sha256 === undefined)) throw Error("resolution record path and digest are required together");
         const resolution = options.resolution_record !== undefined && options.resolution_sha256 !== undefined
           ? { path: options.resolution_record, sha256: options.resolution_sha256 } : undefined;
-        if (options.command === "collect-publication-inputs") {
+        if (["collect-publication-inputs", "bind-publication"].includes(options.command)) {
           const entry = options.entry;
           if ((entry !== "hosted" && entry !== "copilot" && entry !== "claude") || !options.cache || !options.launcher || !options.settings)
             throw Error("publication input collection requires cache-root, entry, launcher and settings");
           const { settings } = loadCommittedSettings(repo, options.source);
-          const publication_inputs = await collectPublicationInputs({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit,
+          const input: Parameters<typeof collectPublicationInputs>[0] = { repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit,
             resolution_record: resolution, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(), credential: nativeCredential(settings.hostname),
-            cache_directory: resolve(options.cache), entry, launcher_path: resolve(options.launcher), settings_path: resolve(options.settings) });
-          report = { schema_version: 1, command: options.command, outcome: publication_inputs.complete ? "collected" : "incomplete",
-            source_commit: options.source, publication_inputs, diagnostics: publication_inputs.diagnostics.map(message => ({ code: "publication-inputs", message })) };
+            cache_directory: resolve(options.cache), entry, launcher_path: resolve(options.launcher), settings_path: resolve(options.settings) };
+          if (options.command === "bind-publication") {
+            const publication_bindings = await collectPublicationBindings({ ...input,
+              source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
+              candidate_verification: { path: options.candidate_verification, sha256: options.candidate_verification_sha256 },
+              decisions: { path: options.decisions, sha256: options.decisions_sha256 } });
+            report = { schema_version: 1, command: options.command, outcome: publication_bindings.complete ? "collected" : "incomplete",
+              source_commit: options.source, publication_bindings, diagnostics: publication_bindings.diagnostics.map(message => ({ code: "publication-bindings", message })) };
+          } else {
+            const publication_inputs = await collectPublicationInputs(input);
+            report = { schema_version: 1, command: options.command, outcome: publication_inputs.complete ? "collected" : "incomplete",
+              source_commit: options.source, publication_inputs, diagnostics: publication_inputs.diagnostics.map(message => ({ code: "publication-inputs", message })) };
+          }
         } else if (options.command === "verify-candidate") {
           const verification = await verifyCandidate({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit,
             resolution_record: resolution, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });

@@ -98,7 +98,7 @@ test("candidate verification keeps its selected input immutable during asynchron
   expect(result.commands).toHaveLength(1);
 });
 
-test.each(["matching", "scan-report", "scan-process", "scan-bindings", "check-stdout", "check-process", "dirty-owned-copy", "changed-candidate", "incomplete-proof", "wrong-diff"])("original candidate verification evidence %s", async scenario => {
+test.each(["matching", "scan-report", "scan-process", "scan-start", "scan-bindings", "check-stdout", "check-process", "dirty-owned-copy", "changed-candidate", "incomplete-proof", "wrong-diff"])("original candidate verification evidence %s", async scenario => {
   const { verifyCandidate } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification");
   const f = fixture("passed"), options = { repo: f.repo, source: f.source, candidate_repo: f.candidate, candidate: f.head,
     selection: JSON.parse(f.selection.toString()), artifact_root: f.artifacts, owner: "fixture-owner", run: "fixture-run" };
@@ -107,7 +107,7 @@ test.each(["matching", "scan-report", "scan-process", "scan-bindings", "check-st
   const proof = result.evidence!, bytes = readFileSync(join(f.artifacts, proof.path)), body = JSON.parse(bytes.toString());
   const scanRoot = join(body.scan.checkout, "..");
   const targets: Record<string, string> = { "scan-report": body.scan.output_path, "scan-process": join(scanRoot, "process-result.json"),
-    "scan-bindings": join(scanRoot, "bindings.json"), "check-stdout": join(f.artifacts, body.commands[0].stdout.path),
+    "scan-start": join(scanRoot, "process-start.json"), "scan-bindings": join(scanRoot, "bindings.json"), "check-stdout": join(f.artifacts, body.commands[0].stdout.path),
     "check-process": join(f.artifacts, body.commands[0].completion.path) };
   if (targets[scenario]) writeFileSync(targets[scenario], "Changed original evidence\n", { mode: 0o600 });
   if (scenario === "dirty-owned-copy") put(body.scan.checkout, "docs/guide.md", "Later edited proof checkout\n");
@@ -132,6 +132,7 @@ test.each(["matching", "changed-output"])("normal original verification check %s
     selection: JSON.parse(f.selection.toString()), artifact_root: f.artifacts, owner: "fixture-owner", run: "fixture-run" });
   expect(verified.complete).toBe(true);
   if (scenario === "changed-output") writeFileSync(join(f.artifacts, verified.commands[0].stdout.path), "Later changed output\n", { mode: 0o600 });
+  const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
   const outcome = Bun.spawnSync([process.execPath, entry, "check-verification", "--repo", f.repo, "--source", f.source,
     "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts, "--selection", "selection.json", "--selection-sha256", sha256(f.selection),
     "--verification", verified.evidence!.path, "--verification-sha256", verified.evidence!.sha256], { stdout: "pipe", stderr: "pipe", timeout: 60000 });
@@ -139,6 +140,8 @@ test.each(["matching", "changed-output"])("normal original verification check %s
   expect(outcome.exitCode).toBe(scenario === "matching" ? 0 : 2);
   if (scenario === "matching") expect(report.verification).toMatchObject({ complete: true, authority: "none", candidate_commit: f.head });
   else expect(report.diagnostics.map((item: { message: string }) => item.message).join("\n")).toContain("artifact changed");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+  expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
 });
 
 
@@ -170,4 +173,14 @@ test("checking original verification reuses the retained store without allocatin
   const result = await verifyCandidate(options), before = readdirSync(f.artifacts).sort();
   expect(readCandidateVerificationArtifacts({ ...options, reference: result.evidence }).complete).toBe(true);
   expect(readdirSync(f.artifacts).sort()).toEqual(before);
+});
+
+test.each(["--verification", "--verification-sha256"])("original verification check names missing %s", missing => {
+  const f = fixture("passed"), supplied = missing === "--verification" ? ["--verification-sha256", "0".repeat(64)] : ["--verification", "missing.json"];
+  const outcome = Bun.spawnSync([process.execPath, entry, "check-verification", "--repo", f.repo, "--source", f.source,
+    "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts,
+    "--selection", "selection.json", "--selection-sha256", sha256(f.selection), ...supplied], { stdout: "pipe", stderr: "pipe", timeout: 60000 });
+  const report = JSON.parse(outcome.stdout.toString());
+  expect(outcome.exitCode).toBe(2);
+  expect(report.diagnostics.map((item: { message: string }) => item.message).join("\n")).toContain(missing);
 });

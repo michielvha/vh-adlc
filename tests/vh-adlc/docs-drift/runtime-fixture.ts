@@ -42,3 +42,30 @@ export async function runtimeFixture(roots: string[], upgrade = false, bounded =
   return { ...f, setup, retained, native, approved, selection };
 }
 
+
+export function nativeReader(f: { root: string; candidate: string }, actor = "fixture-bot", errors = false, incompleteInventory = false) {
+  const bin = join(f.root, "native-bin"), trace = join(f.root, "native-reads.jsonl");
+  mkdirSync(bin, { mode: 0o700 });
+  writeFileSync(join(bin, "gh"), `#!${process.execPath}
+import { appendFileSync } from "node:fs";
+const args = process.argv.slice(2), endpoint = args.find(value => value.startsWith("repos/"));
+appendFileSync(${JSON.stringify(trace)}, JSON.stringify({ args, provider: process.env.COPILOT_GITHUB_TOKEN ?? null,
+  credential: process.env.GH_TOKEN === "synthetic-read-token", enterprise: process.env.GH_ENTERPRISE_TOKEN === "synthetic-read-token" }) + "\\n");
+if (args.includes("graphql")) {
+  console.log(JSON.stringify({ data: { viewer: { login: ${JSON.stringify(actor)}, databaseId: 20 } },
+    ...(${errors} ? { errors: [{ message: "Synthetic incomplete viewer" }] } : {}) }));
+} else {
+  if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
+  const sha = ${JSON.stringify(f.candidate)};
+  const value = endpoint === "repos/fixture/docs" ? { id: 10, full_name: "fixture/docs", default_branch: "main" }
+    : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha } }
+    : endpoint === "repos/fixture/docs/git/commits/" + sha ? { sha, tree: { sha: "a".repeat(40) }, parents: [], message: "Synthetic source" }
+    : endpoint === "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1" ? (${incompleteInventory} ? { message: "Synthetic missing inventory" } : [])
+    : null;
+  if (!value) process.exit(92);
+  console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
+}
+`, { mode: 0o700 });
+  return { trace, environment: { ...process.env, PATH: bin + ":" + process.env.PATH,
+    GH_TOKEN: "synthetic-read-token", COPILOT_GITHUB_TOKEN: "synthetic-provider-canary" } };
+}
