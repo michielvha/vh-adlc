@@ -41,13 +41,17 @@ type View struct {
 	EnrollmentExpires *time.Time `json:"enrollment_expires_at,omitempty"`
 }
 type BrowserHandle struct {
-	Assets     string
-	Target     string
-	CDPAddress string
-	Marker     string
-	Password   string
-	Owned      []state.Process
-	Stop       func()
+	BrowserMode string
+	MarkerURL   string
+	Handoff     func(context.Context, string) (BrowserHandle, error)
+	Alive       func() bool
+	Assets      string
+	Target      string
+	CDPAddress  string
+	Marker      string
+	Password    string
+	Owned       []state.Process
+	Stop        func()
 }
 
 var BrowserLauncher func(context.Context, config.Config, string) (BrowserHandle, error)
