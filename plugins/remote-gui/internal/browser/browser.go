@@ -24,6 +24,7 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/session"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/xclip"
 )
 
 type child struct {
@@ -50,6 +51,29 @@ type runtime struct {
 	display      *state.Display
 	once         sync.Once
 	cleanupErr   error
+	clip         clipboardHelper
+	// clipMu guards the switch mark and the clipboard's own copy of the
+	// browser mode. Health checks never take it, and the handoff holds it
+	// only to mark and unmark a switch.
+	clipMu        sync.Mutex
+	clipSwitching bool
+	clipMode      string
+}
+
+// clipboardHelper is the session display's clipboard; tests substitute a double.
+type clipboardHelper interface {
+	Set(ctx context.Context, text string) error
+	Get(ctx context.Context) (string, error)
+	Clear(ctx context.Context) error
+	Close() error
+}
+
+var openClipboard = func(ctx context.Context, d xclip.Display) (clipboardHelper, error) {
+	h, err := xclip.Open(ctx, d)
+	if err != nil {
+		return nil, err
+	}
+	return h, nil
 }
 
 func chooseDisplay(start int) (int, error) {
@@ -224,6 +248,9 @@ func (r *runtime) stop() {
 		if r.markerServer != nil {
 			_ = r.markerServer.Close()
 		}
+		if r.clip != nil {
+			_ = r.clip.Close()
+		}
 		for i := len(r.children) - 1; i >= 0; i-- {
 			_ = state.Signal(r.children[i].identity, syscall.SIGTERM)
 		}
@@ -355,6 +382,9 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 	if err = r.save(func(record *state.Record) { record.Display = lease }); err != nil {
 		return empty, err
 	}
+	if r.clip, err = openClipboard(ctx, xclip.Display{Number: number, Socket: socket, Authority: auth}); err != nil {
+		return empty, err
+	}
 	secret, err := randomBytes(6)
 	if err != nil {
 		return empty, err
@@ -371,7 +401,7 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 		return empty, err
 	}
 	_, vncPort, _ := net.SplitHostPort(vncAddress)
-	vnc, err := r.spawn("vnc", app.Tool("REMOTE_GUI_X11VNC", "x11vnc"), []string{"-display", display, "-localhost", "-rfbport", vncPort, "-rfbauth", passwordFile, "-forever", "-shared", "-noxdamage", "-quiet"}, env)
+	vnc, err := r.spawn("vnc", app.Tool("REMOTE_GUI_X11VNC", "x11vnc"), vncArgs(display, vncPort, passwordFile), env)
 	if err != nil {
 		return empty, err
 	}
@@ -403,7 +433,19 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 	r.profile, r.env, r.vncAddress = profile, env, vncAddress
 	r.markerServer = &http.Server{ReadHeaderTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, Handler: http.HandlerFunc(r.serveMarker)}
 	go func() { _ = r.markerServer.Serve(markerListener) }()
-	return r.launch(ctx, c.Mode())
+	handle, err := r.launch(ctx, c.Mode())
+	if err != nil {
+		return empty, err
+	}
+	r.clipMu.Lock()
+	r.clipMode = handle.BrowserMode
+	r.clipMu.Unlock()
+	return handle, nil
+}
+
+// x11vnc leaves selections and cut buffers alone, so only the clipboard helper touches them.
+func vncArgs(display, port, passwordFile string) []string {
+	return []string{"-display", display, "-localhost", "-rfbport", port, "-rfbauth", passwordFile, "-forever", "-shared", "-noxdamage", "-nosel", "-quiet"}
 }
 
 func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandle, error) {
