@@ -221,6 +221,8 @@ Existing running sessions retain the executable and mode they started with until
 - [x] T9 `docs/specs/remote-gui-human-login.md`, `plugins/remote-gui/skills/remote-gui/SKILL.md`, `tests/remote-gui/` - finish missing tab-state/revoked-login fixtures and status-routing clarification, run required Go/Bun/lint/build checks and installed-package fixtures under both dependency configurations, then record owner sign-in/hand-back and unavailable checks (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06).
       Evidence: 2026-11-09, root Go tests/vet/tidy and both modules' pinned lint pass; root Bun reports 1296 pass and zero fail. Real browser race, noVNC, service-sharing and installed-copy fixtures pass, with failed artifacts preserved. The 12-case native batch reports 11 pass and one synthetic owning-workflow failure, followed by a corrected two-case rejected/unfinished-login rerun with 2 pass. The owner completed live sign-in, then the candidate's hand-back preserved authenticated Tailscale admin access. Private receipts retain safe booleans and paths without cookies, provider credentials or policy contents. Manual documentation impact confirms the skill, component README and test guide describe the behavior. Ubuntu CI, an independent physical-machine check and installed-host rollout remain distinct pending observations.
 
+- [ ] T10 `plugins/remote-gui/internal/browser/`, `tests/remote-gui/browser.e2e.test.ts`, `tests/remote-gui/package.test.ts`, `tests/remote-gui/package.json`, `tests/remote-gui/bun.lock`, `.github/workflows/ci.yml`, `tests/remote-gui/README.md` - add failing exact-tab-count and managed-dependency regressions, fix R-3 findings F-01/F-02, then pass the real phase/restoration and frozen-package checks (AC-02, AC-05, AC-06).
+
 ## Open Questions
 
 None.
@@ -232,6 +234,7 @@ None.
 | 2026-11-09 | R-1 | spec | `c60bcd95744e13122b15b230b758e8ae4b7b9f78` | unknown | procedural | Blocking session-restoration gap and glossary clarification; model identity unattested. |
 | 2026-11-09 | R-2 | spec | `4502d8d879e418e1e09e41b595ce345f463df808` | unknown | procedural | No findings; model identity unattested. |
 | 2026-11-09 | R-2 | spec | `4502d8d879e418e1e09e41b595ce345f463df808` | n/a | n/a | accepted by owner |
+| 2026-11-09 | R-3 | implementation | `f8761bda7810990c9ffe8375c925fe811c8738d2` | unknown | procedural | Criteria met with two should-fix findings for duplicate tabs and the CI tool pin. Model identity unattested. |
 
 ### R-1
 
@@ -252,6 +255,47 @@ PROPOSAL: Define the modes and handoff in glossary rows, distinguishing the abse
 ### R-2
 
 NO FINDINGS
+
+### R-3
+
+CRITERION: AC-01 Authentication handoffs selected by the shared agent workflow start in the glossary-defined human mode, with a sandboxed browser, no browser-debugging interface and verified viewer/connection-page input restricted to the owner after the initial connection probe.
+VERDICT: met
+EVIDENCE: At f8761bda7810990c9ffe8375c925fe811c8738d2, independently executed the module's go test -race ./... with real GUI checks enabled and the real noVNC human-phase fixture. Both passed. Inspected browserArgs, validateBrowser, marker origin/generation checks and the canonical skill's owner-input pause. Human launches omit debugging/automation switches, expose no CDP metadata and accept the harmless marker through VNC. Inspected live-human-listeners.json, which records zero owned main-browser TCP listeners. Native unknown-login routing passed in the inspected retained execution log. Viewer input restriction after the probe is procedural.
+
+CRITERION: AC-02 After explicit owner confirmation, the same disposable session can transfer to verified agent control while retaining its sign-in state, viewer URL and expiry, and can return to human control for a later challenge.
+VERDICT: met
+EVIDENCE: At f8761bda7810990c9ffe8375c925fe811c8738d2, independently executed browser.e2e.test.ts. Human/agent/human transitions retained nonpersistent HttpOnly authentication, original account-tab sessionStorage, additional tabs, viewer URL and expiry. JavaScript-only state was lost, and a revoked account returned 401 while readiness remained host-transport-only. Independently reran verify-provider.ts and observed the restored Tailscale /admin/machines page with admin heading/navigation, original marker and unchanged viewer/expiry. The parent supplied the preceding owner's explicit words "I am logged in" and the ordering before hand-back. I did not observe credential entry or each identity-provider step. F-01 records additional marker tabs introduced during restoration.
+
+CRITERION: AC-03 Repeated, concurrent and failed handoffs, foreign process identities, profile-lock failures, stop and expiry preserve unrelated processes and leave a truthful, recoverable lifecycle state without duplicate browsers or private-state leaks.
+VERDICT: met
+EVIDENCE: At f8761bda7810990c9ffe8375c925fe811c8738d2, independently executed the module race suite with real browser lifecycle checks, all eight packages passed. Inspected duplicate/concurrent transitions, foreign identities, unsupported records, profile-lock retention, failed-transition recovery, stop conflicts, crash/expiry cleanup and owned-process signaling. The real noVNC cases deleted their profiles, and the repeated-phase probe ended stopped. Inspected the retained installed-copy failure "stopped browser profile survived" and its successful rerun. This review's browser/package run also passed. The failed run lacks the stop diagnostic needed to identify its cleanup cause, so its reliability anomaly remains recorded.
+
+CRITERION: AC-04 The shared agent uses the glossary-defined phases and readiness meanings, distinguishes viewer readiness from provider acceptance, bounds initial-navigation retries and stops repeating rejected provider logins.
+VERDICT: met
+EVIDENCE: At f8761bda7810990c9ffe8375c925fe811c8738d2, inspected the installed skill, native fixture assertions and retained native execution logs. Unknown login and non-login cases selected human and agent phases, configured SSO delegated to the owning interface, unyielded challenges blocked competing setup, navigation cases bounded retries and verified rendered success or cleanup. Inspected the initial provider-rejected failure and the corrected fake owning-interface instruction honoring null configured identity. The final provider-rejected and unconfirmed-login rerun passed two cases. These are inspected execution artifacts, not a new native-model run by this reviewer. The independently executed revoked-login browser case confirmed that runtime readiness makes no provider-authentication claim.
+
+CRITERION: AC-05 Existing agent-mode and service-sharing callers, old session records, owner-restricted transport, auth-refresh ownership and private cleanup retain their supported behavior.
+VERDICT: met
+EVIDENCE: At f8761bda7810990c9ffe8375c925fe811c8738d2, independently executed module race tests, vet, tidy -diff, golangci-lint v2.15.0 config verify/run and browser/package tests. All passed, lint reported zero issues with sandbox cache-write warnings. Inspected legacy-mode tests, service-sharing/owner-identity tests, private cleanup, auth-refresh sentinels and preserved foreign Serve mappings. Inspected t9-root-go.log and the complete t9-root-bun.log result of 1296 pass and zero fail. My separate restricted-sandbox root Bun attempt hit DNS/network failures and an unrelated timeout and was stopped, so it supplies no passing full-suite claim. Inspected Chromium/Firefox trusted-HTTPS identity fixture passes. Optional SSH coverage and published CI were not established by this review.
+
+CRITERION: AC-06 The independently installed plugin exposes the reviewed runtime and instructions across isolated supported-host configurations, with documented version/update verification, and the owner completes Google/Tailscale sign-in in human mode followed by verified authorized access after hand-back.
+VERDICT: met
+EVIDENCE: At f8761bda7810990c9ffe8375c925fe811c8738d2, independently executed the clean-copy offline package build/help checks and inspected matching 0.2.0 manifests, canonical phase instructions, update guidance and retained installed-copy browser passes under executable overrides and PATH discovery. Those configurations share one physical host, with noVNC explicitly configured. Independently rendered the README Mermaid diagram successfully. The supplied original owner turn explicitly states "I am logged in" after the requested Tailscale flow and before hand-back. Independently reran the authorized provider verification and observed restored Tailscale admin access with unchanged session metadata. Credential entry and each Google identity-provider step were not observed. Marketplace publication, installed-host rollout and Ubuntu CI remain pending.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: plugins/remote-gui/internal/browser/phase.go:36 and plugins/remote-gui/internal/browser/browser.go:468-478
+EVIDENCE: At f8761bda7810990c9ffe8375c925fe811c8738d2, the isolated /tmp/remote-gui-review-tabs.ts probe started one human session and repeated agent/human transitions. Marker-tab counts after successive agent transitions were 3, 6 and 9. browserArgs appends the marker URL on every restored launch, and agent launch additionally creates another marker through /json/new before inspecting restored pages. Existing tests only require a matching marker to exist, so they pass despite this growth. The accepted Design requires restoration of existing tabs without opening replacement copies.
+PROPOSAL: Open the marker only for a fresh browser session and reuse its restored tab during handoffs. Add a repeated human/agent regression requiring one marker and stable tab counts while retaining the account tab's state.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: .github/workflows/ci.yml:117
+EVIDENCE: The new browser-verification setup installs playwright-core@1.64.1 through an inline npm command with no package manifest, lockfile or repository custom updater declaration for that pin. The pinned conventions/delivery.md requires every dependency to live in a supported discoverable manifest or an explicit custom manager and requires independently pinned download verification for executable tools. An inline version alone does not establish that delivery contract.
+PROPOSAL: Declare the browser-test tool in a supported dependency manifest with its generated lockfile and install it frozen in CI. Keep its pin discoverable by the selected dependency updater and report updater adoption separately when it has not been verified.
+
 
 ## Sources
 
