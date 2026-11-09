@@ -82,8 +82,15 @@ test("the report keeps its opening short while retaining every detailed finding"
   for (let index = 0; index < 8; index++) expect(markdown).toContain(`### finding-${index}`);
 });
 
-test.each(["matching", "missing-reference", "wrong-digest", "authority-flag", "caller-artifacts"])("the normal report-findings entry preserves caller state for %s", async fault => {
-  const f = await fixture("unknown"), assessment = retain(f, f.packet), verification = f.original.evidence;
+test.each(["matching", "missing-reference", "wrong-digest", "authority-flag", "caller-artifacts", "near-limit"])("the normal report-findings entry preserves caller state for %s", async fault => {
+  const f = await fixture(fault === "near-limit" ? "confirmed-drift" : "unknown");
+  if (fault === "near-limit") {
+    const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
+    const base = api.readAssessmentReport({ ...f, source_verification: f.original.evidence, assessment: retain(f, f.packet) });
+    const priorBytes = canonicalJSON({ report: base, markdown: api.renderAssessmentReport(base) }).length;
+    f.packet.findings[0].reason = "x".repeat(Math.floor((524288 - priorBytes) / 2) + f.packet.findings[0].reason.length - 2);
+  }
+  const assessment = retain(f, f.packet), verification = f.original.evidence;
   if (!verification) throw Error("Missing source evidence fixture");
   const before = captureRepositoryState(f.repo);
   const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
@@ -103,6 +110,7 @@ test.each(["matching", "missing-reference", "wrong-digest", "authority-flag", "c
   expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
   expect(completion.exit_code, JSON.stringify(report.diagnostics)).toBe(fault === "matching" ? 0 : 2);
   expect(report.command).toBe("report-findings");
+  expect(completion.captured!.stdout.length).toBeLessThanOrEqual(524288);
   if (fault === "matching") {
     expect(report.assessment_report).toMatchObject({ complete: true, authority: "none", counts: { unknown: 1 } });
     expect(report.markdown).toContain("Finding details");
@@ -157,4 +165,35 @@ test("an oversized rendered finding report retains bounded diagnostics and origi
   expect(canonicalJSON({ report, markdown }).length).toBeLessThan(524288);
   expect(markdown).toContain("retained"); expect(markdown).not.toContain("No proposed documentation correction");
   expect(sha256(readFileSync(join(f.artifacts, assessment.path)))).toBe(assessment.sha256);
+});
+
+test("the emitted report envelope bounds diagnostics after detail omission", async () => {
+  const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
+  const f = await fixture(), report = api.readAssessmentReport({ ...f, source_verification: f.original.evidence, assessment: retain(f, f.packet) });
+  const large = { ...structuredClone(report), complete: false, diagnostics: Array.from({ length: 10000 }, (_, i) => `Unavailable input ${i} ${"<".repeat(120)}`) };
+  const bounded = api.boundAssessmentReport(large, 524288), emitted = JSON.stringify(api.assessmentReportOutput(bounded)) + "\n";
+  expect(Buffer.byteLength(emitted)).toBeLessThanOrEqual(524288);
+  expect(bounded.complete).toBe(false); expect(bounded.details_omitted).toBe(true); expect(bounded.diagnostics_omitted).toBeGreaterThan(0);
+  expect(bounded.source_verification).toEqual(report.source_verification); expect(bounded.assessment_reference).toEqual(report.assessment_reference);
+});
+
+test("unavailable assessment counts stay nullable in JSON and Markdown", async () => {
+  const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
+  const f = await fixture(), report = api.readAssessmentReport({ ...f, source_verification: { ...f.original.evidence, sha256: "0".repeat(64) }, assessment: retain(f, f.packet) });
+  for (const count of Object.values(report.counts)) expect(count).toBeNull();
+  expect(api.renderAssessmentReport(report)).toContain("Unassessed candidates unavailable");
+});
+
+test("the owner summary distinguishes provisional verdicts and ranks confirmed drift first", async () => {
+  const api = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
+  const f = await fixture(), report = structuredClone(api.readAssessmentReport({ ...f, source_verification: f.original.evidence, assessment: retain(f, f.packet) }));
+  const confirmed = report.findings[0];
+  report.findings = [{ ...confirmed, assessed: false, verdict: "unknown", finding: { ...confirmed.finding, id: "unassessed", document: "docs/unassessed.md" } },
+    { ...confirmed, verdict: "unknown", finding: { ...confirmed.finding, id: "unknown", document: "docs/unknown.md" } }, confirmed];
+  const markdown = api.renderAssessmentReport(report), opening = markdown.split("## Finding details")[0];
+  expect(markdown).toContain("Caller-recorded verdicts and recommendations remain provisional");
+  expect(opening).toContain("Confirmed drift"); expect(opening).toContain("Unknown"); expect(opening).toContain("Unassessed");
+  expect(opening.indexOf("docs/guide.md")).toBeLessThan(opening.indexOf("docs/unassessed.md"));
+  expect(markdown).toContain(`Severity ${confirmed.finding.severity}`);
+  expect(markdown).toContain("Location");
 });

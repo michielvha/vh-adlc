@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { readAssessmentReport, renderAssessmentReport } from "./assessment-report";
+import { readAssessmentReport, assessmentReportOutput } from "./assessment-report";
 import { checkPublication, publishPublication, resumePublication } from "./publication-controller";
 import { collectCandidateReview } from "./candidate-review";
 import { collectReviewTarget } from "./review-target";
@@ -452,9 +452,7 @@ export async function main(argv: string[]): Promise<number> {
       const assessment_report = readAssessmentReport({ repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(),
         source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
         assessment: { path: options.assessment, sha256: options.assessment_sha256 } });
-      report = { schema_version: 1, command: options.command, outcome: assessment_report.complete ? "collected" : "incomplete", source_commit: options.source,
-        assessment_report, markdown: renderAssessmentReport(assessment_report),
-        diagnostics: assessment_report.diagnostics.map(message => ({ code: "finding-assessment", message })) };
+      report = assessmentReportOutput(assessment_report);
     } else if (options.command === "assess-source") {
       const artifacts = privateArtifacts(options.artifacts, repo);
       const source_assessment = await assessSource({ repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
