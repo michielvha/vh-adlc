@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 import { randomUUID } from "node:crypto";
 import { lstatSync, realpathSync, writeSync } from "node:fs";
-import { resolve } from "node:path";
-import { captureSnapshot, externalArtifactDirectory } from "./snapshot";
+import { join, resolve } from "node:path";
+import { artifactDirectoryScope, captureSnapshot, externalArtifactDirectory } from "./snapshot";
 import { runScan, type ScanRun } from "./scan";
 import { checkUpgradeSignals, collectTrialBindings } from "./adoption";
 import { loadCommittedSettings } from "./settings";
@@ -10,10 +10,10 @@ import { readNativeContext } from "./transport";
 import { prepareTrialFixture } from "./trial-setup";
 import { selectApprovedRuntime, selectCandidateRuntime } from "./bootstrap";
 import { collectProposals } from "./proposals";
-import { inspectPreparation, prepareEdits, PreparationEvidenceError } from "./preparation";
+import { inspectPreparation, inspectCandidate, prepareEdits, PreparationEvidenceError } from "./preparation";
 import { collectNativeResolution, collectNativeClosure } from "./resolution-entry";
 import { readBoundArtifact } from "./evidence-input";
-import { canonicalJSON, decodeUTF8 } from "./protocol";
+import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
 
 type Diagnostic = { code: string; message: string };
 export type CLIReport = {
@@ -25,6 +25,7 @@ export type CLIReport = {
   runtime?: Awaited<ReturnType<typeof selectApprovedRuntime> | ReturnType<typeof selectCandidateRuntime>>;
   proposals?: ReturnType<typeof collectProposals>;
   edit_inspection?: ReturnType<typeof inspectPreparation>;
+  candidate_inspection?: ReturnType<typeof inspectCandidate>;
   retained_resources?: { checkout: string | null; record_path: string | null };
   closure?: Awaited<ReturnType<typeof collectNativeClosure>>;
   resolution?: Awaited<ReturnType<typeof collectNativeResolution>>;
@@ -45,6 +46,11 @@ bun <plugin>/scripts/docs-drift/cli.ts inspect-runtime --repo <repo>
   [--trial-definition <sha256>]
 bun <plugin>/scripts/docs-drift/cli.ts collect-proposals --repo <repo>
   --source <full-current-default-commit>
+bun <plugin>/scripts/docs-drift/cli.ts check-candidate --repo <assessment-repo> --source <full-commit>
+  --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
+  [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
+  --artifact-root <private-external-directory> --selection <relative-packet-path>
+  --selection-sha256 <sha256>
 bun <plugin>/scripts/docs-drift/cli.ts check-edits --repo <repo> --source <full-commit>
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
@@ -83,17 +89,23 @@ Edit checks compute postimages and feature-protection decisions. Semantic
 verification, applying changes and publication have their own lifecycle steps.
 Prepare requires the selected run's local-edit authority. It scans the committed
 source, creates an owned preparation copy and applies the selected postimages.
-The later checkpoint, verification, review and publication steps have their own gates.
+Candidate inspection compares immutable Git objects with the selected complete
+postimages and binds the full diff/tree. Working-tree overlays stay preserved.
+A selected durable resolution record must match its exact bytes, assessed source
+and complete postimages. Required input observations must be available.
+The assessment repo must retain its selected HEAD for feature protection.
+Verification, review and publication follow their own fresh owned-checkout gates.
 `;
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure"].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure"].includes(command);
+  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
-  if (["check-edits", "prepare", "collect-resolution", "collect-closure"].includes(command)) flags.push("--selection", "--selection-sha256");
+  if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].includes(command)) flags.push("--selection", "--selection-sha256");
+  if (command === "check-candidate") flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const flag = argv[index], value = argv[index + 1];
@@ -107,7 +119,7 @@ function argumentsForCommand(argv: string[]) {
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) throw Error(command + " requires a full immutable source commit");
   return { command, repo, source, artifacts, cache: values.get("--cache-root"), entry: values.get("--entry"),
     launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition"),
-    selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256") };
+    selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256") };
 }
 
 function nativeContext(repo: string, source: string) {
@@ -145,8 +157,14 @@ export async function main(argv: string[]): Promise<number> {
   let report: CLIReport;
   try {
     const options = argumentsForCommand(argv), repo = realpathSync(options.repo);
-    if (["check-edits", "prepare", "collect-resolution", "collect-closure"].includes(options.command)) {
+    if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo);
+      let candidate: { repo: string; commit: string } | null = null;
+      if (options.command === "check-candidate") {
+        if (!options.candidate_repo || !options.candidate) throw Error("candidate inspection requires candidate-repo and candidate");
+        candidate = { repo: realpathSync(options.candidate_repo), commit: options.candidate };
+        artifactDirectoryScope(artifacts.root, candidate.repo).assertExternal(join(artifacts.root, protocolPath(options.selection)));
+      }
       const bytes = readBoundArtifact({ source_repo: repo, artifact_root: artifacts.root,
         reference: { path: options.selection, sha256: options.selection_sha256 } });
       let selection: unknown;
@@ -154,7 +172,14 @@ export async function main(argv: string[]): Promise<number> {
         selection = JSON.parse(decodeUTF8(bytes));
         if (!canonicalJSON(selection).equals(bytes)) throw Error("noncanonical selection");
       } catch { throw Error("invalid canonical selection JSON"); }
-      if (["collect-resolution", "collect-closure"].includes(options.command)) {
+      if (candidate) {
+        if ((options.resolution_record === undefined) !== (options.resolution_sha256 === undefined)) throw Error("resolution record path and digest are required together");
+        const resolution = options.resolution_record !== undefined && options.resolution_sha256 !== undefined
+          ? { path: options.resolution_record, sha256: options.resolution_sha256 } : undefined;
+        const candidate_inspection = inspectCandidate({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit, resolution_record: resolution });
+        report = { schema_version: 1, command: options.command, outcome: candidate_inspection.complete ? "collected" : "incomplete",
+          source_commit: options.source, candidate_inspection, diagnostics: candidate_inspection.diagnostics.map(message => ({ code: "candidate-inspection", message })) };
+      } else if (["collect-resolution", "collect-closure"].includes(options.command)) {
         const settings = loadCommittedSettings(repo, options.source).settings;
         const hosted = settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com");
         const input = { repo, source: options.source, selection, artifact_root: artifacts.root, owner: artifacts.owner,

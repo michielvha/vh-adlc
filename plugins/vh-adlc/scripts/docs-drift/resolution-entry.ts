@@ -68,6 +68,7 @@ export async function collectNativeResolution(input: NativeCollectionOptions): P
   if (canonicalDigest(captureRepositoryState(snapshot.repo)) !== before) {
     result.diagnostics.push("Caller changed during resolution collection"); result.complete = false;
   }
+  result.diagnostics = [...new Set(result.diagnostics)];
   return result;
 }
 
@@ -104,6 +105,10 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
       consolidation_id: consolidation, required_inputs: [] };
     const candidate = collectClosureInputs(collection);
     if (!candidate.record) { result.inputs = candidate; result.diagnostics.push(...candidate.diagnostics); throw Error("Durable consolidation record unavailable"); }
+    if (candidate.record.value.source.required_inputs.length > 0) {
+      result.inputs = candidate;
+      throw Error("Current observations for required closure inputs unavailable");
+    }
     const environment = { PATH: options.path,
       ...(settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com")
         ? { GH_TOKEN: options.credential } : { GH_ENTERPRISE_TOKEN: options.credential }) };
@@ -128,5 +133,6 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
   if (canonicalDigest(captureRepositoryState(options.repo)) !== before) {
     result.diagnostics.push("Caller changed during closure collection"); result.complete = false;
   }
+  result.diagnostics = [...new Set(result.diagnostics)];
   return result;
 }

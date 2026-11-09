@@ -18,7 +18,9 @@ function nativePull(proposal: PullRequestInput) {
 }
 
 async function fixture(method: "merge" | "squash" | "rebase", fault = "none") {
-  const f = await closureFixture(roots, method), artifacts = dirname(f.collection.store.record_path), bin = join(artifacts, "native-bin");
+  const f = await closureFixture(roots, method, false, fault === "required-input" ? selected => ({ ...selected.options,
+    collection: { ...selected.collection, snapshot: { ...selected.snapshot,
+      required_inputs: [{ id: "current-date", kind: "time", sha256: sha256(Buffer.from("synthetic recorded date")) }] } } }) : undefined), artifacts = dirname(f.collection.store.record_path), bin = join(artifacts, "native-bin");
   mkdirSync(bin, { mode: 0o700 });
   put(f.repo, "later-unrelated.txt", "Later default commit\n"); const source = commitAll(f.repo);
   git(f.repo, "update-ref", "refs/pull/20/head", f.head);
@@ -26,7 +28,9 @@ async function fixture(method: "merge" | "squash" | "rebase", fault = "none") {
   if (fault === "missing-original-ref") git(f.repo, "update-ref", "-d", "refs/pull/1/head");
   const original = f.proposals.get(1); if (!original) throw Error("missing fixture original");
   const repository = original.base_repository;
-  const consolidation = { ...nativePull(f.consolidation), merged: fault !== "unmerged", merge_commit_sha: f.merged };
+  const merged = fault !== "unmerged" && fault !== "open";
+  const consolidation = { ...nativePull(f.consolidation), merged, merge_commit_sha: merged ? f.merged : null,
+    merged_at: merged ? f.consolidation.merged_at : null, state: fault === "open" ? "open" : "closed" };
   const proposal = { ...nativePull(original), body: fault === "changed-original" ? "Changed original body" : original.body };
   const responses = { "repos/fixture/docs": repository,
     "repos/fixture/docs/git/ref/heads/main": { ref: "refs/heads/main", object: { type: "commit", sha: source } },
@@ -66,11 +70,17 @@ test.each(["merge", "squash", "rebase"] as const)("normal fresh-session %s colle
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 30000);
 
-test.each(["unmerged", "changed-original", "missing-original-ref"])("normal fresh-session collection retains incomplete %s", async fault => {
+test.each(["unmerged", "open", "changed-original", "missing-original-ref", "required-input"])("normal fresh-session collection retains incomplete %s", async fault => {
   const f = await fixture("squash", fault), before = captureRepositoryState(f.repo), { result, report } = invoke(f);
   expect(result.exitCode).toBe(2);
   expect(report.closure.complete).toBe(false);
   expect(report.closure.diagnostics.length).toBeGreaterThan(0);
+  expect(new Set(report.closure.diagnostics).size).toBe(report.closure.diagnostics.length);
+  if (fault === "unmerged" || fault === "open") expect(report.closure.diagnostics).toContain("incomplete closure actual merged consolidation identity");
+  if (fault === "required-input") {
+    expect(report.closure.diagnostics).toContain("Current observations for required closure inputs unavailable");
+    expect(report.closure.inputs.record.value.source.required_inputs).toHaveLength(1);
+  }
   expect(report.diagnostics.map((item: { message: string }) => item.message)).toEqual(report.closure.diagnostics);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 30000);

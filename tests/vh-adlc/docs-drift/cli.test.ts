@@ -293,7 +293,7 @@ test.each([
   expect(report.diagnostics.length).toBeGreaterThan(0);
 });
 
-test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
+test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
   const f = fixture(), before = captureRepositoryState(f.repo), native = nativeReader({ ...f, candidate: f.commit });
   let artifacts = kind === "caller" ? f.repo : f.artifacts;
   if (kind === "shared") chmodSync(artifacts, 0o755);

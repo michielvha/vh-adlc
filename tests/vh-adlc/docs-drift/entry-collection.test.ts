@@ -91,6 +91,7 @@ test.each(["fetch-failed", "missing-pr", "changed-body", "nonancestor-base"])("n
   expect(run.exitCode).toBe(2);
   expect(report.resolution.complete).toBe(false);
   expect(report.resolution.diagnostics.length).toBeGreaterThan(0);
+  expect(new Set(report.resolution.diagnostics).size).toBe(report.resolution.diagnostics.length);
   expect(report.diagnostics.map((item: { message: string }) => item.message)).toEqual(report.resolution.diagnostics);
   expect(report.diagnostics.every((item: { code: string }) => item.code === "resolution-collection")).toBe(true);
   expect(captureRepositoryState(f.repo)).toEqual(before);

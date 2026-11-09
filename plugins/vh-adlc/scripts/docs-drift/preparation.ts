@@ -1,11 +1,12 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { gitReadArguments } from "../git-read";
+import { readGit } from "./git";
 import { publishArtifact } from "./journal";
 import { executeOwnedProcess } from "./owned-process";
-import { canonicalDigest, canonicalJSON, protocolPath, sha256 } from "./protocol";
+import { canonicalDigest, canonicalJSON, compareUTF8, protocolPath, sha256 } from "./protocol";
 import { evaluateProtection, type ProtectionContext, type ProtectionResult } from "./protection";
-import { collectEditChanges, parseEdit, type Edit, type ResolutionChange } from "./resolve";
+import { collectEditChanges, parseEdit, readResolutionRecord, resolutionSource, type Edit, type ResolutionChange } from "./resolve";
 import { runScan, scannerEnvironment, type ScanRun } from "./scan";
 import { captureSnapshot } from "./snapshot";
 
@@ -161,5 +162,60 @@ export async function prepareEdits(input: {
   } catch (error) {
     throw new PreparationEvidenceError(result, failure, error);
   }
+  return result;
+}
+
+type CandidateInspection = {
+  schema_version: 1; kind: "docs-drift-candidate-inspection"; authority: "none"; complete: boolean; diagnostics: string[];
+  source_commit: string; candidate_commit: string; candidate_tree: string | null; diff_sha256: string | null; changed_paths: string[]; resolution_record: { path: string; sha256: string } | null;
+};
+
+/** Compare the complete committed candidate with selected, protected raw-byte postimages. */
+export function inspectCandidate(options: {
+  repo: string; source: string; selection: unknown; candidate_repo: string; candidate: string; protection_context?: ProtectionContext;
+  resolution_record?: { path: string; sha256: string };
+}): CandidateInspection {
+  const result: CandidateInspection = { schema_version: 1, kind: "docs-drift-candidate-inspection", authority: "none", complete: false, diagnostics: [],
+    source_commit: options.source, candidate_commit: options.candidate, candidate_tree: null, diff_sha256: null, changed_paths: [], resolution_record: null };
+  try {
+    const inspection = inspectPreparation(options);
+    result.diagnostics.push(...inspection.diagnostics);
+    if (!inspection.complete) throw Error("candidate selection failed protection or preimage checks");
+    const source = captureSnapshot(options.repo, options.source), candidate = captureSnapshot(options.candidate_repo, options.candidate);
+    if (candidate.settings_sha256 !== source.settings_sha256) throw Error("candidate changes the assessed configuration");
+    readGit(candidate.repo, "merge-base", "--is-ancestor", source.source_commit, candidate.source_commit);
+    if (readGit(candidate.repo, "rev-list", "--min-parents=2", source.source_commit + ".." + candidate.source_commit).length !== 0)
+      throw Error("candidate contains an unreviewed merge interval");
+    const before = new Map(source.blobs.map(blob => [blob.path, blob])), after = new Map(candidate.blobs.map(blob => [blob.path, blob]));
+    const paths = [...new Set([...before.keys(), ...after.keys()])].sort(compareUTF8);
+    const changes = [];
+    for (const path of paths) {
+      const old = before.get(path), next = after.get(path);
+      if (old?.mode === next?.mode && old?.oid === next?.oid) continue;
+      changes.push({ path, before_mode: old?.mode ?? null, after_mode: next?.mode ?? null,
+        before_sha256: old ? sha256(old.bytes) : null, after_sha256: next ? sha256(next.bytes) : null });
+    }
+    const expected = inspection.changes.map(({ after_base64: _bytes, ...change }) => change);
+    if (options.resolution_record) {
+      const selected = options.resolution_record, path = protocolPath(selected.path), blob = after.get(path);
+      if (!/^[a-f0-9]{64}$/u.test(selected.sha256) || !blob || blob.mode !== "100644" || before.has(path)
+        || blob.bytes.length > source.settings.reports.max_entry_bytes || sha256(blob.bytes) !== selected.sha256)
+        throw Error("candidate resolution record binding changed");
+      const record = readResolutionRecord(blob.bytes, source.settings);
+      if (path !== source.settings.publication.resolution_root + "/" + record.id + ".yaml") throw Error("candidate resolution record path changed");
+      if (record.source.required_inputs.length > 0) throw Error("Current observations for required resolution inputs unavailable");
+      if (record.assessed_base !== source.source_commit || !canonicalJSON(record.source).equals(canonicalJSON(resolutionSource(source)))
+        || !canonicalJSON(record.postimages).equals(canonicalJSON(expected))) throw Error("candidate resolution source or postimages changed");
+      expected.push({ path, before_mode: null, after_mode: "100644", before_sha256: null, after_sha256: selected.sha256 });
+      expected.sort((left, right) => compareUTF8(left.path, right.path));
+      result.resolution_record = { path, sha256: selected.sha256 };
+    }
+    if (!canonicalJSON(changes).equals(canonicalJSON(expected))) throw Error("candidate differs from the selected complete postimages");
+    result.changed_paths = changes.map(change => change.path);
+    result.candidate_tree = readGit(candidate.repo, "rev-parse", "--verify", "--end-of-options", candidate.source_commit + "^{tree}").toString().trim();
+    result.diff_sha256 = sha256(readGit(candidate.repo, "diff", "--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames",
+      source.source_commit, candidate.source_commit, "--"));
+    result.complete = true;
+  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Candidate inspection unavailable"); }
   return result;
 }
