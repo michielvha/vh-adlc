@@ -7,6 +7,23 @@ import {createRequire} from 'node:module';
 const enabled=process.env.REMOTE_GUI_VIEWER_E2E==='1';
 const check=(condition:unknown,message:string)=>{if(!condition)throw Error(message)};
 
+function runtimeResult(result: ReturnType<typeof Bun.spawnSync>, command: string) {
+ let output: any;
+ try {
+  output = JSON.parse(result.stdout.toString());
+ } catch {
+  throw Error('runtime returned invalid JSON: ' + command);
+ }
+ const diagnostic = {
+  result: output.result,
+  state: output.state,
+  diagnostic: output.diagnostic,
+  cleanup_diagnostic: output.cleanup_diagnostic,
+ };
+ check(result.exitCode === 0, 'runtime command failed: ' + command + ' ' + JSON.stringify(diagnostic));
+ return output;
+}
+
 async function stopBrowser(cli: (...args: string[]) => any, id: string) {
  let stopped = cli('stop', id);
  const deadline = Date.now() + 10000;
@@ -28,8 +45,7 @@ test.skipIf(!enabled)('real noVNC keyboard input survives exact-browser reattach
  let agent:any;
  const cli=(...args:string[])=>{
   const result=Bun.spawnSync([binary,...args,'--home',root,'--transport','loopback'],{env:process.env});
-  check(result.exitCode===0,'runtime command failed: '+args[0]);
-  return JSON.parse(result.stdout.toString());
+  return runtimeResult(result, args[0]);
  };
  try{
   const first=cli('start','--ttl','2m');sessions.push(first);
@@ -124,8 +140,7 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
  });
  const cli = (...args: string[]) => {
   const result = Bun.spawnSync([binary, ...args, '--home', root, '--transport', 'loopback'], {env: process.env});
-  check(result.exitCode === 0, 'runtime command failed: ' + args[0]);
-  return JSON.parse(result.stdout.toString());
+  return runtimeResult(result, args[0]);
  };
  const waitFor = async (condition: () => boolean | Promise<boolean>, message: string) => {
   const deadline = Date.now() + 15000;

@@ -74,6 +74,26 @@ test('browser test dependency is locked in its managed package', () => {
  expect(ci).not.toContain('npm install --prefix');
 });
 
+test('viewer failures retain runtime diagnostics without access material', () => {
+ const root = mkdtempSync(join(tmpdir(), 'rg-diagnostic-'));
+ try {
+  const binary = join(root, 'runtime');
+  const browserModule = join(root, 'browser.cjs');
+  writeFileSync(binary, '#!/bin/sh\nprintf \'%s\\n\' \'{"result":"failed","diagnostic":"synthetic-runtime-diagnostic","access_code":"private-code-sentinel","url":"https://private-url-sentinel/?secret=query-sentinel"}\'\nexit 1\n', {mode: 0o700});
+  writeFileSync(browserModule, 'module.exports = {chromium: {}};\n');
+  const result = Bun.spawnSync([process.execPath, 'test', join(repo, 'tests/remote-gui/browser.e2e.test.ts'), '-t', 'real noVNC keyboard input'], {
+   cwd: root,
+   env: {...process.env, REMOTE_GUI_VIEWER_E2E: '1', REMOTE_GUI_TEST_BINARY: binary, REMOTE_GUI_PLAYWRIGHT_MODULE: browserModule},
+  });
+  const output = result.stdout.toString() + result.stderr.toString();
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toContain('synthetic-runtime-diagnostic');
+  for (const sentinel of ['private-code-sentinel', 'private-url-sentinel', 'query-sentinel']) expect(output).not.toContain(sentinel);
+ } finally {
+  rmSync(root, {recursive: true, force: true});
+ }
+});
+
 test('unsupported source-build hosts get a platform diagnostic before compiling',()=>{
  const root=mkdtempSync(join(tmpdir(),'rg-platform-'));
  try{
