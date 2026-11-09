@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { inspectRecovery, applyRecovery, recoveryInspectionOutput } from "./recovery-controller";
-import { recoveryEffectsOutput } from "./recovery-output";
+import { recoveryEffectsOutput, publicationEffectsOutput } from "./recovery-output";
 import { OUTPUT_LIMIT } from "./owned-process";
 import type { PublishResult } from "./publish";
 import { readAssessmentReport, assessmentReportOutput } from "./assessment-report";
@@ -46,7 +46,7 @@ export type CLIReport = {
   worker_preparation?: Awaited<ReturnType<typeof collectWorkerPreparation>>;
   worker_inputs?: Awaited<ReturnType<typeof collectWorkerInputs>>;
   publication_check?: Awaited<ReturnType<typeof checkPublication>>;
-  publication_effects?: Awaited<ReturnType<typeof publishPublication>>;
+  publication_effects?: ReturnType<typeof publicationEffectsOutput>["publication_effects"];
   candidate_review?: Awaited<ReturnType<typeof collectCandidateReview>>;
   review_target?: Awaited<ReturnType<typeof collectReviewTarget>>;
   publication_bindings?: Awaited<ReturnType<typeof collectPublicationBindings>>;
@@ -403,9 +403,8 @@ export async function main(argv: string[]): Promise<number> {
               const publication_effects = options.command === "resume"
                 ? await resumePublication({ ...publication, journal_directory: resolve(options.journal_directory!) })
                 : await publishPublication(publication);
-              report = { schema_version: 1, command: options.command,
-                outcome: publicationOutcome(publication_effects.state), source_commit: options.source, publication_effects,
-                diagnostics: publication_effects.reason ? [{ code: "publication-effects", message: publication_effects.reason }] : [] };
+              report = publicationEffectsOutput({ command: options.command, source: options.source, result: publication_effects,
+                outcome: publicationOutcome(publication_effects.state), limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
             }
           } else if (options.command === "read-candidate-review") {
             const candidate_review = await collectCandidateReview({ ...input,

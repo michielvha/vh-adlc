@@ -104,6 +104,22 @@ function localEditable(bytes: Buffer, path: string, snapshot: Snapshot, edit: Ra
   return rule.ranges.some(range => edit.start >= range.start && edit.end <= range.end);
 }
 
+function sourceLocalCoverage(snapshot: Snapshot, yaml: (bytes: Uint8Array) => unknown): ProtectionContext["local_coverage"] {
+  const procedure = snapshot.blobs.find(blob => blob.path === snapshot.settings.project_procedure);
+  if (!procedure) return undefined;
+  const value = readDocumentMetadata(procedure.bytes, yaml)?.docs_drift_local_coverage;
+  if (value === undefined) return undefined;
+  if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error("Project-local coverage declaration must be a mapping");
+  const policy = value as Record<string, unknown>;
+  if (Object.keys(policy).sort().join(",") !== "dialect,terminal_statuses"
+    || policy.dialect !== "feature" && policy.dialect !== "documentation" || !Array.isArray(policy.terminal_statuses)
+    || policy.terminal_statuses.some(status => typeof status !== "string" || !status.trim())
+    || new Set(policy.terminal_statuses).size !== policy.terminal_statuses.length) throw Error("Project-local coverage declaration fields changed");
+  const digest = sha256(procedure.bytes);
+  return { dialect: policy.dialect, terminal_statuses: policy.terminal_statuses, procedure_sha256: digest,
+    procedure_quote: { start: 0, end: procedure.bytes.length, sha256: digest } };
+}
+
 /** This checks proposal eligibility. Exact execution selection and independent review remain separate. */
 export function evaluateProtection(repo: string, snapshot: Snapshot, edits: ProtectedEdit[], context: ProtectionContext = {}): ProtectionResult {
   const result: ProtectionResult = {
@@ -116,6 +132,13 @@ export function evaluateProtection(repo: string, snapshot: Snapshot, edits: Prot
     for (const diagnostic of roots.diagnostics) gap(diagnostic.code, diagnostic.path, diagnostic.message);
     if (result.diagnostics.length === 0) gap("assessment-source", undefined, "Protection requires the exact committed assessment and complete root classification.");
     return result;
+  }
+  if (roots.policy.local_format && context.local_coverage === undefined) {
+    try { context = { ...context, local_coverage: sourceLocalCoverage(snapshot, readers.yaml) }; }
+    catch (error) {
+      gap("feature-classification", snapshot.settings.project_procedure, error instanceof Error ? error.message : "Project-local coverage unavailable");
+      return result;
+    }
   }
   const features: Feature[] = [];
   for (const blob of snapshot.blobs) {

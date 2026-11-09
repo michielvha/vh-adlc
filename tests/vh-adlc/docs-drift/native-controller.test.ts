@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { originalPublicationFixture, installOwnedNativeService } from "./original-publication-fixture";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { readJournal } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 
 test("the retained native controller publishes one exact PR and settles its real owned Git lease", async () => {
@@ -48,7 +49,12 @@ test("the normal retained publish CLI delivers its exact approved batch without 
     const report = JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString());
     expect(report.command).toBe("publish"); expect(report.publication_effects.state).toBe("complete");
     const state = JSON.parse(readFileSync(service.statePath, "utf8")); expect(state.prs).toHaveLength(1);
-    expect(state.prs[0].body).toBe(report.publication_effects.journal.plan.manifest.effects.find((effect: { kind: string }) => effect.kind === "pr-create").payload.body);
+    const retainedJournal = readJournal(report.publication_effects.journal.directory, f.repo);
+    const delivered = retainedJournal.plan.manifest.effects.find(effect => effect.kind === "pr-create");
+    if (!delivered) throw Error("Missing original reviewed PR effect");
+    expect(state.prs[0].body).toBe(delivered.payload.body);
+    expect(report.publication_effects.journal.sha256).toBe(retainedJournal.digest);
+    expect(JSON.stringify(report)).not.toContain("Exact synthetic source correction");
     expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-lease").toString()).toBe("");
     expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
     for (const root of roots) rmSync(root, { recursive: true, force: true });

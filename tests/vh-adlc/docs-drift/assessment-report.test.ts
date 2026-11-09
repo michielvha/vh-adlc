@@ -10,7 +10,7 @@ import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-dr
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 
-async function fixture(verdict = "confirmed-drift", options: { badRoots?: boolean; feedback?: boolean } = {}) {
+async function fixture(verdict = "confirmed-drift", options: { badRoots?: boolean; feedback?: boolean; localCoverage?: "declared" | "omitted" | "malformed" } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "vh-drift-assessment-report-"))); roots.push(root);
   const repo = join(root, "source"), artifacts = join(root, "artifacts");
   mkdirSync(repo, { mode: 0o700 }); mkdirSync(artifacts, { mode: 0o700 });
@@ -24,6 +24,13 @@ async function fixture(verdict = "confirmed-drift", options: { badRoots?: boolea
   }
   let source = populateRepository(repo, false, scanner).commit;
   if (options.badRoots) { put(repo, "AGENTS.md", "Feature documents: ../escape/\n"); source = commitAll(repo); }
+  if (options.localCoverage) {
+    put(repo, "AGENTS.md", "Feature documents: plans/\nFeature document format: local\n");
+    put(repo, "plans/prior.md", "---\nstatus: shipped\nbranch: feat/prior\ncovers: [docs/**]\n---\n# Prior local plan\n");
+    if (options.localCoverage !== "omitted") put(repo, "docs/docs-procedure.md", "---\ndocs_drift_local_coverage:\n  dialect: documentation\n  terminal_statuses: "
+      + (options.localCoverage === "malformed" ? "shipped" : "[shipped]") + "\n---\n\nSynthetic project-local coverage convention.\n");
+    source = commitAll(repo);
+  }
   const common = { repo, source, artifact_root: artifacts, owner: "fixture-owner", run: "fixture-report" };
   const original = await assessSource(common);
   if (!original.complete || !original.evidence || !original.scan || original.scan.findings.length !== 1) throw Error("Missing complete original scanner fixture");
@@ -229,4 +236,30 @@ test("bounded report diagnostics preserve Unicode and the final minimal fallback
   expect(Buffer.byteLength(JSON.stringify(api.assessmentReportOutput(minimal)) + "\n")).toBeLessThanOrEqual(4000);
   expect(api.renderAssessmentReport(minimal).split("## Incomplete inputs")[1]).toContain("5 additional diagnostic");
   expect(() => api.boundAssessmentReport(report, 1)).toThrow("Configured output bound cannot hold");
+});
+
+
+test.each(["declared", "omitted", "malformed"] as const)("finding reports load only source-declared project-local coverage (%s)", async localCoverage => {
+  const { readAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
+  const f = await fixture("unknown", { localCoverage }), assessment = retain(f, f.packet);
+  put(f.repo, "docs/docs-procedure.md", "Preserve this different current project procedure.\n");
+  const before = captureRepositoryState(f.repo);
+  const report = readAssessmentReport({ ...f, assessment, source_verification: f.original.evidence });
+  expect(report.complete, report.diagnostics.join("\n")).toBe(localCoverage === "declared");
+  expect(report.authority).toBe("none"); expect(captureRepositoryState(f.repo)).toEqual(before);
+  if (localCoverage === "declared") {
+    const { executeOwnedProcess } = await import("../../../plugins/vh-adlc/scripts/docs-drift/owned-process");
+    const source = f.original.evidence!;
+    const completion = await executeOwnedProcess({ argv: [process.execPath,
+      join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), "report-findings", "--repo", f.repo, "--source", f.source,
+      "--artifact-root", f.artifacts, "--source-verification", source.path, "--source-verification-sha256", source.sha256,
+      "--assessment", assessment.path, "--assessment-sha256", assessment.sha256], cwd: f.root,
+      env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME ?? "", TMPDIR: tmpdir() },
+      watched_outputs: [], capture: "memory", timeout_ms: 30000, stdout: join(f.artifacts, "local-coverage.stdout"),
+      stderr: join(f.artifacts, "local-coverage.stderr"), started: () => {} });
+    expect(completion.reaped).toBe(true); expect(completion.timed_out).toBe(false);
+    const emitted = JSON.parse(Buffer.from(completion.captured?.stdout ?? []).toString());
+    expect(completion.exit_code, JSON.stringify(emitted.diagnostics)).toBe(0);
+    expect(emitted.assessment_report.complete).toBe(true); expect(captureRepositoryState(f.repo)).toEqual(before);
+  }
 });

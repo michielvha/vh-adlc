@@ -1,3 +1,5 @@
+import { publicationEffectsOutput } from "./recovery-output";
+import { OUTPUT_LIMIT } from "./owned-process";
 import { ArtifactChanged } from "./evidence-input";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -126,6 +128,8 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
     settings: initial.settings, credential: options.credential, path: options.path });
   return { source_repo: options.repo, artifact_root: options.artifact_root, object_store: initial.store, settings: initial.settings, plan: initial.plan, transport,
     gate: async (journal: Journal | null) => {
+      if (journal) publicationEffectsOutput({ command: "publish", source: options.source, outcome: "incomplete", capacity_check: true,
+        result: { state: "pending", reason: null, journal }, limit: Math.min(OUTPUT_LIMIT, initial.settings.reports.max_entry_bytes) });
       let inventory: PublicationInventory | undefined;
       const objects = journal ? writePublicationObjects(initial.store, initial.plan, journal.header) : null;
       if (journal && objects) {
@@ -172,8 +176,10 @@ export async function resumePublication(input: Options & { journal_directory: st
     if (confirmedFactsChanged(facts, journal.plan)) throw new PublicationScopeChanged("Original recovery source actor or runtime changed");
     if (!facts.complete || !facts.runtime || !source.object_store) throw Error("Current publication recovery runtime unavailable");
     requireExecutingRuntime(facts.runtime);
-    importCandidate(source.object_store, facts.store!, journal.plan);
     const settings = captureSnapshot(options.repo, options.source).settings;
+    publicationEffectsOutput({ command: "resume", source: options.source, outcome: "incomplete", capacity_check: true,
+      result: { state: "pending", reason: null, journal }, limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
+    importCandidate(source.object_store, facts.store!, journal.plan);
     const transport = createNativeTransport({ source_repo: options.repo, artifact_root: options.artifact_root, object_store: source.object_store,
       settings, credential: options.credential, path: options.path });
     const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });

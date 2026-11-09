@@ -25,3 +25,16 @@ test("recovery CLI output projects a large journal into a bounded persistent-att
   expect(() => recoveryEffectsOutput({ ...options, limit: 1, capacity_check: true })).toThrow();
   expect(() => recoveryEffectsOutput({ ...options, limit: OUTPUT_LIMIT + 1 })).toThrow();
 });
+
+test("original resume projects its oversized retained journal into the bounded publication envelope", async () => {
+  const { publicationEffectsOutput } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-output");
+  const f = publicationFixture(roots), journal = structuredClone(createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan: f.plan }));
+  journal.plan.manifest.effects[3].payload.body = "private-original-resume-canary".repeat(100000);
+  const options = { command: "resume", source: f.plan.manifest.bindings.source_commit, outcome: "attention" as const,
+    result: { state: "acknowledged" as const, reason: null, journal }, limit: 4096 };
+  const output = publicationEffectsOutput(options), bytes = JSON.stringify(output) + "\n";
+  expect(Buffer.byteLength(bytes)).toBeLessThanOrEqual(4096); expect(bytes).not.toContain("private-original-resume-canary");
+  expect(output.publication_effects).toMatchObject({ state: "acknowledged", journal: { directory: journal.directory, sha256: journal.digest } });
+  expect(output.outcome).toBe("attention");
+  expect(() => publicationEffectsOutput({ ...options, capacity_check: true, limit: 1 })).toThrow();
+});

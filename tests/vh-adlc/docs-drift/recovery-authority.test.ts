@@ -61,18 +61,25 @@ test("reconciliation authority remains distinct from acknowledgement approval", 
 });
 
 
-test.each(["matching", "wrong-commit", "wrong-bytes", "extra-origin", "unrelated", "other-repository", "other-operation", "no-retirement"])("reconciliation can bind only its actual current adopted procedure %s", async scenario => {
+test.each(["matching", "wrong-commit", "wrong-bytes", "extra-origin", "unrelated", "other-repository", "other-operation", "no-retirement", "other-lease-ref", "other-receipt-prefix", "no-receipt-retention", "outside-receipt-ref", "matching-receipt"])("reconciliation can bind only its actual current adopted procedure %s", async scenario => {
   const { readRecoveryAuthority } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-authority");
   const f = authorityFixture(), selected: ReconciliationScope = { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20,
     operation_id: "original-operation", plan_sha256: hash, lease_ref: "refs/heads/docs-drift-lease", lease_object: "a".repeat(40),
     release_effect_id: "release", retire_effect_ids: ["publication"], retain_receipt: null };
-  if (["unrelated", "other-repository", "other-operation", "no-retirement"].includes(scenario)) {
+  if (["no-receipt-retention", "outside-receipt-ref", "matching-receipt"].includes(scenario)) {
+    selected.retain_receipt = { effect_id: "receipt", ref: f.settings.publication.receipt_ref_prefix + selected.operation_id, object: "b".repeat(40) };
+    if (scenario === "outside-receipt-ref") selected.retain_receipt.ref = "refs/heads/other-receipt/" + selected.operation_id;
+  }
+  if (["unrelated", "other-repository", "other-operation", "no-retirement", "other-lease-ref", "other-receipt-prefix", "no-receipt-retention"].includes(scenario)) {
     const path = f.settings.project_procedure;
     let bytes = readGit(f.repo, "show", "HEAD:" + path).toString();
     if (scenario === "unrelated") bytes = "An unrelated but nonempty documentation procedure.\n";
     if (scenario === "other-repository") bytes = bytes.replace("repository: fixture/docs", "repository: other/repo");
     if (scenario === "other-operation") bytes = bytes.replace("operation_prefix: original-", "operation_prefix: elsewhere-");
     if (scenario === "no-retirement") bytes = bytes.replace("absence-retirement, ", "");
+    if (scenario === "other-lease-ref") bytes = bytes.replace("lease_ref: refs/heads/docs-drift-lease", "lease_ref: refs/heads/other-lease");
+    if (scenario === "other-receipt-prefix") bytes = bytes.replace("receipt_ref_prefix: refs/heads/docs-drift-receipts/", "receipt_ref_prefix: refs/heads/other-receipts/");
+    if (scenario === "no-receipt-retention") bytes = bytes.replace("receipt-retention, ", "");
     write(f.repo, path, bytes); commit(f.repo, "synthetic changed permission scope");
   }
   const commitSHA = readGit(f.repo, "rev-parse", "HEAD").toString().trim(), path = f.settings.project_procedure;
@@ -84,7 +91,7 @@ test.each(["matching", "wrong-commit", "wrong-bytes", "extra-origin", "unrelated
   writeFileSync(join(f.artifacts, "procedure-authority.json"), bytes, { mode: 0o600 });
   const read = () => readRecoveryAuthority({ source_repo: f.repo, artifact_root: f.artifacts, reference: { path: "procedure-authority.json", sha256: sha256(bytes) },
     purpose: "reconciliation", scope: selected, adopted_procedure: { repo: f.repo, current_default: commitSHA, path, receipt_ref_prefix: f.settings.publication.receipt_ref_prefix } });
-  if (scenario === "matching") expect(read()).toEqual(expect.objectContaining({ scope_sha256: canonicalDigest(selected) }));
+  if (scenario === "matching" || scenario === "matching-receipt") expect(read()).toEqual(expect.objectContaining({ scope_sha256: canonicalDigest(selected) }));
   else expect(read).toThrow();
 });
 

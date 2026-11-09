@@ -80,6 +80,7 @@ test("normal retained recovery inspects and acknowledges a changed delivered PR 
     const resumeReport = JSON.parse(Buffer.from(resumed.captured?.stdout ?? []).toString());
     expect(resumeReport.publication_effects?.state, JSON.stringify(resumeReport.diagnostics)).toBe("acknowledged");
     expect(resumed.exit_code).toBe(1); expect(resumeReport.outcome).toBe("attention");
+    expect(JSON.stringify(resumeReport)).not.toContain("Exact synthetic source correction");
     expect(captureRepositoryState(f.repo)).toEqual(resumeBefore);
     const final = JSON.parse(readFileSync(service.statePath, "utf8")) as { prs: Array<Record<string, unknown>> };
     expect(final.prs).toHaveLength(1); expect(final.prs[0].title).toBe(restored.prs[0].title);
