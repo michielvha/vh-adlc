@@ -1,10 +1,15 @@
+import { collectClosureTarget } from "./closure";
+import { exactRecord } from "./publication-decisions";
+import { publicationMarker } from "./report-history";
+import { loadCommittedSettings } from "./settings";
+import { OUTPUT_LIMIT } from "./owned-process";
 import { realpathSync } from "node:fs";
 import { captureRepositoryState, captureSnapshot, createOwnedObjectStore, externalArtifactDirectory, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
 import { collectClosureInputs, recheckClosureInputs, type ClosureInputs } from "./closure-inputs";
 import { collectResolutionInputs, readResolutionProposal, recheckResolutionInputs, type ResolutionInputs, type ResolutionProposal } from "./resolve-inputs";
 import { fetchProposalObjects } from "./proposals";
 import { readNativeContext } from "./transport";
-import { canonicalDigest, canonicalJSON } from "./protocol";
+import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
 
 function selectedProposals(value: unknown, source: string): number[] {
   if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error("resolution selection object required");
@@ -136,4 +141,55 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
   }
   result.diagnostics = [...new Set(result.diagnostics)];
   return result;
+}
+
+type ClosureTargetCollection = {
+  authority: "none"; complete: boolean; diagnostics: string[]; store: OwnedObjectStore | null;
+  identity: ReturnType<typeof readNativeContext>["identity"] | null;
+  target: ReturnType<typeof collectClosureTarget> | null; target_sha256: string | null;
+};
+export function closureTargetOutput(collection: ClosureTargetCollection, source: string) {
+  return { schema_version: 1 as const, command: "collect-closure-target", source_commit: source,
+    outcome: collection.complete ? "collected" as const : "incomplete" as const, closure_target: collection,
+    diagnostics: collection.diagnostics.map(message => ({ code: "closure-target", message })) };
+}
+
+/** Native metadata collection supplies model input only. Original verification and effect authority follow. */
+export async function collectNativeClosureTarget(input: NativeCollectionOptions): Promise<ClosureTargetCollection> {
+  const options = { ...input, repo: realpathSync(input.repo), selection: structuredClone(input.selection), path: input.path ?? process.env.PATH };
+  const selected = exactRecord(options.selection, ["schema_version", "source_commit", "consolidation", "operation_id"], "Closure target selection fields changed");
+  if (selected.schema_version !== 1 || selected.source_commit !== options.source || typeof selected.operation_id !== "string")
+    throw Error("Exact source and closure operation required");
+  const { settings } = loadCommittedSettings(options.repo, options.source);
+  publicationMarker(settings, selected.operation_id);
+  const result: ClosureTargetCollection = { authority: "none", complete: false, diagnostics: [], store: null, identity: null, target: null, target_sha256: null };
+  const before = canonicalDigest(captureRepositoryState(options.repo)), limit = Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes);
+  try {
+    const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const context = native(); result.identity = context.identity;
+    if (context.default_commit !== options.source) throw Error("Closure target requires its observed current default source");
+    const collected = await collectNativeClosure({ ...options, selection: { schema_version: 1, source_commit: options.source, consolidation: selected.consolidation } });
+    result.store = collected.store;
+    if (!collected.complete || !collected.store || !collected.inputs?.consolidation) {
+      result.diagnostics.push(...collected.diagnostics); throw Error("Complete native closure collection required for its model target");
+    }
+    if (context.identity.repository_id !== collected.inputs.repository_id) throw Error("Closure target native repository changed");
+    result.target = collectClosureTarget({ inputs: collected.inputs, operation_id: selected.operation_id,
+      collection: { source_repo: options.repo, store: collected.store, settings, reader: context.repository,
+        consolidation_id: collected.inputs.consolidation.number, required_inputs: [] } });
+    if (!result.target.complete) { result.diagnostics.push(...result.target.diagnostics); throw Error("Complete current closure model target required"); }
+    const fresh = native();
+    if (fresh.default_commit !== options.source || canonicalDigest(fresh.identity) !== canonicalDigest(context.identity))
+      throw Error("Closure target source or actor changed during collection");
+    if (!matchesRepositoryState(options.repo, before)) throw Error("Caller changed during closure target collection");
+    result.target_sha256 = canonicalDigest({ source_commit: options.source, identity: context.identity, target: result.target });
+    result.complete = true;
+    if (Buffer.byteLength(JSON.stringify(closureTargetOutput(result, options.source)) + "\n") > limit) throw Error("Closure model target exceeds the configured output bound");
+  } catch (error) {
+    result.complete = false; result.target = null; result.target_sha256 = null;
+    result.diagnostics.push(error instanceof Error ? error.message : "Closure model target unavailable");
+  }
+  result.diagnostics = [...new Set(result.diagnostics)];
+  if (Buffer.byteLength(JSON.stringify(closureTargetOutput(result, options.source)) + "\n") > limit) throw Error("Configured output bound cannot retain the incomplete closure target");
+  return freezeJSON(result);
 }

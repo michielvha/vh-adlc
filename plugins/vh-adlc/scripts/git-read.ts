@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 
 /** Run Git byte reads against the selected checkout, independent of inherited hook state. */
 export function readGit(repo: string, ...args: string[]): Buffer {
@@ -20,7 +20,7 @@ export function readGitWithEnvironment(repo: string, args: string[], environment
       const common = readGitWithEnvironment(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"], environment).toString().replace(/\n$/u, "");
       for (const root of [realpathSync(repo), realpathSync(common)]) {
         const delta = relative(root, parent);
-        if (delta === "" || !isAbsolute(delta) && delta !== ".." && !delta.startsWith("../")) throw Error("Git read temporary directory overlaps the selected repository");
+        if (delta === "" || !isAbsolute(delta) && delta !== ".." && !delta.startsWith(".." + sep)) throw Error("Git read temporary directory overlaps the selected repository");
       }
       temporary = mkdtempSync(join(parent, "vh-git-read-index-"));
       const privateIndex = join(temporary, "index");

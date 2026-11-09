@@ -26,7 +26,7 @@ import { collectWorkerPreparation } from "./worker-preparation";
 import { collectWorkerInputs, type WorkerCollectionOptions } from "./publication-worker";
 import { collectPublicationBindings } from "./publication-bindings";
 import { collectPublicationInputs } from "./publication-inputs";
-import { collectNativeResolution, collectNativeClosure } from "./resolution-entry";
+import { collectNativeResolution, collectNativeClosure, collectNativeClosureTarget, closureTargetOutput } from "./resolution-entry";
 import { readBoundArtifact } from "./evidence-input";
 import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
 
@@ -55,6 +55,7 @@ export type CLIReport = {
   source_assessment?: Awaited<ReturnType<typeof assessSource>>;
   candidate_inspection?: ReturnType<typeof inspectCandidate>;
   retained_resources?: { checkout: string | null; record_path: string | null };
+  closure_target?: Awaited<ReturnType<typeof collectNativeClosureTarget>>;
   closure?: Awaited<ReturnType<typeof collectNativeClosure>>;
   resolution?: Awaited<ReturnType<typeof collectNativeResolution>>;
   prepared?: Awaited<ReturnType<typeof prepareEdits>>;
@@ -154,6 +155,9 @@ bun <plugin>/scripts/docs-drift/cli.ts check-edits --repo <repo> --source <full-
 bun <plugin>/scripts/docs-drift/cli.ts collect-closure --repo <repo> --source <full-current-default-commit>
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
+bun <plugin>/scripts/docs-drift/cli.ts collect-closure-target --repo <repo> --source <full-current-default-commit>
+  --artifact-root <private-external-directory> --selection <relative-closure-target-selection>
+  --selection-sha256 <sha256>
 bun <plugin>/scripts/docs-drift/cli.ts collect-resolution --repo <repo> --source <full-current-default-commit>
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
@@ -195,6 +199,9 @@ bound by trial-definition. Actual model invocation and effect grants are separat
 Proposal collection reads the configured shared and legacy PR inventory.
 Resolution collection fetches selected complete native PR diffs into a new owned
 object store, then rechecks their source and metadata. Its output grants no effects.
+Closure-target collection adds the exact proposed explanation/close payloads and
+per-disposition model scopes to current native metadata. It grants no effects and
+requires original semantic verification, independent review and authority before execution.
 Closure collection recovers the durable merged consolidation record and original
 full diffs from native inputs. Independent closure review and permission follow.
 Edit checks require caller HEAD to equal the selected source commit.
@@ -244,7 +251,7 @@ const recoveryCommands = ["inspect-recovery", "acknowledge-delivery", "reconcile
 const finalPublicationCommands = ["check-publication", "publish", "resume"];
 const publicationCommands = ["bind-publication", "collect-review-target", "read-candidate-review", ...finalPublicationCommands];
 const candidateCommands = ["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", ...publicationCommands];
-const selectionCommands = ["check-edits", "prepare", "collect-resolution", "collect-closure", ...candidateCommands];
+const selectionCommands = ["check-edits", "prepare", "collect-resolution", "collect-closure", "collect-closure-target", ...candidateCommands];
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
@@ -451,11 +458,13 @@ export async function main(argv: string[]): Promise<number> {
           report = { schema_version: 1, command: options.command, outcome: candidate_inspection.complete ? "collected" : "incomplete",
             source_commit: options.source, candidate_inspection, diagnostics: candidate_inspection.diagnostics.map(message => ({ code: "candidate-inspection", message })) };
         }
-      } else if (["collect-resolution", "collect-closure"].includes(options.command)) {
+      } else if (["collect-resolution", "collect-closure", "collect-closure-target"].includes(options.command)) {
         const settings = loadCommittedSettings(repo, options.source).settings;
         const input = { repo, source: options.source, selection, artifact_root: artifacts.root, owner: artifacts.owner,
           run: randomUUID(), credential: nativeCredential(settings.hostname) };
-        if (options.command === "collect-closure") {
+        if (options.command === "collect-closure-target") {
+          report = closureTargetOutput(await collectNativeClosureTarget(input), options.source);
+        } else if (options.command === "collect-closure") {
           const closure = await collectNativeClosure(input);
           report = { schema_version: 1, command: options.command, outcome: closure.complete ? "collected" : "incomplete",
             diagnostics: closure.diagnostics.map(message => ({ code: "closure-collection", message })),

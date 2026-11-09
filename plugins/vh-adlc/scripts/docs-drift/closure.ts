@@ -23,7 +23,7 @@ function fail(reason: string): never { throw Error("incomplete closure proposal 
 function unchanged(left: unknown, right: unknown): boolean { return canonicalJSON(left).equals(canonicalJSON(right)); }
 function normalized(value: string): string { return value.replace(/\s+/gu, " ").trim(); }
 
-function explanation(options: ClosureOptions, operationId: string, inputs: ClosureInputs, number: number, id: string): string {
+function explanation(options: Omit<ClosureOptions, "observe_verification">, operationId: string, inputs: ClosureInputs, number: number, id: string): string {
   const { record, consolidation, current_default: current } = inputs;
   if (!record || !consolidation || !current) fail("missing reviewed inputs");
   const settings = options.collection.settings;
@@ -38,11 +38,18 @@ function explanation(options: ClosureOptions, operationId: string, inputs: Closu
     + `Recorded decisions\n\n${preview}${remainder}\n\n${publicationMarker(settings, operationId)}\n${effectMarker(id)}\n`;
 }
 
-/** Produce exact review inputs. The publisher separately checks actual authority and native role proof. */
-export async function prepareClosure(options: ClosureOptions): Promise<ClosureProposal> {
-  const result: ClosureProposal = { state: "proposal", complete: false, diagnostics: [], effects: [], already_closed: [], verification: [], inputs_sha256: "" };
-  const before = canonicalDigest(captureRepositoryState(options.collection.source_repo));
-  const operationId = options.operation_id;
+export type ClosureTarget = {
+  kind: "docs-drift-closure-target"; authority: "none"; verification_ready: false;
+  complete: boolean; diagnostics: string[]; effects: Effect[]; already_closed: number[];
+  closure: ClosureInputs; verification_scopes: Array<Pick<ClosureVerificationScope, "inputs_sha256" | "decision">>; inputs_sha256: string;
+};
+
+/** Collect exact model inputs without supplying a semantic verification verdict or an effect grant. */
+export function collectClosureTarget(options: Omit<ClosureOptions, "observe_verification">): ClosureTarget {
+  const result: ClosureTarget = { kind: "docs-drift-closure-target", authority: "none", verification_ready: false,
+    complete: false, diagnostics: [], effects: [], already_closed: [], closure: freezeJSON(structuredClone(options.inputs)),
+    verification_scopes: [], inputs_sha256: "" };
+  const before = canonicalDigest(captureRepositoryState(options.collection.source_repo)), operationId = options.operation_id;
   try {
     const inputs: ClosureInputs = freezeJSON(structuredClone(options.inputs));
     if (!inputs.complete || !inputs.record || !inputs.consolidation || !inputs.current_default
@@ -69,26 +76,50 @@ export async function prepareClosure(options: ClosureOptions): Promise<ClosurePr
         { id: "close-" + original.number, kind: "pr-close", payload: { number: original.number, expected_head: original.head_sha } });
     }
     effects.push({ id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } });
-    const verifications: ClosureProposal["verification"] = [];
+    result.effects = pending.length > 0 ? freezeJSON(effects) : [];
     for (const original of pending) {
       for (const decision of record.dispositions.filter(item => item.proposal === original.number)) {
-        const binding = { source_commit: inputs.current_default, closure: inputs, decision, proposed_effects: effects };
-        const digest = canonicalDigest(binding);
-        const scope: ClosureVerificationScope = freezeJSON({ inputs_sha256: digest, ...binding });
-        const observed = readVerification(await options.observe_verification(scope), digest);
-        if (observed.state !== "passed") fail("current disposition feedback or carry verification unavailable");
-        const prior = record.originals.find(item => item.number === original.number);
-        if (!prior) fail("missing original record");
-        const hunk = prior.hunks.find(item => item.id === decision.hunk_id);
-        if (hunk?.kind === "binary" && decision.disposition !== "defer" && observed.asset_checks.length === 0) fail("current binary asset checks required");
-        verifications.push({ ...observed, proposal: original.number, hunk_id: decision.hunk_id });
+        const binding = { source_commit: inputs.current_default, closure: inputs, decision, proposed_effects: result.effects };
+        result.verification_scopes.push({ inputs_sha256: canonicalDigest(binding), decision });
       }
     }
     if (!recheckClosureInputs(inputs, options.collection).fresh
-      || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure verification");
-    result.verification = verifications;
-    result.effects = pending.length > 0 ? freezeJSON(effects) : [];
+      || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure target collection");
     result.inputs_sha256 = canonicalDigest({ closure: inputs.inputs_sha256, operation_id: operationId, effects: result.effects });
+    result.complete = true;
+  } catch (error) {
+    result.effects = []; result.verification_scopes = [];
+    result.diagnostics.push(error instanceof Error ? error.message : "Required closure target inputs unavailable");
+  }
+  return freezeJSON(result);
+}
+
+/** Produce exact review inputs. The publisher separately checks actual authority and native role proof. */
+export async function prepareClosure(options: ClosureOptions): Promise<ClosureProposal> {
+  const result: ClosureProposal = { state: "proposal", complete: false, diagnostics: [], effects: [], already_closed: [], verification: [], inputs_sha256: "" };
+  const before = canonicalDigest(captureRepositoryState(options.collection.source_repo));
+  try {
+    const target = collectClosureTarget(options);
+    result.already_closed = target.already_closed;
+    if (!target.complete) { result.diagnostics.push(...target.diagnostics); fail("complete current closure target required"); }
+    const inputs = target.closure, record = inputs.record;
+    if (!record || !inputs.current_default) fail("missing exact closure target source");
+    const verifications: ClosureProposal["verification"] = [];
+    for (const selected of target.verification_scopes) {
+      const decision = selected.decision;
+      const scope: ClosureVerificationScope = freezeJSON({ inputs_sha256: selected.inputs_sha256, source_commit: inputs.current_default,
+        closure: inputs, decision, proposed_effects: target.effects });
+      const observed = readVerification(await options.observe_verification(scope), scope.inputs_sha256);
+      if (observed.state !== "passed") fail("current disposition feedback or carry verification unavailable");
+      const prior = record.value.originals.find(item => item.number === decision.proposal);
+      if (!prior) fail("missing original record");
+      const hunk = prior.hunks.find(item => item.id === decision.hunk_id);
+      if (hunk?.kind === "binary" && decision.disposition !== "defer" && observed.asset_checks.length === 0) fail("current binary asset checks required");
+      verifications.push({ ...observed, proposal: decision.proposal, hunk_id: decision.hunk_id });
+    }
+    if (!recheckClosureInputs(inputs, options.collection).fresh
+      || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure verification");
+    result.verification = verifications; result.effects = target.effects; result.inputs_sha256 = target.inputs_sha256;
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Required closure verification unavailable"); }
   return result;

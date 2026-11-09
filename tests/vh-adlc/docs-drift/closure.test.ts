@@ -181,3 +181,18 @@ test("an unmerged replacement and a replaced original binding cannot prepare clo
   expect(result.complete).toBe(false);
   expect(result.effects).toEqual([]);
 });
+
+test.each(["merge", "squash", "rebase"] as const)("closure target collects exact unverified scopes before semantic verification (%s)", async method => {
+  const { collectClosureTarget } = await import("../../../plugins/vh-adlc/scripts/docs-drift/closure");
+  const f = await closureFixture(roots, method, true), selected = options(f), before = captureRepositoryState(f.repo);
+  let verificationCalls = 0;
+  const targetOptions = { ...selected, observe_verification: async () => { verificationCalls++; throw Error("Target collection requested verification"); } };
+  const target = collectClosureTarget(targetOptions);
+  expect(target.complete, target.diagnostics.join("\n")).toBe(true);
+  expect(target.authority).toBe("none"); expect(target.verification_ready).toBe(false);
+  expect(target.verification_scopes).toHaveLength(f.recordValue.dispositions.length);
+  expect(target.effects.map(effect => effect.kind)).toEqual(["lease-acquire", "receipt-retain", "comment-create", "pr-close", "lease-release"]);
+  for (const scope of target.verification_scopes) expect(scope.inputs_sha256).toBe(canonicalDigest({ source_commit: target.closure.current_default,
+    closure: target.closure, decision: scope.decision, proposed_effects: target.effects }));
+  expect(verificationCalls).toBe(0); expect(captureRepositoryState(f.repo)).toEqual(before);
+});

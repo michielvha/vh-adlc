@@ -242,7 +242,8 @@ test("bounded report diagnostics preserve Unicode and the final minimal fallback
 test.each(["declared", "omitted", "malformed"] as const)("finding reports load only source-declared project-local coverage (%s)", async localCoverage => {
   const { readAssessmentReport } = await import("../../../plugins/vh-adlc/scripts/docs-drift/assessment-report");
   const f = await fixture("unknown", { localCoverage }), assessment = retain(f, f.packet);
-  put(f.repo, "docs/docs-procedure.md", "Preserve this different current project procedure.\n");
+  put(f.repo, "docs/docs-procedure.md", localCoverage === "declared" ? "Preserve this different current project procedure.\n"
+    : "---\ndocs_drift_local_coverage:\n  dialect: documentation\n  terminal_statuses: [shipped]\n---\n\nDirty valid coverage must not replace committed policy.\n");
   const before = captureRepositoryState(f.repo);
   const report = readAssessmentReport({ ...f, assessment, source_verification: f.original.evidence });
   expect(report.complete, report.diagnostics.join("\n")).toBe(localCoverage === "declared");

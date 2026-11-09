@@ -221,3 +221,37 @@ test.each(["worker", "reviewer"] as const)("a role capture changing after candid
     for (const root of roots) rmSync(root, { recursive: true, force: true });
   } catch (error) { console.error("Preserved original-role race roots", JSON.stringify(roots)); throw error; }
 }, 365000);
+
+test("native output capacity refusal precedes publication and original resume mutations", async () => {
+  const roots: string[] = [];
+  try {
+    const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
+    const controller: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/publication-controller") = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const outputs: typeof import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-output") = await import(join(f.retained.directory, "scripts/docs-drift/recovery-output.ts"));
+    const project = outputs.publicationEffectsOutput;
+    // Inject capacity 1 at the actual projector boundary, preserving every adopted input and original role record.
+    const refusal = spyOn(outputs, "publicationEffectsOutput").mockImplementation(options => project({ ...options, limit: 1 }));
+    const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
+    try {
+      const published = await controller.publishPublication(f.publication);
+      expect(published.state).toBe("pending");
+      expect(published.journal.events.some(event => event.kind === "intent" && event.effect_id === "lease")).toBe(true);
+      expect(published.journal.events.some(event => event.kind === "handoff" && event.effect_id === "lease")).toBe(true);
+      expect(published.journal.events.some(event => event.kind === "attempt")).toBe(false);
+      const assertNoWrites = () => {
+        const calls = readFileSync(service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
+        expect(calls.some(call => call.program === "git" && call.args.includes("push"))).toBe(false);
+        expect(calls.some(call => call.program === "gh" && (call.args.includes("PATCH") || call.args.includes("DELETE")
+          || call.args.includes("POST") && !call.args.includes("graphql")))).toBe(false);
+        expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-lease").toString()).toBe("");
+      };
+      assertNoWrites();
+      const digest = readJournal(published.journal.directory, f.repo).digest;
+      await expect(controller.resumePublication({ ...f.publication, journal_directory: published.journal.directory }))
+        .rejects.toThrow("Configured output bound cannot retain the recovery summary");
+      assertNoWrites(); expect(readJournal(published.journal.directory, f.repo).digest).toBe(digest);
+      expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
+    } finally { refusal.mockRestore(); }
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  } catch (error) { console.error("Preserved failed native capacity roots", JSON.stringify(roots)); throw error; }
+}, 365000);
