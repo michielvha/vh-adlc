@@ -5,8 +5,8 @@ import { resolutionFixture } from "./resolution-fixture";
 import { commitAll, git, put } from "./repository-fixture";
 
 export async function closureFixture(roots: string[], method: "merge" | "squash" | "rebase" = "merge", advance: boolean | "bound" = false,
-  configure?: (fixture: ReturnType<typeof resolutionFixture>) => ResolutionOptions) {
-  const f = resolutionFixture(roots), draft = await buildResolution(configure ? configure(f) : f.options);
+  configure?: (fixture: ReturnType<typeof resolutionFixture>) => ResolutionOptions, adoptedRepo?: string) {
+  const f = resolutionFixture(roots, adoptedRepo), draft = await buildResolution(configure ? configure(f) : f.options);
   if (!draft.complete || !draft.record_bytes || !draft.record) throw Error("missing resolution fixture");
   const recordBytes = draft.record_bytes, recordValue = draft.record;
   git(f.repo, "switch", "-qc", "docs-drift/consolidation");

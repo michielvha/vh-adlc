@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview } from "./closure-worker";
 import { inspectRecovery, applyRecovery, recoveryInspectionOutput } from "./recovery-controller";
 import { recoveryEffectsOutput, publicationEffectsOutput } from "./recovery-output";
 import { OUTPUT_LIMIT } from "./owned-process";
@@ -55,6 +56,9 @@ export type CLIReport = {
   source_assessment?: Awaited<ReturnType<typeof assessSource>>;
   candidate_inspection?: ReturnType<typeof inspectCandidate>;
   retained_resources?: { checkout: string | null; record_path: string | null };
+  closure_worker_inputs?: Awaited<ReturnType<typeof collectClosureWorkerInputs>>;
+  closure_review_target?: Awaited<ReturnType<typeof collectClosureReviewTarget>>;
+  closure_review?: Awaited<ReturnType<typeof collectClosureReview>>;
   closure_target?: Awaited<ReturnType<typeof collectNativeClosureTarget>>;
   closure?: Awaited<ReturnType<typeof collectNativeClosure>>;
   resolution?: Awaited<ReturnType<typeof collectNativeResolution>>;
@@ -155,6 +159,13 @@ bun <plugin>/scripts/docs-drift/cli.ts check-edits --repo <repo> --source <full-
 bun <plugin>/scripts/docs-drift/cli.ts collect-closure --repo <repo> --source <full-current-default-commit>
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
+bun <plugin>/scripts/docs-drift/cli.ts <collect-closure-worker-inputs|collect-closure-review-target|read-closure-review>
+  --repo <repo> --source <full-current-default-commit> --artifact-root <private-external-directory>
+  --selection <relative-closure-target-packet> --selection-sha256 <sha256>
+  --cache-root <retained-cache> --entry <hosted|copilot|claude>
+  --launcher <invoked-launcher> --settings <invoked-settings>
+  [--worker-capture <relative-original-capture-path> --worker-capture-sha256 <sha256>]
+  [--reviewer-capture <relative-original-capture-path> --reviewer-capture-sha256 <sha256>]
 bun <plugin>/scripts/docs-drift/cli.ts collect-closure-target --repo <repo> --source <full-current-default-commit>
   --artifact-root <private-external-directory> --selection <relative-closure-target-selection>
   --selection-sha256 <sha256>
@@ -239,6 +250,12 @@ from the exact approved retained controller. Resume reopens the original private
 controller and journal records and rechecks the same source, review and authority.
 Bindings have authority none. Original role evidence, current required observations and actual effect grants
 follow in the controller. This collection has authority none.
+Closure worker inputs bind the current merged record, original proposal hunks, proposed
+explanations and retained runtime before semantic assessment. Closure review-target
+collection reloads the original worker's scoped current-source and asset evidence.
+Reading closure review requires its original independent reviewer at the exact
+manifest. These read-only commands supply authority none. Closure execution follows
+its separate effect grants and fresh publication checks.
 Verification, review and publication follow their own fresh owned-checkout gates.
 `;
 
@@ -251,7 +268,8 @@ const recoveryCommands = ["inspect-recovery", "acknowledge-delivery", "reconcile
 const finalPublicationCommands = ["check-publication", "publish", "resume"];
 const publicationCommands = ["bind-publication", "collect-review-target", "read-candidate-review", ...finalPublicationCommands];
 const candidateCommands = ["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", ...publicationCommands];
-const selectionCommands = ["check-edits", "prepare", "collect-resolution", "collect-closure", "collect-closure-target", ...candidateCommands];
+const closureRoleCommands = ["collect-closure-worker-inputs", "collect-closure-review-target", "read-closure-review"];
+const selectionCommands = [...closureRoleCommands, "check-edits", "prepare", "collect-resolution", "collect-closure", "collect-closure-target", ...candidateCommands];
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
@@ -265,11 +283,11 @@ function argumentsForCommand(argv: string[]) {
   if ([...selectionCommands, ...recoveryCommands].includes(command)) flags.push("--selection", "--selection-sha256");
   if (candidateCommands.includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
   if (command === "check-verification") flags.push("--verification", "--verification-sha256");
-  if (["collect-publication-inputs", ...publicationCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
-  if (["read-worker-preparation", "collect-review-target", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--worker-capture", "--worker-capture-sha256");
+  if (["collect-publication-inputs", ...publicationCommands, ...closureRoleCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
+  if (["collect-closure-review-target", "read-closure-review", "read-worker-preparation", "collect-review-target", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--worker-capture", "--worker-capture-sha256");
   if (["collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256");
   if (publicationCommands.includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256");
-  if (["read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--reviewer-capture", "--reviewer-capture-sha256");
+  if (["read-closure-review", "read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--reviewer-capture", "--reviewer-capture-sha256");
   if (finalPublicationCommands.includes(command)) flags.push("--authority", "--authority-sha256");
   if (command === "resume") flags.push("--journal-directory");
   if (command === "report-findings") flags.push("--source-verification", "--source-verification-sha256", "--assessment", "--assessment-sha256");
@@ -285,6 +303,9 @@ function argumentsForCommand(argv: string[]) {
   if (!repo || !source || (needsArtifacts && !artifacts)) throw Error(command + " requires " + flags.join(", "));
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) throw Error(command + " requires a full immutable source commit");
   const requiredReferences: Record<string, string[]> = {
+    "collect-closure-worker-inputs": ["--cache-root", "--entry", "--launcher", "--settings"],
+    "collect-closure-review-target": ["--cache-root", "--entry", "--launcher", "--settings", "--worker-capture", "--worker-capture-sha256"],
+    "read-closure-review": ["--cache-root", "--entry", "--launcher", "--settings", "--worker-capture", "--worker-capture-sha256", "--reviewer-capture", "--reviewer-capture-sha256"],
     "report-findings": ["--source-verification", "--source-verification-sha256", "--assessment", "--assessment-sha256"],
     "check-verification": ["--verification", "--verification-sha256"],
     "collect-worker-inputs": ["--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256"],
@@ -458,6 +479,30 @@ export async function main(argv: string[]): Promise<number> {
           report = { schema_version: 1, command: options.command, outcome: candidate_inspection.complete ? "collected" : "incomplete",
             source_commit: options.source, candidate_inspection, diagnostics: candidate_inspection.diagnostics.map(message => ({ code: "candidate-inspection", message })) };
         }
+      } else if (closureRoleCommands.includes(options.command)) {
+        if (!options.cache || !options.launcher || !options.settings || !["hosted", "copilot", "claude"].includes(options.entry ?? ""))
+          throw Error("Closure roles require their selected retained entry and cache");
+        const settings = loadCommittedSettings(repo, options.source).settings;
+        const common = { repo, source: options.source, selection, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(),
+          credential: nativeCredential(settings.hostname), cache_directory: resolve(options.cache), entry: options.entry as "hosted" | "copilot" | "claude",
+          launcher_path: resolve(options.launcher), settings_path: resolve(options.settings) };
+        const base = { schema_version: 1 as const, command: options.command, source_commit: options.source };
+        if (options.command === "collect-closure-worker-inputs") {
+          const value = await collectClosureWorkerInputs(common);
+          report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_worker_inputs: value,
+            diagnostics: value.diagnostics.map(message => ({ code: "closure-worker-inputs", message })) };
+        } else if (options.command === "collect-closure-review-target") {
+          const value = await collectClosureReviewTarget({ ...common, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 } });
+          report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_review_target: value,
+            diagnostics: value.diagnostics.map(message => ({ code: "closure-review-target", message })) };
+        } else {
+          const value = await collectClosureReview({ ...common, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 },
+            reviewer_capture: { path: options.reviewer_capture, sha256: options.reviewer_capture_sha256 } });
+          report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_review: value,
+            diagnostics: value.diagnostics.map(message => ({ code: "closure-review", message })) };
+        }
+        if (Buffer.byteLength(JSON.stringify(report) + "\n") > Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes))
+          throw Error("Closure role report exceeds the configured output bound");
       } else if (["collect-resolution", "collect-closure", "collect-closure-target"].includes(options.command)) {
         const settings = loadCommittedSettings(repo, options.source).settings;
         const input = { repo, source: options.source, selection, artifact_root: artifacts.root, owner: artifacts.owner,
