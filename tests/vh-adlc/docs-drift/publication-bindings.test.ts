@@ -559,11 +559,11 @@ test("normal binding rechecks preserve the reviewed input after its exact own PR
   }
   journal = appendIntent(journal, "pr");
   const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
-  writeFileSync(f.inventoryFile, JSON.stringify([{ number: 73, state: "open", merged_at: null, body: payload.body, draft: false,
+  writeFileSync(f.inventoryFile, JSON.stringify([{ number: 73, state: "open", merged_at: null, title: payload.title, labels: [{ id: 101, name: "documentation" }], body: payload.body, draft: false,
     user: { id: 20, login: "fixture-bot", type: "Bot" }, head: { sha: f.head, ref: payload.branch, repo: repository },
     base: { sha: f.source, ref: "main", repo: repository } }]), { mode: 0o600 });
   const { readNativeContext } = await import("../../../plugins/vh-adlc/scripts/docs-drift/transport");
-  const { collectProposals } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
+  const { collectPublicationProposals: collectProposals } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
   const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: f.options.credential, path: f.options.path });
   const current = collectProposals(native.repository, settings); expect(current.complete).toBe(true);
   const transport = { kind: "native" as const, observe: async () => ({ state: "done" as const, outcome: {

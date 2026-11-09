@@ -120,7 +120,10 @@ export function boundAssessmentReport(input: AssessmentReport, limit: number): A
     report.suppressed_findings = [];
     report.stale_suppressions = [];
     const count = report.diagnostics.length;
-    report.diagnostics = report.diagnostics.slice(0, 5).map(message => message.length <= 256 ? message : Array.from(message).slice(0, 256).join("") + "…");
+    report.diagnostics = report.diagnostics.slice(0, 5).map(message => {
+      const points = Array.from(message);
+      return points.length <= 256 ? message : points.slice(0, 256).join("") + "…";
+    });
     report.diagnostics_omitted += count - report.diagnostics.length;
     report.diagnostics.push("Detailed report exceeds the retained entry bound. Full source and assessment records remain available");
     if (size() > limit) {
@@ -177,7 +180,7 @@ export function renderAssessmentReport(report: AssessmentReport): string {
   if (report.stale_suppressions.length) {
     lines.push("## Stale suppressions", "", "Review these rules against current source and the retained exception policy.", "");
     for (const row of report.stale_suppressions)
-      lines.push(`- ${escapeReportText(row.id)}. ${escapeReportText(row.document ?? "Repository-wide rule")}. ${escapeReportText(row.reason)}.`);
+      lines.push(`- ${escapeReportText(row.id)}. ${escapeReportText(row.document ?? "Repository-wide rule")}. ${sentence(row.reason)}`);
     lines.push("");
   }
   lines.push("## Source records", "");

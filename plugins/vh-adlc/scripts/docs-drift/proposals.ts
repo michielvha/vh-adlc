@@ -1,5 +1,5 @@
 import { lstatSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import type { PullRequestInput, RepositoryReader } from "../github-read";
+import type { PublicationPullInput, PullRequestInput, RepositoryReader } from "../github-read";
 import { readGit } from "./git";
 import { gitEnvironment, gitReadArguments } from "../git-read";
 import { join } from "node:path";
@@ -43,6 +43,20 @@ export function collectProposals(reader: RepositoryReader, settings: Settings) {
     proposals.push(...[...selected.values()].sort((left, right) => left.number - right.number));
   } catch { diagnostics.push("Required repository or proposal collection unavailable"); }
   return { complete: diagnostics.length === 0, proposals, diagnostics, observations: reader.trace() };
+}
+
+/** Publication additionally binds mutable titles and labels before either role is launched. */
+export function collectPublicationProposals(reader: RepositoryReader, settings: Settings) {
+  const inventory = collectProposals(reader, settings), proposals: PublicationPullInput[] = [], diagnostics = [...inventory.diagnostics];
+  let scope_changed = false;
+  for (const original of inventory.proposals) {
+    try {
+      const proposal = reader.publicationPull(original.number), { title: _title, labels: _labels, ...core } = proposal;
+      if (!canonicalJSON(core).equals(canonicalJSON(original))) { scope_changed = true; throw Error("Proposal changed during full metadata collection"); }
+      proposals.push(proposal);
+    } catch { diagnostics.push(`Required full proposal metadata ${original.number} unavailable or changed`); }
+  }
+  return { complete: inventory.complete && diagnostics.length === 0, scope_changed, proposals, diagnostics, observations: reader.trace() };
 }
 
 /** Keep an exact metadata preimage for replay checks while retaining only body digests. */

@@ -63,7 +63,7 @@ if (args.includes("graphql")) {
     : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha } }
     : endpoint === "repos/fixture/docs/git/commits/" + sha ? { sha, tree: { sha: "a".repeat(40) }, parents: [], message: "Synthetic source" }
     : endpoint === "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1" ? (${incompleteInventory} ? { message: "Synthetic missing inventory" } : ${f.inventory_path ? `JSON.parse(require("node:fs").readFileSync(${JSON.stringify(f.inventory_path)}, "utf8"))` : "[]"})
-    : null;
+    : ${f.inventory_path ? `endpoint?.startsWith("repos/fixture/docs/pulls/") ? JSON.parse(require("node:fs").readFileSync(${JSON.stringify(f.inventory_path)}, "utf8")).find(item => item.number === Number(endpoint.split("/").at(-1))) : null` : "null"};
   if (!value) process.exit(92);
   console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
 }

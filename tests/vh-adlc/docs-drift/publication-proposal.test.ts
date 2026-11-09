@@ -17,3 +17,13 @@ test.each(["pr", "issue", "null", "unknown-field", "unknown-payload", "authority
   } else if (scenario === "null") expect(parseWorkerPublication(null)).toBe(null);
   else expect(() => parseWorkerPublication(packet)).toThrow();
 });
+
+test("original refresh proposal retains the exact metadata preimage", async () => {
+  const { parseWorkerPublication } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-proposal");
+  const { canonicalDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/protocol");
+  const before = { title: "Previous title", body: "Previous body", labels: ["documentation"], draft: true };
+  const packet = { operation_id: "refresh-operation", proposal: { kind: "pr-update", payload: { number: 17, expected_head: "a".repeat(40),
+    expected_payload: before, expected_payload_sha256: canonicalDigest(before), title: "Reviewed new title", body: "Reviewed new body", labels: ["documentation"], draft: false } } };
+  expect<unknown>(parseWorkerPublication(packet)).toEqual(packet);
+  expect(() => parseWorkerPublication({ ...packet, proposal: { ...packet.proposal, payload: { ...packet.proposal.payload, expected_payload_sha256: "b".repeat(64) } } })).toThrow();
+});

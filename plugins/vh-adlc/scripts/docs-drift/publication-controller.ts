@@ -13,7 +13,7 @@ import { collectPublicationInputs } from "./publication-inputs";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
 import { readPublicationCandidateProof } from "./publication-proof";
 import { createNativeTransport, readNativeContext } from "./transport";
-import { collectProposals, requireOwnedStore } from "./proposals";
+import { collectPublicationProposals as collectProposals, requireOwnedStore } from "./proposals";
 import { readGit } from "./git";
 import { exactRecord } from "./publication-decisions";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
@@ -131,6 +131,7 @@ function publicationOptions(options: Options, initial: Awaited<ReturnType<typeof
       if (journal && objects) {
         const native = readNativeContext({ hostname: initial.settings.hostname, repository: initial.settings.repository, credential: options.credential, path: options.path });
         const proposals = collectProposals(native.repository, initial.settings);
+        if (proposals.scope_changed) throw new PublicationScopeChanged("Current native publication metadata changed");
         if (!proposals.complete) throw Error("Current native publication inventory unavailable");
         inventory = await capturePublicationInventory({ source_repo: options.repo, artifact_root: options.artifact_root, journal_directory: journal.directory,
           original, transport, objects, current_proposals: proposals.proposals });
@@ -177,6 +178,7 @@ export async function resumePublication(input: Options & { journal_directory: st
       settings, credential: options.credential, path: options.path });
     const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
     const proposals = collectProposals(native.repository, settings);
+    if (proposals.scope_changed) throw new PublicationScopeChanged("Current recovery proposal metadata changed");
     if (!proposals.complete) throw Error("Current recovery proposal inventory unavailable");
     const inventory = await capturePublicationInventory({ source_repo: options.repo, artifact_root: options.artifact_root, journal_directory: journal.directory,
       original: invocation.proposal_snapshot, transport, objects: writePublicationObjects(source.object_store, journal.plan, journal.header), current_proposals: proposals.proposals });

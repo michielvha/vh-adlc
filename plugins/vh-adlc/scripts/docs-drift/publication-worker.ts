@@ -7,7 +7,7 @@ import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
 import { publishArtifact } from "./journal";
 import { advisoryDecisionIDs, parseDecisionPacket, projectAttentionProposals } from "./publication-decisions";
 import { collectPublicationOriginals } from "./publication-originals";
-import { collectProposals } from "./proposals";
+import { collectPublicationProposals as collectProposals } from "./proposals";
 import { recheckResolutionInputs, type ResolutionCollection, type ResolutionInputs } from "./resolve-inputs";
 import { roleRuntimeDigest } from "./role-capture";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
@@ -85,6 +85,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     const context = native();
     if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw new PublicationScopeChanged("Native source or actor changed before proposal collection");
     result.proposals = collectProposals(context.repository, snapshot.settings);
+    if (result.proposals.scope_changed) throw new PublicationScopeChanged("Native proposal changed during full metadata collection");
     if (!result.proposals.complete) { result.diagnostics.push(...result.proposals.diagnostics); throw Error("Complete current proposal inventory required"); }
     let collection: ResolutionCollection | null = null;
     if (packet.mode === "resolve") {
@@ -104,6 +105,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
       if (!recheck.fresh) throw Error("Selected original inputs unavailable during final recheck");
     }
     const final = native(), proposals = collectProposals(final.repository, snapshot.settings);
+    if (proposals.scope_changed) throw new PublicationScopeChanged("Native proposal changed during final full metadata collection");
     if (!proposals.complete) throw Error("Current final proposal inventory incomplete");
     if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity)
       || canonicalDigest(proposals.proposals) !== canonicalDigest(result.proposals.proposals)) throw new PublicationScopeChanged("Native source actor or proposals changed during binding collection");

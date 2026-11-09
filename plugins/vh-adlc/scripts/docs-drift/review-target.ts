@@ -2,13 +2,15 @@ import { PublicationScopeChanged } from "./publish";
 import { ArtifactChanged } from "./evidence-input";
 import { realpathSync } from "node:fs";
 import { collectPublicationBindings } from "./publication-bindings";
+import { isRefreshTarget } from "./proposals";
+import { projectCurrentProposals } from "./publication-inventory";
 import { parseWorkerPublication } from "./publication-proposal";
 import { collectWorkerPreparation } from "./worker-preparation";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { effectMarker, manifestDigest, parseActionManifest, type ActionManifest, type Effect } from "./manifests";
 import { validatePublicationShape } from "./publish";
 import { publicationMarker } from "./report-history";
-import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
+import { canonicalDigest, canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 
 type Options = Parameters<typeof collectPublicationBindings>[0] & { worker_capture: unknown };
@@ -51,6 +53,23 @@ export async function collectReviewTarget(input: Options): Promise<ReviewTarget>
       { id: "receipt", kind: "receipt-retain", payload: { ref: settings.publication.receipt_ref_prefix + operationId } },
     ];
     if (action.kind === "pr-create") effects.push({ id: "candidate", kind: "push", payload: { ref: "refs/heads/" + payload.branch, head: bound.bindings.candidate_commit } });
+    if (action.kind === "pr-update") {
+      const inventory = projectCurrentProposals(bound.proposals!.proposals, bound.resolution?.inputs_sha256 ?? null, options.inventory_context);
+      const targets = inventory.inventory.filter(proposal => proposal.number === payload.number);
+      if (targets.length !== 1) throw Error("Refresh requires one collected native proposal");
+      const target = targets[0], before = payload.expected_payload as Record<string, unknown>;
+      if (target.state !== "open" || target.merged_at !== null || target.base_ref !== settings.publication.base
+        || target.base_repository.id !== facts.identity.repository_id || target.head_sha !== payload.expected_head
+        || typeof target.title !== "string" || !Array.isArray(target.labels) || typeof before.body !== "string"
+        || sha256(Buffer.from(before.body)) !== target.body_sha256
+        || !canonicalJSON({ title: target.title, body: before.body, labels: target.labels, draft: target.draft }).equals(canonicalJSON(before))
+        || !isRefreshTarget(settings, facts.identity, { number: target.number, actor: target.actor, actor_id: target.actor_id,
+          head_ref: target.head_ref, head_repository_id: target.head_repository?.id ?? null })) throw Error("Refresh native target or original metadata preimage changed");
+      effects.push({ id: "candidate", kind: "branch-refresh", payload: { ref: "refs/heads/" + target.head_ref,
+        number: target.number, expected_head: target.head_sha, head: bound.bindings.candidate_commit } });
+      payload.expected_head = bound.bindings.candidate_commit;
+      if (payload.draft !== (settings.publication.pr_state[bound.mode] === "draft")) throw Error("Refresh draft policy changed");
+    }
     effects.push({ id: "publication", kind: action.kind, payload }, { id: "release", kind: "lease-release", payload: { ref: settings.publication.lease_ref } });
     const { repository, repository_id, actor, actor_id } = facts.identity;
     const manifest = parseActionManifest({ schema_version: 1, operation_id: proposal.operation_id, repository, repository_id, actor, actor_id,

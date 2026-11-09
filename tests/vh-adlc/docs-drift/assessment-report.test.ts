@@ -19,7 +19,7 @@ async function fixture(verdict = "confirmed-drift", options: { badRoots?: boolea
   if (options.feedback) {
     const suppressed = [{ finding: { id: "suppressed-1", detector: "fixture-feedback", severity: "note", document: "docs/guide.md", location: null,
       explanation: "Synthetic suppressed candidate" }, reason: "Retained historical exception" }];
-    const stale = [{ id: "stale-1", reason: "Synthetic stale suppression", document: "docs/guide.md" }];
+    const stale = [{ id: "stale-1", reason: "Synthetic stale suppression.", document: "docs/guide.md" }];
     scanner = scanner.replace("suppressed_findings: [], stale_suppressions: []", `suppressed_findings: ${JSON.stringify(suppressed)}, stale_suppressions: ${JSON.stringify(stale)}`);
   }
   let source = populateRepository(repo, false, scanner).commit;
@@ -156,6 +156,7 @@ test("the finding report retains suppressed candidates and stale feedback", asyn
   expect(report).toMatchObject({ suppressed_findings: [{ reason: "Retained historical exception" }], stale_suppressions: [{ id: "stale-1" }] });
   const markdown = renderAssessmentReport(report);
   expect(markdown).toContain("Retained historical exception"); expect(markdown).toContain("Synthetic stale suppression");
+  expect(markdown).not.toContain("suppression..");
 });
 
 test("an oversized rendered finding report retains bounded diagnostics and original evidence locators", async () => {
@@ -218,6 +219,10 @@ test("bounded report diagnostics preserve Unicode and the final minimal fallback
   report.diagnostics = ["x".repeat(255) + "😀" + "<".repeat(5000)];
   const unicode = api.boundAssessmentReport(report, 10000);
   expect(() => canonicalJSON(unicode)).not.toThrow(); expect(api.renderAssessmentReport(unicode)).not.toContain("….");
+  expect(unicode.diagnostics[0]).toBe("x".repeat(255) + "😀…"); expect(unicode.diagnostics_omitted).toBe(0);
+  const astral = structuredClone(report);
+  astral.findings[0].reason = "<".repeat(5000); astral.diagnostics = ["😀".repeat(200)];
+  expect(api.boundAssessmentReport(astral, 10000).diagnostics[0]).toBe(astral.diagnostics[0]);
   report.diagnostics = Array.from({ length: 5 }, () => "<".repeat(5000));
   const minimal = api.boundAssessmentReport(report, 4000);
   expect(minimal.diagnostics).toHaveLength(1); expect(minimal.diagnostics_omitted).toBe(5);

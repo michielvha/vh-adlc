@@ -35,7 +35,10 @@ export function validatePublicationShape(plan: Pick<SealedPlan, "manifest" | "co
     if (!["push", "branch-refresh", "pr-create", "pr-update", "issue-create", "comment-create", "pr-close"].includes(effect.kind)) fail("unsupported publication effect");
     const p = effect.payload;
     if (["push", "branch-refresh"].includes(effect.kind)) {
-      if (typeof p.ref !== "string" || !p.ref.startsWith("refs/heads/" + settings.publication.branch_prefix)
+      const legacyRefresh = effect.kind === "branch-refresh" && (settings.legacy_proposals.ids.includes(Number(p.number))
+        || settings.legacy_proposals.branch_prefixes.some(prefix => typeof p.ref === "string" && p.ref.startsWith("refs/heads/" + prefix)));
+      if (typeof p.ref !== "string" || !p.ref.startsWith("refs/heads/")
+        || !p.ref.startsWith("refs/heads/" + settings.publication.branch_prefix) && !legacyRefresh
         || p.head !== manifest.bindings.candidate_commit) fail("candidate branch scope");
     }
     if (effect.kind === "branch-refresh") {

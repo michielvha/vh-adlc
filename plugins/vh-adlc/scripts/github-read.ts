@@ -139,10 +139,12 @@ export function createGitHubReader(hostname: string, options: Omit<ReadOptions, 
 
 export type RepositoryIdentity = { id: number; full_name: string; default_branch?: string };
 export type PullRequestInput = {
+  title?: string; labels?: string[];
   number: number; state: "open" | "closed"; merged_at: string | null; body: string; draft: boolean;
   actor: string; actor_id: number; actor_type: string; head_sha: string; head_ref: string; head_repository: RepositoryIdentity | null;
   base_sha: string; base_ref: string; base_repository: RepositoryIdentity;
 };
+export type PublicationPullInput = PullRequestInput & { title: string; labels: string[] };
 export type CommentInput = { id: number; body: string | null; actor: string; actor_id: number };
 export type WorkflowRunInput = {
   id: number; run_attempt: number; workflow_id: number; path: string; event: string; status: string;
@@ -276,6 +278,15 @@ export function createRepositoryReader(reader: GitHubReader, repository: string)
       const result = pull(reader.get(`${prefix}/pulls/${readID(number)}`));
       if (result.number !== number) throw Error("github-read-pr-number-changed");
       return result;
+    },
+    publicationPull(number: number): PublicationPullInput {
+      const raw = readObject(reader.get(`${prefix}/pulls/${readID(number)}`)), result = pull(raw);
+      if (result.number !== number) throw Error("github-read-pr-number-changed");
+      if (!Array.isArray(raw.labels)) throw Error("github-read-pr-labels-unavailable");
+      const labels = raw.labels.map(value => { const label = readObject(value); return { id: readID(label.id), name: readText(label.name) }; });
+      if (new Set(labels.map(label => label.id)).size !== labels.length || new Set(labels.map(label => label.name)).size !== labels.length)
+        throw Error("github-read-pr-labels-duplicated");
+      return { ...result, title: readText(raw.title), labels: labels.map(label => label.name).sort() };
     },
     mergedPull(number: number): PullRequestInput & { merged: boolean; merge_commit_sha: string | null } {
       const raw = readObject(reader.get(`${prefix}/pulls/${readID(number)}`));

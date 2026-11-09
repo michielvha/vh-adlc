@@ -22,7 +22,7 @@ import { readGit } from "./git";
 import type { Settings } from "./settings";
 export type PlanObjects = ReturnType<typeof writePlanObject> & { lease_object?: string; receipt_object?: string };
 export type RefObservation = { state: "absent" } | { state: "present"; object: string };
-export type EffectObservation = { state: "done"; outcome: Outcome } | { state: "absent"; evidence?: AbsenceEvidence } | { state: "unknown"; reason: string } | { state: "conflict"; reason: string; evidence?: AbsenceEvidence };
+export type EffectObservation = { state: "done"; outcome: Outcome; payload_sha256?: string } | { state: "absent"; evidence?: AbsenceEvidence; payload_sha256?: string } | { state: "unknown"; reason: string } | { state: "conflict"; reason: string; evidence?: AbsenceEvidence };
 type NativeDelivery = { objects: PlanObjects; sent: boolean; reaped: boolean; effect_id: string; attempt_id: string | null; effect: Effect; completed_commands: number; commands: number; before?: ExecutionResult["before"]; successes: ExecutionResult["successes"]; capture_unverified: boolean; identity?: PublicationIdentity; rejection?: RejectionEvidence };
 export type PublicationIdentity = { repository: string; repository_id: number; default_branch: string; actor: string; actor_id: number };
 
@@ -89,7 +89,7 @@ function expectedFields(effect: Effect) {
   const p = effect.payload;
   return { title: p.title, body: p.body, labels: reviewedLabels(p.labels), draft: p.draft };
 }
-function updateTransitions(effect: Effect) {
+export function updateTransitions(effect: Effect) {
   const p = effect.payload, original = record(p.expected_payload);
   if (Object.keys(original).sort().join(",") !== "body,draft,labels,title" || typeof original.body !== "string"
     || typeof original.draft !== "boolean" || !Array.isArray(original.labels)) throw Error("missing original PR payload");
@@ -311,7 +311,8 @@ export function createPublicationReader(options: {
     const requestStart = reader.trace().length;
     const comparisons: LabelComparison[] = [];
     try {
-      const absent = (lookup: unknown): EffectObservation => ({ state: "absent", evidence: retainAbsence({
+      const absent = (lookup: unknown, payload?: ReturnType<typeof submittedFields>): EffectObservation => ({ state: "absent",
+        ...(payload ? { payload_sha256: sha256(canonicalJSON(payload)) } : {}), evidence: retainAbsence({
         artifact_root: root, source_repo: options.source_repo, plan, effect, transport: options.transport, lookup: { result: lookup, label_comparisons: comparisons, requests: reader.trace().slice(requestStart) },
       }) });
       const conflicted = (reason: string, lookup: unknown): EffectObservation => ({ state: "conflict", reason,
@@ -320,7 +321,8 @@ export function createPublicationReader(options: {
       const observedLookup = (input: unknown, resourceId: string, object: string | null): EffectObservation => {
         const lookup = retainLookup({ artifact_root: root, source_repo: options.source_repo, plan, effect, transport: options.transport, state: "done",
           lookup: { resource_sha256: sha256(canonicalJSON(input)), label_comparisons: comparisons, requests: reader.trace().slice(requestStart) } });
-        return { state: "done", outcome: { state: "observed", observation_sha256: lookup.sha256, resource_id: resourceId, object, lookup } };
+        return { state: "done", ...(effect.kind === "pr-update" ? { payload_sha256: sha256(canonicalJSON(submittedFields(input))) } : {}),
+          outcome: { state: "observed", observation_sha256: lookup.sha256, resource_id: resourceId, object, lookup } };
       };
       if (["lease-acquire", "receipt-retain", "lease-release", "push", "branch-refresh"].includes(effect.kind)) {
         const target = getRef(text(p.ref));
@@ -336,8 +338,7 @@ export function createPublicationReader(options: {
         }
         if (effect.kind === "branch-refresh") {
           const pr = pull(positive(p.number), plan, false, false);
-          if (!ownedActor(pr.input.user, plan) || headRepository(pr) !== plan.manifest.repository_id
-            || !pr.branch.startsWith(settings.publication.branch_prefix)) return conflicted("native-refresh-scope-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
+          if (!refreshTarget(pr.input, plan) || headRepository(pr) !== plan.manifest.repository_id) return conflicted("native-refresh-scope-changed", { number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user) });
           if ("refs/heads/" + pr.branch === p.ref && pr.head === p.head) return observed(pr.input, text(p.ref), pr.head);
           if (text(record(pr.input.base).ref) !== settings.publication.base || pr.input.state !== "open" || "refs/heads/" + pr.branch !== p.ref || target.state !== "present") return conflicted("native-refresh-scope-changed", { ref: p.ref, target, number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state });
           if (target.object === p.head && pr.head === p.expected_head) return { state: "unknown", reason: "native-PR-head-sync-pending" };
@@ -393,7 +394,7 @@ export function createPublicationReader(options: {
         const transitions = updateTransitions(effect);
         return pr.input.state === "open" && transitions.some(fields => fieldsMatch(pr.input, fields, comparisons))
           ? absent({ number: p.number, head: pr.head, branch: pr.branch, state: pr.input.state, actor: actor(pr.input.user),
-            source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
+            source_payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) }, submittedFields(pr.input)) : conflicted("native-PR-update-source-changed", { number: p.number, head: pr.head, state: pr.input.state, payload_sha256: sha256(canonicalJSON(submittedFields(pr.input))) });
       }
       if (effect.kind === "issue-create") {
         const inventory = list(`${prefix}/issues?state=all&per_page=100`);

@@ -279,3 +279,30 @@ const child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdout: "in
     for (const name of ["stdout", "stderr"]) expect(lstatSync(join(result.artifact_directory, name)).mode & 0o077).toBe(0);
   }
 });
+
+test.each(["matching", "missing-title", "missing-labels", "duplicate-label", "changed-number"])("publication PR read preserves full native metadata %s", scenario => {
+  const raw: Record<string, unknown> = pull(17, { title: "Original title", labels: [{ id: 51, name: "documentation" }] });
+  if (scenario === "missing-title") delete raw.title;
+  if (scenario === "missing-labels") delete raw.labels;
+  if (scenario === "duplicate-label") raw.labels = [{ id: 51, name: "documentation" }, { id: 52, name: "documentation" }];
+  if (scenario === "changed-number") raw.number = 18;
+  const native = reader({ "repos/fixture/docs": repository, "repos/fixture/docs/pulls/17": raw });
+  native.selected.repository();
+  if (scenario === "matching") expect(native.selected.publicationPull(17)).toMatchObject({ number: 17, title: "Original title", labels: ["documentation"], body: raw.body });
+  else expect(() => native.selected.publicationPull(17)).toThrow();
+});
+
+test.each(["matching", "changed-head", "missing-labels"])("publication inventory distinguishes observed changes from unavailable metadata %s", async scenario => {
+  const { collectPublicationProposals } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
+  const list = pull(17, { title: "Original title", labels: [{ id: 51, name: "documentation" }] });
+  const detail: Record<string, unknown> = structuredClone(list);
+  if (scenario === "changed-head") detail.head = { ...list.head, sha: "e".repeat(40) };
+  if (scenario === "missing-labels") delete detail.labels;
+  const native = reader({ "repos/fixture/docs": repository,
+    "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1": [list], "repos/fixture/docs/pulls/17": detail });
+  const result = collectPublicationProposals(native.selected, parseSettings(settingsFixture()));
+  expect(result.complete).toBe(scenario === "matching");
+  expect(result.scope_changed).toBe(scenario === "changed-head");
+  if (scenario === "matching") expect(result.proposals[0].title).toBe("Original title");
+  else expect(result.diagnostics.join("\n")).toContain("metadata");
+});

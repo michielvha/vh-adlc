@@ -51,3 +51,56 @@ test.each(["matching", "lost-outcome", "no-intent", "partial", "changed-body", "
     expect(current).toHaveLength(1); expect(context.observations).toHaveLength(1);
   } else await expect(check()).rejects.toThrow();
 });
+
+test.each(["branch-only", "partial-metadata", "delivered", "delivered-alias", "missing-payload-proof", "changed-payload-proof", "no-branch-intent", "no-update-intent", "external-title", "external-head", "external-owner", "unrelated-pr"])("refresh replay normalizes only its observed original target %s", async scenario => {
+  const { capturePublicationInventory, projectCurrentProposals } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-inventory");
+  const f = publicationFixture(roots), repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
+  const original: PullRequestInput = { number: 17, state: "open", merged_at: null, title: "Earlier title", labels: ["documentation"], body: "Earlier body", draft: true,
+    actor: "fixture-bot", actor_id: 20, actor_type: "Bot", head_sha: f.input.manifest.bindings.source_commit, head_ref: "docs-drift/earlier",
+    head_repository: repository, base_sha: f.input.manifest.bindings.source_commit, base_ref: "main", base_repository: repository };
+  const bytes = canonicalJSON(projectProposalBindings([original], null)), reference = { path: "refresh-proposals.json", sha256: sha256(bytes) };
+  writeFileSync(join(f.artifacts, reference.path), bytes, { mode: 0o600 });
+  const before = { title: original.title, body: original.body, labels: original.labels, draft: original.draft };
+  const update = { id: "publication", kind: "pr-update" as const, payload: { number: 17, expected_head: f.input.manifest.bindings.candidate_commit,
+    expected_payload: before, expected_payload_sha256: sha256(canonicalJSON(before)), title: "Fresh title", body: "Fresh body", labels: ["documentation", "reviewed"], draft: false } };
+  if (scenario === "delivered-alias") update.payload.labels = ["Documentation"];
+  const effects = [f.input.manifest.effects[0], f.input.manifest.effects[1], { id: "candidate", kind: "branch-refresh" as const,
+    payload: { ref: "refs/heads/" + original.head_ref, number: 17, expected_head: original.head_sha, head: f.input.manifest.bindings.candidate_commit } }, update, f.input.manifest.effects.at(-1)!];
+  const input = manifestFixture({ ...f.input.manifest.bindings, proposals_sha256: reference.sha256 }, effects);
+  const plan = sealPlan({ reviewed: validateReviewedManifest(input), grants: input.grants, adoption_sha256: f.policy.adoption_sha256,
+    context: "trial", transport: "native", publication_kind: "advisory", corrections: [], attention: [] });
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan });
+  if (scenario !== "no-branch-intent") {
+    for (const effect of effects.slice(0, 2)) {
+      journal = appendIntent(journal, effect.id);
+      journal = appendOutcome(journal, effect.id, { state: "observed", observation_sha256: "a".repeat(64), resource_id: null, object: null });
+    }
+    journal = appendIntent(journal, "candidate");
+    if (!["branch-only", "no-update-intent"].includes(scenario)) {
+      journal = appendOutcome(journal, "candidate", { state: "observed", observation_sha256: "a".repeat(64), resource_id: "refs/heads/" + original.head_ref, object: f.input.manifest.bindings.candidate_commit });
+      journal = appendIntent(journal, "publication");
+    }
+  }
+  const current = [{ ...original, head_sha: f.input.manifest.bindings.candidate_commit }];
+  if (!["branch-only", "no-branch-intent"].includes(scenario)) Object.assign(current[0], { title: "Fresh title", body: "Fresh body" });
+  if (scenario === "delivered" || scenario === "delivered-alias") Object.assign(current[0], { labels: scenario === "delivered-alias" ? ["documentation"] : update.payload.labels, draft: false });
+  if (scenario === "external-title") current[0].title = "Another writer changed this";
+  if (scenario === "external-head") current[0].head_sha = "e".repeat(40);
+  if (scenario === "external-owner") current[0].actor_id = 999;
+  if (scenario === "unrelated-pr") current.push({ ...current[0], number: 18 });
+  const transport = { ...f.transport, kind: "native" as const, observe: async (_plan: unknown, effect: { kind: string }) => {
+    const payload = scenario === "missing-payload-proof" ? {} : { payload_sha256: scenario === "changed-payload-proof" ? "0".repeat(64)
+      : sha256(canonicalJSON({ title: current[0].title, body: current[0].body, labels: current[0].labels, draft: current[0].draft })) };
+    if (effect.kind === "pr-update" && !["delivered", "delivered-alias"].includes(scenario)) return { state: "absent" as const, ...payload };
+    return { state: "done" as const, ...payload, outcome: { state: "observed" as const, observation_sha256: "a".repeat(64),
+      resource_id: effect.kind === "branch-refresh" ? "refs/heads/" + original.head_ref : "17", object: current[0].head_sha } };
+  } };
+
+  const check = async () => {
+    const context = await capturePublicationInventory({ source_repo: f.repo, artifact_root: f.artifacts, journal_directory: journal.directory,
+      original: reference, transport, objects: writePublicationObjects(f.store, plan, journal.header), current_proposals: current });
+    return projectCurrentProposals(current, null, context);
+  };
+  if (["branch-only", "partial-metadata", "delivered", "delivered-alias"].includes(scenario)) expect(await check()).toEqual(projectProposalBindings([original], null));
+  else await expect(check()).rejects.toThrow();
+});
