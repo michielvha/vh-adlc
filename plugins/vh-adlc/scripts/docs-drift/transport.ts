@@ -105,7 +105,39 @@ function contentsAccess(selected: ReturnType<typeof createRepositoryReader>) {
   const current = selected.repository();
   const head = selected.ref("refs/heads/" + current.default_branch);
   selected.commit(head.sha);
-  return current;
+  return { ...current, head_sha: head.sha };
+}
+
+function nativeEnvironment(options: { hostname: string; credential: string; path?: string }) {
+  if (!options.credential || /[\r\n\0]/u.test(options.credential)) throw Error("missing selected publication credential");
+  return {
+    PATH: options.path ?? process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME,
+    LANG: "C", LC_ALL: "C", GH_TOKEN: options.credential, GH_ENTERPRISE_TOKEN: options.credential,
+    GH_HOST: options.hostname, GH_PROMPT_DISABLED: "1",
+    GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+  };
+}
+
+function authenticatedIdentity(repo: ReturnType<typeof contentsAccess>, hostname: string,
+  environment: ReturnType<typeof nativeEnvironment>, timeout: number): PublicationIdentity {
+  const response = Bun.spawnSync(["gh", "api", "--hostname", hostname, "--method", "POST", "graphql", "-f",
+    "query=query { viewer { login databaseId } }"], { env: environment, stdout: "pipe", stderr: "pipe", timeout });
+  if (response.exitCode !== 0) throw Error("native authenticated viewer unavailable");
+  const envelope = record(JSON.parse(response.stdout.toString()) as unknown);
+  if (Object.hasOwn(envelope, "errors") && (!Array.isArray(envelope.errors) || envelope.errors.length !== 0)) throw Error("native viewer query incomplete");
+  const viewer = record(record(envelope.data).viewer);
+  return { repository: repo.full_name.toLowerCase(), repository_id: repo.id, default_branch: text(repo.default_branch),
+    actor: text(viewer.login), actor_id: positive(viewer.databaseId) };
+}
+
+/** Observe contents access and the authenticated account without constructing an effect transport. */
+export function readNativeContext(options: {
+  hostname: string; repository: string; credential: string; path?: string; timeout_ms?: number;
+}): { identity: PublicationIdentity; default_commit: string } {
+  const environment = nativeEnvironment(options), timeout = options.timeout_ms ?? 30000;
+  const reader = createGitHubReader(options.hostname, { inherit_env: false, env: environment, timeout_ms: timeout });
+  const repository = contentsAccess(createRepositoryReader(reader, options.repository));
+  return { identity: authenticatedIdentity(repository, options.hostname, environment, timeout), default_commit: repository.head_sha };
 }
 
 /** Shared observation rules operate on the entry's explicitly selected read adapter. */
@@ -403,12 +435,7 @@ export function createNativeTransport(options: {
   const { settings, object_store: store } = options;
   requireOwnedStore(store, settings.repository);
   const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
-  if (!options.credential || /[\r\n\0]/u.test(options.credential)) throw Error("missing selected publication credential");
-  const environment = {
-    PATH: options.path ?? process.env.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME,
-    LANG: "C", LC_ALL: "C", GH_TOKEN: options.credential, GH_HOST: settings.hostname, GH_PROMPT_DISABLED: "1",
-    GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
-  };
+  const environment = nativeEnvironment({ ...options, hostname: settings.hostname });
   const reader = createGitHubReader(settings.hostname, { inherit_env: false, env: environment, timeout_ms: options.timeout_ms ?? 30000 });
   const repository = createRepositoryReader(reader, settings.repository);
   const prefix = "repos/" + settings.repository;
@@ -541,18 +568,11 @@ export function createNativeTransport(options: {
   }
 
   async function nativeIdentity() {
-      // Source fixtures may be unrelated to publication history. Probe the native publication head.
-      const repo = contentsAccess(repository);
-      contentsObserved = true;
-      const response = Bun.spawnSync(["gh", "api", "--hostname", settings.hostname, "--method", "POST", "graphql", "-f",
-        "query=query { viewer { login databaseId } }"], { env: environment, stdout: "pipe", stderr: "pipe", timeout: options.timeout_ms ?? 30000 });
-      if (response.exitCode !== 0) throw Error("native authenticated viewer unavailable");
-      const envelope = record(JSON.parse(response.stdout.toString()) as unknown);
-      if (Object.hasOwn(envelope, "errors") && (!Array.isArray(envelope.errors) || envelope.errors.length !== 0)) throw Error("native viewer query incomplete");
-      const viewer = record(record(envelope.data).viewer);
-      return { repository: repo.full_name.toLowerCase(), repository_id: repo.id, default_branch: text(repo.default_branch),
-        actor: text(viewer.login), actor_id: positive(viewer.databaseId) };
-    }
+    // Source fixtures may be unrelated to publication history. Probe the native publication head.
+    const repo = contentsAccess(repository);
+    contentsObserved = true;
+    return authenticatedIdentity(repo, settings.hostname, environment, options.timeout_ms ?? 30000);
+  }
 
   return {
     kind: "native", object_store: store.root, artifact_root: root,
