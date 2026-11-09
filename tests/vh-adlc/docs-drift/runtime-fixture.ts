@@ -43,7 +43,7 @@ export async function runtimeFixture(roots: string[], upgrade = false, bounded =
 }
 
 
-export function nativeReader(f: { root: string; candidate: string }, actor = "fixture-bot", errors = false, incompleteInventory = false) {
+export function nativeReader(f: { root: string; candidate: string; inventory_path?: string }, actor = "fixture-bot", errors = false, incompleteInventory = false) {
   const bin = join(f.root, "native-bin"), trace = join(f.root, "native-reads.jsonl");
   mkdirSync(bin, { mode: 0o700 });
   writeFileSync(join(bin, "gh"), `#!${process.execPath}
@@ -60,7 +60,7 @@ if (args.includes("graphql")) {
   const value = endpoint === "repos/fixture/docs" ? { id: 10, full_name: "fixture/docs", default_branch: "main" }
     : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha } }
     : endpoint === "repos/fixture/docs/git/commits/" + sha ? { sha, tree: { sha: "a".repeat(40) }, parents: [], message: "Synthetic source" }
-    : endpoint === "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1" ? (${incompleteInventory} ? { message: "Synthetic missing inventory" } : [])
+    : endpoint === "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1" ? (${incompleteInventory} ? { message: "Synthetic missing inventory" } : ${f.inventory_path ? `JSON.parse(require("node:fs").readFileSync(${JSON.stringify(f.inventory_path)}, "utf8"))` : "[]"})
     : null;
   if (!value) process.exit(92);
   console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));

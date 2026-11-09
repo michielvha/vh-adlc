@@ -1,3 +1,5 @@
+import { PublicationScopeChanged } from "./publish";
+import { projectCurrentProposals, type PublicationInventory } from "./publication-inventory";
 import { parseDecisionPacket, projectAttentionProposals, validateAdvisorySelection } from "./publication-decisions";
 import { collectPublicationOriginals } from "./publication-originals";
 import { randomUUID } from "node:crypto";
@@ -10,7 +12,7 @@ import { publishArtifact } from "./journal";
 import { readCandidatePatch } from "./preparation";
 import { deriveWorkerInputs } from "./publication-worker";
 import { collectPublicationInputs } from "./publication-inputs";
-import { collectProposals, projectProposalBindings } from "./proposals";
+import { collectProposals } from "./proposals";
 import { canonicalDigest, canonicalJSON, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { deliveryDigest, type AttentionProjection, type CorrectionInput } from "./report";
 import { readResolutionRecord, resolutionSource } from "./resolve";
@@ -21,10 +23,10 @@ import { readSourceAssessmentArtifacts } from "./source-assessment";
 import { readCandidateVerificationArtifacts } from "./verification-evidence";
 
 type Options = Omit<Parameters<typeof collectPublicationInputs>[0], "object_store"> & {
-  source_verification: unknown; candidate_verification: unknown; decisions: unknown;
+  source_verification: unknown; candidate_verification: unknown; decisions: unknown; inventory_context?: PublicationInventory;
 };
 type Result = {
-  schema_version: 1; kind: "docs-drift-publication-bindings"; authority: "none"; complete: boolean; diagnostics: string[];
+  schema_version: 1; kind: "docs-drift-publication-bindings"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
   proposal_snapshot: { path: string; sha256: string } | null; proposal_snapshot_path: string | null; worker_input_sha256: string | null;
   candidate_verification_sha256: string | null;
   mode: "advisory" | "resolve" | null; bindings: Bindings | null; corrections: CorrectionInput[]; attention: AttentionProjection[];
@@ -39,7 +41,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
   const options = { ...input, selection: structuredClone(input.selection), resolution_record: structuredClone(input.resolution_record),
     source_verification: structuredClone(input.source_verification), candidate_verification: structuredClone(input.candidate_verification),
     decisions: structuredClone(input.decisions), path: input.path ?? process.env.PATH };
-  const result: Result = { schema_version: 1, kind: "docs-drift-publication-bindings", authority: "none", complete: false, diagnostics: [], mode: null, candidate_verification_sha256: null,
+  const result: Result = { schema_version: 1, kind: "docs-drift-publication-bindings", authority: "none", complete: false, scope_changed: false, diagnostics: [], mode: null, candidate_verification_sha256: null,
     proposal_snapshot: null, proposal_snapshot_path: null, worker_input_sha256: null, bindings: null, corrections: [], attention: [], source_verification: null, candidate_verification: null, facts: null, proposals: null, resolution: null };
   const repo = realpathSync(options.repo), candidateRepo = realpathSync(options.candidate_repo);
   const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidateRepo));
@@ -68,7 +70,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
       throw Error("Complete native candidate and original verification required");
     const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path });
     const context = native();
-    if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw Error("Native source or actor changed before proposal collection");
+    if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw new PublicationScopeChanged("Native source or actor changed before proposal collection");
     result.proposals = collectProposals(context.repository, snapshot.settings);
     if (!result.proposals.complete) { result.diagnostics.push(...result.proposals.diagnostics); throw Error("Complete current proposal inventory required"); }
     let resolutionCollection: ResolutionCollection | null = null;
@@ -79,12 +81,12 @@ export async function collectPublicationBindings(input: Options): Promise<Result
         current_default: currentDefault, credential: options.credential, path: options.path });
       resolutionCollection = originals.collection; result.resolution = originals.inputs;
       if (!result.resolution.complete) { result.diagnostics.push(...result.resolution.diagnostics); throw Error("Selected native resolution inputs incomplete"); }
-      if (!canonicalJSON(result.resolution.proposals).equals(canonicalJSON(originals.observed))) throw Error("Selected original inputs changed between fetch and collection");
+      if (!canonicalJSON(result.resolution.proposals).equals(canonicalJSON(originals.observed))) throw new PublicationScopeChanged("Selected original inputs changed between fetch and collection");
       const record = readResolutionRecord(readGit(candidateRepo, "show", options.candidate + ":" + protocolPath(options.resolution_record.path)), snapshot.settings);
       const originalBindings = result.resolution.proposals.map(proposal => ({ ...proposal,
         hunks: proposal.hunks.map(({ before_base64: _before, after_base64: _after, ...hunk }) => hunk) }));
       if (!canonicalJSON(record.originals).equals(canonicalJSON(originalBindings)) || !canonicalJSON(record.dispositions).equals(canonicalJSON(packet.decisions)))
-        throw Error("Resolve record decisions or complete original bindings changed");
+        throw new PublicationScopeChanged("Resolve record decisions or complete original bindings changed");
     }
     const sourceBinding = resolutionSource(snapshot), sourceInputs = canonicalDigest(sourceBinding), candidateSnapshot = captureSnapshot(candidateRepo, options.candidate);
     const verificationBinding = canonicalDigest({ commands: snapshot.settings.verification_commands, documents: candidateSnapshot.protocol.bindings.documents,
@@ -99,7 +101,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     }));
     result.attention = projectAttentionProposals(packet.attention, { repository: snapshot.settings.repository,
       scope_sha256: snapshot.protocol.bindings.scope_sha256, inputs_sha256: sourceInputs });
-    const proposalBytes = canonicalJSON(projectProposalBindings(result.proposals.proposals, result.resolution?.inputs_sha256 ?? null));
+    const proposalBytes = canonicalJSON(projectCurrentProposals(result.proposals.proposals, result.resolution?.inputs_sha256 ?? null, options.inventory_context));
     if (proposalBytes.length > snapshot.settings.reports.max_entry_bytes) throw Error("Proposal snapshot exceeds the configured retained bound");
     if (!baseline.evidence || !verified.evidence) throw Error("Original source and candidate evidence references required");
     result.candidate_verification_sha256 = verified.evidence.sha256;
@@ -107,20 +109,24 @@ export async function collectPublicationBindings(input: Options): Promise<Result
       source_verification: baseline.evidence, decisions_sha256: sha256(bytes), proposals_sha256: sha256(proposalBytes) }),
       candidate_commit: options.candidate, candidate_tree: candidate.candidate_tree, diff_sha256: candidate.diff_sha256,
       delivery_sha256: deliveryDigest(result.corrections, result.attention, result.candidate_verification_sha256) };
-    if (resolutionCollection && result.resolution && !recheckResolutionInputs(result.resolution, resolutionCollection).fresh)
-      throw Error("Selected original inputs changed during final recheck");
+    if (resolutionCollection && result.resolution) {
+      const recheck = recheckResolutionInputs(result.resolution, resolutionCollection);
+      if (recheck.changed) throw new PublicationScopeChanged("Selected original inputs changed during final recheck");
+      if (!recheck.fresh) throw Error("Selected original inputs unavailable during final recheck");
+    }
     const final = native(), proposals = collectProposals(final.repository, snapshot.settings);
-    if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity) || !proposals.complete
-      || canonicalDigest(proposals.proposals) !== canonicalDigest(result.proposals.proposals)) throw Error("Native source actor or proposals changed during binding collection");
+    if (!proposals.complete) throw Error("Current final proposal inventory incomplete");
+    if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity)
+      || canonicalDigest(proposals.proposals) !== canonicalDigest(result.proposals.proposals)) throw new PublicationScopeChanged("Native source actor or proposals changed during binding collection");
     const settled = native();
     if (settled.default_commit !== currentDefault || canonicalDigest(settled.identity) !== canonicalDigest(identity))
-      throw Error("Native source or actor changed after final proposal checks");
+      throw new PublicationScopeChanged("Native source or actor changed after final proposal checks");
     result.proposal_snapshot_path = join(secondary.directory, "proposal-snapshot-" + randomUUID() + ".json");
     publishArtifact(result.proposal_snapshot_path, proposalBytes);
     result.proposal_snapshot = { path: relative(secondary.directory, result.proposal_snapshot_path), sha256: result.bindings.proposals_sha256 };
     result.worker_input_sha256 = workerInputDigest(result.bindings);
     result.complete = true;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Publication binding collection unavailable"); }
+  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || result.facts?.freshness?.fresh === false; result.diagnostics.push(error instanceof Error ? error.message : "Publication binding collection unavailable"); }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during publication binding collection");
   }

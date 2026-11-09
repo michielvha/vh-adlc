@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { collectPublicationBindings } from "./publication-bindings";
-import { exactRecord } from "./publication-decisions";
+import { parseWorkerPublication } from "./publication-proposal";
 import { collectWorkerPreparation } from "./worker-preparation";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { effectMarker, manifestDigest, parseActionManifest, type ActionManifest, type Effect } from "./manifests";
@@ -37,11 +37,8 @@ export async function collectReviewTarget(input: Options): Promise<ReviewTarget>
     const original = readNativeRoleCapture({ source_repo: repo, candidate_repo: candidate, artifact_root: options.artifact_root, reference: options.worker_capture, policy,
       expected: { role: "worker", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: bound.worker_input_sha256! } });
     if (!result.preparation.publication) throw Error("Original worker publication proposal required");
-    const proposal = exactRecord(result.preparation.publication, ["operation_id", "proposal"], "Original publication proposal fields changed");
-    const action = exactRecord(proposal.proposal, ["kind", "payload"], "Original publication action fields changed");
-    if (action.kind !== "pr-create" && action.kind !== "issue-create") throw Error("Publication proposal requires a fresh PR or an issue");
-    if (action.payload === null || typeof action.payload !== "object" || Array.isArray(action.payload)) throw Error("Original publication payload required");
-    const payload = { ...action.payload } as Record<string, unknown>, settings = captureSnapshot(repo, options.source).settings;
+    const proposal = parseWorkerPublication(result.preparation.publication)!;
+    const action = proposal.proposal, payload = { ...action.payload }, settings = captureSnapshot(repo, options.source).settings;
     if (typeof payload.body !== "string") throw Error("Original publication body required");
     // These stable identifiers and exact native/checkpoint values are finalized before the reviewer is launched.
     const operationId = proposal.operation_id as string;

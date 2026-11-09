@@ -148,11 +148,14 @@ export function collectResolutionInputs(options: ResolutionCollection): Resoluti
 }
 
 /** Recompute the controller's complete selected scope. Serialized flags or digests supply no freshness proof. */
-export function recheckResolutionInputs(inputs: ResolutionInputs, options: ResolutionCollection): { fresh: boolean; diagnostics: string[] } {
+export function recheckResolutionInputs(inputs: ResolutionInputs, options: ResolutionCollection): { fresh: boolean; changed: boolean; diagnostics: string[] } {
   try {
     const current = collectResolutionInputs(options);
     const diagnostics = [...current.diagnostics];
-    if (!canonicalJSON(current).equals(canonicalJSON(inputs))) diagnostics.push("Selected resolution Git inputs or native metadata changed");
-    return { fresh: current.complete && diagnostics.length === 0, diagnostics };
-  } catch { return { fresh: false, diagnostics: ["Required current resolution inputs unavailable"] }; }
+    const same = canonicalJSON(current).equals(canonicalJSON(inputs));
+    const changed = current.complete && inputs.complete && !same;
+    if (changed) diagnostics.push("Selected resolution Git inputs or native metadata changed");
+    if (!inputs.complete) diagnostics.push("Original resolution inputs incomplete");
+    return { fresh: current.complete && inputs.complete && same && diagnostics.length === 0, changed, diagnostics };
+  } catch { return { fresh: false, changed: false, diagnostics: ["Required current resolution inputs unavailable"] }; }
 }

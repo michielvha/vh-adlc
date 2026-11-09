@@ -98,7 +98,7 @@ const effectFields = {
   release: ["tag", "head", "title", "body", "draft", "prerelease"],
 } as const;
 
-function parseEffect(value: unknown): Effect {
+export function parseEffect(value: unknown): Effect {
   const input = object(value, ["id", "kind", "payload"], "effect");
   const kind = text(input.kind);
   if (!Object.hasOwn(effectFields, kind)) invalid("effect kind");

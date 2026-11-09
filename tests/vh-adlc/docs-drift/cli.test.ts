@@ -269,6 +269,9 @@ test.each([
   ["collect-review-target", "--approved", "true"],
   ["read-candidate-review", "--collector", "true"],
   ["read-candidate-review", "--approved", "true"],
+  ["check-publication", "--approved", "true"],
+  ["publish", "--collector", "true"],
+  ["resume", "--trial-definition", "a".repeat(64)],
   ["check-verification", "--repo", "x", "--source", "a".repeat(40), "--artifact-root", "x"],
 ].map(argv => [argv]))("unknown, duplicate or unsafe CLI inputs return a structured refusal %j", argv => {
   const { result, report } = invoke(argv);
@@ -277,18 +280,20 @@ test.each([
   expect(report.diagnostics.length).toBeGreaterThan(0);
 });
 
-test.each(["scan", "assess-source", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication", "collect-review-target", "read-candidate-review"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
+test.each(["scan", "assess-source", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication", "collect-review-target", "read-candidate-review", "check-publication", "publish", "resume"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
   const f = fixture(), before = captureRepositoryState(f.repo), native = nativeReader({ ...f, candidate: f.commit });
   let artifacts = kind === "caller" ? f.repo : f.artifacts;
   if (kind === "shared") chmodSync(artifacts, 0o755);
   if (kind === "symlink") { artifacts = join(f.root, "artifact-alias"); symlinkSync(f.artifacts, artifacts); }
   const required = command === "check-verification" ? ["--verification", "proof.json", "--verification-sha256", "a".repeat(64)]
-    : ["bind-publication", "collect-review-target", "read-candidate-review"].includes(command) ? ["--source-verification", "source.json", "--source-verification-sha256", "a".repeat(64),
+    : ["bind-publication", "collect-review-target", "read-candidate-review", "check-publication", "publish", "resume"].includes(command) ? ["--source-verification", "source.json", "--source-verification-sha256", "a".repeat(64),
       "--candidate-verification", "candidate.json", "--candidate-verification-sha256", "a".repeat(64), "--decisions", "decisions.json", "--decisions-sha256", "a".repeat(64)]
       : ["collect-worker-inputs", "read-worker-preparation"].includes(command) ? ["--source-verification", "source.json", "--source-verification-sha256", "a".repeat(64),
         "--decisions", "decisions.json", "--decisions-sha256", "a".repeat(64)] : [];
-  if (["read-worker-preparation", "collect-review-target", "read-candidate-review"].includes(command)) required.push("--worker-capture", "capture.json", "--worker-capture-sha256", "a".repeat(64));
-  if (command === "read-candidate-review") required.push("--reviewer-capture", "reviewer.json", "--reviewer-capture-sha256", "a".repeat(64));
+  if (["read-worker-preparation", "collect-review-target", "read-candidate-review", "check-publication", "publish", "resume"].includes(command)) required.push("--worker-capture", "capture.json", "--worker-capture-sha256", "a".repeat(64));
+  if (["read-candidate-review", "check-publication", "publish", "resume"].includes(command)) required.push("--reviewer-capture", "reviewer.json", "--reviewer-capture-sha256", "a".repeat(64));
+  if (["check-publication", "publish", "resume"].includes(command)) required.push("--authority", "request.json", "--authority-sha256", "a".repeat(64));
+  if (command === "resume") required.push("--journal-directory", join(f.artifacts, "original-journal"));
   const { result, report } = invoke([command, "--repo", f.repo, "--source", f.commit, "--artifact-root", artifacts, ...required], native.environment);
   expect(result.exitCode).toBe(2);
   expect(report.outcome).toBe("incomplete");

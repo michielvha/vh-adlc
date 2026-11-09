@@ -1,3 +1,5 @@
+import { PublicationScopeChanged } from "./publish";
+import { projectCurrentProposals, type PublicationInventory } from "./publication-inventory";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -5,7 +7,7 @@ import { readBoundArtifact } from "./evidence-input";
 import { publishArtifact } from "./journal";
 import { advisoryDecisionIDs, parseDecisionPacket, projectAttentionProposals } from "./publication-decisions";
 import { collectPublicationOriginals } from "./publication-originals";
-import { collectProposals, projectProposalBindings } from "./proposals";
+import { collectProposals } from "./proposals";
 import { recheckResolutionInputs, type ResolutionCollection, type ResolutionInputs } from "./resolve-inputs";
 import { roleRuntimeDigest } from "./role-capture";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
@@ -38,12 +40,12 @@ export function deriveWorkerInputs(options: {
 }
 
 export type WorkerCollectionOptions = Omit<Parameters<typeof collectPublicationInputs>[0], "candidate_repo" | "candidate" | "selection" | "resolution_record" | "object_store"> & {
-  source_verification: unknown; decisions: unknown;
+  source_verification: unknown; decisions: unknown; inventory_context?: PublicationInventory;
 };
 
 
 type WorkerCollection = {
-  schema_version: 1; kind: "docs-drift-worker-inputs"; authority: "none"; complete: boolean; diagnostics: string[];
+  schema_version: 1; kind: "docs-drift-worker-inputs"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
   inputs: WorkerInputs | null; worker_input_sha256: string | null; worker_runtime_sha256: string | null; attention: AttentionProjection[];
   proposal_snapshot: { path: string; sha256: string } | null; proposal_snapshot_path: string | null;
   source_verification: ReturnType<typeof readSourceAssessmentArtifacts> | null;
@@ -56,8 +58,8 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
   const options: WorkerCollectionOptions = { repo: input.repo, source: input.source, artifact_root: input.artifact_root,
     owner: input.owner, run: input.run, credential: input.credential, path: input.path ?? process.env.PATH,
     cache_directory: input.cache_directory, entry: input.entry, launcher_path: input.launcher_path, settings_path: input.settings_path,
-    source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions) };
-  const result: WorkerCollection = { schema_version: 1, kind: "docs-drift-worker-inputs", authority: "none", complete: false, diagnostics: [],
+    source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), inventory_context: input.inventory_context };
+  const result: WorkerCollection = { schema_version: 1, kind: "docs-drift-worker-inputs", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     inputs: null, worker_input_sha256: null, worker_runtime_sha256: null, attention: [], proposal_snapshot: null, proposal_snapshot_path: null,
     source_verification: null, facts: null, proposals: null, resolution: null };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
@@ -81,7 +83,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     result.worker_runtime_sha256 = roleRuntimeDigest(result.facts.runtime, "worker");
     const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path });
     const context = native();
-    if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw Error("Native source or actor changed before proposal collection");
+    if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw new PublicationScopeChanged("Native source or actor changed before proposal collection");
     result.proposals = collectProposals(context.repository, snapshot.settings);
     if (!result.proposals.complete) { result.diagnostics.push(...result.proposals.diagnostics); throw Error("Complete current proposal inventory required"); }
     let collection: ResolutionCollection | null = null;
@@ -90,23 +92,28 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
         current_default: currentDefault, credential: options.credential, path: options.path });
       collection = originals.collection; result.resolution = originals.inputs;
       if (!result.resolution.complete) { result.diagnostics.push(...result.resolution.diagnostics); throw Error("Selected native resolution inputs incomplete"); }
-      if (!canonicalJSON(result.resolution.proposals).equals(canonicalJSON(originals.observed))) throw Error("Selected original inputs changed between fetch and collection");
+      if (!canonicalJSON(result.resolution.proposals).equals(canonicalJSON(originals.observed))) throw new PublicationScopeChanged("Selected original inputs changed between fetch and collection");
     }
-    const proposalBytes = canonicalJSON(projectProposalBindings(result.proposals.proposals, result.resolution?.inputs_sha256 ?? null));
+    const proposalBytes = canonicalJSON(projectCurrentProposals(result.proposals.proposals, result.resolution?.inputs_sha256 ?? null, options.inventory_context));
     if (proposalBytes.length > snapshot.settings.reports.max_entry_bytes) throw Error("Proposal snapshot exceeds the configured retained bound");
     result.inputs = deriveWorkerInputs({ snapshot, assessment_sha256: baseline.scan_artifacts.report.sha256, source_verification: baseline.evidence,
       decisions_sha256: sha256(bytes), proposals_sha256: sha256(proposalBytes) });
-    if (collection && result.resolution && !recheckResolutionInputs(result.resolution, collection).fresh) throw Error("Selected original inputs changed during final recheck");
+    if (collection && result.resolution) {
+      const recheck = recheckResolutionInputs(result.resolution, collection);
+      if (recheck.changed) throw new PublicationScopeChanged("Selected original inputs changed during final recheck");
+      if (!recheck.fresh) throw Error("Selected original inputs unavailable during final recheck");
+    }
     const final = native(), proposals = collectProposals(final.repository, snapshot.settings);
-    if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity) || !proposals.complete
-      || canonicalDigest(proposals.proposals) !== canonicalDigest(result.proposals.proposals)) throw Error("Native source actor or proposals changed during binding collection");
+    if (!proposals.complete) throw Error("Current final proposal inventory incomplete");
+    if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity)
+      || canonicalDigest(proposals.proposals) !== canonicalDigest(result.proposals.proposals)) throw new PublicationScopeChanged("Native source actor or proposals changed during binding collection");
     const settled = native();
-    if (settled.default_commit !== currentDefault || canonicalDigest(settled.identity) !== canonicalDigest(identity)) throw Error("Native source or actor changed after final proposal checks");
+    if (settled.default_commit !== currentDefault || canonicalDigest(settled.identity) !== canonicalDigest(identity)) throw new PublicationScopeChanged("Native source or actor changed after final proposal checks");
     result.proposal_snapshot_path = join(scope.directory, "proposal-snapshot-" + randomUUID() + ".json");
     publishArtifact(result.proposal_snapshot_path, proposalBytes);
     result.proposal_snapshot = { path: relative(scope.directory, result.proposal_snapshot_path), sha256: result.inputs.proposals_sha256 };
     result.worker_input_sha256 = workerInputsDigest(result.inputs); result.complete = true;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Worker input collection unavailable"); }
+  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || result.facts?.freshness?.fresh === false; result.diagnostics.push(error instanceof Error ? error.message : "Worker input collection unavailable"); }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during worker input collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);

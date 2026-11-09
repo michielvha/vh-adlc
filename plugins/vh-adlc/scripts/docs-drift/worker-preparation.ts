@@ -1,9 +1,10 @@
+import { parseWorkerPublication } from "./publication-proposal";
 import { realpathSync } from "node:fs";
 import { collectWorkerInputs, type WorkerCollectionOptions } from "./publication-worker";
 import { readBoundArtifact } from "./evidence-input";
 import { exactRecord, parseDecisionPacket, validateAdvisorySelection } from "./publication-decisions";
 import { inspectPreparation } from "./preparation";
-import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON } from "./protocol";
+import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
 import { parseEdit, type Edit } from "./resolve";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
@@ -14,7 +15,7 @@ type Preparation = {
   worker_inputs: Awaited<ReturnType<typeof collectWorkerInputs>> | null;
   worker: Omit<ReturnType<typeof readNativeRoleCapture>, "evidence"> | null;
   selection: { schema_version: 1; source_commit: string; edits: Edit[] } | null;
-  publication: Record<string, unknown> | null; inspection: ReturnType<typeof inspectPreparation> | null;
+  publication: ReturnType<typeof parseWorkerPublication>; inspection: ReturnType<typeof inspectPreparation> | null;
 };
 
 /** Preserve the original worker's bounded output as preparation data under current source/runtime checks. */
@@ -37,12 +38,12 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     if (Buffer.byteLength(verified.records, "utf8") > snapshot.settings.reports.max_entry_bytes) throw Error("Bounded original worker handoff required");
     const packet = exactRecord(JSON.parse(verified.records), ["input_sha256", "edits", "publication"], "Original worker handoff fields changed");
     if (packet.input_sha256 !== current.worker_input_sha256 || !Array.isArray(packet.edits)) throw Error("Original worker input target changed");
-    if (packet.publication !== null && (typeof packet.publication !== "object" || Array.isArray(packet.publication))) throw Error("Worker publication proposal required");
+    const publication = parseWorkerPublication(packet.publication);
     const edits = packet.edits.map(parseEdit);
     result.selection = { schema_version: 1, source_commit: options.source, edits };
     const decisions = parseDecisionPacket(readBoundArtifact({ source_repo: repo, artifact_root: options.artifact_root, reference: options.decisions }), snapshot);
     if (decisions.mode === "advisory") validateAdvisorySelection(decisions, result.selection);
-    result.publication = packet.publication as Record<string, unknown> | null;
+    result.publication = publication;
     result.inspection = inspectPreparation({ repo, source: options.source, selection: result.selection });
     if (!result.inspection.complete) { result.diagnostics.push(...result.inspection.diagnostics); throw Error("Original worker preparation incomplete"); }
     // Keep the exact parsed worker postimages; preparation and publication have separate grants.

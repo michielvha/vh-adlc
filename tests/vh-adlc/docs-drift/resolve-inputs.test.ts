@@ -129,3 +129,11 @@ test("serialized completeness flags cannot hide omitted hunks from freshness ver
   input.proposals[0].hunks = [];
   expect(recheckResolutionInputs(input, { ...f, selected: [1] }).fresh).toBe(false);
 });
+
+test("a temporary native lookup failure is incomplete without asserting a material change", () => {
+  const f = setup(), input = collect(f);
+  const reader = { ...f.reader, pull: () => { throw Error("Synthetic temporary native lookup outage"); } };
+  const current = recheckResolutionInputs(input, { ...f, reader, selected: [1] });
+  expect(current.fresh).toBe(false); expect(current.changed).toBe(false);
+  expect(current.diagnostics.join("\n")).not.toContain("native metadata changed");
+});
