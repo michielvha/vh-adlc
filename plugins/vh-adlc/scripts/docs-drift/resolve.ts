@@ -110,11 +110,12 @@ export function readVerification(value: unknown, expected: string): Verification
   return result;
 }
 function selectedKey(proposal: number, hunk: string): string { return `${proposal}:${hunk}`; }
-function validQuote(value: Quote, collection: ResolutionCollection): boolean {
+function validQuote(value: Quote, collection: Pick<ResolutionCollection, "snapshot">): boolean {
   const blob = collection.snapshot.blobs.find(blob => blob.path === value.path);
   return blob !== undefined && collection.snapshot.entries.some(entry => entry[0] === value.path) && sha256(blob.bytes) === value.sha256
     && value.end <= blob.bytes.length && sha256(blob.bytes.subarray(value.start, value.end)) === value.quote_sha256;
 }
+export { quote as parseSourceQuote, validQuote as matchesSourceQuote };
 function overlap(left: Edit, right: Edit): boolean {
   if (left.path !== right.path) return false;
   if ([left.action, right.action].some(action => action === "create" || action === "delete")) return true;

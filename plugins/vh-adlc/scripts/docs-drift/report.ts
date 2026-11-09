@@ -233,6 +233,7 @@ export function buildReport(input: ReportInput): Report {
 function prose(value: string): string {
   return value.replaceAll(/\r?\n/gu, " ").replaceAll(/[<>`\[\]\\*_]/gu, character => `\\${character}`);
 }
+export { prose as escapeReportText };
 export function renderReport(report: Report): string {
   const count = report.attention.length;
   const lines = ["# Documentation drift report", "", `${report.outcome}. ${report.published.length} published correction(s), ${report.carried_delivery.length} pending delivery item(s), ${count} unresolved item${count === 1 ? "" : "s"}.`, "", "## Fixes", ""];

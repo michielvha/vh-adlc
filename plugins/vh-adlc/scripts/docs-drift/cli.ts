@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { readAssessmentReport, renderAssessmentReport } from "./assessment-report";
 import { checkPublication, publishPublication, resumePublication } from "./publication-controller";
 import { collectCandidateReview } from "./candidate-review";
 import { collectReviewTarget } from "./review-target";
@@ -28,6 +29,7 @@ import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
 type Diagnostic = { code: string; message: string };
 export type CLIReport = {
   schema_version: 1; command: string; outcome: "collected" | "attention" | "incomplete"; diagnostics: Diagnostic[];
+  assessment_report?: ReturnType<typeof readAssessmentReport>; markdown?: string;
   source_commit?: string; settings_sha256?: string; bindings_sha256?: string; assessment?: ScanRun;
   signals?: ReturnType<typeof checkUpgradeSignals>;
   trial?: ReturnType<typeof collectTrialBindings>;
@@ -56,6 +58,10 @@ bun <plugin>/scripts/docs-drift/cli.ts scan --repo <repo> --source <full-commit>
   --artifact-root <private-external-directory>
 bun <plugin>/scripts/docs-drift/cli.ts assess-source --repo <repo> --source <full-commit>
   --artifact-root <private-external-directory>
+bun <plugin>/scripts/docs-drift/cli.ts report-findings --repo <repo> --source <full-commit>
+  --artifact-root <private-external-directory> --source-verification <relative-original-record>
+  --source-verification-sha256 <sha256> --assessment <relative-finding-assessments>
+  --assessment-sha256 <sha256>
 bun <plugin>/scripts/docs-drift/cli.ts check-upgrade-signals --repo <repo>
   --source <full-commit>
 bun <plugin>/scripts/docs-drift/cli.ts trial-bindings --repo <repo>
@@ -149,6 +155,10 @@ bun <plugin>/scripts/docs-drift/cli.ts prepare --repo <repo> --source <full-comm
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
 
+report-findings checks original source quotes and complete finding accounting.
+It emits caller-recorded judgments in JSON and Markdown. The workflow combines
+delivery and prior-attention evidence in its final run report.
+
 Prepare the locked verified binary and required knowledge before invoking this
 helper. The scanner reads the selected committed configuration and runs in its
 owned source copy. JSON reports collection accounting. Candidate assessment,
@@ -213,8 +223,8 @@ const selectionCommands = ["check-edits", "prepare", "collect-resolution", "coll
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "assess-source", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...selectionCommands].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "assess-source", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...selectionCommands].includes(command);
+  if (!["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...selectionCommands].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...selectionCommands].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
@@ -228,6 +238,7 @@ function argumentsForCommand(argv: string[]) {
   if (["read-candidate-review", ...finalPublicationCommands].includes(command)) flags.push("--reviewer-capture", "--reviewer-capture-sha256");
   if (finalPublicationCommands.includes(command)) flags.push("--authority", "--authority-sha256");
   if (command === "resume") flags.push("--journal-directory");
+  if (command === "report-findings") flags.push("--source-verification", "--source-verification-sha256", "--assessment", "--assessment-sha256");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const flag = argv[index], value = argv[index + 1];
@@ -240,6 +251,7 @@ function argumentsForCommand(argv: string[]) {
   if (!repo || !source || (needsArtifacts && !artifacts)) throw Error(command + " requires " + flags.join(", "));
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) throw Error(command + " requires a full immutable source commit");
   const requiredReferences: Record<string, string[]> = {
+    "report-findings": ["--source-verification", "--source-verification-sha256", "--assessment", "--assessment-sha256"],
     "check-verification": ["--verification", "--verification-sha256"],
     "collect-worker-inputs": ["--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256"],
     "read-worker-preparation": ["--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256", "--worker-capture", "--worker-capture-sha256"],
@@ -255,6 +267,7 @@ function argumentsForCommand(argv: string[]) {
     launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition"),
     selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256"), verification: values.get("--verification"), verification_sha256: values.get("--verification-sha256"),
     source_verification: values.get("--source-verification"), source_verification_sha256: values.get("--source-verification-sha256"),
+    assessment: values.get("--assessment"), assessment_sha256: values.get("--assessment-sha256"),
     candidate_verification: values.get("--candidate-verification"), candidate_verification_sha256: values.get("--candidate-verification-sha256"),
     decisions: values.get("--decisions"), decisions_sha256: values.get("--decisions-sha256"),
     authority: values.get("--authority"), authority_sha256: values.get("--authority-sha256"), journal_directory: values.get("--journal-directory"),
@@ -434,6 +447,14 @@ export async function main(argv: string[]): Promise<number> {
         report = { schema_version: 1, command: options.command, outcome: worker_inputs.complete ? "collected" : "incomplete", source_commit: options.source,
           worker_inputs, diagnostics: worker_inputs.diagnostics.map(message => ({ code: "worker-inputs", message })) };
       }
+    } else if (options.command === "report-findings") {
+      const artifacts = privateArtifacts(options.artifacts, repo);
+      const assessment_report = readAssessmentReport({ repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(),
+        source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
+        assessment: { path: options.assessment, sha256: options.assessment_sha256 } });
+      report = { schema_version: 1, command: options.command, outcome: assessment_report.complete ? "collected" : "incomplete", source_commit: options.source,
+        assessment_report, markdown: renderAssessmentReport(assessment_report),
+        diagnostics: assessment_report.diagnostics.map(message => ({ code: "finding-assessment", message })) };
     } else if (options.command === "assess-source") {
       const artifacts = privateArtifacts(options.artifacts, repo);
       const source_assessment = await assessSource({ repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
