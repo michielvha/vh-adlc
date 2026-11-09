@@ -207,6 +207,7 @@ None.
 | 2026-11-09 | R-3 | spec | `a5ef9e6204cad85777293bb5ec33b505f6311be4` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and five nits. |
 | 2026-11-09 | R-4 | spec | `05b51e9093dacbb1bc2df87bb88772e9555c1986` | claude-opus-5-5 | procedural | No blocking findings; two should-fix findings and two nits. |
 | 2026-11-10 | R-5 | spec | `c071bd4682d176391849c39b9eb873bdce972510` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and two nits. |
+| 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | claude-opus-5-5 | procedural | No blocking findings; one should-fix finding and four nits, left in the record at the owner's direction. |
 
 ### R-1
 
@@ -490,6 +491,43 @@ SEVERITY: nit
 WHERE: Context (Owner summary)
 EVIDENCE: The owner summary (lines 19-29) leaves out several defaults and trade-offs that Design settles. With an overridden sessions root, `start --profile` and the `profile` commands fail with `profile-home-required` unless a profile root is also given (line 100). That affects any setup that sets `REMOTE_GUI_HOME`, including the existing fixtures (tests/remote-gui/native-routing.e2e.test.ts:49). A profile last opened by a newer Chromium major version is refused (line 125). Stop and expiry kill Chromium after a two-second close attempt (line 124). The standard asks the summary to cover important defaults and trade-offs.
 PROPOSAL: Add one or two sentences to the owner summary covering the profile-home requirement, the newer-Chromium refusal and the bounded close on stop.
+
+### R-6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan (AC-16), AC-16
+EVIDENCE: Test Plan line 191 has a real-browser case "with the Exit path blocked by an open dialog: the page sets a persistent cookie just before `stop`, and the next session sees it." The row does not check that Exit actually failed. A scripted JS alert is tab-modal and may not stop the Alt+F, X menu exit that quitBrowser sends (plugins/remote-gui/internal/browser/quit.go:44-63). A beforeunload prompt only appears after user activation. If the dialog does not block Exit, the case passes through a graceful close, and the SIGTERM path added for R-5 F-01 (Lifecycle line 125) gets no real-browser evidence. The unit stand-in row checks only signal timing. AC-16's clause "keeping cookies set just before the stop whenever Chromium honours the terminate" could then be marked met without any observation of a terminate.
+PROPOSAL: Block Exit in a way that is known to work, for example by ending the owned x11vnc process so quitBrowser fails. Have the test assert that Chromium was still running after the Exit attempt and received SIGTERM, then check that the cookie is present in the next session.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary), Design (Lifecycle)
+EVIDENCE: Owner summary line 27 says the close happens "all within the five-second deadline" for stop and expiry. The five-second supervisor deadline exists only when the guard is signalled or the TTL fires (plugins/remote-gui/internal/session/daemon.go:304-319). An explicit `stop` goes through the control socket, the guard has no deadline on that path (daemon.go:295-303), and only the ten-second `stop` wait applies (plugins/remote-gui/internal/session/session.go:302-313). Lifecycle line 125 says the close "stays inside the guard's five-second supervisor deadline on expiry", but it counts only the 2 s plus 1 s browser budget. The deferred forward removal (daemon.go:473-483) runs before the deferred `bundle.Stop()` (daemon.go:422), and removeForward can wait up to 6 s for the state lock (daemon.go:123) before it calls the Tailscale API.
+PROPOSAL: In the summary, tie the five-second limit to expiry. In Lifecycle, note that forward removal runs before the browser stop, so a slow removal leaves Chromium to the guard's group stop under the fallback sentence that is already there.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Lifecycle), AC-07, Test Plan (AC-07)
+EVIDENCE: Lifecycle line 126 refuses a profile last opened by a newer Chromium "Before launching". It does not say which process runs the `--version` check or what a refusal leaves behind. The other profile refusals (owner mismatch, in-use, browser still running) run in the CLI before the session record exists, and AC-04, AC-05 and AC-06 say no record or process remains. AC-07 says only "refused before launch". If the check runs in browser.Start, it is retried three times (plugins/remote-gui/internal/browser/browser.go:284-301) and the caller sees `session-start-failed: ...` with a failed record (session.go:189-190), after Xvfb, x11vnc and websockify have started.
+PROPOSAL: Run the version check in the CLI after the profile lock and before the session record is created. State in AC-07 and its proof row that the refusal leaves no record or process.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Commands, Storage, Sign-in and hand-back), AC-11, AC-15
+EVIDENCE: Sign-in line 131 refuses a misplaced `--agent-start-approved`. The Design says nothing about `--profile` on commands other than `start` (for example `share`, `handoff <id>`, `doctor`), or about `--profile-home` outside `start --profile` and the `profile` commands. The parser refuses other misplaced options explicitly (plugins/remote-gui/internal/config/config.go:103, :119, :165). If `handoff <id> --profile other` or `share <url> --profile x` were accepted and ignored, the owner could believe a profile is in use when it is not.
+PROPOSAL: Say that `--profile` is refused outside `start`, and `--profile-home` outside `start --profile`, `profile list` and `profile delete`, like other misplaced options. Add those cases to the AC-11 or AC-15 unit tests.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-05, Test Plan (AC-05)
+EVIDENCE: AC-05 (line 159) names the case where "the supervisor and Chromium of a profile session are killed with SIGKILL". In that case the guard survives, its finish path records the session `failed` (daemon.go:296-303, :196-201), and under the new design it clears the holder and releases the lock. The AC-05 real-browser row (line 180) kills the guard as well, which tests a different path: the kernel releases the lock and the next CLI clears a dead holder. No row exercises the guard-alive bookkeeping after an unclean supervisor exit, and no row checks recovery of the singleton files that path leaves behind.
+PROPOSAL: Add an AC-05 variant that SIGKILLs only the supervisor and Chromium. Assert that the guard clears the holder and releases the lock before it records the session, and that the next start removes the stale singleton files and reaches ready.
 
 ## Sources
 
