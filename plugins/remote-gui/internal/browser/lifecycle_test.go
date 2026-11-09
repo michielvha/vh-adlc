@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -18,6 +20,105 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/session"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
+
+func TestFailedHandoffRetainsRecoveryAfterOwnerClosesBrowser(t *testing.T) {
+	c, id := setup(t)
+	command := exec.Command("sleep", "30")
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = command.Wait(); close(done) }()
+	defer func() { _ = command.Process.Kill(); <-done }()
+	identity, err := state.Inspect(command.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chrome := &child{role: "browser", identity: identity, done: done}
+	r := &runtime{home: c.Home, id: id, chrome: chrome, children: []*child{chrome}, modeReady: true}
+	r.current.BrowserMode = "human"
+	if err := state.Update(context.Background(), c.Home, id, func(record *state.Record) {
+		record.Owned = []state.Process{{Role: "browser", Identity: identity}}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.handoff(context.Background(), "agent"); err == nil {
+		t.Fatal("missing owned display reported a completed handoff")
+	}
+	if err := command.Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	if !r.healthy() {
+		t.Fatal("owner completing a failed close would trigger premature profile cleanup")
+	}
+}
+
+func TestHandoffRetainsLockedProfile(t *testing.T) {
+	c, id := setup(t)
+	profile := filepath.Join(c.Home, id, "profile")
+	if err := os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	lock := filepath.Join(profile, "SingletonLock")
+	if err := os.WriteFile(lock, []byte("owned-lock-sentinel"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := &runtime{home: c.Home, id: id, profile: profile}
+	r.current.BrowserMode = "human"
+	if _, err := r.handoff(context.Background(), "agent"); err == nil || !strings.Contains(err.Error(), "profile-still-locked") {
+		t.Fatalf("locked profile accepted: %v", err)
+	}
+	data, err := os.ReadFile(lock)
+	if err != nil || string(data) != "owned-lock-sentinel" || len(r.children) != 0 {
+		t.Fatal("profile lock modified or duplicate browser started")
+	}
+}
+
+func TestFailedMarkerFocusRetainsPrivateControlForRetry(t *testing.T) {
+	c, id := setup(t)
+	command := exec.Command("sleep", "30")
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = command.Wait(); close(done) }()
+	defer func() { _ = command.Process.Kill(); <-done }()
+	identity, err := state.Inspect(command.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chrome := &child{role: "browser", identity: identity, done: done}
+	r := &runtime{home: c.Home, id: id, chrome: chrome, children: []*child{chrome}, modeReady: true}
+	r.current.BrowserMode, r.current.CDPAddress = "agent", "http://127.0.0.1:1"
+	if err = state.Update(context.Background(), c.Home, id, func(record *state.Record) {
+		record.Owned = []state.Process{{Role: "browser", Identity: identity}}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.handoff(context.Background(), "human"); err == nil {
+		t.Fatal("unverified marker focus reported successful handoff")
+	}
+	if r.current.CDPAddress == "" || !state.Alive(identity) || !r.healthy() {
+		t.Fatal("failed marker focus lost the owned browser's retry state")
+	}
+}
+
+func TestHandoffRejectsForeignBrowserIdentity(t *testing.T) {
+	c, id := setup(t)
+	self, err := state.Inspect(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &runtime{home: c.Home, id: id, chrome: &child{role: "browser", identity: self}}
+	r.current.BrowserMode = "human"
+	if _, err := r.handoff(context.Background(), "agent"); err == nil || !strings.Contains(err.Error(), "ownership-changed") {
+		t.Fatalf("foreign process accepted: %v", err)
+	}
+	if !state.Alive(self) {
+		t.Fatal("unowned process was disturbed")
+	}
+}
 
 func TestMain(m *testing.M) {
 	session.BrowserLauncher = Start

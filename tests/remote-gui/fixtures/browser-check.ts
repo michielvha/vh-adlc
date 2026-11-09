@@ -1,4 +1,4 @@
-import {readFileSync,writeFileSync,mkdirSync,appendFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,mkdirSync,appendFileSync,existsSync} from 'node:fs';
 import {createRequire} from 'node:module';
 import {X509Certificate,createHash} from 'node:crypto';
 import {join} from 'node:path';
@@ -41,8 +41,14 @@ try{
  }
  const page=await context.newPage();let failedAsset=false;
  page.on('response',(response:any)=>{if(new URL(response.url()).pathname.startsWith('/assets/')&&response.status()!==200)failedAsset=true});
- stage='authentication';
+ stage='initial-navigation';
+ if(settings.scenario==='navigation-transient'||settings.scenario==='navigation-failure'){
+  const attempts=join(import.meta.dir,'browser-attempts.jsonl');
+  const failures=existsSync(attempts)?readFileSync(attempts,'utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line)).filter(attempt=>attempt.failure_code==='ERR_NETWORK_CHANGED').length:0;
+  if(settings.scenario==='navigation-failure'||failures<2)throw Error('ERR_NETWORK_CHANGED');
+ }
  const response=await page.goto(access.url);httpStatus=response.status();
+ stage='authentication';
  if(identity){
   if(response.status()!==200||response.headers()['www-authenticate']||await page.getByRole('link',{name:'Open session'}).count())throw Error('unexpected viewer authentication');
  }else await page.getByRole('link',{name:'Open session'}).click();

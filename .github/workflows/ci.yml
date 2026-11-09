@@ -110,6 +110,24 @@ jobs:
           go mod tidy -diff
       - name: Check the independently installed package
         run: bun test tests/remote-gui
+      - name: Prepare real browser verification
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth x11vnc novnc websockify
+          bun install --cwd tests/remote-gui --frozen-lockfile --ignore-scripts
+          test -x /usr/bin/google-chrome
+      - name: Verify browser phases and session continuity
+        env:
+          REMOTE_GUI_BROWSER_E2E: '1'
+          REMOTE_GUI_VIEWER_E2E: '1'
+          REMOTE_GUI_CHROMIUM: /usr/bin/google-chrome
+          REMOTE_GUI_PLAYWRIGHT_MODULE: ${{ github.workspace }}/tests/remote-gui/node_modules/playwright-core
+          REMOTE_GUI_TEST_BINARY: ${{ github.workspace }}/plugins/remote-gui/remote-gui
+        run: |
+          cd plugins/remote-gui
+          go test -race ./internal/browser -count=1
+          cd ../..
+          bun test tests/remote-gui/browser.e2e.test.ts
 
   # Tags main, and a branch whose open PR has the release:preview label at this
   # commit. Every other run only calculates the version.

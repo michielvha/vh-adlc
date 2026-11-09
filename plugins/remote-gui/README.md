@@ -1,6 +1,6 @@
 # remote-gui
 
-Share a task-local app through private Tailscale HTTPS, or give a human control of a fresh headed Chromium browser and resume automation in that same browser afterward. Tailscale access opens directly for the selected owner's identity, with no viewer password or enrollment step. Forms and inspection use the same browser handoff as login and MFA.
+Share a task-local app through private Tailscale HTTPS, or give a human control of a fresh headed Chromium browser. Human sign-in runs with automation and browser debugging disabled. After the owner confirms completion, the agent can resume in the same disposable profile. Tailscale access opens directly for the selected owner's identity, with no viewer password or enrollment step.
 
 ## Install and activate
 
@@ -25,6 +25,26 @@ required browser verification fails, report the blocker without a localhost fall
 ```
 
 Installation makes the plugin discoverable. Activation establishes remote context for future chats. Native-agent scenarios and a browser on the other device establish actual behavior; package discovery alone does not.
+
+Version 0.2.0 adds human and agent browser phases. Update the installed marketplace plugin through your agent's plugin manager, then start a new chat to load its instructions. Existing sessions retain their running supervisor's code. End an older session before using the updated phase workflow.
+
+## Human sign-in and agent hand-back
+
+```mermaid
+flowchart LR
+    H[Human browser\nAutomation and debugging off] -->|Owner confirms sign-in| A[Agent browser\nLocal CDP enabled]
+    A -->|Another sign-in needed| H
+    H --> E[Stop or expiry\nDelete temporary profile]
+    A --> E
+```
+
+Use human mode for an unfamiliar login or MFA. Keep the connection tab open and open the authorized website in a new tab inside the shared browser. The agent pauses input while the owner signs in. After confirmation, `handoff` gracefully closes only the owned Chromium process and relaunches it with native session restoration. Tabs, session cookies and tab-scoped storage remain in that session's profile. The viewer URL, expiry, display and pinned owner stay fixed.
+
+Ordinary inspection and non-login forms can start in agent mode. A later credential challenge requires a transition to human mode before entry. Legacy `start` and records without a mode retain agent behavior.
+
+A failed handoff preserves the viewer and profile until stop or expiry. Its diagnostic may require the owner to finish closing a browser window or resolve a profile lock before retrying. Require `ready` and the intended `browser_mode` before continuing. The reported mode on a failed transition is the last completed phase. Never delete locks or force a second browser into the profile.
+
+Provider acceptance remains a separate check. If a provider rejects a genuine human browser, use its supported authentication route or keep that task human-only. Initial side-effect-free `ERR_NETWORK_CHANGED` navigation allows two retries in the same session. Credential submissions and provider rejections require a separate recovery decision.
 
 ## Existing host tools
 
@@ -55,8 +75,10 @@ From the installed plugin directory, run `bash scripts/remote-gui.sh` (abbreviat
 ```sh
 remote-gui doctor --kind share --transport tailscale
 remote-gui share http://127.0.0.1:3000/preview --ttl 2h
-remote-gui doctor --kind browser --transport tailscale
-remote-gui start --ttl 2h
+remote-gui doctor --kind browser --browser-mode human --transport tailscale
+remote-gui start --browser-mode human --ttl 2h
+remote-gui handoff <session-id> --browser-mode agent
+remote-gui handoff <session-id> --browser-mode human
 remote-gui status
 remote-gui status <session-id>
 remote-gui access <session-id> --reveal
@@ -76,7 +98,7 @@ Service shares pin one unambiguous listener and its process birth identity. Each
 
 State defaults to `$XDG_STATE_HOME/remote-gui/sessions` or `~/.local/state/remote-gui/sessions`. `REMOTE_GUI_HOME` or `--home` selects a short absolute private directory. Directories use 0700 and files/sockets use 0600. `REMOTE_GUI_BUILD_CACHE` selects a private build cache. Stopping a browser deletes its temporary profile and downloads; stopping a service share preserves its app process, files and settings.
 
-Syntax errors exit 2; operation failures exit 1. Missing status/access fails. Repeated stops exit 0; an unknown ID returns `state: missing`. States are starting, ready, stopping, stopped, failed and cleanup-pending. `diagnostic` preserves the primary failure; `cleanup_diagnostic` reports unresolved cleanup separately. Cleanup retains its record and denial listener when scoped removal fails. Changed mappings or socket paths remain untouched. Resolve the blocker and rerun cleanup.
+Syntax errors exit 2; operation failures exit 1. Missing status/access fails. Repeated stops exit 0; an unknown ID returns `state: missing`. States are starting, ready, handoff, handoff-failed, stopping, stopped, failed and cleanup-pending. `diagnostic` preserves the primary failure; `cleanup_diagnostic` reports unresolved cleanup separately. Cleanup retains its record and denial listener when scoped removal fails. Changed mappings or socket paths remain untouched. Resolve the blocker and rerun cleanup.
 
 ## Viewer context and explicit SSH
 
