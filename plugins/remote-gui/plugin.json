@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "remote-gui",
-  "version": "0.1.0",
-  "description": "Share task-local apps over the tailnet and hand a fresh browser to the human, then resume in that same session.",
+  "version": "0.2.0",
+  "description": "Share task-local apps over the tailnet, support human-only sign-in and resume agent control after confirmed hand-back.",
   "author": { "name": "Michiel VH" }
 }

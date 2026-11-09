@@ -190,7 +190,9 @@ func (r *runtime) serveMarker(w http.ResponseWriter, req *http.Request) {
 	generation := strconv.FormatUint(r.generation.Load(), 10)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'")
-	page := `<!doctype html><title>` + marker + `</title><h1>Shared browser ready</h1><label>Connection check <input autofocus aria-label="Connection check"></label><script>
+	page := `<!doctype html><title>` + marker + `</title><h1>Shared browser ready</h1>
+<p>Open your website in a new tab. Keep this connection tab open.</p>
+<label>Connection check <input autofocus aria-label="Connection check"></label><script>
 requestAnimationFrame(()=>requestAnimationFrame(()=>fetch('/loaded?generation=` + generation + `&automated='+navigator.webdriver,{method:'POST'})));
 document.querySelector('input').addEventListener('input',event=>{
 if(event.target.value===` + strconv.Quote(marker) + `)fetch('/verified?generation=` + generation + `',{method:'POST'});

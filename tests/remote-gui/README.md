@@ -10,6 +10,8 @@ REMOTE_GUI_VIEWER_E2E=1 bun test tests/remote-gui
 
 These cases retain explicit-loopback verification: actual noVNC canvas input followed by CDP reattachment, shared-app compatibility and native HTTP authentication in Chromium/Firefox. Tailscale identity verification is exercised separately below. An unmanaged handler on another port receives the non-bearer binding cookie but no HTTP credential, even when it copies the protected realm. Replaying either proof alone fails. Browser contexts are created fresh, recordings are disabled and temporary code values are kept out of reported results.
 
+The human-phase fixture starts the actual CLI with debugging disabled, types through noVNC and signs into a loopback test app. Its nonpersistent HttpOnly cookie and original tab's sessionStorage must survive human/agent/human transitions. Fresh uncached requests establish authentication after each transition. The viewer URL and expiry must remain fixed, human status must omit CDP, and stop must delete the profile. This synthetic sign-in is separate from owner-performed Google/Tailscale acceptance.
+
 Run the GUI component crash and expiry checks from the plugin module with the same existing GUI tool paths:
 
 ```sh
@@ -17,6 +19,8 @@ REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser -count=1
 ```
 
 These checks kill only recorded process identities through pidfds. They verify closed viewer sockets, dead owned processes and private-session descendants, and deleted profiles. Loss of the guard exercises the documented next-lifecycle cleanup path.
+
+Ubuntu CI runs the real browser lifecycle and noVNC fixtures with the runner's sandboxed Google Chrome, distribution GUI tools and pinned Playwright core 1.64.1. Browser tests remain opt-in locally. The runtime itself never installs these tools.
 
 The bounded native cases require an existing signed-in Copilot CLI. `REMOTE_GUI_NATIVE_CLI` can select that executable. They load the plugin through its native `--plugin-dir` option and the persistent remote-mode instruction, with isolated native state and shell/write tools denied:
 
@@ -34,7 +38,9 @@ REMOTE_GUI_ROUTING_E2E=1 bun test tests/remote-gui/native-routing.e2e.test.ts
 
 These cases install a complete plugin copy and run its actual CLI against a private fake LocalAPI and trusted HTTPS fixture. A fresh browser opens the Tailscale identity share directly without HTTP credentials or enrollment, then checks the intended page, assets, same-app redirects, server cookies, origin behavior and WebSockets. The fake HTTPS ingress reproduces Serve header sanitization and forwards through the private Unix backend from the pinned LocalAPI process. The native agent must share the first app link, reuse its task's existing share, preserve external/internal routing and select an explicitly established SSH route. Deliberate asset, redirect, origin, WebSocket and browser-capability failures must produce `compatibility-blocked` and stop forwarding; denied transport must have no localhost fallback. The fixture also checks that foreign Serve entries and unknown fields survive teardown. Set `REMOTE_GUI_ROUTING_CASES` to a comma-separated subset to investigate a failed case.
 
-Four authentication-routing cases use a recording fake auth-refresh owning interface and protected synthetic credential state. They check configured SSO delegation, an active unyielded challenge, and selection of fresh-browser capability for unknown logins and non-login forms. GUI capability is deliberately unavailable in these bounded cases. They establish neither a completed human handoff nor provider authentication. The fake HTTPS transport and selected loopback SSH metadata also establish no actual tailnet or SSH network access.
+Authentication-routing cases use a recording fake auth-refresh owning interface and protected synthetic credential state. They check configured SSO delegation, an active unyielded challenge, human-mode selection for unknown logins and agent-mode selection for non-login forms. They also require the agent to preserve a rejected provider login or an unconfirmed owner's pause without claiming success or starting a competing browser. GUI capability is deliberately unavailable in these bounded cases. These checks do not establish provider authentication. The fake HTTPS transport and selected loopback SSH metadata establish no actual tailnet or SSH network access.
+
+The `navigation-transient` and `navigation-failure` cases inject `ERR_NETWORK_CHANGED` before initial navigation. The installed agent must make at most two retries in the same session. Transient failure must reach rendered-page verification, while exhaustion must stop the share and report the observed compatibility blocker. No workstation network change is made.
 
 The `identity-chromium` and `identity-firefox` cases run only browser verification, with no native model invocation. Set `REMOTE_GUI_ROUTING_CASES=identity-chromium,identity-firefox` to select them. Firefox needs its matching existing executable in `REMOTE_GUI_FIREFOX` and existing `certutil`; its fresh private temporary profile trusts only the generated fixture CA through a private NSS database. Chromium pins the generated certificate SPKI. Neither case disables TLS verification globally or changes the host certificate store.
 
