@@ -46,7 +46,12 @@ export function readNativeRoleArtifacts(options: {
   const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
   const native = readFromRoot(root, references.native), returned = readFromRoot(root, references.returned);
   const processBytes = readFromRoot(root, references.process);
-  const completion = object(JSON.parse(decodeUTF8(processBytes)) as unknown, ["pid", "exit_code", "timed_out", "cancelled", "output_limit", "reaped"]);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(decodeUTF8(processBytes));
+    if (!canonicalJSON(parsed).equals(processBytes)) fail("process JSON");
+  } catch { fail("process JSON"); }
+  const completion = object(parsed, ["pid", "exit_code", "timed_out", "cancelled", "output_limit", "reaped"]);
   if (typeof completion.pid !== "number" || !Number.isSafeInteger(completion.pid) || completion.pid < 1
     || completion.exit_code !== 0 || completion.timed_out !== false || completion.cancelled !== null
     || completion.output_limit !== false || completion.reaped !== true) fail("native process incomplete");
@@ -56,6 +61,7 @@ export function readNativeRoleArtifacts(options: {
     native, native_sha256: binding.native_sha256, returned, returned_sha256: binding.returned_sha256,
     process: { pid: completion.pid, exit_code: completion.exit_code, timed_out: completion.timed_out,
       cancelled: completion.cancelled, output_limit: completion.output_limit, reaped: completion.reaped } };
-  verifyRoleIdentity(evidence, options.policy);
+  const { records: _records, ...verified } = verifyRoleIdentity(evidence, options.policy);
+  if (!canonicalJSON(verified).equals(canonicalJSON(binding))) fail("sealed role binding changed");
   return evidence;
 }

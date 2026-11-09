@@ -23,7 +23,7 @@ function inputs() {
   }
   const references = { native: retain("worker-native.jsonl", reviewed.worker.native), returned: retain("worker-returned.txt", reviewed.worker.returned),
     process: retain("worker-process.json", canonicalJSON(reviewed.worker.process)) };
-  return { ...f, reviewed, references, retain, options: { source_repo: f.repo, artifact_root: f.artifacts, binding: plan.roles.worker, policy: role } };
+  return { ...f, reviewed, references, retain, options: { source_repo: f.repo, artifact_root: f.artifacts, binding: structuredClone(plan.roles.worker), policy: role } };
 }
 
 test("normal evidence loading reads original bound role artifacts", () => {
@@ -61,6 +61,22 @@ test.each(["pid", "exit_code", "timed_out", "cancelled", "output_limit"])("role 
   expect(() => readNativeRoleArtifacts({ ...f.options, references: f.references })).toThrow("native process incomplete");
 });
 
+test.each(["duplicate-key", "pretty", "malformed"])("role evidence refuses process JSON %s", scenario => {
+  const f = inputs(), canonical = canonicalJSON(f.reviewed.worker.process).toString();
+  const bytes = scenario === "malformed" ? "{" : scenario === "pretty" ? JSON.stringify(f.reviewed.worker.process, null, 2)
+    : canonical.replace('"exit_code":0', '"exit_code":1,"exit_code":0');
+  f.references.process = f.retain("process-format.json", Buffer.from(bytes));
+  expect(() => readNativeRoleArtifacts({ ...f.options, references: f.references })).toThrow("original evidence process JSON");
+});
+
+test.each(["model", "requested_model", "identity_source"])("role evidence refuses a stale sealed %s", field => {
+  const f = inputs();
+  if (field === "model") f.options.binding.model = "claude-opus-5.6";
+  if (field === "requested_model") f.options.binding.requested_model = "other-selector";
+  if (field === "identity_source") f.options.binding.identity_source = { ...f.options.binding.identity_source, event_type: "other.event" };
+  expect(() => readNativeRoleArtifacts({ ...f.options, references: f.references })).toThrow("sealed role binding changed");
+});
+
 test.each(["escape", "absolute", "symlink", "hardlink", "shared-file", "linked-parent", "shared-parent", "caller-root"] as const)("bound artifact loading refuses %s", scenario => {
   const f = inputs(), reference = { ...f.references.native }, options = { ...f.options };
   if (scenario === "escape") reference.path = "../" + reference.path;
@@ -71,6 +87,7 @@ test.each(["escape", "absolute", "symlink", "hardlink", "shared-file", "linked-p
   if (scenario === "linked-parent") { symlinkSync(f.artifacts, join(f.artifacts, "alias")); reference.path = "alias/" + reference.path; }
   if (scenario === "shared-parent") {
     mkdirSync(join(f.artifacts, "shared"), { mode: 0o755 });
+    chmodSync(join(f.artifacts, "shared"), 0o755);
     f.retain("shared/child", f.reviewed.worker.native); reference.path = "shared/child";
   }
   if (scenario === "caller-root") options.artifact_root = f.repo;
