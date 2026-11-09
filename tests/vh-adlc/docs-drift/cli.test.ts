@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import type { CLIReport } from "../../../plugins/vh-adlc/scripts/docs-drift/cli";
-import { commitAll, populateRepository, put } from "./repository-fixture";
+import { commitAll, git, populateRepository, put } from "./repository-fixture";
 import { source, pin, write, commit, portableRecord, deliverRecord } from "./adoption-fixture";
 import { trialDefinitionFixture } from "./trial-definition-fixture";
 import { runtimeFixture } from "./runtime-fixture";
@@ -286,6 +286,7 @@ test.each([
   ["scan", "--repo", "x", "--source", "main", "--artifact-root", "x"], ["publish", "--approved", "true"],
   ["check-upgrade-signals", "--repo", "x", "--source", "main"], ["trial-bindings", "--fixture", "yes"],
   ["prepare-trial-fixture", "--repo", "x", "--source", "a".repeat(40)],
+  ["collect-publication-inputs", "--trial-definition", "a".repeat(64)],
 ].map(argv => [argv]))("unknown, duplicate or unsafe CLI inputs return a structured refusal %j", argv => {
   const { result, report } = invoke(argv);
   expect(result.exitCode).toBe(2);
@@ -293,7 +294,7 @@ test.each([
   expect(report.diagnostics.length).toBeGreaterThan(0);
 });
 
-test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
+test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
   const f = fixture(), before = captureRepositoryState(f.repo), native = nativeReader({ ...f, candidate: f.commit });
   let artifacts = kind === "caller" ? f.repo : f.artifacts;
   if (kind === "shared") chmodSync(artifacts, 0o755);
@@ -348,3 +349,68 @@ process.exit(child.exitCode);
   expect(readFileSync(join(report.retained_resources.checkout, "docs/guide.md")).toString()).toBe("# Prepared guide\n");
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
+
+
+test.each(["matching", "actor", "rollback", "changed-source", "settings", "cache", "cache-in-candidate", "credential", "caller-missing", "caller-symlink"])("normal publication input collection binds current production policy %s", async fault => {
+  const f = await runtimeFixture(roots, true), selected = f.selection;
+  put(f.repo, "docs/suppressions.yaml", "suppressions: []\n");
+  const source = commitAll(f.repo);
+  const origin = join(f.root, "publication-origin"); git(f.root, "clone", "--no-local", "--no-checkout", f.repo, origin);
+  git(origin, "checkout", "--detach", source);
+  let remoteDefault = source;
+  if (fault === "rollback") {
+    const settings = JSON.parse(readFileSync(join(origin, ".vh-adlc/docs-drift.yaml"), "utf8"));
+    settings.publication.mode = "staged"; put(origin, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
+    remoteDefault = commitAll(origin);
+  }
+  if (fault === "changed-source") { put(origin, "docs/later.md", "Later bound documentation\n"); remoteDefault = commitAll(origin); }
+  git(origin, "update-ref", "refs/heads/main", remoteDefault);
+  if (remoteDefault !== source) expect(() => git(f.repo, "cat-file", "-e", remoteDefault + "^{commit}")).toThrow();
+  const artifacts = join(f.root, "publication-inputs"), candidate = join(f.root, "publication-candidate");
+  mkdirSync(artifacts, { mode: 0o700 }); git(f.root, "clone", "--no-local", "--no-checkout", f.repo, candidate);
+  git(candidate, "checkout", "--detach", source);
+  const beforeBytes = readFileSync(join(candidate, "docs/guide.md")), replacement = Buffer.from("# Selected candidate guide\n");
+  put(candidate, "docs/guide.md", replacement.toString()); const head = commitAll(candidate);
+  const packet = canonicalJSON({ schema_version: 1, source_commit: source, edits: [{ id: "guide-fix", path: "docs/guide.md", action: "replace",
+    start: 0, end: beforeBytes.length, before_sha256: sha256(beforeBytes), replacement_base64: replacement.toString("base64"), after_mode: "100644" }] });
+  writeFileSync(join(artifacts, "edits.json"), packet, { mode: 0o600 });
+  const native = nativeReader({ ...f, candidate: remoteDefault }, fault === "actor" ? "other-bot" : "fixture-bot"), realGit = Bun.which("git");
+  if (!realGit) throw Error("fixture requires Git");
+  writeFileSync(join(f.root, "native-bin", "git"), `#!${process.execPath}
+import { renameSync, symlinkSync } from "node:fs";
+const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
+if (args.includes("fetch") && args.some(value => value.startsWith("https://")) && target < 0) process.exit(91);
+if (target >= 0) { args[target] = ${JSON.stringify(origin)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always"); }
+const child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdout: "inherit", stderr: "inherit" });
+if (target >= 0 && child.exitCode === 0 && ["caller-missing", "caller-symlink"].includes(${JSON.stringify(fault)})) {
+  renameSync(${JSON.stringify(candidate)}, ${JSON.stringify(join(f.root, "retained-candidate"))});
+  if (${JSON.stringify(fault)} === "caller-symlink") symlinkSync(${JSON.stringify(join(f.root, "retained-candidate"))}, ${JSON.stringify(candidate)});
+}
+process.exit(child.exitCode);
+`, { mode: 0o700 });
+  if (fault === "settings") put(f.repo, ".vh-adlc/docs-drift.yaml", "Other caller draft\n");
+  if (fault === "cache-in-candidate") chmodSync(candidate, 0o700);
+  const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(candidate);
+  const { result, report } = invoke(["collect-publication-inputs", "--repo", f.repo, "--source", source,
+    "--candidate-repo", candidate, "--candidate", head, "--artifact-root", artifacts, "--selection", "edits.json", "--selection-sha256", sha256(packet),
+    "--cache-root", fault === "cache" ? join(f.root, "missing-cache") : fault === "cache-in-candidate" ? candidate : selected.cache_directory, "--entry", "copilot",
+    "--launcher", selected.launcher_path, "--settings", join(f.repo, ".vh-adlc/docs-drift.yaml")],
+  { ...native.environment, GH_TOKEN: fault === "credential" ? "" : native.environment.GH_TOKEN });
+  if (fault === "matching") expect(report.diagnostics).toEqual([]);
+  expect(result.exitCode).toBe(fault === "matching" ? 0 : 2);
+  if (fault === "matching") expect(report.publication_inputs).toMatchObject({ complete: true, authority: "none", current_default: remoteDefault,
+    candidate: { complete: true, candidate_commit: head }, runtime: { kind: "docs-drift-approved-runtime" } });
+  else {
+    expect(report.publication_inputs?.complete).toBe(false);
+    const reason = { actor: "Selected native publication actor", rollback: "not adopted", "changed-source": "needs fresh collection and review",
+      settings: "invoked entry bytes differ from committed policy", cache: "missing-cache", "cache-in-candidate": "overlaps a caller checkout", credential: "missing selected publication credential",
+      "caller-missing": "Caller changed or became unavailable", "caller-symlink": "Caller changed or became unavailable" }[fault];
+    expect(report.diagnostics.map(item => item.message).join("\n")).toContain(reason);
+  }
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+  if (fault === "caller-missing" || fault === "caller-symlink") {
+    expect(report.publication_inputs?.store?.root.startsWith(artifacts + "/")).toBe(true);
+    expect(existsSync(report.publication_inputs?.store?.record_path ?? "")).toBe(true);
+    expect(captureRepositoryState(join(f.root, "retained-candidate"))).toEqual(candidateBefore);
+  } else expect(captureRepositoryState(candidate)).toEqual(candidateBefore);
+}, 60000);

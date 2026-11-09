@@ -11,6 +11,7 @@ import { prepareTrialFixture } from "./trial-setup";
 import { selectApprovedRuntime, selectCandidateRuntime } from "./bootstrap";
 import { collectProposals } from "./proposals";
 import { inspectPreparation, inspectCandidate, prepareEdits, PreparationEvidenceError } from "./preparation";
+import { collectPublicationInputs } from "./publication-inputs";
 import { collectNativeResolution, collectNativeClosure } from "./resolution-entry";
 import { readBoundArtifact } from "./evidence-input";
 import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
@@ -25,6 +26,7 @@ export type CLIReport = {
   runtime?: Awaited<ReturnType<typeof selectApprovedRuntime> | ReturnType<typeof selectCandidateRuntime>>;
   proposals?: ReturnType<typeof collectProposals>;
   edit_inspection?: ReturnType<typeof inspectPreparation>;
+  publication_inputs?: Awaited<ReturnType<typeof collectPublicationInputs>>;
   candidate_inspection?: ReturnType<typeof inspectCandidate>;
   retained_resources?: { checkout: string | null; record_path: string | null };
   closure?: Awaited<ReturnType<typeof collectNativeClosure>>;
@@ -46,6 +48,13 @@ bun <plugin>/scripts/docs-drift/cli.ts inspect-runtime --repo <repo>
   [--trial-definition <sha256>]
 bun <plugin>/scripts/docs-drift/cli.ts collect-proposals --repo <repo>
   --source <full-current-default-commit>
+bun <plugin>/scripts/docs-drift/cli.ts collect-publication-inputs --repo <assessment-repo>
+  --source <full-commit> --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
+  --cache-root <retained-cache> --entry <hosted|copilot|claude>
+  --launcher <invoked-launcher> --settings <invoked-settings>
+  --artifact-root <private-external-directory> --selection <relative-packet-path>
+  --selection-sha256 <sha256>
+  [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
 bun <plugin>/scripts/docs-drift/cli.ts check-candidate --repo <assessment-repo> --source <full-commit>
   --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
   [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
@@ -94,18 +103,23 @@ postimages and binds the full diff/tree. Working-tree overlays stay preserved.
 A selected durable resolution record must match its exact bytes, assessed source
 and complete postimages. Required input observations must be available.
 The assessment repo must retain its selected HEAD for feature protection.
+Publication input collection observes native current-default policy in a new owned
+object store and verifies the adopted retained runtime and Git-source freshness.
+Original role evidence, current required observations and actual effect grants
+follow in the controller. This collection has authority none.
 Verification, review and publication follow their own fresh owned-checkout gates.
 `;
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].includes(command);
+  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs"].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs"].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
-  if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].includes(command)) flags.push("--selection", "--selection-sha256");
-  if (command === "check-candidate") flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
+  if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs"].includes(command)) flags.push("--selection", "--selection-sha256");
+  if (["check-candidate", "collect-publication-inputs"].includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
+  if (command === "collect-publication-inputs") flags.push("--cache-root", "--entry", "--launcher", "--settings");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const flag = argv[index], value = argv[index + 1];
@@ -122,11 +136,13 @@ function argumentsForCommand(argv: string[]) {
     selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256"), candidate_repo: values.get("--candidate-repo"), candidate: values.get("--candidate"), resolution_record: values.get("--resolution-record"), resolution_sha256: values.get("--resolution-sha256") };
 }
 
+function nativeCredential(hostname: string): string {
+  return (hostname === "github.com" || hostname.endsWith(".ghe.com") ? process.env.GH_TOKEN : process.env.GH_ENTERPRISE_TOKEN) ?? "";
+}
+
 function nativeContext(repo: string, source: string) {
   const { settings } = loadCommittedSettings(repo, source);
-  const hosted = settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com");
-  return readNativeContext({ hostname: settings.hostname, repository: settings.repository,
-    credential: (hosted ? process.env.GH_TOKEN : process.env.GH_ENTERPRISE_TOKEN) ?? "" });
+  return readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: nativeCredential(settings.hostname) });
 }
 
 function privateArtifacts(path: string | undefined, repo: string) {
@@ -157,10 +173,10 @@ export async function main(argv: string[]): Promise<number> {
   let report: CLIReport;
   try {
     const options = argumentsForCommand(argv), repo = realpathSync(options.repo);
-    if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate"].includes(options.command)) {
+    if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs"].includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo);
       let candidate: { repo: string; commit: string } | null = null;
-      if (options.command === "check-candidate") {
+      if (["check-candidate", "collect-publication-inputs"].includes(options.command)) {
         if (!options.candidate_repo || !options.candidate) throw Error("candidate inspection requires candidate-repo and candidate");
         candidate = { repo: realpathSync(options.candidate_repo), commit: options.candidate };
         artifactDirectoryScope(artifacts.root, candidate.repo).assertExternal(join(artifacts.root, protocolPath(options.selection)));
@@ -176,14 +192,26 @@ export async function main(argv: string[]): Promise<number> {
         if ((options.resolution_record === undefined) !== (options.resolution_sha256 === undefined)) throw Error("resolution record path and digest are required together");
         const resolution = options.resolution_record !== undefined && options.resolution_sha256 !== undefined
           ? { path: options.resolution_record, sha256: options.resolution_sha256 } : undefined;
-        const candidate_inspection = inspectCandidate({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit, resolution_record: resolution });
-        report = { schema_version: 1, command: options.command, outcome: candidate_inspection.complete ? "collected" : "incomplete",
-          source_commit: options.source, candidate_inspection, diagnostics: candidate_inspection.diagnostics.map(message => ({ code: "candidate-inspection", message })) };
+        if (options.command === "collect-publication-inputs") {
+          const entry = options.entry;
+          if ((entry !== "hosted" && entry !== "copilot" && entry !== "claude") || !options.cache || !options.launcher || !options.settings)
+            throw Error("publication input collection requires cache-root, entry, launcher and settings");
+          const { settings } = loadCommittedSettings(repo, options.source);
+          const publication_inputs = await collectPublicationInputs({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit,
+            resolution_record: resolution, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(), credential: nativeCredential(settings.hostname),
+            cache_directory: resolve(options.cache), entry, launcher_path: resolve(options.launcher), settings_path: resolve(options.settings) });
+          report = { schema_version: 1, command: options.command, outcome: publication_inputs.complete ? "collected" : "incomplete",
+            source_commit: options.source, publication_inputs, diagnostics: publication_inputs.diagnostics.map(message => ({ code: "publication-inputs", message })) };
+        } else {
+          const candidate_inspection = inspectCandidate({ repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit, resolution_record: resolution,
+            artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
+          report = { schema_version: 1, command: options.command, outcome: candidate_inspection.complete ? "collected" : "incomplete",
+            source_commit: options.source, candidate_inspection, diagnostics: candidate_inspection.diagnostics.map(message => ({ code: "candidate-inspection", message })) };
+        }
       } else if (["collect-resolution", "collect-closure"].includes(options.command)) {
         const settings = loadCommittedSettings(repo, options.source).settings;
-        const hosted = settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com");
         const input = { repo, source: options.source, selection, artifact_root: artifacts.root, owner: artifacts.owner,
-          run: randomUUID(), credential: (hosted ? process.env.GH_TOKEN : process.env.GH_ENTERPRISE_TOKEN) ?? "" };
+          run: randomUUID(), credential: nativeCredential(settings.hostname) };
         if (options.command === "collect-closure") {
           const closure = await collectNativeClosure(input);
           report = { schema_version: 1, command: options.command, outcome: closure.complete ? "collected" : "incomplete",

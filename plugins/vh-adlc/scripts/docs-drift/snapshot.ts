@@ -259,6 +259,13 @@ export function captureRepositoryState(directory: string) {
   };
 }
 
+/** Preserve an incomplete handoff when the original canonical caller changes or becomes unavailable. */
+export function matchesRepositoryState(directory: string, expected: string): boolean {
+  try {
+    return realpathSync(directory) === directory && canonicalDigest(captureRepositoryState(directory)) === expected;
+  } catch { return false; }
+}
+
 export type OwnedObjectStore = { root: string; record_path: string; record_sha256: string; source_commit: string };
 export type ObjectStoreOptions = {
   parent: string; evidence_directory: string; repository: string; source_repo: string;

@@ -128,3 +128,15 @@ test("normal candidate inspection reuses a committed tree for an empty edit sele
   expect(report.candidate_inspection).toMatchObject({ complete: true, candidate_commit: f.source, changed_paths: [], diff_sha256: sha256(Buffer.alloc(0)) });
   expect(captureRepositoryState(f.candidate)).toEqual(before);
 });
+
+test("committed candidate diff binding ignores caller-local diff configuration and attributes", () => {
+  const f = fixture(), baseline = invoke(f); expect(baseline.result.exitCode).toBe(0);
+  git(f.candidate, "config", "diff.noprefix", "true"); git(f.candidate, "config", "diff.algorithm", "patience");
+  git(f.candidate, "config", "core.quotePath", "false");
+  put(f.candidate, ".gitattributes", "* -diff\n");
+  writeFileSync(join(f.candidate, ".git", "info", "attributes"), "* -diff\n");
+  const before = captureRepositoryState(f.candidate), { result, report } = invoke(f);
+  expect(result.exitCode).toBe(0);
+  expect(report.candidate_inspection.diff_sha256).toBe(baseline.report.candidate_inspection.diff_sha256);
+  expect(captureRepositoryState(f.candidate)).toEqual(before);
+});

@@ -1,4 +1,5 @@
-import { captureRepositoryState, captureSnapshot, createOwnedObjectStore, externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
+import { realpathSync } from "node:fs";
+import { captureRepositoryState, captureSnapshot, createOwnedObjectStore, externalArtifactDirectory, matchesRepositoryState, type OwnedObjectStore } from "./snapshot";
 import { collectClosureInputs, recheckClosureInputs, type ClosureInputs } from "./closure-inputs";
 import { collectResolutionInputs, readResolutionProposal, recheckResolutionInputs, type ResolutionInputs, type ResolutionProposal } from "./resolve-inputs";
 import { fetchProposalObjects } from "./proposals";
@@ -65,8 +66,8 @@ export async function collectNativeResolution(input: NativeCollectionOptions): P
       result.diagnostics.push("Native source or actor changed during resolution collection");
     result.complete = result.inputs.complete && fresh.fresh && result.diagnostics.length === 0;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Native resolution collection unavailable"); }
-  if (canonicalDigest(captureRepositoryState(snapshot.repo)) !== before) {
-    result.diagnostics.push("Caller changed during resolution collection"); result.complete = false;
+  if (!matchesRepositoryState(snapshot.repo, before)) {
+    result.diagnostics.push("Caller changed or became unavailable during resolution collection"); result.complete = false;
   }
   result.diagnostics = [...new Set(result.diagnostics)];
   return result;
@@ -78,7 +79,7 @@ type ClosureCollectionResult = {
 
 /** Recover the committed consolidation record and original full diffs using current native inputs. */
 export async function collectNativeClosure(input: NativeCollectionOptions): Promise<ClosureCollectionResult> {
-  const options = { ...input, selection: structuredClone(input.selection), path: input.path ?? process.env.PATH };
+  const options = { ...input, repo: realpathSync(input.repo), selection: structuredClone(input.selection), path: input.path ?? process.env.PATH };
   if (options.selection === null || typeof options.selection !== "object" || Array.isArray(options.selection)) throw Error("closure selection object required");
   canonicalJSON(options.selection);
   const selection = options.selection as Record<string, unknown>, keys = ["schema_version", "source_commit", "consolidation"];
@@ -130,8 +131,8 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
       result.diagnostics.push("Native source or actor changed during closure collection");
     result.complete = result.inputs.complete && fresh.fresh && result.diagnostics.length === 0;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Native closure collection unavailable"); }
-  if (canonicalDigest(captureRepositoryState(options.repo)) !== before) {
-    result.diagnostics.push("Caller changed during closure collection"); result.complete = false;
+  if (!matchesRepositoryState(options.repo, before)) {
+    result.diagnostics.push("Caller changed or became unavailable during closure collection"); result.complete = false;
   }
   result.diagnostics = [...new Set(result.diagnostics)];
   return result;

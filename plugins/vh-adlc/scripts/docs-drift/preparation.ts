@@ -1,14 +1,14 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { gitReadArguments } from "../git-read";
-import { readGit } from "./git";
+import { readGit, writeMetadataObject } from "./git";
 import { publishArtifact } from "./journal";
 import { executeOwnedProcess } from "./owned-process";
 import { canonicalDigest, canonicalJSON, compareUTF8, protocolPath, sha256 } from "./protocol";
 import { evaluateProtection, type ProtectionContext, type ProtectionResult } from "./protection";
 import { collectEditChanges, parseEdit, readResolutionRecord, resolutionSource, type Edit, type ResolutionChange } from "./resolve";
 import { runScan, scannerEnvironment, type ScanRun } from "./scan";
-import { captureSnapshot } from "./snapshot";
+import { captureSnapshot, createOwnedObjectStore, externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
 
 type EditInspection = {
   schema_version: 1; kind: "docs-drift-edit-inspection"; authority: "none"; source_commit: string;
@@ -167,16 +167,16 @@ export async function prepareEdits(input: {
 
 type CandidateInspection = {
   schema_version: 1; kind: "docs-drift-candidate-inspection"; authority: "none"; complete: boolean; diagnostics: string[];
-  source_commit: string; candidate_commit: string; candidate_tree: string | null; diff_sha256: string | null; changed_paths: string[]; resolution_record: { path: string; sha256: string } | null;
+  source_commit: string; candidate_commit: string; candidate_tree: string | null; diff_sha256: string | null; changed_paths: string[]; object_store: OwnedObjectStore | null; resolution_record: { path: string; sha256: string } | null;
 };
 
 /** Compare the complete committed candidate with selected, protected raw-byte postimages. */
 export function inspectCandidate(options: {
   repo: string; source: string; selection: unknown; candidate_repo: string; candidate: string; protection_context?: ProtectionContext;
-  resolution_record?: { path: string; sha256: string };
+  artifact_root: string; owner: string; run: string; resolution_record?: { path: string; sha256: string };
 }): CandidateInspection {
   const result: CandidateInspection = { schema_version: 1, kind: "docs-drift-candidate-inspection", authority: "none", complete: false, diagnostics: [],
-    source_commit: options.source, candidate_commit: options.candidate, candidate_tree: null, diff_sha256: null, changed_paths: [], resolution_record: null };
+    source_commit: options.source, candidate_commit: options.candidate, candidate_tree: null, diff_sha256: null, changed_paths: [], object_store: null, resolution_record: null };
   try {
     const inspection = inspectPreparation(options);
     result.diagnostics.push(...inspection.diagnostics);
@@ -213,8 +213,16 @@ export function inspectCandidate(options: {
     if (!canonicalJSON(changes).equals(canonicalJSON(expected))) throw Error("candidate differs from the selected complete postimages");
     result.changed_paths = changes.map(change => change.path);
     result.candidate_tree = readGit(candidate.repo, "rev-parse", "--verify", "--end-of-options", candidate.source_commit + "^{tree}").toString().trim();
-    result.diff_sha256 = sha256(readGit(candidate.repo, "diff", "--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames",
-      source.source_commit, candidate.source_commit, "--"));
+    const root = externalArtifactDirectory(options.artifact_root, source.repo);
+    externalArtifactDirectory(root, candidate.repo);
+    const store = createOwnedObjectStore({ source_repo: candidate.repo, source_commit: candidate.source_commit, parent: root, evidence_directory: root,
+      repository: source.settings.repository, owner: options.owner, run: options.run });
+    result.object_store = store;
+    const emptyTree = writeMetadataObject(store.root, "tree", Buffer.alloc(0));
+    result.diff_sha256 = sha256(readGit(store.root, "--attr-source=" + emptyTree, "-c", "core.attributesFile=/dev/null", "-c", "core.quotePath=true",
+      "-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false", "-c", "diff.indentHeuristic=true", "-c", "diff.suppressBlankEmpty=false",
+      "diff", "--binary", "--full-index", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames", "--diff-algorithm=myers",
+      "--src-prefix=a/", "--dst-prefix=b/", "-O/dev/null", "--unified=3", "--inter-hunk-context=0", source.source_commit, candidate.source_commit, "--"));
     result.complete = true;
   } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Candidate inspection unavailable"); }
   return result;

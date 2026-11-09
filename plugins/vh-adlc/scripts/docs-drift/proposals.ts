@@ -113,17 +113,14 @@ export type ProposalFetchOptions = {
   environment: Readonly<Record<string, string | undefined>>; timeout_ms?: number;
 };
 
-/** Authenticated reads are confined to fixed PR/default refs in the already recorded owned store. */
-export async function fetchProposalObjects(store: OwnedObjectStore, proposal: PullRequestInput, options: ProposalFetchOptions): Promise<ProposalDiff> {
+function validateFetchTarget(store: OwnedObjectStore, options: ProposalFetchOptions): void {
   requireOwnedStore(store, options.repository);
   if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/iu.test(options.hostname)
-    || !/^[a-z0-9-]+\/[a-z0-9_.-]+$/iu.test(options.repository)
-    || proposal.base_repository.full_name.toLowerCase() !== options.repository.toLowerCase()
-    || !Number.isSafeInteger(proposal.number) || proposal.number < 1
-    || proposal.base_ref !== options.default_branch) throw new Error("invalid owned proposal fetch target");
-  const expectedDefault = options.expected_default_commit ?? proposal.base_sha;
-  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(expectedDefault)) throw Error("invalid observed default commit");
+    || !/^[a-z0-9-]+\/[a-z0-9_.-]+$/iu.test(options.repository)) throw Error("invalid owned proposal fetch target");
   readGit(store.root, "check-ref-format", "--branch", options.default_branch);
+}
+
+async function fetchFixedRefs(store: OwnedObjectStore, options: ProposalFetchOptions, refs: string[], scope: Record<string, string>) {
   const environment = {
     PATH: options.environment.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME,
     GH_CONFIG_DIR: options.environment.GH_CONFIG_DIR, GH_HOST: options.hostname,
@@ -132,22 +129,36 @@ export async function fetchProposalObjects(store: OwnedObjectStore, proposal: Pu
     GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1",
     GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
   };
+  const args = gitReadArguments(["--no-lazy-fetch", "--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "gc.auto=0",
+    "-c", "fetch.writeCommitGraph=false", "-c", "http.extraHeader=", "-c", "credential.helper=",
+    "-c", "credential.helper=!gh auth git-credential", "-c", "http.followRedirects=false", "-c", "http.sslVerify=true", "-c", "protocol.file.allow=never",
+    "fetch", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance", "--",
+    `https://${options.hostname}/${options.repository}.git`, ...refs]);
+  const root = mkdtempSync(join(store.root, "docs-drift-fetch-"));
+  writeFileSync(join(root, "intent.json"), canonicalJSON({ repository: options.repository, ...scope, argv: args }), { flag: "wx", mode: 0o600 });
+  const stdout = join(root, "stdout"), stderr = join(root, "stderr");
+  for (const path of [stdout, stderr]) writeFileSync(path, "", { flag: "wx", mode: 0o600 });
+  const env = Object.fromEntries(Object.entries(gitEnvironment(environment)).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+  const execution = await executeOwnedProcess({ argv: args, cwd: store.root, env, watched_outputs: [], stdout, stderr,
+    timeout_ms: options.timeout_ms ?? 60000,
+    started: pid => writeFileSync(join(root, "process-start.json"), canonicalJSON({ pid }), { flag: "wx", mode: 0o600 }) });
+  writeFileSync(join(root, "process-result.json"), canonicalJSON(execution), { flag: "wx", mode: 0o600 });
+  if (execution.exit_code !== 0 || !execution.reaped || execution.timed_out || execution.cancelled || execution.output_limit) throw Error("incomplete fetch process");
+  return root;
+}
+
+/** Authenticated reads are confined to fixed PR/default refs in the already recorded owned store. */
+export async function fetchProposalObjects(inputStore: OwnedObjectStore, inputProposal: PullRequestInput, inputOptions: ProposalFetchOptions): Promise<ProposalDiff> {
+  const store = { ...inputStore }, proposal = structuredClone(inputProposal), options = { ...inputOptions, environment: { ...inputOptions.environment } };
+  validateFetchTarget(store, options);
+  if (proposal.base_repository.full_name.toLowerCase() !== options.repository.toLowerCase()
+    || !Number.isSafeInteger(proposal.number) || proposal.number < 1 || proposal.base_ref !== options.default_branch)
+    throw Error("invalid owned proposal fetch target");
+  const expectedDefault = options.expected_default_commit ?? proposal.base_sha;
+  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(expectedDefault)) throw Error("invalid observed default commit");
   try {
-    const args = gitReadArguments(["--no-lazy-fetch", "--no-replace-objects", "-c", "core.hooksPath=/dev/null", "-c", "gc.auto=0",
-      "-c", "fetch.writeCommitGraph=false", "-c", "http.extraHeader=", "-c", "credential.helper=",
-      "-c", "credential.helper=!gh auth git-credential", "-c", "http.followRedirects=false", "-c", "http.sslVerify=true", "-c", "protocol.file.allow=never",
-      "fetch", "--no-tags", "--no-write-fetch-head", "--no-recurse-submodules", "--no-auto-maintenance", "--",
-      `https://${options.hostname}/${options.repository}.git`,
-      `+refs/heads/${options.default_branch}:refs/docs-drift/inputs/default`, `+refs/pull/${proposal.number}/head:refs/docs-drift/inputs/pr-${proposal.number}`,
-    ]);
-    const root = mkdtempSync(join(store.root, "docs-drift-fetch-"));
-    writeFileSync(join(root, "intent.json"), canonicalJSON({ repository: options.repository, base_sha: proposal.base_sha, head_sha: proposal.head_sha, argv: args }), { flag: "wx", mode: 0o600 });
-    const env = Object.fromEntries(Object.entries(gitEnvironment(environment)).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
-    const execution = await executeOwnedProcess({ argv: args, cwd: store.root, env, watched_outputs: [],
-      stdout: join(root, "stdout"), stderr: join(root, "stderr"), timeout_ms: options.timeout_ms ?? 60000,
-      started: pid => writeFileSync(join(root, "process-start.json"), canonicalJSON({ pid }), { flag: "wx", mode: 0o600 }) });
-    writeFileSync(join(root, "process-result.json"), canonicalJSON(execution), { flag: "wx", mode: 0o600 });
-    if (execution.exit_code !== 0 || !execution.reaped || execution.timed_out || execution.cancelled || execution.output_limit) throw Error("incomplete fetch process");
+    await fetchFixedRefs(store, options, [`+refs/heads/${options.default_branch}:refs/docs-drift/inputs/default`,
+      `+refs/pull/${proposal.number}/head:refs/docs-drift/inputs/pr-${proposal.number}`], { base_sha: proposal.base_sha, head_sha: proposal.head_sha });
     const head = readGit(store.root, "rev-parse", "--verify", `refs/docs-drift/inputs/pr-${proposal.number}^{commit}`).toString().trim();
     const base = readGit(store.root, "rev-parse", "--verify", "refs/docs-drift/inputs/default^{commit}").toString().trim();
     if (head !== proposal.head_sha || base !== expectedDefault) throw Error("proposal changed during fetch");
@@ -157,4 +168,20 @@ export async function fetchProposalObjects(store: OwnedObjectStore, proposal: Pu
     return { complete: false, diagnostics: ["Fixed-ref proposal fetch unavailable or source changed"], base_sha: proposal.base_sha,
       head_sha: proposal.head_sha, merge_base: null, patch_bytes: Buffer.alloc(0), patch_sha256: null, files: [], inputs_sha256: null };
   }
+}
+
+/** Observe the selected native default only in its recorded external object store. */
+export async function fetchCurrentDefault(inputStore: OwnedObjectStore, inputOptions: ProposalFetchOptions & { expected_default_commit: string }) {
+  const store = { ...inputStore }, options = { ...inputOptions, environment: { ...inputOptions.environment } };
+  validateFetchTarget(store, options);
+  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(options.expected_default_commit)) throw Error("invalid observed default commit");
+  const result = { complete: false, diagnostics: [] as string[], commit: null as string | null, artifact_directory: null as string | null };
+  try {
+    result.artifact_directory = await fetchFixedRefs(store, options, [`+refs/heads/${options.default_branch}:refs/docs-drift/inputs/default`],
+      { default_sha: options.expected_default_commit });
+    result.commit = readGit(store.root, "rev-parse", "--verify", "refs/docs-drift/inputs/default^{commit}").toString().trim();
+    if (result.commit !== options.expected_default_commit) throw Error("default changed during fetch");
+    result.complete = true;
+  } catch { result.diagnostics.push("Fixed-ref default fetch unavailable or source changed"); }
+  return result;
 }

@@ -413,8 +413,8 @@ export function retainComponentSnapshot(options: { cache_directory: string; cons
 }
 
 
-function inspectEntryInput(repo: string, commit: string, path: string, invokedPath: string): string {
-  const root = realpathSync(repo), expectedPath = join(root, protocolPath(path));
+function inspectEntryInput(repo: string, commit: string, path: string, invokedPath: string, invokedRepo = repo): string {
+  const root = realpathSync(invokedRepo), expectedPath = join(root, protocolPath(path));
   if (invokedPath !== expectedPath || realpathSync(invokedPath) !== expectedPath) fail("invoked entry path differs from committed policy");
   const item = lstatSync(invokedPath), entry = readGit(repo, "--literal-pathspecs", "ls-tree", "-z", commit, "--", path).toString();
   const mode = (item.mode & 0o100) ? "100755" : "100644";
@@ -461,15 +461,16 @@ async function retainedRuntimeEntry(options: RuntimeEntryOptions) {
 }
 
 export async function selectApprovedRuntime(input: {
-  repo: string; current_default: string; identity: PublicationIdentity; cache_directory: string;
+  repo: string; policy_repo?: string; current_default: string; identity: PublicationIdentity; cache_directory: string;
   entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string;
 }) {
-  const options = { ...input };
+  const options = { ...input }, policyRepo = options.policy_repo ?? options.repo;
   inspectCacheLocation(options.cache_directory, options.repo);
-  const adopted = verifyRuntimeAdoption(options);
-  const bindings = collectAdoptionBindings(options.repo, options.current_default), settings = bindings.settings;
-  const launcherSHA = inspectEntryInput(options.repo, options.current_default, settings.runtime_loader.launcher, options.launcher_path);
-  const settingsSHA = inspectEntryInput(options.repo, options.current_default, ".vh-adlc/docs-drift.yaml", options.settings_path);
+  if (policyRepo !== options.repo) inspectCacheLocation(options.cache_directory, policyRepo);
+  const adopted = verifyRuntimeAdoption({ repo: policyRepo, current_default: options.current_default, identity: options.identity });
+  const bindings = collectAdoptionBindings(policyRepo, options.current_default), settings = bindings.settings;
+  const launcherSHA = inspectEntryInput(policyRepo, options.current_default, settings.runtime_loader.launcher, options.launcher_path, options.repo);
+  const settingsSHA = inspectEntryInput(policyRepo, options.current_default, ".vh-adlc/docs-drift.yaml", options.settings_path, options.repo);
   if (settingsSHA !== bindings.settings_sha256) fail("invoked settings changed");
   const runtime = await retainedRuntimeEntry({ ...options, settings, pin: adopted.component_pin, identity: adopted.identity,
     launcher_sha256: launcherSHA, settings_sha256: settingsSHA });

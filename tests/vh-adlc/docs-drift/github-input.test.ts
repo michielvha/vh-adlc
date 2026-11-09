@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { afterEach, expect, test } from "bun:test";
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, lstatSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createGitHubReader, createRepositoryReader } from "../../../plugins/vh-adlc/scripts/github-read";
-import { collectProposals, fetchProposalObjects, readProposalDiff } from "../../../plugins/vh-adlc/scripts/docs-drift/proposals";
+import { collectProposals, fetchCurrentDefault, fetchProposalObjects, readProposalDiff } from "../../../plugins/vh-adlc/scripts/docs-drift/proposals";
 import { captureRepositoryState, createOwnedObjectStore } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { canonicalDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { parseSettings } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
@@ -252,4 +252,30 @@ test("comment baselines use complete native GET inventories and preserve malform
   const comments = api.selected.comments(1);
   expect(comments.complete).toBe(false);
   expect(comments.items.map(item => item.id)).toEqual([90, 92]);
+});
+
+test.each(["proposal", "default"] as const)("owned native %s fetch keeps its selected request and store across asynchronous caller mutation", async kind => {
+  const fixture = proposalRepository(), originalHead = fixture.proposal.head_sha;
+  git(fixture.source, "update-ref", "refs/pull/1/head", fixture.head);
+  const bin = directory(), realGit = Bun.which("git"); if (!realGit) throw Error("fixture requires Git");
+  writeFileSync(join(bin, "git"), `#!${process.execPath}
+const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
+if (target < 0) process.exit(91);
+args[target] = ${JSON.stringify(fixture.source)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always");
+const child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdout: "inherit", stderr: "inherit" }); process.exit(child.exitCode);
+`, { mode: 0o700 });
+  const options = { hostname: "github.com", repository: "fixture/docs", default_branch: "main", environment: { PATH: bin }, expected_default_commit: fixture.initial.commit };
+  const pending = kind === "proposal" ? fetchProposalObjects(fixture.store, fixture.proposal, options) : fetchCurrentDefault(fixture.store, options);
+  fixture.proposal.number = 99; fixture.proposal.head_sha = fixture.initial.commit;
+  fixture.proposal.base_repository.full_name = "other/repository";
+  fixture.store.root = join(bin, "unselected-store"); options.repository = "other/repository"; options.environment.PATH = "/unselected/path";
+  options.expected_default_commit = "0".repeat(40);
+  const result = await pending;
+  expect(result.diagnostics).toEqual([]);
+  expect(result.complete).toBe(true);
+  expect(result).toMatchObject(kind === "proposal" ? { head_sha: originalHead } : { commit: fixture.initial.commit });
+  if (kind === "default") {
+    if (!("artifact_directory" in result) || !result.artifact_directory) throw Error("missing selected default artifacts");
+    for (const name of ["stdout", "stderr"]) expect(lstatSync(join(result.artifact_directory, name)).mode & 0o077).toBe(0);
+  }
 });
