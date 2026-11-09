@@ -26,6 +26,8 @@ function capture(root: string, source: string, selectedRole: "worker" | "reviewe
       process: retain(root, selectedRole + "-process.json", canonicalJSON(original.process)) } }));
 }
 
+export { retain as retainSyntheticArtifact, capture as captureSyntheticRole };
+
 export async function originalPublicationFixture(roots: string[]) {
   let worker: Reference | null = null;
   const f = await bindingFixture(roots, false, { fullComponent: true, role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source },

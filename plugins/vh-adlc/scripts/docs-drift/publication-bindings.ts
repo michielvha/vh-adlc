@@ -20,7 +20,8 @@ import { recheckResolutionInputs, type ResolutionCollection, type ResolutionInpu
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { readNativeContext } from "./transport";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
-import { readCandidateVerificationArtifacts } from "./verification-evidence";
+import type { readCandidateVerificationArtifacts } from "./verification-evidence";
+import { readPublicationCandidateProof } from "./publication-proof";
 
 type Options = Omit<Parameters<typeof collectPublicationInputs>[0], "object_store"> & {
   source_verification: unknown; candidate_verification: unknown; decisions: unknown; inventory_context?: PublicationInventory;
@@ -29,6 +30,7 @@ type Result = {
   schema_version: 1; kind: "docs-drift-publication-bindings"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
   proposal_snapshot: { path: string; sha256: string } | null; proposal_snapshot_path: string | null; worker_input_sha256: string | null;
   candidate_verification_sha256: string | null;
+  candidate_source_only: boolean;
   mode: "advisory" | "resolve" | null; bindings: Bindings | null; corrections: CorrectionInput[]; attention: AttentionProjection[];
   source_verification: ReturnType<typeof readSourceAssessmentArtifacts> | null;
   candidate_verification: ReturnType<typeof readCandidateVerificationArtifacts> | null;
@@ -41,7 +43,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
   const options = { ...input, selection: structuredClone(input.selection), resolution_record: structuredClone(input.resolution_record),
     source_verification: structuredClone(input.source_verification), candidate_verification: structuredClone(input.candidate_verification),
     decisions: structuredClone(input.decisions), path: input.path ?? process.env.PATH };
-  const result: Result = { schema_version: 1, kind: "docs-drift-publication-bindings", authority: "none", complete: false, scope_changed: false, diagnostics: [], mode: null, candidate_verification_sha256: null,
+  const result: Result = { schema_version: 1, kind: "docs-drift-publication-bindings", authority: "none", complete: false, scope_changed: false, diagnostics: [], mode: null, candidate_verification_sha256: null, candidate_source_only: false,
     proposal_snapshot: null, proposal_snapshot_path: null, worker_input_sha256: null, bindings: null, corrections: [], attention: [], source_verification: null, candidate_verification: null, facts: null, proposals: null, resolution: null };
   const repo = realpathSync(options.repo), candidateRepo = realpathSync(options.candidate_repo);
   const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidateRepo));
@@ -58,9 +60,12 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     if (result.mode === "advisory") validateAdvisorySelection(packet, options.selection);
     const common = { repo, source: options.source, artifact_root: secondary.directory, owner: options.owner, run: options.run };
     result.source_verification = readSourceAssessmentArtifacts({ ...common, candidate_repo: candidateRepo, reference: options.source_verification });
-    result.candidate_verification = readCandidateVerificationArtifacts({ ...common, candidate_repo: candidateRepo, candidate: options.candidate,
-      selection: options.selection, resolution_record: options.resolution_record, reference: options.candidate_verification });
-    const verified = result.candidate_verification, baseline = result.source_verification;
+    const baseline = result.source_verification;
+    const verified = readPublicationCandidateProof({ ...common, candidate_repo: candidateRepo, candidate: options.candidate,
+      selection: options.selection, resolution_record: options.resolution_record, candidate_verification: options.candidate_verification }, baseline);
+    result.candidate_verification = verified.verification;
+    result.candidate_source_only = verified.source_only;
+    if (verified.source_only && result.mode !== "advisory") throw Error("Source-only publication requires an advisory issue assessment");
     result.facts = await collectPublicationInputs({ ...common, candidate_repo: candidateRepo, candidate: options.candidate, selection: options.selection,
       resolution_record: options.resolution_record, object_store: verified.inspection?.object_store ?? undefined, credential: options.credential, path: options.path,
       cache_directory: options.cache_directory, entry: options.entry, launcher_path: options.launcher_path, settings_path: options.settings_path });

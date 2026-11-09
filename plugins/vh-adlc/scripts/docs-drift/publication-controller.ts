@@ -11,7 +11,7 @@ import { publish, PublicationScopeChanged, type PublicationGate, type PublishOpt
 import { resumeEffects } from "./recovery";
 import { collectPublicationInputs } from "./publication-inputs";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
-import { readCandidateVerificationArtifacts } from "./verification-evidence";
+import { readPublicationCandidateProof } from "./publication-proof";
 import { createNativeTransport, readNativeContext } from "./transport";
 import { collectProposals, requireOwnedStore } from "./proposals";
 import { readGit } from "./git";
@@ -162,7 +162,9 @@ export async function resumePublication(input: Options & { journal_directory: st
   const journal = readJournal(options.journal_directory, options.repo), invocation = readInvocation(options, journal.plan);
   try {
     const source = readSourceAssessmentArtifacts({ ...options, candidate_repo: options.candidate_repo, reference: options.source_verification });
-    const candidate = readCandidateVerificationArtifacts({ ...options, reference: options.candidate_verification });
+    const candidate = readPublicationCandidateProof(options, source);
+    if (candidate.source_only && journal.plan.manifest.effects.some(effect => !["lease-acquire", "receipt-retain", "issue-create", "lease-release"].includes(effect.kind)))
+      throw new PublicationScopeChanged("Source-only recovery requires its original issue-only plan");
     const facts = await collectPublicationInputs({ ...options, object_store: candidate.inspection?.object_store ?? undefined });
     if (confirmedFactsChanged(facts, journal.plan)) throw new PublicationScopeChanged("Original recovery source actor or runtime changed");
     if (!facts.complete || !facts.runtime || !source.object_store) throw Error("Current publication recovery runtime unavailable");

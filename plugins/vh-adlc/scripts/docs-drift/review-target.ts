@@ -40,6 +40,7 @@ export async function collectReviewTarget(input: Options): Promise<ReviewTarget>
       expected: { role: "worker", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: bound.worker_input_sha256! } });
     if (!result.preparation.publication) throw Error("Original worker publication proposal required");
     const proposal = parseWorkerPublication(result.preparation.publication)!;
+    if (bound.candidate_source_only && proposal.proposal.kind !== "issue-create") throw Error("Source-only publication requires an issue proposal");
     const action = proposal.proposal, payload = { ...action.payload }, settings = captureSnapshot(repo, options.source).settings;
     if (typeof payload.body !== "string") throw Error("Original publication body required");
     // These stable identifiers and exact native/checkpoint values are finalized before the reviewer is launched.

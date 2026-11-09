@@ -50,7 +50,12 @@ export async function collectPublicationInputs(input: {
     if (!fetched.complete) { result.diagnostics.push(...fetched.diagnostics); throw Error("Current native default objects unavailable"); }
     result.freshness = checkFreshness(captureBareSnapshot(store.root, options.source), context.default_commit);
     if (result.freshness.diagnostic) throw Error("Assessed publication source comparison unavailable");
-    if (!result.freshness.fresh) throw new PublicationScopeChanged("Assessed publication source needs fresh collection and review");
+    if (!result.freshness.fresh) {
+      result.scope_changed = true;
+      if (loadCommittedSettings(store.root, context.default_commit).settings.publication.mode !== "adopted")
+        throw new PublicationScopeChanged("Current publication consumer is not adopted");
+      throw new PublicationScopeChanged("Assessed publication source needs fresh collection and review");
+    }
     result.runtime = await selectApprovedRuntime({ repo, policy_repo: store.root, current_default: context.default_commit, identity: context.identity,
       cache_directory: options.cache_directory, entry: options.entry, launcher_path: options.launcher_path, settings_path: options.settings_path });
     const current = native();
@@ -58,7 +63,7 @@ export async function collectPublicationInputs(input: {
       throw new PublicationScopeChanged("Native publication source or actor changed during collection");
     result.complete = true;
   } catch (error) {
-    result.scope_changed = error instanceof PublicationScopeChanged;
+    result.scope_changed ||= error instanceof PublicationScopeChanged;
     result.diagnostics.push(error instanceof Error ? error.message : "Publication input collection unavailable");
   }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {

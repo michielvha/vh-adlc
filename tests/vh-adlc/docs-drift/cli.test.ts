@@ -346,16 +346,16 @@ process.exit(child.exitCode);
 });
 
 
-test.each(["matching", "disjoint-advance", "actor", "rollback", "changed-source", "settings", "cache", "cache-in-candidate", "credential", "caller-missing", "caller-symlink"])("normal publication input collection binds current production policy %s", async fault => {
+test.each(["matching", "disjoint-advance", "actor", "rollback", "malformed-policy", "changed-source", "settings", "cache", "cache-in-candidate", "credential", "caller-missing", "caller-symlink"])("normal publication input collection binds current production policy %s", async fault => {
   const f = await runtimeFixture(roots, true, fault === "disjoint-advance"), selected = f.selection;
   put(f.repo, "docs/suppressions.yaml", "suppressions: []\n");
   const source = commitAll(f.repo);
   const origin = join(f.root, "publication-origin"); git(f.root, "clone", "--no-local", "--no-checkout", f.repo, origin);
   git(origin, "checkout", "--detach", source);
   let remoteDefault = source;
-  if (fault === "rollback") {
+  if (fault === "rollback" || fault === "malformed-policy") {
     const settings = JSON.parse(readFileSync(join(origin, ".vh-adlc/docs-drift.yaml"), "utf8"));
-    settings.publication.mode = "staged"; put(origin, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
+    settings.publication.mode = fault === "malformed-policy" ? "invalid-state" : "staged"; put(origin, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
     remoteDefault = commitAll(origin);
   }
   if (fault === "disjoint-advance") { put(origin, "outside.txt", "Unbound native default advance\n"); remoteDefault = commitAll(origin); }
@@ -400,7 +400,8 @@ process.exit(child.exitCode);
     candidate: { complete: true, candidate_commit: head }, runtime: { kind: "docs-drift-approved-runtime" } });
   else {
     expect(report.publication_inputs?.complete).toBe(false);
-    const reasons: Record<string, string> = { actor: "Selected native publication actor", rollback: "not adopted", "changed-source": "needs fresh collection and review",
+    if (fault === "rollback" || fault === "malformed-policy") expect(report.publication_inputs?.scope_changed).toBe(true);
+    const reasons: Record<string, string> = { actor: "Selected native publication actor", rollback: "not adopted", "malformed-policy": "publication mode", "changed-source": "needs fresh collection and review",
       settings: "invoked entry bytes differ from committed policy", cache: "missing-cache", "cache-in-candidate": "overlaps a caller checkout", credential: "missing selected publication credential",
       "caller-missing": "Caller changed or became unavailable", "caller-symlink": "Caller changed or became unavailable" };
     expect(report.diagnostics.map(item => item.message).join("\n")).toContain(reasons[fault]);
