@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "In progress on feat/host-cleanup, local only at the owner's direction. The owner accepted on 2026-11-06 at R-17, given in advance on the condition that the narrow confirmation pass of the changes since R-15 had no blocking or judgement finding, which it met. Tasks T1 to T28 are done. Implementation review R-19 at 2a3a2e6 and the narrow re-checks R-20 and R-21, the latest at 5cfb851, found 10 criteria met and AC-11, AC-12 and AC-23 not verified, with nothing left open. AC-11 and AC-12 need the owner's sessions and host runs with the binary built at 7235dbb; Stackweaver's manifest is on its local branch chore/vh-adlc-cleanup-manifest, and AC-23 needs its separate adoption change. The branch was rebuilt on origin/main 21bc3e4 at plugin 0.11.0; its pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "In progress on feat/host-cleanup, local only at the owner's direction, at plugin 0.13.0 after merging main at 7adb076. The owner accepted at R-17. Tasks T1 to T28 are done and the code is unchanged since 7235dbb. AC-11 and AC-23 carry evidence from 2026-11-09. AC-12 runs 1 to 3 ran on 2026-11-09; run 4 waits for another session's sw-e2e cluster to go, and the owner has not yet accepted the run 1 report. Stackweaver's adoption merged early, as PR #1050 (6fe5fcce, 2026-11-08), before Order steps 1 to 3, so sessions in a Stackweaver checkout can already apply its manifest through the candidate binary and the two allow rules. Spec review R-22 at 7ea9ba7 found 3 findings, none blocking; Q1 asks whether the f781ee7 glossary and trade-off rules apply. The pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -61,6 +61,27 @@ and `t.TempDir` (`go doc`, Go 1.27). The Bash tool's `PATH` here is `/usr/local/
 Disabling lazy fetch needs Git 2.45 (see Sources), while the stated floor is 2.35
 (`docs/get-started/installation.md:10`). In a PID namespace, `kill -0` on a live host pid returns "No such
 process" (a `bwrap --unshare-pid` probe, and `codex sandbox` the same).
+
+### Artifact and publication path
+
+The change affects two artifacts, each with its own version.
+
+- The `vh-adlc` binary gains `clean` and `env`. The `version` job in `.github/workflows/ci.yml` tags `main`
+  after the checks pass; the `feat` commit makes that tag the next minor after `v0.17.0`.
+  `.github/workflows/release.yml` publishes on a `v*.*.*` tag through `vhco-pro/go-release-workflow` at
+  `311467e`, with the `.goreleaser.yml` settings: `CGO_ENABLED=0`, `-trimpath`, darwin and linux on amd64
+  and arm64.
+- The marketplace source package under `plugins/vh-adlc/` gains `vh-adlc-clean`. The merge to `main`
+  publishes it for marketplace installs and updates; its two manifests name 0.13.0, the first plugin
+  version with the operation. The lock in `plugins/vh-adlc/vh-adlc.lock.json` stays at 0.9.0 until Order
+  step 2.
+
+Before merge, at `7adb076`, Go 1.27.2 built all four targets with the release settings
+(`CGO_ENABLED=0 GOOS=<os> GOARCH=<arch> go build -trimpath -ldflags "-s -w -X main.version=..."
+./cmd/vh-adlc`), and the linux amd64 build printed its version. R-22 built the same four at `7ea9ba7`
+and ran `go vet` for darwin arm64. GoReleaser itself did not run, so archives and signing were not
+exercised. Delivery ends once the tagged release has published its assets, the lock PR has merged and
+the marketplace source on `main` matches the reviewed package.
 
 ## Scope
 
@@ -322,7 +343,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
       Evidence: `tests/vh-adlc/evidence/clean/procedure.md`, steps 1 to 12, on 2026-11-09 (steps 3 to 5 on 2026-11-06), with `/usr/local/bin/vh-adlc` printing `vh-adlc 0.11.0-candidate.7235dbb`, this branch's plugin 0.11.0 loaded (`claude -p --plugin-dir`, and a local Codex marketplace) and only the documented rules for `vh-adlc clean`. Claude Code 2.1.316 in auto mode ran `vh-adlc clean --dry-run` then `vh-adlc clean` with no permission check event and no denial, and removed `/tmp/vh-ac11-old`; its direct `rm -rf /tmp/vh-ac11-control` drew a classifier check. A `dontAsk` control admitted `vh-adlc clean` and denied that `rm -rf`. A session told only that `/tmp` was full ran both commands without `--compose` or `--kind`. Codex 0.163.0 in its default `workspace-write` session ran both commands with no approval and no `pid-namespace`, outside its sandbox, while `codex sandbox` alone reported `pid-namespace`; its direct `rm -rf` went to the approvals reviewer, which allowed it. With the binary hidden, and with the locked 0.9.0 binary answering `usage`, the session stopped and gave the install line. Limitations: headless sessions (`claude -p`, `codex exec`) with no interactive prompt, so the classifier or the owner's Codex reviewer, not a person, decided each `rm -rf`, which then ran on a stand-in; each session had a private `/tmp` under Bubblewrap and the host's PID namespace; the replies in steps 11 and 12 ran past one line.
 - [ ] AC-12: Run 1 of the real-host sequence reports every row that needs no flag as required, the owner accepts
       that report before run 2, and runs 2 to 4 leave every row as the table requires.
-      Evidence: R-21 at `5cfb851` returned `not verified`.
+      Evidence: Partial, 2026-11-09, candidate `0.11.0-candidate.7235dbb`. Disposable clones under `~/.cache/vh-ac12-work`: `vh`, whose `origin/main` is this branch at `3fa548a` (manifest blob `e7203bd`), and `sw`, a clone of Stackweaver `main` at `8405fbe1` (manifest blob `846cae0`, the reviewed one). Each run used `bwrap` with a scratch directory bound as `/tmp`, the host's PID namespace, Docker engine and `/proc`, and no `host.yaml`, because the real `/tmp` and temp root hold matching entries that are not stand-ins. Stand-ins: `go-build9101` (25h), `go-build9102` (2h), `vh-triage-ac12old` and `vh-maintenance-ac12old` (7h), `TestConformance_ac12old` (7h), `TestConformance_ac12young` (1h), `TestConformance_ac12inuse` (7h, a process's cwd during each run), `stackweaver-visuals-ac12old` (7h), `vh-ac12-unmatched` (3 days), Compose projects `swc-9101` (working directory present) and `swc-9102` (removed), and a volume labelled `sh.stackweaver.test-run=fedora-43/1`. Run 1, dry, in both clones: `answered`, no findings, planning removal of exactly the old `go-build`, `vh-triage`, `vh-maintenance`, `TestConformance` and `stackweaver-visuals` stand-ins, keeping the young and in-use ones, keeping `swc-9101` and the other session's live `sw-e2e`, and listing `swc-9102` as needing `--compose`. Run 2, applied: `pass` in both, removing those five entries and nothing else. Run 3, `--compose` in `sw` after its dry run: `pass`, `swc-9102` stopped and removed with its container, network and volume; `swc-9101`, Compose `deploy` (17 containers before and after), the `sw-e2e-registry` container, leftover `swc-3` and `swc-9` volumes and networks with no containers, and the test-run volume untouched. Not done: run 4, because another session's `e2e/k8s/run.sh` (pid 2632858) held `sw-e2e` throughout; and the owner's acceptance of the run 1 report before run 2, which was not obtained. R-21 at `5cfb851` returned `not verified`.
 - [x] AC-14: The guides, the CLI reference, the compatibility table and `references/clean.md` document the commands,
       the manifest, the Git floor and both rules, `references/authority.md` has the new row, and the package
       checker accepts the operation.
@@ -417,7 +438,18 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 
 ## Open Questions
 
-None.
+### Q1: Do the glossary and trade-off rules added at docs pin f781ee7 apply to this document, accepted at R-17?
+
+**Recommendation:** A. The document was accepted under 0e52f51, where neither rule existed, and the owner
+answered the trade-offs that mattered; record that decision in Context so later reviews do not reopen it.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Exempt it** | The feature completes on its current baseline; Context records the exemption | Terms such as temp root, temp base, mark and liveness stay without a glossary row or a criterion holding them; author-settled defaults (the built-in 24-hour Go globs, the one-hour age floor, the four-character glob floor) are not raised as questions |
+| **B. Apply them** | A glossary, a criterion that holds it, and an open question for each author-settled trade-off | A normative revision: back to draft, every tick and evidence line reset, a new spec review and acceptance, and the criteria proved again |
+
+**Why this is yours:** the new rule has no clause for documents accepted before it, unlike the Owner
+summary rule beside it, so whether it reaches back is a policy choice (R-22 F-03).
 
 ## Review Log
 
@@ -446,6 +478,7 @@ None.
 | 2026-11-06 | R-19 | implementation | `2a3a2e672254611471e00897716c1f46ae1311e3` | claude-opus-5-5 | procedural | 10 criteria met, 3 not verified, no findings |
 | 2026-11-06 | R-20 | implementation | `ffa201e108efa842b214cf777869211db0e2aec1` | claude-opus-5-5 | procedural | Narrow re-check of the docs-only change since R-19 at 2a3a2e6, with the fast and engine suites rerun: 10 criteria met, 3 not verified, 1 judgement nit |
 | 2026-11-06 | R-21 | implementation | `5cfb851d94545b9dcdb496520e73e34f0f561773` | claude-opus-5-5 | procedural | Narrow re-check of the docs-only change since R-20 at ffa201e, with the fast and engine suites rerun: 10 criteria met, 3 not verified, no findings |
+| 2026-11-09 | R-22 | spec | `7ea9ba7133c2fcdcc8c8784694ff19bb92117a69` | claude-opus-5-5 | procedural | Narrow scope, the changes since R-17 at cb4deba, the merge of main and the docs pin moving to f781ee7: 3 findings, 0 blocking |
 
 ### R-1
 
@@ -1681,6 +1714,29 @@ EVIDENCE: Narrow re-check at 5cfb851. The check is the Test Plan procedure on St
 CRITERION: AC-24 `--older-than` below a rule's age changes nothing, a repository with no manifest still gets the built-in globs, and a missing `kind` skips only the kind step. An invalid `host.yaml`, including a relative `temp_base`, `$HOME`, or one inside a Git work tree or above the repository, stops the run before it removes anything. A failing `env --sh` prints nothing to stdout, and a path with a space or quote is shell-quoted.
 VERDICT: met
 EVIDENCE: Narrow re-check at 5cfb851. The code is unchanged since ffa201e. `go test -count=1 ./internal/clean ./cmd/vh-adlc` passed. It covers TestOlderThan, TestBuiltinGlobsWithoutManifest, TestKindUnavailable, TestHostSettingsInvalid, TestResults, TestEnvShFailurePrintsNothing, TestEnvShellLines and TestEnvPointsGoTestAtTheRoot. Limitation: no per-test listing in this run.
+
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context; Scope; Design, Order
+EVIDENCE: conventions/delivery.md at f781ee7 adds "Prove the real release path", which is not at 0e52f51: a feature document names every artifact its change affects and the path that builds and publishes each one, and before merge a check rebuilds each artifact the way that path builds it. This document mentions releases in only two places: Scope says "The release, lock bump and first real run follow the merge", and Order steps 1 and 2 cover the tag and the lock PR. Neither names a build and publication path or a pre-merge rebuild. The change affects two artifacts. The first is the Go binary, which gains `clean` and `env` (cmd/vh-adlc, internal/clean). The version job in .github/workflows/ci.yml tags it on main, and .github/workflows/release.yml publishes it through vhco-pro/go-release-workflow@311467e with .goreleaser.yml settings: CGO_ENABLED=0, -trimpath, darwin and linux, amd64 and arm64. The second is the marketplace source package under plugins/vh-adlc, whose two manifests the merge 7adb076 moved to 0.13.0. The two version tracks are separate: `git ls-remote --tags origin` shows v0.17.0 at 837ebc4, so this PR's feat commit tags the next minor after v0.17.0, while the operation requires plugin 0.13.0. No existing check builds the darwin binaries that contain internal/clean. CI's verify job runs go-ci-action on ubuntu only, and checker-macos uses the locked 0.9.0 binary. I built 7ea9ba7 with the goreleaser settings and Go 1.27.2, output to a scratch directory. All four targets built, and `GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go vet ./internal/clean ./cmd/vh-adlc` passed. So nothing is broken; the document just leaves the path out. At this same pin, github-projects-coordinator R-10 F-01 found the same gap, and that document added "### Artifact and publication path" under Context.
+PROPOSAL: Add an "Artifact and publication path" subsection to Context, outside the normative baseline. It should name the binary release path and the plugin source package path with their separate versions, record a pre-merge build using the goreleaser settings (for example `goreleaser release --snapshot --clean`, or the four cross-builds), and say that delivery ends once the tagged release has published its assets and the lock PR has merged.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: frontmatter status_description; Design, Order
+EVIDENCE: At 7ea9ba7, status_description still says AC-11, AC-12 and AC-23 are not verified. It also says "Stackweaver's manifest is on its local branch chore/vh-adlc-cleanup-manifest, and AC-23 needs its separate adoption change", and that the branch is "at plugin 0.11.0". The same commit ticks AC-11 and AC-23. In /home/m/code/stackweaver, 6fe5fcce "Merge pull request #1050: Stackweaver adopts vh-adlc host cleanup" (2026-11-08) is an ancestor of origin/main, and `git show origin/main:.vh-adlc/cleanup.yaml` prints the manifest. The merge 7adb076 set both plugin manifests to 0.13.0. Order puts Stackweaver's adoption merge at step 4, after the release, the lock bump and the owner's install, and says those outcomes go in status_description. Step 4 happened before steps 1 to 3, and the document does not record it. This has a practical effect. `/usr/local/bin/vh-adlc --version` prints `vh-adlc 0.11.0-candidate.7235dbb`, ~/.claude/settings.json line 51 holds `Bash(vh-adlc clean *)`, and ~/.codex/rules/default.rules line 22 holds the `vh-adlc clean` prefix rule. Any session in a Stackweaver checkout can therefore already apply Stackweaver's default-branch rules through the unreleased candidate, and the owner has not yet accepted AC-12 run 1. Separately, line 1 of Stackweaver's manifest says "vh-adlc plugin 0.11.0 or later". Plugin 0.11.0 and origin/main's 0.12.0 have no vh-adlc-clean skill (`git ls-tree origin/main plugins/vh-adlc/skills/` lists none); 0.13.0 is the first that does.
+PROPOSAL: Rewrite status_description to give the current state: the merge of main at 7adb076, plugin 0.13.0, and the early Stackweaver adoption merge. Ask the owner to confirm that real runs in Stackweaver checkouts with the candidate binary are acceptable before AC-12. Correct the plugin version in the comment of Stackweaver's manifest, in Stackweaver.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Acceptance Criteria
+EVIDENCE: Lines 154 to 157 of conventions/feature-documents.md at f781ee7 are not at 0e52f51. They say "Every trade-off the document settles is an open question" and "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion." The feature introduces user-facing terms that references/clean.md and docs/reference/cli.md use: temp root, temp base, manifest, abandoned, mark and liveness. The document has no glossary row and no criterion that holds these terms; AC-14 covers only "the commands, the manifest, the Git floor and both rules". The owner answered many of the settled choices, but the author settled others, such as the built-in `go-build*` and `gopls-tempmod*` globs at 24 hours, the one-hour minimum age and the four-literal-character glob floor. The Owner summary rule (lines 92 to 95) exempts historical documents, but this rule has no such clause. Meeting it means changing a criterion, which is a normative revision that resets every tick. remote-gui-human-login R-1 applied this rule to a new document.
+PROPOSAL: Ask the owner whether the f781ee7 glossary and trade-off rules apply to this document, which was accepted at R-17. If they do not, record that decision in Context so later reviews do not reopen it. If they do, revise the document with a glossary and a criterion that holds it.
 
 ## Sources
 
