@@ -52,6 +52,24 @@ test("typed repository reads use fixed GET routes and an explicit credential-sco
   }
 });
 
+test("GHE cloud pagination follows only its dedicated API host", () => {
+  const root = directory(), endpoint = "repos/fixture/docs/pulls?state=open&base=main&per_page=100";
+  const next = "https://api.fixture.ghe.com/" + endpoint + "&page=2";
+  const program = `#!${process.execPath}
+const endpoint = process.argv.at(-1), next = ${JSON.stringify(next)};
+const first = endpoint === ${JSON.stringify(endpoint + "&page=1")};
+if (!first && endpoint !== next) process.exit(93);
+console.log("HTTP/2.0 200 OK\\r\\n" + (first ? "Link: <" + next + ">; rel=\\"next\\"\\r\\n" : "") + "\\r\\n" + JSON.stringify([first ? 1 : 2]));
+`;
+  writeFileSync(join(root, "gh"), program, { mode: 0o700 });
+  const api = createGitHubReader("fixture.ghe.com", { inherit_env: false, env: { PATH: root } });
+  const result = api.pages(endpoint);
+  expect(result.complete).toBe(true);
+  expect(result.items).toEqual([1, 2]);
+  expect(api.trace().map(read => read.endpoint)).toEqual([endpoint + "&page=1", next]);
+  expect(() => api.get("https://api.foreign.ghe.com/repos/fixture/docs")).toThrow("invalid-github-read-target");
+});
+
 test("malformed or foreign PR metadata makes collection incomplete while retaining valid neighbors", () => {
   const foreign = pull(2); foreign.base.repo = { ...repository, full_name: "foreign/repo" };
   const api = reader(routes([pull(1), foreign, pull(3, { number: -4 }), pull(4)]));

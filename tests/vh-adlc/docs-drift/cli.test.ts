@@ -7,6 +7,7 @@ import type { CLIReport } from "../../../plugins/vh-adlc/scripts/docs-drift/cli"
 import { populateRepository, put } from "./repository-fixture";
 import { source, pin, write, commit, portableRecord, deliverRecord } from "./adoption-fixture";
 import { trialDefinitionFixture } from "./trial-definition-fixture";
+import { runtimeFixture } from "./runtime-fixture";
 import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
 const roots: string[] = [];
@@ -25,7 +26,7 @@ function invoke(argv: string[], environment = process.env) {
   return { result, report: JSON.parse(result.stdout.toString()) as CLIReport };
 }
 
-function nativeReader(f: { root: string; candidate: string }, actor = "fixture-bot", errors = false) {
+function nativeReader(f: { root: string; candidate: string }, actor = "fixture-bot", errors = false, incompleteInventory = false) {
   const bin = join(f.root, "native-bin"), trace = join(f.root, "native-reads.jsonl");
   mkdirSync(bin, { mode: 0o700 });
   writeFileSync(join(bin, "gh"), `#!${process.execPath}
@@ -42,6 +43,7 @@ if (args.includes("graphql")) {
   const value = endpoint === "repos/fixture/docs" ? { id: 10, full_name: "fixture/docs", default_branch: "main" }
     : endpoint === "repos/fixture/docs/git/ref/heads/main" ? { ref: "refs/heads/main", object: { type: "commit", sha } }
     : endpoint === "repos/fixture/docs/git/commits/" + sha ? { sha, tree: { sha: "a".repeat(40) }, parents: [], message: "Synthetic source" }
+    : endpoint === "repos/fixture/docs/pulls?state=open&base=main&per_page=100&page=1" ? (${incompleteInventory} ? { message: "Synthetic missing inventory" } : [])
     : null;
   if (!value) process.exit(92);
   console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
@@ -64,7 +66,18 @@ test("normal signal checks report an unselected staged runtime without changing 
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
-test.each([false, true])("normal signal checks distinguish candidate metadata mismatch %s", mismatch => {
+test.each(["complete", "incomplete"])("normal proposal collection preserves native inventory %s", scenario => {
+  const incomplete = scenario === "incomplete";
+  const f = source(roots), native = nativeReader(f, "fixture-bot", false, incomplete), before = captureRepositoryState(f.repo);
+  const { result, report } = invoke(["collect-proposals", "--repo", f.repo, "--source", f.candidate], native.environment);
+  expect(result.exitCode).toBe(incomplete ? 2 : 0);
+  expect(report.proposals).toMatchObject({ complete: !incomplete, proposals: [] });
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+  expect(readFileSync(native.trace, "utf8")).not.toContain("synthetic-provider-canary");
+});
+
+test.each(["match", "mismatch"])("normal signal checks distinguish candidate metadata %s", scenario => {
+  const mismatch = scenario === "mismatch";
   const f = trialDefinitionFixture(roots), component = pin(), client = f.candidate_settings.clients["copilot-linux"];
   write(f.repo, ".vh-adlc/docs-drift-upgrade-signal.yaml", canonicalJSON({ schema_version: 1,
     source_repository: component.source_repository, source_commit: mismatch ? "b".repeat(40) : component.source_commit,
@@ -89,7 +102,7 @@ test("normal trial-binding reports expose committed candidate policy without exe
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
-test.each(["matching", "different-actor", "partial-viewer"])("normal adopted signal checks authenticate the native account %s", scenario => {
+test.each(["without-token", "different-actor", "partial-viewer"])("normal adopted signal consistency remains credential-free %s", scenario => {
   const f = source(roots), component = pin(), client = f.configured.clients["copilot-linux"];
   write(f.repo, ".vh-adlc/docs-drift-upgrade-signal.yaml", canonicalJSON({ schema_version: 1,
     source_repository: component.source_repository, source_commit: component.source_commit, source_release: component.source_release }));
@@ -98,16 +111,16 @@ test.each(["matching", "different-actor", "partial-viewer"])("normal adopted sig
   f.candidate = commit(f.repo, "synthetic CLI adopted signals");
   const selected = deliverRecord(f, portableRecord(f)), before = captureRepositoryState(f.repo);
   const native = nativeReader(f, scenario === "different-actor" ? "other-bot" : "fixture-bot", scenario === "partial-viewer");
-  const { result, report } = invoke(["check-upgrade-signals", "--repo", f.repo, "--source", selected], native.environment);
-  expect(result.exitCode).toBe(scenario === "matching" ? 0 : 2);
-  expect(report.outcome).toBe(scenario === "matching" ? "collected" : "incomplete");
-  const reads = readFileSync(native.trace, "utf8");
-  expect(reads).toContain("graphql");
-  expect(reads).not.toContain("synthetic-provider-canary");
+  const { result, report } = invoke(["check-upgrade-signals", "--repo", f.repo, "--source", selected],
+    { ...native.environment, GH_TOKEN: scenario === "without-token" ? "" : native.environment.GH_TOKEN });
+  expect(result.exitCode).toBe(0);
+  expect(report.outcome).toBe("collected");
+  expect(existsSync(native.trace)).toBe(false);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
-test.each([false, true])("normal trial preparation requires the observed current default %s", stale => {
+test.each(["current", "stale"])("normal trial preparation requires the observed default %s", scenario => {
+  const stale = scenario === "stale";
   const f = trialDefinitionFixture(roots), artifacts = join(f.root, "cli-trial-artifacts");
   mkdirSync(artifacts, { mode: 0o700 });
   const native = nativeReader({ ...f, candidate: stale ? f.candidate : f.staged });
@@ -127,9 +140,10 @@ test.each([false, true])("normal trial preparation requires the observed current
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
-test("native metadata refuses a missing selected credential before invoking GitHub", () => {
-  const f = source(roots), selected = deliverRecord(f, portableRecord(f)), native = nativeReader(f);
-  const { result, report } = invoke(["check-upgrade-signals", "--repo", f.repo, "--source", selected], {
+test("native preparation refuses a missing selected credential before invoking GitHub", () => {
+  const f = trialDefinitionFixture(roots), native = nativeReader({ ...f, candidate: f.staged });
+  const artifacts = join(f.root, "cli-empty-credential"); mkdirSync(artifacts, { mode: 0o700 });
+  const { result, report } = invoke(["prepare-trial-fixture", "--repo", f.repo, "--source", f.staged, "--artifact-root", artifacts], {
     ...native.environment, GH_TOKEN: "", GH_ENTERPRISE_TOKEN: "synthetic-wrong-host-token",
   });
   expect(result.exitCode).toBe(2);
@@ -138,20 +152,52 @@ test("native metadata refuses a missing selected credential before invoking GitH
   expect(JSON.stringify(report)).not.toContain("synthetic-wrong-host-token");
 });
 
-test.each(["github.enterprise.invalid", "fixture.ghe.com"])("normal metadata uses the selected token for %s", hostname => {
-  const f = source(roots, { hostname }), component = pin(), client = f.configured.clients["copilot-linux"];
-  write(f.repo, ".vh-adlc/docs-drift-upgrade-signal.yaml", canonicalJSON({ schema_version: 1,
-    source_repository: component.source_repository, source_commit: component.source_commit, source_release: component.source_release }));
-  write(f.repo, ".vh-adlc/docs-drift-client-upgrade-signals.yaml", canonicalJSON({ schema_version: 1,
-    clients: { "copilot-linux": { provider: client.provider, package: "@github/copilot", version: client.version, platform: client.platform } } }));
-  f.candidate = commit(f.repo, "synthetic enterprise CLI signals");
-  const selected = deliverRecord(f, portableRecord(f)), native = nativeReader(f);
+test.each(["github.enterprise.invalid", "fixture.ghe.com"])("normal preparation uses the selected token for %s", hostname => {
+  const f = trialDefinitionFixture(roots, { approved: { hostname } }), native = nativeReader({ ...f, candidate: f.staged });
+  const artifacts = join(f.root, "cli-enterprise"); mkdirSync(artifacts, { mode: 0o700 });
   const environment = hostname.endsWith(".ghe.com") ? native.environment
     : { ...native.environment, GH_TOKEN: "synthetic-unselected-token", GH_ENTERPRISE_TOKEN: "synthetic-read-token" };
-  const { result } = invoke(["check-upgrade-signals", "--repo", f.repo, "--source", selected], environment);
+  const { result } = invoke(["prepare-trial-fixture", "--repo", f.repo, "--source", f.staged, "--artifact-root", artifacts], environment);
   expect(result.exitCode).toBe(0);
   const reads = readFileSync(native.trace, "utf8").trim().split("\n");
   for (const line of reads) expect(JSON.parse(line)).toMatchObject(hostname.endsWith(".ghe.com") ? { credential: true } : { enterprise: true });
+});
+
+test.each(["approved", "candidate"])("normal runtime inspection selects the retained %s", async scenario => {
+  const candidate = scenario === "candidate";
+  const f = await runtimeFixture(roots, true), selected = f.selection, native = nativeReader({ ...f, candidate: selected.current_default });
+  const before = captureRepositoryState(f.repo);
+  const args = ["inspect-runtime", "--repo", f.repo, "--source", selected.current_default,
+    "--cache-root", selected.cache_directory, "--entry", selected.entry, "--launcher", selected.launcher_path,
+    "--settings", candidate ? selected.settings_path : join(f.repo, ".vh-adlc/docs-drift.yaml"),
+    ...(candidate ? ["--trial-definition", selected.definition_sha256] : [])];
+  const { result, report } = invoke(args, native.environment);
+  expect(result.exitCode).toBe(0);
+  expect(report.runtime).toMatchObject({ kind: candidate ? "docs-drift-candidate-runtime" : "docs-drift-approved-runtime",
+    current_default: selected.current_default, worker: { client: { version: candidate ? "fixture-2.0.0" : "fixture-1.0.0" } } });
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+  expect(readFileSync(join(f.approved.profile_directory, "session-marker"), "utf8")).toBe("Synthetic approved session\n");
+});
+
+test.each(["source", "definition", "settings", "launcher", "profile", "entry", "actor", "partial-viewer"] as const)("normal runtime inspection refuses stale or unavailable %s", async scenario => {
+  const f = await runtimeFixture(roots), selected = f.selection;
+  const native = nativeReader({ ...f, candidate: scenario === "source" ? f.candidate : selected.current_default },
+    scenario === "actor" ? "other-bot" : "fixture-bot", scenario === "partial-viewer");
+  if (scenario === "settings") writeFileSync(selected.settings_path, "Other candidate settings\n");
+  if (scenario === "launcher") writeFileSync(selected.launcher_path, "Other launcher\n");
+  if (scenario === "profile") rmSync(f.native.profile_directory, { recursive: true });
+  const before = captureRepositoryState(f.repo);
+  const { result, report } = invoke(["inspect-runtime", "--repo", f.repo, "--source", selected.current_default,
+    "--cache-root", selected.cache_directory, "--entry", scenario === "entry" ? "unknown" : selected.entry,
+    "--launcher", selected.launcher_path, "--settings", selected.settings_path,
+    "--trial-definition", scenario === "definition" ? "0".repeat(64) : selected.definition_sha256], native.environment);
+  expect(result.exitCode).toBe(2);
+  const reason = { source: "observed current default", definition: "candidate trial definition changed",
+    settings: "invoked entry bytes differ from committed policy", launcher: "invoked entry bytes differ from committed policy",
+    profile: f.native.profile_directory, entry: "runtime inspection requires", actor: "current native trial identity",
+    "partial-viewer": "native viewer query incomplete" }[scenario];
+  expect(report.diagnostics[0].message).toContain(reason);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
 test("the normal CLI scans the selected committed source and preserves dirty caller work", () => {
@@ -192,13 +238,15 @@ test.each([
 });
 
 test.each(["scan", "prepare-trial-fixture"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
-  const f = fixture(), before = captureRepositoryState(f.repo);
+  const f = fixture(), before = captureRepositoryState(f.repo), native = nativeReader({ ...f, candidate: f.commit });
   let artifacts = kind === "caller" ? f.repo : f.artifacts;
   if (kind === "shared") chmodSync(artifacts, 0o755);
   if (kind === "symlink") { artifacts = join(f.root, "artifact-alias"); symlinkSync(f.artifacts, artifacts); }
-  const { result, report } = invoke([command, "--repo", f.repo, "--source", f.commit, "--artifact-root", artifacts]);
+  const { result, report } = invoke([command, "--repo", f.repo, "--source", f.commit, "--artifact-root", artifacts], native.environment);
   expect(result.exitCode).toBe(2);
   expect(report.outcome).toBe("incomplete");
+  expect(report.diagnostics[0].message).toContain(kind === "caller" ? "owned resource overlaps" : "private artifact directory required");
+  expect(existsSync(native.trace)).toBe(false);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 

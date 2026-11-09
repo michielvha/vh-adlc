@@ -1,5 +1,10 @@
 import { createHash } from "node:crypto";
 
+function apiHostname(hostname: string): string {
+  const host = hostname.toLowerCase();
+  return host === "github.com" || host.endsWith(".ghe.com") ? "api." + host : host;
+}
+
 export function parsePage(raw: string, expected: { hostname: string; endpoint: string; page: number; repositoryId?: number; onNext?: (url: string) => void }): { items: unknown[]; next: number | null } {
   const split = raw.search(/\r?\n\r?\n/);
   if (split < 0) throw new Error("missing-response-headers");
@@ -17,7 +22,7 @@ export function parsePage(raw: string, expected: { hostname: string; endpoint: s
   }
   if (nextLinks.length > 1) throw new Error("ambiguous-next-page");
   if (!nextLinks.length) return { items, next: null };
-  const apiHost = expected.hostname === "github.com" ? "api.github.com" : expected.hostname;
+  const apiHost = apiHostname(expected.hostname);
   const base = new URL(`https://${apiHost}/${expected.endpoint}`), next = new URL(nextLinks[0]);
   const acceptedPaths = [base.pathname.toLowerCase()];
   const suffix = base.pathname.match(/^\/repos\/[^/]+\/[^/]+(\/.*)$/)?.[1];
@@ -47,7 +52,7 @@ export type ReadOptions = { inherit_env?: boolean; env?: Record<string, string |
 /** Fixed GET-only argv, shared without importing a mutation adapter or controller. */
 export function ghRead(hostname: string, endpoint: string, options: ReadOptions = {}) {
   if (!/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i.test(hostname)) throw Error("invalid-github-read-host");
-  const apiHost = hostname === "github.com" ? "api.github.com" : hostname;
+  const apiHost = apiHostname(hostname);
   const url = new URL(endpoint.startsWith("https://") ? endpoint : `https://${apiHost}/${endpoint}`);
   const path = url.pathname.replace(/^\/api\/v3\//, "/");
   if (url.protocol !== "https:" || url.hostname !== apiHost || url.port || url.username || url.password || url.hash ||

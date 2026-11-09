@@ -133,11 +133,11 @@ function authenticatedIdentity(repo: ReturnType<typeof contentsAccess>, hostname
 /** Observe contents access and the authenticated account without constructing an effect transport. */
 export function readNativeContext(options: {
   hostname: string; repository: string; credential: string; path?: string; timeout_ms?: number;
-}): { identity: PublicationIdentity; default_commit: string } {
+}): { identity: PublicationIdentity; default_commit: string; repository: ReturnType<typeof createRepositoryReader> } {
   const environment = nativeEnvironment(options), timeout = options.timeout_ms ?? 30000;
   const reader = createGitHubReader(options.hostname, { inherit_env: false, env: environment, timeout_ms: timeout });
-  const repository = contentsAccess(createRepositoryReader(reader, options.repository));
-  return { identity: authenticatedIdentity(repository, options.hostname, environment, timeout), default_commit: repository.head_sha };
+  const repository = createRepositoryReader(reader, options.repository), current = contentsAccess(repository);
+  return { identity: authenticatedIdentity(current, options.hostname, environment, timeout), default_commit: current.head_sha, repository };
 }
 
 /** Shared observation rules operate on the entry's explicitly selected read adapter. */

@@ -549,7 +549,12 @@ export function checkUpgradeSignals(options: { repo: string; source: string; ide
     selectedSettings = trial.candidate.settings;
     target = "candidate-trial";
   } else {
-    selectedPin = verifyRuntimeAdoption({ repo: options.repo, current_default: source, identity: options.identity }).component_pin;
+    const input = committedInput(options.repo, source, settings.publication.adoption_record);
+    if (!input || input.mode !== "100644") fail("committed adoption record missing");
+    const record = parseAdoptionRecord(input.bytes, { kind: "observed" });
+    // Consistency checks use only committed identity. Runtime selection still requires native identity.
+    selectedPin = verifyAdoptionRecord({ repo: options.repo, current_default: source,
+      identity: nativeIdentity(record.identity) }, { kind: "observed" }).component_pin;
     target = "adopted";
   }
   const input = committedInput(options.repo, source, componentSignalPath), clientInput = committedInput(options.repo, source, clientSignalPath);
