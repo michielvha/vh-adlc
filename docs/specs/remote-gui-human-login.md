@@ -226,6 +226,8 @@ Existing running sessions retain the executable and mode they started with until
 - [x] T10 `plugins/remote-gui/internal/browser/`, `tests/remote-gui/browser.e2e.test.ts`, `tests/remote-gui/package.test.ts`, `tests/remote-gui/package.json`, `tests/remote-gui/bun.lock`, `.github/workflows/ci.yml`, `tests/remote-gui/README.md` - add failing exact-tab-count and managed-dependency regressions, fix R-3 findings F-01/F-02, then pass the real phase/restoration and frozen-package checks (AC-02, AC-05, AC-06).
       Evidence: 2026-11-09, new tab-count and missing-package assertions failed against the previous runtime/package. The repair opens the connection page on the first launch, activates its restored tab through owned agent CDP, and focuses it before returning to human mode so lazy restoration can load it. The reviewer's three-cycle probe now reports one tab and one marker after every round trip, followed by stopped cleanup. The real viewer/package run passes 11 tests with locked Playwright core, and installed-copy override/PATH runs each pass both viewer cases. Final module race, vet, tidy and pinned lint pass, including private retry-state preservation after a failed marker focus. Browser tests now wait boundedly for guarded cleanup to reach a terminal state and retain its diagnostic on failure. Frozen Bun installation verifies the generated integrity lock. The manifest is discoverable through standard Renovate package matching, while updater activation on this repository remains unverified. Manual docs impact updates the test setup and keeps component usage consistent. R-3 remains verbatim and a new exact-commit review is required.
 
+- [ ] T11 `tests/remote-gui/browser.e2e.test.ts`, `tests/remote-gui/package.test.ts` - test and retain allowlisted runtime failure diagnostics without exposing access material, then pass the diagnostic and viewer regressions for R-4 F-03 (AC-03, AC-05).
+
 ## Open Questions
 
 None.
@@ -238,6 +240,7 @@ None.
 | 2026-11-09 | R-2 | spec | `4502d8d879e418e1e09e41b595ce345f463df808` | unknown | procedural | No findings; model identity unattested. |
 | 2026-11-09 | R-2 | spec | `4502d8d879e418e1e09e41b595ce345f463df808` | n/a | n/a | accepted by owner |
 | 2026-11-09 | R-3 | implementation | `f8761bda7810990c9ffe8375c925fe811c8738d2` | unknown | procedural | Criteria met with two should-fix findings for duplicate tabs and the CI tool pin. Model identity unattested. |
+| 2026-11-09 | R-4 | implementation | `1b49faf987404f3c76c33518eabf9845cd698639` | unknown | procedural | Previous findings resolved, all criteria met, with a test-diagnostics nit. Model identity unattested. |
 
 ### R-1
 
@@ -298,6 +301,40 @@ SEVERITY: should-fix
 WHERE: .github/workflows/ci.yml:117
 EVIDENCE: The new browser-verification setup installs playwright-core@1.64.1 through an inline npm command with no package manifest, lockfile or repository custom updater declaration for that pin. The pinned conventions/delivery.md requires every dependency to live in a supported discoverable manifest or an explicit custom manager and requires independently pinned download verification for executable tools. An inline version alone does not establish that delivery contract.
 PROPOSAL: Declare the browser-test tool in a supported dependency manifest with its generated lockfile and install it frozen in CI. Keep its pin discoverable by the selected dependency updater and report updater adoption separately when it has not been verified.
+
+
+### R-4
+
+CRITERION: AC-01 Authentication handoffs selected by the shared agent workflow start in the glossary-defined human mode, with a sandboxed browser, no browser-debugging interface and verified viewer/connection-page input restricted to the owner after the initial connection probe.
+VERDICT: met
+EVIDENCE: At 1b49faf987404f3c76c33518eabf9845cd698639, independently ran module race tests with real GUI checks and the noVNC fixtures from a clean installed copy archived from this commit. Human mode omitted automation/debugging switches and CDP metadata, and harmless marker input reached its owned browser. Inspected unchanged native human-mode selection and owner-input pause instructions, plus the retained native execution receipts and earlier live main-browser listener check. Viewer input restriction after the connection probe remains procedural.
+
+CRITERION: AC-02 After explicit owner confirmation, the same disposable session can transfer to verified agent control while retaining its sign-in state, viewer URL and expiry, and can return to human control for a later challenge.
+VERDICT: met
+EVIDENCE: At 1b49faf987404f3c76c33518eabf9845cd698639, independently executed the real human/agent/human fixture through the exact installed copy under both dependency configurations. Nonpersistent HttpOnly authentication, original-tab sessionStorage, three original tabs, one marker, viewer URL and expiry survived. In-memory-only state was lost and revocation returned 401 without changing the host-only readiness meaning. The separate three-cycle probe retained one tab and one marker on every cycle and cleaned to stopped. R-3's live Tailscale verification and supplied owner words "I am logged in" establish the earlier confirmed provider hand-back. That live session still runs the earlier t8 candidate, while this repair was verified through synthetic real-browser fixtures.
+
+CRITERION: AC-03 Repeated, concurrent and failed handoffs, foreign process identities, profile-lock failures, stop and expiry preserve unrelated processes and leave a truthful, recoverable lifecycle state without duplicate browsers or private-state leaks.
+VERDICT: met
+EVIDENCE: At 1b49faf987404f3c76c33518eabf9845cd698639, the independently executed module race suite passed all eight packages, including real component crash/expiry cleanup, foreign identities, concurrency, locks and transition failures. Inspected the new private retry-address regression and supervisor finalization, which hides CDP after failure. An independent real-browser negative probe deliberately removed its synthetic marker, observed browser-marker-tab-missing and handoff-failed status without CDP, restored the marker, retried successfully to ready human mode, then stopped with its profile deleted. The probe initially expected state inside the CLI error envelope, then was corrected to query status and rerun successfully. Bounded test cleanup preserves terminal-state checks and diagnostics. The earlier undiagnosed cleanup anomaly remains historical evidence.
+
+CRITERION: AC-04 The shared agent uses the glossary-defined phases and readiness meanings, distinguishes viewer readiness from provider acceptance, bounds initial-navigation retries and stops repeating rejected provider logins.
+VERDICT: met
+EVIDENCE: At 1b49faf987404f3c76c33518eabf9845cd698639, inspected unchanged canonical guidance and native fixture assertions against the retained phase-selection, configured-identity, unyielded-challenge, provider-rejection, unconfirmed-owner and navigation execution logs. Those receipts establish bounded retries, rendered checks, cleanup and preserved authentication ownership. The corrected rejected/unfinished cases passed after the fake interface honored null configured identity. This review did not invoke a new native model. Its independently executed revoked-login fixture confirmed that runtime readiness claims no provider authentication.
+
+CRITERION: AC-05 Existing agent-mode and service-sharing callers, old session records, owner-restricted transport, auth-refresh ownership and private cleanup retain their supported behavior.
+VERDICT: met
+EVIDENCE: At 1b49faf987404f3c76c33518eabf9845cd698639, independently executed module race tests, vet, tidy -diff and golangci-lint v2.15.0 config verify/run, all passed with zero lint issues. The nine package checks passed, and the exact installed copy passed both viewer cases under each dependency configuration. Reused directly inspected root Go and 1296-pass Bun evidence because root implementation was unchanged. Inspected retained service-sharing, native legacy routing and Chromium/Firefox trusted-HTTPS identity passes. One concurrent run using the supplied precommit binary failed reverse handoff without retaining its runtime diagnostic. The diagnostic-enhanced exact-source rerun and both clean installed-copy runs passed, so the cause remains undetermined. F-03 addresses that diagnostic loss. Published CI and full optional SSH/native-code browser coverage remain unverified.
+
+CRITERION: AC-06 The independently installed plugin exposes the reviewed runtime and instructions across isolated supported-host configurations, with documented version/update verification, and the owner completes Google/Tailscale sign-in in human mode followed by verified authorized access after hand-back.
+VERDICT: met
+EVIDENCE: At 1b49faf987404f3c76c33518eabf9845cd698639, independently built the committed module and archived a clean installed copy, whose offline wrapper and real viewer fixtures passed under executable overrides and PATH-discovered GUI tools. Chromium and noVNC paths remained explicit for the viewer driver. Inspected matching 0.2.0 manifests, current instructions and update guidance. A scratch frozen Bun install succeeded without changing the integrity lock, resolving R-3 F-02. The repeated-tab regression resolves R-3 F-01. The owner-confirmed Tailscale sign-in and independently observed restored admin access belong to the earlier t8 live candidate, with current repair behavior established by exact-source fixtures. Credential entry and individual Google identity-provider steps were not observed. No separate physical host, updater activation, Ubuntu CI, marketplace publication or installed-host rollout was established.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: tests/remote-gui/browser.e2e.test.ts:127
+EVIDENCE: During this review, a reverse handoff failed at line 197, but the CLI helper reduced its response to "runtime command failed: handoff". The response's diagnostic was discarded before finally stopped and deleted the disposable session. Exact-source reruns passed, so the missing diagnostic prevents attributing the original failure. The CLI itself supplies a useful diagnostic, as the deliberate missing-marker probe confirmed.
+PROPOSAL: Include only allowlisted result, state, diagnostic and cleanup_diagnostic fields in failed CLI assertions. Keep access codes, URLs, queries and raw stdout/stderr outside the failure report.
 
 
 ## Sources
