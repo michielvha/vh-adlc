@@ -233,6 +233,9 @@ func Load(root, id string) (Record, error) {
 	if err = dec.Decode(&r); err != nil || r.Version != 1 || r.ID != id || r.Owner != "remote-gui/v1" || r.Config.Home != root {
 		return r, errors.New("invalid session state")
 	}
+	if r.Kind == "browser" && r.Config.Mode() != "human" && r.Config.Mode() != "agent" {
+		return r, errors.New("invalid browser mode in session state")
+	}
 	return r, nil
 }
 
