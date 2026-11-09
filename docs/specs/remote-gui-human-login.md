@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Implementation and local verification passed independent review. Draft publication, CI and final owner delivery review follow."
+status_description: "Implementation reviewed and published in draft PR 63 with passing CI evidence. Final owner delivery review is pending."
 branch: feat/remote-gui-human-login
 issue: https://github.com/michielvha/vh-adlc/issues/60
 goal: "A remote owner can complete provider authentication in a human-controlled browser before explicitly returning the same disposable session to the agent."
@@ -43,7 +43,12 @@ After hand-back, read-only verification found the restored authenticated Tailsca
 the original connection tab and the same viewer URL and expiry.
 Independent implementation review now returns all six criteria met.
 It verified the duplicate-tab repair, frozen browser-test package and safe failure diagnostics.
-Published CI remains pending.
+Draft PR #63 contains the implementation.
+CI at `4d4d3b758aa1437587980dd90d34fe84adb2d0c6` passed on its third attempt after two GitHub release-download HTTP 504 failures.
+Linux reported 1296 passing tests and macOS reported 1122, both with zero failures.
+The remote-gui job passed its real-browser race checks and both noVNC fixtures on Ubuntu.
+Version calculation ran in dry-run mode.
+Later delivery checks are tracked with the PR. [Draft PR](https://github.com/michielvha/vh-adlc/pull/63), [CI evidence](https://github.com/michielvha/vh-adlc/actions/runs/42582682382).
 Earlier cleanup and reverse-handoff failures were retained, while their diagnostic and installed-copy reruns passed.
 Their original causes remain unconfirmed.
 On 2026-11-09, the owner selected human sign-in followed by explicit agent hand-back.
