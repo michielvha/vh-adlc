@@ -558,12 +558,13 @@ test("retained client setup snapshots caller-owned distribution bytes before awa
 test("retained client setup keeps its original paths and nested profile scope during asynchronous work", async () => {
   const f = await clientFixture({ format: "executable" }), other = realpathSync(mkdtempSync(join(tmpdir(), "vh-unused-runtime-")));
   roots.push(other); chmodSync(other, 0o700);
-  const setup = { ...f.setup, profile_scope: { ...profileScope,
+  const setup = { ...f.setup, client: { ...f.setup.client }, profile_scope: { ...profileScope,
     trial: { definition_sha256: "a".repeat(64), fixture_id: "00000000-0000-0000-0000-000000000001" } } };
-  const expected = { ...setup, profile_scope: structuredClone(setup.profile_scope) };
+  const expected = { ...setup, client: { ...setup.client }, profile_scope: structuredClone(setup.profile_scope) };
   const pending = bootstrap.retainClientDistribution(setup);
   setup.cache_directory = other; setup.client_id = "changed-client"; setup.executable = "changed-executable"; setup.format = "tar";
-  setup.client = { ...setup.client, version: "fixture-2.0.0" };
+  setup.client.version = "fixture-2.0.0"; setup.client.distribution_sha256 = "0".repeat(64);
+  setup.client = { ...setup.client, version: "fixture-3.0.0" };
   setup.profile_scope.actor_id += 1;
   setup.profile_scope.trial.definition_sha256 = "b".repeat(64);
   setup.profile_scope.trial.fixture_id = "00000000-0000-0000-0000-000000000002";
@@ -574,10 +575,20 @@ test("retained client setup keeps its original paths and nested profile scope du
   expect((await bootstrap.inspectRetainedClient(expected)).profile_directory).toBe(selected.profile_directory);
 });
 
+test.each(["array-buffer", "data-view", "array"] as const)("retained setup refuses untyped %s distribution input before selection", async kind => {
+  const f = await clientFixture({ format: "executable" }), bytes = Uint8Array.from(f.setup.distribution), input = { ...f.setup };
+  const invalid = kind === "array-buffer" ? bytes.buffer : kind === "data-view" ? new DataView(bytes.buffer) : Array.from(bytes);
+  Reflect.set(input, "distribution", invalid);
+  await expect(bootstrap.retainClientDistribution(input)).rejects.toThrow("client distribution checksum");
+  expect(existsSync(f.index)).toBe(false);
+});
+
 test("retained client inspection preserves the original client ID while awaiting", async () => {
   const f = await clientFixture(); await bootstrap.retainClientDistribution(f.setup);
-  const input = { ...f.setup }, pending = bootstrap.inspectRetainedClient(input);
+  const input = { ...f.setup, client: { ...f.setup.client } }, pending = bootstrap.inspectRetainedClient(input);
   input.client_id = "changed-client";
+  input.client.version = "fixture-2.0.0"; input.client.distribution_sha256 = "0".repeat(64);
   const selected = await pending;
   expect(selected.client_id).toBe(f.setup.client_id);
+  expect(selected.client).toEqual(f.setup.client);
 });

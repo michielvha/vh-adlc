@@ -279,8 +279,8 @@ export async function retainClientDistribution(input: {
   const options = { ...input, client: parseClientBinding(input.client), profile_scope: structuredClone(input.profile_scope) };
   const client = options.client, paths = clientPaths(options.cache_directory, options.client_id, client, options.profile_scope, options.consumer_repo);
   const executable = protocolPath(options.executable);
-  if (options.distribution.byteLength > clientArchiveLimit) fail("client distribution checksum");
-  options.distribution = Buffer.from(options.distribution);
+  if (!(options.distribution instanceof Uint8Array) || options.distribution.byteLength > clientArchiveLimit) fail("client distribution checksum");
+  options.distribution = new Uint8Array(options.distribution);
   const files = await clientFiles(options.distribution, client, options.format, executable);
   privateRuntimeDirectory(dirname(paths.index), true); privateRuntimeDirectory(paths.profile, true);
   async function selectedClient() {
