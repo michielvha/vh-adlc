@@ -177,6 +177,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-09 | R-1 | spec | `8ff685a1883330fd0d50536c79788eae4cc0399f` | claude-opus-5-5 | procedural | Blocking startup-restore and stale Chromium lock gaps plus ten should-fix and nit findings. |
+| 2026-11-09 | R-2 | spec | `4891dcc7d97e9c725fbef93c83a7413f59321aa8` | claude-opus-5-5 | procedural | Blocking crash-restored session cookies plus eight should-fix and one nit finding. |
 
 ### R-1
 
@@ -263,6 +264,78 @@ SEVERITY: nit
 WHERE: Design (Compatibility, Storage, Sign-in), AC-05, AC-10
 EVIDENCE: Compatibility (line 111) says a profile adds only an optional `profile` field to new records, but line 101 also records `--agent-start-approved` on the session record. The `meta.json` field list (line 80) omits the holder session ID and supervisor identity (line 90) and the idle period (line 97). AC-10 says cleanup "keep[s] [its] behavior" while AC-06 changes it. AC-05 says "no profile path follows a symlink", yet Chromium creates its own `SingletonLock`, `SingletonSocket` and `SingletonCookie` symlinks inside the user data directory.
 PROPOSAL: Make the record and `meta.json` field lists complete, limit AC-10 to unchanged behavior outside profiles, and scope AC-05 to the store's own paths (store root, profile directory, `meta.json`, `.lock`, `chromium/`).
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Lifecycle), AC-03, AC-05, Test Plan, Context (Owner summary)
+EVIDENCE: Design line 101 says that on a session's first launch "the previous session's tabs and session-only cookies do not" carry over, because remote-gui sets the startup preference to the New Tab page and drops `--restore-last-session`. The owner summary (line 27) and AC-03 state the same thing with no condition. Chromium also restores old session cookies after a crash, whatever the startup preference says. In chromium/src main, chrome/browser/profiles/profile_impl.cc, `ProfileImpl::ShouldRestoreOldSessionCookies()` returns `ExitTypeService::GetLastSessionExitType(this) == ExitType::kCrashed || startup_pref.ShouldRestoreLastSession()`, and `ShouldPersistSessionCookies()` returns true. chrome/browser/sessions/exit_type_service.cc writes `profile.exit_type` = "Crashed" when the profile opens and only replaces it on a clean exit. The design produces non-graceful ends on purpose: a SIGKILLed Chromium (AC-05), and "A browser that does not close in time is terminated" (line 103). After either one, the next session inherits the previous session's session-only cookies, which are often the provider's actual sign-in cookies. Removing `Default/Sessions` stops tab restore but has no effect on cookies. The AC-03 row covers only the graceful stop path, and the AC-05 row checks only that the new session reaches ready. Both can pass while AC-03 is false after a crash.
+PROPOSAL: Before each session's first launch, make the Preferences merge also set `profile.exit_type` to "Normal", or delete non-persistent cookies from `chromium/Default/Cookies`. Cite the Chromium source. Extend the AC-05 real-browser test to set a session-only cookie before the SIGKILL and assert that the fixture does not see it in the next session.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Lifecycle), AC-02, AC-14
+EVIDENCE: Line 103 has stop and expiry wait up to eight seconds for a graceful Chromium close and then "stop the remaining children as today" (another 3 seconds, browser.go:230-244). That close would run in the supervisor's deferred `bundle.Stop()` (daemon.go:419-421). On a stop or expiry the guard sends SIGTERM to the supervisor and SIGKILLs it after 5 seconds (daemon.go:304-318). Its `finish` then calls `stopMembers`, which SIGTERMs every group member, Chromium included, and SIGKILLs any member still alive after about 300 ms (daemon.go:88-118). The `stop` command polls for only 10 seconds and then fails with `session-cleanup-pending` (session.go:302-313). A close that takes more than about 5 seconds therefore ends in a SIGKILL, which triggers F-01. A close near the full budget also makes `stop` report a failure, contrary to line 103's claim that `stop` behaves as today.
+PROPOSAL: Fit the graceful close inside the guard's supervisor deadline and the `stop` wait, or extend those deadlines for profile sessions, and state the numbers in Design. Add a test in which Chromium closes slowly, asserting that `stop` reports `stopped` and that the next session sees a clean exit.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Commands), AC-06, Test Plan
+EVIDENCE: Line 72 says an owner or transport mismatch "fails with `profile-owner-mismatch` before the session record is created", and AC-06 says "no record or process is created". The CLI does not know the Tailscale owner today. `session.Start` takes only the optional `--owner-login` (config.go:60, session.go:131-170). The resolved login comes from `client.ResolveOwner` in the supervisor's `serve` (daemon.go:441-445), and that runs after `BrowserLauncher` has already started Chromium (daemon.go:415). Design names no CLI-side resolution, and it never requires the supervisor's resolved owner to match the profile owner before the viewer is served. If the check is placed where the owner is known today, the signed-in profile opens in Chromium before the check. If the CLI resolves the owner and the supervisor resolves it again, the two results can differ. The AC-06 proof uses only unit tests with injected owner logins, so it cannot catch either ordering.
+PROPOSAL: Specify that the CLI resolves the owner through the same LocalAPI check before it locks the profile, and that the supervisor refuses to launch Chromium unless its own resolved owner equals the profile owner. Add a CLI-level AC-06 test against a fake LocalAPI with no `--owner-login`.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Commands), AC-10, Test Plan
+EVIDENCE: Line 74 has `profile delete` take the profile lock and remove the directory, refusing only "while a session holds it". The lock belongs to the guard (line 95), and Background line 40 notes that Chromium can outlive its controllers. When the guard is SIGKILLed while Chromium keeps running (the AC-05 setup), the lock is free, so delete removes `chromium/` from under a live browser that is still writing to it. Only `start` runs the `SingletonLock` check (line 97). The design also does not say what happens to a `start` that opened `.lock` before delete unlinked it and acquires that orphaned inode afterwards.
+PROPOSAL: Have `profile delete` run the same singleton check and refuse with `profile-browser-still-running`, and have `start` confirm after locking that its `.lock` is still the file at the profile path. Add both cases to the AC-10 row.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Single writer, Commands), AC-04, Test Plan
+EVIDENCE: Line 95 has the CLI lock the profile before it creates the session record. The session ID only exists after `state.New` (session.go:150), and the guard identity only after the guard starts (session.go:172). Until the winner writes them to `meta.json`, a concurrent loser finds no current holder there. The AC-04 row still requires the loser's `profile-in-use` to name "the first session's ID". Line 73 also says `profile list` shows `in_use`, but not how it decides that. A probe that briefly takes the lock would make a concurrent `start` fail with a stale or empty holder.
+PROPOSAL: Define when the holder ID is written and what the loser reports before it exists, for example `profile-in-use` with `holder: starting`, and say that `profile list` checks the lock without holding it in a way that can refuse a start. Make the AC-04 proof match.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Single writer), Test Plan (AC-05)
+EVIDENCE: Line 97 clears singleton files only when the hostname is this host's. In every other case the start fails with `profile-browser-still-running`, "and the owner stops that browser". When the host has been renamed, or the profile was copied or reached from another machine, no browser exists to stop. The only way out is `profile delete`, which loses the sign-ins. The AC-05 row lists "a foreign hostname" next to the recovery cases (dead PID, unrelated live PID) without giving its expected outcome, so the test can assert either result.
+PROPOSAL: Give a foreign-host lock its own diagnostic and a documented owner recovery, and state in the AC-05 row which outcome each unit case expects.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, Test Plan
+EVIDENCE: Several Design behaviors have no criterion or proof: `profile-home-required` and the `REMOTE_GUI_PROFILE_HOME` / `--profile-home` override (line 79), where `profile list` and `profile delete` look for the store when only `--home` is set, and the graceful close on expiry (line 103, a Scope item at line 51). The AC-03 row exercises only an explicit `stop`. Existing fixtures set `REMOTE_GUI_HOME` (tests/remote-gui/native-routing.e2e.test.ts:49), so the AC-11 routing scenarios hit `profile-home-required` unless they also set a profile home, and the Test Plan does not say that they do.
+PROPOSAL: Add a criterion and CLI tests for `profile-home-required` and the override, an expiry variant of the AC-03 real-browser test, and a note that the routing fixtures set a profile home.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Sign-in and hand-back, Working with auth-refresh), AC-11, AC-13
+EVIDENCE: The goal says the owner "can opt in to a named browser profile", but Design never says when the skill may pass `--profile` or create a new profile. It covers only `--agent-start-approved` (line 111) and identities owned by auth-refresh (line 115). An agent could open or create any profile on its own initiative. Also, the current skill tells agents "Never delete locks, force a competing launch" (plugins/remote-gui/skills/remote-gui/SKILL.md:53). Design now has remote-gui remove stale Chromium singleton files on its own (line 97), and does not say how the skill's wording changes.
+PROPOSAL: State that the skill uses `--profile <name>` only for a profile the owner named in the current task or in persistent instructions, add that to AC-11 and its routing fixtures, and say how the skill's lock wording changes.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions, Context (Owner summary)
+EVIDENCE: Open Questions says "None.", and line 29 says the owner answered "the original four questions and the review R-1 questions" without saying what they were. R-1 F-10 asked the author to record which answer settled each trade-off, and that is still missing. Only the choices of no retention and no auth-refresh path checks are attributed to the owner. This revision settles further trade-offs: automatic removal of stale Chromium singleton files (line 97), the eight-second close budget (line 103), `profile-home-required` instead of a derived location (line 79), refusing a profile last opened by a newer Chromium (line 104), a human-mode default with a per-session `--agent-start-approved` flag (line 109), and refusing a foreign-host lock (line 97). The standard says every trade-off the document settles is an open question.
+PROPOSAL: Note beside each settled choice the owner answer that decided it, and raise any that no answer covers as open questions before acceptance.
+
+FINDING: F-10
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Single writer, Lifecycle), Sources
+EVIDENCE: Several claims about Chromium internals have no citation: that `SingletonLock` is a symlink to `<hostname>-<pid>` (line 97), that the saved session lives in `chromium/Default/Sessions` (line 101), and the behavior of the `restore_on_startup` values (lines 101-102). Sources lists only S1 and a page that returned 503. The standard requires Design claims to be cited and Sources to list every external page read.
+PROPOSAL: Cite the Chromium sources, for example process_singleton_posix.cc for the lock format, plus profile_impl.cc and exit_type_service.cc for F-01, and add them to Sources.
 
 ## Sources
 
