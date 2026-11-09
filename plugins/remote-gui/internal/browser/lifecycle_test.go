@@ -75,6 +75,35 @@ func TestHandoffRetainsLockedProfile(t *testing.T) {
 	}
 }
 
+func TestFailedMarkerFocusRetainsPrivateControlForRetry(t *testing.T) {
+	c, id := setup(t)
+	command := exec.Command("sleep", "30")
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = command.Wait(); close(done) }()
+	defer func() { _ = command.Process.Kill(); <-done }()
+	identity, err := state.Inspect(command.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chrome := &child{role: "browser", identity: identity, done: done}
+	r := &runtime{home: c.Home, id: id, chrome: chrome, children: []*child{chrome}, modeReady: true}
+	r.current.BrowserMode, r.current.CDPAddress = "agent", "http://127.0.0.1:1"
+	if err = state.Update(context.Background(), c.Home, id, func(record *state.Record) {
+		record.Owned = []state.Process{{Role: "browser", Identity: identity}}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = r.handoff(context.Background(), "human"); err == nil {
+		t.Fatal("unverified marker focus reported successful handoff")
+	}
+	if r.current.CDPAddress == "" || !state.Alive(identity) || !r.healthy() {
+		t.Fatal("failed marker focus lost the owned browser's retry state")
+	}
+}
+
 func TestHandoffRejectsForeignBrowserIdentity(t *testing.T) {
 	c, id := setup(t)
 	self, err := state.Inspect(os.Getpid())

@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "Owner approved publishing the claim and preparing a draft PR. Implementing browser phases and their regression checks."
+status_description: "Live owner sign-in passed. Independent review findings are repaired and await re-review before draft publication."
 branch: feat/remote-gui-human-login
 issue: https://github.com/michielvha/vh-adlc/issues/60
 goal: "A remote owner can complete provider authentication in a human-controlled browser before explicitly returning the same disposable session to the agent."
@@ -41,7 +41,9 @@ The shared skill now selects human sign-in and preserves the owner's pause.
 The owner completed the live Tailscale sign-in and confirmed completion on 2026-11-09.
 After hand-back, read-only verification found the restored authenticated Tailscale Machines page,
 the original connection tab and the same viewer URL and expiry.
-Independent implementation review and published CI remain pending.
+The first implementation review found duplicate connection tabs and an unmanaged CI tool pin.
+Their repairs pass local regressions and await independent re-review.
+Published CI remains pending.
 On 2026-11-09, the owner selected human sign-in followed by explicit agent hand-back.
 Native browser session restoration retains session cookies and tab storage inside the protected disposable profile until its existing expiry and cleanup.
 This adds profile-local persistence of that state during the session.
@@ -221,7 +223,8 @@ Existing running sessions retain the executable and mode they started with until
 - [x] T9 `docs/specs/remote-gui-human-login.md`, `plugins/remote-gui/skills/remote-gui/SKILL.md`, `tests/remote-gui/` - finish missing tab-state/revoked-login fixtures and status-routing clarification, run required Go/Bun/lint/build checks and installed-package fixtures under both dependency configurations, then record owner sign-in/hand-back and unavailable checks (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06).
       Evidence: 2026-11-09, root Go tests/vet/tidy and both modules' pinned lint pass; root Bun reports 1296 pass and zero fail. Real browser race, noVNC, service-sharing and installed-copy fixtures pass, with failed artifacts preserved. The 12-case native batch reports 11 pass and one synthetic owning-workflow failure, followed by a corrected two-case rejected/unfinished-login rerun with 2 pass. The owner completed live sign-in, then the candidate's hand-back preserved authenticated Tailscale admin access. Private receipts retain safe booleans and paths without cookies, provider credentials or policy contents. Manual documentation impact confirms the skill, component README and test guide describe the behavior. Ubuntu CI, an independent physical-machine check and installed-host rollout remain distinct pending observations.
 
-- [ ] T10 `plugins/remote-gui/internal/browser/`, `tests/remote-gui/browser.e2e.test.ts`, `tests/remote-gui/package.test.ts`, `tests/remote-gui/package.json`, `tests/remote-gui/bun.lock`, `.github/workflows/ci.yml`, `tests/remote-gui/README.md` - add failing exact-tab-count and managed-dependency regressions, fix R-3 findings F-01/F-02, then pass the real phase/restoration and frozen-package checks (AC-02, AC-05, AC-06).
+- [x] T10 `plugins/remote-gui/internal/browser/`, `tests/remote-gui/browser.e2e.test.ts`, `tests/remote-gui/package.test.ts`, `tests/remote-gui/package.json`, `tests/remote-gui/bun.lock`, `.github/workflows/ci.yml`, `tests/remote-gui/README.md` - add failing exact-tab-count and managed-dependency regressions, fix R-3 findings F-01/F-02, then pass the real phase/restoration and frozen-package checks (AC-02, AC-05, AC-06).
+      Evidence: 2026-11-09, new tab-count and missing-package assertions failed against the previous runtime/package. The repair opens the connection page on the first launch, activates its restored tab through owned agent CDP, and focuses it before returning to human mode so lazy restoration can load it. The reviewer's three-cycle probe now reports one tab and one marker after every round trip, followed by stopped cleanup. The real viewer/package run passes 11 tests with locked Playwright core, and installed-copy override/PATH runs each pass both viewer cases. Final module race, vet, tidy and pinned lint pass, including private retry-state preservation after a failed marker focus. Browser tests now wait boundedly for guarded cleanup to reach a terminal state and retain its diagnostic on failure. Frozen Bun installation verifies the generated integrity lock. The manifest is discoverable through standard Renovate package matching, while updater activation on this repository remains unverified. Manual docs impact updates the test setup and keeps component usage consistent. R-3 remains verbatim and a new exact-commit review is required.
 
 ## Open Questions
 
@@ -305,3 +308,8 @@ PROPOSAL: Declare the browser-test tool in a supported dependency manifest with 
 - [S4. Chromium startup restoration](https://chromium.googlesource.com/chromium/src/+/HEAD/components/policy/resources/templates/policy_definitions/Startup/RestoreOnStartup.yaml) describes native last-session restoration and session-cookie retention.
 - [S5. Session cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) describes their shutdown and session-restoration behavior.
 - [S6. Session storage](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage) describes tab-scoped state and page-session lifetime.
+- [S7. Chrome keyboard shortcuts](https://support.google.com/chrome/answer/2391819) documents the Linux native Exit menu sequence used by the owned viewer.
+- [S8. Ubuntu runner image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md) lists the preinstalled Google Chrome used by the real-browser CI job.
+- [S9. Playwright CI](https://playwright.dev/docs/ci) describes browser and system-dependency setup for CI execution.
+- [S10. Bun install](https://bun.sh/docs/pm/cli/install) documents frozen-lockfile installation and script controls.
+- [S11. Renovate package matching](https://docs.renovatebot.com/modules/manager/npm/) documents package.json discovery and devDependency extraction. This supports manifest discoverability, while repository updater activation remains unverified.

@@ -4,6 +4,13 @@
 
 For the browser cases, build the plugin's CLI and set `REMOTE_GUI_TEST_BINARY` to that output. Point `REMOTE_GUI_PLAYWRIGHT_MODULE` to an existing matching Playwright installation, and set `REMOTE_GUI_CHROMIUM` and `REMOTE_GUI_FIREFOX` to its existing browser executables. The GUI test also needs the `REMOTE_GUI_XVFB`, `REMOTE_GUI_XAUTH`, `REMOTE_GUI_X11VNC`, `REMOTE_GUI_WEBSOCKIFY` and `REMOTE_GUI_NOVNC` paths documented in the plugin README.
 
+Contributors can use the test package's locked Playwright dependency from the repository root.
+
+```sh
+bun install --cwd tests/remote-gui --frozen-lockfile --ignore-scripts
+export REMOTE_GUI_PLAYWRIGHT_MODULE="$PWD/tests/remote-gui/node_modules/playwright-core"
+```
+
 ```sh
 REMOTE_GUI_VIEWER_E2E=1 bun test tests/remote-gui
 ```
@@ -20,7 +27,7 @@ REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser -count=1
 
 These checks kill only recorded process identities through pidfds. They verify closed viewer sockets, dead owned processes and private-session descendants, and deleted profiles. Loss of the guard exercises the documented next-lifecycle cleanup path.
 
-Ubuntu CI runs the real browser lifecycle and noVNC fixtures with the runner's sandboxed Google Chrome, distribution GUI tools and pinned Playwright core 1.64.1. Browser tests remain opt-in locally. The runtime itself never installs these tools.
+Ubuntu CI runs the real browser lifecycle and noVNC fixtures with the runner's sandboxed Google Chrome, distribution GUI tools and the locked Playwright core package. Browser tests remain opt-in locally. The runtime itself never installs these tools.
 
 The bounded native cases require an existing signed-in Copilot CLI. `REMOTE_GUI_NATIVE_CLI` can select that executable. They load the plugin through its native `--plugin-dir` option and the persistent remote-mode instruction, with isolated native state and shell/write tools denied:
 

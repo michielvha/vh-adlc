@@ -7,6 +7,17 @@ import {createRequire} from 'node:module';
 const enabled=process.env.REMOTE_GUI_VIEWER_E2E==='1';
 const check=(condition:unknown,message:string)=>{if(!condition)throw Error(message)};
 
+async function stopBrowser(cli: (...args: string[]) => any, id: string) {
+ let stopped = cli('stop', id);
+ const deadline = Date.now() + 10000;
+ while (['stopping', 'cleanup-pending'].includes(stopped.state) && Date.now() < deadline) {
+  await Bun.sleep(100);
+  stopped = cli('status', id);
+ }
+ check(['stopped', 'failed'].includes(stopped.state), 'owned browser cleanup incomplete: ' + stopped.state + ' ' + (stopped.cleanup_diagnostic || stopped.diagnostic || ''));
+ return stopped;
+}
+
 test.skipIf(!enabled)('real noVNC keyboard input survives exact-browser reattachment',async()=>{
  const require=createRequire(import.meta.url);
  const {chromium}=require(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE!);
@@ -49,7 +60,7 @@ test.skipIf(!enabled)('real noVNC keyboard input survives exact-browser reattach
   check(resumed,'original marker absent after reattachment');
   check(await resumed.getByLabel('Connection check').inputValue()===input,'viewer input did not reach exact browser');
   await agent.close();agent=undefined;
-  cli('stop',second.id);
+  await stopBrowser(cli, second.id);
   check(!existsSync(join(root,second.id,'profile')),'stopped browser profile survived');
   check(cli('status',first.id).state==='ready','stopping another browser broke this session');
   agent=await chromium.connectOverCDP(first.local_cdp,{timeout:10000});
@@ -57,7 +68,7 @@ test.skipIf(!enabled)('real noVNC keyboard input survives exact-browser reattach
  }finally{
   if(agent)await agent.close();if(viewer)await viewer.close();
   let safe=true;
-  for(const session of sessions){try{const stopped=cli('stop',session.id);if(stopped.state==='cleanup-pending')safe=false}catch{safe=false}}
+  for(const session of sessions){try{await stopBrowser(cli,session.id)}catch{safe=false}}
   if(safe)rmSync(root,{recursive:true,force:true});
   else throw Error('owned browser cleanup pending; private test records retained');
  }
@@ -167,6 +178,8 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   check(returned.browser_mode === 'agent' && returned.local_cdp, 'agent hand-back did not establish control');
   check(returned.url === session.url && returned.expires_at === session.expires_at, 'handoff changed viewer or lifetime');
   agent = await chromium.connectOverCDP(returned.local_cdp, {timeout: 10000});
+  check(agent.contexts()[0].pages().length === 3, 'handoff added tabs instead of restoring the original three');
+  check(agent.contexts()[0].pages().filter((candidate: any) => candidate.url() === session.marker_url).length === 1, 'handoff duplicated the connection tab');
   const account = agent.contexts()[0].pages().find((candidate: any) => candidate.url() === fixture.url.href + 'account');
   check(account, 'original fixture tab was not restored');
   await account.bringToFront();
@@ -193,6 +206,8 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   const lostLogin = cli('handoff', session.id, '--browser-mode', 'agent');
   check(lostLogin.state === 'ready' && lostLogin.readiness_scope === 'host-transport-only' && lostLogin.app_verification === 'not-attested', 'transport readiness claimed provider authentication');
   agent = await chromium.connectOverCDP(lostLogin.local_cdp, {timeout: 10000});
+  check(agent.contexts()[0].pages().length === 3, 'repeated handoffs changed the original tab count');
+  check(agent.contexts()[0].pages().filter((candidate: any) => candidate.url() === session.marker_url).length === 1, 'repeated handoffs duplicated the connection tab');
   const revokedAccount = agent.contexts()[0].pages().find((candidate: any) => candidate.url() === fixture.url.href + 'account');
   check(revokedAccount, 'original account tab absent after revocation');
   const denied = await revokedAccount.reload({waitUntil: 'domcontentloaded'});
@@ -202,8 +217,7 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   if (viewer) await viewer.close();
   fixture.stop(true);
   if (session) {
-   const stopped = cli('stop', session.id);
-   check(stopped.state === 'stopped' || stopped.state === 'failed', 'owned browser cleanup pending; private records retained');
+   await stopBrowser(cli, session.id);
    check(!existsSync(join(root, session.id, 'profile')), 'owned browser profile survived cleanup');
   }
   rmSync(root, {recursive: true, force: true});

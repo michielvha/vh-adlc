@@ -33,7 +33,10 @@ func browserArgs(profile, marker, mode string) []string {
 	if mode == "agent" {
 		args = append(args, "--enable-automation", "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0")
 	}
-	return append(args, marker)
+	if marker != "" {
+		args = append(args, marker)
+	}
+	return args
 }
 
 func validateBrowser(identity state.Identity, mode string) error {
@@ -113,9 +116,13 @@ func (r *runtime) handoff(ctx context.Context, mode string) (session.BrowserHand
 	// A later owner-completed close is expected after a failed transition.
 	// Keep the viewer/profile available until retry, explicit stop or expiry.
 	r.modeReady = false
-	r.current.CDPAddress = ""
 	if r.chrome != nil {
 		if state.Alive(r.chrome.identity) {
+			if r.current.CDPAddress != "" {
+				if err = r.focusMarker(ctx, r.current.CDPAddress); err != nil {
+					return r.snapshot(), err
+				}
+			}
 			if err = r.quitBrowser(ctx); err != nil {
 				return r.snapshot(), err
 			}
@@ -143,6 +150,50 @@ func (r *runtime) handoff(ctx context.Context, mode string) (session.BrowserHand
 		return r.snapshot(), err
 	}
 	return handle, nil
+}
+
+// Activate the restored connection tab so Chromium loads it before readiness or exit.
+func (r *runtime) focusMarker(ctx context.Context, address string) error {
+	if r.chrome == nil || !session.OwnsListener(address, r.chrome.identity) {
+		return errors.New("browser-control-ownership-changed")
+	}
+	transport := &http.Transport{Proxy: nil}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, Timeout: time.Second}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address+"/json/list", nil)
+	if err != nil {
+		return errors.New("browser-page-list-unavailable")
+	}
+	reply, err := client.Do(req)
+	if err != nil {
+		return errors.New("browser-page-list-unavailable")
+	}
+	defer func() { _ = reply.Body.Close() }()
+	var pages []struct {
+		ID, Title, URL string
+	}
+	if reply.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(reply.Body, 1<<20)).Decode(&pages) != nil {
+		return errors.New("invalid-browser-page-list")
+	}
+	for _, page := range pages {
+		if page.URL != r.current.MarkerURL {
+			continue
+		}
+		req, err = http.NewRequestWithContext(ctx, http.MethodGet, address+"/json/activate/"+page.ID, nil)
+		if err != nil {
+			return errors.New("browser-marker-activation-unavailable")
+		}
+		activated, err := client.Do(req)
+		if err != nil {
+			return errors.New("browser-marker-activation-unavailable")
+		}
+		_ = activated.Body.Close()
+		if activated.StatusCode == http.StatusOK && page.Title == r.current.Marker && r.loaded.Load() {
+			return nil
+		}
+		return errors.New("browser-marker-loading")
+	}
+	return errors.New("browser-marker-tab-missing")
 }
 
 // The connection page reports only probe booleans, never text typed by the owner.

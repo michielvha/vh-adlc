@@ -64,6 +64,16 @@ test('real browser phase and session continuity checks run in CI', () => {
  expect(ci).toContain('tests/remote-gui/browser.e2e.test.ts');
 });
 
+test('browser test dependency is locked in its managed package', () => {
+ const manifest = JSON.parse(read('tests/remote-gui/package.json'));
+ expect(manifest.private).toBe(true);
+ expect(manifest.devDependencies['playwright-core']).toMatch(/^\d+\.\d+\.\d+$/);
+ expect(read('tests/remote-gui/bun.lock')).toContain('playwright-core@' + manifest.devDependencies['playwright-core']);
+ const ci = read('.github/workflows/ci.yml');
+ expect(ci).toContain('bun install --cwd tests/remote-gui --frozen-lockfile --ignore-scripts');
+ expect(ci).not.toContain('npm install --prefix');
+});
+
 test('unsupported source-build hosts get a platform diagnostic before compiling',()=>{
  const root=mkdtempSync(join(tmpdir(),'rg-platform-'));
  try{

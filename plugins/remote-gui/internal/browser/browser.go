@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -409,14 +408,18 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 
 func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandle, error) {
 	var empty session.BrowserHandle
-	r.generation.Add(1)
+	generation := r.generation.Add(1)
 	r.loaded.Store(false)
 	r.modeReady = false
 	r.current.CDPAddress = ""
 	if err := os.Remove(filepath.Join(r.profile, "DevToolsActivePort")); err != nil && !os.IsNotExist(err) {
 		return empty, errors.New("stale-browser-control-file-unavailable")
 	}
-	chrome, err := r.spawn("browser", app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser"), browserArgs(r.profile, r.current.MarkerURL, mode), r.env)
+	initialURL := ""
+	if generation == 1 {
+		initialURL = r.current.MarkerURL
+	}
+	chrome, err := r.spawn("browser", app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser"), browserArgs(r.profile, initialURL, mode), r.env)
 	if err != nil {
 		return empty, err
 	}
@@ -431,10 +434,7 @@ func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandl
 		return r.snapshot(), nil
 	}
 	var cdp string
-	markerCreated := false
 	cdpReason := "active-port-file-unavailable"
-	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: time.Second}
-	defer client.Transport.(*http.Transport).CloseIdleConnections()
 	if err = r.wait(ctx, "cdp", func() bool {
 		name := filepath.Join(r.profile, "DevToolsActivePort")
 		info, e := os.Lstat(name)
@@ -465,53 +465,11 @@ func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandl
 			cdpReason = "browser-launch-protection-unverified"
 			return false
 		}
-		if !markerCreated {
-			create, e := http.NewRequestWithContext(ctx, http.MethodPut, address+"/json/new?"+r.current.MarkerURL, nil)
-			if e == nil {
-				reply, e := client.Do(create)
-				if e == nil {
-					_ = reply.Body.Close()
-					if reply.StatusCode == 200 {
-						markerCreated = true
-					}
-				}
-			}
-		}
-		cdpReason = "marker-page-unavailable"
-		req, e := http.NewRequestWithContext(ctx, http.MethodGet, address+"/json/list", nil)
-		if e != nil {
-			return false
-		}
-		reply, e := client.Do(req)
-		if e != nil {
-			return false
-		}
-		defer func() { _ = reply.Body.Close() }()
-		var pages []struct {
-			Title string
-			URL   string
-			Type  string
-		}
-		if reply.StatusCode != 200 {
-			cdpReason = "cdp-http-status-" + strconv.Itoa(reply.StatusCode)
-			return false
-		}
-		if json.NewDecoder(io.LimitReader(reply.Body, 1<<20)).Decode(&pages) != nil {
-			cdpReason = "invalid-cdp-page-list"
-			return false
-		}
-		cdpReason = "marker-not-among-" + strconv.Itoa(len(pages)) + "-pages"
-		for _, p := range pages {
-			if p.URL == r.current.MarkerURL {
-				cdpReason = "marker-uri-title-pending"
-			}
-			if strings.HasPrefix(p.URL, "chrome:") {
-				cdpReason = "browser-startup-page-pending"
-			}
-			if p.Title == r.current.Marker && p.URL == r.current.MarkerURL && r.loaded.Load() {
-				cdp = address
-				return true
-			}
+		if e := r.focusMarker(ctx, address); e != nil {
+			cdpReason = e.Error()
+		} else {
+			cdp = address
+			return true
 		}
 		return false
 	}); err != nil {
