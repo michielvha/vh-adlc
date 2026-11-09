@@ -19,8 +19,9 @@ export function commit(repo: string, message: string) {
   readGit(repo, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", message);
   return readGit(repo, "rev-parse", "HEAD").toString().trim();
 }
-export function source(roots: string[], options: { pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"]; hostname?: string } = {}) {
+export function source(roots: string[], options: { pin?: ReturnType<typeof pin>; client?: ReturnType<typeof settingsFixture>["clients"]["copilot-linux"]; hostname?: string; bounded?: boolean } = {}) {
   const f = publicationFixture(roots), settings = { ...settingsFixture(),
+    ...(options.bounded ? { verification_commands: [], generation_commands: [], read_set: { source_roots: ["src"], reference_roots: ["references"] } } : {}),
     component_pin: ".vh-adlc/docs-drift-components/shared.yaml", publication: { ...settingsFixture().publication, mode: "adopted" },
     reports: { ...settingsFixture().reports, workflow_id: 19 } };
   if (options.client) settings.clients["copilot-linux"] = options.client;

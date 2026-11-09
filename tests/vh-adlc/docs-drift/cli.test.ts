@@ -294,7 +294,7 @@ test.each([
   expect(report.diagnostics.length).toBeGreaterThan(0);
 });
 
-test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
+test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
   const f = fixture(), before = captureRepositoryState(f.repo), native = nativeReader({ ...f, candidate: f.commit });
   let artifacts = kind === "caller" ? f.repo : f.artifacts;
   if (kind === "shared") chmodSync(artifacts, 0o755);
@@ -351,8 +351,8 @@ process.exit(child.exitCode);
 });
 
 
-test.each(["matching", "actor", "rollback", "changed-source", "settings", "cache", "cache-in-candidate", "credential", "caller-missing", "caller-symlink"])("normal publication input collection binds current production policy %s", async fault => {
-  const f = await runtimeFixture(roots, true), selected = f.selection;
+test.each(["matching", "disjoint-advance", "actor", "rollback", "changed-source", "settings", "cache", "cache-in-candidate", "credential", "caller-missing", "caller-symlink"])("normal publication input collection binds current production policy %s", async fault => {
+  const f = await runtimeFixture(roots, true, fault === "disjoint-advance"), selected = f.selection;
   put(f.repo, "docs/suppressions.yaml", "suppressions: []\n");
   const source = commitAll(f.repo);
   const origin = join(f.root, "publication-origin"); git(f.root, "clone", "--no-local", "--no-checkout", f.repo, origin);
@@ -363,12 +363,14 @@ test.each(["matching", "actor", "rollback", "changed-source", "settings", "cache
     settings.publication.mode = "staged"; put(origin, ".vh-adlc/docs-drift.yaml", canonicalJSON(settings).toString());
     remoteDefault = commitAll(origin);
   }
+  if (fault === "disjoint-advance") { put(origin, "outside.txt", "Unbound native default advance\n"); remoteDefault = commitAll(origin); }
   if (fault === "changed-source") { put(origin, "docs/later.md", "Later bound documentation\n"); remoteDefault = commitAll(origin); }
   git(origin, "update-ref", "refs/heads/main", remoteDefault);
   if (remoteDefault !== source) expect(() => git(f.repo, "cat-file", "-e", remoteDefault + "^{commit}")).toThrow();
   const artifacts = join(f.root, "publication-inputs"), candidate = join(f.root, "publication-candidate");
   mkdirSync(artifacts, { mode: 0o700 }); git(f.root, "clone", "--no-local", "--no-checkout", f.repo, candidate);
   git(candidate, "checkout", "--detach", source);
+  if (remoteDefault !== source) expect(() => git(candidate, "cat-file", "-e", remoteDefault + "^{commit}")).toThrow();
   const beforeBytes = readFileSync(join(candidate, "docs/guide.md")), replacement = Buffer.from("# Selected candidate guide\n");
   put(candidate, "docs/guide.md", replacement.toString()); const head = commitAll(candidate);
   const packet = canonicalJSON({ schema_version: 1, source_commit: source, edits: [{ id: "guide-fix", path: "docs/guide.md", action: "replace",
@@ -396,16 +398,26 @@ process.exit(child.exitCode);
     "--cache-root", fault === "cache" ? join(f.root, "missing-cache") : fault === "cache-in-candidate" ? candidate : selected.cache_directory, "--entry", "copilot",
     "--launcher", selected.launcher_path, "--settings", join(f.repo, ".vh-adlc/docs-drift.yaml")],
   { ...native.environment, GH_TOKEN: fault === "credential" ? "" : native.environment.GH_TOKEN });
-  if (fault === "matching") expect(report.diagnostics).toEqual([]);
-  expect(result.exitCode).toBe(fault === "matching" ? 0 : 2);
-  if (fault === "matching") expect(report.publication_inputs).toMatchObject({ complete: true, authority: "none", current_default: remoteDefault,
+  const success = ["matching", "disjoint-advance"].includes(fault);
+  if (success) expect(report.diagnostics).toEqual([]);
+  expect(result.exitCode).toBe(success ? 0 : 2);
+  if (success) expect(report.publication_inputs).toMatchObject({ complete: true, authority: "none", current_default: remoteDefault,
     candidate: { complete: true, candidate_commit: head }, runtime: { kind: "docs-drift-approved-runtime" } });
   else {
     expect(report.publication_inputs?.complete).toBe(false);
-    const reason = { actor: "Selected native publication actor", rollback: "not adopted", "changed-source": "needs fresh collection and review",
+    const reasons: Record<string, string> = { actor: "Selected native publication actor", rollback: "not adopted", "changed-source": "needs fresh collection and review",
       settings: "invoked entry bytes differ from committed policy", cache: "missing-cache", "cache-in-candidate": "overlaps a caller checkout", credential: "missing selected publication credential",
-      "caller-missing": "Caller changed or became unavailable", "caller-symlink": "Caller changed or became unavailable" }[fault];
-    expect(report.diagnostics.map(item => item.message).join("\n")).toContain(reason);
+      "caller-missing": "Caller changed or became unavailable", "caller-symlink": "Caller changed or became unavailable" };
+    expect(report.diagnostics.map(item => item.message).join("\n")).toContain(reasons[fault]);
+  }
+  if (fault === "disjoint-advance") {
+    const inputs = report.publication_inputs;
+    if (!inputs?.freshness || !inputs.store) throw Error("missing collected disjoint source");
+    expect(inputs.freshness.fresh).toBe(true);
+    expect(inputs.freshness.changed_paths).toEqual(["outside.txt"]);
+    expect(git(inputs.store.root, "rev-parse", remoteDefault + "^{commit}")).toBe(remoteDefault);
+    expect(() => git(f.repo, "cat-file", "-e", remoteDefault + "^{commit}")).toThrow();
+    expect(() => git(candidate, "cat-file", "-e", remoteDefault + "^{commit}")).toThrow();
   }
   expect(captureRepositoryState(f.repo)).toEqual(before);
   if (fault === "caller-missing" || fault === "caller-symlink") {

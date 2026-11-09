@@ -243,7 +243,7 @@ export async function runScan(snapshot: Snapshot, options: ScanOptions): Promise
       writeFileSync(file, blob.bytes, { flag: "wx", mode: blob.mode === "100755" ? 0o755 : 0o644 });
     }
     writeFileSync(bindingsPath, snapshot.protocol.bytes, { flag: "wx", mode: 0o600 });
-    for (const file of [stdout, stderr]) writeFileSync(file, "", { flag: "wx", mode: 0o600 });
+    for (const file of [stdout, stderr, output]) writeFileSync(file, "", { flag: "wx", mode: 0o600 });
     const args = [
       isAbsolute(runtime) ? runtime : join(checkout, runtime), ...snapshot.settings.scanner.argv.slice(1),
       "--protocol-bindings", bindingsPath, "--protocol-json", output,

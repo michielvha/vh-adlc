@@ -19,7 +19,7 @@ export function settingsFixture() {
     project_procedure: "docs/docs-procedure.md",
     verification_commands: [["bun", "test", "tests/docs"]],
     generation_commands: [],
-    read_set: { source_roots: null, reference_roots: null },
+    read_set: { source_roots: null, reference_roots: null } as { source_roots: string[] | null; reference_roots: string[] | null },
     component_pin: null,
     pr_discovery: { repository: "fixture/docs", base: "main", authors: ["fixture-bot"], branch_prefixes: ["docs-drift/"] },
     publication: {

@@ -1,10 +1,11 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { gitReadArguments } from "../git-read";
 import { readGit, writeMetadataObject } from "./git";
 import { publishArtifact } from "./journal";
 import { executeOwnedProcess } from "./owned-process";
 import { canonicalDigest, canonicalJSON, compareUTF8, protocolPath, sha256 } from "./protocol";
+import { requireOwnedStore } from "./proposals";
 import { evaluateProtection, type ProtectionContext, type ProtectionResult } from "./protection";
 import { collectEditChanges, parseEdit, readResolutionRecord, resolutionSource, type Edit, type ResolutionChange } from "./resolve";
 import { runScan, scannerEnvironment, type ScanRun } from "./scan";
@@ -173,7 +174,7 @@ type CandidateInspection = {
 /** Compare the complete committed candidate with selected, protected raw-byte postimages. */
 export function inspectCandidate(options: {
   repo: string; source: string; selection: unknown; candidate_repo: string; candidate: string; protection_context?: ProtectionContext;
-  artifact_root: string; owner: string; run: string; resolution_record?: { path: string; sha256: string };
+  artifact_root: string; owner: string; run: string; object_store?: OwnedObjectStore; resolution_record?: { path: string; sha256: string };
 }): CandidateInspection {
   const result: CandidateInspection = { schema_version: 1, kind: "docs-drift-candidate-inspection", authority: "none", complete: false, diagnostics: [],
     source_commit: options.source, candidate_commit: options.candidate, candidate_tree: null, diff_sha256: null, changed_paths: [], object_store: null, resolution_record: null };
@@ -215,8 +216,12 @@ export function inspectCandidate(options: {
     result.candidate_tree = readGit(candidate.repo, "rev-parse", "--verify", "--end-of-options", candidate.source_commit + "^{tree}").toString().trim();
     const root = externalArtifactDirectory(options.artifact_root, source.repo);
     externalArtifactDirectory(root, candidate.repo);
-    const store = createOwnedObjectStore({ source_repo: candidate.repo, source_commit: candidate.source_commit, parent: root, evidence_directory: root,
+    const store = options.object_store ? { ...options.object_store } : createOwnedObjectStore({ source_repo: candidate.repo, source_commit: candidate.source_commit, parent: root, evidence_directory: root,
       repository: source.settings.repository, owner: options.owner, run: options.run });
+    protocolPath(relative(root, store.root)); protocolPath(relative(root, store.record_path));
+    externalArtifactDirectory(store.root, source.repo); externalArtifactDirectory(store.root, candidate.repo);
+    requireOwnedStore(store, source.settings.repository);
+    if (store.source_commit !== candidate.source_commit) throw Error("Retained candidate object store source changed");
     result.object_store = store;
     const emptyTree = writeMetadataObject(store.root, "tree", Buffer.alloc(0));
     result.diff_sha256 = sha256(readGit(store.root, "--attr-source=" + emptyTree, "-c", "core.attributesFile=/dev/null", "-c", "core.quotePath=true",
