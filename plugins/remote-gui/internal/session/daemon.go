@@ -205,6 +205,7 @@ func finish(home, id string, controller bool) error {
 		r.CleanupDiagnostic = ""
 		r.CDPAddress = ""
 		r.Marker = ""
+		r.MarkerURL = ""
 		r.Display = nil
 		r.Config.Target = redactedTarget(r.Config.Target)
 	})
@@ -387,6 +388,8 @@ func supervise(home, id string) int {
 }
 
 func serve(ctx context.Context, r state.Record) (result error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 	home, id := r.Config.Home, r.ID
 	file := os.NewFile(3, "proxy-listener")
 	listener, err := net.FileListener(file)
@@ -400,6 +403,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	}
 
 	var bundle BrowserHandle
+	var browserState *browserControl
 	target := r.Config.Target
 	if r.Kind == "share" {
 		if !bindingAlive(r) {
@@ -420,10 +424,13 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		if err = update(home, id, func(r *state.Record) {
 			r.CDPAddress = bundle.CDPAddress
 			r.Marker = bundle.Marker
+			r.MarkerURL = bundle.MarkerURL
+			r.Config.BrowserMode = bundle.BrowserMode
 			r.Owned = bundle.Owned
 		}); err != nil {
 			return err
 		}
+		browserState = &browserControl{home: home, id: id, handle: bundle, guard: r.Guard, supervisor: r.Supervisor}
 	}
 	origin := "http://" + r.ProxyAddress
 	client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
@@ -448,12 +455,7 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		if r.Kind == "share" {
 			return bindingAlive(r)
 		}
-		for _, owned := range bundle.Owned {
-			if !state.Alive(owned.Identity) {
-				return false
-			}
-		}
-		return true
+		return browserState.alive()
 	}
 	var connectionCheck func(context.Context, net.Conn) bool
 	if r.Kind == "share" {
@@ -482,13 +484,19 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	stopped := make(chan struct{})
 	var stopOnce sync.Once
 	mux := http.NewServeMux()
+	if browserState != nil {
+		mux.HandleFunc("/handoff", func(w http.ResponseWriter, req *http.Request) {
+			// Stop and expiry own cancellation; a disconnected control client can reconcile the result.
+			browserState.serveHandoff(w, req.WithContext(ctx))
+		})
+	}
 	mux.HandleFunc("/access", func(w http.ResponseWriter, req *http.Request) {
 		if req.Method != http.MethodPost {
 			w.WriteHeader(405)
 			return
 		}
 		current, e := state.Load(home, id)
-		if e != nil || current.State != "ready" {
+		if e != nil || (current.State != "ready" && (current.Kind != "browser" || current.State != "handoff-failed")) {
 			w.WriteHeader(409)
 			return
 		}
@@ -515,6 +523,14 @@ func serve(ctx context.Context, r state.Record) (result error) {
 			w.WriteHeader(405)
 			return
 		}
+		if browserState != nil {
+			_ = update(home, id, func(current *state.Record) {
+				if current.State == "ready" || current.State == "handoff" || current.State == "handoff-failed" {
+					current.State = "stopping"
+				}
+			})
+		}
+		cancel()
 		w.WriteHeader(200)
 		stopOnce.Do(func() { close(stopped) })
 	})

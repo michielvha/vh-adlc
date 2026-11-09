@@ -32,6 +32,7 @@ The agent runs the workflow; you accept the feature scope and decide when to shi
 - Handle documentation and small maintenance tasks without creating a feature spec.
 - Sweep dependency and security work through [shared maintenance](docs/user-guides/workflows.md#dependency-and-security-maintenance), keeping project rules local and selecting work from an evidence-based report.
 - Audit software bugs and reliability through a [persistent finding ledger](docs/user-guides/workflows.md#persistent-codebase-audit), then reverify findings or repair selected work under local project rules.
+- Free space that killed runs left in `/tmp` with [host cleanup](docs/user-guides/workflows.md#host-cleanup), limited to what each project declares on its default branch.
 - Triage backlog issues against source and observed checks. [Every published triage verdict requires the managed verification controller](plugins/vh-adlc/references/triage-boundary.md) and exact approval; local reports work across harnesses.
 
 ## Get started

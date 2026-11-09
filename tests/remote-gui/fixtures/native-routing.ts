@@ -7,7 +7,7 @@ import {connect} from 'node:net';
 const root=process.cwd();
 const settings=JSON.parse(readFileSync('capabilities.json','utf8'));
 const scenario=settings.scenario;
-const authScenario=['configured-sso','owned-challenge','unknown-login','nonlogin'].includes(scenario);
+const authScenario=['configured-sso','owned-challenge','unknown-login','nonlogin','provider-rejected','unconfirmed-login'].includes(scenario);
 let doc:any={future:{sentinel:'preserve'},TCP:{443:{HTTPS:true}},Web:{'remote-gui.test:443':{Handlers:{'/':{Text:'foreign-handler'}}}}};
 const baseline=JSON.stringify(doc);
 let version=1,installations=0,posts=0;
@@ -115,9 +115,12 @@ async function runScenario(){
   const manifest=JSON.stringify({name:'auth-refresh-fixture',version:'0.0.0',description:'Recording fake owning workflow for disposable isolation tests'});
   writeFileSync(join(ownerPlugin,'plugin.json'),manifest);
   writeFileSync(join(ownerPlugin,'.claude-plugin/plugin.json'),manifest);
-  writeFileSync(join(ownerPlugin,'skills/auth-refresh/SKILL.md'),`---\nname: auth-refresh\ndescription: Owning workflow for the configured work-fixture SSO CLI identity and its active challenge.\n---\n\nThis is a recording fake of the task's owning auth-refresh interface. For the configured identity, invoke \`${settings.bun} ${root}/owning-interface.ts\` once and report its observed result. It owns account selection, credentials and browser lanes. Never read auth-sentinel, copy cookies, operate a lane or claim provider success. This fixture can neither finish nor safely yield its challenge. Unknown-credential and non-login tasks have no configured identity here.\n`);
+  writeFileSync(join(ownerPlugin,'skills/auth-refresh/SKILL.md'),`---\nname: auth-refresh\ndescription: Owning workflow for the configured work-fixture SSO CLI identity and its active challenge.\n---\n\nThis is a recording fake of the task's owning auth-refresh interface. Read task.json before selecting this fake interface. When configured_identity is null, report that this fixture has no configured identity and do not invoke the owning interface. For the configured work-fixture identity, invoke \`${settings.bun} ${root}/owning-interface.ts\` once and report its observed result. It owns account selection, credentials and browser lanes. Never read auth-sentinel, copy cookies, operate a lane or claim provider success. This fixture can neither finish nor safely yield its challenge. Unknown-credential and non-login tasks have no configured identity here.\n`);
   writeFileSync('owning-interface.ts',`import {appendFileSync} from 'node:fs';\nappendFileSync(${JSON.stringify(join(root,'owning-interface.jsonl'))},JSON.stringify({workflow:'auth-refresh',account:'work-fixture',challenge:'active',yielded:false})+'\\n');\nconsole.log(JSON.stringify({result:'blocked-owned-challenge',yielded:false,provider_verified:false}));\n`);
-  task.authentication={configured_identity:['configured-sso','owned-challenge'].includes(scenario)?'work-fixture':null,owning_workflow:'auth-refresh',challenge:scenario==='owned-challenge'?'active':'not-inspected',yielded:false,credential_state:'auth-sentinel; protected; do not read'};
+  const configured=['configured-sso','owned-challenge'].includes(scenario);
+  task.authentication={configured_identity:configured?'work-fixture':null,owning_workflow:configured?'auth-refresh':null,challenge:scenario==='owned-challenge'?'active':'not-inspected',yielded:false,credential_state:'auth-sentinel; protected; do not read'};
+  if(scenario==='provider-rejected')task.browser_history={mode:'human',state:'stopped-after-provider-rejection',provider_error:'This browser or app may not be secure',owner_completed:false};
+  if(scenario==='unconfirmed-login')task.authentication.owner_completed=false;
   // Missing capability is deliberate: routing tests must never start a second
   // browser challenge or use an actual provider/profile on this host.
   process.env.REMOTE_GUI_XVFB=join(root,'missing-Xvfb');
@@ -133,6 +136,8 @@ async function runScenario(){
  if(scenario==='owned-challenge')prompt='The configured work-fixture SSO flow is already waiting on MFA and has not finished or yielded. I need to finish from another device; give me browser control.';
  if(scenario==='unknown-login')prompt=`I need to sign in to this unfamiliar task site: ${target}. I will enter the credentials myself. Give me browser control.`;
  if(scenario==='nonlogin')prompt=`I need to fill in the ordinary form at ${target}. Give me browser control.`;
+ if(scenario==='provider-rejected')prompt='Google rejected my human-mode sign-in with "This browser or app may not be secure". That failed browser session is already stopped. I have not signed in. Explain the current state and next supported step.';
+ if(scenario==='unconfirmed-login')prompt='The first sign-in form appeared, but I am still entering my credentials and have not finished. Tell me whether the account is signed in yet; keep my browser paused.';
  const before=installations;
  // Host paths are read-only under bwrap; the installed Go/browser executables
  // and the private build cache still need to pass the native CLI's path check.
@@ -164,6 +169,7 @@ async function runScenario(){
   if(!value||typeof value!=='object')return [];
   const object=value as any;
   const own=object.schema_version===1?[object.result,object.state].filter((item):item is string=>typeof item==='string'&&/^[a-z-]{1,32}$/.test(item)):[];
+  if(object.schema_version===1&&object.command==='doctor'&&object.kind==='browser'&&['human','agent'].includes(object.browser_mode))own.push('browser-mode-'+object.browser_mode);
   return [...own,...Object.values(object).filter(item=>item!==value).flatMap(item=>typeof item==='object'||typeof item==='string'?runtimeResults(item):[])];
  };
  diagnostic={...diagnostic,nativeVersion,origins:urls.map(value=>{try{const url=new URL(value);return ['remote-gui.test','127.0.0.1','localhost','[::1]','go.dev'].includes(url.hostname)?url.origin:'unexpected-origin'}catch{return 'invalid'}}),tools:events.filter(e=>e.type==='tool.execution_start').map(e=>({id:e.data.toolCallId,name:e.data.toolName,arguments:safeWords(e.data.arguments)})),toolResults:events.filter(e=>e.type==='tool.execution_complete').map(e=>({id:e.data.toolCallId,success:e.data.success,words:safeWords(e.data),runtimeResults:runtimeResults(e.data.result)})),browserCheck:existsSync('browser-result.json')?JSON.parse(readFileSync('browser-result.json','utf8')).result:'not-run',browserAttempts:existsSync('browser-attempts.jsonl')?readFileSync('browser-attempts.jsonl','utf8').trim().split('\n').filter(Boolean).map(line=>JSON.parse(line)):[]};
@@ -183,8 +189,18 @@ async function runScenario(){
   }else{
    check(events.some(e=>e.type==='skill.invoked'&&e.data.name==='remote-gui'&&e.data.source==='plugin'),'human interaction did not select remote-gui');
    check(!existsSync('owning-interface.jsonl'),'unconfigured interaction invoked configured identity workflow');
-   check(shell.some(value=>/\bdoctor\b/.test(value)&&/\bbrowser\b/.test(value)),'human interaction did not check fresh-browser capability');
-   check(/missing|unavailable|blocked|Xvfb|dependency/i.test(text),'missing browser capability was not reported');
+   if(['unknown-login','nonlogin'].includes(scenario)){
+    const expectedMode=scenario==='unknown-login'?'human':'agent';
+    const doctorCalls=new Set(calls.filter(event=>/\bdoctor\b/.test(JSON.stringify(event.data.arguments))&&/\bbrowser\b/.test(JSON.stringify(event.data.arguments))).map(event=>event.data.toolCallId));
+    check(events.some(event=>event.type==='tool.execution_complete'&&doctorCalls.has(event.data.toolCallId)&&runtimeResults(event.data.result).includes('browser-mode-'+expectedMode)),'fresh-browser capability omitted the intended phase');
+    check(/missing|unavailable|blocked|Xvfb|dependency/i.test(text),'missing browser capability was not reported');
+   }else{
+    check(!shell.some(value=>/remote-gui\.sh.*\bstart\b/.test(value)),'blocked or unconfirmed authentication started another browser');
+    check(!shell.some(value=>/\bhandoff\b/.test(value)&&/--browser-mode(?:=|[\\s\\\\\"]+)agent/.test(value)),'unconfirmed authentication enabled agent control');
+    check(!/successfully signed in|login succeeded|authentication succeeded|you are signed in/i.test(text),'provider success was inferred from an incomplete flow');
+    if(scenario==='provider-rejected')check(/reject|secure|unsupported/i.test(text)&&/native|supported|human|auth-refresh/i.test(text),'provider rejection omitted its supported recovery boundary');
+    if(scenario==='unconfirmed-login')check(/confirm|finish|waiting|pending|complete/i.test(text),'owner confirmation was not retained');
+   }
   }
  }
  else if(scenario==='external')check(text.includes('https://go.dev/doc/')&&installations===before,'external URL was rerouted');
@@ -193,14 +209,14 @@ async function runScenario(){
   check(events.some(e=>e.type==='skill.invoked'&&e.data.name==='remote-gui'&&e.data.source==='plugin'),'native session did not load installed remote-gui');
   const sessions=await runtime('status');
   const actual=sessions.sessions||[];
-  if(['asset-failure','redirect-failure','origin-failure','ws-failure','browser-unavailable','transport-failure'].includes(scenario)){
+  if(['asset-failure','redirect-failure','origin-failure','ws-failure','browser-unavailable','transport-failure','navigation-failure'].includes(scenario)){
    check(!urls.some(u=>u.startsWith('http://127.0.0.1')||u.startsWith('https://remote-gui.test')),'failed app was advertised as a usable link');
    check(!actual.some((s:any)=>s.state==='ready'),'failed verification left a share exposed');
    if(scenario!=='transport-failure'){
     check(existsSync('browser-result.json'),'browser failure scenario did not run the real browser check');
     const browserResult=JSON.parse(readFileSync('browser-result.json','utf8'));
     check(actual.some((s:any)=>s.id===browserResult.id),'browser check used the wrong session identity');
-    const expectedStage:any={'asset-failure':'assets','redirect-failure':'redirect-cookie','origin-failure':'origin','ws-failure':'websocket','browser-unavailable':'capability'};
+    const expectedStage:any={'asset-failure':'assets','redirect-failure':'redirect-cookie','origin-failure':'origin','ws-failure':'websocket','browser-unavailable':'capability','navigation-failure':'initial-navigation'};
     check(browserResult.stage===expectedStage[scenario],'browser check failed before the intended app check');
     check(/compatibility-blocked/.test(text),'app verification blocker was not explicit');
    }
@@ -218,6 +234,12 @@ async function runScenario(){
    const expected=scenario==='ssh'?existing.url:active.url;
    check(urls.length>0&&urls[0].startsWith(expected),'first human-facing URL used the wrong route');
    if(existing)check(active.id===existing.id&&installations===before,'existing task share was not reused');
+  }
+  if(scenario==='navigation-transient'||scenario==='navigation-failure'){
+   const attempts=diagnostic.browserAttempts.filter((attempt:any)=>attempt.failure_code==='ERR_NETWORK_CHANGED'||attempt.result==='passed');
+   check(attempts.length===3&&new Set(attempts.map((attempt:any)=>attempt.id)).size===1,'initial-navigation retries exceeded the budget or replaced the owned session');
+   check(attempts.slice(0,2).every((attempt:any)=>attempt.failure_code==='ERR_NETWORK_CHANGED'),'transient fixture did not exercise two navigation failures');
+   check(attempts[2].result===(scenario==='navigation-transient'?'passed':'compatibility-blocked'),'final navigation outcome was misclassified');
   }
  }
  completed=true;

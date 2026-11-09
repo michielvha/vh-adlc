@@ -7,7 +7,7 @@ Choose the client you use to work on a local Git repository. Check
 versions. A successful installation does not establish that every workflow works
 on that host.
 
-The binary requires Git 2.35 or newer. The installer uses Bash, curl, tar, and a
+The binary requires Git 2.35 or newer, and its `clean` command Git 2.45. The installer uses Bash, curl, tar, and a
 SHA-256 utility (`sha256sum` or `shasum`). It downloads releases for Linux and
 macOS on amd64 and arm64; you do not need Go to use the plugin.
 
@@ -89,8 +89,9 @@ Type `/vh-adlc` and choose an operation from the suggestions.
 
 ## What the plugin installs
 
-The package contains fourteen skills: the generic `vh-adlc` entry, eleven engineering
-operations, `vh-adlc-blog` for article and promotion drafts and `vh-adlc-docs-impact` for documentation review. It includes
+The package contains fifteen skills: the generic `vh-adlc` entry, eleven engineering
+operations, `vh-adlc-blog` for article and promotion drafts, `vh-adlc-docs-impact` for
+documentation review and `vh-adlc-clean` for host cleanup. It includes
 separate feature-reviewer and prose-editor definitions. Its first operation
 uses the [installer](../../plugins/vh-adlc/scripts/ensure-vh-adlc.sh) to fetch the
 binary version in [vh-adlc.lock.json](../../plugins/vh-adlc/vh-adlc.lock.json).
@@ -132,6 +133,29 @@ triage's controller, provision credentials or grant remote effects merely by bei
 The other marketplace plugins install separately. Bun is required for the
 GitHub App registration scripts; installing vh-adlc does not install those scripts
 or auth-refresh.
+
+## Host cleanup
+
+`vh-adlc-clean` calls `vh-adlc` from the shell's `PATH`, which the installer does not
+change. After each plugin update that moves the lock, install the locked binary
+once, on Linux, from the installed plugin's directory:
+
+```sh
+sudo install -m 755 "$(bash <plugin directory>/scripts/ensure-vh-adlc.sh)" /usr/local/bin/vh-adlc
+```
+
+Install [kind](https://kind.sigs.k8s.io/) the same way if a project's manifest
+names kind clusters. Then add one allow rule for each client, in user scope, so
+any session can run the operation without a prompt:
+
+- Claude Code, in `~/.claude/settings.json`:
+  `"permissions": {"allow": ["Bash(vh-adlc clean *)"]}`
+- Codex, in `~/.codex/rules/default.rules`:
+  `prefix_rule(pattern=["vh-adlc", "clean"], decision="allow")`
+
+The rule also allows `--compose` and `--kind`; the operation adds those only when
+you ask. A command other than `vh-adlc clean`, such as `rm`, still goes to the
+client's own approval.
 
 Continue with [your first feature](first-feature.md). For an existing installation,
 see [updating and uninstalling](../user-guides/managing-plugins.md).

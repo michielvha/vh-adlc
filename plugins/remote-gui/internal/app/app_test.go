@@ -19,6 +19,18 @@ func TestHelpAndInvalidCommands(t *testing.T) {
 	}
 }
 
+func TestHelpExplainsBrowserPhases(t *testing.T) {
+	var out bytes.Buffer
+	if code := Run([]string{"help"}, &out); code != 0 {
+		t.Fatalf("help failed: %s", out.String())
+	}
+	for _, option := range []string{"handoff", "--browser-mode", "human|agent"} {
+		if !bytes.Contains(out.Bytes(), []byte(option)) {
+			t.Fatalf("help omits %s", option)
+		}
+	}
+}
+
 func TestServiceDoctorDoesNotNeedGUI(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	var out bytes.Buffer

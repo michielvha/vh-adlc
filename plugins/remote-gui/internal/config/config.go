@@ -17,15 +17,16 @@ import (
 )
 
 type Config struct {
-	OwnerLogin string        `json:"owner_login,omitempty"`
-	Command    string        `json:"command"`
-	Kind       string        `json:"kind"`
-	ID         string        `json:"id,omitempty"`
-	Target     string        `json:"target,omitempty"`
-	Transport  string        `json:"transport"`
-	Home       string        `json:"home"`
-	TTL        time.Duration `json:"ttl"`
-	Reveal     bool          `json:"-"`
+	BrowserMode string        `json:"browser_mode,omitempty"`
+	OwnerLogin  string        `json:"owner_login,omitempty"`
+	Command     string        `json:"command"`
+	Kind        string        `json:"kind"`
+	ID          string        `json:"id,omitempty"`
+	Target      string        `json:"target,omitempty"`
+	Transport   string        `json:"transport"`
+	Home        string        `json:"home"`
+	TTL         time.Duration `json:"ttl"`
+	Reveal      bool          `json:"-"`
 }
 
 func Parse(args []string) (Config, error) {
@@ -50,13 +51,14 @@ func Parse(args []string) (Config, error) {
 		c.Command = "help"
 	}
 	switch c.Command {
-	case "help", "doctor", "share", "start", "status", "access", "stop", "cleanup":
+	case "help", "doctor", "share", "start", "handoff", "status", "access", "stop", "cleanup":
 	default:
 		return c, errors.New("unknown command; use remote-gui help")
 	}
 	fs := flag.NewFlagSet("remote-gui", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	fs.StringVar(&c.OwnerLogin, "owner-login", "", "")
+	fs.StringVar(&c.BrowserMode, "browser-mode", "", "")
 	fs.StringVar(&c.Kind, "kind", c.Kind, "")
 	fs.StringVar(&c.Transport, "transport", c.Transport, "")
 	fs.DurationVar(&c.TTL, "ttl", c.TTL, "")
@@ -83,6 +85,29 @@ func Parse(args []string) (Config, error) {
 	}
 	if err := fs.Parse(flags); err != nil {
 		return c, errors.New("invalid option; use remote-gui help")
+	}
+	modeProvided := false
+	fs.Visit(func(option *flag.Flag) {
+		if option.Name == "browser-mode" {
+			modeProvided = true
+		}
+	})
+	if c.Command == "start" || c.Command == "handoff" {
+		c.Kind = "browser"
+	}
+	if modeProvided {
+		if c.BrowserMode != "human" && c.BrowserMode != "agent" {
+			return c, errors.New("browser-mode must be human or agent")
+		}
+		if c.Kind != "browser" || (c.Command != "start" && c.Command != "doctor" && c.Command != "handoff") {
+			return c, errors.New("browser-mode requires a browser start, doctor or handoff command")
+		}
+	}
+	if c.Command == "handoff" && !modeProvided {
+		return c, errors.New("handoff requires an explicit browser-mode")
+	}
+	if c.Kind == "browser" {
+		c.BrowserMode = c.Mode()
 	}
 	if c.Kind != "share" && c.Kind != "browser" {
 		return c, errors.New("kind must be share or browser")
@@ -116,7 +141,7 @@ func Parse(args []string) (Config, error) {
 		if len(positionals) != 0 {
 			return c, errors.New("start does not accept an existing profile or target")
 		}
-	case "access", "stop":
+	case "access", "stop", "handoff":
 		if len(positionals) != 1 || !ValidID(positionals[0]) {
 			return c, errors.New("a valid session ID is required")
 		}
@@ -140,6 +165,14 @@ func Parse(args []string) (Config, error) {
 		return c, errors.New("reveal is allowed only with access")
 	}
 	return c, nil
+}
+
+// Mode preserves the agent-controlled behavior of records created before phases existed.
+func (c Config) Mode() string {
+	if c.BrowserMode == "" {
+		return "agent"
+	}
+	return c.BrowserMode
 }
 
 func ValidID(s string) bool {

@@ -70,6 +70,105 @@ func TestMissingDependenciesLeaveNoProfile(t *testing.T) {
 	}
 }
 
+func TestBrowserPhaseArguments(t *testing.T) {
+	const profile = "/owned/session/profile"
+	const marker = "http://127.0.0.1:12345/"
+	for _, mode := range []string{"human", "agent"} {
+		t.Run(mode, func(t *testing.T) {
+			args := browserArgs(profile, marker, mode)
+			foundProfile, foundMarker, foundAutomation, foundDebug := false, false, false, false
+			for _, arg := range args {
+				foundProfile = foundProfile || arg == "--user-data-dir="+profile
+				foundMarker = foundMarker || arg == marker
+				foundAutomation = foundAutomation || arg == "--enable-automation"
+				foundDebug = foundDebug || strings.HasPrefix(arg, "--remote-debugging-")
+				if strings.HasPrefix(arg, "--no-sandbox") || strings.Contains(arg, "AutomationControlled") {
+					t.Fatal("unsafe or spoofed browser launch")
+				}
+			}
+			if !foundProfile || !foundMarker {
+				t.Fatal("owned profile/marker missing")
+			}
+			if mode == "human" && (foundAutomation || foundDebug) {
+				t.Fatal("human phase exposes browser automation")
+			}
+			if mode == "agent" && (!foundAutomation || !foundDebug) {
+				t.Fatal("legacy agent control missing")
+			}
+		})
+	}
+}
+
+func TestRealHumanBrowserHandoff(t *testing.T) {
+	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
+		t.Skip("requires existing GUI dependencies and disposable browser processes")
+	}
+	c, id := setup(t)
+	c.BrowserMode = "human"
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	if err := state.Update(ctx, c.Home, id, func(record *state.Record) { record.Config = c }); err != nil {
+		t.Fatal(err)
+	}
+	h, err := Start(ctx, c, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer h.Stop()
+	if h.CDPAddress != "" || h.MarkerURL == "" || h.Handoff == nil {
+		t.Fatal("human phase metadata or control boundary invalid")
+	}
+	checkHumanProcess(t, h.Owned)
+	agent, err := h.Handoff(ctx, "agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if agent.CDPAddress == "" || agent.Target != h.Target || agent.MarkerURL != h.MarkerURL {
+		t.Fatal("hand-back lost browser control or viewer/marker identity")
+	}
+	repeated, err := agent.Handoff(ctx, "agent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if repeated.CDPAddress != agent.CDPAddress {
+		t.Fatal("repeated handoff restarted an already matching browser")
+	}
+	human, err := repeated.Handoff(ctx, "human")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if human.CDPAddress != "" || human.Target != h.Target || human.MarkerURL != h.MarkerURL {
+		t.Fatal("return to human mode lost its control boundary or viewer")
+	}
+	checkHumanProcess(t, human.Owned)
+}
+
+func checkHumanProcess(t *testing.T, owned []state.Process) {
+	t.Helper()
+	found := false
+	for _, process := range owned {
+		if process.Role != "browser" {
+			continue
+		}
+		found = true
+		if !state.Alive(process.Identity) {
+			t.Fatal("owned human browser is not alive")
+		}
+		data, err := os.ReadFile("/proc/" + strconv.Itoa(process.Identity.PID) + "/cmdline")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, arg := range strings.Split(string(data), "\x00") {
+			if arg == "--enable-automation" || strings.HasPrefix(arg, "--remote-debugging-") {
+				t.Fatal("human browser has an automation/debugging switch")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("owned human browser missing")
+	}
+}
+
 func TestDisplayAllocationPreservesForeignLock(t *testing.T) {
 	start := 42000 + os.Getpid()%1000
 	name := "/tmp/.X" + strconv.Itoa(start) + "-lock"

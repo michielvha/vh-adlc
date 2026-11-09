@@ -20,6 +20,7 @@ import (
 )
 
 type Result struct {
+	BrowserMode   string   `json:"browser_mode,omitempty"`
 	SchemaVersion int      `json:"schema_version"`
 	Command       string   `json:"command"`
 	Result        string   `json:"result"`
@@ -38,7 +39,7 @@ func RunWith(args []string, out io.Writer, execute Executor) int {
 		return 2
 	}
 	if c.Command == "help" {
-		_, _ = fmt.Fprintln(out, "remote-gui: doctor | share <local-http-url> | start | status [id] | access <id> [--reveal] | stop <id> | cleanup\nOptions: --transport tailscale|loopback --ttl 2h --home <private-directory> --kind share|browser --owner-login <tailscale-login>")
+		_, _ = fmt.Fprintln(out, "remote-gui: doctor | share <local-http-url> | start | handoff <id> --browser-mode human|agent | status [id] | access <id> [--reveal] | stop <id> | cleanup\nOptions: --transport tailscale|loopback --ttl 2h --home <private-directory> --kind share|browser --owner-login <tailscale-login> --browser-mode human|agent")
 		return 0
 	}
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
@@ -82,6 +83,7 @@ func Doctor(c config.Config) Result {
 		tools["tailscale"] = "tailscale"
 	}
 	if c.Kind == "browser" {
+		r.BrowserMode = c.Mode()
 		tools["Xvfb"] = Tool("REMOTE_GUI_XVFB", "Xvfb")
 		tools["x11vnc"] = Tool("REMOTE_GUI_X11VNC", "x11vnc")
 		tools["websockify"] = Tool("REMOTE_GUI_WEBSOCKIFY", "websockify")

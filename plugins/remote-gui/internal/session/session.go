@@ -21,6 +21,8 @@ import (
 )
 
 type View struct {
+	BrowserMode       string     `json:"browser_mode,omitempty"`
+	MarkerURL         string     `json:"marker_url,omitempty"`
 	CleanupDiagnostic string     `json:"cleanup_diagnostic,omitempty"`
 	AuthMode          string     `json:"auth_mode"`
 	OwnerLogin        string     `json:"owner_login,omitempty"`
@@ -41,25 +43,35 @@ type View struct {
 	EnrollmentExpires *time.Time `json:"enrollment_expires_at,omitempty"`
 }
 type BrowserHandle struct {
-	Assets     string
-	Target     string
-	CDPAddress string
-	Marker     string
-	Password   string
-	Owned      []state.Process
-	Stop       func()
+	BrowserMode string
+	MarkerURL   string
+	Handoff     func(context.Context, string) (BrowserHandle, error)
+	Alive       func() bool
+	Assets      string
+	Target      string
+	CDPAddress  string
+	Marker      string
+	Password    string
+	Owned       []state.Process
+	Stop        func()
 }
 
 var BrowserLauncher func(context.Context, config.Config, string) (BrowserHandle, error)
 
 func view(r state.Record, revealURL bool) View {
 	v := View{SchemaVersion: 1, ID: r.ID, Kind: r.Kind, State: r.State, Result: r.State, LocalTarget: redactedTarget(r.Config.Target), Expires: r.Expires, Diagnostic: r.Diagnostic, CleanupDiagnostic: r.CleanupDiagnostic, CDPAddress: r.CDPAddress, Marker: r.Marker}
+	if r.Kind == "browser" {
+		v.BrowserMode, v.MarkerURL = r.Config.Mode(), r.MarkerURL
+		if v.BrowserMode == "human" {
+			v.CDPAddress = ""
+		}
+	}
 	v.AuthMode = "native-code"
 	if r.OwnerLogin != "" {
 		v.AuthMode = "tailscale-identity"
 		v.OwnerLogin = r.OwnerLogin
 	}
-	if r.State == "ready" {
+	if r.State == "ready" || (r.Kind == "browser" && r.State == "handoff-failed") {
 		v.ReadinessScope = "host-transport-only"
 		v.AppVerification = "not-attested"
 		v.URL = r.Origin
@@ -81,17 +93,19 @@ func Read(home, id string) (View, error) {
 		return View{}, err
 	}
 	v := view(r, false)
-	if (r.State == "starting" || r.State == "ready" || r.State == "stopping") && !state.Alive(r.Guard) && !state.Alive(r.Supervisor) {
+	if (r.State == "starting" || r.State == "ready" || r.State == "handoff" || r.State == "handoff-failed" || r.State == "stopping") && !state.Alive(r.Guard) && !state.Alive(r.Supervisor) {
 		v.State = "cleanup-pending"
 		v.Result = v.State
 		v.URL = ""
+		v.CDPAddress = ""
 		v.Diagnostic = "controllers-unavailable; run cleanup"
 		return v, nil
 	}
-	if r.State == "ready" && (!state.Alive(r.Guard) || !state.Alive(r.Supervisor) || !time.Now().Before(r.Expires)) {
+	if (r.State == "ready" || r.State == "handoff" || r.State == "handoff-failed") && (!state.Alive(r.Guard) || !state.Alive(r.Supervisor) || !time.Now().Before(r.Expires)) {
 		v.State = "stopping"
 		v.Result = v.State
 		v.URL = ""
+		v.CDPAddress = ""
 		v.Diagnostic = "controller-or-lifetime-check-pending"
 	}
 	return v, nil
@@ -209,7 +223,11 @@ func rejectControl(ctx context.Context, target string) error {
 	return nil
 }
 
-func control(home, id, route string, into any) error {
+func control(home, id, route string, into *View) error {
+	return controlTimeout(home, id, route, into, 3*time.Second)
+}
+
+func controlTimeout(home, id, route string, into *View, timeout time.Duration) error {
 	if !config.ValidID(id) {
 		return errors.New("invalid-session-id")
 	}
@@ -218,7 +236,7 @@ func control(home, id, route string, into any) error {
 		return (&net.Dialer{Timeout: time.Second}).DialContext(ctx, "unix", socket)
 	}}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 3 * time.Second}
+	client := &http.Client{Transport: transport, Timeout: timeout}
 	req, err := http.NewRequest(http.MethodPost, "http://unix/"+route, nil)
 	if err != nil {
 		return errors.New("invalid-control-request")
@@ -234,9 +252,11 @@ func control(home, id, route string, into any) error {
 	if into == nil {
 		return nil
 	}
-	if err = json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(into); err != nil {
+	var result View
+	if err = json.NewDecoder(io.LimitReader(resp.Body, 1<<16)).Decode(&result); err != nil {
 		return errors.New("invalid-session-control-response")
 	}
+	*into = result
 	return nil
 }
 
@@ -245,7 +265,7 @@ func Access(home, id string, reveal bool) (View, error) {
 	if err != nil || !reveal {
 		return v, err
 	}
-	if v.State != "ready" {
+	if v.State != "ready" && (v.Kind != "browser" || v.State != "handoff-failed") {
 		return v, errors.New("session-not-ready-or-stopped")
 	}
 	err = control(home, id, "access", &v)

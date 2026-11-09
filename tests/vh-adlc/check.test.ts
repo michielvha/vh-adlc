@@ -21,6 +21,9 @@ const SCHEDULE: Record<number, string[]> = {
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
 const CONTENT_OPERATIONS = ["blog", "docs-impact"];
+// Host operations call the vh-adlc binary on PATH, unverified and without
+// knowledge, as references/loop.md's exception allows.
+const HOST_OPERATIONS = ["clean"];
 
 function selectedPhase(): number {
   const raw = process.env.VH_ADLC_PHASE;
@@ -230,11 +233,11 @@ describe("manifest and marketplace", () => {
 });
 
 describe("skills", () => {
-  test("every skill is the entry, a gated operation or a declared content operation", () => {
+  test("every skill is the entry, a gated operation, a declared content operation or a host operation", () => {
 
     const dirs = existsSync(join(PKG, "skills")) ? readdirSync(join(PKG, "skills")).sort() : [];
     expect(dirs).toContain("vh-adlc");
-    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
+    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS, ...HOST_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
     for (const op of CONTENT_OPERATIONS) {
       expect(dirs).toContain(`vh-adlc-${op}`);
       const fm = frontmatter(read(skillPath(op)));
@@ -270,6 +273,48 @@ describe("skills", () => {
       }
     });
   }
+});
+
+describe("host operations", () => {
+  for (const op of HOST_OPERATIONS) {
+    test(`vh-adlc-${op} exists, and its name equals its directory`, () => {
+      expect(existsSync(skillPath(op))).toBe(true);
+      const fm = frontmatter(read(skillPath(op)));
+      expect(fm?.name).toBe(`vh-adlc-${op}`);
+      expect(typeof fm?.description).toBe("string");
+      expect(fm).not.toHaveProperty("model");
+    });
+  }
+
+  test("vh-adlc-clean plans first, adds the heavy flags only on request and stays inside the binary", () => {
+    const text = read(skillPath("clean"));
+    expect(text).toContain("vh-adlc clean --dry-run");
+    expect(text).toContain("references/clean.md");
+    expect(text).not.toContain("ensure-vh-adlc.sh");
+    expect(text).not.toContain("vh-adlc knowledge");
+    expect(text).toMatch(/`--compose`[^.]*`--kind`[^.]*only when the user asks/);
+    expect(text).toMatch(/[Nn]ever (run|use)[^.]*`rm`[^.]*`docker rm`[^.]*`pkill`/);
+  });
+
+  test("references/clean.md gives the procedure, the report fields and both allow rules", () => {
+    const text = read(join(PKG, "references", "clean.md"));
+    for (const field of ["`dry_run`", "`removed`", "`kept`", "`needs_flag`", "`unmerged`", "`freed_bytes`", "`unmatched`"]) expect(text).toContain(field);
+    for (const code of ["`pid-namespace`", "`manifest-unmerged`", "`engine-unreachable`", "`kind-unavailable`", "`usage`"]) expect(text).toContain(code);
+    expect(text).toContain('"permissions": {"allow": ["Bash(vh-adlc clean *)"]}');
+    expect(text).toContain('prefix_rule(pattern=["vh-adlc", "clean"], decision="allow")');
+    expect(text).toMatch(/in a terminal/);
+    expect(text).toMatch(/one line/);
+  });
+
+  test("the loop, the authority table and lifecycle intake name the clean operation", () => {
+    const loop = read(join(PKG, "references", "loop.md"));
+    expect(loop).toContain("skills/vh-adlc-clean/SKILL.md");
+    expect(loop).toMatch(/steps 1 and 2/);
+    const authority = read(join(PKG, "references", "authority.md"));
+    expect(authority).toContain("`/tmp` entries and the project's temp root");
+    expect(authority).toMatch(/`--compose`[^|]*`--kind`/);
+    expect(read(join(PKG, "references", "lifecycle.md"))).toContain("skills/vh-adlc-clean/SKILL.md");
+  });
 });
 
 describe("reviewer agent", () => {

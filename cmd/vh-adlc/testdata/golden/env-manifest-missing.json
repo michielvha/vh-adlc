@@ -1,0 +1,1 @@
+{"schema_version":1,"command":"env","result":"fail","knowledge":null,"data":null,"findings":[{"code":"manifest-missing","message":"the working tree has no .vh-adlc/cleanup.yaml","path":".vh-adlc/cleanup.yaml","line":0}]}

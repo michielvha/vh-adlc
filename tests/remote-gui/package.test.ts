@@ -24,6 +24,8 @@ describe('independent remote-gui package', () => {
    const result=Bun.spawnSync(['/usr/bin/bash',join(installed,'scripts/remote-gui.sh'),'help'],{cwd:root,env:{...process.env,REMOTE_GUI_BUILD_CACHE:join(root,'cache'),REMOTE_GUI_GO:join(toolchain,'bin/go'),GOTOOLCHAIN:'local'}});
    expect(result.exitCode,result.stderr.toString()).toBe(0);
    expect(result.stdout.toString()).toContain('share <local-http-url>');
+   expect(result.stdout.toString()).toContain('--browser-mode human|agent');
+   expect(result.stdout.toString()).toContain('handoff <id>');
    const missing=Bun.spawnSync(['/usr/bin/bash',join(installed,'scripts/remote-gui.sh'),'help'],{cwd:root,env:{PATH:root,HOME:root}});
    expect(missing.exitCode).not.toBe(0);
    expect(missing.stderr.toString()).toContain('Go');
@@ -43,6 +45,53 @@ describe('independent remote-gui package', () => {
   expect(skill).toContain('human-facing local');
   expect(skill).toContain('connectOverCDP');
  });
+});
+
+test('installed authentication guidance selects human control and verifies the provider outcome', () => {
+ const skill = read('plugins/remote-gui/skills/remote-gui/SKILL.md');
+ for (const instruction of ['--browser-mode human', '--browser-mode agent', 'handoff <id>', 'host-transport-only', 'ERR_NETWORK_CHANGED', 'two retries', 'provider rejection', 'owner confirms']) {
+  expect(skill).toContain(instruction);
+ }
+ const version = JSON.parse(read('plugins/remote-gui/plugin.json')).version;
+ const [major, minor] = version.split('.').map(Number);
+ expect(major > 0 || minor >= 2).toBe(true);
+});
+
+test('real browser phase and session continuity checks run in CI', () => {
+ const ci = read('.github/workflows/ci.yml');
+ expect(ci).toContain('REMOTE_GUI_BROWSER_E2E');
+ expect(ci).toContain('REMOTE_GUI_VIEWER_E2E');
+ expect(ci).toContain('tests/remote-gui/browser.e2e.test.ts');
+});
+
+test('browser test dependency is locked in its managed package', () => {
+ const manifest = JSON.parse(read('tests/remote-gui/package.json'));
+ expect(manifest.private).toBe(true);
+ expect(manifest.devDependencies['playwright-core']).toMatch(/^\d+\.\d+\.\d+$/);
+ expect(read('tests/remote-gui/bun.lock')).toContain('playwright-core@' + manifest.devDependencies['playwright-core']);
+ const ci = read('.github/workflows/ci.yml');
+ expect(ci).toContain('bun install --cwd tests/remote-gui --frozen-lockfile --ignore-scripts');
+ expect(ci).not.toContain('npm install --prefix');
+});
+
+test('viewer failures retain runtime diagnostics without access material', () => {
+ const root = mkdtempSync(join(tmpdir(), 'rg-diagnostic-'));
+ try {
+  const binary = join(root, 'runtime');
+  const browserModule = join(root, 'browser.cjs');
+  writeFileSync(binary, '#!/bin/sh\nprintf \'%s\\n\' \'{"result":"failed","diagnostic":"synthetic-runtime-diagnostic","access_code":"private-code-sentinel","url":"https://private-url-sentinel/?secret=query-sentinel"}\'\nexit 1\n', {mode: 0o700});
+  writeFileSync(browserModule, 'module.exports = {chromium: {}};\n');
+  const result = Bun.spawnSync([process.execPath, 'test', join(repo, 'tests/remote-gui/browser.e2e.test.ts'), '-t', 'real noVNC keyboard input'], {
+   cwd: root,
+   env: {...process.env, REMOTE_GUI_VIEWER_E2E: '1', REMOTE_GUI_TEST_BINARY: binary, REMOTE_GUI_PLAYWRIGHT_MODULE: browserModule},
+  });
+  const output = result.stdout.toString() + result.stderr.toString();
+  expect(result.exitCode).not.toBe(0);
+  expect(output).toContain('synthetic-runtime-diagnostic');
+  for (const sentinel of ['private-code-sentinel', 'private-url-sentinel', 'query-sentinel']) expect(output).not.toContain(sentinel);
+ } finally {
+  rmSync(root, {recursive: true, force: true});
+ }
 });
 
 test('unsupported source-build hosts get a platform diagnostic before compiling',()=>{

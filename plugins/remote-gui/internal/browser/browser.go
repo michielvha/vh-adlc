@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -32,6 +32,18 @@ type child struct {
 	done     chan struct{}
 }
 type runtime struct {
+	mu           sync.Mutex
+	current      session.BrowserHandle
+	profile      string
+	env          []string
+	vncAddress   string
+	chrome       *child
+	modeReady    bool
+	stopped      bool
+	generation   atomic.Uint64
+	loaded       atomic.Bool
+	automated    atomic.Bool
+	inputChecked atomic.Bool
 	markerServer *http.Server
 	home, id     string
 	children     []*child
@@ -205,7 +217,10 @@ func freePort() (string, error) {
 }
 
 func (r *runtime) stop() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.once.Do(func() {
+		r.stopped = true
 		if r.markerServer != nil {
 			_ = r.markerServer.Close()
 		}
@@ -300,7 +315,7 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 	if err := os.Mkdir(filepath.Join(profile, "Default"), 0o700); err != nil {
 		return empty, errors.New("browser-preferences-unavailable")
 	}
-	preferences, _ := json.Marshal(map[string]any{"download": map[string]any{"default_directory": filepath.Join(directory, "downloads"), "prompt_for_download": false}, "credentials_enable_service": false, "profile": map[string]any{"password_manager_enabled": false}})
+	preferences, _ := json.Marshal(map[string]any{"download": map[string]any{"default_directory": filepath.Join(directory, "downloads"), "prompt_for_download": false}, "credentials_enable_service": false, "profile": map[string]any{"password_manager_enabled": false}, "session": map[string]any{"restore_on_startup": 1}})
 	if err := os.WriteFile(filepath.Join(profile, "Default", "Preferences"), preferences, 0o600); err != nil {
 		return empty, errors.New("browser-preferences-unavailable")
 	}
@@ -379,29 +394,49 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 		return empty, err
 	}
 	marker := "remote-gui-" + hex.EncodeToString(nonce)
-	page := `<!doctype html><title>` + marker + `</title><h1>Shared browser ready</h1><label>Connection check <input aria-label="Connection check"></label>`
 	markerListener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return empty, errors.New("browser-marker-listener-unavailable")
 	}
-	r.markerServer = &http.Server{ReadHeaderTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-store")
-		_, _ = io.WriteString(w, page)
-	})}
-	go func() { _ = r.markerServer.Serve(markerListener) }()
 	initial := "http://" + markerListener.Addr().String() + "/"
-	chrome, err := r.spawn("browser", app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser"), []string{"--user-data-dir=" + profile, "--remote-debugging-address=127.0.0.1", "--remote-debugging-port=0", "--no-first-run", "--no-default-browser-check", "--enable-automation", "--disable-search-engine-choice-screen", "--disable-default-apps", "--disable-background-networking", "--disable-component-update", "--disable-extensions", "--disable-sync", "--disable-features=OptimizationHints,MediaRouter,Translate,HttpsUpgrades,PaintHolding", "--password-store=basic", "--use-mock-keychain", "--disable-breakpad", "--disable-crash-reporter", "--disable-dev-shm-usage", "--disable-gpu", "--disable-renderer-backgrounding", "--disable-background-timer-throttling", "--ozone-platform=x11", "--window-position=0,0", "--window-size=1440,900", "about:blank"}, env)
+	r.current = session.BrowserHandle{Target: "http://" + bridgeAddress + "/vnc.html", Marker: marker, MarkerURL: initial, Password: password, Assets: app.Tool("REMOTE_GUI_NOVNC", "/usr/share/novnc")}
+	r.profile, r.env, r.vncAddress = profile, env, vncAddress
+	r.markerServer = &http.Server{ReadHeaderTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, Handler: http.HandlerFunc(r.serveMarker)}
+	go func() { _ = r.markerServer.Serve(markerListener) }()
+	return r.launch(ctx, c.Mode())
+}
+
+func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandle, error) {
+	var empty session.BrowserHandle
+	generation := r.generation.Add(1)
+	r.loaded.Store(false)
+	r.modeReady = false
+	r.current.CDPAddress = ""
+	if err := os.Remove(filepath.Join(r.profile, "DevToolsActivePort")); err != nil && !os.IsNotExist(err) {
+		return empty, errors.New("stale-browser-control-file-unavailable")
+	}
+	initialURL := ""
+	if generation == 1 {
+		initialURL = r.current.MarkerURL
+	}
+	chrome, err := r.spawn("browser", app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser"), browserArgs(r.profile, initialURL, mode), r.env)
 	if err != nil {
 		return empty, err
 	}
+	r.chrome = chrome
+	if mode == "human" {
+		if err = r.wait(ctx, "human-page", func() bool {
+			return r.loaded.Load() && !r.automated.Load() && validateBrowser(chrome.identity, mode) == nil
+		}); err != nil {
+			return empty, err
+		}
+		r.current.BrowserMode, r.modeReady = mode, true
+		return r.snapshot(), nil
+	}
 	var cdp string
-	markerCreated := false
 	cdpReason := "active-port-file-unavailable"
-	client := &http.Client{Transport: &http.Transport{Proxy: nil}, Timeout: time.Second}
-	defer client.Transport.(*http.Transport).CloseIdleConnections()
 	if err = r.wait(ctx, "cdp", func() bool {
-		name := filepath.Join(profile, "DevToolsActivePort")
+		name := filepath.Join(r.profile, "DevToolsActivePort")
 		info, e := os.Lstat(name)
 		if e != nil || !info.Mode().IsRegular() {
 			return false
@@ -426,71 +461,20 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 			cdpReason = "listener-ownership-unverified"
 			return false
 		}
-		cdpReason = "sandbox-arguments-unverified"
-		cmdline, e := os.ReadFile("/proc/" + strconv.Itoa(chrome.identity.PID) + "/cmdline")
-		if e != nil {
+		if validateBrowser(chrome.identity, mode) != nil {
+			cdpReason = "browser-launch-protection-unverified"
 			return false
 		}
-		for _, arg := range strings.Split(string(cmdline), "\x00") {
-			if strings.HasPrefix(arg, "--no-sandbox") || strings.HasPrefix(arg, "--disable-setuid-sandbox") || strings.HasPrefix(arg, "--enable-logging") || strings.HasPrefix(arg, "--log-net-log") {
-				return false
-			}
-		}
-		if !markerCreated {
-			create, e := http.NewRequestWithContext(ctx, http.MethodPut, address+"/json/new?"+initial, nil)
-			if e == nil {
-				reply, e := client.Do(create)
-				if e == nil {
-					_ = reply.Body.Close()
-					if reply.StatusCode == 200 {
-						markerCreated = true
-					}
-				}
-			}
-		}
-		cdpReason = "marker-page-unavailable"
-		req, e := http.NewRequestWithContext(ctx, http.MethodGet, address+"/json/list", nil)
-		if e != nil {
-			return false
-		}
-		reply, e := client.Do(req)
-		if e != nil {
-			return false
-		}
-		defer func() { _ = reply.Body.Close() }()
-		var pages []struct {
-			Title string
-			URL   string
-			Type  string
-		}
-		if reply.StatusCode != 200 {
-			cdpReason = "cdp-http-status-" + strconv.Itoa(reply.StatusCode)
-			return false
-		}
-		if json.NewDecoder(io.LimitReader(reply.Body, 1<<20)).Decode(&pages) != nil {
-			cdpReason = "invalid-cdp-page-list"
-			return false
-		}
-		cdpReason = "marker-not-among-" + strconv.Itoa(len(pages)) + "-pages"
-		for _, p := range pages {
-			if p.URL == initial {
-				cdpReason = "marker-uri-title-pending"
-			}
-			if strings.HasPrefix(p.URL, "chrome:") {
-				cdpReason = "browser-startup-page-pending"
-			}
-			if p.Title == marker {
-				cdp = address
-				return true
-			}
+		if e := r.focusMarker(ctx, address); e != nil {
+			cdpReason = e.Error()
+		} else {
+			cdp = address
+			return true
 		}
 		return false
 	}); err != nil {
 		return empty, errors.New(err.Error() + ": " + cdpReason)
 	}
-	handle := session.BrowserHandle{Target: "http://" + bridgeAddress + "/vnc.html", CDPAddress: cdp, Marker: marker, Password: password, Assets: app.Tool("REMOTE_GUI_NOVNC", "/usr/share/novnc")}
-	for _, child := range r.children {
-		handle.Owned = append(handle.Owned, state.Process{Role: child.role, Identity: child.identity})
-	}
-	return handle, nil
+	r.current.CDPAddress, r.current.BrowserMode, r.modeReady = cdp, mode, true
+	return r.snapshot(), nil
 }

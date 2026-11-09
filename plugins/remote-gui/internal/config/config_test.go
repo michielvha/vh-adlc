@@ -1,9 +1,56 @@
 package config
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 )
+
+func TestBrowserModesAndHandoff(t *testing.T) {
+	const id = "0123456789abcdef0123456789abcdef"
+	for _, test := range []struct {
+		name string
+		args []string
+		mode string
+	}{
+		{"legacy default", []string{"start"}, "agent"},
+		{"human start", []string{"start", "--browser-mode", "human"}, "human"},
+		{"explicit agent", []string{"start", "--browser-mode", "agent"}, "agent"},
+		{"human doctor", []string{"doctor", "--kind", "browser", "--browser-mode", "human"}, "human"},
+		{"hand to human", []string{"handoff", id, "--browser-mode", "human"}, "human"},
+		{"hand to agent", []string{"handoff", "--browser-mode=agent", id}, "agent"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			c, err := Parse(test.args)
+			if err != nil {
+				t.Fatal(err)
+			}
+			data, err := json.Marshal(c)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var fields map[string]any
+			if err := json.Unmarshal(data, &fields); err != nil {
+				t.Fatal(err)
+			}
+			if fields["browser_mode"] != test.mode || c.Kind != "browser" {
+				t.Fatalf("unexpected mode/kind: %s", data)
+			}
+		})
+	}
+	for _, args := range [][]string{
+		{"handoff", id},
+		{"handoff", "--browser-mode", "human"},
+		{"start", "--browser-mode", "invalid"},
+		{"status", "--browser-mode", "human"},
+		{"share", "http://127.0.0.1:3000", "--browser-mode", "agent"},
+		{"doctor", "--kind", "share", "--browser-mode", "human"},
+	} {
+		if _, err := Parse(args); err == nil {
+			t.Fatalf("accepted inapplicable mode: %v", args)
+		}
+	}
+}
 
 func TestParseLifetimeAndArgumentOrder(t *testing.T) {
 	for _, args := range [][]string{{"share", "http://127.0.0.1:3000/app", "--ttl", "1h", "--transport", "loopback"}, {"share", "--ttl", "1h", "--transport", "loopback", "http://127.0.0.1:3000/app"}} {
