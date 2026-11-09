@@ -68,7 +68,7 @@ export async function verifyPublicationGate(options: PublishOptions, journal: Jo
   if (manifestDigest(parseActionManifest(gate.review.current)) !== plan.manifest_sha256) throw new PublicationScopeChanged("current-manifest-changed");
   const checked = validateReviewedManifest(gate.review);
   const current = sealPlan({ reviewed: checked, grants: gate.review.grants, adoption_sha256: gate.policy.adoption_sha256,
-    context: gate.policy.context, transport: gate.policy.transport, publication_kind: gate.policy.publication_kind, corrections: plan.corrections, attention: plan.attention });
+    context: gate.policy.context, transport: gate.policy.transport, publication_kind: gate.policy.publication_kind, corrections: plan.corrections, attention: plan.attention, candidate_verification_sha256: plan.candidate_verification_sha256 });
   if (!canonicalJSON(current).equals(canonicalJSON(plan))) fail("changed current review or authority");
   const committed = loadCommittedSettings(options.source_repo, plan.manifest.bindings.source_commit);
   if (committed.settings_sha256 !== plan.manifest.bindings.settings_sha256 || !canonicalJSON(committed.settings).equals(canonicalJSON(options.settings))) fail("source settings binding");

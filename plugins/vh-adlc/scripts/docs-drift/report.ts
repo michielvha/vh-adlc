@@ -12,6 +12,10 @@ export type CorrectionInput = {
   repository: string; scope_sha256: string; identity: string; path: string;
   patch_sha256: string; postimage_sha256: string; verification_sha256: string; inputs_sha256: string;
 };
+/** Candidate proof is an output reviewed with delivery. Legacy retained plans omit it. */
+export function deliveryDigest(corrections: CorrectionInput[], attention: AttentionProjection[], candidate_verification_sha256?: string): string {
+  return canonicalDigest({ corrections, attention, ...(candidate_verification_sha256 === undefined ? {} : { candidate_verification_sha256 }) });
+}
 export type Failure = { code: string; message: string };
 export type Proposal = {
   locator: string; state: "open" | "closed" | "merged";

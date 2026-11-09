@@ -1,6 +1,7 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, expect, spyOn, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import * as artifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { verifyCandidate } from "../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -9,7 +10,8 @@ import { commitAll, git, put } from "./repository-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-async function fixture(incompleteInventory: boolean, sourceInsideCandidate = false) {
+async function fixture(incompleteInventory: boolean, sourceInsideCandidate = false,
+  beforeCandidate?: (input: { repo: string; source: string; artifacts: string; baseline: Awaited<ReturnType<typeof verifyCandidate>>; selection: unknown; decisions: Uint8Array }) => void) {
   const f = await runtimeFixture(roots, true), repo = f.repo;
   const scanner = readFileSync(join(import.meta.dir, "fixtures/scanner.js"), "utf8")
     .replace("__FIXTURE_CASE__", JSON.stringify("none")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
@@ -18,9 +20,12 @@ async function fixture(incompleteInventory: boolean, sourceInsideCandidate = fal
   const source = commitAll(repo), candidate = join(f.root, "binding-candidate"), origin = join(f.root, "binding-origin"), artifacts = sourceInsideCandidate ? f.root : join(f.root, "binding-artifacts");
   if (!sourceInsideCandidate) mkdirSync(artifacts, { mode: 0o700 });
   git(f.root, "clone", "--no-local", "--no-checkout", repo, origin); git(origin, "update-ref", "refs/heads/main", source);
-  git(f.root, "clone", "--no-local", "--no-checkout", repo, candidate); git(candidate, "checkout", "--detach", source);
-  const preimage = readFileSync(join(candidate, "docs/guide.md")), replacement = Buffer.from("# Current candidate guide\n");
-  put(candidate, "docs/guide.md", replacement.toString()); const head = commitAll(candidate);
+  let head = "";
+  if (sourceInsideCandidate) {
+    git(f.root, "clone", "--no-local", "--no-checkout", repo, candidate); git(candidate, "checkout", "--detach", source);
+    put(candidate, "docs/guide.md", "# Current candidate guide\n"); head = commitAll(candidate);
+  }
+  const preimage = readFileSync(join(repo, "docs/guide.md")), replacement = Buffer.from("# Current candidate guide\n");
   const selection = { schema_version: 1, source_commit: source, edits: [{ id: "guide-fix", path: "docs/guide.md", action: "replace", start: 0,
     end: preimage.length, before_sha256: sha256(preimage), replacement_base64: replacement.toString("base64"), after_mode: "100644" }] };
   const common = { artifact_root: artifacts, owner: "fixture-owner", run: "fixture-run" };
@@ -37,11 +42,18 @@ async function fixture(incompleteInventory: boolean, sourceInsideCandidate = fal
     writeFileSync(baseline.record_path, bytes, { mode: 0o600 });
     baseline.evidence = { path: relative(artifacts, baseline.record_path), sha256: sha256(bytes) };
   }
-  const verified = await verifyCandidate({ ...common, repo, source, candidate_repo: candidate, candidate: head, selection });
-  expect(baseline.complete).toBe(true); expect(verified.complete).toBe(true);
   const decisions = { schema_version: 1, kind: "docs-drift-decisions", mode: "advisory", source_commit: source,
     selected_proposals: [], decisions: [{ id: "guide-fix", reason: "Synthetic source-based candidate" }], attention: [] };
   const decisionBytes = canonicalJSON(decisions); writeFileSync(join(artifacts, "decisions.json"), decisionBytes, { mode: 0o600 });
+  beforeCandidate?.({ repo, source, artifacts, baseline, selection, decisions: decisionBytes });
+  if (!sourceInsideCandidate) {
+    git(f.root, "clone", "--no-local", "--no-checkout", repo, candidate); git(candidate, "checkout", "--detach", source);
+    put(candidate, "docs/guide.md", replacement.toString()); head = commitAll(candidate);
+  }
+  const verified = await verifyCandidate({ ...common, repo, source, candidate_repo: candidate, candidate: head, selection });
+  expect(baseline.complete, JSON.stringify({ stage: "source", diagnostics: baseline.diagnostics, scan: baseline.scan?.process })).toBe(true);
+  expect(verified.complete, JSON.stringify({ stage: "candidate", diagnostics: verified.diagnostics, scan: verified.scan?.process,
+    commands: verified.commands.map(command => ({ argv: command.argv, process: command.process })) })).toBe(true);
   const native = nativeReader({ ...f, candidate: source }, "fixture-bot", false, incompleteInventory), executable = Bun.which("git");
   if (!executable) throw Error("fixture requires Git");
   writeFileSync(join(f.root, "native-bin", "git"), `#!${process.execPath}
@@ -113,8 +125,9 @@ async function resolveFixture(scenario: string) {
   const origin = join(f.root, "binding-origin");
   git(origin, "fetch", "--no-write-fetch-head", f.candidate, f.head); git(origin, "update-ref", "refs/pull/1/head", f.head);
   const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
-  const proposal = { number: 1, state: "open" as const, merged_at: null, body: "Synthetic selected original", draft: true,
-    actor: "fixture-bot", actor_id: 20, actor_type: "Bot", head_sha: f.head, head_ref: "docs-drift/proposal", head_repository: repository,
+  const outside = scenario.startsWith("outside-");
+  const proposal = { number: 1, state: "open" as const, merged_at: null, body: "Synthetic selected original" + (scenario === "outside-during-fetch" ? " Changed" : ""), draft: true,
+    actor: outside ? "other-author" : "fixture-bot", actor_id: outside ? 70 : 20, actor_type: "Bot", head_sha: f.head, head_ref: outside ? "other-scope/proposal" : "docs-drift/proposal", head_repository: repository,
     base_sha: f.source, base_ref: "main", base_repository: repository };
   const reader = { repository: () => repository, pull: (id: number) => { if (id !== 1) throw Error("unselected original"); return structuredClone(proposal); }, trace: () => [] };
   const collection = { snapshot, store, reader, selected: [1] }, inputs = collectResolutionInputs(collection), quote = snapshot.blobs.find(blob => blob.path === "README.md");
@@ -138,9 +151,14 @@ async function resolveFixture(scenario: string) {
   if (scenario === "changed-decisions") packet.decisions[0].reason = "An unrecorded decision";
   const bytes = canonicalJSON(packet); writeFileSync(join(f.artifacts, "decisions.json"), bytes, { mode: 0o600 });
   const raw = { number: 1, state: "open", merged_at: null, body: proposal.body + (scenario === "changed-original" ? " Changed" : ""), draft: true,
-    user: { login: "fixture-bot", id: 20, type: "Bot" }, head: { sha: f.head, ref: proposal.head_ref, repo: repository }, base: { sha: f.source, ref: "main", repo: repository } };
+    user: { login: proposal.actor, id: proposal.actor_id, type: "Bot" }, head: { sha: f.head, ref: proposal.head_ref, repo: repository }, base: { sha: f.source, ref: "main", repo: repository } };
   writeFileSync(join(f.root, "native-bin", "gh"), `#!${process.execPath}
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 const args = process.argv.slice(2), endpoint = args.at(-1), source = ${JSON.stringify(f.source)}, repository = ${JSON.stringify(repository)}, proposal = ${JSON.stringify(raw)};
+const trace = ${JSON.stringify(join(f.root, "resolve-native-reads.jsonl"))}, previous = existsSync(trace) ? readFileSync(trace, "utf8").split("\\n").filter(Boolean).map(line => JSON.parse(line)) : [];
+const pulls = previous.filter(value => value.endpoint === "repos/fixture/docs/pulls/1").length;
+appendFileSync(trace, JSON.stringify({ endpoint }) + "\\n");
+if (${JSON.stringify(outside)}) proposal.body = "Synthetic selected original" + (pulls >= (${JSON.stringify(scenario)} === "outside-during-fetch" ? 1 : 2) ? " Changed" : "");
 if (args.includes("graphql")) { console.log(JSON.stringify({ data: { viewer: { login: "fixture-bot", databaseId: 20 } } })); process.exit(0); }
 if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
 const value = endpoint === "repos/fixture/docs" ? repository
@@ -163,4 +181,107 @@ test.each(["matching", "changed-decisions", "changed-original", "missing-ref"])(
   else expect(result.diagnostics.join("\n")).toContain(scenario === "missing-ref" ? "Selected complete original diff unavailable" : "Resolve record decisions or complete original bindings changed");
   expect(result.complete).toBe(scenario === "matching"); expect(result.authority).toBe("none");
   expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
+}, 60000);
+
+test("publication bindings retain a bounded body-free proposal preimage and expose the worker target", async () => {
+  const f = await resolveFixture("matching"), { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
+  const result = await collectPublicationBindings(f.options);
+  expect(result.complete).toBe(true);
+  expect(result.proposal_snapshot).toMatchObject({ sha256: result.bindings!.proposals_sha256 });
+  const bytes = readFileSync(join(f.artifacts, result.proposal_snapshot!.path));
+  expect(sha256(bytes)).toBe(result.bindings!.proposals_sha256);
+  expect(bytes.toString()).not.toContain("Synthetic selected original");
+  expect(JSON.parse(bytes.toString()).inventory[0].body_sha256).toBe(sha256(Buffer.from("Synthetic selected original")));
+  const { workerInputDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
+  expect(result.worker_input_sha256).toBe(workerInputDigest(result.bindings!));
+});
+
+
+test("proposal snapshot retention failure leaves binding assembly incomplete with its resource locator", async () => {
+  const f = await fixture(false), { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
+  const publish = artifacts.publishArtifact;
+  const failure = spyOn(artifacts, "publishArtifact").mockImplementation((path, bytes) => {
+    if (path.includes("/proposal-snapshot-")) throw Error("fixture proposal-snapshot retention failure");
+    return publish(path, bytes);
+  });
+  try {
+    const result = await collectPublicationBindings(f.options);
+    expect(result.complete).toBe(false);
+    expect(result.proposal_snapshot).toBe(null);
+    expect(result.worker_input_sha256).toBe(null);
+    expect(result.proposal_snapshot_path?.startsWith(f.artifacts + "/proposal-snapshot-")).toBe(true);
+    expect(result.diagnostics).toContain("fixture proposal-snapshot retention failure");
+    expect(result.facts?.store?.root.startsWith(f.artifacts + "/")).toBe(true);
+  } finally { failure.mockRestore(); }
+});
+
+test.each(["outside-late-change", "outside-during-fetch"])("selected resolve originals are rechecked independently of discovery %s", async scenario => {
+  const f = await resolveFixture(scenario), { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
+  const result = await collectPublicationBindings(f.options);
+  expect(result.complete).toBe(false);
+  expect(result.diagnostics.join("\n")).toContain("Selected original inputs changed during binding collection");
+});
+
+test.each(["missing", "extra", "duplicate", "unknown-field", "malformed-attention", "duplicate-attention"])("publication bindings refuse unaccounted decisions or attention %s", async scenario => {
+  const f = await fixture(false), packet: Record<string, unknown> = structuredClone(f.decisions);
+  if (scenario === "missing") packet.decisions = [];
+  if (scenario === "extra") packet.decisions = [...f.decisions.decisions, { id: "unselected", reason: "Not selected" }];
+  if (scenario === "duplicate") packet.decisions = [f.decisions.decisions[0], f.decisions.decisions[0]];
+  if (scenario === "unknown-field") packet.decisions = [{ ...f.decisions.decisions[0], approved: true }];
+  if (scenario === "malformed-attention") packet.attention = [7];
+  if (scenario === "duplicate-attention") {
+    const item = { identity: "unknown-one", disposition: "unknown", reason: "A current input is unavailable", owner_action: "Choose its resolution",
+      rule: { id: "fixture-rule" }, title: "Current input", links: [] };
+    packet.attention = [item, item];
+  }
+  const bytes = canonicalJSON(packet); writeFileSync(join(f.artifacts, "decisions.json"), bytes, { mode: 0o600 });
+  const { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
+  const result = await collectPublicationBindings({ ...f.options, decisions: { path: "decisions.json", sha256: sha256(bytes) } });
+  expect(result.complete).toBe(false);
+  expect(result.diagnostics.join("\n")).toContain(scenario.includes("attention") ? "Invalid or duplicate attention proposal" : "Advisory decisions do not account for selected edits");
+});
+
+
+test("worker target is captured before a candidate exists and passes the original review validator", async () => {
+  const workerInputs = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+  const { workerInputsDigest, manifestDigest, validateReviewedManifest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
+  const { captureSnapshot } = await import("../../../plugins/vh-adlc/scripts/docs-drift/snapshot");
+  const { projectProposalBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
+  const { evidence, role } = await import("./manifest-fixture");
+  let target = "", originalWorker: ReturnType<typeof evidence>;
+  const f = await fixture(false, false, input => {
+    expect(existsSync(join(input.repo, "../binding-candidate"))).toBe(false);
+    const inputs = workerInputs.deriveWorkerInputs({ snapshot: captureSnapshot(input.repo, input.source),
+      assessment_sha256: input.baseline.scan_artifacts!.report.sha256, source_verification: input.baseline.evidence!,
+      decisions_sha256: sha256(input.decisions), proposals_sha256: sha256(canonicalJSON(projectProposalBindings([], null))) });
+    target = workerInputsDigest(inputs);
+    originalWorker = evidence("pre-candidate-worker", target, canonicalJSON({ input_sha256: target, edits: (input.selection as { edits: unknown[] }).edits, publication: null }).toString());
+  });
+  const { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
+  const result = await collectPublicationBindings(f.options);
+  expect(result.diagnostics).toEqual([]); expect(result.worker_input_sha256).toBe(target);
+  const worker = originalWorker!, manifest = { schema_version: 1 as const, operation_id: "pre-candidate", repository: "fixture/docs", repository_id: 10,
+    actor: "fixture-bot", actor_id: 20, bindings: result.bindings!, effects: [], worker: { invocation_id: worker.invocation_id, context_id: worker.context_id,
+      native_sha256: worker.native_sha256, returned_sha256: worker.returned_sha256 } };
+  const reviewer = evidence("post-candidate-reviewer", manifestDigest(manifest), "NO FINDINGS\n");
+  const checked = validateReviewedManifest({ manifest, current: structuredClone(manifest), worker, reviewer, grants: [], policy: { worker: role, reviewer: role } });
+  expect(checked.manifest_sha256).toBe(manifestDigest(manifest));
+  const { sealPlan, readRetainedPlan } = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const plan = sealPlan({ reviewed: checked, grants: [], adoption_sha256: sha256(Buffer.from("synthetic adoption")),
+    context: "production", transport: "native", publication_kind: "advisory", corrections: result.corrections, attention: result.attention,
+    candidate_verification_sha256: result.candidate_verification_sha256! });
+  expect(readRetainedPlan(canonicalJSON(plan))).toEqual(plan);
+  const repeated = await verifyCandidate({ repo: f.repo, source: f.source, candidate_repo: f.candidate, candidate: f.head,
+    selection: f.selection, artifact_root: f.artifacts, owner: f.owner, run: f.run });
+  expect(repeated.complete).toBe(true);
+  const next = await collectPublicationBindings({ ...f.options, candidate_verification: repeated.evidence! });
+  expect(next.diagnostics).toEqual([]); expect(next.worker_input_sha256).toBe(target);
+  expect(next.candidate_verification_sha256).not.toBe(result.candidate_verification_sha256);
+  expect(next.bindings!.delivery_sha256).not.toBe(result.bindings!.delivery_sha256);
+  const changed = { ...manifest, bindings: next.bindings! };
+  expect(() => validateReviewedManifest({ manifest: changed, current: structuredClone(changed), worker, reviewer, grants: [],
+    policy: { worker: role, reviewer: role } })).toThrow("review target");
+  expect(result.candidate_verification_sha256).toBe(f.verified.evidence!.sha256);
+  expect(result.bindings!.delivery_sha256).toBe(sha256(canonicalJSON({ corrections: result.corrections, attention: result.attention,
+    candidate_verification_sha256: f.verified.evidence!.sha256 })));
 }, 60000);

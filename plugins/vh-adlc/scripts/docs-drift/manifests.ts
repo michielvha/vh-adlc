@@ -154,18 +154,31 @@ const bindingFields = [
   "scanner_sha256", "options_sha256", "scope_sha256", "feedback_sha256", "proposals_sha256", "decisions_sha256", "dependencies_sha256", "delivery_sha256",
 ] as const;
 
-export function bindingDigest(value: Bindings): string {
-  const bindings = object(value, bindingFields, "bindings");
+export type WorkerInputs = Omit<Bindings, "candidate_commit" | "candidate_tree" | "diff_sha256" | "delivery_sha256">;
+const workerInputFields = bindingFields.filter(field => !["candidate_commit", "candidate_tree", "diff_sha256", "delivery_sha256"].includes(field));
+
+function checkedBindingDigest(value: unknown, fields: readonly string[]): string {
+  const bindings = object(value, fields, "bindings");
   for (const [key, value] of Object.entries(bindings)) {
     if (key.endsWith("sha256")) digest(value); else gitObject(value);
   }
   return sha256(canonicalJSON(bindings));
 }
+
+export function bindingDigest(value: Bindings): string {
+  return checkedBindingDigest(value, bindingFields);
+}
+
+/** Capture this target before authoring. It contains no candidate or verification outputs. */
+export function workerInputsDigest(value: WorkerInputs): string {
+  return checkedBindingDigest(value, workerInputFields);
+}
+
 /** Worker inputs precede produced diff/tree/commit identities. The reviewer binds those outputs. */
 export function workerInputDigest(value: Bindings): string {
   bindingDigest(value);
   const { candidate_commit, candidate_tree, diff_sha256, delivery_sha256, ...inputs } = value;
-  return sha256(canonicalJSON(inputs));
+  return workerInputsDigest(inputs);
 }
 
 export function effectDigest(value: Effect[]): string {

@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { authorizeEffects, effectDigest, manifestDigest, modelMatches, parseActionManifest, requireReviewedManifest, workerInputDigest } from "./manifests";
 import type { ActionManifest, EffectGrant, ReviewedManifest, RolePolicy } from "./manifests";
 import { canonicalJSON, decodeUTF8, freezeJSON, sha256 } from "./protocol";
-import { correctionProjection, type AttentionProjection, type CorrectionInput } from "./report";
+import { deliveryDigest, correctionProjection, type AttentionProjection, type CorrectionInput } from "./report";
 import { parseIdentitySource } from "./settings";
 import { externalArtifactDirectory, type OwnedObjectStore } from "./snapshot";
 import { requireOwnedStore } from "./proposals";
@@ -16,7 +16,7 @@ export type SealedPlan = {
   schema_version: 1; manifest: ActionManifest; manifest_sha256: string; approval_sha256: string;
   adoption_sha256: string; context: "production" | "trial"; transport: "native" | "collector";
   publication_kind: "advisory" | "resolve"; review_verdict: "clean"; roles: { worker: RoleBinding; reviewer: RoleBinding };
-  corrections: CorrectionInput[]; attention: AttentionProjection[];
+  corrections: CorrectionInput[]; attention: AttentionProjection[]; candidate_verification_sha256?: string;
 };
 export type PlanPolicy = {
   adoption_sha256: string; context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"]; pr_draft: boolean;
@@ -77,7 +77,9 @@ function roleBinding(value: unknown): RoleBinding {
   return input as RoleBinding;
 }
 function parsePlan(value: unknown): SealedPlan {
-  const input = exact(value, ["schema_version", "manifest", "manifest_sha256", "approval_sha256", "adoption_sha256", "context", "transport", "publication_kind", "review_verdict", "roles", "corrections", "attention"]);
+  const hasProof = value !== null && typeof value === "object" && Object.hasOwn(value, "candidate_verification_sha256");
+  const input = exact(value, ["schema_version", "manifest", "manifest_sha256", "approval_sha256", "adoption_sha256", "context", "transport", "publication_kind", "review_verdict", "roles", "corrections", "attention", ...(hasProof ? ["candidate_verification_sha256"] : [])]);
+  const proof = hasProof ? hash(input.candidate_verification_sha256) : undefined;
   if (input.schema_version !== 1 || input.review_verdict !== "clean" || !["production", "trial"].includes(String(input.context))
     || !["native", "collector"].includes(String(input.transport)) || (input.context === "production" && input.transport !== "native")) fail("plan context or verdict");
   if (input.publication_kind !== "advisory" && input.publication_kind !== "resolve") fail("publication kind");
@@ -108,7 +110,7 @@ function parsePlan(value: unknown): SealedPlan {
     if (binding.repository !== manifest.repository || binding.scope_sha256 !== manifest.bindings.scope_sha256) fail("attention scope");
     attentionIds.add(String(attention.sha256));
   }
-  if (manifest.bindings.delivery_sha256 !== sha256(canonicalJSON({ corrections: input.corrections, attention: input.attention }))) fail("changed reviewed delivery bindings");
+  if (manifest.bindings.delivery_sha256 !== deliveryDigest(input.corrections as CorrectionInput[], input.attention as AttentionProjection[], proof)) fail("changed reviewed delivery bindings");
   return freezeJSON(JSON.parse(canonicalJSON(input).toString()) as SealedPlan);
 }
 
@@ -116,7 +118,7 @@ function parsePlan(value: unknown): SealedPlan {
 export function sealPlan(options: {
   reviewed: ReviewedManifest; grants: EffectGrant[]; adoption_sha256: string;
   context: SealedPlan["context"]; transport: SealedPlan["transport"]; publication_kind: SealedPlan["publication_kind"];
-  corrections: CorrectionInput[]; attention: AttentionProjection[];
+  corrections: CorrectionInput[]; attention: AttentionProjection[]; candidate_verification_sha256?: string;
 }): SealedPlan {
   requireReviewedManifest(options.reviewed);
   const { manifest, manifest_sha256, worker, reviewer } = options.reviewed;
@@ -128,6 +130,7 @@ export function sealPlan(options: {
     adoption_sha256: options.adoption_sha256, context: options.context, transport: options.transport,
     publication_kind: options.publication_kind, review_verdict: "clean", roles: { worker: workerBinding, reviewer: reviewerBinding },
     corrections: options.corrections, attention: options.attention,
+    ...(options.candidate_verification_sha256 === undefined ? {} : { candidate_verification_sha256: options.candidate_verification_sha256 }),
   });
 }
 

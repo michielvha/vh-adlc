@@ -339,3 +339,21 @@ for (const format of ["sha1", "sha256"] as const) {
     expect(written.receipt_object).toBe(written.lease_object);
   });
 }
+
+
+test("candidate proof binds delivery while retained legacy plans preserve their exact shape", () => {
+  const { policy, plan: legacy } = setup();
+  expect(readVerifiedPlan(canonicalJSON(legacy), policy)).toEqual(legacy);
+  expect(Object.hasOwn(legacy, "candidate_verification_sha256")).toBe(false);
+  const proof = hash("original candidate verification"), selected = { ...bindings,
+    delivery_sha256: sha256(canonicalJSON({ corrections: [], attention: [], candidate_verification_sha256: proof })) };
+  const input = fixture(selected), options = { reviewed: validateReviewedManifest(input), grants: input.grants,
+    adoption_sha256: hash("adoption"), publication_kind: "advisory" as const, context: "production" as const, transport: "native" as const,
+    corrections: [], attention: [], candidate_verification_sha256: proof };
+  const plan = sealPlan(options);
+  expect(plan.candidate_verification_sha256).toBe(proof);
+  expect(readVerifiedPlan(canonicalJSON(plan), policy)).toEqual(plan);
+  expect(() => readVerifiedPlan(canonicalJSON({ ...plan, candidate_verification_sha256: hash("changed proof") }), policy)).toThrow("delivery");
+  const { candidate_verification_sha256: _proof, ...missing } = plan;
+  expect(() => readVerifiedPlan(canonicalJSON(missing), policy)).toThrow("delivery");
+});

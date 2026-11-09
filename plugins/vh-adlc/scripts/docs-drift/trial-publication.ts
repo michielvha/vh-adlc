@@ -80,7 +80,7 @@ export function readTrialPublication(selected: TrialContext, requestPath: string
     worker: nativeRole(context, request.worker, plan.roles.worker, workerPolicy), reviewer: nativeRole(context, request.reviewer, plan.roles.reviewer, reviewerPolicy),
     policy: { worker: workerPolicy, reviewer: reviewerPolicy } };
   const checked = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy,
-    corrections: plan.corrections, attention: plan.attention });
+    corrections: plan.corrections, attention: plan.attention, candidate_verification_sha256: plan.candidate_verification_sha256 });
   if (!canonicalJSON(checked).equals(canonicalJSON(plan))) throw Error("synthetic publication original review changed");
   return { source_repo: context.source, artifact_root: context.artifacts, object_store: context.store, settings: context.settings,
     plan, request_sha256: requestHash, transport: createTrialTransport(context), gate: async () => {

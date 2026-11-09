@@ -45,6 +45,13 @@ export function collectProposals(reader: RepositoryReader, settings: Settings) {
   return { complete: diagnostics.length === 0, proposals, diagnostics, observations: reader.trace() };
 }
 
+/** Keep an exact metadata preimage for replay checks while retaining only body digests. */
+export function projectProposalBindings(inventory: PullRequestInput[], resolutionSHA: string | null) {
+  return { schema_version: 1 as const, kind: "docs-drift-proposal-snapshot" as const,
+    inventory: inventory.map(({ body, ...proposal }) => ({ ...proposal, body_sha256: sha256(Buffer.from(body)) })),
+    resolution_sha256: resolutionSHA };
+}
+
 export function requireOwnedStore(store: OwnedObjectStore, repository: string): void {
   try {
     const file = lstatSync(store.record_path), directory = lstatSync(store.root);
