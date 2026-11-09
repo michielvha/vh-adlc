@@ -62,3 +62,108 @@ test.skipIf(!enabled)('real noVNC keyboard input survives exact-browser reattach
   else throw Error('owned browser cleanup pending; private test records retained');
  }
 },120000);
+
+test.skipIf(!enabled)('human sign-in retains session cookies and tab state through both handoffs', async () => {
+ const require = createRequire(import.meta.url);
+ const {chromium} = require(process.env.REMOTE_GUI_PLAYWRIGHT_MODULE!);
+ const root = mkdtempSync(join(tmpdir(), 'rg-human-'));
+ const binary = process.env.REMOTE_GUI_TEST_BINARY!;
+ let session: any;
+ let viewer: any;
+ let agent: any;
+ let proofs = 0;
+ const fixture = Bun.serve({
+  hostname: '127.0.0.1',
+  port: 0,
+  fetch(request) {
+   const url = new URL(request.url);
+   const signedIn = request.headers.get('cookie')?.includes('fixture-session=accepted');
+   if (url.pathname === '/login') {
+    return new Response(`<script>sessionStorage.setItem('fixture-state','retained');location.replace('/account')</script>`, {
+     headers: {'Content-Type': 'text/html', 'Set-Cookie': 'fixture-session=accepted; HttpOnly; SameSite=Lax; Path=/'},
+    });
+   }
+   if (url.pathname === '/account' && signedIn) {
+    return new Response(`<p>Authenticated fixture</p><script>fetch('/proof?retained='+(sessionStorage.getItem('fixture-state')==='retained'))</script>`, {
+     headers: {'Content-Type': 'text/html'},
+    });
+   }
+   if (url.pathname === '/proof' && signedIn && url.searchParams.get('retained') === 'true') {
+    proofs++;
+    return new Response('ok');
+   }
+   return new Response('Sign-in required', {status: 401});
+  },
+ });
+ const cli = (...args: string[]) => {
+  const result = Bun.spawnSync([binary, ...args, '--home', root, '--transport', 'loopback'], {env: process.env});
+  check(result.exitCode === 0, 'runtime command failed: ' + args[0]);
+  return JSON.parse(result.stdout.toString());
+ };
+ const waitFor = async (condition: () => boolean, message: string) => {
+  const deadline = Date.now() + 15000;
+  while (!condition() && Date.now() < deadline) await Bun.sleep(100);
+  check(condition(), message);
+ };
+ try {
+  session = cli('start', '--browser-mode', 'human', '--ttl', '4m');
+  check(session.browser_mode === 'human' && !session.local_cdp, 'human browser exposed debugging');
+  check(session.marker_url, 'owned connection-page URL missing');
+  viewer = await chromium.launch({
+   executablePath: process.env.REMOTE_GUI_CHROMIUM,
+   headless: true,
+   chromiumSandbox: true,
+   args: ['--disable-gpu'],
+  });
+  const access = cli('access', session.id, '--reveal');
+  const context = await viewer.newContext({
+   serviceWorkers: 'block',
+   viewport: {width: 1500, height: 1000},
+   httpCredentials: {username: 'viewer', password: access.access_code, origin: new URL(session.url).origin},
+  });
+  const page = await context.newPage();
+  await page.goto(session.url, {waitUntil: 'domcontentloaded'});
+  await page.getByRole('link', {name: 'Open session'}).click();
+  await page.locator('#status').filter({hasText: 'Shared browser connected'}).waitFor({timeout: 15000});
+  const canvas = page.locator('canvas');
+  await canvas.waitFor({state: 'visible'});
+  await canvas.focus();
+  await page.keyboard.type(session.marker, {delay: 15});
+  const markerCheck = await fetch(session.marker_url + 'check').then(response => response.json()) as any;
+  check(markerCheck.input_verified === true, 'viewer input missed the owned human browser');
+  await page.keyboard.press('Control+t');
+  await page.keyboard.type(fixture.url.href + 'login');
+  await page.keyboard.press('Enter');
+  await waitFor(() => proofs >= 1, 'fixture owner sign-in failed');
+
+  // The fixture owner has finished sign-in before this explicit hand-back.
+  const returned = cli('handoff', session.id, '--browser-mode', 'agent');
+  check(returned.browser_mode === 'agent' && returned.local_cdp, 'agent hand-back did not establish control');
+  check(returned.url === session.url && returned.expires_at === session.expires_at, 'handoff changed viewer or lifetime');
+  agent = await chromium.connectOverCDP(returned.local_cdp, {timeout: 10000});
+  const account = agent.contexts()[0].pages().find((candidate: any) => candidate.url() === fixture.url.href + 'account');
+  check(account, 'original fixture tab was not restored');
+  await account.bringToFront();
+  await account.getByText('Authenticated fixture').waitFor({timeout: 15000});
+  check(await account.evaluate(() => sessionStorage.getItem('fixture-state')) === 'retained', 'tab storage lost during hand-back');
+  await waitFor(() => proofs >= 2, 'session cookie or tab state lost during hand-back');
+  await agent.close();
+  agent = undefined;
+
+  const human = cli('handoff', session.id, '--browser-mode', 'human');
+  check(human.browser_mode === 'human' && !human.local_cdp, 'human return retained debugging');
+  check(human.url === session.url && human.expires_at === session.expires_at, 'return changed viewer or lifetime');
+  await canvas.focus();
+  await page.keyboard.press('Control+2');
+  await waitFor(() => proofs >= 3, 'session cookie or tab state lost on return to the owner');
+ } finally {
+  if (agent) await agent.close();
+  if (viewer) await viewer.close();
+  fixture.stop(true);
+  if (session) {
+   const stopped = cli('stop', session.id);
+   check(stopped.state === 'stopped', 'owned browser cleanup pending; private records retained');
+  }
+  rmSync(root, {recursive: true, force: true});
+ }
+}, 180000);
