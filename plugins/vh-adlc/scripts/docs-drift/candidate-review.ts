@@ -36,7 +36,10 @@ export async function collectCandidateReview(input: Options): Promise<CandidateR
       policy: { worker: workerPolicy, reviewer: reviewerPolicy } });
     result.review = { manifest_sha256: verified.manifest_sha256, worker: worker.binding, reviewer: reviewer.binding };
     result.complete = true;
-  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.target?.scope_changed); result.diagnostics.push(error instanceof Error ? error.message : "Original candidate review unavailable"); }
+  } catch (error) {
+    result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.target?.scope_changed);
+    result.diagnostics.push(error instanceof Error ? error.message : "Original candidate review unavailable");
+  }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidate, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during original review collection");
   }

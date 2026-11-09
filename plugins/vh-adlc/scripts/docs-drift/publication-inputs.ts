@@ -48,15 +48,19 @@ export async function collectPublicationInputs(input: {
     const fetched = await fetchCurrentDefault(store, { hostname: settings.hostname, repository: settings.repository,
       default_branch: settings.default_branch, expected_default_commit: context.default_commit, environment });
     if (!fetched.complete) { result.diagnostics.push(...fetched.diagnostics); throw Error("Current native default objects unavailable"); }
+    result.freshness = checkFreshness(captureBareSnapshot(store.root, options.source), context.default_commit);
+    if (result.freshness.diagnostic) throw Error("Assessed publication source comparison unavailable");
+    if (!result.freshness.fresh) throw new PublicationScopeChanged("Assessed publication source needs fresh collection and review");
     result.runtime = await selectApprovedRuntime({ repo, policy_repo: store.root, current_default: context.default_commit, identity: context.identity,
       cache_directory: options.cache_directory, entry: options.entry, launcher_path: options.launcher_path, settings_path: options.settings_path });
-    result.freshness = checkFreshness(captureBareSnapshot(store.root, options.source), context.default_commit);
-    if (!result.freshness.fresh) throw new PublicationScopeChanged("Assessed publication source needs fresh collection and review");
     const current = native();
     if (current.default_commit !== context.default_commit || canonicalDigest(current.identity) !== canonicalDigest(context.identity))
       throw new PublicationScopeChanged("Native publication source or actor changed during collection");
     result.complete = true;
-  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged; result.diagnostics.push(error instanceof Error ? error.message : "Publication input collection unavailable"); }
+  } catch (error) {
+    result.scope_changed = error instanceof PublicationScopeChanged;
+    result.diagnostics.push(error instanceof Error ? error.message : "Publication input collection unavailable");
+  }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during publication input collection");
   }

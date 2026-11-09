@@ -142,3 +142,38 @@ async function changedBindingCase(kind: string) {
 }
 
 test.each(["authority", "body", "actor"])("the retained native controller invalidates changed binding %s", changedBindingCase, 365000);
+
+test.each(["authority", "actor"])("resume permanently records a binding change first observed after interruption %s", async kind => {
+  const roots: string[] = [];
+  try {
+    const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
+    console.error("Owned interrupted binding fixture roots", JSON.stringify(roots));
+    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
+    const original = journal.appendOutcome;
+    let interrupted = false;
+    const fault = spyOn(journal, "appendOutcome").mockImplementation((current: unknown, id: string, outcome: unknown) => {
+      if (id === "lease" && !interrupted) { interrupted = true; throw Error("Synthetic interruption after lease delivery"); }
+      return original(current, id, outcome);
+    });
+    let pending;
+    try { pending = await controller.publishPublication(f.publication); }
+    finally { fault.mockRestore(); }
+    expect(interrupted).toBe(true); expect(pending.state).toBe("pending");
+    expect(pending.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(false);
+    const authorityPath = join(f.artifacts, f.authority.path), authority = readFileSync(authorityPath);
+    const state = JSON.parse(readFileSync(service.statePath, "utf8"));
+    if (kind === "authority") writeFileSync(authorityPath, Buffer.concat([authority, Buffer.from("\n")]));
+    else { state.viewer_id = 21; writeFileSync(service.statePath, JSON.stringify(state)); }
+    const options = { ...f.publication, journal_directory: pending.journal.directory };
+    await expect(controller.resumePublication(options)).rejects.toThrow();
+    const observed = journal.readJournal(options.journal_directory, f.repo);
+    expect(observed.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
+    if (kind === "authority") writeFileSync(authorityPath, authority);
+    else { state.viewer_id = 20; writeFileSync(service.statePath, JSON.stringify(state)); }
+    const resumed = await controller.resumePublication(options);
+    expect(resumed.state).toBe("pending"); expect(resumed.reason).toBe("reconciliation-only-no-replay");
+    expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(0);
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  } catch (error) { console.error("Preserved interrupted binding roots", JSON.stringify(roots)); throw error; }
+}, 365000);

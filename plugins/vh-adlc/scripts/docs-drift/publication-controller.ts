@@ -6,7 +6,7 @@ import { readPublicationAuthority } from "./publication-authority";
 import { capturePublicationInventory, type PublicationInventory } from "./publication-inventory";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
 import { manifestDigest, validateReviewedManifest, workerInputDigest } from "./manifests";
-import { publishArtifact, readArtifact, readJournal, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
+import { appendIntent, appendInvalidation, publishArtifact, readArtifact, readJournal, sealPlan, writePublicationObjects, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
 import { publish, PublicationScopeChanged, type PublicationGate, type PublishOptions } from "./publish";
 import { resumeEffects } from "./recovery";
 import { collectPublicationInputs } from "./publication-inputs";
@@ -21,6 +21,14 @@ import { captureSnapshot, type OwnedObjectStore } from "./snapshot";
 
 type Options = Parameters<typeof collectCandidateReview>[0] & { authority: unknown };
 type Runtime = NonNullable<Awaited<ReturnType<typeof collectPublicationInputs>>["runtime"]>;
+type PublicationFacts = Awaited<ReturnType<typeof collectPublicationInputs>>;
+
+function confirmedFactsChanged(facts: PublicationFacts | null | undefined, plan: SealedPlan | undefined): boolean {
+  const identity = facts?.identity, manifest = plan?.manifest;
+  return Boolean(facts?.scope_changed || identity && manifest && (identity.repository_id !== manifest.repository_id || identity.actor_id !== manifest.actor_id
+    || identity.repository.toLowerCase() !== manifest.repository.toLowerCase() || identity.actor.toLowerCase() !== manifest.actor.toLowerCase())
+    || plan && facts?.runtime && facts.runtime.adoption_sha256 !== plan.adoption_sha256);
+}
 
 function requireExecutingRuntime(runtime: Runtime): void {
   if (Bun.version !== "1.4.4" || realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/publication-controller.ts"))
@@ -47,11 +55,7 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
   if (!checked.complete) {
     const before = checked.target?.preparation?.worker_inputs;
     const facts = before?.facts ?? checked.target?.bindings?.facts;
-    const identity = facts?.identity, manifest = expected?.manifest;
-    const identityChanged = identity && manifest && (identity.repository_id !== manifest.repository_id || identity.actor_id !== manifest.actor_id
-      || identity.repository.toLowerCase() !== manifest.repository.toLowerCase() || identity.actor.toLowerCase() !== manifest.actor.toLowerCase());
-    const runtimeChanged = expected && facts?.runtime && facts.runtime.adoption_sha256 !== expected.adoption_sha256;
-    if (identityChanged || runtimeChanged || checked.scope_changed || before?.scope_changed || checked.target?.bindings?.scope_changed
+    if (confirmedFactsChanged(facts, expected) || checked.scope_changed || before?.scope_changed || checked.target?.bindings?.scope_changed
       || expected && before?.complete && before.worker_input_sha256 !== workerInputDigest(expected.manifest.bindings))
       throw new PublicationScopeChanged("Publication worker or candidate inputs changed");
     throw Error(checked.diagnostics.join("\n") || "Current publication review unavailable");
@@ -156,22 +160,36 @@ export async function resumePublication(input: Options & { journal_directory: st
   const options = structuredClone(input);
   if (dirname(realpathSync(options.journal_directory)) !== realpathSync(options.artifact_root)) throw Error("Original publication journal artifact root required");
   const journal = readJournal(options.journal_directory, options.repo), invocation = readInvocation(options, journal.plan);
-  const source = readSourceAssessmentArtifacts({ ...options, candidate_repo: options.candidate_repo, reference: options.source_verification });
-  const candidate = readCandidateVerificationArtifacts({ ...options, reference: options.candidate_verification });
-  const facts = await collectPublicationInputs({ ...options, object_store: candidate.inspection?.object_store ?? undefined });
-  if (!facts.complete || !facts.runtime || !source.object_store) throw Error("Current publication recovery runtime unavailable");
-  requireExecutingRuntime(facts.runtime);
-  importCandidate(source.object_store, facts.store!, journal.plan);
-  const settings = captureSnapshot(options.repo, options.source).settings;
-  const transport = createNativeTransport({ source_repo: options.repo, artifact_root: options.artifact_root, object_store: source.object_store,
-    settings, credential: options.credential, path: options.path });
-  const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
-  const proposals = collectProposals(native.repository, settings);
-  if (!proposals.complete) throw Error("Current recovery proposal inventory unavailable");
-  const inventory = await capturePublicationInventory({ source_repo: options.repo, artifact_root: options.artifact_root, journal_directory: journal.directory,
-    original: invocation.proposal_snapshot, transport, objects: writePublicationObjects(source.object_store, journal.plan, journal.header), current_proposals: proposals.proposals });
-  const current = await currentState(options, inventory, journal.plan);
-  if (!canonicalJSON(current.plan).equals(canonicalJSON(journal.plan))) throw new PublicationScopeChanged("Original recovery plan changed");
-  const publication = publicationOptions(options, current, invocation.proposal_snapshot);
-  return resumeEffects({ ...publication, journal_directory: options.journal_directory });
+  try {
+    const source = readSourceAssessmentArtifacts({ ...options, candidate_repo: options.candidate_repo, reference: options.source_verification });
+    const candidate = readCandidateVerificationArtifacts({ ...options, reference: options.candidate_verification });
+    const facts = await collectPublicationInputs({ ...options, object_store: candidate.inspection?.object_store ?? undefined });
+    if (confirmedFactsChanged(facts, journal.plan)) throw new PublicationScopeChanged("Original recovery source actor or runtime changed");
+    if (!facts.complete || !facts.runtime || !source.object_store) throw Error("Current publication recovery runtime unavailable");
+    requireExecutingRuntime(facts.runtime);
+    importCandidate(source.object_store, facts.store!, journal.plan);
+    const settings = captureSnapshot(options.repo, options.source).settings;
+    const transport = createNativeTransport({ source_repo: options.repo, artifact_root: options.artifact_root, object_store: source.object_store,
+      settings, credential: options.credential, path: options.path });
+    const native = readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
+    const proposals = collectProposals(native.repository, settings);
+    if (!proposals.complete) throw Error("Current recovery proposal inventory unavailable");
+    const inventory = await capturePublicationInventory({ source_repo: options.repo, artifact_root: options.artifact_root, journal_directory: journal.directory,
+      original: invocation.proposal_snapshot, transport, objects: writePublicationObjects(source.object_store, journal.plan, journal.header), current_proposals: proposals.proposals });
+    const current = await currentState(options, inventory, journal.plan);
+    if (!canonicalJSON(current.plan).equals(canonicalJSON(journal.plan))) throw new PublicationScopeChanged("Original recovery plan changed");
+    const publication = publicationOptions(options, current, invocation.proposal_snapshot);
+    return resumeEffects({ ...publication, journal_directory: options.journal_directory });
+  } catch (error) {
+    if (error instanceof PublicationScopeChanged || error instanceof ArtifactChanged) {
+      let latest = readJournal(options.journal_directory, options.repo);
+      const pending = latest.plan.manifest.effects.find(effect => !latest.events.some(event => event.effect_id === effect.id
+        && ["outcome", "retired-absence", "acknowledged-delivery"].includes(event.kind)));
+      if (pending && !latest.events.some(event => event.kind === "invalidation")) {
+        if (!latest.events.some(event => event.kind === "intent" && event.effect_id === pending.id)) latest = appendIntent(latest, pending.id);
+        appendInvalidation(latest, pending.id, "original-recovery-inputs-changed");
+      }
+    }
+    throw error;
+  }
 }

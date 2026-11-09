@@ -126,7 +126,10 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     result.proposal_snapshot = { path: relative(secondary.directory, result.proposal_snapshot_path), sha256: result.bindings.proposals_sha256 };
     result.worker_input_sha256 = workerInputDigest(result.bindings);
     result.complete = true;
-  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || result.facts?.scope_changed === true || result.facts?.freshness?.fresh === false; result.diagnostics.push(error instanceof Error ? error.message : "Publication binding collection unavailable"); }
+  } catch (error) {
+    result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || result.facts?.scope_changed === true;
+    result.diagnostics.push(error instanceof Error ? error.message : "Publication binding collection unavailable");
+  }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during publication binding collection");
   }

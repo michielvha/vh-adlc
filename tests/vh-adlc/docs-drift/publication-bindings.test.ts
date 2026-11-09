@@ -576,3 +576,33 @@ test("normal binding rechecks preserve the reviewed input after its exact own PR
   const after = await collectPublicationBindings({ ...f.options, inventory_context: context });
   expect(after.diagnostics).toEqual([]); expect(after.bindings).toEqual(bound.bindings);
 }, 60000);
+
+test.each(["changed-source", "unknown-comparison", "unavailable-runtime"])("publication freshness distinguishes confirmed changes from unavailable proof %s", async scenario => {
+  const f = await fixture(false);
+  const snapshots = await import("../../../plugins/vh-adlc/scripts/docs-drift/snapshot");
+  const bootstrap = await import("../../../plugins/vh-adlc/scripts/docs-drift/bootstrap");
+  const { collectPublicationInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-inputs");
+  const freshness = spyOn(snapshots, "checkFreshness").mockReturnValue({
+    fresh: scenario === "unavailable-runtime", assessed_commit: f.source, current_commit: f.source,
+    changed_paths: scenario === "changed-source" ? ["docs/guide.md"] : [],
+    material_paths: scenario === "changed-source" ? ["docs/guide.md"] : [],
+    history_changed: false, required_inputs_changed: false,
+    diagnostic: scenario === "unknown-comparison" ? "unavailable-history-or-comparison" : null,
+  });
+  const runtime = spyOn(bootstrap, "selectApprovedRuntime").mockImplementation(async () => { throw Error("Synthetic unavailable retained runtime"); });
+  try {
+    const result = await collectPublicationInputs(f.options);
+    expect(result.complete).toBe(false);
+    expect(result.freshness).not.toBeNull();
+    expect(result.scope_changed).toBe(scenario === "changed-source");
+    expect(runtime.mock.calls).toHaveLength(scenario === "unavailable-runtime" ? 1 : 0);
+    expect(result.diagnostics.join("\n")).toContain(scenario === "changed-source" ? "needs fresh collection"
+      : scenario === "unknown-comparison" ? "comparison unavailable" : "Synthetic unavailable retained runtime");
+    const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+    const { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
+    for (const downstream of [await collectWorkerInputs(f.options), await collectPublicationBindings(f.options)]) {
+      expect(downstream.complete).toBe(false);
+      expect(downstream.scope_changed).toBe(scenario === "changed-source");
+    }
+  } finally { freshness.mockRestore(); runtime.mockRestore(); }
+}, 60000);

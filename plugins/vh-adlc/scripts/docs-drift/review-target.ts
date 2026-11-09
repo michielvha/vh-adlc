@@ -60,7 +60,10 @@ export async function collectReviewTarget(input: Options): Promise<ReviewTarget>
     result.manifest = manifest; result.manifest_sha256 = manifestDigest(manifest);
     result.reviewer_runtime_sha256 = roleRuntimeDigest(runtime, "reviewer");
     result.complete = true;
-  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.preparation?.scope_changed || result.bindings?.scope_changed); result.diagnostics.push(error instanceof Error ? error.message : "Candidate review target unavailable"); }
+  } catch (error) {
+    result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.preparation?.scope_changed || result.bindings?.scope_changed);
+    result.diagnostics.push(error instanceof Error ? error.message : "Candidate review target unavailable");
+  }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidate, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during review target collection");
   }

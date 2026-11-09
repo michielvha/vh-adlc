@@ -50,7 +50,10 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     // Keep the exact parsed worker postimages; preparation and publication have separate grants.
     if (!canonicalJSON(packet.edits).equals(canonicalJSON(edits))) throw Error("Original worker edit representation changed");
     result.complete = true;
-  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.worker_inputs?.scope_changed); result.diagnostics.push(error instanceof Error ? error.message : "Original worker preparation unavailable"); }
+  } catch (error) {
+    result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.worker_inputs?.scope_changed);
+    result.diagnostics.push(error instanceof Error ? error.message : "Original worker preparation unavailable");
+  }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during worker handoff collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);

@@ -113,7 +113,10 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     publishArtifact(result.proposal_snapshot_path, proposalBytes);
     result.proposal_snapshot = { path: relative(scope.directory, result.proposal_snapshot_path), sha256: result.inputs.proposals_sha256 };
     result.worker_input_sha256 = workerInputsDigest(result.inputs); result.complete = true;
-  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || result.facts?.scope_changed === true || result.facts?.freshness?.fresh === false; result.diagnostics.push(error instanceof Error ? error.message : "Worker input collection unavailable"); }
+  } catch (error) {
+    result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || result.facts?.scope_changed === true;
+    result.diagnostics.push(error instanceof Error ? error.message : "Worker input collection unavailable");
+  }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during worker input collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);
