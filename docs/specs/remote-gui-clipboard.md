@@ -198,6 +198,7 @@ None.
 | 2026-11-09 | R-2 | spec | `4891dcc7d97e9c725fbef93c83a7413f59321aa8` | claude-opus-5-5 | procedural | Blocking: the installed x11vnc moves no clipboard text in either direction; six should-fix findings. |
 | 2026-11-09 | R-3 | spec | `a5ef9e6204cad85777293bb5ec33b505f6311be4` | claude-opus-5-5 | procedural | Blocking: same-origin GET carries no Origin header; six should-fix and two nit findings. |
 | 2026-11-09 | R-4 | spec | `05b51e9093dacbb1bc2df87bb88772e9555c1986` | claude-opus-5-5 | procedural | Blocking: viewer browsers save the panel field in session-restore files; four should-fix and two nit findings. |
+| 2026-11-10 | R-5 | spec | `c071bd4682d176391849c39b9eb873bdce972510` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and three nits. |
 
 ### R-1
 
@@ -423,6 +424,50 @@ SEVERITY: nit
 WHERE: Design, Clipboard helper; Test Plan, AC-06
 EVIDENCE: The design says "The package also exposes read-only probes for tests: the current owner of a selection and whether `CUT_BUFFER0` exists". The AC-06 proof, a Go test in plugins/remote-gui/internal/browser, says "set `CUT_BUFFER0` through that connection and assert it exists". A test in another package can write CUT_BUFFER0 only through an exported write operation, and the design lists none.
 PROPOSAL: Add a test-facing CUT_BUFFER0 setter to the helper's listed API, or name another way for the AC-06 test to fill the cut buffer before the handoff.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-05; Acceptance Criteria, AC-05
+EVIDENCE: The AC-05 row says "Run the AC-01 and AC-02 fixtures with unique sentinels ... then search command output, the session directory, state records, diagnostics, supervisor logs and all test artifacts for each sentinel; any match fails." The remote Chromium profile is inside the session directory (`profile := filepath.Join(directory, "profile")`, plugins/remote-gui/internal/browser/browser.go:305-306), and Chromium runs with `--restore-last-session` (phase.go:23) and `restore_on_startup: 1` (browser.go:318). The AC-01 fixture page "copies each pasted value into sessionStorage", and the human-mode proof depends on that storage surviving the handoff, which works because Chromium writes it to disk. I measured this in this review. On a scratch Xvfb :4719 with a scratch Chromium 151.0.7922.137 profile, I inserted R5SSSENTINELQ into a 127.0.0.1 page input whose input handler stores the value in sessionStorage, and waited 16 s. With the browser still running, the sentinel was in the profile's `Default/Sessions/Session_*` and `Default/Session Storage/000003.log` (as UTF-16). The AC-02 fixture field that holds the copied sentinel lands in the same Sessions files. A sweep of the session directory before stop therefore matches on correct code. After stop the profile is deleted (browser.go:255-256), but the row does not say when the sweep runs, and AC-05 itself excludes no file.
+PROPOSAL: Say that the sweep runs after the session stops and cleanup has removed the profile, and assert that removal. Alternatively, exclude the remote browser's own profile from the sweep and say in AC-05 that it covers remote-gui's outputs, records, logs and test evidence, not what remote pages store.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-03; Acceptance Criteria, AC-03
+EVIDENCE: AC-03 says "Neither viewer browser saves panel text in its profile". The real-browser part of the AC-03 proof only covers the send field: "type a sentinel into the panel, wait 16 seconds, close the browser, and search every profile file". Remote text in **Copied in the remote browser** is never fetched before the browser closes. The design keeps it out of session restore only by using "A read-only, non-form text element". I measured the alternative in this review. On a 127.0.0.1 page in Chromium 151 and Playwright Firefox (firefox-1569), each with a scratch persistent profile, a script set a `readonly` textarea to R5ROSENTINELX and a `<pre>` to R5PRESENTINELX; after 16 s and a close, R5ROSENTINELX was in Chromium's `Default/Sessions/Session_*` and `Tabs_*` files and in Firefox's decompressed `sessionstore.jsonlz4`, while the `<pre>` text was in neither. An implementation that shows remote text in a readonly textarea would pass every AC-03 check while the owner's browser writes remote clipboard text to disk. A passing subset never upgrades a composite criterion.
+PROPOSAL: In the real profile check, also fetch a separate remote sentinel into **Copied in the remote browser** (open the panel or press **Refresh**) before waiting and closing, and fail on either sentinel. Optionally add a viewer page test that the remote area is not a form control.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Viewer panel; Test Plan, AC-02 and AC-04
+EVIDENCE: Remote clipboard text comes from whatever owns CLIPBOARD on the session display: any page in the remote browser that writes the clipboard after a click, or the agent through CDP in agent mode. The design only says the area "shows a character count and the text, unmasked", and it fetches automatically "as soon as the panel opens". It does not say that the text is inserted only as text. The viewer page runs on the owner-authenticated origin, holds the VNC password from viewer-access (plugins/remote-gui/internal/proxy/viewer.go:21-28) and has no script-src restriction: its script is inline, and ServeHTTP adds only `Content-Security-Policy: worker-src 'none'` (plugins/remote-gui/internal/proxy/proxy.go, ServeHTTP). Remote text inserted as markup would run in that origin when the owner opens the panel. No viewer page test or real fixture uses a sentinel that contains markup.
+PROPOSAL: State that remote text is set only through `textContent` (or an equivalent text-only API) and never parsed as HTML. Add a viewer page test where the GET returns markup such as `<img src=x onerror=...>` and assert that it shows literally and creates no element.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan, AC-06
+EVIDENCE: The row asks for a test in plugins/remote-gui/internal/browser/lifecycle_test.go "with a clipboard double that fails Clear once", in which "a second handoff calls Clear again and launches agent mode". The existing fakes-driven tests in that file run ungated under CI's `go test -race ./...`, before any Xvfb or browser is installed (.github/workflows/ci.yml, "Check the remote-gui module"). Launching agent mode spawns `REMOTE_GUI_CHROMIUM` and waits for DevToolsActivePort, listener ownership and the marker tab (plugins/remote-gui/internal/browser/browser.go, launch), which cannot succeed there. The row does not say whether this test is gated by REMOTE_GUI_BROWSER_E2E with a real display, or whether it stops at proving that Clear runs again before launch is attempted. AC-06's "a retried handoff then succeeds" depends on which one.
+PROPOSAL: Name the gate for the failed-clear test. Either run it under REMOTE_GUI_BROWSER_E2E against a real runtime with the double injected, or assert in the ungated test that the retry calls Clear again and reaches launch, and prove the successful agent launch in the gated test.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, Glossary; Acceptance Criteria, AC-08
+EVIDENCE: The panel introduces the user-facing labels **Text for the remote browser**, **Copied in the remote browser**, **Refresh** and **Clear** (Design, Viewer panel). None of them has a Glossary row; the glossary lists only Clipboard panel, Clipboard helper, Send to remote browser, Copy to this device and Remote clipboard. AC-08 holds only the README and skill to "the glossary terms". The standard says "User-facing terms the feature introduces or changes appear in a glossary row and are held to it by a criterion."
+PROPOSAL: Add glossary rows for the remaining labels and make a criterion, AC-08 or a viewer page test under AC-11, check that the viewer uses the glossary labels.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background
+EVIDENCE: Background says "a Firefox viewer is used only by `tests/remote-gui/origin-auth.e2e.test.ts` when `REMOTE_GUI_FIREFOX` names one (`:40`)". tests/remote-gui/native-routing.e2e.test.ts:47 also passes `firefox:process.env.REMOTE_GUI_FIREFOX` to tests/remote-gui/fixtures/browser-check.ts, which launches Firefox with a private persistent profile (`firefox.launchPersistentContext(profile, ...)`, browser-check.ts:27-34) for the identity-firefox case (tests/remote-gui/README.md:52).
+PROPOSAL: Correct the sentence to name both users of REMOTE_GUI_FIREFOX. The browser-check fixture's persistent Firefox profile handling may also be reusable for the AC-03 profile search.
 
 ## Sources
 
