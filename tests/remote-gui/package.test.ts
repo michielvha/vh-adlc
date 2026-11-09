@@ -24,6 +24,8 @@ describe('independent remote-gui package', () => {
    const result=Bun.spawnSync(['/usr/bin/bash',join(installed,'scripts/remote-gui.sh'),'help'],{cwd:root,env:{...process.env,REMOTE_GUI_BUILD_CACHE:join(root,'cache'),REMOTE_GUI_GO:join(toolchain,'bin/go'),GOTOOLCHAIN:'local'}});
    expect(result.exitCode,result.stderr.toString()).toBe(0);
    expect(result.stdout.toString()).toContain('share <local-http-url>');
+   expect(result.stdout.toString()).toContain('--browser-mode human|agent');
+   expect(result.stdout.toString()).toContain('handoff <id>');
    const missing=Bun.spawnSync(['/usr/bin/bash',join(installed,'scripts/remote-gui.sh'),'help'],{cwd:root,env:{PATH:root,HOME:root}});
    expect(missing.exitCode).not.toBe(0);
    expect(missing.stderr.toString()).toContain('Go');
@@ -43,6 +45,23 @@ describe('independent remote-gui package', () => {
   expect(skill).toContain('human-facing local');
   expect(skill).toContain('connectOverCDP');
  });
+});
+
+test('installed authentication guidance selects human control and verifies the provider outcome', () => {
+ const skill = read('plugins/remote-gui/skills/remote-gui/SKILL.md');
+ for (const instruction of ['--browser-mode human', '--browser-mode agent', 'handoff <id>', 'host-transport-only', 'ERR_NETWORK_CHANGED', 'two retries', 'provider rejection', 'owner confirms']) {
+  expect(skill).toContain(instruction);
+ }
+ const version = JSON.parse(read('plugins/remote-gui/plugin.json')).version;
+ const [major, minor] = version.split('.').map(Number);
+ expect(major > 0 || minor >= 2).toBe(true);
+});
+
+test('real browser phase and session continuity checks run in CI', () => {
+ const ci = read('.github/workflows/ci.yml');
+ expect(ci).toContain('REMOTE_GUI_BROWSER_E2E');
+ expect(ci).toContain('REMOTE_GUI_VIEWER_E2E');
+ expect(ci).toContain('tests/remote-gui/browser.e2e.test.ts');
 });
 
 test('unsupported source-build hosts get a platform diagnostic before compiling',()=>{
