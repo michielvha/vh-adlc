@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Owner-selected design passed independent review and the planned gate. Implementation awaits publication authority for its claim."
+status: in-progress
+status_description: "Owner approved publishing the claim and preparing a draft PR. Implementing browser phases and their regression checks."
+branch: feat/remote-gui-human-login
 issue: null
 goal: "A remote owner can complete provider authentication in a human-controlled browser before explicitly returning the same disposable session to the agent."
 covers:
