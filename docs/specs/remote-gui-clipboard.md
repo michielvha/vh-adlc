@@ -182,6 +182,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-09 | R-1 | spec | `8ff685a1883330fd0d50536c79788eae4cc0399f` | claude-opus-5-5 | procedural | Blocking x11vnc replacement health gap plus seven should-fix and nit findings. |
 | 2026-11-09 | R-2 | spec | `4891dcc7d97e9c725fbef93c83a7413f59321aa8` | claude-opus-5-5 | procedural | Blocking: the installed x11vnc moves no clipboard text in either direction; six should-fix findings. |
+| 2026-11-09 | R-3 | spec | `a5ef9e6204cad85777293bb5ec33b505f6311be4` | claude-opus-5-5 | procedural | Blocking: same-origin GET carries no Origin header; six should-fix and two nit findings. |
 
 ### R-1
 
@@ -291,6 +292,71 @@ SEVERITY: should-fix
 WHERE: Design, Intact text only; Acceptance Criteria, AC-04
 EVIDENCE: Design: "Text received from the remote side is shown as received." noVNC decodes standard ServerCutText as one byte per character (`rQshiftStr`, core/rfb.js:2217-2218), and the installed x11vnc has no extended clipboard (Background). Remote text with characters above U+00FF therefore reaches the panel replaced or garbled, and **Copy to this device** copies it with no warning. A copied credential could arrive altered. AC-04 covers only the send direction.
 PROPOSAL: Define what the panel does with remote text that may have been altered, for example a warning beside the copy button when the received text contains `?` or bytes outside printable Latin-1. Alternatively, raise the choice as an open question, and cover the chosen behavior in AC-04.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Clipboard routes; Acceptance Criteria, AC-02 and AC-10
+EVIDENCE: The design says all three routes "require an `Origin` header equal to the viewer origin". Browsers do not send Origin on a same-origin GET fetch. I served a page on a scratch 127.0.0.1 origin and called fetch('/__remote_gui/clipboard') with the header X-Remote-GUI-Clipboard: 1 and credentials 'same-origin', then POST and DELETE, from headless Chromium (/usr/bin/chromium-browser) and Playwright Firefox through playwright-core 1.59.1. The server logged, for both engines: "GET origin=(absent) x=1 sfs=same-origin", "POST origin=http://127.0.0.1:38174", "DELETE origin=http://127.0.0.1:38174". Built as written, every panel open and every Refresh is refused, so AC-02 cannot pass, and the AC-10 proof would treat the refusal as correct. The existing validOrigin accepts a request with no Origin and rejects only a different one (plugins/remote-gui/internal/proxy/proxy.go, validOrigin: `if origin := r.Header.Get("Origin"); origin != "" && origin != p.origin.String()`).
+PROPOSAL: Define a check that a real same-origin GET passes. For example, refuse a present Origin that differs, require Sec-Fetch-Site same-origin when that header is present, and keep the custom header. Or make the read a POST. Add a real-browser assertion that the panel's GET succeeds in Chromium and Firefox, and make AC-10's proof match the chosen rule.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-03 and AC-06
+EVIDENCE: The AC-03 row says "`xprop` reports no CLIPBOARD owner". xprop has no option that reports a selection owner; `xprop -help` on a scratch display lists only -id, -name, -font, -remove, -set, -root, -len, -notype, -fs, -frame, -f, -spy and -version. The AC-06 row asserts "no CLIPBOARD or PRIMARY owner" and uses "a helper Get" in the "Real fixture", but names no probe. The real viewer fixture is TypeScript run against the built binary (tests/remote-gui/browser.e2e.test.ts:42), so it cannot call the Go helper package, and no clipboard route exposes PRIMARY or tells "no owner" apart from an owner with empty text. The host has no xsel, xclip or xdotool (`which` found none). The CI real-browser step installs only "xvfb xauth x11vnc novnc websockify" (.github/workflows/ci.yml, Prepare real browser verification), not the package that provides xprop, while Design says "No module or host dependency is added".
+PROPOSAL: Name the probe for selection owners and CUT_BUFFER0, and say where it runs. One option is to put these assertions in a Go test under REMOTE_GUI_BROWSER_E2E in internal/browser that opens a second xclip connection on the session display. Another is a test-only probe built from the package. If xprop stays, add it to the CI install list and to the test prerequisites.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-01 and AC-02
+EVIDENCE: The AC-01 row says "Extend the real noVNC browser fixture (`REMOTE_GUI_BROWSER_E2E=1`) and `tests/remote-gui/browser.e2e.test.ts`". That file is gated by `const enabled=process.env.REMOTE_GUI_VIEWER_E2E==='1'` (tests/remote-gui/browser.e2e.test.ts:7). REMOTE_GUI_BROWSER_E2E gates the Go tests in plugins/remote-gui/internal/browser (browser_test.go:103, 196; lifecycle_test.go:132). browser.e2e.test.ts launches only Chromium (line 60). A Firefox viewer appears only in origin-auth.e2e.test.ts through REMOTE_GUI_FIREFOX (line 40), and the CI step runs browser.e2e.test.ts with no Firefox variable.
+PROPOSAL: Name REMOTE_GUI_VIEWER_E2E for the TypeScript fixture, and say how the Firefox viewer is provided (REMOTE_GUI_FIREFOX) and whether CI or only a local run covers the Firefox half of AC-01 and AC-02.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-06; Design, Clearing on human-to-agent handoff
+EVIDENCE: The AC-06 row says "Real fixture: ... Inject a Clear failure, assert `handoff-failed` and no agent-mode browser after at least one supervisor health tick, then retry and assert ready agent mode." The real fixture drives the released binary through the CLI (browser.e2e.test.ts:45-48), and the design defines no way to make Clear fail there. The health tick runs only in the session daemon (plugins/remote-gui/internal/session/daemon.go, serve ticker loop), while the existing failure-injection tests work at runtime level with fakes (plugins/remote-gui/internal/browser/lifecycle_test.go:24-120) and run no daemon. A failure hook in the shipped binary would be a new production surface, and the design does not mention one.
+PROPOSAL: State where the failure is injected and how the retry then succeeds. For example, give the runtime a clipboard interface that a session-level test replaces with one that fails once, and run that test under the daemon tick. Or state explicitly that a test-only hook exists and how it is kept out of normal use.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Clipboard helper; Test Plan, AC-02 and AC-04
+EVIDENCE: After **Send to remote browser**, the helper owns CLIPBOARD. Opening the panel or pressing **Refresh** then calls Get, which "convert[s] CLIPBOARD to `UTF8_STRING` on its own window". The X server sends the matching SelectionRequest back to the helper's own connection, which must answer it while Get waits for SelectionNotify. The design does not say whether Get returns the held text directly or serves its own request concurrently. A single synchronous event loop would hit the timeout. No proof covers this path: AC-04 uses "Set then a second client's Get", and AC-02 copies in Chromium before reading.
+PROPOSAL: Define Get while the helper owns the selection, for example returning the held text without a round trip. Add a helper unit test for Set followed by Get on the same helper, and a viewer-flow check that sends text and then opens the panel.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Clearing on human-to-agent handoff; Context, Owner summary
+EVIDENCE: The summary says the handoff "clears the remote clipboard and checks that it is empty before the agent's browser starts, so a credential pasted during human sign-in is not left for the agent". The handoff holds the runtime mutex (plugins/remote-gui/internal/browser/phase.go:95-97), but the clipboard routes call the helper directly, and the design states no ordering between a POST Set and the handoff's Clear. A Send that the owner pressed in human mode and that lands after Clear but before or after the agent-mode launch leaves that text in CLIPBOARD for the agent, and the page confirms it as sent. The viewer page shows no browser mode, so the owner cannot tell that the mode changed (viewer.go:10 status texts are connected, disconnected and authentication failed only).
+PROPOSAL: Serialize clipboard operations with the handoff, for example by refusing Set with a fixed code while the record is in `handoff`, and running Clear and the agent-mode launch under the same lock that Set takes. Add a test that a Set racing a handoff either fails or is cleared.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design, Owner decisions
+EVIDENCE: Open Questions says "None.", and the Owner decisions list has six items. The design also settles trade-offs that the list does not include. (1) The 64 KiB limit in both directions, which is new in this revision (the earlier revisions f299eac, 4891dcc and dd6e4c9 had no size limit). (2) The remote text is shown "unmasked" with a character count, although it may be a credential copied in the remote browser. (3) A Clear error fails the handoff closed into `handoff-failed`, instead of continuing with a warning. The standard says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would."
+PROPOSAL: Raise these as open questions with a recommendation, or record the owner's answers to them under Owner decisions if they were already given.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-04
+EVIDENCE: AC-04 says "larger text is refused with a message" and "in both directions". The proof covers only the send direction: "a 64 KiB plus one byte POST returns 413". Nothing checks that remote text over 64 KiB, or an INCR reply, gives `clipboard-too-large` from Get, or that the panel shows a message in either case. A passing subset never upgrades a composite criterion.
+PROPOSAL: Add a helper test where a second client owns CLIPBOARD with more than 64 KiB, and one that answers with INCR, asserting `clipboard-too-large`. Add viewer page tests that both refusals show a message.
+
+FINDING: F-09
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Background
+EVIDENCE: Background presents the prototype as proving "the helper approach", but its run did not start x11vnc and did not deliver Ctrl+V as an X key event. run.mjs drives Chromium only over CDP, and run-keys.log records FAIL for CDP key events. AC-01 depends on exactly the path the prototype skipped: viewer keys through x11vnc into Chromium while x11vnc runs with `-nosel`. I measured it in this review. I ran a scratch Xvfb :3817, x11vnc 0.9.17 with `-nosel` (plus -nopw for a scratch None-auth RFB client), a scratch Chromium 151 page, and the prototype's `own` command holding "Zürich € ✓ rev3-A". RFB KeyEvents Control_L+v produced `paste:"Zürich € ✓ rev3-A"` in the textarea (PASS). RFB Ctrl+A, Ctrl+C then made the prototype's `read` return `text="rev3-B ✓ ü"` as UTF8_STRING. x11vnc sent no ServerCutText, and CUT_BUFFER0 was "not found". I also confirmed that a wrong cookie is refused ("Invalid MIT-MAGIC-COOKIE-1 key"); the prototype's logs do not contain that observation.
+PROPOSAL: Add a Background line for the round trip through x11vnc with `-nosel` and real X key events, and keep the CDP-only prototype result as the helper-level evidence.
 
 ## Sources
 
