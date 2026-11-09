@@ -97,7 +97,7 @@ export function readAssessmentReport(input: Options): AssessmentReport {
     assessed: scan ? result.findings.filter(row => row.assessed).length : null,
     confirmed_drift: scan ? result.findings.filter(row => row.verdict === "confirmed-drift").length : null,
     still_accurate: scan ? result.findings.filter(row => row.verdict === "still-accurate").length : null,
-    unknown: scan ? result.findings.filter(row => row.verdict === "unknown").length : null,
+    unknown: scan ? result.findings.filter(row => row.assessed && row.verdict === "unknown").length : null,
     unassessed: scan ? result.findings.filter(row => !row.assessed).length : null,
   };
   return boundAssessmentReport(result, entryLimit);
@@ -120,7 +120,7 @@ export function boundAssessmentReport(input: AssessmentReport, limit: number): A
     report.suppressed_findings = [];
     report.stale_suppressions = [];
     const count = report.diagnostics.length;
-    report.diagnostics = report.diagnostics.slice(0, 5).map(message => message.length <= 256 ? message : message.slice(0, 256) + "…");
+    report.diagnostics = report.diagnostics.slice(0, 5).map(message => message.length <= 256 ? message : Array.from(message).slice(0, 256).join("") + "…");
     report.diagnostics_omitted += count - report.diagnostics.length;
     report.diagnostics.push("Detailed report exceeds the retained entry bound. Full source and assessment records remain available");
     if (size() > limit) {
@@ -134,13 +134,13 @@ export function boundAssessmentReport(input: AssessmentReport, limit: number): A
 
 function sentence(value: string): string {
   const escaped = escapeReportText(value.trim());
-  return /[.!?]$/u.test(value.trim()) ? escaped : escaped + ".";
+  return /[.!?…]$/u.test(value.trim()) ? escaped : escaped + ".";
 }
 
 export function renderAssessmentReport(report: AssessmentReport): string {
   const verdictNames = { "confirmed-drift": "Confirmed drift", "still-accurate": "Still accurate", unknown: "Unknown" };
   const summary = report.counts.candidates === null ? "Candidate counts unavailable."
-    : `${report.counts.candidates} candidate(s). ${report.counts.confirmed_drift} confirmed drift, ${report.counts.still_accurate} still accurate, ${report.counts.unknown} unknown.`;
+    : `${report.counts.candidates} candidate(s). ${report.counts.confirmed_drift} confirmed drift, ${report.counts.still_accurate} still accurate, ${report.counts.unknown} unknown, ${report.counts.unassessed} unassessed.`;
   const sourceLabel = report.source_verification === null ? "Selected source" : "Assessed source";
   const lines = ["# Documentation drift report", "", summary,
     "", "Caller-recorded verdicts and recommendations remain provisional pending independent review.",
@@ -161,7 +161,7 @@ export function renderAssessmentReport(report: AssessmentReport): string {
   if (report.details_omitted) lines.push("Full finding details are retained in the original source and assessment records.", "");
   for (const row of report.findings) {
     lines.push(`### ${escapeReportText(row.finding.id)}`, "", `Document ${escapeReportText(row.finding.document)}. Detector ${escapeReportText(row.finding.detector)}.`,
-      `Severity ${escapeReportText(row.finding.severity)}. Location ${escapeReportText(JSON.stringify(row.finding.location))}.`,
+      `Severity ${escapeReportText(row.finding.severity)}.${row.finding.location === null ? "" : " Location " + escapeReportText(JSON.stringify(row.finding.location)) + "."}`,
       `Candidate ${sentence(row.finding.explanation)}`, `Verdict ${row.assessed ? verdictNames[row.verdict] : "Unassessed"}. ${sentence(row.reason)}`,
       `Recommendation ${sentence(row.recommendation)}`, "");
     for (const quote of row.evidence) lines.push(`- Evidence ${escapeReportText(quote.path)} at bytes ${quote.start} to ${quote.end}, blob ${quote.sha256}, quote ${quote.quote_sha256}.`);
@@ -184,10 +184,10 @@ export function renderAssessmentReport(report: AssessmentReport): string {
   if (report.source_verification) lines.push(`- Original source ${escapeReportText(report.source_verification.path)} at ${report.source_verification.sha256}.`);
   if (report.assessment_reference) lines.push(`- Recorded assessment ${escapeReportText(report.assessment_reference.path)} at ${report.assessment_reference.sha256}.`);
   lines.push("");
-  if (report.diagnostics_omitted) lines.push(`${report.diagnostics_omitted} additional diagnostic(s) omitted to fit the output bound.`, "");
-  if (report.diagnostics.length) {
+  if (report.diagnostics.length || report.diagnostics_omitted) {
     lines.push("## Incomplete inputs", "");
     for (const diagnostic of report.diagnostics) lines.push(`- ${sentence(diagnostic)}`);
+    if (report.diagnostics_omitted) lines.push(`${report.diagnostics_omitted} additional diagnostic(s) omitted to fit the output bound.`);
     lines.push("");
   }
   return lines.join("\n") + "\n";
