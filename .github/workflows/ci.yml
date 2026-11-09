@@ -125,7 +125,7 @@ jobs:
           REMOTE_GUI_TEST_BINARY: ${{ github.workspace }}/plugins/remote-gui/remote-gui
         run: |
           cd plugins/remote-gui
-          go test -race ./internal/browser -count=1
+          go test -race ./internal/browser ./internal/xclip -count=1
           cd ../..
           bun test tests/remote-gui/browser.e2e.test.ts
 
