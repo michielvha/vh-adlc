@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Human sign-in and explicit agent hand-back proposed; awaiting owner direction and independent review."
+status_description: "Owner selected human sign-in and explicit hand-back. Session-restoration corrections await renewed independent review."
 issue: null
 goal: "A remote owner can complete provider authentication in a human-controlled browser before explicitly returning the same disposable session to the agent."
 covers:
@@ -35,7 +35,9 @@ The implementation does not promise that every provider will accept every host.
 The proposed checks cover launch arguments, process ownership, phase transitions and login-state continuity through local fixtures, followed by an owner-performed Google/Tailscale acceptance test.
 
 This draft has no implementation or provider-success evidence.
-The owner must choose whether agent hand-back belongs in this version.
+On 2026-11-09, the owner selected human sign-in followed by explicit agent hand-back.
+Native browser session restoration retains session cookies and tab storage inside the protected disposable profile until its existing expiry and cleanup.
+This adds profile-local persistence of that state during the session.
 An accepted, independently reviewed design authorizes its feature implementation through the existing vh-adlc gates.
 Publication, merging and installation are tracked delivery steps with their own authorization.
 Verification uses owned workstation sessions and leaves the Oracle compute instance outside the runtime target set.
@@ -76,6 +78,13 @@ Oracle lifecycle operations, new runtime-platform support, browser-fingerprint s
 
 ### Browser phases and compatibility
 
+| Term | Meaning |
+| --- | --- |
+| Human mode | The owner interacts with the headed browser through its authenticated viewer. Browser debugging and CDP are absent. Agent input is procedurally limited to the owned connection probe before the owner's turn. |
+| Agent mode | The session exposes verified loopback CDP for the agent's authorized browser work. |
+| Handoff | A serialized, supervisor-owned transition between human and agent modes, retaining the session's profile, restored tabs, viewer URL and expiry. |
+| Transport ready | The owned browser, viewer and connection probe work. Provider authentication remains a separate observed result. |
+
 Extend browser creation and doctor with `--browser-mode human|agent`.
 The omitted option retains the existing agent mode for existing callers and stored sessions.
 The shared skill explicitly selects human mode when authentication is required.
@@ -102,6 +111,10 @@ Route transitions through the existing session supervisor and private control en
 Serialize each transition with the session's lifecycle operations.
 Signal only the browser whose process identity and birth metadata match the current record.
 Allow it to close cleanly before launching its replacement with the exact same session-owned disposable profile.
+Configure native restore-last-session behavior in that disposable profile from its first launch, preserving session cookies and restoring the original tabs and their sessionStorage namespaces in both transition directions. [S4], [S5], [S6]
+Restore the existing tabs rather than opening replacement copies of their URLs.
+Keep the original connection-marker tab available through native restoration.
+Use profile-local browser preferences and launch behavior; the workstation's other browser profiles and managed policies retain their existing settings.
 Retain the viewer, authenticated display, marker, session ID, URL and original expiry.
 Treat a browser still holding its profile lock as a failed transition.
 Avoid a forced process termination during a phase transition because it can lose sign-in state.
@@ -111,6 +124,10 @@ Return the resulting phase and verified browser-control readiness after an agent
 Make repeated requests for the current phase observationally idempotent.
 Concurrent handoff, stop and expiry operations must leave one owned browser or an explicit recoverable failure state.
 An uncertain or failed transition must not report successful agent control.
+A restored browser is checked separately for the authorized provider's post-login state.
+Sites whose login depends on nonrestorable in-memory state require human reauthentication or their supported native authentication flow.
+The runtime reports mode and control readiness, while the agent reports provider acceptance only after observing it.
+Fixtures must establish persistence for nonpersistent HttpOnly cookies and tab-scoped sessionStorage; a persistent-cookie-only test is insufficient.
 The existing cleanup contract remains responsible for expiry and private-data deletion.
 
 Reusing the same task-owned profile is an in-session lifecycle operation.
@@ -151,10 +168,10 @@ Existing running sessions retain the executable and mode they started with until
 
 ## Acceptance Criteria
 
-- [ ] AC-01: Authentication handoffs selected by the shared agent workflow start in an owner-controlled, sandboxed browser with no automation or debugging interface, and the owner can use its verified viewer and connection page.
+- [ ] AC-01: Authentication handoffs selected by the shared agent workflow start in the glossary-defined human mode, with a sandboxed browser, no browser-debugging interface and verified viewer/connection-page input restricted to the owner after the initial connection probe.
 - [ ] AC-02: After explicit owner confirmation, the same disposable session can transfer to verified agent control while retaining its sign-in state, viewer URL and expiry, and can return to human control for a later challenge.
 - [ ] AC-03: Repeated, concurrent and failed handoffs, foreign process identities, profile-lock failures, stop and expiry preserve unrelated processes and leave a truthful, recoverable lifecycle state without duplicate browsers or private-state leaks.
-- [ ] AC-04: The shared agent routes authentication by phase, distinguishes viewer readiness from provider acceptance, bounds initial-navigation retries and stops repeating rejected provider logins.
+- [ ] AC-04: The shared agent uses the glossary-defined phases and readiness meanings, distinguishes viewer readiness from provider acceptance, bounds initial-navigation retries and stops repeating rejected provider logins.
 - [ ] AC-05: Existing agent-mode and service-sharing callers, old session records, owner-restricted transport, auth-refresh ownership and private cleanup retain their supported behavior.
 - [ ] AC-06: The independently installed plugin exposes the reviewed runtime and instructions across isolated supported-host configurations, with documented version/update verification, and the owner completes Google/Tailscale sign-in in human mode followed by verified authorized access after hand-back.
 
@@ -163,7 +180,7 @@ Existing running sessions retain the executable and mode they started with until
 | Criterion | Proof |
 | --- | --- |
 | AC-01 | Run parser, launch-argument, owned-marker and real VNC input tests against human mode. Inspect the real browser's owned process arguments and listening sockets to establish that no debugging endpoint exists. Keep provider sign-in screens outside recordings and traces. |
-| AC-02 | Authenticate to a local fixture through the human viewer, request hand-back only after fixture-owner confirmation, and verify the same session cookie through normal page behavior after agent attachment. Switch back to human mode and verify control absence, URL and expiry. No cookie export or secret inspection. |
+| AC-02 | Authenticate to a local fixture through the human viewer using a nonpersistent HttpOnly cookie and tab-scoped sessionStorage. Request hand-back after fixture-owner confirmation and verify authenticated page behavior and the original tab's state after native restoration. Repeat in the reverse direction through the viewer. Include multiple tabs, an unsupported in-memory-state fixture, a lost-login result, and stable URL/expiry checks. No cookie export or secret inspection. |
 | AC-03 | Exercise duplicate and concurrent transitions, simulated PID reuse, profile-lock timeout, failed launch, disconnect, stop and expiry. Assert browser counts, process ownership, truthful result/state, retained repair evidence and final private-directory cleanup. |
 | AC-04 | Run installed native-agent routing fixtures for authentication, plain page inspection, active auth-refresh challenges, transient navigation failure, provider rejection and false-positive first-login readiness. Require actual skill selection and ordered operations, and verify that credentials/forms are not automatically retried. |
 | AC-05 | Run the module's race tests, vet, pinned lint and tidy checks, plus package tests and existing viewer/native-routing fixtures. Include legacy records and existing command outputs. Check unrelated Serve state and auth-refresh sentinels before/after. |
@@ -175,25 +192,35 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q1: Should the first version support agent hand-back after human sign-in?
-
-**Recommendation:** A. Keep the existing shared-session workflow while making the authentication phase genuinely human-controlled.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Human sign-in and explicit hand-back** | The owner signs in before the agent resumes authorized work in the same disposable profile. | An owned browser-process transition and additional lifecycle verification. |
-| **B. Human-only authentication** | A simpler browser mode for owner-operated authentication and administration. | Subsequent provider UI work remains manual or uses separately configured native credentials. |
-
-**Why this is yours:** This decides whether the tool retains automated work after authentication or keeps that provider session entirely human-operated.
-The question was sent to the owner on 2026-11-09 and remains unanswered.
+None.
 
 ## Review Log
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-09 | R-1 | spec | `c60bcd95744e13122b15b230b758e8ae4b7b9f78` | unknown | procedural | Blocking session-restoration gap and glossary clarification; model identity unattested. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: docs/specs/remote-gui-human-login.md, Owned browser transitions and AC-02 Test Plan
+EVIDENCE: Lines 104-105 close and relaunch the browser with the same profile, while AC-02 promises retained sign-in state. The design specifies no native session or tab restoration. Existing profile preferences at plugins/remote-gui/internal/browser/browser.go:303 configure downloads and password storage only. MDN documents that session cookies end at browser shutdown unless restored by session restoration, and that sessionStorage belongs to a tab's page session. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie and https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage. A persistent-cookie fixture could pass while a provider using session-only or tab-scoped state loses authentication during hand-back.
+PROPOSAL: Define native session/tab restoration for the owned browser transition and its supported-state limits. Require fixtures using nonpersistent HttpOnly cookies and tab-scoped sessionStorage in both transition directions, with truthful failure handling when a site's required state cannot be preserved.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: docs/specs/remote-gui-human-login.md, Browser phases and compatibility and AC-01
+EVIDENCE: The feature introduces user-facing human mode, agent mode and handoff without glossary rows. The pinned conventions/feature-documents.md:156-157 requires introduced terms to appear in glossary rows and be held to them by a criterion. AC-01 promises no automation interface while Design retains a VNC path capable of programmatic input, so the intended distinction between disabled browser debugging and procedurally restricted viewer input needs an explicit definition.
+PROPOSAL: Define the modes and handoff in glossary rows, distinguishing the absent browser-debugging interface from the retained viewer and its input restrictions. Bind the existing criteria and routing tests to those definitions.
 
 ## Sources
 
 - [S1. Google supported browsers](https://support.google.com/accounts/answer/7675428?hl=en) documents software-controlled browsers among possible sign-in rejection reasons.
 - [S2. Navigator webdriver](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/webdriver) documents Chrome automation flags and the port-zero debugging behavior.
 - [S3. Chrome remote debugging security](https://developer.chrome.com/blog/remote-debugging-port) documents dedicated user-data directories for remote debugging.
+- [S4. Chromium startup restoration](https://chromium.googlesource.com/chromium/src/+/HEAD/components/policy/resources/templates/policy_definitions/Startup/RestoreOnStartup.yaml) describes native last-session restoration and session-cookie retention.
+- [S5. Session cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) describes their shutdown and session-restoration behavior.
+- [S6. Session storage](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage) describes tab-scoped state and page-session lifetime.
