@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -19,6 +20,39 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/session"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
+
+func TestFailedHandoffRetainsRecoveryAfterOwnerClosesBrowser(t *testing.T) {
+	c, id := setup(t)
+	command := exec.Command("sleep", "30")
+	if err := command.Start(); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan struct{})
+	go func() { _ = command.Wait(); close(done) }()
+	defer func() { _ = command.Process.Kill(); <-done }()
+	identity, err := state.Inspect(command.Process.Pid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chrome := &child{role: "browser", identity: identity, done: done}
+	r := &runtime{home: c.Home, id: id, chrome: chrome, children: []*child{chrome}, modeReady: true}
+	r.current.BrowserMode = "human"
+	if err := state.Update(context.Background(), c.Home, id, func(record *state.Record) {
+		record.Owned = []state.Process{{Role: "browser", Identity: identity}}
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.handoff(context.Background(), "agent"); err == nil {
+		t.Fatal("missing owned display reported a completed handoff")
+	}
+	if err := command.Process.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	<-done
+	if !r.healthy() {
+		t.Fatal("owner completing a failed close would trigger premature profile cleanup")
+	}
+}
 
 func TestHandoffRetainsLockedProfile(t *testing.T) {
 	c, id := setup(t)

@@ -62,6 +62,7 @@ type Record struct {
 	ProxyAddress      string        `json:"proxy_address,omitempty"`
 	CDPAddress        string        `json:"cdp_address,omitempty"`
 	Marker            string        `json:"marker,omitempty"`
+	MarkerURL         string        `json:"marker_url,omitempty"`
 	Forward           *Forward      `json:"forward,omitempty"`
 	Diagnostic        string        `json:"diagnostic,omitempty"`
 }

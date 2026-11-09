@@ -41,6 +41,8 @@ func execute(c config.Config) (any, error) {
 		}{1, "observed", reconciled}, nil
 	case "access":
 		return session.Access(c.Home, c.ID, c.Reveal)
+	case "handoff":
+		return session.Handoff(c.Home, c.ID, c.Mode())
 	case "stop":
 		return session.Stop(c.Home, c.ID)
 	case "cleanup":

@@ -99,9 +99,6 @@ func (r *runtime) handoff(ctx context.Context, mode string) (session.BrowserHand
 	if err != nil || r.stopped || record.Kind != "browser" || !time.Now().Before(record.Expires) {
 		return r.snapshot(), errors.New("browser-handoff-unavailable")
 	}
-	if r.modeReady && r.current.BrowserMode == mode && r.alive() {
-		return r.snapshot(), nil
-	}
 	if r.chrome != nil {
 		owned := slices.ContainsFunc(record.Owned, func(process state.Process) bool {
 			return process.Role == "browser" && state.Equal(process.Identity, r.chrome.identity)
@@ -109,6 +106,15 @@ func (r *runtime) handoff(ctx context.Context, mode string) (session.BrowserHand
 		if !owned {
 			return r.snapshot(), errors.New("browser-ownership-changed")
 		}
+	}
+	if r.modeReady && r.current.BrowserMode == mode && r.alive() {
+		return r.snapshot(), nil
+	}
+	// A later owner-completed close is expected after a failed transition.
+	// Keep the viewer/profile available until retry, explicit stop or expiry.
+	r.modeReady = false
+	r.current.CDPAddress = ""
+	if r.chrome != nil {
 		if state.Alive(r.chrome.identity) {
 			if err = r.quitBrowser(ctx); err != nil {
 				return r.snapshot(), err

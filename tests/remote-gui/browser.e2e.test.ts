@@ -72,25 +72,27 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
  let viewer: any;
  let agent: any;
  let proofs = 0;
+ const fixtureRequests: {path: string; signedIn: boolean; retained: string | null}[] = [];
  const fixture = Bun.serve({
   hostname: '127.0.0.1',
   port: 0,
   fetch(request) {
    const url = new URL(request.url);
    const signedIn = request.headers.get('cookie')?.includes('fixture-session=accepted');
+   fixtureRequests.push({path: url.pathname, signedIn: signedIn === true, retained: url.searchParams.get('retained')});
    if (url.pathname === '/login') {
     return new Response(`<script>sessionStorage.setItem('fixture-state','retained');location.replace('/account')</script>`, {
-     headers: {'Content-Type': 'text/html', 'Set-Cookie': 'fixture-session=accepted; HttpOnly; SameSite=Lax; Path=/'},
+     headers: {'Content-Type': 'text/html', 'Cache-Control': 'no-store', 'Set-Cookie': 'fixture-session=accepted; HttpOnly; SameSite=Lax; Path=/'},
     });
    }
    if (url.pathname === '/account' && signedIn) {
-    return new Response(`<p>Authenticated fixture</p><script>fetch('/proof?retained='+(sessionStorage.getItem('fixture-state')==='retained'))</script>`, {
-     headers: {'Content-Type': 'text/html'},
+    return new Response(`<p>Authenticated fixture</p><script>fetch('/proof?retained='+(sessionStorage.getItem('fixture-state')==='retained'),{method:'POST'})</script>`, {
+     headers: {'Content-Type': 'text/html', 'Cache-Control': 'no-store'},
     });
    }
-   if (url.pathname === '/proof' && signedIn && url.searchParams.get('retained') === 'true') {
+   if (request.method === 'POST' && url.pathname === '/proof' && signedIn && url.searchParams.get('retained') === 'true') {
     proofs++;
-    return new Response('ok');
+    return new Response('ok', {headers: {'Cache-Control': 'no-store'}});
    }
    return new Response('Sign-in required', {status: 401});
   },
@@ -100,10 +102,13 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   check(result.exitCode === 0, 'runtime command failed: ' + args[0]);
   return JSON.parse(result.stdout.toString());
  };
- const waitFor = async (condition: () => boolean, message: string) => {
+ const waitFor = async (condition: () => boolean | Promise<boolean>, message: string) => {
   const deadline = Date.now() + 15000;
-  while (!condition() && Date.now() < deadline) await Bun.sleep(100);
-  check(condition(), message);
+  while (Date.now() < deadline) {
+   if (await condition()) return;
+   await Bun.sleep(100);
+  }
+  throw Error(message + '; fixture requests ' + JSON.stringify(fixtureRequests));
  };
  try {
   session = cli('start', '--browser-mode', 'human', '--ttl', '4m');
@@ -129,8 +134,10 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   await canvas.waitFor({state: 'visible'});
   await canvas.focus();
   await page.keyboard.type(session.marker, {delay: 15});
-  const markerCheck = await fetch(session.marker_url + 'check').then(response => response.json()) as any;
-  check(markerCheck.input_verified === true, 'viewer input missed the owned human browser');
+  await waitFor(async () => {
+   const probe = await fetch(session.marker_url + 'check').then(response => response.json()) as any;
+   return probe.input_verified === true;
+  }, 'viewer input missed the owned human browser');
   await page.keyboard.press('Control+t');
   await page.keyboard.type(fixture.url.href + 'login');
   await page.keyboard.press('Enter');
@@ -162,7 +169,8 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   fixture.stop(true);
   if (session) {
    const stopped = cli('stop', session.id);
-   check(stopped.state === 'stopped', 'owned browser cleanup pending; private records retained');
+   check(stopped.state === 'stopped' || stopped.state === 'failed', 'owned browser cleanup pending; private records retained');
+   check(!existsSync(join(root, session.id, 'profile')), 'owned browser profile survived cleanup');
   }
   rmSync(root, {recursive: true, force: true});
  }

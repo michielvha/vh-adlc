@@ -2,7 +2,7 @@
 status: in-progress
 status_description: "Owner approved publishing the claim and preparing a draft PR. Implementing browser phases and their regression checks."
 branch: feat/remote-gui-human-login
-issue: null
+issue: https://github.com/michielvha/vh-adlc/issues/60
 goal: "A remote owner can complete provider authentication in a human-controlled browser before explicitly returning the same disposable session to the agent."
 covers:
   - plugins/remote-gui/
@@ -35,12 +35,15 @@ Provider challenges remain with the owner, and provider-native authentication is
 The implementation does not promise that every provider will accept every host.
 The proposed checks cover launch arguments, process ownership, phase transitions and login-state continuity through local fixtures, followed by an owner-performed Google/Tailscale acceptance test.
 
-This draft has no implementation or provider-success evidence.
+The design passed independent review.
+Browser-level and real noVNC fixtures now pass human/agent transitions with restored session-only cookies and tab storage.
+The shared skill update and owner-performed Google/Tailscale acceptance remain outstanding.
 On 2026-11-09, the owner selected human sign-in followed by explicit agent hand-back.
 Native browser session restoration retains session cookies and tab storage inside the protected disposable profile until its existing expiry and cleanup.
 This adds profile-local persistence of that state during the session.
 An accepted, independently reviewed design authorizes its feature implementation through the existing vh-adlc gates.
-Publication, merging and installation are tracked delivery steps with their own authorization.
+The owner approved publishing the feature claim and tracking issue, and preparing a draft implementation PR.
+Merge, release and installed-host rollout follow the final review.
 Verification uses owned workstation sessions and leaves the Oracle compute instance outside the runtime target set.
 
 ### Observed defect
@@ -199,7 +202,8 @@ Existing running sessions retain the executable and mode they started with until
       Evidence: 2026-11-09, the module race suite passed. `REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser -run '^TestRealHumanBrowserHandoff$' -count=1 -v` passed after two prior successful real-browser repetitions. Native human/agent/human transitions preserve the viewer and marker, repeated same-mode requests preserve the browser, and human process arguments omit debugging/automation. Earlier Exit-shortcut/rendering failures remain in private logs. Browser exit uses the owned existing RFB display and native Exit menu, preserving the profile on a blocked close. Full supervisor and session-cookie/tab-storage proof remains scheduled for T6/T9. Manual docs impact remains T8.
 - [x] T5 `plugins/remote-gui/internal/session/`, `plugins/remote-gui/internal/browser/lifecycle_test.go`, `plugins/remote-gui/cmd/remote-gui/main_test.go` - add failing supervisor-control and lifecycle regressions for handoff, duplicate/concurrent requests, foreign identities, profile locks, lost state, stop and expiry (AC-02, AC-03, AC-05).
       Evidence: 2026-11-09, supervisor tests fail on absent browserControl and phase/marker status fields, while the CLI test fails on its unsupported lifecycle command. Cases cover idempotence, concurrent requests, failed/retried transitions, expired/changed bindings and stop during a transition. The existing browser layer separately passed new real profile-lock preservation and foreign-process rejection checks. Full sign-in continuity remains the T3 viewer fixture. Manual docs impact includes truthful phase failure/retry guidance in T8.
-- [ ] T6 `plugins/remote-gui/internal/session/`, `plugins/remote-gui/cmd/remote-gui/main.go` - connect the handoff command to serialized supervisor transitions and truthful status, then pass T5 and the full T3 CLI/viewer fixture without duplicate browsers or unrelated process/Serve changes (AC-02, AC-03, AC-05).
+- [x] T6 `plugins/remote-gui/internal/session/`, `plugins/remote-gui/internal/state/state.go`, `plugins/remote-gui/internal/browser/phase.go`, `plugins/remote-gui/internal/browser/lifecycle_test.go`, `plugins/remote-gui/cmd/remote-gui/main.go`, `tests/remote-gui/browser.e2e.test.ts` - connect the handoff command to serialized supervisor transitions and truthful status, finalize failed-close recovery, then pass T5 and the full T3 CLI/viewer fixture without duplicate browsers or unrelated process/Serve changes (AC-02, AC-03, AC-05).
+      Evidence: 2026-11-09, all eight module packages passed `go test -p 4 -race ./...`; pinned golangci-lint v2.15.0, vet and tidy passed. The real noVNC fixture passed owner input, nonpersistent HttpOnly-cookie and original-tab sessionStorage continuity across human/agent/human transitions, with stable URL/expiry and final profile cleanup. Additional observed failures and passing regressions cover stale omitted JSON fields, premature failed-close cleanup and loss of the recovery viewer. Fixture authentication proofs now use uncached requests. Supervisor cases pass duplicate/concurrent requests, changed ownership/records, stop-state conflicts and retries. Earlier failed artifacts remain private. Manual docs impact is the new status, recovery and phase guidance in T8.
 - [ ] T7 `tests/remote-gui/`, `plugins/remote-gui/internal/config/config_test.go` - add installed-agent routing and packaging regressions for authentication phases, provider rejection, bounded initial navigation and legacy operations, then observe the current skill's failures (AC-04, AC-05, AC-06).
 - [ ] T8 `plugins/remote-gui/skills/remote-gui/SKILL.md`, `plugins/remote-gui/README.md`, `plugins/remote-gui/.claude-plugin/plugin.json`, `docs/reference/marketplace.md`, `tests/remote-gui/README.md` - update canonical routing, phase definitions, supported-host setup and plugin version through the existing packaging path, then pass T7 (AC-04, AC-05, AC-06).
 - [ ] T9 `docs/specs/remote-gui-human-login.md`, `tests/remote-gui/` - run required Go/Bun/lint/build checks, installed-package fixtures under both dependency configurations, owner Google/Tailscale sign-in and confirmed hand-back, then record actual results and any unavailable acceptance check (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06).

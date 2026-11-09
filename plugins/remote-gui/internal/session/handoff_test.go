@@ -2,8 +2,12 @@ package session
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"net"
+	"net/http"
 	"os"
+	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -11,6 +15,30 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
+
+func TestControlResponseClearsOmittedPhaseFields(t *testing.T) {
+	home := root(t)
+	id, err := state.New(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listener, err := net.Listen("unix", filepath.Join(home, id, "control.sock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &http.Server{ReadHeaderTimeout: time.Second, Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(View{State: "ready", Result: "ready", BrowserMode: "human"})
+	})}
+	go func() { _ = server.Serve(listener) }()
+	defer func() { _ = server.Close() }()
+	result := View{State: "ready", BrowserMode: "agent", CDPAddress: "stale-debug-endpoint", Diagnostic: "stale-diagnostic"}
+	if err := control(home, id, "handoff", &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.BrowserMode != "human" || result.CDPAddress != "" || result.Diagnostic != "" {
+		t.Fatal("omitted fields retained stale phase information")
+	}
+}
 
 func browserFixture(t *testing.T, mode string) *browserControl {
 	t.Helper()
@@ -127,6 +155,10 @@ func TestConcurrentHandoffsRunOneTransition(t *testing.T) {
 
 func TestFailedHandoffCanBeReconciled(t *testing.T) {
 	control := browserFixture(t, "human")
+	before, err := Read(control.home, control.id)
+	if err != nil {
+		t.Fatal(err)
+	}
 	control.handle.Handoff = func(context.Context, string) (BrowserHandle, error) {
 		return control.handle, errors.New("browser-profile-still-locked")
 	}
@@ -136,6 +168,10 @@ func TestFailedHandoffCanBeReconciled(t *testing.T) {
 	failed, err := state.Load(control.home, control.id)
 	if err != nil || failed.State != "handoff-failed" || failed.CDPAddress != "" || failed.Config.Mode() != "human" {
 		t.Fatalf("failure state: %+v %v", failed, err)
+	}
+	failedView, err := Read(control.home, control.id)
+	if err != nil || failedView.URL != before.URL || failedView.Expires != before.Expires {
+		t.Fatal("failed handoff removed the owner's recovery viewer")
 	}
 	var calls atomic.Int32
 	successfulHandoff(control, &calls)
