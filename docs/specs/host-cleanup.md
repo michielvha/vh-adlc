@@ -1,6 +1,6 @@
 ---
 status: in-progress
-status_description: "In progress on feat/host-cleanup, local only at the owner's direction, at plugin 0.13.0 after merging main at 7adb076. The owner accepted at R-17. Tasks T1 to T28 are done and the code is unchanged since 7235dbb. AC-11 and AC-23 carry evidence from 2026-11-09. AC-12 runs 1 to 3 ran on 2026-11-09; run 4 waits for another session's sw-e2e cluster to go, and the owner has not yet accepted the run 1 report. Stackweaver's adoption merged early, as PR #1050 (6fe5fcce, 2026-11-08), before Order steps 1 to 3, so sessions in a Stackweaver checkout can already apply its manifest through the candidate binary and the two allow rules. Spec review R-22 at 7ea9ba7 found 3 findings, none blocking; Q1 asks whether the f781ee7 glossary and trade-off rules apply. The pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
+status_description: "In progress on feat/host-cleanup, local only at the owner's direction, at plugin 0.13.0 after merging main at 7adb076. The owner accepted at R-17 and on 2026-11-09 exempted the document from the glossary and trade-off rules of docs f781ee7 (R-22 Q1). Tasks T1 to T28 are done and the code is unchanged since 7235dbb. AC-11 and AC-23 carry evidence from 2026-11-09. AC-12: the owner accepted the run 1 report on 2026-11-09 and runs 2 and 3 were repeated after it; run 4 waits for another session's sw-e2e cluster to go. Stackweaver's adoption merged early, as PR #1050 (6fe5fcce, 2026-11-08), before Order steps 1 to 3; by the owner's decision the candidate binary and both allow rules stay live until the release. The pre-rebuild tip fd23dae stays reachable locally as refs/archive/host-cleanup-pre-rebuild, which keeps the commits the Review Log cites."
 issue: null
 branch: feat/host-cleanup
 goal: "Any agent session can remove what a repository's killed runs left behind, through one vh-adlc command that touches only the binary's built-in Go temp globs and what that repository's default branch says it owns and has abandoned. A sandboxed Codex session may be refused and sent to a terminal."
@@ -82,6 +82,15 @@ Before merge, at `7adb076`, Go 1.27.2 built all four targets with the release se
 and ran `go vet` for darwin arm64. GoReleaser itself did not run, so archives and signing were not
 exercised. Delivery ends once the tagged release has published its assets, the lock PR has merged and
 the marketplace source on `main` matches the reviewed package.
+
+### Decisions after acceptance
+
+- The glossary and trade-off rules that docs pin `f781ee7` added to the feature-document standard do not
+  apply to this document, which the owner accepted at R-17 under `0e52f51`, before they existed: the
+  owner's answer to Q1 (R-22 F-03) on 2026-11-09. The normative baseline is unchanged.
+- The candidate binary stays installed, with both allow rules, until the release, although Stackweaver's
+  adoption merged before Order steps 1 to 3, so sessions in a Stackweaver checkout can already apply its
+  manifest: the owner's answer to R-22 F-02 on 2026-11-09.
 
 ## Scope
 
@@ -438,18 +447,7 @@ Every criterion is proved on the feature branch. The rest follows `complete`, an
 
 ## Open Questions
 
-### Q1: Do the glossary and trade-off rules added at docs pin f781ee7 apply to this document, accepted at R-17?
-
-**Recommendation:** A. The document was accepted under 0e52f51, where neither rule existed, and the owner
-answered the trade-offs that mattered; record that decision in Context so later reviews do not reopen it.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Exempt it** | The feature completes on its current baseline; Context records the exemption | Terms such as temp root, temp base, mark and liveness stay without a glossary row or a criterion holding them; author-settled defaults (the built-in 24-hour Go globs, the one-hour age floor, the four-character glob floor) are not raised as questions |
-| **B. Apply them** | A glossary, a criterion that holds it, and an open question for each author-settled trade-off | A normative revision: back to draft, every tick and evidence line reset, a new spec review and acceptance, and the criteria proved again |
-
-**Why this is yours:** the new rule has no clause for documents accepted before it, unlike the Owner
-summary rule beside it, so whether it reaches back is a policy choice (R-22 F-03).
+None.
 
 ## Review Log
 
