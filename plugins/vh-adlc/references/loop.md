@@ -4,6 +4,11 @@ Every operation follows the same frame. The steps below are the plugin's procedu
 apply live in `vhco-pro/docs` at the resolved revision, and an operation cites the page it took each
 rule from.
 
+`skills/vh-adlc-clean/SKILL.md` skips steps 1 and 2 altogether; audit's offline bootstrap below still
+uses the verified binary and knowledge. Clean calls `vh-adlc` from `PATH` without the installer, so that
+its allow rule matches, and it skips `knowledge`, because `clean` and `env` read no conventions. The
+binary it runs is therefore not checked against the lock.
+
 ## 1. Get the binary
 
 Audit entry overrides this section's online bootstrap, including when selected through lifecycle

@@ -35,6 +35,10 @@ func TestUsage(t *testing.T) {
 		{"settings without read", []string{"settings"}},
 		{"settings read without stdin", []string{"settings", "read"}},
 		{"settings read with an argument", []string{"settings", "read", "--stdin", "file.yaml"}},
+		{"clean with an argument", []string{"clean", "extra"}},
+		{"clean with a bad age", []string{"clean", "--older-than", "soon"}},
+		{"clean with a negative age", []string{"clean", "--older-than", "-2h"}},
+		{"env with an argument", []string{"env", "extra"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
