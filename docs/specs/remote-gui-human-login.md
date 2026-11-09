@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Owner selected human sign-in and explicit hand-back. Session-restoration corrections await renewed independent review."
+status: planned
+status_description: "Owner-selected design passed independent review and the planned gate. Implementation awaits publication authority for its claim."
 issue: null
 goal: "A remote owner can complete provider authentication in a human-controlled browser before explicitly returning the same disposable session to the agent."
 covers:
@@ -199,6 +199,8 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-09 | R-1 | spec | `c60bcd95744e13122b15b230b758e8ae4b7b9f78` | unknown | procedural | Blocking session-restoration gap and glossary clarification; model identity unattested. |
+| 2026-11-09 | R-2 | spec | `4502d8d879e418e1e09e41b595ce345f463df808` | unknown | procedural | No findings; model identity unattested. |
+| 2026-11-09 | R-2 | spec | `4502d8d879e418e1e09e41b595ce345f463df808` | n/a | n/a | accepted by owner |
 
 ### R-1
 
@@ -215,6 +217,10 @@ SEVERITY: should-fix
 WHERE: docs/specs/remote-gui-human-login.md, Browser phases and compatibility and AC-01
 EVIDENCE: The feature introduces user-facing human mode, agent mode and handoff without glossary rows. The pinned conventions/feature-documents.md:156-157 requires introduced terms to appear in glossary rows and be held to them by a criterion. AC-01 promises no automation interface while Design retains a VNC path capable of programmatic input, so the intended distinction between disabled browser debugging and procedurally restricted viewer input needs an explicit definition.
 PROPOSAL: Define the modes and handoff in glossary rows, distinguishing the absent browser-debugging interface from the retained viewer and its input restrictions. Bind the existing criteria and routing tests to those definitions.
+
+### R-2
+
+NO FINDINGS
 
 ## Sources
 
