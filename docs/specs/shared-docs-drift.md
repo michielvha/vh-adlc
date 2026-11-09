@@ -1053,6 +1053,7 @@ None.
 | 2026-11-07 | R-56 | spec | `6caabfb632d3c4255eb475b8983c332d737644c7` | claude-opus-5.5 | procedural | 1 should-fix. Full requested read coverage. |
 | 2026-11-07 | R-57 | spec | `b9342ea91e2e4549febd9f37ca6d2a90d5ca3479` | claude-opus-5.5 | procedural | NO FINDINGS; full requested read coverage. |
 | 2026-11-08 | R-57 | spec | `b9342ea91e2e4549febd9f37ca6d2a90d5ca3479` | n/a | n/a | accepted by owner |
+| 2026-11-09 | R-58 | spec | `63eefe743ffd8823fdfea7a1a8af52fb8a83bf29` | claude-opus-5.5 | procedural | 1 should-fix and 1 nit. Full 167-chunk read coverage. |
 
 ### R-1
 
@@ -2124,6 +2125,21 @@ PROPOSAL: State the Git rule explicitly in the capture paragraph. Option A: `git
 ### R-57
 
 NO FINDINGS
+
+### R-58
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: shared-docs-drift.md T40 (00509 lines 6-7), T23 "Main freshness" (00929 line 12); plugins/vh-adlc/plugin.json and plugins/vh-adlc/.claude-plugin/plugin.json
+EVIDENCE: T40 requires the branch to "reconcile the candidate plugin version above its published baseline", and it recorded candidate 0.13.0 above the earlier baseline. The main-drift patch moves both main manifests from 0.12.0 to 0.14.0 (main-drift.patch 00141 lines 70-71, 00211 lines 1 and 12). The integrated tree also has "version": "0.14.0" in both manifests (plugin.json 00001 line 4; .claude-plugin/plugin.json 00001 line 3), so the branch now uses main's published version. The branch still changes plugins/vh-adlc. check.test.ts "a package change comes with a version change" compares against origin/main and asserts `expect(now.version).not.toBe(JSON.parse(base.out).version)` (check.test.ts 00211 lines 14-22). With origin/main at 53b62fa (0.14.0), this covered check fails at the next committed gate. No task records this integration or a new candidate version. T23 only says the fixes are preserved "before integrating that default".
+PROPOSAL: Record the 53b62fa preserving merge as a T40-style integration. Reconcile both manifests to a candidate version above main's 0.14.0, for example 0.15.0, without changing accepted behavior. Run the version check and the merged-tree gate against origin/main 53b62fa, and record the result.
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: shared-docs-drift.md Context (00071 line 29); T23 "Main freshness" (00929 line 12)
+EVIDENCE: Context says T40 integrated 837ebc4 "with candidate plugin 0.13.0" and that "The refreshed review uses that integrated source for the manifests and workflow/compatibility guides." The reviewed commit includes main 53b62fa, which changes the covered README, installation, compatibility, marketplace, workflows, authority, lifecycle, loop, lock, manifests, CI and check/discovery tests (main-drift.patch 00001 to 00421). The lock is now 0.19.0 and the guides now count fifteen skills. T23 still describes integrating that default as future work. The documentation convention says to keep current version readings in configuration or dated measurements, not in prose that goes stale (documentation.md 00071 lines 25-26).
+PROPOSAL: Rewrite the Context sentence as dated history. State that the manifests and guides are now reviewed at the 53b62fa integration, and name the resulting candidate version, or point to the manifests instead of stating a version. Change the T23 entry to past tense and record the merge commit.
 
 ## Sources
 
