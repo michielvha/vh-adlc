@@ -306,3 +306,12 @@ test.each(["matching", "changed-head", "missing-labels"])("publication inventory
   if (scenario === "matching") expect(result.proposals[0].title).toBe("Original title");
   else expect(result.diagnostics.join("\n")).toContain("metadata");
 });
+
+test.each(["shared", "legacy", "inventoried-human", "inventoried-other-namespace", "inventoried-foreign-author"])("refresh ownership does not follow inventory membership %s", async scenario => {
+  const { isRefreshTarget } = await import("../../../plugins/vh-adlc/scripts/docs-drift/proposals");
+  const raw = { ...settingsFixture(), legacy_proposals: { ...settingsFixture().legacy_proposals, ids: [17] } };
+  const settings = parseSettings(raw), identity = { repository_id: 10, actor: "fixture-bot", actor_id: 20 };
+  const target = { number: 17, actor: scenario === "shared" ? "fixture-bot" : scenario.includes("human") || scenario.includes("foreign-author") ? "owner-human" : "legacy-bot",
+    actor_id: scenario === "shared" ? 20 : 21, head_ref: scenario === "shared" ? "docs-drift/one" : scenario.includes("human") || scenario.includes("other-namespace") ? "feature/owner-work" : "docs-audit/one", head_repository_id: 10 };
+  expect(isRefreshTarget(settings, identity, target)).toBe(scenario === "shared" || scenario === "legacy");
+});

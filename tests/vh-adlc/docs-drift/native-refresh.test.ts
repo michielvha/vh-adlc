@@ -69,7 +69,7 @@ test.each(["cli", "interrupted-branch", "interrupted-delivery", "legacy", "alias
 }, 365000);
 
 
-test.each(["title", "body", "head", "number", "draft", "fork"] as const)("normal refresh refuses an unbound native target %s", async fault => {
+test.each(["title", "body", "head", "number", "draft", "fork", "id-only", "foreign-author"] as const)("normal refresh refuses an unbound native target %s", async fault => {
   const f = await refreshFixture(roots, false, fault);
   expect(f.target.complete).toBe(false); expect(f.target.manifest).toBeNull();
   const expected = fault === "number" ? "one collected native proposal" : fault === "draft" ? "draft policy" : "metadata preimage changed";

@@ -52,7 +52,7 @@ export function settingsFixture() {
       secret_mappings: { COPILOT_GITHUB_TOKEN: "COPILOT_GITHUB_TOKEN" },
       entries: { hosted: entry, copilot: entry, claude: entry },
     },
-    legacy_proposals: { authors: ["legacy-bot"], branch_prefixes: ["docs-audit/"], ids: [] },
+    legacy_proposals: { authors: ["legacy-bot"], branch_prefixes: ["docs-audit/"], ids: [] as number[] },
     knowledge_pages: [],
   });
 }

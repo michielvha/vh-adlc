@@ -12,17 +12,18 @@ import { canonicalDigest, canonicalJSON } from "../../../plugins/vh-adlc/scripts
 import { effectDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 
 type Reference = { path: string; sha256: string };
-export async function refreshFixture(roots: string[], legacy = false, fault?: "title" | "body" | "head" | "number" | "draft" | "fork" | "alias") {
+export async function refreshFixture(roots: string[], legacy = false, fault?: "title" | "body" | "head" | "number" | "draft" | "fork" | "alias" | "id-only" | "foreign-author") {
   let worker: Reference | null = null;
   const before = { title: "Earlier proposal", body: "Original source proposal\n", labels: ["documentation"], draft: true };
-  const branch = legacy ? "docs-audit/legacy" : "docs-drift/earlier";
+  const branch = fault === "id-only" ? "feature/owner-work" : legacy || fault === "foreign-author" ? "docs-audit/legacy" : "docs-drift/earlier";
+  const foreign = fault === "id-only" || fault === "foreign-author";
   const original = (source: string) => {
     const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
     return { id: 901, number: 17, state: "open", merged_at: null, ...before, labels: [{ id: 101, name: "documentation" }],
-      user: { id: legacy ? 21 : 20, login: legacy ? "legacy-bot" : "fixture-bot", type: "Bot" },
+      user: { id: foreign ? 30 : legacy ? 21 : 20, login: foreign ? "owner-human" : legacy ? "legacy-bot" : "fixture-bot", type: "Bot" },
       head: { sha: source, ref: branch, repo: fault === "fork" ? { ...repository, id: 99, full_name: "other/fork" } : repository }, base: { sha: source, ref: "main", repo: repository } };
   };
-  const f = await bindingFixture(roots, false, { fullComponent: true, mutableInventory: true,
+  const f = await bindingFixture(roots, false, { fullComponent: true, mutableInventory: true, legacy_ids: foreign ? [17] : undefined,
     role: { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source },
     beforeCandidate: async input => {
       expect(input.baseline.complete, JSON.stringify({ diagnostics: input.baseline.diagnostics, scan: input.baseline.scan?.process, commands: input.baseline.commands })).toBe(true);

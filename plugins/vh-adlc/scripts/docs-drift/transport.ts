@@ -618,6 +618,11 @@ export function createNativeTransport(options: {
         if (effect.kind === "receipt-retain") { await pushRef(plan, text(p.ref), objects.receipt_object ?? objects.object, "", delivery); return execution(); }
         if (effect.kind === "lease-release") { await pushRef(plan, text(p.ref), null, objects.lease_object ?? objects.object, delivery); return execution(); }
         if (effect.kind === "push" || effect.kind === "branch-refresh") {
+          if (effect.kind === "branch-refresh") {
+            const target = pull(positive(p.number), plan);
+            if (target.input.state !== "open" || target.input.merged_at !== null || target.head !== p.expected_head
+              || "refs/heads/" + target.branch !== p.ref) throw Error("native refresh target changed before dispatch");
+          }
           const tree = readGit(store.root, "rev-parse", "--verify", "--end-of-options", text(p.head) + "^{tree}").toString().trim();
           if (tree !== plan.manifest.bindings.candidate_tree) throw Error("native candidate tree changed");
           await pushRef(plan, text(p.ref), text(p.head), effect.kind === "branch-refresh" ? text(p.expected_head) : "", delivery); return execution();

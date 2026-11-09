@@ -10,7 +10,7 @@ import { publicationFixture } from "./publication-fixture";
 import { commit, pin, runtimeIdentity, write } from "./adoption-fixture";
 import { settingsFixture } from "./settings-fixture";
 
-export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string }, fullComponent = false) {
+export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string }, fullComponent = false, legacyIDs?: number[]) {
   const shared = publicationFixture(roots), prefix = "plugins/vh-adlc/";
   if (fullComponent) cpSync(join(import.meta.dir, "../../../plugins/vh-adlc"), join(shared.repo, prefix), { recursive: true });
   if (fullComponent) write(shared.repo, prefix + "plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');
@@ -23,7 +23,7 @@ export async function runtimeFixture(roots: string[], upgrade = false, bounded =
     distribution_sha256: sha256(distribution) });
   const candidateDistribution = upgrade ? Buffer.from(distribution.toString().replace("fixture-1.0.0", "fixture-2.0.0")) : distribution;
   const candidateClient = upgrade ? { ...client, version: "fixture-2.0.0", distribution_sha256: sha256(candidateDistribution) } : client;
-  const approvedSource = { pin: componentPin, client, bounded, role };
+  const approvedSource = { pin: componentPin, client, bounded, role, legacy_ids: legacyIDs };
   const f = upgrade ? fullDefinitionUpgradeFixture(roots, { approved: approvedSource, candidate_client: candidateClient })
     : trialDefinitionFixture(roots, { approved: approvedSource });
   const current = "policySource" in f ? f.policySource : f.staged;

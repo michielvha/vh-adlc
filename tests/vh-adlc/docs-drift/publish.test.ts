@@ -1,3 +1,4 @@
+import { canonicalDigest } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { afterAll, expect, test } from "bun:test";
 import { existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
@@ -186,4 +187,14 @@ test("a losing atomic acquisition throws before any after-observation or invalid
   expect(resumed.journal.events.some(event => event.kind === "recovery-only")).toBe(true);
   expect(resumed.journal.events.some(event => event.kind === "invalidation")).toBe(false);
   expect(f.executed).toEqual(["lease"]);
+});
+
+test("an inventoried PR cannot authorize a non-namespace branch rewrite", () => {
+  const f = setup(), before = { title: "Original title", body: "Original body", labels: [], draft: true };
+  const effects = f.plan.manifest.effects.map(effect => effect.kind === "push"
+    ? { ...effect, kind: "branch-refresh" as const, payload: { ref: "refs/heads/feature/owner-work", number: 17, expected_head: f.plan.manifest.bindings.source_commit, head: f.plan.manifest.bindings.candidate_commit } }
+    : effect.kind === "pr-create" ? { ...effect, kind: "pr-update" as const, payload: { number: 17, expected_head: f.plan.manifest.bindings.candidate_commit,
+      expected_payload: before, expected_payload_sha256: canonicalDigest(before), title: effect.payload.title, body: effect.payload.body, labels: effect.payload.labels, draft: true } } : effect);
+  const settings = { ...f.settings, legacy_proposals: { ...f.settings.legacy_proposals, ids: [17] } };
+  expect(() => validatePublicationShape({ ...f.plan, manifest: { ...f.plan.manifest, effects } }, settings, true)).toThrow("candidate branch scope");
 });
