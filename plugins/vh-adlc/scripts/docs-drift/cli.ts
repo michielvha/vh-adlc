@@ -14,6 +14,7 @@ import { inspectPreparation, inspectCandidate, prepareEdits, PreparationEvidence
 import { readCandidateVerificationArtifacts } from "./verification-evidence";
 import { assessSource } from "./source-assessment";
 import { verifyCandidate } from "./candidate-verification";
+import { collectWorkerInputs } from "./publication-worker";
 import { collectPublicationBindings } from "./publication-bindings";
 import { collectPublicationInputs } from "./publication-inputs";
 import { collectNativeResolution, collectNativeClosure } from "./resolution-entry";
@@ -30,6 +31,7 @@ export type CLIReport = {
   runtime?: Awaited<ReturnType<typeof selectApprovedRuntime> | ReturnType<typeof selectCandidateRuntime>>;
   proposals?: ReturnType<typeof collectProposals>;
   edit_inspection?: ReturnType<typeof inspectPreparation>;
+  worker_inputs?: Awaited<ReturnType<typeof collectWorkerInputs>>;
   publication_bindings?: Awaited<ReturnType<typeof collectPublicationBindings>>;
   publication_inputs?: Awaited<ReturnType<typeof collectPublicationInputs>>;
   verification?: Awaited<ReturnType<typeof verifyCandidate>>;
@@ -64,6 +66,11 @@ bun <plugin>/scripts/docs-drift/cli.ts collect-publication-inputs --repo <assess
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
   [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
+bun <plugin>/scripts/docs-drift/cli.ts collect-worker-inputs --repo <assessment-repo> --source <full-commit>
+  --artifact-root <private-external-directory> --cache-root <retained-cache>
+  --entry <hosted|copilot|claude> --launcher <invoked-launcher> --settings <invoked-settings>
+  --source-verification <relative-record-path> --source-verification-sha256 <sha256>
+  --decisions <relative-packet-path> --decisions-sha256 <sha256>
 bun <plugin>/scripts/docs-drift/cli.ts bind-publication --repo <assessment-repo> --source <full-commit>
   --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
   --artifact-root <private-external-directory> --selection <relative-packet-path>
@@ -138,7 +145,9 @@ Candidate verification reruns the committed scanner and configured verification
 vectors in a fresh credential-free owned copy and retains original process/output
 artifacts. Verification checks re-read those original bytes and current bindings.
 Generators and semantic review follow their separately selected steps.
-Publication binding collection rechecks source and candidate verification artifacts,
+Worker input collection captures the original assessment, decisions and native proposal
+inputs before candidate authoring. Publication binding collection rechecks source
+and candidate verification artifacts,
 current native proposals and the decision packet before deriving review bindings.
 Source assessment retains the complete original scan without running baseline checks.
 Existing passing baseline verification records remain readable. Candidate checks
@@ -150,15 +159,16 @@ Verification, review and publication follow their own fresh owned-checkout gates
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "assess-source", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "assess-source", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command);
+  if (!["scan", "assess-source", "collect-worker-inputs", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "assess-source", "collect-worker-inputs", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
   if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) flags.push("--selection", "--selection-sha256");
   if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
   if (command === "check-verification") flags.push("--verification", "--verification-sha256");
-  if (["collect-publication-inputs", "bind-publication"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
+  if (["collect-publication-inputs", "bind-publication", "collect-worker-inputs"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
+  if (command === "collect-worker-inputs") flags.push("--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256");
   if (command === "bind-publication") flags.push("--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
@@ -173,6 +183,7 @@ function argumentsForCommand(argv: string[]) {
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) throw Error(command + " requires a full immutable source commit");
   const requiredReferences: Record<string, string[]> = {
     "check-verification": ["--verification", "--verification-sha256"],
+    "collect-worker-inputs": ["--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256"],
     "bind-publication": ["--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256"],
   };
   const missing = (requiredReferences[command] ?? []).filter(flag => !values.has(flag));
@@ -302,6 +313,17 @@ export async function main(argv: string[]): Promise<number> {
         report = { schema_version: 1, command: options.command, outcome: edit_inspection.complete ? "collected" : "incomplete",
           source_commit: options.source, diagnostics: [...protection, ...edit_inspection.diagnostics.filter(message => !protectionMessages.has(message)).map(message => ({ code: "edit-inspection", message }))], edit_inspection };
       }
+    } else if (options.command === "collect-worker-inputs") {
+      const artifacts = privateArtifacts(options.artifacts, repo), entry = options.entry;
+      if ((entry !== "hosted" && entry !== "copilot" && entry !== "claude") || !options.cache || !options.launcher || !options.settings)
+        throw Error("worker input collection requires cache-root, entry, launcher and settings");
+      const { settings } = loadCommittedSettings(repo, options.source);
+      const worker_inputs = await collectWorkerInputs({ repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(),
+        credential: nativeCredential(settings.hostname), cache_directory: resolve(options.cache), entry, launcher_path: resolve(options.launcher), settings_path: resolve(options.settings),
+        source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
+        decisions: { path: options.decisions, sha256: options.decisions_sha256 } });
+      report = { schema_version: 1, command: options.command, outcome: worker_inputs.complete ? "collected" : "incomplete", source_commit: options.source,
+        worker_inputs, diagnostics: worker_inputs.diagnostics.map(message => ({ code: "worker-inputs", message })) };
     } else if (options.command === "assess-source") {
       const artifacts = privateArtifacts(options.artifacts, repo);
       const source_assessment = await assessSource({ repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });

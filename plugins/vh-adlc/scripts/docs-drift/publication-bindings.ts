@@ -1,3 +1,5 @@
+import { advisoryDecisionIDs, exactRecord, parseDecisionPacket, projectAttentionProposals } from "./publication-decisions";
+import { collectPublicationOriginals } from "./publication-originals";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -8,11 +10,11 @@ import { publishArtifact } from "./journal";
 import { readCandidatePatch } from "./preparation";
 import { deriveWorkerInputs } from "./publication-worker";
 import { collectPublicationInputs } from "./publication-inputs";
-import { collectProposals, fetchProposalObjects, projectProposalBindings } from "./proposals";
-import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath, sha256 } from "./protocol";
-import { deliveryDigest, attentionProjection, type AttentionInput, type AttentionProjection, type CorrectionInput } from "./report";
+import { collectProposals, projectProposalBindings } from "./proposals";
+import { canonicalDigest, canonicalJSON, freezeJSON, protocolPath, sha256 } from "./protocol";
+import { deliveryDigest, type AttentionProjection, type CorrectionInput } from "./report";
 import { parseEdit, readResolutionRecord, resolutionSource } from "./resolve";
-import { collectResolutionInputs, readResolutionProposal, recheckResolutionInputs, type ResolutionCollection, type ResolutionInputs } from "./resolve-inputs";
+import { recheckResolutionInputs, type ResolutionCollection, type ResolutionInputs } from "./resolve-inputs";
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { readNativeContext } from "./transport";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
@@ -32,13 +34,6 @@ type Result = {
   resolution: ResolutionInputs | null;
 };
 
-function exactRecord(value: unknown, fields: string[], reason: string): Record<string, unknown> {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error(reason);
-  const input = value as Record<string, unknown>;
-  if (Object.keys(input).length !== fields.length || fields.some(field => !Object.hasOwn(input, field))) throw Error(reason);
-  return input;
-}
-
 /** Assemble the actual immutable review inputs. Native role verification and effect authority follow separately. */
 export async function collectPublicationBindings(input: Options): Promise<Result> {
   const options = { ...input, selection: structuredClone(input.selection), resolution_record: structuredClone(input.resolution_record),
@@ -53,16 +48,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     const reference = options.decisions as { path?: unknown } | null;
     secondary.assertExternal(join(secondary.directory, protocolPath(reference?.path)));
     const bytes = readBoundArtifact({ source_repo: repo, artifact_root: secondary.directory, reference: options.decisions });
-    if (bytes.length > snapshot.settings.reports.max_entry_bytes) throw Error("Canonical bounded decision packet required");
-    const parsed: unknown = JSON.parse(decodeUTF8(bytes));
-    if (!canonicalJSON(parsed).equals(bytes)
-      || parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) throw Error("Canonical bounded decision packet required");
-    const packet = parsed as Record<string, unknown>, fields = ["schema_version", "kind", "mode", "source_commit", "selected_proposals", "decisions", "attention"];
-    if (Object.keys(packet).length !== fields.length || fields.some(field => !Object.hasOwn(packet, field)) || packet.schema_version !== 1
-      || packet.kind !== "docs-drift-decisions" || !["advisory", "resolve"].includes(String(packet.mode)) || packet.source_commit !== options.source
-      || !Array.isArray(packet.decisions) || !Array.isArray(packet.attention) || !Array.isArray(packet.selected_proposals)
-      || packet.selected_proposals.length > 1000 || packet.selected_proposals.some(id => typeof id !== "number" || !Number.isSafeInteger(id) || id < 1)
-      || new Set(packet.selected_proposals).size !== packet.selected_proposals.length) throw Error("Decision packet fields or source changed");
+    const packet = parseDecisionPacket(bytes, snapshot);
     const selected = packet.selected_proposals as number[];
     result.mode = packet.mode as "advisory" | "resolve";
     if (result.mode === "advisory" && (selected.length > 0 || options.resolution_record)) throw Error("Advisory decision packet contains a resolution selection");
@@ -72,9 +58,8 @@ export async function collectPublicationBindings(input: Options): Promise<Result
       const selection = exactRecord(options.selection, ["schema_version", "source_commit", "edits"], reason);
       if (selection.schema_version !== 1 || selection.source_commit !== options.source || !Array.isArray(selection.edits)) throw Error(reason);
       const ids = selection.edits.map(edit => parseEdit(edit).id), expected = new Set(ids);
-      const decisions = packet.decisions.map(value => exactRecord(value, ["id", "reason"], reason));
-      if (expected.size !== ids.length || decisions.length !== expected.size || new Set(decisions.map(item => item.id)).size !== decisions.length
-        || decisions.some(item => typeof item.id !== "string" || !expected.has(item.id) || typeof item.reason !== "string" || !item.reason.trim())) throw Error(reason);
+      const decisions = advisoryDecisionIDs(packet);
+      if (expected.size !== ids.length || decisions.length !== expected.size || decisions.some(id => !expected.has(id))) throw Error(reason);
     }
     const common = { repo, source: options.source, artifact_root: secondary.directory, owner: options.owner, run: options.run };
     result.source_verification = readSourceAssessmentArtifacts({ ...common, candidate_repo: candidateRepo, reference: options.source_verification });
@@ -97,20 +82,11 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     if (result.mode === "resolve") {
       const sourceStore = baseline.object_store;
       if (!sourceStore || !options.resolution_record) throw Error("Original assessed objects and resolve record required");
-      const environment = { PATH: options.path, ...(snapshot.settings.hostname === "github.com" || snapshot.settings.hostname.endsWith(".ghe.com")
-        ? { GH_TOKEN: options.credential } : { GH_ENTERPRISE_TOKEN: options.credential }) };
-      const observed: ReturnType<typeof readResolutionProposal>[] = [];
-      for (const id of selected) {
-        const proposal = context.repository.pull(id);
-        const fetched = await fetchProposalObjects(sourceStore, proposal, { hostname: snapshot.settings.hostname, repository: snapshot.settings.repository,
-          default_branch: snapshot.settings.default_branch, expected_default_commit: currentDefault, environment });
-        if (!fetched.complete) throw Error("Selected complete original diff unavailable");
-        observed.push(readResolutionProposal(sourceStore, proposal));
-      }
-      resolutionCollection = { snapshot, store: sourceStore, reader: context.repository, selected };
-      result.resolution = collectResolutionInputs(resolutionCollection);
+      const originals = await collectPublicationOriginals({ snapshot, store: sourceStore, context, selected,
+        current_default: currentDefault, credential: options.credential, path: options.path });
+      resolutionCollection = originals.collection; result.resolution = originals.inputs;
       if (!result.resolution.complete) { result.diagnostics.push(...result.resolution.diagnostics); throw Error("Selected native resolution inputs incomplete"); }
-      if (!canonicalJSON(result.resolution.proposals).equals(canonicalJSON(observed))) throw Error("Selected original inputs changed between fetch and collection");
+      if (!canonicalJSON(result.resolution.proposals).equals(canonicalJSON(originals.observed))) throw Error("Selected original inputs changed between fetch and collection");
       const record = readResolutionRecord(readGit(candidateRepo, "show", options.candidate + ":" + protocolPath(options.resolution_record.path)), snapshot.settings);
       const originalBindings = result.resolution.proposals.map(proposal => ({ ...proposal,
         hunks: proposal.hunks.map(({ before_base64: _before, after_base64: _after, ...hunk }) => hunk) }));
@@ -128,17 +104,8 @@ export async function collectPublicationBindings(input: Options): Promise<Result
       postimage_sha256: postimages.has(path) ? sha256(postimages.get(path)!.bytes) : canonicalDigest({ path, absent: true }),
       verification_sha256: verificationBinding, inputs_sha256: sourceInputs,
     }));
-    result.attention = packet.attention.map(value => {
-      const reason = "Invalid or duplicate attention proposal";
-      const item = exactRecord(value, ["identity", "disposition", "reason", "owner_action", "rule", "title", "links"], reason);
-      if ([item.identity, item.reason, item.owner_action, item.title].some(value => typeof value !== "string" || !value.trim())
-        || !Array.isArray(item.links) || item.links.some(link => typeof link !== "string" || !link.trim())) throw Error(reason);
-      try {
-        return attentionProjection({ ...item as Omit<AttentionInput, "repository" | "scope_sha256" | "inputs" | "required_inputs">,
-          repository: snapshot.settings.repository, scope_sha256: snapshot.protocol.bindings.scope_sha256, inputs: { source: sourceInputs }, required_inputs: ["source"] });
-      } catch { throw Error(reason); }
-    });
-    if (new Set(result.attention.map(item => item.sha256)).size !== result.attention.length) throw Error("Invalid or duplicate attention proposal");
+    result.attention = projectAttentionProposals(packet.attention, { repository: snapshot.settings.repository,
+      scope_sha256: snapshot.protocol.bindings.scope_sha256, inputs_sha256: sourceInputs });
     const proposalBytes = canonicalJSON(projectProposalBindings(result.proposals.proposals, result.resolution?.inputs_sha256 ?? null));
     if (proposalBytes.length > snapshot.settings.reports.max_entry_bytes) throw Error("Proposal snapshot exceeds the configured retained bound");
     if (!baseline.evidence || !verified.evidence) throw Error("Original source and candidate evidence references required");

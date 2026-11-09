@@ -2,6 +2,7 @@ import { afterAll, expect, spyOn, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import * as artifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import type { WorkerCollectionOptions } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
 import { verifyCandidate } from "../../../plugins/vh-adlc/scripts/docs-drift/candidate-verification";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
@@ -12,7 +13,7 @@ const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 async function fixture(incompleteInventory: boolean, options: {
   sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean;
-  beforeCandidate?: (input: { repo: string; source: string; artifacts: string; baseline: Awaited<ReturnType<typeof verifyCandidate>>; selection: unknown; decisions: Uint8Array }) => void;
+  beforeCandidate?: (input: { repo: string; source: string; artifacts: string; baseline: Awaited<ReturnType<typeof verifyCandidate>>; selection: unknown; decisions: Uint8Array; worker_options: WorkerCollectionOptions }) => void | Promise<void>;
 } = {}) {
   const { sourceInsideCandidate = false, sourceCheckNeedsRepair = false, beforeCandidate } = options;
   const f = await runtimeFixture(roots, true), repo = f.repo;
@@ -50,7 +51,18 @@ async function fixture(incompleteInventory: boolean, options: {
   const decisions = { schema_version: 1, kind: "docs-drift-decisions", mode: "advisory", source_commit: source,
     selected_proposals: [], decisions: [{ id: "guide-fix", reason: "Synthetic source-based candidate" }], attention: [] };
   const decisionBytes = canonicalJSON(decisions); writeFileSync(join(artifacts, "decisions.json"), decisionBytes, { mode: 0o600 });
-  beforeCandidate?.({ repo, source, artifacts, baseline, selection, decisions: decisionBytes });
+  const native = nativeReader({ ...f, candidate: source }, "fixture-bot", false, incompleteInventory), executable = Bun.which("git");
+  if (!executable) throw Error("fixture requires Git");
+  writeFileSync(join(f.root, "native-bin", "git"), `#!${process.execPath}
+const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
+if (args.includes("fetch") && args.some(value => value.startsWith("https://")) && target < 0) process.exit(91);
+if (target >= 0) { args[target] = ${JSON.stringify(origin)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always"); }
+const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdout: "inherit", stderr: "inherit" }); process.exit(result.exitCode);
+`, { mode: 0o700 });
+  const worker_options: WorkerCollectionOptions = { ...common, repo, source, source_verification: baseline.evidence!,
+    decisions: { path: "decisions.json", sha256: sha256(decisionBytes) }, credential: "synthetic-read-token", path: native.environment.PATH,
+    cache_directory: f.selection.cache_directory, entry: "copilot", launcher_path: f.selection.launcher_path, settings_path: join(repo, ".vh-adlc/docs-drift.yaml") };
+  await beforeCandidate?.({ repo, source, artifacts, baseline, selection, decisions: decisionBytes, worker_options });
   if (!sourceInsideCandidate) {
     git(f.root, "clone", "--no-local", "--no-checkout", repo, candidate); git(candidate, "checkout", "--detach", source);
     put(candidate, "docs/guide.md", replacement.toString()); head = commitAll(candidate);
@@ -61,14 +73,6 @@ async function fixture(incompleteInventory: boolean, options: {
   expect(baseline.complete, JSON.stringify({ stage: "source", diagnostics: baseline.diagnostics, scan: baseline.scan?.process })).toBe(!sourceCheckNeedsRepair);
   expect(verified.complete, JSON.stringify({ stage: "candidate", diagnostics: verified.diagnostics, scan: verified.scan?.process,
     commands: verified.commands.map(command => ({ argv: command.argv, process: command.process })) })).toBe(true);
-  const native = nativeReader({ ...f, candidate: source }, "fixture-bot", false, incompleteInventory), executable = Bun.which("git");
-  if (!executable) throw Error("fixture requires Git");
-  writeFileSync(join(f.root, "native-bin", "git"), `#!${process.execPath}
-const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
-if (args.includes("fetch") && args.some(value => value.startsWith("https://")) && target < 0) process.exit(91);
-if (target >= 0) { args[target] = ${JSON.stringify(origin)}; args.splice(args.indexOf("fetch"), 0, "-c", "protocol.file.allow=always"); }
-const result = Bun.spawnSync([${JSON.stringify(executable)}, ...args], { stdout: "inherit", stderr: "inherit" }); process.exit(result.exitCode);
-`, { mode: 0o700 });
   return { ...f, ...common, repo, source, candidate, head, artifacts, selection, baseline, assessment, verified, decisions, native,
     options: { ...common, repo, source, candidate_repo: candidate, candidate: head, selection,
       source_verification: assessment?.evidence ?? baseline.evidence!, candidate_verification: verified.evidence!, decisions: { path: "decisions.json", sha256: sha256(decisionBytes) },
@@ -307,4 +311,80 @@ test("normal binding collection accepts a complete source scan when only the rep
   expect(result.diagnostics).toEqual([]); expect(result.complete).toBe(true);
   expect(result.source_verification?.scan?.complete).toBe(true);
   expect(result.bindings?.assessment_sha256).toBe(f.assessment!.scan_artifacts!.report.sha256);
+}, 60000);
+
+
+test.each(["api", "cli"])("normal worker-input collection precedes the candidate and matches its later review binding %s", async surface => {
+  let target = "";
+  const f = await fixture(false, { beforeCandidate: async input => {
+    expect(existsSync(join(input.repo, "../binding-candidate"))).toBe(false);
+    const before = captureRepositoryState(input.repo);
+    if (surface === "api") {
+      const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+      const result = await collectWorkerInputs(input.worker_options);
+      expect(result.diagnostics).toEqual([]); expect(result.complete).toBe(true); expect(result.authority).toBe("none");
+      target = result.worker_input_sha256!;
+    } else {
+      const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), options = input.worker_options;
+      const proof = options.source_verification as { path: string; sha256: string }, decisions = options.decisions as { path: string; sha256: string };
+      const outcome = Bun.spawnSync([process.execPath, entry, "collect-worker-inputs", "--repo", input.repo, "--source", input.source,
+        "--artifact-root", input.artifacts, "--source-verification", proof.path, "--source-verification-sha256", proof.sha256,
+        "--decisions", decisions.path, "--decisions-sha256", decisions.sha256, "--cache-root", options.cache_directory,
+        "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path], {
+        env: { ...process.env, PATH: options.path, GH_TOKEN: "synthetic-read-token" }, stdout: "pipe", stderr: "pipe", timeout: 60000 });
+      const report = JSON.parse(outcome.stdout.toString());
+      expect(outcome.exitCode, JSON.stringify(report.diagnostics)).toBe(0);
+      expect(report.worker_inputs).toMatchObject({ complete: true, authority: "none" });
+      target = report.worker_inputs.worker_input_sha256;
+    }
+    expect(captureRepositoryState(input.repo)).toEqual(before);
+  } });
+  const { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
+  const result = await collectPublicationBindings(f.options);
+  expect(result.diagnostics).toEqual([]); expect(result.worker_input_sha256).toBe(target);
+}, 60000);
+
+test.each(["source-only", "resolve", "partial-inventory", "changed-proof"])("normal worker inputs retain source/original bindings and refuse incomplete inputs %s", async scenario => {
+  const f = scenario === "resolve" ? await resolveFixture("matching") : await fixture(scenario === "partial-inventory", { sourceCheckNeedsRepair: scenario === "source-only" });
+  const options = structuredClone(f.options), { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+  if (scenario === "changed-proof") options.source_verification.sha256 = "0".repeat(64);
+  const result = await collectWorkerInputs(options), complete = scenario === "source-only" || scenario === "resolve";
+  if (complete) {
+    expect(result.diagnostics).toEqual([]);
+    const { collectPublicationBindings } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-bindings");
+    const reviewed = await collectPublicationBindings(f.options);
+    expect(reviewed.diagnostics).toEqual([]); expect(result.worker_input_sha256).toBe(reviewed.worker_input_sha256);
+    if (scenario === "resolve") expect(result.resolution?.complete).toBe(true);
+  } else {
+    expect(result.diagnostics.join("\n")).toContain(scenario === "partial-inventory" ? "Complete current proposal inventory required" : "artifact changed");
+    expect(result.worker_input_sha256).toBe(null);
+  }
+  expect(result.complete).toBe(complete); expect(result.authority).toBe("none");
+}, 60000);
+
+test.each(["outside-late-change", "outside-during-fetch"])("normal worker inputs recheck selected originals outside discovery %s", async scenario => {
+  const f = await resolveFixture(scenario), { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+  const result = await collectWorkerInputs(f.options);
+  expect(result.complete).toBe(false); expect(result.authority).toBe("none");
+  expect(result.diagnostics.join("\n")).toContain(scenario === "outside-during-fetch"
+    ? "Selected original inputs changed between fetch and collection" : "Selected original inputs changed during final recheck");
+}, 60000);
+
+
+test("worker input snapshot retention failure preserves caller state and owned resource locators", async () => {
+  const f = await fixture(false), { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+  put(f.repo, "docs/guide.md", "Preserved source draft\n"); const before = captureRepositoryState(f.repo), publish = artifacts.publishArtifact;
+  const failure = spyOn(artifacts, "publishArtifact").mockImplementation((path, bytes) => {
+    if (path.includes("/proposal-snapshot-")) throw Error("fixture worker snapshot retention failure");
+    return publish(path, bytes);
+  });
+  try {
+    const result = await collectWorkerInputs(f.options);
+    expect(result.complete).toBe(false); expect(result.authority).toBe("none");
+    expect(result.worker_input_sha256).toBe(null); expect(result.proposal_snapshot).toBe(null);
+    expect(result.proposal_snapshot_path?.startsWith(f.artifacts + "/proposal-snapshot-")).toBe(true);
+    expect(result.facts?.store?.root.startsWith(f.artifacts + "/")).toBe(true);
+    expect(result.diagnostics).toContain("fixture worker snapshot retention failure");
+    expect(captureRepositoryState(f.repo)).toEqual(before);
+  } finally { failure.mockRestore(); }
 }, 60000);
