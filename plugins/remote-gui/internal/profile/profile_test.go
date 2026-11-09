@@ -297,7 +297,7 @@ func TestSingletonCheckRecoversStaleLocks(t *testing.T) {
 			t.Fatalf("%s: stale singleton files remain", name)
 		}
 	}
-	if err = CheckSingleton(filepath.Join(t.TempDir())); err != nil {
+	if err = CheckSingleton(t.TempDir()); err != nil {
 		t.Fatal("profile without singleton files refused")
 	}
 }
@@ -465,6 +465,9 @@ func TestListShowsProfilesWithoutLocking(t *testing.T) {
 	entries, err := List(root)
 	if err != nil || len(entries) != 1 || !entries[0].InUse || entries[0].Holder != id || entries[0].OwnerLogin != "owner@example.test" {
 		t.Fatalf("in-use entry: %+v %v", entries, err)
+	}
+	if err = held.SaveMeta(Meta{Name: "work", OwnerLogin: "owner@example.test", Transport: "tailscale"}); err != nil {
+		t.Fatal(err)
 	}
 	held.Release()
 	if again, err := Acquire(root, "work"); err != nil {

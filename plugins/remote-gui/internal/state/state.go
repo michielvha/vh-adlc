@@ -85,6 +85,10 @@ func private(path string, mode os.FileMode) error {
 	return nil
 }
 
+// Private checks that path is this user's own directory (0700) or regular file
+// (0600), reached without following a symlink.
+func Private(path string, mode os.FileMode) error { return private(path, mode) }
+
 func EnsureRoot(root string) error {
 	if !filepath.IsAbs(root) {
 		return errors.New("private state root must be absolute")
