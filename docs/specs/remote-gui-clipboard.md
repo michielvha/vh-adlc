@@ -1,6 +1,7 @@
 ---
-status: planned
-status_description: "Accepted by the owner against spec review R-6; next step is the task list."
+status: in-progress
+status_description: "Claimed for implementation on feat/remote-gui-clipboard."
+branch: feat/remote-gui-clipboard
 issue: https://github.com/michielvha/vh-adlc/issues/61
 goal: "The owner can move text between their own device and the shared remote browser through explicit viewer controls, and the text never reaches logs, records or retained evidence."
 covers:
