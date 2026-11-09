@@ -1,3 +1,7 @@
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { isAbsolute, join, relative } from "node:path";
+
 /** Run Git byte reads against the selected checkout, independent of inherited hook state. */
 export function readGit(repo: string, ...args: string[]): Buffer {
   return readGitWithEnvironment(repo, args, process.env);
@@ -5,15 +9,33 @@ export function readGit(repo: string, ...args: string[]): Buffer {
 
 /** Collection subprocesses can supply an allowlisted environment through the same runner. */
 export function readGitWithEnvironment(repo: string, args: string[], environment: Readonly<Record<string, string | undefined>>, input?: Uint8Array): Buffer {
-  const result = Bun.spawnSync(gitReadArguments(args), {
-    cwd: repo,
-    env: gitEnvironment(environment),
-    ...(input === undefined ? {} : { stdin: input }),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  if (result.exitCode !== 0) throw new Error("Git collection failed");
-  return result.stdout;
+  const env = gitEnvironment(environment);
+  let temporary: string | undefined;
+  try {
+    let selectedArgs = args;
+    if (args.includes("diff")) {
+      // Porcelain diff can refresh the index even with optional locks disabled.
+      const index = readGitWithEnvironment(repo, ["rev-parse", "--path-format=absolute", "--git-path", "index"], environment).toString().replace(/\n$/u, "");
+      const parent = realpathSync(tmpdir());
+      const common = readGitWithEnvironment(repo, ["rev-parse", "--path-format=absolute", "--git-common-dir"], environment).toString().replace(/\n$/u, "");
+      for (const root of [realpathSync(repo), realpathSync(common)]) {
+        const delta = relative(root, parent);
+        if (delta === "" || !isAbsolute(delta) && delta !== ".." && !delta.startsWith("../")) throw Error("Git read temporary directory overlaps the selected repository");
+      }
+      temporary = mkdtempSync(join(parent, "vh-git-read-index-"));
+      const privateIndex = join(temporary, "index");
+      if (existsSync(index)) writeFileSync(privateIndex, readFileSync(index), { flag: "wx", mode: 0o600 });
+      env.GIT_INDEX_FILE = privateIndex;
+      selectedArgs = ["-c", "diff.autoRefreshIndex=true", "-c", "core.splitIndex=false", ...args];
+    }
+    const result = Bun.spawnSync(gitReadArguments(selectedArgs), {
+      cwd: repo, env, ...(input === undefined ? {} : { stdin: input }), stdout: "pipe", stderr: "pipe",
+    });
+    if (result.exitCode !== 0) throw new Error("Git collection failed");
+    return result.stdout;
+  } finally {
+    if (temporary) rmSync(temporary, { recursive: true, force: true });
+  }
 }
 
 export function gitEnvironment(base: Readonly<Record<string, string | undefined>> = process.env): Record<string, string | undefined> {

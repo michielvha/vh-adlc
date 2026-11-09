@@ -4,6 +4,7 @@ import { selectRecoveryRuntime } from "./bootstrap";
 import { fetchCurrentDefault } from "./proposals";
 import { readJournal } from "./journal";
 import { acknowledgeDeliveries, reconcileAbsent, type AcknowledgementScope, type ReconciliationScope } from "./recovery";
+import { recoveryEffectsOutput } from "./recovery-output";
 import { readRecoveryAuthority } from "./recovery-authority";
 import { exactRecord } from "./publication-decisions";
 import { canonicalDigest, freezeJSON } from "./protocol";
@@ -41,13 +42,14 @@ function readSelection(value: unknown, source: string, operation: string) {
   return { purpose: packet.purpose as Purpose, acknowledge_effect_ids: acknowledge, retire_effect_ids: retire, retirement_lookups: selected };
 }
 
-async function collectContext(input: RecoveryOptions) {
+async function collectContext(input: RecoveryOptions, execution?: Purpose) {
   const options = structuredClone(input), repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
   const root = artifactDirectoryScope(options.artifact_root, repo).directory;
   if (dirname(realpathSync(options.journal_directory)) !== root) throw Error("Original recovery journal artifact root required");
   const journal = readJournal(options.journal_directory, repo), plan = journal.plan;
   if (plan.manifest.bindings.source_commit !== options.source || plan.transport !== "native") throw Error("Original native recovery source required");
   const selection = readSelection(options.selection, options.source, plan.manifest.operation_id);
+  if (execution && execution !== selection.purpose) throw Error("Recovery command purpose differs from its selected operation");
   const { settings } = loadCommittedSettings(repo, options.source);
   const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
   const observed = native();
@@ -55,6 +57,8 @@ async function collectContext(input: RecoveryOptions) {
     || observed.identity.actor_id !== plan.manifest.actor_id || observed.identity.actor !== plan.manifest.actor) throw Error("Recovery original repository and actor required");
   const runtime = await selectRecoveryRuntime({ repo, source_commit: options.source, identity: observed.identity,
     cache_directory: options.cache_directory, entry: options.entry, adoption_sha256: plan.adoption_sha256 });
+  if (execution && realpathSync(import.meta.path) !== join(runtime.component.directory, "scripts/docs-drift/recovery-controller.ts"))
+    throw Error("Original retained recovery controller required");
   // This owned environment carries immutable source and metadata. Original journals and application artifacts supply proof.
   const store = createOwnedObjectStore({ source_repo: repo, source_commit: options.source, parent: root, evidence_directory: root,
     owner: options.owner, run: options.run, repository: settings.repository });
@@ -112,17 +116,26 @@ export async function inspectRecovery(input: RecoveryOptions): Promise<RecoveryI
 
 /** Execute only metadata recovery under fresh exact authority using the original retained code. */
 export async function applyRecovery(input: RecoveryOptions & { authority: unknown; purpose: Purpose }) {
-  const options = structuredClone(input), context = await collectContext(options), selected = context.selection;
-  if (options.purpose !== selected.purpose) throw Error("Recovery command purpose differs from its selected operation");
-  if (Bun.version !== "1.4.4" || realpathSync(import.meta.path) !== join(context.runtime.component.directory, "scripts/docs-drift/recovery-controller.ts"))
-    throw Error("Original retained recovery controller required");
+  if (Bun.version !== "1.4.4") throw Error("Original retained recovery Bun version required");
+  const options = structuredClone(input), context = await collectContext(options, options.purpose), selected = context.selection;
+  recoveryEffectsOutput({ command: selected.purpose === "acknowledgement" ? "acknowledge-delivery" : "reconcile-publication",
+    source: options.source, outcome: "incomplete", limit: Math.min(OUTPUT_LIMIT, context.settings.reports.max_entry_bytes), capacity_check: true,
+    result: { state: "pending", reason: null, journal: readJournal(options.journal_directory, options.repo) } });
   const reference = options.authority;
   const authorize = async (scope: Parameters<typeof readRecoveryAuthority>[0]["scope"]) => {
     const fresh = context.native();
     if (canonicalDigest(fresh.identity) !== canonicalDigest(context.observed.identity) || fresh.default_commit !== context.observed.default_commit)
       throw Error("Current recovery authority source changed");
     return readRecoveryAuthority({ source_repo: context.repo, artifact_root: context.common.transport.artifact_root, reference, purpose: selected.purpose, scope,
-      adopted_procedure: { repo: context.store.root, current_default: fresh.default_commit, path: context.settings.project_procedure } });
+      current_procedure: () => {
+        const current = loadCommittedSettings(context.store.root, fresh.default_commit).settings;
+        if (current.repository !== context.settings.repository || current.hostname !== context.settings.hostname
+          || current.publication.lease_ref !== context.settings.publication.lease_ref
+          || current.publication.receipt_ref_prefix !== context.settings.publication.receipt_ref_prefix)
+          throw Error("Recovery current procedure repository or ref namespace changed");
+        return { repo: context.store.root, current_default: fresh.default_commit, path: current.project_procedure,
+          receipt_ref_prefix: current.publication.receipt_ref_prefix };
+      } });
   };
   return selected.purpose === "acknowledgement"
     ? acknowledgeDeliveries({ ...context.common, ...selected, authorize }) : reconcileAbsent({ ...context.common, ...selected, authorize });

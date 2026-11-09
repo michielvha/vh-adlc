@@ -2068,3 +2068,31 @@ test("native refresh preserves a competing push after its fresh PR read", async 
   expect(f.inspect().refs[ref]).toBe("f".repeat(40));
   expect((f.inspect().prs[0].head as { sha: string }).sha).not.toBe(f.commit);
 });
+
+test.each(["matching", "changed-facts"] as const)("native conflict retirement reuses only the displayed approved lookup (%s)", async scenario => {
+  const f = setup(); await f.transport.identity();
+  f.update(state => { state.prs.push({ number: 77, state: "open", user: { login: "fixture-bot", id: 20 },
+    head: { ref: "docs-drift/one", sha: f.commit, repo: { id: 10 } }, base: { ref: "release", repo: { id: 10 } } }); });
+  const effect: Effect = { id: "selected", kind: "pr-close", payload: { number: 77, expected_head: f.commit } };
+  const selected = await startCleanupJournal(f, [effect]);
+  const common = { source_repo: selected.repo, journal_directory: selected.journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, retire_effect_ids: [effect.id] };
+  const inspected = await reconcileAbsent({ ...common, inspect_only: true, authorize: async () => { throw Error("Inspection requested approval"); } });
+  const scopes = inspected.inspection_scopes;
+  if (!scopes || scopes.length !== 2 || !scopes[1].retirement) throw Error("Missing exact native conflict scopes");
+  const hashes = new Set(scopes.map(scope => sha256(canonicalJSON(scope))));
+  const lookup = scopes[1].retirement.lookup;
+  expect(JSON.parse(readFileSync(lookup.path, "utf8")).lookup.requests.length).toBeGreaterThan(0);
+  if (scenario === "changed-facts") f.update(state => { (state.prs[0].base as { ref: string }).ref = "another-release"; });
+  const result = await reconcileAbsent({ ...common, retirement_lookups: { [effect.id]: lookup }, authorize: async scope => {
+    const digest = sha256(canonicalJSON(scope));
+    if (!hashes.has(digest)) throw Error("Native scope differs from the displayed approved batch");
+    return { scope_sha256: digest, request_sha256: hash("exact original native conflict retirement") };
+  } });
+  expect(result.state, result.reason ?? undefined).toBe(scenario === "matching" ? "retired" : "pending");
+  expect(result.journal.events.some(event => event.kind === "retired-absence" && event.effect_id === effect.id)).toBe(scenario === "matching");
+  expect(f.inspect().prs[0].state).toBe("open");
+  expect(f.inspect().refs[f.settings.publication.lease_ref] !== undefined).toBe(scenario !== "matching");
+  const calls = readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
+  expect(calls.some(call => call.program === "gh" && call.args.includes("PATCH"))).toBe(false);
+});

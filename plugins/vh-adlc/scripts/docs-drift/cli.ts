@@ -1,5 +1,8 @@
 #!/usr/bin/env bun
 import { inspectRecovery, applyRecovery, recoveryInspectionOutput } from "./recovery-controller";
+import { recoveryEffectsOutput } from "./recovery-output";
+import { OUTPUT_LIMIT } from "./owned-process";
+import type { PublishResult } from "./publish";
 import { readAssessmentReport, assessmentReportOutput } from "./assessment-report";
 import { checkPublication, publishPublication, resumePublication } from "./publication-controller";
 import { collectCandidateReview } from "./candidate-review";
@@ -31,7 +34,7 @@ type Diagnostic = { code: string; message: string };
 export type CLIReport = {
   schema_version: 1; command: string; outcome: "collected" | "attention" | "incomplete"; diagnostics: Diagnostic[];
   recovery_inspection?: Awaited<ReturnType<typeof inspectRecovery>>;
-  recovery_effects?: Awaited<ReturnType<typeof applyRecovery>>;
+  recovery_effects?: ReturnType<typeof recoveryEffectsOutput>["recovery_effects"];
   assessment_report?: ReturnType<typeof readAssessmentReport>; markdown?: string;
   source_commit?: string; settings_sha256?: string; bindings_sha256?: string; assessment?: ScanRun;
   signals?: ReturnType<typeof checkUpgradeSignals>;
@@ -232,6 +235,11 @@ follow in the controller. This collection has authority none.
 Verification, review and publication follow their own fresh owned-checkout gates.
 `;
 
+function publicationOutcome(state: PublishResult["state"]): CLIReport["outcome"] {
+  if (state === "complete") return "collected";
+  return state === "acknowledged" || state === "retired" ? "attention" : "incomplete";
+}
+
 const recoveryCommands = ["inspect-recovery", "acknowledge-delivery", "reconcile-publication"];
 const finalPublicationCommands = ["check-publication", "publish", "resume"];
 const publicationCommands = ["bind-publication", "collect-review-target", "read-candidate-review", ...finalPublicationCommands];
@@ -349,9 +357,8 @@ export async function main(argv: string[]): Promise<number> {
         const recovery_effects = await applyRecovery({ ...input,
           purpose: options.command === "acknowledge-delivery" ? "acknowledgement" : "reconciliation",
           authority: { path: options.authority, sha256: options.authority_sha256 } });
-        report = { schema_version: 1, command: options.command, source_commit: options.source, recovery_effects,
-          outcome: ["acknowledged", "retired"].includes(recovery_effects.state) ? "attention" : recovery_effects.state === "complete" ? "collected" : "incomplete",
-          diagnostics: recovery_effects.reason ? [{ code: "recovery-effects", message: recovery_effects.reason }] : [] };
+        report = recoveryEffectsOutput({ command: options.command, source: options.source, result: recovery_effects,
+          outcome: publicationOutcome(recovery_effects.state), limit: Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes) });
       }
     } else if (selectionCommands.includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo);
@@ -397,7 +404,7 @@ export async function main(argv: string[]): Promise<number> {
                 ? await resumePublication({ ...publication, journal_directory: resolve(options.journal_directory!) })
                 : await publishPublication(publication);
               report = { schema_version: 1, command: options.command,
-                outcome: ["complete", "retired", "acknowledged"].includes(publication_effects.state) ? "collected" : "incomplete", source_commit: options.source, publication_effects,
+                outcome: publicationOutcome(publication_effects.state), source_commit: options.source, publication_effects,
                 diagnostics: publication_effects.reason ? [{ code: "publication-effects", message: publication_effects.reason }] : [] };
             }
           } else if (options.command === "read-candidate-review") {

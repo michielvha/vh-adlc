@@ -1,7 +1,8 @@
 import { afterAll, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { captureRepositoryState } from "../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import { readGit } from "../../plugins/vh-adlc/scripts/git-read";
 
 const repositories: string[] = [];
@@ -102,4 +103,26 @@ test("successful and failed reads preserve caller HEAD, refs, index, FETCH_HEAD 
   expect(paths.map(path => readFileSync(join(repo, path)))).toEqual(before);
   expect(git(repo, "show-ref")).toEqual(refs);
   expect(git(repo, "status", "--porcelain=v1", "-z")).toEqual(status);
+});
+
+
+test.each(["ordinary", "split"])("worktree diffs preserve an index with stale stat data after same-byte restoration (%s)", mode => {
+  const repo = fixture(), path = join(repo, "literal1.bin"), index = join(repo, ".git/index");
+  if (mode === "split") git(repo, "update-index", "--split-index");
+  const bytes = readFileSync(path);
+  writeFileSync(path, bytes);
+  const changedTime = new Date(Date.now() - 10000);
+  utimesSync(path, changedTime, changedTime);
+  const before = readFileSync(index), state = captureRepositoryState(repo);
+  const scratch = realpathSync(mkdtempSync(join(tmpdir(), "vh-git-read-scratch-")));
+  repositories.push(scratch);
+  withEnvironment({ TMPDIR: scratch }, () => {
+    expect(readGit(repo, "diff", "--no-ext-diff", "--no-textconv", "--name-status", "-z", "--find-renames", "HEAD", "--").length).toBe(0);
+    expect(readdirSync(scratch)).toEqual([]);
+    expect(() => readGit(repo, "diff", "no-such-commit", "--")).toThrow("Git collection failed");
+    expect(readdirSync(scratch)).toEqual([]);
+  });
+  expect(readFileSync(index)).toEqual(before);
+  expect(readFileSync(path)).toEqual(bytes);
+  expect(captureRepositoryState(repo)).toEqual(state);
 });

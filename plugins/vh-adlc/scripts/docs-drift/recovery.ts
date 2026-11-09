@@ -332,18 +332,26 @@ export async function reconcileAbsent(options: {
       release_effect_id: release.id, retire_effect_ids: [...ids], actor: identity.actor, actor_id: identity.actor_id,
       retain_receipt: retained.state === "absent" ? { effect_id: receipt.id, ref: String(receipt.payload.ref), object: receiptObject } : null };
     if (options.inspect_only) {
+      if (lease.state !== "present") return blocked("owned-cleanup-lease-unavailable");
       const scopes: ReconciliationScope[] = [scope];
-      for (const id of ids) {
-        const effect = plan.manifest.effects.find(effect => effect.id === id)!;
-        if (terminal(journal, id) || isRetired(id)) continue;
-        const observation = await options.transport.observe(plan, effect, objects);
-        if (observation.state === "unknown") return blocked(observation.reason);
-        if (observation.state === "conflict") {
-          if (!observation.evidence || pendingAttempt(journal, effect, true)) return blocked("retirement-lookup-unavailable");
-          const lookup = readLookup({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
-            plan, effect, transport: options.transport.kind, state: "conflict" });
-          scopes.push({ ...scope, retirement: { effect_id: id, observed_state: "conflict", lookup } });
+      for (const effect of plan.manifest.effects.slice(0, -1)) {
+        if (terminal(journal, effect.id) || isRetired(effect.id)) continue;
+        const observation = await options.transport.observe(plan, effect, objects), active = pendingAttempt(journal, effect);
+        if (active === "attempt-in-flight" || observation.state !== "done" && active === "attempt-not-reaped") return blocked(active);
+        if (observation.state === "unknown" || observation.state === "conflict" && ["lease-acquire", "receipt-retain"].includes(effect.kind)) return blocked(observation.reason);
+        if (observation.state === "done") continue;
+        if (effect.id === receipt.id) {
+          if (!scope.retain_receipt) return blocked("receipt-retention-scope-changed");
+          if (pendingAttempt(journal, effect)) return blocked("receipt-attempt-pending");
+          continue;
         }
+        if (!ids.includes(effect.id) || !observation.evidence) return blocked("known-absence-retirement-not-authorized");
+        if (isObservationOnly(journal)) return blocked("retained-absence-not-definitive");
+        const pending = pendingAttempt(journal, effect, true);
+        if (pending) return blocked(pending);
+        const lookup = readLookup({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
+          plan, effect, transport: options.transport.kind, state: observation.state });
+        if (observation.state === "conflict") scopes.push({ ...scope, retirement: { effect_id: effect.id, observed_state: "conflict", lookup } });
       }
       return { ...blocked("inspection-only"), inspection_scopes: scopes };
     }

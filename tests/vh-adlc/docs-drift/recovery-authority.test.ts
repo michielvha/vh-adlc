@@ -13,7 +13,7 @@ afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force
 const hash = "a".repeat(64);
 function authorityFixture() {
   const f = publicationFixture(roots);
-  write(f.repo, f.settings.project_procedure, "Synthetic current adopted metadata-recovery procedure.\n");
+  write(f.repo, f.settings.project_procedure, "---\ndocs_drift_reconciliation:\n  repository: fixture/docs\n  operation_prefix: original-\n  lease_ref: refs/heads/docs-drift-lease\n  receipt_ref_prefix: refs/heads/docs-drift-receipts/\n  effects: [absence-retirement, receipt-retention, owned-lease-release]\n---\n\nSynthetic adopted metadata-recovery procedure.\n");
   commit(f.repo, "synthetic recovery procedure");
   return f;
 }
@@ -40,7 +40,7 @@ test.each(["matching", "changed-scope", "extra-field", "wrong-purpose", "adopted
   if (scenario === "changed-request") writeFileSync(join(f.artifacts, "current-owner.txt"), "A different request\n");
   const bytes = canonicalJSON(record); writeFileSync(join(f.artifacts, "recovery-authority.json"), bytes, { mode: 0o600 });
   const read = () => readRecoveryAuthority({ source_repo: f.repo, artifact_root: f.artifacts, reference: { path: "recovery-authority.json", sha256: sha256(bytes) },
-    purpose: "acknowledgement", scope: selected, adopted_procedure: { repo: f.repo, current_default: commit, path } });
+    purpose: "acknowledgement", scope: selected, adopted_procedure: { repo: f.repo, current_default: commit, path, receipt_ref_prefix: f.settings.publication.receipt_ref_prefix } });
   if (scenario === "matching") expect(read()).toMatchObject({ kind: "owner-delivery-acknowledgement", source: "owner-current-request", scope_sha256: canonicalDigest(selected) });
   else expect(read).toThrow();
 });
@@ -61,20 +61,29 @@ test("reconciliation authority remains distinct from acknowledgement approval", 
 });
 
 
-test.each(["matching", "wrong-commit", "wrong-bytes", "extra-origin"])("reconciliation can bind only its actual current adopted procedure %s", async scenario => {
+test.each(["matching", "wrong-commit", "wrong-bytes", "extra-origin", "unrelated", "other-repository", "other-operation", "no-retirement"])("reconciliation can bind only its actual current adopted procedure %s", async scenario => {
   const { readRecoveryAuthority } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery-authority");
   const f = authorityFixture(), selected: ReconciliationScope = { repository: "fixture/docs", repository_id: 10, actor: "fixture-bot", actor_id: 20,
     operation_id: "original-operation", plan_sha256: hash, lease_ref: "refs/heads/docs-drift-lease", lease_object: "a".repeat(40),
     release_effect_id: "release", retire_effect_ids: ["publication"], retain_receipt: null };
-  const commit = readGit(f.repo, "rev-parse", "HEAD").toString().trim(), path = f.settings.project_procedure;
-  const origin: Record<string, unknown> = { kind: "adopted-procedure", commit, path, sha256: sha256(readGit(f.repo, "show", commit + ":" + path)) };
+  if (["unrelated", "other-repository", "other-operation", "no-retirement"].includes(scenario)) {
+    const path = f.settings.project_procedure;
+    let bytes = readGit(f.repo, "show", "HEAD:" + path).toString();
+    if (scenario === "unrelated") bytes = "An unrelated but nonempty documentation procedure.\n";
+    if (scenario === "other-repository") bytes = bytes.replace("repository: fixture/docs", "repository: other/repo");
+    if (scenario === "other-operation") bytes = bytes.replace("operation_prefix: original-", "operation_prefix: elsewhere-");
+    if (scenario === "no-retirement") bytes = bytes.replace("absence-retirement, ", "");
+    write(f.repo, path, bytes); commit(f.repo, "synthetic changed permission scope");
+  }
+  const commitSHA = readGit(f.repo, "rev-parse", "HEAD").toString().trim(), path = f.settings.project_procedure;
+  const origin: Record<string, unknown> = { kind: "adopted-procedure", commit: commitSHA, path, sha256: sha256(readGit(f.repo, "show", commitSHA + ":" + path)) };
   if (scenario === "wrong-commit") origin.commit = "a".repeat(40);
   if (scenario === "wrong-bytes") origin.sha256 = "0".repeat(64);
   if (scenario === "extra-origin") origin.approved = true;
   const bytes = canonicalJSON({ schema_version: 1, kind: "docs-drift-recovery-authority", purpose: "reconciliation", scope_sha256s: [canonicalDigest(selected)], origin });
   writeFileSync(join(f.artifacts, "procedure-authority.json"), bytes, { mode: 0o600 });
   const read = () => readRecoveryAuthority({ source_repo: f.repo, artifact_root: f.artifacts, reference: { path: "procedure-authority.json", sha256: sha256(bytes) },
-    purpose: "reconciliation", scope: selected, adopted_procedure: { repo: f.repo, current_default: commit, path } });
+    purpose: "reconciliation", scope: selected, adopted_procedure: { repo: f.repo, current_default: commitSHA, path, receipt_ref_prefix: f.settings.publication.receipt_ref_prefix } });
   if (scenario === "matching") expect(read()).toEqual(expect.objectContaining({ scope_sha256: canonicalDigest(selected) }));
   else expect(read).toThrow();
 });

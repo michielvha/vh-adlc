@@ -998,3 +998,23 @@ test.each(["matching", "changed-facts", "changed-original", "unknown-current"])(
   expect(f.refs.has(f.settings.publication.lease_ref)).toBe(scenario !== "matching");
   expect(result.journal.events.some(event => event.kind === "retired-absence" && event.effect_id === "pr")).toBe(scenario === "matching");
 });
+
+test("reconciliation inspection refuses an unselected absent effect before requesting approval", async () => {
+  const f = setup(), interrupted = await legacyReceiptInterruption(f);
+  const before = readJournal(interrupted.journal.directory, f.repo).digest;
+  const inspected = await reconcileAbsent({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, retire_effect_ids: ["push"], inspect_only: true,
+    authorize: async () => { throw Error("Incomplete inspection requested approval"); } });
+  expect(inspected.state).toBe("pending"); expect(inspected.reason).toBe("known-absence-retirement-not-authorized");
+  expect(inspected.inspection_scopes).toBeUndefined(); expect(readJournal(interrupted.journal.directory, f.repo).digest).toBe(before);
+});
+
+test("reconciliation inspection refuses cleanup while its original owned lease is absent", async () => {
+  const f = setup(), interrupted = await legacyReceiptInterruption(f);
+  f.refs.delete(f.settings.publication.lease_ref);
+  const inspected = await reconcileAbsent({ source_repo: f.repo, journal_directory: interrupted.journal.directory,
+    object_store: f.store, settings: f.settings, transport: f.transport, retire_effect_ids: ["push", "pr"], inspect_only: true,
+    authorize: async () => { throw Error("Unavailable lease inspection requested authority"); } });
+  expect(inspected.state).toBe("pending"); expect(inspected.reason).toBe("owned-cleanup-lease-unavailable");
+  expect(inspected.inspection_scopes).toBeUndefined();
+});
