@@ -1,3 +1,4 @@
+import { ArtifactChanged } from "./evidence-input";
 import { existsSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { collectCandidateReview } from "./candidate-review";
@@ -45,7 +46,12 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
   const checked = await collectCandidateReview({ ...options, inventory_context: inventory });
   if (!checked.complete) {
     const before = checked.target?.preparation?.worker_inputs;
-    if (before?.scope_changed || checked.target?.bindings?.scope_changed
+    const facts = before?.facts ?? checked.target?.bindings?.facts;
+    const identity = facts?.identity, manifest = expected?.manifest;
+    const identityChanged = identity && manifest && (identity.repository_id !== manifest.repository_id || identity.actor_id !== manifest.actor_id
+      || identity.repository.toLowerCase() !== manifest.repository.toLowerCase() || identity.actor.toLowerCase() !== manifest.actor.toLowerCase());
+    const runtimeChanged = expected && facts?.runtime && facts.runtime.adoption_sha256 !== expected.adoption_sha256;
+    if (identityChanged || runtimeChanged || checked.scope_changed || before?.scope_changed || checked.target?.bindings?.scope_changed
       || expected && before?.complete && before.worker_input_sha256 !== workerInputDigest(expected.manifest.bindings))
       throw new PublicationScopeChanged("Publication worker or candidate inputs changed");
     throw Error(checked.diagnostics.join("\n") || "Current publication review unavailable");
@@ -61,8 +67,14 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
     expected: { role: "worker", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: workerInputDigest(target.manifest.bindings) } });
   const reviewer = readNativeRoleCapture({ ...common, reference: options.reviewer_capture, policy: reviewerPolicy,
     expected: { role: "reviewer", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "reviewer"), target_sha256: manifestDigest(target.manifest) } });
-  const authority = readPublicationAuthority({ source_repo: options.repo, artifact_root: options.artifact_root, reference: options.authority, manifest: target.manifest,
-    adopted_procedure: { repo: facts.store.root, current_default: facts.current_default, path: settings.project_procedure } });
+  let authority: ReturnType<typeof readPublicationAuthority>;
+  try {
+    authority = readPublicationAuthority({ source_repo: options.repo, artifact_root: options.artifact_root, reference: options.authority, manifest: target.manifest,
+      adopted_procedure: { repo: facts.store.root, current_default: facts.current_default, path: settings.project_procedure } });
+  } catch (error) {
+    if (error instanceof ArtifactChanged) throw new PublicationScopeChanged(error.message);
+    throw error;
+  }
   const review: PublicationGate["review"] = { manifest: target.manifest, current: target.manifest, worker: worker.evidence, reviewer: reviewer.evidence,
     policy: { worker: workerPolicy, reviewer: reviewerPolicy }, grants: authority.grants };
   const policy: PlanPolicy = { adoption_sha256: runtime.adoption_sha256, context: "production", transport: "native", publication_kind: bound.mode!,

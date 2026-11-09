@@ -1,3 +1,4 @@
+import { PublicationScopeChanged } from "./publish";
 import { realpathSync } from "node:fs";
 import { selectApprovedRuntime } from "./bootstrap";
 import { inspectCandidate } from "./preparation";
@@ -8,7 +9,7 @@ import { loadCommittedSettings } from "./settings";
 import { readNativeContext, type PublicationIdentity } from "./transport";
 
 type PublicationInputs = {
-  schema_version: 1; kind: "docs-drift-publication-inputs"; authority: "none"; complete: boolean; diagnostics: string[];
+  schema_version: 1; kind: "docs-drift-publication-inputs"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
   source_commit: string; current_default: string | null; identity: PublicationIdentity | null; store: OwnedObjectStore | null;
   candidate: ReturnType<typeof inspectCandidate> | null; freshness: ReturnType<typeof checkFreshness> | null;
   runtime: Awaited<ReturnType<typeof selectApprovedRuntime>> | null;
@@ -21,7 +22,7 @@ export async function collectPublicationInputs(input: {
   object_store?: OwnedObjectStore; cache_directory: string; entry: "hosted" | "copilot" | "claude"; launcher_path: string; settings_path: string;
 }): Promise<PublicationInputs> {
   const options = { ...input, object_store: input.object_store ? { ...input.object_store } : undefined, selection: structuredClone(input.selection), resolution_record: structuredClone(input.resolution_record), path: input.path ?? process.env.PATH };
-  const result: PublicationInputs = { schema_version: 1, kind: "docs-drift-publication-inputs", authority: "none", complete: false, diagnostics: [],
+  const result: PublicationInputs = { schema_version: 1, kind: "docs-drift-publication-inputs", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     source_commit: options.source, current_default: null, identity: null, store: null, candidate: null, freshness: null, runtime: null };
   const repo = realpathSync(options.repo), candidateRepo = realpathSync(options.candidate_repo);
   const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidateRepo));
@@ -38,7 +39,7 @@ export async function collectPublicationInputs(input: {
     const context = native();
     result.current_default = context.default_commit; result.identity = context.identity;
     if (context.identity.actor.toLowerCase() !== settings.publication.actor.toLowerCase() || context.identity.default_branch !== settings.default_branch)
-      throw Error("Selected native publication actor or default differs from assessed policy");
+      throw new PublicationScopeChanged("Selected native publication actor or default differs from assessed policy");
     const store = result.candidate.object_store;
     if (!store) throw Error("Owned candidate objects unavailable");
     result.store = store;
@@ -50,12 +51,12 @@ export async function collectPublicationInputs(input: {
     result.runtime = await selectApprovedRuntime({ repo, policy_repo: store.root, current_default: context.default_commit, identity: context.identity,
       cache_directory: options.cache_directory, entry: options.entry, launcher_path: options.launcher_path, settings_path: options.settings_path });
     result.freshness = checkFreshness(captureBareSnapshot(store.root, options.source), context.default_commit);
-    if (!result.freshness.fresh) throw Error("Assessed publication source needs fresh collection and review");
+    if (!result.freshness.fresh) throw new PublicationScopeChanged("Assessed publication source needs fresh collection and review");
     const current = native();
     if (current.default_commit !== context.default_commit || canonicalDigest(current.identity) !== canonicalDigest(context.identity))
-      throw Error("Native publication source or actor changed during collection");
+      throw new PublicationScopeChanged("Native publication source or actor changed during collection");
     result.complete = true;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Publication input collection unavailable"); }
+  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged; result.diagnostics.push(error instanceof Error ? error.message : "Publication input collection unavailable"); }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidateRepo, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during publication input collection");
   }

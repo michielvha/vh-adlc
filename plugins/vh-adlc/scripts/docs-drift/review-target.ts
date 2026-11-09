@@ -1,3 +1,5 @@
+import { PublicationScopeChanged } from "./publish";
+import { ArtifactChanged } from "./evidence-input";
 import { realpathSync } from "node:fs";
 import { collectPublicationBindings } from "./publication-bindings";
 import { parseWorkerPublication } from "./publication-proposal";
@@ -11,7 +13,7 @@ import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from 
 
 type Options = Parameters<typeof collectPublicationBindings>[0] & { worker_capture: unknown };
 type ReviewTarget = {
-  schema_version: 1; kind: "docs-drift-review-target"; authority: "none"; complete: boolean; diagnostics: string[];
+  schema_version: 1; kind: "docs-drift-review-target"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
   manifest: ActionManifest | null; manifest_sha256: string | null; reviewer_runtime_sha256: string | null;
   bindings: Awaited<ReturnType<typeof collectPublicationBindings>> | null;
   preparation: Awaited<ReturnType<typeof collectWorkerPreparation>> | null;
@@ -22,7 +24,7 @@ export async function collectReviewTarget(input: Options): Promise<ReviewTarget>
   const options = { ...input, worker_capture: structuredClone(input.worker_capture), selection: structuredClone(input.selection) };
   const repo = realpathSync(options.repo), candidate = realpathSync(options.candidate_repo);
   const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidate));
-  const result: ReviewTarget = { schema_version: 1, kind: "docs-drift-review-target", authority: "none", complete: false, diagnostics: [],
+  const result: ReviewTarget = { schema_version: 1, kind: "docs-drift-review-target", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     manifest: null, manifest_sha256: null, reviewer_runtime_sha256: null, bindings: null, preparation: null };
   try {
     result.preparation = await collectWorkerPreparation(options);
@@ -58,7 +60,7 @@ export async function collectReviewTarget(input: Options): Promise<ReviewTarget>
     result.manifest = manifest; result.manifest_sha256 = manifestDigest(manifest);
     result.reviewer_runtime_sha256 = roleRuntimeDigest(runtime, "reviewer");
     result.complete = true;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Candidate review target unavailable"); }
+  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.preparation?.scope_changed || result.bindings?.scope_changed); result.diagnostics.push(error instanceof Error ? error.message : "Candidate review target unavailable"); }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidate, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during review target collection");
   }

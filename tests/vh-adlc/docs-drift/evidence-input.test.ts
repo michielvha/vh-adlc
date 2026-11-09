@@ -106,3 +106,15 @@ test.each(["escape", "absolute", "symlink", "hardlink", "shared-file", "linked-p
     "caller-root": "owned resource overlaps" }[scenario];
   expect(() => readBoundArtifact({ ...options, reference })).toThrow(reason);
 });
+
+test.each(["changed", "missing"])("original artifact changes stay distinct from unavailable files %s", async scenario => {
+  const { ArtifactChanged } = await import("../../../plugins/vh-adlc/scripts/docs-drift/evidence-input");
+  expect(typeof ArtifactChanged).toBe("function");
+  const f = inputs(), reference = f.references.native;
+  if (scenario === "changed") writeFileSync(join(f.artifacts, reference.path), "Changed original native bytes\n");
+  else rmSync(join(f.artifacts, reference.path));
+  let caught: unknown;
+  try { readBoundArtifact({ ...f.options, reference }); } catch (error) { caught = error; }
+  expect(caught).toBeInstanceOf(Error);
+  expect(caught instanceof ArtifactChanged).toBe(scenario === "changed");
+});

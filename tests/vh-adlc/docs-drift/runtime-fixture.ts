@@ -1,5 +1,5 @@
 /** Toy retained runtimes for helper and normal CLI controls. No model or hosted execution. */
-import { mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
@@ -10,8 +10,10 @@ import { publicationFixture } from "./publication-fixture";
 import { commit, pin, runtimeIdentity, write } from "./adoption-fixture";
 import { settingsFixture } from "./settings-fixture";
 
-export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string }) {
+export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string }, fullComponent = false) {
   const shared = publicationFixture(roots), prefix = "plugins/vh-adlc/";
+  if (fullComponent) cpSync(join(import.meta.dir, "../../../plugins/vh-adlc"), join(shared.repo, prefix), { recursive: true });
+  if (fullComponent) write(shared.repo, prefix + "plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');
   write(shared.repo, prefix + ".claude-plugin/plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');
   write(shared.repo, prefix + "scripts/runner.ts", "// Synthetic candidate worker\n");
   const source = commit(shared.repo, "synthetic shared candidate"), component = bootstrap.computeComponentIdentity(shared.repo, source);

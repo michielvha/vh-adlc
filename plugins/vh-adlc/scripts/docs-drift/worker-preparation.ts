@@ -1,7 +1,8 @@
+import { PublicationScopeChanged } from "./publish";
 import { parseWorkerPublication } from "./publication-proposal";
 import { realpathSync } from "node:fs";
 import { collectWorkerInputs, type WorkerCollectionOptions } from "./publication-worker";
-import { readBoundArtifact } from "./evidence-input";
+import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
 import { exactRecord, parseDecisionPacket, validateAdvisorySelection } from "./publication-decisions";
 import { inspectPreparation } from "./preparation";
 import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
@@ -11,7 +12,7 @@ import { captureRepositoryState, captureSnapshot, matchesRepositoryState } from 
 import { verifyRoleIdentity } from "./manifests";
 
 type Preparation = {
-  schema_version: 1; kind: "docs-drift-worker-preparation"; authority: "none"; complete: boolean; diagnostics: string[];
+  schema_version: 1; kind: "docs-drift-worker-preparation"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
   worker_inputs: Awaited<ReturnType<typeof collectWorkerInputs>> | null;
   worker: Omit<ReturnType<typeof readNativeRoleCapture>, "evidence"> | null;
   selection: { schema_version: 1; source_commit: string; edits: Edit[] } | null;
@@ -22,7 +23,7 @@ type Preparation = {
 export async function collectWorkerPreparation(input: WorkerCollectionOptions & { worker_capture: unknown }): Promise<Preparation> {
   const options = { ...input, source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions), worker_capture: structuredClone(input.worker_capture) };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
-  const result: Preparation = { schema_version: 1, kind: "docs-drift-worker-preparation", authority: "none", complete: false, diagnostics: [],
+  const result: Preparation = { schema_version: 1, kind: "docs-drift-worker-preparation", authority: "none", complete: false, scope_changed: false, diagnostics: [],
     worker_inputs: null, worker: null, selection: null, publication: null, inspection: null };
   try {
     result.worker_inputs = await collectWorkerInputs(options);
@@ -49,7 +50,7 @@ export async function collectWorkerPreparation(input: WorkerCollectionOptions & 
     // Keep the exact parsed worker postimages; preparation and publication have separate grants.
     if (!canonicalJSON(packet.edits).equals(canonicalJSON(edits))) throw Error("Original worker edit representation changed");
     result.complete = true;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Original worker preparation unavailable"); }
+  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.worker_inputs?.scope_changed); result.diagnostics.push(error instanceof Error ? error.message : "Original worker preparation unavailable"); }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed or became unavailable during worker handoff collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);

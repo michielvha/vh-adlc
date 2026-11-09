@@ -1,3 +1,5 @@
+import { PublicationScopeChanged } from "./publish";
+import { ArtifactChanged } from "./evidence-input";
 import { realpathSync } from "node:fs";
 import { collectReviewTarget } from "./review-target";
 import { readAdoptedRolePolicy, readNativeRoleCapture, roleRuntimeDigest } from "./role-capture";
@@ -7,7 +9,7 @@ import { captureRepositoryState, matchesRepositoryState } from "./snapshot";
 
 type Options = Parameters<typeof collectReviewTarget>[0] & { reviewer_capture: unknown };
 type CandidateReview = {
-  schema_version: 1; kind: "docs-drift-candidate-review"; authority: "none"; complete: boolean; diagnostics: string[];
+  schema_version: 1; kind: "docs-drift-candidate-review"; authority: "none"; complete: boolean; scope_changed: boolean; diagnostics: string[];
   target: Awaited<ReturnType<typeof collectReviewTarget>> | null;
   review: { manifest_sha256: string; worker: ReturnType<typeof readNativeRoleCapture>["binding"]; reviewer: ReturnType<typeof readNativeRoleCapture>["binding"] } | null;
 };
@@ -17,7 +19,7 @@ export async function collectCandidateReview(input: Options): Promise<CandidateR
   const options = { ...input, worker_capture: structuredClone(input.worker_capture), reviewer_capture: structuredClone(input.reviewer_capture) };
   const repo = realpathSync(options.repo), candidate = realpathSync(options.candidate_repo);
   const before = canonicalDigest(captureRepositoryState(repo)), candidateBefore = canonicalDigest(captureRepositoryState(candidate));
-  const result: CandidateReview = { schema_version: 1, kind: "docs-drift-candidate-review", authority: "none", complete: false, diagnostics: [], target: null, review: null };
+  const result: CandidateReview = { schema_version: 1, kind: "docs-drift-candidate-review", authority: "none", complete: false, scope_changed: false, diagnostics: [], target: null, review: null };
   try {
     result.target = await collectReviewTarget(options);
     if (!result.target.complete) { result.diagnostics.push(...result.target.diagnostics); throw Error("Current candidate review target required"); }
@@ -34,7 +36,7 @@ export async function collectCandidateReview(input: Options): Promise<CandidateR
       policy: { worker: workerPolicy, reviewer: reviewerPolicy } });
     result.review = { manifest_sha256: verified.manifest_sha256, worker: worker.binding, reviewer: reviewer.binding };
     result.complete = true;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Original candidate review unavailable"); }
+  } catch (error) { result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.target?.scope_changed); result.diagnostics.push(error instanceof Error ? error.message : "Original candidate review unavailable"); }
   if (!matchesRepositoryState(repo, before) || !matchesRepositoryState(candidate, candidateBefore)) {
     result.complete = false; result.diagnostics.push("Caller changed or became unavailable during original review collection");
   }

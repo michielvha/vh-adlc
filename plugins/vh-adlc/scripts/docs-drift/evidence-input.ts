@@ -5,6 +5,8 @@ import { verifyRoleIdentity, type NativeRoleEvidence, type RolePolicy } from "./
 import { canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
 import { artifactDirectoryScope } from "./snapshot";
 
+export class ArtifactChanged extends Error {}
+
 function fail(reason: string): never { throw Error("docs-drift original evidence " + reason); }
 function object(value: unknown, keys: string[]): Record<string, unknown> {
   if (value === null || typeof value !== "object" || Array.isArray(value)) fail("object required");
@@ -31,7 +33,7 @@ function readFromScope(scope: ReturnType<typeof artifactDirectoryScope>, value: 
   if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1) fail("single-link regular artifact required");
   const bytes = readArtifact(path), after = lstatSync(path);
   if (before.dev !== after.dev || before.ino !== after.ino || before.mode !== after.mode || before.uid !== after.uid
-    || after.nlink !== 1 || after.size !== bytes.length || sha256(bytes) !== reference.sha256) fail("artifact changed");
+    || after.nlink !== 1 || after.size !== bytes.length || sha256(bytes) !== reference.sha256) throw new ArtifactChanged("docs-drift original evidence artifact changed");
   return bytes;
 }
 

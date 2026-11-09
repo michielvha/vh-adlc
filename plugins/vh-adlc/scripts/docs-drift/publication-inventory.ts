@@ -1,6 +1,6 @@
 import { PublicationScopeChanged } from "./publish";
 import type { PullRequestInput } from "../github-read";
-import { readBoundArtifact } from "./evidence-input";
+import { ArtifactChanged, readBoundArtifact } from "./evidence-input";
 import { readJournal } from "./journal";
 import { exactRecord } from "./publication-decisions";
 import { projectProposalBindings } from "./proposals";
@@ -21,8 +21,10 @@ export async function capturePublicationInventory(input: {
 }): Promise<PublicationInventory> {
   const current = structuredClone(input.current_proposals), journal = readJournal(input.journal_directory, input.source_repo), plan = journal.plan;
   if (input.transport.kind !== "native" || plan.transport !== "native") throw Error("Native publication inventory required");
-  const bytes = readBoundArtifact({ ...input, reference: input.original });
-  if (sha256(bytes) !== plan.manifest.bindings.proposals_sha256) throw Error("Original proposal inventory binding changed");
+  let bytes: Buffer;
+  try { bytes = readBoundArtifact({ ...input, reference: input.original }); }
+  catch (error) { if (error instanceof ArtifactChanged) throw new PublicationScopeChanged(error.message); throw error; }
+  if (sha256(bytes) !== plan.manifest.bindings.proposals_sha256) throw new PublicationScopeChanged("Original proposal inventory binding changed");
   const parsed: unknown = JSON.parse(decodeUTF8(bytes));
   const original = exactRecord(parsed, ["schema_version", "kind", "inventory", "resolution_sha256"], "Original proposal inventory fields changed");
   if (original.schema_version !== 1 || original.kind !== "docs-drift-proposal-snapshot" || !Array.isArray(original.inventory)
