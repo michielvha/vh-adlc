@@ -203,6 +203,7 @@ None.
 | 2026-11-09 | R-1 | spec | `8ff685a1883330fd0d50536c79788eae4cc0399f` | claude-opus-5-5 | procedural | Blocking startup-restore and stale Chromium lock gaps plus ten should-fix and nit findings. |
 | 2026-11-09 | R-2 | spec | `4891dcc7d97e9c725fbef93c83a7413f59321aa8` | claude-opus-5-5 | procedural | Blocking crash-restored session cookies plus eight should-fix and one nit finding. |
 | 2026-11-09 | R-3 | spec | `a5ef9e6204cad85777293bb5ec33b505f6311be4` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and five nits. |
+| 2026-11-09 | R-4 | spec | `05b51e9093dacbb1bc2df87bb88772e9555c1986` | claude-opus-5-5 | procedural | No blocking findings; two should-fix findings and two nits. |
 
 ### R-1
 
@@ -419,6 +420,36 @@ SEVERITY: nit
 WHERE: Test Plan (AC-12)
 EVIDENCE: The AC-12 row proves "unread" with "recorded hashes and access times". `findmnt -no OPTIONS /home` shows `relatime`, and `/tmp` is a tmpfs, which also defaults to relatime. Under relatime a read updates atime only when the old atime is not later than mtime, and a newly written sentinel's atime is never earlier than its mtime, so the access-time check can pass even after a read.
 PROPOSAL: Set each sentinel's atime earlier than its mtime before the run so that any read updates it, or watch the trees for access events during the scenarios.
+
+### R-4
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Single writer), AC-05, Test Plan (AC-05)
+EVIDENCE: Line 117 removes `SingletonLock`, `SingletonSocket` and `SingletonCookie` and continues "when the PID is alive but its command line does not name this profile's `chromium/` directory". That rule fails open. Removal is the default whenever the string match misses, so a missed match lets a second Chromium open a profile that a live browser is still writing. I started Chromium 151.0.7922.137 on a scratch profile. `readlink SingletonLock` gave `fedora-43-23356`, and `/proc/23356/cmdline` held `--user-data-dir=<path>` exactly as the caller spelled it. A browser the owner starts by hand, which line 117 names as a case, can spell the same directory relative to its working directory or through a symlinked home, and the match then misses. A Chromium in another PID namespace on this host records a PID that is meaningless here. The repository's own fixtures run under `bwrap --unshare-pid` (tests/remote-gui/native-routing.e2e.test.ts:47). The AC-05 unit cases cover only a dead PID, an unrelated live PID and a foreign hostname, so every box can be ticked while a differently spelled live browser loses its lock.
+PROPOSAL: Decide liveness with a check that does not depend on spelling. For example, try to connect to the `SingletonSocket` target, or compare paths resolved against `/proc/<pid>/cwd` and symlinks, and refuse when either finds the profile in use. Add an AC-05 unit case for a live browser whose `--user-data-dir` is spelled differently from remote-gui's path.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary), Design (Lifecycle), AC-02, AC-13
+EVIDENCE: The goal (line 5) says "provider sessions survive the end of a remote-gui session". Lifecycle line 121 and the owner summary (line 27) drop session-only cookies at every first launch, and only persistent cookies carry over. Many providers keep a sign-in in a session-only cookie unless the user chooses an option such as "stay signed in". For those providers the sign-in does not survive, and nothing in the document says so: searching it for "stay signed", "remember" or "keep me" finds nothing relevant. AC-02 proves reuse only with a fixture cookie that is persistent. The AC-13 README and skill list names "the provider expiry limitation" but not this one. So every criterion can be met while the owner keeps signing in again for those providers, and that is the problem the feature exists to fix.
+PROPOSAL: State in the owner summary, the Lifecycle and the AC-13 README and skill items that only persistent sign-ins survive, and that the owner should choose the provider's stay-signed-in option. Have the skill tell the owner this when it opens a profile in human mode.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Single writer), AC-05, Test Plan (AC-05)
+EVIDENCE: Line 117 says the `profile-browser-still-running` diagnostic tells the owner to run `cleanup`, which "stops an orphaned remote-gui browser through its record". For a record whose controllers are dead, `cleanup` calls `finish(home, id, false)` (plugins/remote-gui/internal/session/daemon.go:671). That function sends SIGTERM to each owned process in spawn order (display, vnc, viewer-bridge, browser), waits 30 ms, and returns `owned-process-cleanup-pending` at the first one still alive (daemon.go:164-181). When I sent SIGTERM to an idle headless Chromium 151, it exited after 33 ms. One `cleanup` can therefore report `cleanup-pending` before it reaches the browser, or while the browser is still exiting. The AC-05 sequence "run `cleanup`, then start successfully" then depends on timing, and the record stays `cleanup-pending`.
+PROPOSAL: Either say that the recovery is to repeat `cleanup` until the record reports `stopped`, or give `cleanup` a bounded wait for the owned browser of a profile session. Make the diagnostic, the README and skill text, and the AC-05 test agree.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Single writer), AC-05
+EVIDENCE: Line 117 places the Chromium singleton check "Before Chromium launches" but does not say which process runs it. `profile delete` runs it in the CLI (line 94). If `start` runs it in `browser.Start`, the check happens after the session record, the guard, the supervisor and Xvfb already exist (plugins/remote-gui/internal/session/session.go:150-170, plugins/remote-gui/internal/browser/browser.go:303-338). `browser.Start` retries a failed runtime three times (browser.go:284-301), and the error reaches the caller as `session-start-failed: ...` with a failed record (session.go:189-190). AC-04 and AC-06 say what a refusal leaves behind, but AC-05 does not.
+PROPOSAL: Run the check in the CLI after the profile lock and before the session record is created, as `profile delete` does, and state in AC-05 that the refusal leaves no record or process. Otherwise, state the record outcome and that the check is not retried.
 
 ## Sources
 
