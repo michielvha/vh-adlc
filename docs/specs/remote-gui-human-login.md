@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Live owner sign-in passed. Independent review findings are repaired and await re-review before draft publication."
+status: complete
+status_description: "Implementation and local verification passed independent review. Draft publication, CI and final owner delivery review follow."
 branch: feat/remote-gui-human-login
 issue: https://github.com/michielvha/vh-adlc/issues/60
 goal: "A remote owner can complete provider authentication in a human-controlled browser before explicitly returning the same disposable session to the agent."
