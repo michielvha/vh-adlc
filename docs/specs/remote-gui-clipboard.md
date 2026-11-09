@@ -189,6 +189,7 @@ None.
 | 2026-11-09 | R-1 | spec | `8ff685a1883330fd0d50536c79788eae4cc0399f` | claude-opus-5-5 | procedural | Blocking x11vnc replacement health gap plus seven should-fix and nit findings. |
 | 2026-11-09 | R-2 | spec | `4891dcc7d97e9c725fbef93c83a7413f59321aa8` | claude-opus-5-5 | procedural | Blocking: the installed x11vnc moves no clipboard text in either direction; six should-fix findings. |
 | 2026-11-09 | R-3 | spec | `a5ef9e6204cad85777293bb5ec33b505f6311be4` | claude-opus-5-5 | procedural | Blocking: same-origin GET carries no Origin header; six should-fix and two nit findings. |
+| 2026-11-09 | R-4 | spec | `05b51e9093dacbb1bc2df87bb88772e9555c1986` | claude-opus-5-5 | procedural | Blocking: viewer browsers save the panel field in session-restore files; four should-fix and two nit findings. |
 
 ### R-1
 
@@ -363,6 +364,57 @@ SEVERITY: nit
 WHERE: Context, Background
 EVIDENCE: Background presents the prototype as proving "the helper approach", but its run did not start x11vnc and did not deliver Ctrl+V as an X key event. run.mjs drives Chromium only over CDP, and run-keys.log records FAIL for CDP key events. AC-01 depends on exactly the path the prototype skipped: viewer keys through x11vnc into Chromium while x11vnc runs with `-nosel`. I measured it in this review. I ran a scratch Xvfb :3817, x11vnc 0.9.17 with `-nosel` (plus -nopw for a scratch None-auth RFB client), a scratch Chromium 151 page, and the prototype's `own` command holding "Zürich € ✓ rev3-A". RFB KeyEvents Control_L+v produced `paste:"Zürich € ✓ rev3-A"` in the textarea (PASS). RFB Ctrl+A, Ctrl+C then made the prototype's `read` return `text="rev3-B ✓ ü"` as UTF8_STRING. x11vnc sent no ServerCutText, and CUT_BUFFER0 was "not found". I also confirmed that a wrong cookie is refused ("Invalid MIT-MAGIC-COOKIE-1 key"); the prototype's logs do not contain that observation.
 PROPOSAL: Add a Background line for the round trip through x11vnc with `-nosel` and real X key events, and keep the CDP-only prototype result as the helper-level evidence.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Viewer panel; Design, Privacy; Acceptance Criteria, AC-03; Test Plan, AC-03
+EVIDENCE: The design puts the owner's text in "A plain `textarea` labelled **Text for the remote browser**" and states "The page never stores clipboard text outside page memory". AC-03 requires that the viewer "keeps clipboard text only in page memory". I tested this. I served a page on a scratch 127.0.0.1 origin with a textarea and a `<pre>` whose text a script set to rev4REMOTEPRE. I launched Chromium 151 (/usr/bin/chromium-browser, headless) and Playwright Firefox (firefox-1569) through playwright-core 1.59.1, each with a scratch persistent profile, typed rev4FORMSENTINEL into the textarea, waited 12 s and closed the browser. The sentinel was then on disk in the Chromium profile's Default/Sessions/Session_* and Tabs_* files (stored as UTF-16) and in the Firefox profile's sessionstore.jsonlz4. The `<pre>` text was in neither profile. The AC-03 proof checks only page state and "that storage APIs hold no sentinel", so it passes while the owner's browser writes the pasted text to disk. Browsers leave password fields out of session restore, so a credential sent through the panel would be kept where one typed into a normal sign-in form would not.
+PROPOSAL: Define how the panel keeps text out of browser session history, for example by clearing the field promptly and on pagehide, setting autocomplete="off" and showing remote text in a non-form element, and measure that the mechanism works in both engines. Add a real-browser step to the AC-03 proof that searches the viewer's scratch profile for the sentinel after the browser closes.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-06; Design, Clearing on human-to-agent handoff
+EVIDENCE: The design puts the Clear call inside the browser runtime's handoff in plugins/remote-gui/internal/browser/phase.go, which imports internal/session. All six session test files are `package session` and build BrowserHandle values with fake Handoff funcs (plugins/remote-gui/internal/session/handoff_test.go:81, 124, 162, 211). A test in internal/session cannot build the browser runtime or reach its clipboard interface without an import cycle. Its "clipboard double that fails Clear once" can only sit behind a fake Handoff that returns an error, and TestFailedHandoffCanBeReconciled (handoff_test.go:156) already covers that case. Such a test passes whether phase.go calls Clear before the agent-mode launch, after it, or ignores its error, and with a fake handle the assertion "no agent-mode browser" is vacuous. The REMOTE_GUI_BROWSER_E2E test in the same row covers only the success path. This is the test placement the owner adopted from R-3 F-04, but as written it never runs the code it is meant to prove.
+PROPOSAL: Put the failed-clear proof in internal/browser, where lifecycle_test.go already drives runtime.handoff with fakes. A clipboard double that fails once should make handoff return the diagnostic before r.launch adds a browser child, and a second handoff should call Clear again and then launch. If the tick check is still wanted, keep it as a separate fake-handle test in internal/session, and tell the owner the placement differs from the recorded R-3 decision.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Clearing on human-to-agent handoff; Design, Viewer panel; Context, Owner summary
+EVIDENCE: The design says "Set takes the same runtime mutex as the handoff and is refused with `clipboard-busy` while a handoff is in progress". runtime.healthy() also takes r.mu (plugins/remote-gui/internal/browser/phase.go:71-72), and the supervisor reaches it through BrowserHandle.Alive (browserControl.alive in internal/session/handoff.go). If Set blocks on r.mu, it waits for the handoff to finish and then sets the clipboard after the agent-mode launch, which AC-06 forbids. If Set uses TryLock, a health check holding the mutex refuses it at random. Neither reading gives the stated rule. A Send that arrives just before the session record enters `handoff`, or just after the handoff completes, also lands in the agent-mode browser. The viewer shows no browser mode (viewer.go:10 has only the connected, disconnected and authentication-failed status texts), so the owner cannot tell where the text went. The Owner summary never says the panel also sends to the agent-mode browser, where the agent can read the clipboard through CDP.
+PROPOSAL: Specify the mechanism. For example, capture the browser generation (r.generation) or a handoff flag when the request arrives, recheck it under the mutex, and refuse Set if it changed. Have the panel show the current browser mode, or have the Send confirmation name it, and say in the Owner summary that agent-mode sends are readable by the agent.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-03; Design, Viewer panel; Context, Owner summary; Test Plan, AC-02 and AC-03
+EVIDENCE: AC-03 says page memory "is empty after a send", and the Owner summary says "The panel clears after a send". The design clears only the field: "Only after a successful response does the page clear the field". The panel has to be open to send, and opening it fetches remote text into **Copied in the remote browser**, which the design never clears on a send. The AC-02 proof ("send a sentinel and immediately open the panel, asserting the held text returns") expects page memory to hold the sent text right after the send. The AC-03 proof's "Assert empty page state after send" leaves an implementer to guess whether the remote area must be wiped.
+PROPOSAL: Decide whether a send also clears or refreshes the remote area. Then make the Design, the Owner summary, AC-03 and the AC-02 and AC-03 proofs agree.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions; Design, Owner decisions
+EVIDENCE: Open Questions says "None.". The R-3 decision recorded under Owner decisions lists "Get returns held text directly, Set is refused during a handoff, the failed-clear test uses a session-level test double, oversized remote text is tested, and selection checks run in a Go test". R-3 F-01 offered two options: accept a missing Origin and add a Sec-Fetch-Site rule, or make the read a POST. The design adopts the first without a recorded decision. R-3 F-07 also asked whether remote text should be shown "unmasked" with a character count. The decisions record when it is shown ("Show remote text as soon as the panel opens") but not whether it is masked. The standard says "Every trade-off the document settles is an open question, including one the author would answer the same way the owner would."
+PROPOSAL: Raise the read-route check and the unmasked display as open questions, each with a recommendation, or record the owner's answers under Owner decisions.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-04
+EVIDENCE: The AC-04 row specifies "Helper unit tests against a scratch Xvfb" but names no gate. CI's "Check the remote-gui module" step runs `go test -race ./...` before any Xvfb is installed, and the real-browser step runs only `go test -race ./internal/browser -count=1` (.github/workflows/ci.yml, "Verify browser phases and session continuity"). An ungated test would therefore fail the unit step, and a test gated like the browser tests would never run in CI. `covers` does not list .github/workflows/ci.yml.
+PROPOSAL: Name the gate for the internal/xclip display tests. Either add the package to the real-browser CI step and add .github/workflows/ci.yml to `covers`, or state that only a local run covers these tests.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Clipboard helper; Test Plan, AC-06
+EVIDENCE: The design says "The package also exposes read-only probes for tests: the current owner of a selection and whether `CUT_BUFFER0` exists". The AC-06 proof, a Go test in plugins/remote-gui/internal/browser, says "set `CUT_BUFFER0` through that connection and assert it exists". A test in another package can write CUT_BUFFER0 only through an exported write operation, and the design lists none.
+PROPOSAL: Add a test-facing CUT_BUFFER0 setter to the helper's listed API, or name another way for the AC-06 test to fill the cut buffer before the handoff.
 
 ## Sources
 
