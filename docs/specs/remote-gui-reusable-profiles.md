@@ -160,3 +160,90 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-09 | R-1 | spec | `8ff685a1883330fd0d50536c79788eae4cc0399f` | claude-opus-5-5 | procedural | Blocking startup-restore and stale Chromium lock gaps plus ten should-fix and nit findings. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Lifecycle), Context (Background), Acceptance Criteria
+EVIDENCE: Design line 94 says the first launch drops `--restore-last-session`, "so the previous session's tabs are not restored" and "session-only cookies do not" carry over. Background line 43 repeats this. The profile itself stores the opposite setting. plugins/remote-gui/internal/browser/browser.go:318 writes `"session": {"restore_on_startup": 1}` into Default/Preferences. docs/specs/remote-gui-human-login.md:131 requires that native restore be configured "from its first launch". Its source S4 (the RestoreOnStartup policy, remote-gui-human-login.md:381) describes value 1 as last-session restore with session-cookie retention. Chromium keeps that preference in a reused profile, so session two would restore session one's tabs and session-only cookies whatever the command line says. Design line 84 reasserts the session preferences on each open, which makes the conflict worse. No criterion or Test Plan row checks that tabs and session cookies are absent in a later session, so every box can be ticked while the owner summary's statement (line 27) is false.
+PROPOSAL: Specify how a reusable profile's startup preference is set before each session's first launch, while handoffs keep native restore. Add a criterion and a real-browser Test Plan row: a session-only cookie and an extra tab from session one are absent in session two, and in-session handoffs still keep both.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Storage)
+EVIDENCE: Design line 84 reasserts only "the session profile preferences that disable the password manager". The existing preference write (browser.go:318) also sets `download.default_directory` to the per-session `<session>/downloads` path and sets `restore_on_startup`. On a reused profile, a stored download directory points at the previous session's deleted directory unless it is rewritten on every open. The existing code also writes the whole Preferences file with `os.WriteFile` (browser.go:319). Repeating that on a reused profile would erase every other preference Chromium saved.
+PROPOSAL: State that each open merges the controlled keys (password manager, credential service, download directory and startup restore) into the existing Preferences file instead of replacing it. Add a test that a download in session two lands in session two's directory.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: blocking
+WHERE: Design (Single writer, Lifecycle), AC-03, Test Plan
+EVIDENCE: Design line 90 treats a remaining Chromium `SingletonLock` as `browser-profile-still-locked`. It says "the owner resolves it; remote-gui never deletes it", but no command, README text or criterion says how the owner does that. A stale lock is the normal result of a crash. Browser children are spawned with an empty SysProcAttr (browser.go:148), so Chromium can outlive a killed supervisor. Stop sends SIGTERM to every child, including the X server, then SIGKILL after 3 seconds (browser.go:227-244). Stop does not use the graceful Exit path that handoff uses to let Chrome flush its state (quit.go:17-19). A SIGKILLed Chromium leaves `SingletonLock` behind, so the profile refuses every later start. AC-03 promises that such a profile "becomes usable again". The AC-03 Test Plan row has unit tests only, with no real Chromium, so it can pass while a real crashed profile stays unusable.
+PROPOSAL: Define a safe recovery for a stale Chromium singleton lock, for example confirming that its recorded host and process are dead or letting Chromium's own stale-lock handling run. Specify a graceful browser close on stop and expiry. Add a real-browser test that kills the supervisor and Chromium with SIGKILL and then starts a session on the same profile.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Lifecycle), Test Plan (AC-02)
+EVIDENCE: Design line 95 says "the session directory [is] deleted as today", and the AC-02 row (line 141) asserts "session one's directory is gone". Today stop removes only `profile`, `downloads`, `Xauthority` and `vnc.passwd` (browser.go:255-259; daemon.go:145-151 also removes `control.sock`). The record `state.json` lives in the session directory (state/state.go:180), and stopped records are kept and reported by cleanup (session/daemon.go:656-658). Repeated stops exit 0 against that record (README.md:101). Deleting the directory would change the output that AC-01 requires to stay unchanged.
+PROPOSAL: Correct the Lifecycle claim. Change the AC-02 proof to assert that the named private files are absent and that the stopped record remains.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Commands, Single writer), AC-03, AC-04
+EVIDENCE: Design line 90 has the supervisor take the profile `flock`. Line 71 requires the owner check "before any process starts", and the AC-03 row expects two concurrent starts to give one success and one `profile-in-use` with the holder's ID. `session.Start` creates the session record and spawns `_guard` before any browser work (session/session.go:150-170), and `browser.Start` retries its runtime three times (browser.go:286-301). Two concurrent CLIs can therefore both pass any pre-launch check. The loser then fails after its guard and supervisor have started, and it surfaces as `session-start-failed: ...` rather than `profile-in-use`.
+PROPOSAL: Specify that the CLI acquires the profile lock before it creates the session record and passes the descriptor to the guard or supervisor, as the guard already does with its Unix listener (remote-gui.md:101). State that the lock is held across the start retries.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary), Design (Lifecycle, Retention), AC-06
+EVIDENCE: The owner summary (line 23) says "`cleanup` deletes a profile after 30 idle days by default". `cleanup` runs only when invoked (config/config.go:54, cmd/remote-gui/main.go:48, session/daemon.go:641), and nothing schedules it. The skill uses it only for owned records (skills/remote-gui/SKILL.md:61). An idle signed-in profile can therefore stay on disk indefinitely. AC-06 tests only an explicit `cleanup` call.
+PROPOSAL: Either expire profiles on every `start` and `profile` command too, or state in the summary, the README criterion and AC-06 that expiry happens only when `cleanup` runs. Put that choice to the owner.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Background), Test Plan (AC-05), Tasks
+EVIDENCE: Line 44 says "T1 measures what a reused profile's cookie database holds and records it before the storage design is finalized". The AC-05 row (line 144) says "Record the T1 measurement". Tasks (line 153) says "None yet". The document therefore asks for acceptance of a Storage design it calls unfinished, and it depends on a task that does not exist. Line 27 ("Chromium's current `basic` password store is not backed by a keyring") and line 43 (which cookies survive across sessions) are external Chromium claims with no citation, and there is no Sources section.
+PROPOSAL: Take the measurement now and cite the command and its output in Context, or make the README wording independent of it and drop "before the storage design is finalized". Cite the Chromium claims, for example by reusing the human-login sources S4 and S5.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, Test Plan
+EVIDENCE: Several Design behaviors have no criterion or proof row: the `profile-chromium-newer` refusal (line 96), profile name validation against `^[a-z0-9][a-z0-9-]{0,39}$` (line 71), the `profile list` fields with `in_use` and the holding session ID (line 72), the `profile: <name>` field in `status` and `access` (line 74), the holder's session ID in `profile-in-use` (line 90), and whether the stored `--profile-retention` persists on reopen (line 97). Name validation is what keeps profile names from becoming path traversal, and AC-05 covers only symlinks.
+PROPOSAL: Add criteria for these end states and Test Plan rows naming their checks, including a downgrade refusal test with a recorded newer major version and rejected names.
+
+FINDING: F-09
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Storage, Separation from auth-refresh), AC-08, Test Plan
+EVIDENCE: Line 78 lets `REMOTE_GUI_PROFILE_HOME` or `--profile-home` put the store anywhere. Line 107 says the store "never resolves inside auth-refresh's state", and the AC-08 row asserts "the store root is outside the auth-refresh tree". The document never says where auth-refresh's state lives. auth-refresh is not in this repository (`ls plugins` lists codex-qr-pairing, github-app-registration, remote-gui, vh-adlc), and searching docs/specs for an auth-refresh state path finds none. As written, the check cannot be implemented or observed, and an override can point the store into auth-refresh's directories.
+PROPOSAL: Name the auth-refresh state roots the check uses, and specify that a profile-home override resolving inside them is refused. Add that refusal to AC-08 and its test row.
+
+FINDING: F-10
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Open Questions, Context (Owner summary)
+EVIDENCE: Open Questions says "None.", and line 31 says the owner answered "the four design questions" without saying which they were. The document settles further trade-offs that do not trace to any recorded answer: no tab or session restore across sessions (line 94), refusing profiles opened by a newer Chromium (line 96), leaving a stale `SingletonLock` to the owner (line 90), placing profiles beside a custom `REMOTE_GUI_HOME` (line 78), profiles that cannot move between loopback and Tailscale owners (line 71), and retention that runs only on `cleanup` (line 97). The standard says every trade-off the document settles is an open question.
+PROPOSAL: Record which owner answer settled each of these. Raise the rest as open questions before acceptance.
+
+FINDING: F-11
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Storage)
+EVIDENCE: Line 78 handles only `REMOTE_GUI_HOME`, but `--home` also sets the sessions root (config/config.go:65). Profiles "in a `profiles` directory beside that sessions root" means a generic `profiles` directory in the parent of whatever path the caller chose, for example `$HOME/profiles` for `REMOTE_GUI_HOME=$HOME/rg`. Nothing guarantees that parent directory is private.
+PROPOSAL: Define the derived location for `--home` as well, and use a remote-gui-specific name or require an explicit profile home when the sessions root is overridden.
+
+FINDING: F-12
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Compatibility, Storage, Sign-in), AC-05, AC-10
+EVIDENCE: Compatibility (line 111) says a profile adds only an optional `profile` field to new records, but line 101 also records `--agent-start-approved` on the session record. The `meta.json` field list (line 80) omits the holder session ID and supervisor identity (line 90) and the idle period (line 97). AC-10 says cleanup "keep[s] [its] behavior" while AC-06 changes it. AC-05 says "no profile path follows a symlink", yet Chromium creates its own `SingletonLock`, `SingletonSocket` and `SingletonCookie` symlinks inside the user data directory.
+PROPOSAL: Make the record and `meta.json` field lists complete, limit AC-10 to unchanged behavior outside profiles, and scope AC-05 to the store's own paths (store root, profile directory, `meta.json`, `.lock`, `chromium/`).

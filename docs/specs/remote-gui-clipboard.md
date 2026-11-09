@@ -143,6 +143,65 @@ None.
 
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
+| 2026-11-09 | R-1 | spec | `8ff685a1883330fd0d50536c79788eae4cc0399f` | claude-opus-5-5 | procedural | Blocking x11vnc replacement health gap plus seven should-fix and nit findings. |
+
+### R-1
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design, Clearing on human-to-agent handoff
+EVIDENCE: The design records the replacement x11vnc "with the existing `spawn` path", which appends to r.children and record.Owned (plugins/remote-gui/internal/browser/browser.go:158-163). It says nothing about removing the old vnc entry. runtime.healthy() returns false when any owned child other than the browser is dead (plugins/remote-gui/internal/browser/phase.go:71-86), and browserControl.handoff fails a transition whose result is not healthy (plugins/remote-gui/internal/session/handoff.go:100, "browser-handoff-result-unverified"). Implemented as written, every human-to-agent handoff would fail. For a failed restart, the supervisor tick returns "upstream-ownership-changed" once alive() is false (plugins/remote-gui/internal/session/daemon.go:624-625), and supervise() then sets the state to "stopping" and overwrites the diagnostic (daemon.go:375-381). That contradicts AC-06's "leaves a `handoff-failed` record" and the design's "stop and expiry clean up as today".
+PROPOSAL: State that the replacement takes the old vnc entry's place in r.children and record.Owned. Define how health and a retry from `handoff-failed` behave when the restart fails: whether the session survives without x11vnc, and whether the retry starts x11vnc again. Make the AC-06 proof assert that the record is still `handoff-failed` after at least one supervisor health tick.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Clearing on human-to-agent handoff; Context, Owner summary
+EVIDENCE: I ran a scratch Xvfb :2711 with x11vnc 0.9.17 started with `-noprimary -nosetprimary`, sent ClientCutText "SENTINEL-two" from a raw RFB client, then killed x11vnc while one other X client (`xprop -root -spy`) stayed connected. Before the kill, `xprop -root CUT_BUFFER0` printed `CUT_BUFFER0(STRING) = "SENTINEL-two"`, and it printed the same after the kill. The property was cleared in my run only when x11vnc was the last X client and Xvfb reset (Xvfb starts without -noreset, browser.go:338). The design says clearing works because "X selections owned by the old x11vnc and the old Chromium end with those processes", and the summary says a pasted credential "is therefore not left for the agent". Viewer text also lands in the root window's CUT_BUFFER0, which does not end with x11vnc.
+PROPOSAL: Name CUT_BUFFER0 in the design. Either clear it explicitly during the handoff, or state that clearing depends on the Xvfb reset and require Chromium and all its X clients to exit before x11vnc stops. Extend the AC-06 proof to assert that CUT_BUFFER0 is absent on the root window after handoff.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Background; Design, Intact text only
+EVIDENCE: Background ("is measured in T1") and Design ("T1 measures whether x11vnc 0.9.17 ... negotiates the extension") both rely on a task T1, but Tasks says "None yet; written once the document is planned." I measured it in this review against a scratch x11vnc 0.9.17 linked to /lib64/libvncserver.so.1 -> libvncserver.so.0.9.15. After SetEncodings advertised the ExtendedClipboard pseudo-encoding (-1063131698, 0xC0A1E5CE), the server sent 0 bytes, and its log has "Using raw encoding for client 127.0.0.1" but no "Enabling ExtendedClipboard extension" line. Detecting the extension would also need the private field `_clipboardServerCapabilitiesFormats` (core/rfb.js:155, 499).
+PROPOSAL: Settle the design now: apply the Latin-1 check unconditionally, have the README state the limit, and drop the conditional branch. Alternatively, point to a Test Plan row instead of a task that does not exist.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Viewer panel
+EVIDENCE: The existing page calls `remote.focus()` in the `connect` handler and in `window.addEventListener('resize',()=>remote.focus())` (plugins/remote-gui/internal/proxy/viewer.go:10). noVNC binds its Keyboard to the canvas (`new Keyboard(this._canvas)`, core/rfb.js:261). On a phone, focusing the textarea opens the soft keyboard and resizes the viewport. The planned reconnect after handoff fires `connect`. Either one moves focus to the canvas, so text the owner meant for the panel goes to the remote browser as keystrokes, possibly the agent-mode browser. The design only says "Keyboard focus inside the panel stays out of the RFB canvas".
+PROPOSAL: State that the resize and connect handlers do not refocus the canvas while focus is inside the panel. Add a viewer page test that checks this.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Clearing on human-to-agent handoff
+EVIDENCE: "The viewer page reconnects automatically after a disconnect that happens during a handoff ... The status line says the browser is switching." The page has no handoff signal: /__remote_gui/viewer-access returns only the password (viewer.go:21-28), and the RFB `disconnect` event does not say why the connection closed. The page cannot tell a handoff from a stop, an expiry or a network drop, so this behavior and AC-06's "reconnects on its own" are not defined in a form an implementer can build.
+PROPOSAL: Define the trigger. One option is a bounded retry with backoff after any disconnect that follows a successful connection, with a neutral status message. Another is an owner-authenticated state endpoint the page can query. State what the page shows when the retries run out.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Viewer panel
+EVIDENCE: `clipboardPasteFrom` returns silently when `this._rfbConnectionState !== 'connected' || this._viewOnly` (noVNC 1.5.0 core/rfb.js:497). The design has **Send to remote browser** call it, "then clears the field and shows a short confirmation". During the reconnect window after a handoff, or after any disconnect, the text is dropped while the page confirms the send and clears the field.
+PROPOSAL: Disable **Send to remote browser** unless the RFB connection is connected, and clear the field or confirm only after that check passes. Cover it with a viewer page test.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-01 and AC-05
+EVIDENCE: The AC-01 proof asserts the pasted value "through the marker page, once per mode". The marker page reports only booleans, and sets `input_verified` only when the input equals the marker (plugins/remote-gui/internal/browser/phase.go:199, 209, 248-249). Human mode has no CDP. To prove the paste in human mode, the sentinel would have to be the marker. The CLI prints the marker (the existing test types `session.marker` taken from CLI output, tests/remote-gui/browser.e2e.test.ts:176), so the AC-05 sweep of command output would match it. Making the marker page report text instead would break its "only probe booleans" rule.
+PROPOSAL: Say how the human-mode paste is observed without the marker string and without the marker page reporting text. One way is to read the value through CDP after handing back to agent mode, as the existing test does at browser.e2e.test.ts:74-77. Require sentinels to differ from the marker.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan, AC-02 and AC-03
+EVIDENCE: The AC-02 proof grants clipboard-write in Chromium before clicking **Copy to this device**. With that permission, `writeText` succeeds without transient activation, so the real-browser run cannot detect a write made outside the click handler. That part of AC-03 then rests only on the stubbed unit test.
+PROPOSAL: Run the Chromium case without granting clipboard-write so that it uses transient activation as an owner would, or add a real-browser check that no write happens without a click.
 
 ## Sources
 
