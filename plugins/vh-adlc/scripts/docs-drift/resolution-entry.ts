@@ -1,3 +1,5 @@
+import { PublicationScopeChanged } from "./publish";
+import { projectClosureReader, type ClosureInventory } from "./closure-inventory";
 import { collectClosureTarget } from "./closure";
 import { exactRecord } from "./publication-decisions";
 import { publicationMarker } from "./report-history";
@@ -23,18 +25,18 @@ function selectedProposals(value: unknown, source: string): number[] {
 }
 
 type ResolutionCollectionResult = {
-  complete: boolean; diagnostics: string[]; store: OwnedObjectStore | null; inputs: ResolutionInputs | null;
+  scope_changed: boolean; complete: boolean; diagnostics: string[]; store: OwnedObjectStore | null; inputs: ResolutionInputs | null;
 };
 
 type NativeCollectionOptions = {
   repo: string; source: string; artifact_root: string; selection: unknown; owner: string; run: string;
-  credential: string; path?: string;
+  credential: string; path?: string; closure_inventory?: ClosureInventory;
 };
 
 /** The production collector selects the native reader and fixed authenticated fetch itself. */
 export async function collectNativeResolution(input: NativeCollectionOptions): Promise<ResolutionCollectionResult> {
   const options = { ...input, path: input.path ?? process.env.PATH }, selected = selectedProposals(structuredClone(input.selection), input.source);
-  const result: ResolutionCollectionResult = { complete: false, diagnostics: [], store: null, inputs: null };
+  const result: ResolutionCollectionResult = { scope_changed: false, complete: false, diagnostics: [], store: null, inputs: null };
   const snapshot = captureSnapshot(options.repo, options.source), settings = snapshot.settings;
   const before = canonicalDigest(captureRepositoryState(snapshot.repo));
   const environment = { PATH: options.path ?? process.env.PATH,
@@ -45,7 +47,7 @@ export async function collectNativeResolution(input: NativeCollectionOptions): P
   try {
     const root = externalArtifactDirectory(options.artifact_root, snapshot.repo), context = native();
     if (context.default_commit !== snapshot.source_commit || context.identity.default_branch !== settings.default_branch)
-      throw Error("resolution collection requires the observed current default source");
+      throw new PublicationScopeChanged("resolution collection requires the observed current default source");
     const store = createOwnedObjectStore({ source_repo: snapshot.repo, source_commit: snapshot.source_commit,
       parent: root, evidence_directory: root, owner: options.owner, run: options.run, repository: settings.repository });
     result.store = store;
@@ -63,14 +65,15 @@ export async function collectNativeResolution(input: NativeCollectionOptions): P
     const collection = { snapshot, store, reader: context.repository, selected };
     result.inputs = collectResolutionInputs(collection);
     result.diagnostics.push(...result.inputs.diagnostics);
-    if (canonicalDigest(result.inputs.proposals) !== canonicalDigest(observed)) result.diagnostics.push("Selected proposal changed during native fetch");
+    if (canonicalDigest(result.inputs.proposals) !== canonicalDigest(observed)) { result.scope_changed = true; result.diagnostics.push("Selected proposal changed during native fetch"); }
     const fresh = recheckResolutionInputs(result.inputs, collection);
     result.diagnostics.push(...fresh.diagnostics);
+    result.scope_changed ||= fresh.changed;
     const current = native();
     if (current.default_commit !== snapshot.source_commit || canonicalDigest(current.identity) !== canonicalDigest(context.identity))
-      result.diagnostics.push("Native source or actor changed during resolution collection");
+      { result.scope_changed = true; result.diagnostics.push("Native source or actor changed during resolution collection"); }
     result.complete = result.inputs.complete && fresh.fresh && result.diagnostics.length === 0;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Native resolution collection unavailable"); }
+  } catch (error) { result.scope_changed ||= error instanceof PublicationScopeChanged; result.diagnostics.push(error instanceof Error ? error.message : "Native resolution collection unavailable"); }
   if (!matchesRepositoryState(snapshot.repo, before)) {
     result.diagnostics.push("Caller changed or became unavailable during resolution collection"); result.complete = false;
   }
@@ -79,7 +82,7 @@ export async function collectNativeResolution(input: NativeCollectionOptions): P
 }
 
 type ClosureCollectionResult = {
-  complete: boolean; diagnostics: string[]; store: OwnedObjectStore | null; inputs: ClosureInputs | null;
+  scope_changed: boolean; complete: boolean; diagnostics: string[]; store: OwnedObjectStore | null; inputs: ClosureInputs | null;
 };
 
 /** Recover the committed consolidation record and original full diffs using current native inputs. */
@@ -92,11 +95,11 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
     || selection.source_commit !== options.source || typeof selection.consolidation !== "number"
     || !Number.isSafeInteger(selection.consolidation) || selection.consolidation < 1) throw Error("closure selection fields or source changed");
   const consolidation = selection.consolidation;
-  const result: ClosureCollectionResult = { complete: false, diagnostics: [], store: null, inputs: null };
+  const result: ClosureCollectionResult = { scope_changed: false, complete: false, diagnostics: [], store: null, inputs: null };
   const before = canonicalDigest(captureRepositoryState(options.repo));
   try {
     const initial = await collectNativeResolution({ ...options, selection: { schema_version: 1, source_commit: options.source, proposals: [consolidation] } });
-    result.store = initial.store;
+    result.store = initial.store; result.scope_changed = initial.scope_changed;
     if (!initial.complete || !initial.store || !initial.inputs) {
       result.diagnostics.push(...initial.diagnostics); throw Error("Initial consolidation collection incomplete");
     }
@@ -107,7 +110,7 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
     if (context.default_commit !== options.source || context.identity.repository_id !== initial.inputs.repository_id)
       throw Error("Closure source or repository changed");
     const merged = context.repository.mergedPull(consolidation);
-    const collection = { source_repo: snapshot.repo, store: initial.store, settings, reader: context.repository,
+    const collection = { source_repo: snapshot.repo, store: initial.store, settings, reader: projectClosureReader(context.repository, options.closure_inventory),
       consolidation_id: consolidation, required_inputs: [] };
     const candidate = collectClosureInputs(collection);
     if (!candidate.record) { result.inputs = candidate; result.diagnostics.push(...candidate.diagnostics); throw Error("Durable consolidation record unavailable"); }
@@ -128,14 +131,16 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
       } catch { result.diagnostics.push("Required original " + original.number + " unavailable"); }
     }
     result.inputs = collectClosureInputs(collection);
+    result.scope_changed ||= result.inputs.scope_changed === true;
     result.diagnostics.push(...result.inputs.diagnostics);
-    if (canonicalDigest(merged) !== canonicalDigest(result.inputs.consolidation)) result.diagnostics.push("Consolidation changed during collection");
+    if (canonicalDigest(merged) !== canonicalDigest(result.inputs.consolidation)) { result.scope_changed = true; result.diagnostics.push("Consolidation changed during collection"); }
     const fresh = recheckClosureInputs(result.inputs, collection); result.diagnostics.push(...fresh.diagnostics);
+    result.scope_changed ||= fresh.scope_changed === true;
     const current = native();
     if (current.default_commit !== options.source || canonicalDigest(current.identity) !== canonicalDigest(context.identity))
-      result.diagnostics.push("Native source or actor changed during closure collection");
+      { result.scope_changed = true; result.diagnostics.push("Native source or actor changed during closure collection"); }
     result.complete = result.inputs.complete && fresh.fresh && result.diagnostics.length === 0;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Native closure collection unavailable"); }
+  } catch (error) { result.scope_changed ||= error instanceof PublicationScopeChanged; result.diagnostics.push(error instanceof Error ? error.message : "Native closure collection unavailable"); }
   if (!matchesRepositoryState(options.repo, before)) {
     result.diagnostics.push("Caller changed or became unavailable during closure collection"); result.complete = false;
   }
@@ -144,7 +149,7 @@ export async function collectNativeClosure(input: NativeCollectionOptions): Prom
 }
 
 type ClosureTargetCollection = {
-  authority: "none"; complete: boolean; diagnostics: string[]; store: OwnedObjectStore | null;
+  authority: "none"; scope_changed: boolean; complete: boolean; diagnostics: string[]; store: OwnedObjectStore | null;
   identity: ReturnType<typeof readNativeContext>["identity"] | null;
   target: ReturnType<typeof collectClosureTarget> | null; target_sha256: string | null;
 };
@@ -162,30 +167,34 @@ export async function collectNativeClosureTarget(input: NativeCollectionOptions)
     throw Error("Exact source and closure operation required");
   const { settings } = loadCommittedSettings(options.repo, options.source);
   publicationMarker(settings, selected.operation_id);
-  const result: ClosureTargetCollection = { authority: "none", complete: false, diagnostics: [], store: null, identity: null, target: null, target_sha256: null };
+  if (options.closure_inventory && (options.closure_inventory.operation_id !== selected.operation_id
+    || options.closure_inventory.original.closure.current_default !== options.source)) throw Error("Original closure inventory source and operation required");
+  const result: ClosureTargetCollection = { authority: "none", scope_changed: false, complete: false, diagnostics: [], store: null, identity: null, target: null, target_sha256: null };
   const before = canonicalDigest(captureRepositoryState(options.repo)), limit = Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes);
   try {
     const native = () => readNativeContext({ hostname: settings.hostname, repository: settings.repository, credential: options.credential, path: options.path });
     const context = native(); result.identity = context.identity;
-    if (context.default_commit !== options.source) throw Error("Closure target requires its observed current default source");
+    if (context.default_commit !== options.source) throw new PublicationScopeChanged("Closure target requires its observed current default source");
     const collected = await collectNativeClosure({ ...options, selection: { schema_version: 1, source_commit: options.source, consolidation: selected.consolidation } });
-    result.store = collected.store;
+    result.store = collected.store; result.scope_changed = collected.scope_changed;
     if (!collected.complete || !collected.store || !collected.inputs?.consolidation) {
       result.diagnostics.push(...collected.diagnostics); throw Error("Complete native closure collection required for its model target");
     }
     if (context.identity.repository_id !== collected.inputs.repository_id) throw Error("Closure target native repository changed");
     result.target = collectClosureTarget({ inputs: collected.inputs, operation_id: selected.operation_id,
-      collection: { source_repo: options.repo, store: collected.store, settings, reader: context.repository,
+      collection: { source_repo: options.repo, store: collected.store, settings, reader: projectClosureReader(context.repository, options.closure_inventory),
         consolidation_id: collected.inputs.consolidation.number, required_inputs: [] } });
+    if (result.target.scope_changed) throw new PublicationScopeChanged("Current closure target inputs changed");
     if (!result.target.complete) { result.diagnostics.push(...result.target.diagnostics); throw Error("Complete current closure model target required"); }
     const fresh = native();
     if (fresh.default_commit !== options.source || canonicalDigest(fresh.identity) !== canonicalDigest(context.identity))
-      throw Error("Closure target source or actor changed during collection");
+      throw new PublicationScopeChanged("Closure target source or actor changed during collection");
     if (!matchesRepositoryState(options.repo, before)) throw Error("Caller changed during closure target collection");
     result.target_sha256 = canonicalDigest({ source_commit: options.source, identity: context.identity, target: result.target });
     result.complete = true;
     if (Buffer.byteLength(JSON.stringify(closureTargetOutput(result, options.source)) + "\n") > limit) throw Error("Closure model target exceeds the configured output bound");
   } catch (error) {
+    result.scope_changed ||= error instanceof PublicationScopeChanged;
     result.complete = false; result.target = null; result.target_sha256 = null;
     result.diagnostics.push(error instanceof Error ? error.message : "Closure model target unavailable");
   }

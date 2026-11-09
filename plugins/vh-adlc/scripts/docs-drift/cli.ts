@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview } from "./closure-worker";
+import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview, closureReviewTargetProjection, closureReviewProjection } from "./closure-worker";
 import { inspectRecovery, applyRecovery, recoveryInspectionOutput } from "./recovery-controller";
 import { recoveryEffectsOutput, publicationEffectsOutput } from "./recovery-output";
 import { OUTPUT_LIMIT } from "./owned-process";
@@ -57,8 +57,8 @@ export type CLIReport = {
   candidate_inspection?: ReturnType<typeof inspectCandidate>;
   retained_resources?: { checkout: string | null; record_path: string | null };
   closure_worker_inputs?: Awaited<ReturnType<typeof collectClosureWorkerInputs>>;
-  closure_review_target?: Awaited<ReturnType<typeof collectClosureReviewTarget>>;
-  closure_review?: Awaited<ReturnType<typeof collectClosureReview>>;
+  closure_review_target?: ReturnType<typeof closureReviewTargetProjection>;
+  closure_review?: ReturnType<typeof closureReviewProjection>;
   closure_target?: Awaited<ReturnType<typeof collectNativeClosureTarget>>;
   closure?: Awaited<ReturnType<typeof collectNativeClosure>>;
   resolution?: Awaited<ReturnType<typeof collectNativeResolution>>;
@@ -493,12 +493,12 @@ export async function main(argv: string[]): Promise<number> {
             diagnostics: value.diagnostics.map(message => ({ code: "closure-worker-inputs", message })) };
         } else if (options.command === "collect-closure-review-target") {
           const value = await collectClosureReviewTarget({ ...common, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 } });
-          report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_review_target: value,
+          report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_review_target: closureReviewTargetProjection(value),
             diagnostics: value.diagnostics.map(message => ({ code: "closure-review-target", message })) };
         } else {
           const value = await collectClosureReview({ ...common, worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 },
             reviewer_capture: { path: options.reviewer_capture, sha256: options.reviewer_capture_sha256 } });
-          report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_review: value,
+          report = { ...base, outcome: value.complete ? "collected" : "incomplete", closure_review: closureReviewProjection(value),
             diagnostics: value.diagnostics.map(message => ({ code: "closure-review", message })) };
         }
         if (Buffer.byteLength(JSON.stringify(report) + "\n") > Math.min(OUTPUT_LIMIT, settings.reports.max_entry_bytes))

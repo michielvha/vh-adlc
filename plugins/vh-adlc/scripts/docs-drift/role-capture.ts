@@ -2,7 +2,7 @@ import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
 import type { selectApprovedRuntime } from "./bootstrap";
 import type { PublicationIdentity } from "./transport";
 import { join } from "node:path";
-import { readBoundArtifact, readNativeRoleArtifacts } from "./evidence-input";
+import { ArtifactChanged, readBoundArtifact, readNativeRoleArtifacts } from "./evidence-input";
 import type { SealedPlan } from "./journal";
 import { fullModel, modelMatches, type RolePolicy } from "./manifests";
 import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
@@ -42,11 +42,11 @@ export function readNativeRoleCapture(options: {
     || ![expected.target_sha256, expected.runtime_sha256].every(value => /^[a-f0-9]{64}$/u.test(value))) fail("expected bindings required");
   const capture = record(json(read(options.reference)), ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "launch", "binding", "artifacts"]);
   if (capture.schema_version !== 1 || capture.kind !== "docs-drift-role-capture" || capture.role !== expected.role
-    || capture.source_commit !== expected.source_commit || capture.runtime_sha256 !== expected.runtime_sha256) fail("captured context changed");
+    || capture.source_commit !== expected.source_commit || capture.runtime_sha256 !== expected.runtime_sha256) throw new ArtifactChanged("docs-drift original role capture captured context changed");
   const launch = record(json(read(capture.launch)), ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "target_sha256", "invocation_id", "context_id", "pid"]);
   if (launch.schema_version !== 1 || launch.kind !== "docs-drift-role-launch" || launch.role !== expected.role
     || launch.source_commit !== expected.source_commit || launch.runtime_sha256 !== expected.runtime_sha256 || launch.target_sha256 !== expected.target_sha256)
-    fail("original launch target or context changed");
+    throw new ArtifactChanged("docs-drift original role capture original launch target or context changed");
   const artifacts = record(capture.artifacts, ["native", "returned", "process"]);
   for (const reference of Object.values(artifacts)) outside(reference);
   if (capture.binding === null || typeof capture.binding !== "object" || Array.isArray(capture.binding)) fail("sealed role binding required");

@@ -1,3 +1,4 @@
+import { projectClosureReader } from "./closure-inventory";
 import { realpathSync } from "node:fs";
 import { selectApprovedRuntime } from "./bootstrap";
 import { collectClosureTarget, prepareClosure, type ClosureProposal, type ClosureTarget } from "./closure";
@@ -62,7 +63,7 @@ export async function collectClosureWorkerInputs(input: Options): Promise<Inputs
     recheckRoleTarget(options, result);
     result.complete = true;
   } catch (error) {
-    result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged;
+    result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.target?.scope_changed);
     result.diagnostics.push(error instanceof Error ? error.message : "Closure worker input collection unavailable");
   }
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during closure worker input collection"); }
@@ -82,8 +83,9 @@ function recheckRoleTarget(options: Options, current: Inputs): void {
   const closure = observed.target.closure;
   if (!closure.consolidation) throw Error("Original closure consolidation unavailable");
   const fresh = collectClosureTarget({ inputs: closure, operation_id: (options.selection as { operation_id: string }).operation_id,
-    collection: { source_repo: options.repo, store: observed.store, settings, reader: context.repository,
+    collection: { source_repo: options.repo, store: observed.store, settings, reader: projectClosureReader(context.repository, options.closure_inventory),
       consolidation_id: closure.consolidation.number, required_inputs: [] } });
+  if (fresh.scope_changed) throw new PublicationScopeChanged("Current closure inputs changed after original role collection");
   if (!fresh.complete) throw Error("Current closure inputs unavailable after original role collection");
   if (canonicalDigest(fresh) !== canonicalDigest(observed.target)) throw new PublicationScopeChanged("Closure payload changed after original role collection");
   const final = native();
@@ -159,13 +161,14 @@ export async function collectClosureReviewTarget(input: Options & { worker_captu
     const closure = target.target.closure;
     if (!closure.consolidation) throw Error("Actual merged closure proposal required");
     result.proposal = await prepareClosure({ inputs: closure, operation_id: (options.selection as { operation_id: string }).operation_id,
-      collection: { source_repo: repo, store: target.store, settings, reader: context.repository,
+      collection: { source_repo: repo, store: target.store, settings, reader: projectClosureReader(context.repository, options.closure_inventory),
         consolidation_id: closure.consolidation.number, required_inputs: [] },
       observe_verification: async scope => {
         const observed = verified.get(scope.inputs_sha256);
         if (!observed) throw Error("Original worker lacks this exact closure verification");
         return observed;
       } });
+    if (result.proposal.scope_changed) throw new PublicationScopeChanged("Current semantic closure inputs changed");
     if (!result.proposal.complete) { result.diagnostics.push(...result.proposal.diagnostics); throw Error("Fresh complete semantic closure verification required"); }
     if (result.proposal.inputs_sha256 !== target.target.inputs_sha256
       || canonicalDigest(result.proposal.effects) !== canonicalDigest(target.target.effects)) throw new PublicationScopeChanged("Closure review payload changed after original worker launch");
@@ -196,7 +199,7 @@ export async function collectClosureReviewTarget(input: Options & { worker_captu
 
 /** Both independent native roles are reopened at the freshly reassembled exact closure manifest. */
 export async function collectClosureReview(input: Options & { worker_capture: unknown; reviewer_capture: unknown }) {
-  const options = { ...input, selection: structuredClone(input.selection), worker_capture: structuredClone(input.worker_capture), reviewer_capture: structuredClone(input.reviewer_capture) };
+  const options = { ...input, selection: structuredClone(input.selection), worker_capture: structuredClone(input.worker_capture), reviewer_capture: structuredClone(input.reviewer_capture), path: input.path ?? process.env.PATH };
   const result = { schema_version: 1 as const, kind: "docs-drift-closure-review" as const, authority: "none" as const,
     complete: false, scope_changed: false, diagnostics: [] as string[], target: null as ReviewTarget | null,
     review: null as { manifest_sha256: string; worker: ReturnType<typeof readNativeRoleCapture>["binding"]; reviewer: ReturnType<typeof readNativeRoleCapture>["binding"] } | null };
@@ -204,8 +207,9 @@ export async function collectClosureReview(input: Options & { worker_capture: un
   try {
     const target = await collectClosureReviewTarget(options); result.target = target;
     const current = target.worker_inputs, facts = current?.target;
-    if (!target.complete || !target.manifest || !target.manifest_sha256 || !current?.runtime || !facts?.store || !facts.identity)
-      throw Error("Fresh complete closure review target required");
+    if (!target.complete || !target.manifest || !target.manifest_sha256 || !current?.runtime || !facts?.store || !facts.identity) {
+      result.diagnostics.push(...target.diagnostics); throw Error("Fresh complete closure review target required");
+    }
     const runtime = current.runtime, policyOptions = { repo: facts.store.root, current_default: options.source, identity: facts.identity, runtime };
     const workerPolicy = readAdoptedRolePolicy({ ...policyOptions, role: "worker" });
     const reviewerPolicy = readAdoptedRolePolicy({ ...policyOptions, role: "reviewer" });
@@ -216,8 +220,8 @@ export async function collectClosureReview(input: Options & { worker_capture: un
       expected: { role: "reviewer", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "reviewer"), target_sha256: target.manifest_sha256 } });
     const verified = verifyReviewEvidence({ manifest: target.manifest, current: target.manifest, worker: worker.evidence, reviewer: reviewer.evidence,
       policy: { worker: workerPolicy, reviewer: reviewerPolicy } });
-    result.review = { manifest_sha256: verified.manifest_sha256, worker: worker.binding, reviewer: reviewer.binding };
     recheckRoleTarget(options, current);
+    result.review = { manifest_sha256: verified.manifest_sha256, worker: worker.binding, reviewer: reviewer.binding };
     result.complete = true;
   } catch (error) {
     result.scope_changed = error instanceof PublicationScopeChanged || error instanceof ArtifactChanged || Boolean(result.target?.scope_changed);
@@ -226,4 +230,22 @@ export async function collectClosureReview(input: Options & { worker_capture: un
   if (!matchesRepositoryState(repo, before)) { result.complete = false; result.diagnostics.push("Caller changed during closure role collection"); }
   result.diagnostics = [...new Set(result.diagnostics)];
   return freezeJSON(result);
+}
+
+/** Later CLI handoffs carry exact digests and the manifest without duplicating the original native corpus. */
+export function closureReviewTargetProjection(result: ReviewTarget) {
+  return { schema_version: result.schema_version, kind: result.kind, authority: result.authority, complete: result.complete,
+    scope_changed: result.scope_changed, diagnostics: result.diagnostics,
+    worker_input_sha256: result.worker_inputs?.worker_input_sha256 ?? null,
+    target_sha256: result.worker_inputs?.target?.target_sha256 ?? null, worker: result.worker,
+    verification: result.proposal?.verification ?? [], already_closed: result.proposal?.already_closed ?? [],
+    manifest: result.manifest, manifest_sha256: result.manifest_sha256, reviewer_runtime_sha256: result.reviewer_runtime_sha256 };
+}
+
+export function closureReviewProjection(result: Awaited<ReturnType<typeof collectClosureReview>>) {
+  return { schema_version: result.schema_version, kind: result.kind, authority: result.authority, complete: result.complete,
+    scope_changed: result.scope_changed, diagnostics: result.diagnostics,
+    worker_input_sha256: result.target?.worker_inputs?.worker_input_sha256 ?? null,
+    target_sha256: result.target?.worker_inputs?.target?.target_sha256 ?? null,
+    manifest: result.target?.manifest ?? null, manifest_sha256: result.target?.manifest_sha256 ?? null, review: result.review };
 }

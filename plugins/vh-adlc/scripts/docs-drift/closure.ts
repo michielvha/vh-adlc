@@ -1,3 +1,4 @@
+import { PublicationScopeChanged } from "./publish";
 import { captureRepositoryState } from "./snapshot";
 import { canonicalDigest, canonicalJSON, freezeJSON } from "./protocol";
 import { publicationMarker } from "./report-history";
@@ -15,7 +16,7 @@ export type ClosureOptions = {
   observe_verification: (scope: ClosureVerificationScope) => Promise<unknown>;
 };
 export type ClosureProposal = {
-  state: "proposal"; complete: boolean; diagnostics: string[]; effects: Effect[]; already_closed: number[];
+  state: "proposal"; scope_changed?: true; complete: boolean; diagnostics: string[]; effects: Effect[]; already_closed: number[];
   verification: Array<Verification & { proposal: number; hunk_id: string }>; inputs_sha256: string;
 };
 
@@ -40,7 +41,7 @@ function explanation(options: Omit<ClosureOptions, "observe_verification">, oper
 
 export type ClosureTarget = {
   kind: "docs-drift-closure-target"; authority: "none"; verification_ready: false;
-  complete: boolean; diagnostics: string[]; effects: Effect[]; already_closed: number[];
+  scope_changed?: true; complete: boolean; diagnostics: string[]; effects: Effect[]; already_closed: number[];
   closure: ClosureInputs; verification_scopes: Array<Pick<ClosureVerificationScope, "inputs_sha256" | "decision">>; inputs_sha256: string;
 };
 
@@ -52,8 +53,9 @@ export function collectClosureTarget(options: Omit<ClosureOptions, "observe_veri
   const before = canonicalDigest(captureRepositoryState(options.collection.source_repo)), operationId = options.operation_id;
   try {
     const inputs: ClosureInputs = freezeJSON(structuredClone(options.inputs));
-    if (!inputs.complete || !inputs.record || !inputs.consolidation || !inputs.current_default
-      || !recheckClosureInputs(inputs, options.collection).fresh) fail("current complete native inputs required");
+    const initial = recheckClosureInputs(inputs, options.collection);
+    if (inputs.scope_changed || initial.scope_changed) throw new PublicationScopeChanged("Current closure inputs changed");
+    if (!inputs.complete || !inputs.record || !inputs.consolidation || !inputs.current_default || !initial.fresh) fail("current complete native inputs required");
     const marker = publicationMarker(options.collection.settings, operationId);
     const record = inputs.record.value;
     if (record.carried_decisions.some(item => !normalized(inputs.consolidation?.body ?? "").includes(normalized(item.text)))) fail("recorded carry-forward missing from current consolidation body");
@@ -83,11 +85,13 @@ export function collectClosureTarget(options: Omit<ClosureOptions, "observe_veri
         result.verification_scopes.push({ inputs_sha256: canonicalDigest(binding), decision });
       }
     }
-    if (!recheckClosureInputs(inputs, options.collection).fresh
-      || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure target collection");
+    const fresh = recheckClosureInputs(inputs, options.collection);
+    if (fresh.scope_changed) throw new PublicationScopeChanged("Closure inputs changed during target collection");
+    if (!fresh.fresh || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure target collection");
     result.inputs_sha256 = canonicalDigest({ closure: inputs.inputs_sha256, operation_id: operationId, effects: result.effects });
     result.complete = true;
   } catch (error) {
+    if (error instanceof PublicationScopeChanged) result.scope_changed = true;
     result.effects = []; result.verification_scopes = [];
     result.diagnostics.push(error instanceof Error ? error.message : "Required closure target inputs unavailable");
   }
@@ -100,7 +104,8 @@ export async function prepareClosure(options: ClosureOptions): Promise<ClosurePr
   const before = canonicalDigest(captureRepositoryState(options.collection.source_repo));
   try {
     const target = collectClosureTarget(options);
-    result.already_closed = target.already_closed;
+    result.already_closed = [...target.already_closed];
+    if (target.scope_changed) throw new PublicationScopeChanged("Current semantic closure target inputs changed");
     if (!target.complete) { result.diagnostics.push(...target.diagnostics); fail("complete current closure target required"); }
     const inputs = target.closure, record = inputs.record;
     if (!record || !inputs.current_default) fail("missing exact closure target source");
@@ -117,10 +122,14 @@ export async function prepareClosure(options: ClosureOptions): Promise<ClosurePr
       if (hunk?.kind === "binary" && decision.disposition !== "defer" && observed.asset_checks.length === 0) fail("current binary asset checks required");
       verifications.push({ ...observed, proposal: decision.proposal, hunk_id: decision.hunk_id });
     }
-    if (!recheckClosureInputs(inputs, options.collection).fresh
-      || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure verification");
+    const fresh = recheckClosureInputs(inputs, options.collection);
+    if (fresh.scope_changed) throw new PublicationScopeChanged("Closure inputs changed during semantic verification");
+    if (!fresh.fresh || canonicalDigest(captureRepositoryState(options.collection.source_repo)) !== before) fail("native inputs changed during closure verification");
     result.verification = verifications; result.effects = target.effects; result.inputs_sha256 = target.inputs_sha256;
     result.complete = true;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Required closure verification unavailable"); }
+  } catch (error) {
+    if (error instanceof PublicationScopeChanged) result.scope_changed = true;
+    result.diagnostics.push(error instanceof Error ? error.message : "Required closure verification unavailable");
+  }
   return result;
 }

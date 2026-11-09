@@ -1,3 +1,4 @@
+import { PublicationScopeChanged } from "./publish";
 import type { PullRequestInput, RepositoryReader } from "../github-read";
 import { collectionReaders, readGit } from "./git";
 import { readProposalDiff, requireOwnedStore } from "./proposals";
@@ -14,7 +15,7 @@ export type ClosureCollection = {
 };
 type RecordInput = { path: string; sha256: string; blob: string; value: ResolutionRecord };
 export type ClosureInputs = {
-  complete: boolean; diagnostics: string[]; repository: string; repository_id: number | null;
+  scope_changed?: true; complete: boolean; diagnostics: string[]; repository: string; repository_id: number | null;
   current_default: string | null; consolidation: ReturnType<Reader["mergedPull"]> | null; record: RecordInput | null;
   originals: PullRequestInput[]; inputs_sha256: string;
   interval: { base: string; current: string; changed_paths: string[]; material_paths: string[];
@@ -22,17 +23,18 @@ export type ClosureInputs = {
 };
 
 function same(left: unknown, right: unknown): boolean { return canonicalJSON(left).equals(canonicalJSON(right)); }
+function changed(reason: string): never { throw new PublicationScopeChanged("incomplete closure " + reason); }
 function fail(reason: string): never { throw Error("incomplete closure " + reason); }
 function selectedRepository(proposal: PullRequestInput, settings: Settings, id: number): void {
   if (proposal.base_repository.id !== id || proposal.base_repository.full_name.toLowerCase() !== settings.repository
-    || proposal.base_ref !== settings.default_branch) fail("proposal repository scope");
+    || proposal.base_ref !== settings.default_branch) changed("proposal repository scope");
 }
 function nativeShape(proposal: ReturnType<Reader["mergedPull"]>, settings: Settings, id: number): void {
   selectedRepository(proposal, settings, id);
   if (proposal.merged !== true || proposal.state !== "closed" || proposal.merged_at === null || proposal.merge_commit_sha === null || proposal.draft
     || proposal.actor !== settings.publication.actor || proposal.head_repository?.id !== id
     || proposal.head_repository.full_name.toLowerCase() !== settings.repository
-    || !proposal.head_ref.startsWith(settings.publication.branch_prefix)) fail("actual merged consolidation identity");
+    || !proposal.head_ref.startsWith(settings.publication.branch_prefix)) changed("actual merged consolidation identity");
 }
 function nulPaths(bytes: Buffer): string[] {
   if (bytes.length === 0) return [];
@@ -95,34 +97,34 @@ export function collectClosureInputs(options: ClosureCollection): ClosureInputs 
   try {
     requireOwnedStore(options.store, options.settings.repository);
     const repository = options.reader.repository();
-    if (repository.full_name.toLowerCase() !== options.settings.repository || repository.default_branch !== options.settings.default_branch) fail("native repository changed");
+    if (repository.full_name.toLowerCase() !== options.settings.repository || repository.default_branch !== options.settings.default_branch) changed("native repository changed");
     result.repository_id = repository.id;
     const consolidation = options.reader.mergedPull(options.consolidation_id);
-    if (consolidation.number !== options.consolidation_id) fail("native consolidation changed");
+    if (consolidation.number !== options.consolidation_id) changed("native consolidation changed");
     nativeShape(consolidation, options.settings, repository.id);
     result.consolidation = consolidation;
     const mergeCommit = consolidation.merge_commit_sha;
     if (mergeCommit === null) fail("missing actual merge commit");
     const current = options.reader.ref("refs/heads/" + options.settings.default_branch);
-    if (current.ref !== "refs/heads/" + options.settings.default_branch) fail("default ref changed");
+    if (current.ref !== "refs/heads/" + options.settings.default_branch) changed("default ref changed");
     result.current_default = current.sha;
     const currentSnapshot = captureBareSnapshot(options.store.root, current.sha, { required_inputs: options.required_inputs });
-    if (!same(currentSnapshot.settings, options.settings)) fail("current committed settings changed");
+    if (!same(currentSnapshot.settings, options.settings)) changed("current committed settings changed");
     const merged = mergeCommit === current.sha ? currentSnapshot : captureBareSnapshot(options.store.root, mergeCommit);
     readGit(options.store.root, "merge-base", "--is-ancestor", mergeCommit, current.sha);
     const record = locateRecord(options, consolidation, repository.id);
     result.record = record;
     if (!matchesPostimages(record.value, merged, record.path, record.sha256)
-      || !matchesPostimages(record.value, currentSnapshot, record.path, record.sha256)) fail("merged or current postimages changed");
+      || !matchesPostimages(record.value, currentSnapshot, record.path, record.sha256)) changed("merged or current postimages changed");
     readGit(options.store.root, "merge-base", "--is-ancestor", record.value.assessed_base, mergeCommit);
     for (const original of record.value.originals) {
       const observed = options.reader.pull(original.number);
       selectedRepository(observed, options.settings, repository.id);
-      if (observed.number !== original.number || observed.head_sha !== original.head_sha || sha256(Buffer.from(observed.body)) !== original.body_sha256) fail("original head or body changed");
+      if (observed.number !== original.number || observed.head_sha !== original.head_sha || sha256(Buffer.from(observed.body)) !== original.body_sha256) changed("original head or body changed");
       const actual = readResolutionProposal(options.store, { ...observed, base_sha: original.base_sha });
       const hunks = actual.hunks.map(({ before_base64, after_base64, ...hunk }) => hunk);
       if (actual.merge_base !== original.merge_base || actual.inputs_sha256 !== original.inputs_sha256
-        || actual.diff_sha256 !== original.diff_sha256 || !same(actual.files, original.files) || !same(hunks, original.hunks)) fail("original full Git inputs changed");
+        || actual.diff_sha256 !== original.diff_sha256 || !same(actual.files, original.files) || !same(hunks, original.hunks)) changed("original full Git inputs changed");
       result.originals.push(observed);
     }
     const base = record.value.assessed_base;
@@ -135,11 +137,14 @@ export function collectClosureInputs(options: ClosureCollection): ClosureInputs 
     if (history.length > 64 * 1024 * 1024) fail("history processing bound");
     result.interval = { base, current: current.sha, changed_paths, material_paths, history_sha256: sha256(history),
       required_inputs: currentSnapshot.required_inputs, required_inputs_changed: !same(record.value.source.required_inputs, currentSnapshot.required_inputs) };
-    if (result.originals.some(original => !same(options.reader.pull(original.number), original))) fail("original changed during collection");
+    if (result.originals.some(original => !same(options.reader.pull(original.number), original))) changed("original changed during collection");
     if (!same(options.reader.mergedPull(options.consolidation_id), consolidation)
-      || options.reader.ref(current.ref).sha !== current.sha || !same(options.reader.repository(), repository)) fail("native inputs changed during collection");
+      || options.reader.ref(current.ref).sha !== current.sha || !same(options.reader.repository(), repository)) changed("native inputs changed during collection");
     result.complete = true;
-  } catch (error) { result.diagnostics.push(error instanceof Error ? error.message : "Required closure inputs unavailable"); }
+  } catch (error) {
+    if (error instanceof PublicationScopeChanged) result.scope_changed = true;
+    result.diagnostics.push(error instanceof Error ? error.message : "Required closure inputs unavailable");
+  }
   if (canonicalDigest(captureRepositoryState(options.source_repo)) !== before) {
     result.complete = false; result.diagnostics.push("Caller repository changed during closure collection");
   }
@@ -147,9 +152,9 @@ export function collectClosureInputs(options: ClosureCollection): ClosureInputs 
   return freezeJSON(result);
 }
 
-export function recheckClosureInputs(inputs: ClosureInputs, options: ClosureCollection): { fresh: boolean; diagnostics: string[] } {
+export function recheckClosureInputs(inputs: ClosureInputs, options: ClosureCollection): { fresh: boolean; scope_changed?: true; diagnostics: string[] } {
   const current = collectClosureInputs(options);
-  if (!current.complete) return { fresh: false, diagnostics: current.diagnostics };
-  if (!same(current, inputs)) return { fresh: false, diagnostics: ["Closure inputs changed"] };
+  if (!current.complete) return { fresh: false, ...(current.scope_changed ? { scope_changed: true as const } : {}), diagnostics: current.diagnostics };
+  if (!same(current, inputs)) return { fresh: false, scope_changed: true, diagnostics: ["Closure inputs changed"] };
   return { fresh: true, diagnostics: [] };
 }

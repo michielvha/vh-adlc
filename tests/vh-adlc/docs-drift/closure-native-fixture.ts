@@ -23,6 +23,7 @@ export async function nativeClosureFixture(roots: string[], method: "merge" | "s
     settings.reports.max_entry_bytes = f.recordBytes.length + 100;
     put(f.repo, ".vh-adlc/docs-drift.yaml", JSON.stringify(settings));
   }
+  if (fault === "changed-source-bytes") put(f.repo, "src/app.ts", "export const value = 2;\n");
   put(f.repo, "later-unrelated.txt", "Later default commit\n"); const source = commitAll(f.repo);
   git(f.repo, "update-ref", "refs/pull/20/head", f.head);
   for (const proposal of f.proposals.values()) git(f.repo, "update-ref", "refs/pull/" + proposal.number + "/head", proposal.head_sha);
@@ -38,7 +39,8 @@ export async function nativeClosureFixture(roots: string[], method: "merge" | "s
     ["repos/fixture/docs/git/commits/" + source]: { sha: source, tree: { sha: "a".repeat(40) }, parents: [], message: "Fixture" },
     "repos/fixture/docs/pulls/20": consolidation, "repos/fixture/docs/pulls/1": proposal,
     "repos/fixture/docs/issues/1/comments?per_page=100&page=1": fault === "missing-comments" ? null : [] };
-  const calls = join(artifacts, "native-closure-calls.jsonl");
+  const calls = join(artifacts, "native-closure-calls.jsonl"), responses_file = join(artifacts, "native-closure-responses.json");
+  writeFileSync(responses_file, JSON.stringify(responses), { mode: 0o600 });
   const realGit = Bun.which("git"); if (!realGit) throw Error("fixture requires Git");
   writeFileSync(join(bin, "git"), `#!${process.execPath}
 const args = process.argv.slice(2), target = args.indexOf("https://github.com/fixture/docs.git");
@@ -52,14 +54,22 @@ require("node:fs").appendFileSync(${JSON.stringify(calls)}, JSON.stringify({ pro
 if (args.includes("graphql")) {
   const reads = require("node:fs").readFileSync(${JSON.stringify(calls)}, "utf8").trim().split("\\n").map(line => JSON.parse(line));
   const changed = ${JSON.stringify(fault === "changed-actor")} && reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length >= 6;
-  console.log(JSON.stringify({ data: { viewer: { login: changed ? "other-fixture-actor" : "fixture-bot", databaseId: changed ? 21 : 20 } } })); process.exit(0);
+  const values = JSON.parse(require("node:fs").readFileSync(${JSON.stringify(responses_file)}, "utf8"));
+  const count = reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length;
+  if (values.__mutation_after && count >= values.__mutation_after.at) {
+    values[values.__mutation_after.endpoint] = values.__mutation_after.value;
+    require("node:fs").writeFileSync(${JSON.stringify(responses_file)}, JSON.stringify(values));
+  }
+  const viewer = values.__viewer_after && count >= values.__viewer_after.at ? values.__viewer_after.viewer
+    : values.__viewer ?? { login: changed ? "other-fixture-actor" : "fixture-bot", databaseId: changed ? 21 : 20 };
+  console.log(JSON.stringify({ data: { viewer } })); process.exit(0);
 }
 if (args[args.indexOf("--method") + 1] !== "GET") process.exit(91);
-const values = ${JSON.stringify(responses)}, value = values[args.at(-1)];
+const values = JSON.parse(require("node:fs").readFileSync(${JSON.stringify(responses_file)}, "utf8")), value = values[args.at(-1)];
 if (!value) { console.log("HTTP/2.0 404 Not Found\\r\\n\\r\\n{}"); process.exit(1); }
 console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
 `, { mode: 0o700 });
   const selection = canonicalJSON({ schema_version: 1, source_commit: source, consolidation: 20 });
   writeFileSync(join(artifacts, "closure-selection.json"), selection, { mode: 0o600 });
-  return { ...f, source, artifacts, selection, calls, environment: { ...process.env, PATH: bin + ":" + process.env.PATH, GH_TOKEN: "synthetic-read-token" } };
+  return { ...f, source, artifacts, selection, calls, responses_file, environment: { ...process.env, PATH: bin + ":" + process.env.PATH, GH_TOKEN: "synthetic-read-token" } };
 }

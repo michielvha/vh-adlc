@@ -5,7 +5,9 @@ import { afterAll, expect, test } from "bun:test";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { collectClosureWorkerInputs, collectClosureReviewTarget, collectClosureReview } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-worker";
-import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
+import { captureClosureInventory } from "../../../plugins/vh-adlc/scripts/docs-drift/closure-inventory";
+import { readNativeContext, createNativeTransport } from "../../../plugins/vh-adlc/scripts/docs-drift/transport";
+import { appendIntent, appendOutcome, createJournal, writePublicationObjects, sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 import { effectDigest, manifestDigest, validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { collectResolutionInputs } from "../../../plugins/vh-adlc/scripts/docs-drift/resolve-inputs";
@@ -18,10 +20,10 @@ import { captureSyntheticRole, retainSyntheticArtifact } from "./original-public
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
-async function fixture(method: "merge" | "squash" | "rebase" = "merge", binary = false) {
+async function fixture(method: "merge" | "squash" | "rebase" = "merge", binary = false, nativeFault = "none") {
   const adopted = await runtimeFixture(roots, true, false,
     { model: role.requested_model, native_model: role.adopted_model, identity_source: role.identity_source }, true);
-  const f = await nativeClosureFixture(roots, method, "none", adopted.repo, binary ? original => {
+  const f = await nativeClosureFixture(roots, method, nativeFault, adopted.repo, binary ? original => {
     const bytes = Buffer.from([0, 255, 1]);
     git(original.repo, "switch", "-q", "docs-drift/one");
     writeFileSync(join(original.repo, "docs/asset.bin"), bytes);
@@ -115,12 +117,18 @@ test("normal closure role commands preserve original native evidence and remain 
     evidence("closure-cli-reviewer", target.manifest_sha256!, "NO FINDINGS\n"));
   const review = await invoke(f, "read-closure-review", worker, reviewer);
   expect(review.completion.exit_code, JSON.stringify(review.report.diagnostics)).toBe(0);
-  expect(review.report.closure_review).toMatchObject({ complete: true, authority: "none", review: { manifest_sha256: target.manifest_sha256 } });
+  expect(review.report.closure_review).toMatchObject({ complete: true, authority: "none", review: { manifest_sha256: target.manifest_sha256 },
+    worker_input_sha256: current.worker_input_sha256, target_sha256: current.target!.target_sha256 });
+  expect(targetResult.report.closure_review_target.worker_inputs).toBeUndefined();
+  expect(review.report.closure_review.target).toBeUndefined();
+  const initialSize = Buffer.byteLength(JSON.stringify(initial.report) + "\n");
+  expect(Buffer.byteLength(JSON.stringify(targetResult.report) + "\n")).toBeLessThan(initialSize);
+  expect(Buffer.byteLength(JSON.stringify(review.report) + "\n")).toBeLessThan(initialSize);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 240000);
 
-test.each(["missing", "duplicate", "foreign-scope", "unknown", "failed", "stale-quote", "extra-fields"])("closure worker refuses %s semantic evidence", async fault => {
-  const f = await fixture(), before = captureRepositoryState(f.repo), current = await collectClosureWorkerInputs(f.options);
+test.each(["missing", "duplicate", "foreign-scope", "unknown", "failed", "stale-quote", "stale-quote-bytes", "extra-fields"])("closure worker refuses %s semantic evidence", async fault => {
+  const f = await fixture("merge", false, fault === "stale-quote-bytes" ? "changed-source-bytes" : "none"), before = captureRepositoryState(f.repo), current = await collectClosureWorkerInputs(f.options);
   expect(current.complete, JSON.stringify(current.diagnostics)).toBe(true);
   const selected = packet(f, current);
   if (fault === "missing") selected.verifications = [];
@@ -128,11 +136,21 @@ test.each(["missing", "duplicate", "foreign-scope", "unknown", "failed", "stale-
   if (fault === "foreign-scope") selected.verifications[0].inputs_sha256 = "b".repeat(64);
   if (fault === "unknown" || fault === "failed") selected.verifications[0].state = fault;
   if (fault === "stale-quote") selected.verifications[0].evidence[0].sha256 = "c".repeat(64);
+  if (fault === "stale-quote-bytes") {
+    const currentBytes = readFileSync(join(f.repo, "src/app.ts"));
+    expect(sha256(currentBytes)).not.toBe(selected.verifications[0].evidence[0].quote_sha256);
+    selected.verifications[0].evidence[0].sha256 = sha256(currentBytes);
+  }
   const original = evidence("closure-negative-worker", current.worker_input_sha256!, canonicalJSON(fault === "extra-fields" ? { ...selected, approved: true } : selected).toString());
   const worker = captureSyntheticRole(f.artifacts, f.source, "worker", current.worker_runtime_sha256!, original);
   const result = await collectClosureReviewTarget({ ...f.options, worker_capture: worker });
   expect(result.complete).toBe(false); expect(result.manifest).toBeNull();
-  expect(result.diagnostics.length).toBeGreaterThan(0);
+  const expected: Record<string, string> = {
+    missing: "Exact complete closure worker scopes required", duplicate: "Exact complete closure worker scopes required", "foreign-scope": "Exact unique closure verification required",
+    unknown: "incomplete closure proposal current disposition feedback or carry verification unavailable", failed: "incomplete closure proposal current disposition feedback or carry verification unavailable",
+    "stale-quote": "Current quoted closure source evidence required", "stale-quote-bytes": "Current quoted closure source evidence required", "extra-fields": "Closure worker fields changed",
+  };
+  expect(result.diagnostics).toContain(expected[fault]);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 120000);
 
@@ -150,6 +168,10 @@ test.each(["same-context", "blocking-findings", "changed-target", "changed-artif
   if (fault === "changed-artifact") writeFileSync(join(f.artifacts, "reviewer-returned.txt"), "MODEL: claude-opus-5.5\nChanged later\n");
   const reviewed = await collectClosureReview({ ...f.options, worker_capture: worker, reviewer_capture: reviewer });
   expect(reviewed.complete).toBe(false); expect(reviewed.review).toBeNull();
+  const expected: Record<string, string> = { "same-context": "invalid docs-drift manifest independent review context",
+    "blocking-findings": "invalid docs-drift manifest blocking review findings", "changed-target": "docs-drift original role capture original launch target or context changed",
+    "changed-artifact": "docs-drift original evidence artifact changed" };
+  expect(reviewed.diagnostics).toContain(expected[fault]);
   if (fault === "changed-artifact") expect(reviewed.scope_changed).toBe(true);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 180000);
@@ -172,7 +194,110 @@ test("original binary closure binds a current asset and its original inspection 
     const target = await collectClosureReviewTarget({ ...f.options, worker_capture: worker });
     expect(target.complete, JSON.stringify({ fault, diagnostics: target.diagnostics })).toBe(fault === "valid");
     if (fault === "valid") expect(target.proposal!.verification[binaryIndex].asset_checks).toHaveLength(1);
-    else expect(target.manifest).toBeNull();
+    else {
+      expect(target.manifest).toBeNull();
+      const expected: Record<string, string> = { missing: "incomplete closure proposal current binary asset checks required",
+        "wrong-path": "Current selected closure asset binding required", "stale-asset": "Current selected closure asset binding required",
+        "empty-artifact": "Bounded original asset inspection artifact required" };
+      expect(target.diagnostics).toContain(expected[fault]);
+    }
   }
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+}, 180000);
+
+
+test("original closure roles survive freshly proven own explanation and closure on retry", async () => {
+  const f = await fixture(), before = captureRepositoryState(f.repo), current = await collectClosureWorkerInputs(f.options);
+  expect(current.complete, JSON.stringify(current.diagnostics)).toBe(true);
+  const workerEvidence = evidence("closure-retry-worker", current.worker_input_sha256!, canonicalJSON(packet(f, current)).toString());
+  const worker = captureSyntheticRole(f.artifacts, f.source, "worker", current.worker_runtime_sha256!, workerEvidence);
+  const target = await collectClosureReviewTarget({ ...f.options, worker_capture: worker });
+  expect(target.complete, JSON.stringify(target.diagnostics)).toBe(true);
+  const reviewerEvidence = evidence("closure-retry-reviewer", target.manifest_sha256!, "NO FINDINGS\n");
+  const reviewer = captureSyntheticRole(f.artifacts, f.source, "reviewer", target.reviewer_runtime_sha256!, reviewerEvidence);
+  const manifest = target.manifest!, grants = manifest.effects.map(effect => ({ manifest_sha256: target.manifest_sha256!, effect_id: effect.id, effect_sha256: effectDigest([effect]) }));
+  const validated = validateReviewedManifest({ manifest, current: manifest, worker: workerEvidence, reviewer: reviewerEvidence, policy: { worker: role, reviewer: role }, grants });
+  const plan = sealPlan({ reviewed: validated, grants, adoption_sha256: current.runtime!.adoption_sha256, context: "production", transport: "native", publication_kind: "resolve", corrections: [], attention: [] });
+  let journal = createJournal({ source_repo: f.repo, artifact_root: f.artifacts, plan });
+  const selected = retainSyntheticArtifact(f.artifacts, "retry-original-target.json", canonicalJSON({ source_commit: f.source,
+    identity: current.target!.identity, target: current.target!.target }));
+  for (const effect of plan.manifest.effects.slice(0, -1)) {
+    journal = appendIntent(journal, effect.id);
+    if (effect.kind !== "pr-close") journal = appendOutcome(journal, effect.id, { state: "observed", observation_sha256: "a".repeat(64),
+      resource_id: effect.kind === "comment-create" ? "101" : null, object: null });
+  }
+  const responses = JSON.parse(readFileSync(f.responses_file, "utf8")), comment = plan.manifest.effects.find(effect => effect.kind === "comment-create")!;
+  responses["repos/fixture/docs/pulls/1"].state = "closed";
+  responses["repos/fixture/docs/issues/1/comments?per_page=100&page=1"] = [{ id: 101, body: comment.payload.body, user: { login: "fixture-bot", id: 20, type: "Bot" } }];
+  writeFileSync(f.responses_file, JSON.stringify(responses));
+  const store = current.target!.store!, transport = createNativeTransport({ source_repo: f.repo, artifact_root: f.artifacts,
+    object_store: store, settings: f.collection.settings, credential: f.options.credential, path: f.options.path });
+  const native = readNativeContext({ hostname: "github.com", repository: "fixture/docs", credential: f.options.credential, path: f.options.path });
+  const context = await captureClosureInventory({ source_repo: f.repo, artifact_root: f.artifacts, journal_directory: journal.directory,
+    original: selected, transport, objects: writePublicationObjects(store, plan, journal.header), reader: native.repository });
+  const result = await collectClosureReview({ ...f.options, closure_inventory: context, worker_capture: worker, reviewer_capture: reviewer });
+  expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+  expect(result.review!.manifest_sha256).toBe(target.manifest_sha256!);
+  const other = await collectClosureWorkerInputs({ ...f.options, closure_inventory: context,
+    selection: { ...f.options.selection, operation_id: "another-closure" } });
+  expect(other.complete).toBe(false);
+  expect(other.diagnostics).toContain("Original closure inventory source and operation required");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+}, 180000);
+
+
+test.each(["actor", "late-actor", "runtime-actor", "runtime-comments", "default", "body", "head", "comments", "closed"])("closure original roles flag changed native %s after worker inputs", async fault => {
+  const f = await fixture(), before = captureRepositoryState(f.repo), current = await collectClosureWorkerInputs(f.options);
+  expect(current.complete, JSON.stringify(current.diagnostics)).toBe(true);
+  const worker = captureSyntheticRole(f.artifacts, f.source, "worker", current.worker_runtime_sha256!,
+    evidence("closure-native-change-worker", current.worker_input_sha256!, canonicalJSON(packet(f, current)).toString()));
+  const values = JSON.parse(readFileSync(f.responses_file, "utf8"));
+  if (fault === "actor") values.__viewer = { login: "other-fixture-actor", databaseId: 21 };
+  if (["late-actor", "runtime-actor", "runtime-comments"].includes(fault)) {
+    const reads = readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
+    const count = reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length;
+    if (fault === "runtime-comments") values.__mutation_after = { at: count + 7,
+      endpoint: "repos/fixture/docs/issues/1/comments?per_page=100&page=1",
+      value: [{ id: 301, body: "Later owner concern", user: { login: "owner", id: 22 } }] };
+    else values.__viewer_after = { at: count + (fault === "late-actor" ? 6 : 8), viewer: { login: "other-fixture-actor", databaseId: 21 } };
+  }
+  if (fault === "default") {
+    values["repos/fixture/docs/git/ref/heads/main"].object.sha = f.snapshot.source_commit;
+    values["repos/fixture/docs/git/commits/" + f.snapshot.source_commit] = { ...values["repos/fixture/docs/git/commits/" + f.source], sha: f.snapshot.source_commit };
+  }
+  if (fault === "body") values["repos/fixture/docs/pulls/1"].body += "Material later original edit\n";
+  if (fault === "head") values["repos/fixture/docs/pulls/1"].head.sha = f.head;
+  if (fault === "comments") values["repos/fixture/docs/issues/1/comments?per_page=100&page=1"] = [{ id: 301, body: "New owner concern", user: { login: "owner", id: 22 } }];
+  if (fault === "closed") values["repos/fixture/docs/pulls/1"].state = "closed";
+  writeFileSync(f.responses_file, JSON.stringify(values));
+  const checked = await collectClosureReviewTarget({ ...f.options, worker_capture: worker });
+  expect(checked.complete).toBe(false); expect(checked.scope_changed, JSON.stringify(checked.diagnostics)).toBe(true);
+  const expected: Record<string, string> = { actor: "Current closure actor differs from committed policy",
+    "late-actor": "Closure target source or actor changed during collection", "runtime-actor": "Closure source or actor changed during final role recheck",
+    "runtime-comments": "Closure payload changed after original role collection", default: "Closure target requires its observed current default source",
+    body: "incomplete closure original head or body changed", head: "incomplete closure original head or body changed",
+    comments: "docs-drift original role capture original launch target or context changed", closed: "docs-drift original role capture original launch target or context changed" };
+  expect(checked.diagnostics).toContain(expected[fault]);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+}, 120000);
+
+
+test("closure independent review rechecks the native actor after reopening both original roles", async () => {
+  const f = await fixture(), before = captureRepositoryState(f.repo), current = await collectClosureWorkerInputs(f.options);
+  expect(current.complete, JSON.stringify(current.diagnostics)).toBe(true);
+  const worker = captureSyntheticRole(f.artifacts, f.source, "worker", current.worker_runtime_sha256!,
+    evidence("closure-final-worker", current.worker_input_sha256!, canonicalJSON(packet(f, current)).toString()));
+  const target = await collectClosureReviewTarget({ ...f.options, worker_capture: worker });
+  expect(target.complete, JSON.stringify(target.diagnostics)).toBe(true);
+  const reviewer = captureSyntheticRole(f.artifacts, f.source, "reviewer", target.reviewer_runtime_sha256!,
+    evidence("closure-final-reviewer", target.manifest_sha256!, "NO FINDINGS\n"));
+  const reads = readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
+  const values = JSON.parse(readFileSync(f.responses_file, "utf8"));
+  values.__viewer_after = { at: reads.filter(call => call.program === "gh" && call.args.includes("graphql")).length + 12,
+    viewer: { login: "changed-final-review-actor", databaseId: 21 } };
+  writeFileSync(f.responses_file, JSON.stringify(values));
+  const reviewed = await collectClosureReview({ ...f.options, worker_capture: worker, reviewer_capture: reviewer });
+  expect(reviewed.complete).toBe(false); expect(reviewed.scope_changed).toBe(true); expect(reviewed.review).toBeNull();
+  expect(reviewed.diagnostics).toContain("Closure source or actor changed during final role recheck");
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 180000);
