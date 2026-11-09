@@ -109,7 +109,7 @@ export function readProposalDiff(store: OwnedObjectStore, proposal: PullRequestI
 }
 
 export type ProposalFetchOptions = {
-  hostname: string; repository: string; default_branch: string;
+  hostname: string; repository: string; default_branch: string; expected_default_commit?: string;
   environment: Readonly<Record<string, string | undefined>>; timeout_ms?: number;
 };
 
@@ -121,6 +121,8 @@ export async function fetchProposalObjects(store: OwnedObjectStore, proposal: Pu
     || proposal.base_repository.full_name.toLowerCase() !== options.repository.toLowerCase()
     || !Number.isSafeInteger(proposal.number) || proposal.number < 1
     || proposal.base_ref !== options.default_branch) throw new Error("invalid owned proposal fetch target");
+  const expectedDefault = options.expected_default_commit ?? proposal.base_sha;
+  if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(expectedDefault)) throw Error("invalid observed default commit");
   readGit(store.root, "check-ref-format", "--branch", options.default_branch);
   const environment = {
     PATH: options.environment.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME,
@@ -148,7 +150,8 @@ export async function fetchProposalObjects(store: OwnedObjectStore, proposal: Pu
     if (execution.exit_code !== 0 || !execution.reaped || execution.timed_out || execution.cancelled || execution.output_limit) throw Error("incomplete fetch process");
     const head = readGit(store.root, "rev-parse", "--verify", `refs/docs-drift/inputs/pr-${proposal.number}^{commit}`).toString().trim();
     const base = readGit(store.root, "rev-parse", "--verify", "refs/docs-drift/inputs/default^{commit}").toString().trim();
-    if (head !== proposal.head_sha || base !== proposal.base_sha) throw Error("proposal changed during fetch");
+    if (head !== proposal.head_sha || base !== expectedDefault) throw Error("proposal changed during fetch");
+    readGit(store.root, "merge-base", "--is-ancestor", proposal.base_sha, expectedDefault);
     return readProposalDiff(store, proposal);
   } catch {
     return { complete: false, diagnostics: ["Fixed-ref proposal fetch unavailable or source changed"], base_sha: proposal.base_sha,

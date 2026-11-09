@@ -116,6 +116,7 @@ test.each(["without-token", "different-actor", "partial-viewer"])("normal adopte
   expect(result.exitCode).toBe(0);
   expect(report.outcome).toBe("collected");
   expect(existsSync(native.trace)).toBe(false);
+  expect(readdirSync(f.artifacts)).toEqual([]);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
@@ -264,7 +265,10 @@ test.each(["digest", "noncanonical", "source", "authority-field", "escape", "sym
   expect(result.exitCode).toBe(2);
   expect(report.outcome).toBe("incomplete");
   expect(report.diagnostics.length).toBeGreaterThan(0);
-  if (scenario === "different-head") expect(report.diagnostics.some(item => item.code === "assessment-source")).toBe(true);
+  if (scenario === "different-head") {
+    expect(report.diagnostics.some(item => item.code === "assessment-source")).toBe(true);
+    expect(new Set(report.diagnostics.map(item => item.message)).size).toBe(report.diagnostics.length);
+  }
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
@@ -289,7 +293,7 @@ test.each([
   expect(report.diagnostics.length).toBeGreaterThan(0);
 });
 
-test.each(["scan", "prepare-trial-fixture", "check-edits"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
+test.each(["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
   const f = fixture(), before = captureRepositoryState(f.repo), native = nativeReader({ ...f, candidate: f.commit });
   let artifacts = kind === "caller" ? f.repo : f.artifacts;
   if (kind === "shared") chmodSync(artifacts, 0o755);
@@ -299,6 +303,7 @@ test.each(["scan", "prepare-trial-fixture", "check-edits"].flatMap(command => ["
   expect(report.outcome).toBe("incomplete");
   expect(report.diagnostics[0].message).toContain(kind === "caller" ? "owned resource overlaps" : "private artifact directory required");
   expect(existsSync(native.trace)).toBe(false);
+  expect(readdirSync(f.artifacts)).toEqual([]);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 

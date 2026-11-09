@@ -17,13 +17,15 @@ function fixture(hostname = "github.com", fault = "none") {
   for (const path of [repo, artifacts, bin]) mkdirSync(path, { mode: 0o700 });
   populateRepository(repo);
   put(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...settingsFixture(), hostname }).toString());
-  const source = commitAll(repo);
+  const base = commitAll(repo);
+  let source = base;
   git(repo, "checkout", "-b", "docs-drift/proposal"); put(repo, "docs/guide.md", "# Updated guide\n");
   const head = commitAll(repo); git(repo, "update-ref", "refs/pull/1/head", head); git(repo, "checkout", "main");
+  if (fault === "later-default") { put(repo, "later-default.txt", "Later default input\n"); source = commitAll(repo); }
   const repository = { id: 10, full_name: "fixture/docs", default_branch: "main" };
   const proposal = { number: 1, state: "open", merged_at: null, body: "Synthetic correction", draft: false,
     user: { login: "fixture-bot", id: 20, type: "Bot" }, head: { sha: head, ref: "docs-drift/proposal", repo: repository },
-    base: { sha: source, ref: "main", repo: repository } };
+    base: { sha: fault === "nonancestor-base" ? head : base, ref: "main", repo: repository } };
   const realGit = Bun.which("git"); if (!realGit) throw Error("fixture requires Git");
   writeFileSync(join(bin, "git"), `#!${process.execPath}
 import { appendFileSync } from "node:fs";
@@ -55,7 +57,7 @@ console.log("HTTP/2.0 200 OK\\r\\n\\r\\n" + JSON.stringify(value));
 `, { mode: 0o700 });
   const selection = canonicalJSON({ schema_version: 1, source_commit: source, proposals: [1] });
   writeFileSync(join(artifacts, "selection.json"), selection, { mode: 0o600 });
-  return { repo, root, artifacts, source, head, trace, selection,
+  return { repo, root, artifacts, source, base, head, trace, selection,
     environment: { ...process.env, PATH: bin + ":" + process.env.PATH,
       GH_TOKEN: hostname === "github.com" ? "synthetic-read-token" : "",
       GH_ENTERPRISE_TOKEN: hostname === "github.com" ? "" : "synthetic-read-token", COPILOT_GITHUB_TOKEN: "synthetic-provider-canary" } };
@@ -84,11 +86,13 @@ test.each(["github.com", "git.fixture.invalid"])("normal full-diff collection us
   expect(events.every(event => event.provider === null)).toBe(true);
 }, 30000);
 
-test.each(["fetch-failed", "missing-pr", "changed-body"])("normal full-diff collection retains incomplete %s", fault => {
+test.each(["fetch-failed", "missing-pr", "changed-body", "nonancestor-base"])("normal full-diff collection retains incomplete %s", fault => {
   const f = fixture("github.com", fault), before = captureRepositoryState(f.repo), { run, report } = invoke(f);
   expect(run.exitCode).toBe(2);
   expect(report.resolution.complete).toBe(false);
   expect(report.resolution.diagnostics.length).toBeGreaterThan(0);
+  expect(report.diagnostics.map((item: { message: string }) => item.message)).toEqual(report.resolution.diagnostics);
+  expect(report.diagnostics.every((item: { code: string }) => item.code === "resolution-collection")).toBe(true);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 30000);
 
@@ -112,5 +116,14 @@ test("normal resolution refuses a nondefault source without creating a store", (
   expect(run.exitCode).toBe(2);
   expect(report.resolution).toMatchObject({ complete: false, store: null, inputs: null });
   expect(report.resolution.diagnostics).toContain("resolution collection requires the observed current default source");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
+
+test("normal resolution retains a historical PR base after the default advances", () => {
+  const f = fixture("github.com", "later-default"), before = captureRepositoryState(f.repo), { run, report } = invoke(f);
+  expect(run.exitCode).toBe(0);
+  expect(report.resolution.inputs.proposals[0]).toMatchObject({ base_sha: f.base, head_sha: f.head, merge_base: f.base });
+  expect(report.resolution.inputs.source_commit).toBe(f.source);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
