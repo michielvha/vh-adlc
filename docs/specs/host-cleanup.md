@@ -91,6 +91,9 @@ the marketplace source on `main` matches the reviewed package.
 - The candidate binary stays installed, with both allow rules, until the release, although Stackweaver's
   adoption merged before Order steps 1 to 3, so sessions in a Stackweaver checkout can already apply its
   manifest: the owner's answer to R-22 F-02 on 2026-11-09.
+- AC-12 runs 2 and 3 first ran before the owner accepted the run 1 report. Told so on 2026-11-09, the owner
+  chose "Accept; re-run 2 and 3": the run 1 report is accepted, and runs 2 and 3 were repeated on recreated
+  stand-ins so the recorded order holds, with the first pass superseded (R-23 F-01).
 
 ## Scope
 
