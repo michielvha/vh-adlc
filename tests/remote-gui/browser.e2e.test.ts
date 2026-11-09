@@ -72,13 +72,16 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
  let viewer: any;
  let agent: any;
  let proofs = 0;
+ let revoked = false;
+ let memoryVisits = 0;
+ const memoryProofs: boolean[] = [];
  const fixtureRequests: {path: string; signedIn: boolean; retained: string | null}[] = [];
  const fixture = Bun.serve({
   hostname: '127.0.0.1',
   port: 0,
   fetch(request) {
    const url = new URL(request.url);
-   const signedIn = request.headers.get('cookie')?.includes('fixture-session=accepted');
+   const signedIn = !revoked && request.headers.get('cookie')?.includes('fixture-session=accepted');
    fixtureRequests.push({path: url.pathname, signedIn: signedIn === true, retained: url.searchParams.get('retained')});
    if (url.pathname === '/login') {
     return new Response(`<script>sessionStorage.setItem('fixture-state','retained');location.replace('/account')</script>`, {
@@ -92,6 +95,17 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
    }
    if (request.method === 'POST' && url.pathname === '/proof' && signedIn && url.searchParams.get('retained') === 'true') {
     proofs++;
+    return new Response('ok', {headers: {'Cache-Control': 'no-store'}});
+   }
+   if (url.pathname === '/memory') {
+    memoryVisits++;
+    const initialize = memoryVisits === 1 ? 'window.fixtureEphemeral=true;' : '';
+    return new Response(`<script>${initialize}fetch('/memory-proof?present='+(window.fixtureEphemeral===true),{method:'POST'})</script>`, {
+     headers: {'Content-Type': 'text/html', 'Cache-Control': 'no-store'},
+    });
+   }
+   if (request.method === 'POST' && url.pathname === '/memory-proof') {
+    memoryProofs.push(url.searchParams.get('present') === 'true');
     return new Response('ok', {headers: {'Cache-Control': 'no-store'}});
    }
    return new Response('Sign-in required', {status: 401});
@@ -142,6 +156,11 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   await page.keyboard.type(fixture.url.href + 'login');
   await page.keyboard.press('Enter');
   await waitFor(() => proofs >= 1, 'fixture owner sign-in failed');
+  await page.keyboard.press('Control+t');
+  await page.keyboard.type(fixture.url.href + 'memory');
+  await page.keyboard.press('Enter');
+  await waitFor(() => memoryProofs.includes(true), 'in-memory-only fixture did not initialize');
+  await page.keyboard.press('Control+2');
 
   // The fixture owner has finished sign-in before this explicit hand-back.
   const returned = cli('handoff', session.id, '--browser-mode', 'agent');
@@ -154,6 +173,11 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   await account.getByText('Authenticated fixture').waitFor({timeout: 15000});
   check(await account.evaluate(() => sessionStorage.getItem('fixture-state')) === 'retained', 'tab storage lost during hand-back');
   await waitFor(() => proofs >= 2, 'session cookie or tab state lost during hand-back');
+  check((await Promise.all(agent.contexts()[0].pages().map((candidate: any) => candidate.title()))).includes(session.marker), 'original connection tab was not restored');
+  const memory = agent.contexts()[0].pages().find((candidate: any) => candidate.url() === fixture.url.href + 'memory');
+  check(memory, 'additional tab was not restored');
+  await memory.bringToFront();
+  await waitFor(() => memoryProofs.includes(false), 'in-memory-only fixture was incorrectly reported as retained');
   await agent.close();
   agent = undefined;
 
@@ -163,6 +187,16 @@ test.skipIf(!enabled)('human sign-in retains session cookies and tab state throu
   await canvas.focus();
   await page.keyboard.press('Control+2');
   await waitFor(() => proofs >= 3, 'session cookie or tab state lost on return to the owner');
+
+  // A provider can revoke a session independently of transport and browser mode.
+  revoked = true;
+  const lostLogin = cli('handoff', session.id, '--browser-mode', 'agent');
+  check(lostLogin.state === 'ready' && lostLogin.readiness_scope === 'host-transport-only' && lostLogin.app_verification === 'not-attested', 'transport readiness claimed provider authentication');
+  agent = await chromium.connectOverCDP(lostLogin.local_cdp, {timeout: 10000});
+  const revokedAccount = agent.contexts()[0].pages().find((candidate: any) => candidate.url() === fixture.url.href + 'account');
+  check(revokedAccount, 'original account tab absent after revocation');
+  const denied = await revokedAccount.reload({waitUntil: 'domcontentloaded'});
+  check(denied.status() === 401, 'revoked provider session was treated as authenticated');
  } finally {
   if (agent) await agent.close();
   if (viewer) await viewer.close();
