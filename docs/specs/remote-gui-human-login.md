@@ -41,9 +41,11 @@ The shared skill now selects human sign-in and preserves the owner's pause.
 The owner completed the live Tailscale sign-in and confirmed completion on 2026-11-09.
 After hand-back, read-only verification found the restored authenticated Tailscale Machines page,
 the original connection tab and the same viewer URL and expiry.
-The first implementation review found duplicate connection tabs and an unmanaged CI tool pin.
-Their repairs pass local regressions and await independent re-review.
+Independent implementation review now returns all six criteria met.
+It verified the duplicate-tab repair, frozen browser-test package and safe failure diagnostics.
 Published CI remains pending.
+Earlier cleanup and reverse-handoff failures were retained, while their diagnostic and installed-copy reruns passed.
+Their original causes remain unconfirmed.
 On 2026-11-09, the owner selected human sign-in followed by explicit agent hand-back.
 Native browser session restoration retains session cookies and tab storage inside the protected disposable profile until its existing expiry and cleanup.
 This adds profile-local persistence of that state during the session.
@@ -242,6 +244,7 @@ None.
 | 2026-11-09 | R-2 | spec | `4502d8d879e418e1e09e41b595ce345f463df808` | n/a | n/a | accepted by owner |
 | 2026-11-09 | R-3 | implementation | `f8761bda7810990c9ffe8375c925fe811c8738d2` | unknown | procedural | Criteria met with two should-fix findings for duplicate tabs and the CI tool pin. Model identity unattested. |
 | 2026-11-09 | R-4 | implementation | `1b49faf987404f3c76c33518eabf9845cd698639` | unknown | procedural | Previous findings resolved, all criteria met, with a test-diagnostics nit. Model identity unattested. |
+| 2026-11-09 | R-5 | implementation | `3f07bff3430f809d66a40cc2353e9ac9f0cc5235` | unknown | procedural | All six criteria met with no new findings. Model identity unattested. |
 
 ### R-1
 
@@ -338,6 +341,33 @@ EVIDENCE: During this review, a reverse handoff failed at line 197, but the CLI 
 PROPOSAL: Include only allowlisted result, state, diagnostic and cleanup_diagnostic fields in failed CLI assertions. Keep access codes, URLs, queries and raw stdout/stderr outside the failure report.
 
 
+### R-5
+
+CRITERION: AC-01 Authentication handoffs selected by the shared agent workflow start in the glossary-defined human mode, with a sandboxed browser, no browser-debugging interface and verified viewer/connection-page input restricted to the owner after the initial connection probe.
+VERDICT: met
+EVIDENCE: At 3f07bff3430f809d66a40cc2353e9ac9f0cc5235, independently reran both real noVNC fixtures and the package checks, all 12 tests passed. Human mode retained its debugging-free launch, absent CDP metadata and verified marker input. Git comparison confirmed production code and canonical instructions are identical to independently reviewed R-4 commit 1b49faf987404f3c76c33518eabf9845cd698639. Reused that review's directly executed launch/lifecycle checks and inspected native routing receipts. Input restriction after the connection probe remains procedural.
+
+CRITERION: AC-02 After explicit owner confirmation, the same disposable session can transfer to verified agent control while retaining its sign-in state, viewer URL and expiry, and can return to human control for a later challenge.
+VERDICT: met
+EVIDENCE: At 3f07bff3430f809d66a40cc2353e9ac9f0cc5235, the independently executed human/agent/human fixture retained nonpersistent HttpOnly authentication, original-tab sessionStorage, exactly three tabs and one marker, viewer URL and expiry. In-memory-only state was lost and revoked authentication returned 401 with truthful host-only readiness. Production code matches R-4, whose directly executed three-cycle probe retained one marker and ended stopped. The supplied owner words "I am logged in" and this reviewer's earlier observed Tailscale admin access establish the prior confirmed live hand-back on the t8 candidate. The final repair has synthetic real-browser verification, while the live provider session remains on that earlier candidate.
+
+CRITERION: AC-03 Repeated, concurrent and failed handoffs, foreign process identities, profile-lock failures, stop and expiry preserve unrelated processes and leave a truthful, recoverable lifecycle state without duplicate browsers or private-state leaks.
+VERDICT: met
+EVIDENCE: At 3f07bff3430f809d66a40cc2353e9ac9f0cc5235, current viewer tests passed restoration/count assertions and private-profile deletion. Reused R-4's directly executed eight-package module race suite and real missing-marker failure/recovery probe because production code is unchanged. Those checks covered concurrent transitions, foreign identities, locks, crashes, expiry, hidden CDP during failure and successful retry. The new diagnostic/privacy regression passed. An additional independent malformed-output probe returned the fixed invalid-JSON diagnostic without disclosing its synthetic private sentinels. The earlier undiagnosed cleanup and reverse-handoff failures remain historical observations with undetermined causes.
+
+CRITERION: AC-04 The shared agent uses the glossary-defined phases and readiness meanings, distinguishes viewer readiness from provider acceptance, bounds initial-navigation retries and stops repeating rejected provider logins.
+VERDICT: met
+EVIDENCE: At 3f07bff3430f809d66a40cc2353e9ac9f0cc5235, confirmed canonical instructions and native fixture assertions are unchanged from R-4. Reused directly inspected phase-selection, configured-identity, unyielded-challenge, rejected-provider, unconfirmed-owner and bounded-navigation execution receipts. The corrected fake owning-interface cases passed after honoring null configured identity. This review did not invoke another native model. Its current real revoked-login fixture again established that healthy transport does not attest provider authentication.
+
+CRITERION: AC-05 Existing agent-mode and service-sharing callers, old session records, owner-restricted transport, auth-refresh ownership and private cleanup retain their supported behavior.
+VERDICT: met
+EVIDENCE: At 3f07bff3430f809d66a40cc2353e9ac9f0cc5235, independently ran the current viewer/package suite, 12 pass and zero fail, and the feature-document lint passed. Inspected both CLI helpers using the shared allowlisted diagnostic parser and the passing synthetic privacy regression, resolving R-4 F-03. Reused R-4's directly executed module race/vet/tidy/pinned-lint checks and inspected root Go, 1296-pass Bun, native legacy routing and Chromium/Firefox identity evidence for unchanged production paths. The prior reverse-handoff failure was not reproduced or diagnosed and is not relabelled fixed. Published CI and full optional SSH/native-code browser coverage remain unverified.
+
+CRITERION: AC-06 The independently installed plugin exposes the reviewed runtime and instructions across isolated supported-host configurations, with documented version/update verification, and the owner completes Google/Tailscale sign-in in human mode followed by verified authorized access after hand-back.
+VERDICT: met
+EVIDENCE: At 3f07bff3430f809d66a40cc2353e9ac9f0cc5235, the current clean-copy offline build/help package check passed. Git comparison confirmed the plugin, manifests, workflow and locked browser dependency are identical to R-4. Reused that review's independently archived installed-copy browser passes under executable overrides and PATH-discovered GUI tools, plus its frozen-lock integrity check. Both manifests remain 0.2.0 with current update guidance. Owner-confirmed Tailscale sign-in and this reviewer's observed restored admin access belong to the earlier t8 live candidate. Current production behavior is established by the exact-source real-browser fixtures. Credential entry and individual Google identity-provider steps were not observed. Separate physical-host acceptance, updater activation, Ubuntu CI, marketplace publication and installed-host rollout remain unverified.
+
+
 ## Sources
 
 - [S1. Google supported browsers](https://support.google.com/accounts/answer/7675428?hl=en) documents software-controlled browsers among possible sign-in rejection reasons.
@@ -347,7 +377,7 @@ PROPOSAL: Include only allowlisted result, state, diagnostic and cleanup_diagnos
 - [S5. Session cookies](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie) describes their shutdown and session-restoration behavior.
 - [S6. Session storage](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage) describes tab-scoped state and page-session lifetime.
 - [S7. Chrome keyboard shortcuts](https://support.google.com/chrome/answer/2391819) documents the Linux native Exit menu sequence used by the owned viewer.
-- [S8. Ubuntu runner image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md) lists the preinstalled Google Chrome used by the real-browser CI job.
+- S8. The Ubuntu runner images list preinstalled Google Chrome for real-browser CI. [24.04 image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md), [26.04 image](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2604-Readme.md).
 - [S9. Playwright CI](https://playwright.dev/docs/ci) describes browser and system-dependency setup for CI execution.
 - [S10. Bun install](https://bun.sh/docs/pm/cli/install) documents frozen-lockfile installation and script controls.
 - [S11. Renovate package matching](https://docs.renovatebot.com/modules/manager/npm/) documents package.json discovery and devDependency extraction. This supports manifest discoverability, while repository updater activation remains unverified.
