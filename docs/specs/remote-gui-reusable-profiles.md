@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised for review R-5 with the owner's answers; waits for the final spec review and acceptance."
+status: planned
+status_description: "Accepted by the owner against spec review R-6; next step is the task list."
 issue: https://github.com/michielvha/vh-adlc/issues/62
 goal: "An owner can opt in to a named browser profile bound to their identity, so provider sessions survive the end of a remote-gui session, while credential entry stays human-only and agent control of a signed-in profile always rests on the owner's confirmation."
 covers:
@@ -208,6 +208,7 @@ None.
 | 2026-11-09 | R-4 | spec | `05b51e9093dacbb1bc2df87bb88772e9555c1986` | claude-opus-5-5 | procedural | No blocking findings; two should-fix findings and two nits. |
 | 2026-11-10 | R-5 | spec | `c071bd4682d176391849c39b9eb873bdce972510` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and two nits. |
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | claude-opus-5-5 | procedural | No blocking findings; one should-fix finding and four nits, left in the record at the owner's direction. |
+| 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | n/a | n/a | accepted by owner |
 
 ### R-1
 
