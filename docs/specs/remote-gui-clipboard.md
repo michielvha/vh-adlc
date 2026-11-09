@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Revised for review R-1 with the owner's answers; waits for a new spec review and acceptance."
+status_description: "Redesigned around a built-in X clipboard helper after review R-2; waits for a new spec review and acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/61
 goal: "The owner can move text between their own device and the shared remote browser through explicit viewer controls, and the text never reaches logs, records or retained evidence."
 covers:
@@ -10,36 +10,38 @@ covers:
 
 # Plan: Clipboard controls for the remote-gui viewer
 
-Add an owner-initiated clipboard panel to the shared-browser viewer so the owner can send text into the remote browser and copy text back out, without automatic clipboard access on either side.
+Add an owner-initiated clipboard panel to the shared-browser viewer, backed by a built-in X clipboard helper, so the owner can send text into the remote browser and copy text back out without automatic clipboard access on either side.
 
 ## Context
 
 ### Owner summary
 
-Typing a long URL or token into the shared browser today means retyping it through the canvas. The viewer has no clipboard controls, even though the underlying noVNC library and x11vnc already exchange clipboard text.
+Typing a long URL or token into the shared browser today means retyping it through the canvas. The viewer has no clipboard controls. The installed x11vnc does not move clipboard text in either direction between a viewer and Chromium, so the VNC connection cannot carry it.
 
-This feature adds a small clipboard panel to the viewer page. The owner pastes text into a field on their own device and presses **Send to remote browser**; the text becomes the remote clipboard, ready for Ctrl+V in Chromium. When something is copied inside the remote browser, the panel offers it, and **Copy to this device** writes it to the local clipboard only on that click. Nothing reads the local clipboard on its own, and nothing writes to it without a click.
+This feature adds a small clipboard panel to the viewer page and a built-in clipboard helper in the session supervisor. The helper is a minimal X client written in plain Go, with no new host tool or module. It sets and reads the remote browser's CLIPBOARD selection. The panel talks to it over the viewer's existing owner-authenticated connection.
 
-The panel keeps text in page memory only and shows remote text as soon as the owner opens it. It clears after a send, on **Clear**, on disconnect and when the session ends. Send works only while the viewer is connected, and typing in the panel never reaches the remote browser, even when the page reconnects or a phone keyboard resizes it. x11vnc syncs only the CLIPBOARD selection, so selecting text in the remote browser sends nothing. The panel never calls the browser's clipboard read API, so neither engine shows a permission prompt. Clipboard text never appears in state records, diagnostics, command output, logs or retained test evidence. The installed x11vnc carries only Latin-1 text, so the panel refuses other characters with a message instead of letting them turn into `?`.
+The owner pastes text into a field on their own device and presses **Send to remote browser**; the text becomes the remote clipboard, ready for Ctrl+V in Chromium. Opening the panel, or pressing **Refresh**, fetches what was last copied in the remote browser, and **Copy to this device** writes it to the local clipboard only on that click. Nothing reads the local clipboard on its own, and nothing writes to it without a click. Full Unicode works in both directions, up to 64 KiB.
 
-When control passes from the human to the agent, the handoff closes Chromium, stops the session's x11vnc as the last X client so the X server resets, then starts a new x11vnc before the agent's browser. The reset empties every selection and the root window's cut buffer, so a credential pasted during human sign-in is not left for the agent. The viewer retries the connection a few times after any drop. If the x11vnc restart fails, the session stays in `handoff-failed` and a retry starts x11vnc again.
+Text stays in page memory and in the helper's memory only. The panel clears after a send, on **Clear**, on disconnect and when the session ends; **Clear** also empties the remote clipboard. Typing in the panel never reaches the remote browser. When control passes from the human to the agent, the handoff clears the remote clipboard and checks that it is empty before the agent's browser starts, so a credential pasted during human sign-in is not left for the agent. Clipboard text never appears in state records, diagnostics, command output, logs or retained test evidence.
 
-Excluded: file transfer, images and rich text, automatic clipboard sync, service shares (they have no viewer), and changes to auth-refresh.
+Excluded: file transfer, images and rich text, automatic clipboard sync, the PRIMARY selection, service shares, and changes to auth-refresh.
 
-Validation is planned, not yet run: unit tests for the viewer page and x11vnc arguments, a real noVNC round trip on Chromium and Firefox without a pre-granted clipboard permission, a handoff-clearing test that checks the cut buffer, and a privacy sweep with synthetic sentinels. The owner answered the four design questions and the six questions raised by review R-1 on 2026-11-09, each with the recommended option. R-1 found a blocking gap that this revision addresses; a new review is pending. Acceptance authorizes implementation on a feature branch; publication, merge and release stay separate approvals.
+A prototype of the helper passed a full round trip on this host, recorded in Background. The feature's own checks are planned, not run: viewer page and helper unit tests, a real round trip on Chromium and Firefox viewers, a handoff test with before and after checks, and a privacy sweep. The owner's decisions are listed under Design. Reviews R-1 and R-2 found blocking gaps that this revision replaces; a new review is pending. Acceptance authorizes implementation on a feature branch; publication, merge and release stay separate approvals.
 
 ### Background
 
-- The viewer page is a custom inline page that creates a noVNC `RFB` object and handles only `connect`, `disconnect` and `securityfailure` events. It never listens for `clipboard` or calls `clipboardPasteFrom`, and it calls `remote.focus()` on `connect` and on every window `resize` (`plugins/remote-gui/internal/proxy/viewer.go:10`). The viewer serves only `/`, `/vnc.html`, `/__remote_gui/viewer-access`, `/websockify` and asset prefixes, and viewer-access returns only the VNC password (`plugins/remote-gui/internal/proxy/viewer.go:16-39`).
-- The installed noVNC is 1.5.0 (`$REMOTE_GUI_NOVNC/package.json`, `"version": "1.5.0"`). Its `RFB.clipboardPasteFrom(text)` sends text to the server, returning silently when the connection is not `connected` (`core/rfb.js:496-497`), and its `_handleServerCutText` dispatches a `clipboard` event with the server's text (`core/rfb.js:2204-2224`). Without the extended clipboard extension it replaces every code point above U+00FF with `?` (`core/rfb.js:520-523`). Its keyboard handler is bound to the canvas (`core/rfb.js:261`). noVNC's full `app/ui.js` has its own clipboard panel (`app/ui.js:335-339`), but remote-gui does not serve that page.
-- x11vnc starts with `-display`, `-localhost`, `-rfbport`, `-rfbauth`, `-forever`, `-shared`, `-noxdamage` and `-quiet`, and no selection flags (`plugins/remote-gui/internal/browser/browser.go:374`). x11vnc 0.9.17 therefore uses its defaults: it polls PRIMARY and CLIPBOARD and sends changes to viewers, and sets both on text from viewers. Its help lists `-noprimary`, `-nosetprimary`, `-noclipboard`, `-nosetclipboard` and `-nosel` to change that (`x11vnc -help`, lines 3248-3259 of the output).
-- The installed x11vnc does not use the extended clipboard. The linked libvncserver 0.9.15 contains the ExtendedClipboard messages (`strings /lib64/libvncserver.so.0.9.15`), but the x11vnc binary has no UTF-8 cut-text symbol (`strings $REMOTE_GUI_X11VNC | grep -i utf8` printed nothing). Review R-1 (finding F-03) advertised the ExtendedClipboard pseudo-encoding to a scratch x11vnc 0.9.17 and observed no capability reply and no "Enabling ExtendedClipboard" log line.
-- Text sent from a viewer also lands in the root window's `CUT_BUFFER0`, which survives the x11vnc process while another X client stays connected. It disappeared only when x11vnc was the last X client and Xvfb reset (review R-1, finding F-02). Xvfb starts without `-noreset` (`plugins/remote-gui/internal/browser/browser.go:338`).
-- Child processes run with stdout and stderr discarded (`plugins/remote-gui/internal/browser/browser.go:146-147`), and x11vnc runs with `-quiet`.
-- A human-to-agent handoff closes Chromium through the owned x11vnc connection and the native Exit menu, then relaunches only Chromium. Xvfb, x11vnc and websockify keep running (`plugins/remote-gui/internal/browser/quit.go:19-29`, `plugins/remote-gui/internal/browser/phase.go:95-152`). Chromium arguments are validated for human mode, but x11vnc arguments are not (`plugins/remote-gui/internal/browser/phase.go:42-59`).
-- `spawn` appends each new child to the runtime's children and the record's owned processes (`plugins/remote-gui/internal/browser/browser.go:158-163`). `healthy()` fails when any owned child other than a not-yet-ready browser is dead (`plugins/remote-gui/internal/browser/phase.go:71-86`), and the supervisor fails a transition whose result is not healthy (`plugins/remote-gui/internal/session/handoff.go:100`). A supervisor tick that sees a dead owned child reports `upstream-ownership-changed` and moves the session to `stopping` (`plugins/remote-gui/internal/session/daemon.go:375-381`, `:624-625`).
-- Stop terminates every owned child and deletes the profile, downloads, X authority and VNC password file (`plugins/remote-gui/internal/browser/browser.go:219-260`). The X server's selections end with it.
-- The real-browser test reads page values through CDP after handing back to agent mode (`tests/remote-gui/browser.e2e.test.ts:74-77`) and types the marker printed by the CLI (`tests/remote-gui/browser.e2e.test.ts:176`). The marker page reports only booleans (`plugins/remote-gui/internal/browser/phase.go:199-209`).
+- The viewer page is a custom inline page that creates a noVNC `RFB` object and handles only `connect`, `disconnect` and `securityfailure` events. It calls `remote.focus()` on `connect` and on every window `resize` (`plugins/remote-gui/internal/proxy/viewer.go:10`). The viewer serves only `/`, `/vnc.html`, `/__remote_gui/viewer-access`, `/websockify` and asset prefixes, and viewer-access returns only the VNC password (`plugins/remote-gui/internal/proxy/viewer.go:16-39`). noVNC binds its keyboard handler to the canvas (`$REMOTE_GUI_NOVNC/core/rfb.js:261`).
+- The installed x11vnc 0.9.17 moves no clipboard text between a viewer and Chromium. Review R-2 (finding F-01) measured on a scratch display that text copied in Chromium produced no ServerCutText, and that ClientCutText was logged as set but never became the CLIPBOARD selection Chromium pastes from, with and without `-noprimary -nosetprimary`. Viewer text did land in the root window's `CUT_BUFFER0`, which Chromium does not read (R-1 F-02, R-2 F-01 and F-02).
+- x11vnc starts with no selection flags (`plugins/remote-gui/internal/browser/browser.go:374`). Its help lists `-nosel`, which stops it managing selections and cut buffers at all (`x11vnc -help`, line 3248 of the output).
+- A prototype X client proved the helper approach on this host on 2026-11-09. It is 513 lines of Go with no module requirements and a hand-written X11 protocol, authenticating with a MIT-MAGIC-COOKIE-1 Xauthority file over the display's Unix socket, as remote-gui starts Xvfb (`plugins/remote-gui/internal/browser/browser.go:335-338`). On a scratch Xvfb with a scratch Chromium 151, its run log recorded:
+  - owning CLIPBOARD with `Zürich € ✓ sentinel-A`, then pasting in Chromium: `textarea="Zürich € ✓ sentinel-A" ... -> PASS`;
+  - reading after Chromium copied `sentinel-B ✓ ü`: `text="sentinel-B ✓ ü"`, received as `UTF8_STRING`;
+  - after clearing: `CLIPBOARD has no owner`, an empty paste, and `CUT_BUFFER0: not found` (also after first setting it to `stale-cut`);
+  - retaking ownership afterwards: PASS.
+  Chromium sent about 13 `TARGETS` requests and one `UTF8_STRING` request per paste, so the helper must answer `TARGETS`. No INCR transfer occurred. Pastes driven by CDP editing commands worked; Ctrl+V and Ctrl+C sent as CDP key events did nothing. A wrong cookie was refused by the server.
+- A human-to-agent handoff closes Chromium through the owned x11vnc connection and relaunches only Chromium; Xvfb, x11vnc and websockify keep running, so the viewer connection stays up (`plugins/remote-gui/internal/browser/quit.go:19-29`, `plugins/remote-gui/internal/browser/phase.go:95-152`).
+- Child processes run with stdout and stderr discarded (`plugins/remote-gui/internal/browser/browser.go:146-147`). Stop terminates every owned child and deletes the profile, downloads, X authority and VNC password file (`plugins/remote-gui/internal/browser/browser.go:219-260`).
+- The real-browser handoff test shows that sessionStorage survives a human-to-agent handoff while in-memory page state does not (`tests/remote-gui/browser.e2e.test.ts:192-207`). The marker page reports only booleans (`plugins/remote-gui/internal/browser/phase.go:199-209`).
 - Chromium requires a secure context and either transient activation or the clipboard-write permission for `navigator.clipboard.writeText`; Firefox requires transient activation. Reading with `readText` triggers a permission request in Chromium and a paste context menu in Firefox [S1], [S2], [S3]. Tailscale HTTPS viewers and `127.0.0.1` loopback viewers are secure contexts [S4].
 
 ## Scope
@@ -47,107 +49,124 @@ Validation is planned, not yet run: unit tests for the viewer page and x11vnc ar
 In scope:
 
 - A clipboard panel on the browser-handoff viewer page, in human and agent modes, for Tailscale and loopback transports.
-- Sending owner-pasted text to the remote clipboard, and copying the latest remote clipboard text to the owner's device on an explicit click.
-- x11vnc selection flags that limit sync to CLIPBOARD.
-- Clearing rules for the panel, page memory and the remote clipboard and cut buffer on human-to-agent handoff.
-- Bounded automatic reconnect of the viewer after a dropped connection.
-- Refusing text that would not arrive intact.
+- A built-in clipboard helper in the supervisor that sets, reads and clears the CLIPBOARD selection of the session's display.
+- Clipboard routes on the viewer origin, behind the existing owner authentication.
+- Clearing the remote clipboard on **Clear** and on human-to-agent handoff, with a check that it is empty.
+- Turning off x11vnc's own selection handling.
 - README and skill updates describing the controls and their privacy behavior.
 
 Out of scope:
 
 - File transfer, images, rich text or HTML clipboard formats.
 - Automatic or background clipboard sync in either direction, and any use of `navigator.clipboard.readText`.
-- Characters above U+00FF, which the installed x11vnc cannot carry.
+- The PRIMARY selection and middle-click paste.
+- Text over 64 KiB.
 - Service shares, which have no viewer.
 - Agent access to the owner's local clipboard. The agent keeps only the access it already has through CDP in agent mode.
 - Persisting clipboard text in `localStorage`, `sessionStorage`, IndexedDB, cookies, state records or logs.
-- Changes to auth-refresh, Tailscale configuration or the session lifecycle beyond the x11vnc restart during human-to-agent handoff.
+- Changes to auth-refresh or Tailscale configuration.
 
 ## Design
+
+### Owner decisions
+
+The owner settled these on 2026-11-09:
+
+- Clear the remote clipboard on every human-to-agent handoff.
+- Sync only the CLIPBOARD selection.
+- A plain paste field, with no button that reads the local clipboard.
+- Show remote text as soon as the panel opens.
+- Use a built-in X helper instead of x11vnc or a new host tool, after R-2 showed x11vnc moves no text.
+- Apply the R-2 test proposals as written: a native paste into a separate local test field to read the local clipboard, positive before and after checks for clearing, and an observable human-mode paste.
+
+Earlier answers about restarting x11vnc, reconnecting after a restart and the Latin-1 limit applied to the x11vnc design and no longer apply: the helper needs no x11vnc restart and carries full Unicode.
+
+### Clipboard helper
+
+A new package `plugins/remote-gui/internal/xclip` implements a minimal X11 client with the standard library only. The browser runtime creates one helper per session after Xvfb is ready, using the session's display socket and Xauthority file. It runs inside the supervisor process, so no new owned process is tracked. It offers three operations:
+
+- **Set(text)**: create an unmapped window, take ownership of CLIPBOARD with a server timestamp from a zero-length PropertyNotify, and answer SelectionRequest events for `TARGETS`, `UTF8_STRING`, `STRING` (Latin-1, with characters outside it replaced) and `TEXT`; refuse other targets. The helper keeps the text in memory only while it owns the selection, and drops it on SelectionClear, Clear or stop.
+- **Get()**: convert CLIPBOARD to `UTF8_STRING` on its own window, falling back to `STRING` decoded as Latin-1, and return the text. No owner returns an empty result. An INCR reply or text over 64 KiB returns `clipboard-too-large`.
+- **Clear()**: take CLIPBOARD and PRIMARY with a helper window, destroy the window so neither selection has an owner, delete `CUT_BUFFER0` on the root window, and drop any held text. Then verify that CLIPBOARD and PRIMARY have no owner and `CUT_BUFFER0` is absent, and return `clipboard-clear-unverified` if not.
+
+Each operation has a bounded timeout. The helper never logs text, and its errors carry fixed diagnostic codes only.
+
+x11vnc gains `-nosel`, so only the helper touches selections and cut buffers. A unit test asserts the exact x11vnc argument list.
+
+### Clipboard routes
+
+The viewer proxy serves `/__remote_gui/clipboard` for browser sessions, behind the same owner authentication as every other viewer request:
+
+- `POST` with a UTF-8 `text/plain` body up to 64 KiB calls Set. A larger body returns 413 with `clipboard-too-large`.
+- `GET` calls Get and returns `{"text": ...}`.
+- `DELETE` calls Clear.
+
+All three require an `Origin` header equal to the viewer origin and the header `X-Remote-GUI-Clipboard: 1`, return `Cache-Control: no-store`, and send no CORS headers. Responses and errors contain no text other than the requested clipboard value.
 
 ### Viewer panel
 
 `plugins/remote-gui/internal/proxy/viewer.go` gains a collapsed clipboard panel in the header beside the status line. It contains:
 
-- A plain `textarea` labelled **Text for the remote browser**. The owner pastes into it with the device's normal paste gesture, which uses no clipboard API and shows no prompt. **Send to remote browser** is enabled only while the RFB connection is connected. On a click the page checks the connection again and the characters (below), calls `RFB.clipboardPasteFrom(text)`, then clears the field and shows a short confirmation that says to press Ctrl+V in the remote page. If either check fails, the field keeps its text and the page shows why.
-- A read-only area labelled **Copied in the remote browser**. The page keeps the latest `clipboard` event's text in one variable. When the owner opens the panel, the area shows a character count and the text, unmasked. **Copy to this device** calls `navigator.clipboard.writeText` inside that click handler. If the promise rejects, the page selects the text and asks the owner to copy it with their device's shortcut.
-- **Clear**, which empties both areas and the in-memory value and, while connected, sends an empty string with `clipboardPasteFrom` so the remote clipboard is empty too.
+- A plain `textarea` labelled **Text for the remote browser**. The owner pastes into it with the device's normal paste gesture, which uses no clipboard API and shows no prompt. **Send to remote browser** posts the text. Only after a successful response does the page clear the field and show a short confirmation that says to press Ctrl+V in the remote page. On failure the field keeps its text and the page shows why.
+- A read-only area labelled **Copied in the remote browser**. Opening the panel and pressing **Refresh** fetch the remote clipboard; the area then shows a character count and the text, unmasked. **Copy to this device** calls `navigator.clipboard.writeText` inside that click handler. If the promise rejects, the page selects the text and asks the owner to copy it with their device's shortcut.
+- **Clear**, which empties both areas and the in-memory value and sends `DELETE`.
 
-While focus is inside the panel, the `connect` and `resize` handlers do not call `remote.focus()`, so typing and pasting there are never sent as remote keystrokes, including after a reconnect or when a phone keyboard resizes the viewport. Closing the panel returns focus to the canvas with `remote.focus()`. Controls have accessible labels and keyboard access.
+While focus is inside the panel, the `connect` and `resize` handlers do not call `remote.focus()`, so typing and pasting there are never sent as remote keystrokes, including when a phone keyboard resizes the viewport. Closing the panel returns focus to the canvas with `remote.focus()`. Controls have accessible labels and keyboard access.
 
 The page never stores clipboard text outside page memory. It drops the in-memory value on `disconnect`, on `pagehide` and when the session expires. The viewer-access fetch, WebSocket URL and RFB credentials are unchanged.
 
-### Reconnect
-
-After any `disconnect` that follows a successful connection, the page shows a neutral "Reconnecting to shared browser" status and retries up to five times with backoff from one to eight seconds, fetching viewer-access again each time. A successful attempt restores the "connected" status. When the retries run out, or viewer-access fails, the page shows the existing "Shared browser unavailable. Reopen the session link." message. The page does not try to tell a handoff from a stop, an expiry or a network drop.
-
-### Intact text only
-
-Before sending, the page checks every code point. If any is above U+00FF, it refuses the send and names the characters the remote browser cannot receive. It never sends text that noVNC would turn into `?`. The check is unconditional because the installed x11vnc does not negotiate the extended clipboard and detecting it would need a private noVNC field. The README states the limit. Text received from the remote side is shown as received.
-
-### x11vnc selection flags
-
-`plugins/remote-gui/internal/browser/browser.go` adds `-noprimary` and `-nosetprimary` to the x11vnc arguments. Middle-click paste of viewer text in the remote browser therefore stops working, which the owner accepted. Selecting text in the remote browser then sends nothing, and only an explicit copy reaches the viewer. Text from the viewer sets only CLIPBOARD. A unit test asserts the exact argument list.
-
 ### Clearing on human-to-agent handoff
 
-The human-to-agent handoff in `plugins/remote-gui/internal/browser/phase.go` runs in this order:
-
-1. Close Chromium through the owned x11vnc connection, as today, and wait for it to exit.
-2. Stop the session's owned x11vnc process, verified by its recorded identity, and wait for it to exit. It is then the last X client, so Xvfb resets and drops every selection and the root window's `CUT_BUFFER0`.
-3. Start a replacement x11vnc on the same display, port and password file. The replacement takes the old `vnc` entry's place in the runtime's children and in the record's owned processes, so `healthy()` and the supervisor see exactly one live `vnc` child.
-4. Launch Chromium in agent mode as today.
-
-The agent-to-human direction does not restart x11vnc.
-
-If step 2 or 3 fails, the handoff fails and the record moves to `handoff-failed` with a diagnostic that names x11vnc. Chromium is not launched in agent mode. While the record is `handoff-failed` after an x11vnc failure, the runtime marks the `vnc` child as absent, like the browser before it is ready, so `healthy()` and the supervisor tick treat it as a recoverable gap and do not stop the session. A retried handoff starts x11vnc before launching Chromium. The viewer cannot connect until that retry succeeds. Stop and expiry clean up as today.
+The human-to-agent handoff in `plugins/remote-gui/internal/browser/phase.go` calls Clear after Chromium exits and before Chromium launches in agent mode. If Clear returns an error, the handoff fails, the record moves to `handoff-failed` with that diagnostic, and Chromium is not launched in agent mode. A retried handoff runs Clear again. Xvfb, x11vnc and websockify keep running, so the viewer stays connected. The agent-to-human direction does not clear.
 
 ### Privacy
 
-- No Go code reads, logs or stores clipboard text. Clipboard bytes travel only inside the existing authenticated WebSocket between the viewer and x11vnc, through the proxy, which copies frames without inspecting them.
-- Command output, state records, diagnostics and supervisor logs contain no clipboard text. The privacy test in AC-05 checks this with synthetic sentinel strings that differ from the session marker.
+- Clipboard text exists only in the viewer page's memory, in request and response bodies on the owner-authenticated connection, and in the helper's memory while it owns the selection. No Go code logs or stores it, and diagnostics use fixed codes.
+- Command output, state records, diagnostics and supervisor logs contain no clipboard text. The privacy test in AC-05 checks this with synthetic sentinels that differ from the session marker.
 - Tests and acceptance runs use synthetic sentinels only. Browser verification keeps recordings, tracing, screenshots of the panel contents, HAR and input logging disabled, following the existing skill rule.
 - The skill tells agents never to ask the owner to paste a password through the panel in agent mode, and that the panel is for text the owner chooses to share.
 
 ### Compatibility
 
-Existing sessions keep the viewer and x11vnc arguments their supervisor started with. Service shares, owner identity, loopback native-code access, the agent-to-human handoff and cleanup are otherwise unchanged. No new dependency is added; noVNC's existing `core/rfb.js` provides both directions.
+Existing sessions keep the viewer, proxy routes and x11vnc arguments their supervisor started with. Service shares, owner identity, loopback native-code access, browser phases and cleanup are otherwise unchanged. No module or host dependency is added.
 
 ### Glossary
 
 | Term | Meaning |
 | --- | --- |
 | Clipboard panel | The viewer's collapsible area with the send field, the remote text area and their buttons. |
-| Send to remote browser | The button that makes the field's text the remote CLIPBOARD selection. |
-| Copy to this device | The button that writes the latest remote clipboard text to the owner's local clipboard. |
-| Remote clipboard | The CLIPBOARD selection and the root window's cut buffer on the session's X display. |
+| Clipboard helper | The built-in X client in the supervisor that sets, reads and clears the remote clipboard. |
+| Send to remote browser | The button that makes the field's text the remote clipboard. |
+| Copy to this device | The button that writes the fetched remote clipboard text to the owner's local clipboard. |
+| Remote clipboard | The CLIPBOARD selection of the session's X display. |
 
 ## Acceptance Criteria
 
 - [ ] AC-01: In a fresh Chromium viewer and a fresh Firefox viewer, the owner can paste text into the panel, send it, and paste it into a page in the remote browser with Ctrl+V, in both human and agent modes.
-- [ ] AC-02: Text copied inside the remote browser appears in the open panel, and **Copy to this device** places it on the viewer device's clipboard in Chromium and Firefox. Selecting text without copying sends nothing to the viewer.
-- [ ] AC-03: The viewer never reads the local clipboard without the owner's paste gesture, never writes it without a click on **Copy to this device**, and keeps clipboard text only in page memory, which is empty after a send, **Clear**, disconnect and session stop.
-- [ ] AC-04: Text containing a character above U+00FF is refused with a message naming it, and is never delivered altered to the remote clipboard.
+- [ ] AC-02: Text copied inside the remote browser appears when the owner opens the panel or presses **Refresh**, and **Copy to this device** places it on the viewer device's clipboard in Chromium and Firefox.
+- [ ] AC-03: The viewer never reads the local clipboard without the owner's paste gesture, never writes it without a click on **Copy to this device**, and keeps clipboard text only in page memory, which is empty after a send, **Clear**, disconnect and session stop. After **Clear**, the remote clipboard has no owner.
+- [ ] AC-04: Text up to 64 KiB, including characters outside Latin-1, arrives unchanged in both directions, and larger text is refused with a message.
 - [ ] AC-05: Synthetic clipboard sentinels sent in both directions appear in no command output, state record, diagnostic, supervisor or child log, test artifact or retained evidence file.
-- [ ] AC-06: After a human-to-agent handoff, the remote CLIPBOARD selection and the root window's `CUT_BUFFER0` are empty and the viewer reconnects on its own with the same URL and expiry. A failed x11vnc restart leaves a `handoff-failed` record without an agent-mode browser that survives supervisor health ticks, and a retried handoff then succeeds.
+- [ ] AC-06: After a human-to-agent handoff, CLIPBOARD and PRIMARY have no owner and `CUT_BUFFER0` is absent on the session display, and the viewer stays connected. A failed clear leaves a `handoff-failed` record without an agent-mode browser, and a retried handoff then succeeds.
 - [ ] AC-07: Existing service shares, owner-restricted access, loopback native-code access, browser phases, legacy records and private cleanup keep their supported behavior, and the module's race tests, vet, pinned lint and tidy checks pass.
-- [ ] AC-08: The README and skill describe the panel with the glossary terms, the privacy and clearing rules, the browser permission behavior and the character limit, and contain no claim that the clipboard syncs automatically.
-- [ ] AC-09: Typing or pasting in the panel never reaches the remote browser, including across reconnects and viewport resizes, and **Send to remote browser** neither clears the field nor confirms a send while the viewer is disconnected.
+- [ ] AC-08: The README and skill describe the panel with the glossary terms, the privacy and clearing rules, the browser permission behavior and the size limit, and contain no claim that the clipboard syncs automatically.
+- [ ] AC-09: Typing or pasting in the panel never reaches the remote browser, including across reconnects and viewport resizes, and **Send to remote browser** neither clears the field nor confirms a send that did not succeed.
+- [ ] AC-10: Clipboard routes refuse requests without the owner's authentication, with a different `Origin`, or without the clipboard header, and return no clipboard text in those refusals.
 
 ## Test Plan
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01 | Extend the real noVNC browser fixture (`REMOTE_GUI_BROWSER_E2E=1`) and `tests/remote-gui/browser.e2e.test.ts`: in fresh Chromium and Firefox contexts, fill the panel field with a synthetic sentinel that differs from the marker, send, focus a remote page input and press Ctrl+V. In agent mode read the input value through CDP. In human mode, paste, hand off to agent, then read the same input through CDP. |
-| AC-02 | Same fixture: copy a sentinel inside the remote page, assert it appears in the opened panel, click **Copy to this device** in Chromium without granting clipboard-write and in Firefox, so both rely on the click, and assert the local clipboard value. Select text without copying and assert the panel value is unchanged. Unit-test the x11vnc argument list for `-noprimary` and `-nosetprimary`. |
-| AC-03 | Viewer page tests with a stubbed `navigator.clipboard` that records calls: assert no `readText` call ever and `writeText` only inside the click handler. Assert empty page state after send, **Clear**, a simulated disconnect and stop, and assert storage APIs hold no sentinel. The AC-02 real-browser run without a clipboard-write grant also fails if a write happens outside the click. |
-| AC-04 | Viewer page test: sending text with a code point above U+00FF shows the refusal naming it and calls no send. Real fixture: attempt a sentinel containing `€` and assert the refusal appears and the remote clipboard is unchanged, never holding a `?` substitution. |
+| AC-01 | Extend the real noVNC browser fixture (`REMOTE_GUI_BROWSER_E2E=1`) and `tests/remote-gui/browser.e2e.test.ts`. In fresh Chromium and Firefox viewer contexts, send a sentinel that differs from the marker, focus an input on a test fixture page in the remote browser, and press Ctrl+V through the viewer canvas so the key reaches Chromium as an X event. The fixture page copies each pasted value into sessionStorage. In agent mode read it through CDP; in human mode hand off to agent first, then read sessionStorage through CDP. |
+| AC-02 | Same fixture: in agent mode, copy a sentinel on the fixture page with a CDP `copy` editing command; open the panel and assert the text; click **Copy to this device** in Chromium without granting clipboard-write and in Firefox; then paste natively into a separate local test field and assert the value. |
+| AC-03 | Viewer page tests with a stubbed `navigator.clipboard` that records calls: no `readText` call ever, and `writeText` only inside the click handler. Assert empty page state after send, **Clear**, a simulated disconnect and stop, and that storage APIs hold no sentinel. Real fixture: after **Clear**, a helper Get returns empty and `xprop` reports no CLIPBOARD owner. |
+| AC-04 | Helper unit tests against a scratch Xvfb: Set then a second client's Get round trip `Zürich € ✓` and a 64 KiB string exactly; a 64 KiB plus one byte POST returns 413; `STRING` fallback decodes Latin-1. Real fixture: the AC-01 and AC-02 sentinels include `€` and `✓`. |
 | AC-05 | Run the AC-01 and AC-02 fixtures with unique sentinels that differ from the marker, then search command output, the session directory, state records, diagnostics, supervisor logs and all test artifacts for each sentinel; any match fails. |
-| AC-06 | Real fixture: send a sentinel from the viewer and copy another in the remote page in human mode, hand off to agent, paste into an agent-mode page input and read it through CDP, and read the root window's `CUT_BUFFER0` with `xprop` on the session display; assert both are empty. Assert the viewer reconnects and URL and expiry are unchanged. Inject an x11vnc restart failure, assert `handoff-failed` and no agent-mode browser after at least one supervisor health tick, then retry the handoff and assert ready agent mode and a working viewer. |
+| AC-06 | Real fixture: in human mode, send a sentinel and assert with a helper Get that CLIPBOARD returns it; set `CUT_BUFFER0` with `xprop` and assert it is present. Hand off to agent; assert no CLIPBOARD or PRIMARY owner and `CUT_BUFFER0` absent, and that the viewer WebSocket stayed open. Inject a Clear failure, assert `handoff-failed` and no agent-mode browser after at least one supervisor health tick, then retry and assert ready agent mode. |
 | AC-07 | Run `go test -race ./...`, `go vet ./...`, golangci-lint v2.15.0 `config verify` and `run`, and `go mod tidy -diff` in `plugins/remote-gui`, plus the existing service, origin-auth and native-routing fixtures in `tests/remote-gui`. |
 | AC-08 | Review the README and skill diff against the glossary and design; `bun test tests/vh-adlc` and the package test in `tests/remote-gui/package.test.ts` pass; grep both files for automatic-sync wording. |
-| AC-09 | Viewer page tests: with focus in the panel, fire `connect` and `resize` and assert focus stays in the panel and no key event reaches the RFB stub; with the connection disconnected, assert **Send to remote browser** is disabled and a forced click keeps the field text without calling `clipboardPasteFrom`. Real fixture: type in the panel during a reconnect and assert the remote page input is unchanged. |
+| AC-09 | Viewer page tests: with focus in the panel, fire `connect` and `resize` and assert focus stays in the panel and no key event reaches the RFB stub; with a failing POST, assert the field keeps its text and no confirmation shows. Real fixture: type in the panel and assert the remote fixture page saw no keystrokes. |
+| AC-10 | Proxy unit tests: requests with no owner identity, a foreign `Origin`, a missing `X-Remote-GUI-Clipboard` header or a wrong method are refused, call no helper operation and return no clipboard text. |
 
 ## Tasks
 
