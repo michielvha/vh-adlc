@@ -241,8 +241,9 @@ test("native output capacity refusal precedes publication and original resume mu
       const assertNoWrites = () => {
         const calls = readFileSync(service.calls, "utf8").trim().split("\n").map(line => JSON.parse(line) as { program: string; args: string[] });
         expect(calls.some(call => call.program === "git" && call.args.includes("push"))).toBe(false);
-        expect(calls.some(call => call.program === "gh" && (call.args.includes("PATCH") || call.args.includes("DELETE")
-          || call.args.includes("POST") && !call.args.includes("graphql")))).toBe(false);
+        expect(calls.some(call => call.program === "gh" && (call.args.includes("PATCH") || call.args.includes("DELETE") || call.args.includes("PUT")
+          || call.args.includes("POST") && !call.args.includes("graphql")
+          || call.args.includes("graphql") && call.args.some(arg => /mutation\b/u.test(arg))))).toBe(false);
         expect(readGit(f.origin, "for-each-ref", "--format=%(refname)", "refs/heads/docs-drift-lease").toString()).toBe("");
       };
       assertNoWrites();

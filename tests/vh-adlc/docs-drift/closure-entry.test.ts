@@ -140,7 +140,16 @@ test.each(["unmerged", "changed-original", "required-input", "missing-comments",
   expect(result.exitCode).toBe(2); expect(report.outcome).toBe("incomplete");
   expect(report.closure_target?.complete ?? false).toBe(false);
   expect(report.closure_target?.target_sha256 ?? null).toBeNull();
-  if (fault === "changed-actor") expect(report.diagnostics.some((item: { message: string }) => item.message.includes("actor changed"))).toBe(true);
+  if (["missing-comments", "oversized-target", "changed-actor"].includes(fault)) {
+    expect(report.closure_target.store).toBeDefined();
+    expect(existsSync(report.closure_target.store.record_path)).toBe(true);
+    expect(sha256(readFileSync(report.closure_target.store.record_path))).toBe(report.closure_target.store.record_sha256);
+  }
+  if (fault === "changed-actor") {
+    const messages = report.diagnostics.map((item: { message: string }) => item.message);
+    expect(messages).toContain("Closure target source or actor changed during collection");
+    expect(messages).not.toContain("Native source or actor changed during closure collection");
+  }
   if (fault === "oversized-target") expect(report.diagnostics.some((item: { message: string }) => item.message.includes("configured output bound"))).toBe(true);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 }, 65000);

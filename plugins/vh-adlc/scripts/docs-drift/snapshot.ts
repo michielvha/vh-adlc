@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
+import { isAbsolute, join, relative, sep } from "node:path";
 import { readGit } from "./git";
 import { loadCommittedSettings } from "./settings";
 import type { Settings } from "./settings";
@@ -275,7 +275,7 @@ export type ObjectStoreOptions = {
 function outside(path: string, protectedPaths: string[]): void {
   for (const protectedPath of protectedPaths) {
     const delta = relative(protectedPath, path);
-    if (delta === "" || (!isAbsolute(delta) && delta !== ".." && !delta.startsWith("../"))) incomplete("owned resource overlaps a caller checkout or Git directory");
+    if (delta === "" || (!isAbsolute(delta) && delta !== ".." && !delta.startsWith(".." + sep))) incomplete("owned resource overlaps a caller checkout or Git directory");
   }
 }
 
