@@ -206,6 +206,7 @@ None.
 | 2026-11-09 | R-3 | spec | `a5ef9e6204cad85777293bb5ec33b505f6311be4` | claude-opus-5-5 | procedural | Blocking: same-origin GET carries no Origin header; six should-fix and two nit findings. |
 | 2026-11-09 | R-4 | spec | `05b51e9093dacbb1bc2df87bb88772e9555c1986` | claude-opus-5-5 | procedural | Blocking: viewer browsers save the panel field in session-restore files; four should-fix and two nit findings. |
 | 2026-11-10 | R-5 | spec | `c071bd4682d176391849c39b9eb873bdce972510` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and three nits. |
+| 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and two nits, left in the record at the owner's direction. |
 
 ### R-1
 
@@ -475,6 +476,43 @@ SEVERITY: nit
 WHERE: Context, Background
 EVIDENCE: Background says "a Firefox viewer is used only by `tests/remote-gui/origin-auth.e2e.test.ts` when `REMOTE_GUI_FIREFOX` names one (`:40`)". tests/remote-gui/native-routing.e2e.test.ts:47 also passes `firefox:process.env.REMOTE_GUI_FIREFOX` to tests/remote-gui/fixtures/browser-check.ts, which launches Firefox with a private persistent profile (`firefox.launchPersistentContext(profile, ...)`, browser-check.ts:27-34) for the identity-firefox case (tests/remote-gui/README.md:52).
 PROPOSAL: Correct the sentence to name both users of REMOTE_GUI_FIREFOX. The browser-check fixture's persistent Firefox profile handling may also be reusable for the AC-03 profile search.
+
+### R-6
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-03; Context, Background
+EVIDENCE: The AC-03 real fixture says "with persistent scratch viewer profiles in Chromium and Firefox, type a sentinel into the send field ... search every profile file ... any match fails". Nothing in it shows the search could ever find a saved field, so it passes whenever the profile writes no session-restore data at all. Background now points implementers at the fixture "tests/remote-gui/fixtures/browser-check.ts with a private persistent Firefox profile". That fixture launches Firefox with `firefoxUserPrefs:{'browser.privatebrowsing.autostart':true}` (browser-check.ts:34). I measured the effect in this review with Playwright Firefox (firefox-1569) through playwright-core: a scratch persistent profile, a plain `textarea` on a 127.0.0.1 page, a typed sentinel, a 16 s wait, then close. Without the pref, the sentinel was in the decompressed `sessionstore.jsonlz4`. With `browser.privatebrowsing.autostart: true`, it was in no profile file. If the AC-03 check reuses that fixture's profile setup, it goes green even when the send field is a plain textarea that a normal profile would save.
+PROPOSAL: Require a non-private profile for the AC-03 profile search in both engines. Add a positive control: in the same profile and on the viewer origin, type a third sentinel into a plain `textarea`. The check fails as inconclusive unless that sentinel is found.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-03, AC-04, AC-08, AC-09, AC-11 and AC-12; Design, Compatibility
+EVIDENCE: Six Test Plan rows depend on "Viewer page tests" that use "a stubbed `navigator.clipboard` that records calls", an "RFB stub", fired `connect` and `resize` events, "a simulated disconnect and stop", and a GET that returns markup. The viewer page is an inline module script inside a Go string constant that imports `/core/rfb.js` (plugins/remote-gui/internal/proxy/viewer.go:10). Nothing in the repository runs that script today. The only viewer test fetches the page and checks that it embeds no credential (plugins/remote-gui/internal/proxy/proxy_test.go, around lines 385-401). tests/remote-gui/package.json lists only `playwright-core` 1.64.1, with no DOM library. Design, Compatibility says "No module or host dependency is added". A DOM-library harness would add a dependency. A browser-backed harness needs Chromium, so it runs only in CI's REMOTE_GUI_VIEWER_E2E step (.github/workflows/ci.yml lines 112-130). The document does not say which one, which file holds these tests, how the test gets the page out of the Go constant, or whether CI runs them.
+PROPOSAL: Name the harness, its file and its gate. For example, a bun test in tests/remote-gui that gets the page from the built proxy, serves a stub `/core/rfb.js` and drives the page through playwright-core in Chromium, and in Firefox when REMOTE_GUI_FIREFOX is set, under REMOTE_GUI_VIEWER_E2E. Say whether CI runs it.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Clearing on human-to-agent handoff; Test Plan, AC-06
+EVIDENCE: The design says "The handoff takes it to mark a mode switch before it closes Chromium, and again to unmark it after the new browser is ready", and Set is refused "when the request's `expected_mode` differs from the current mode". The handoff can return an error at many points before the new browser is ready: invalid mode, ownership change, marker focus, quit, close timeout, persist, locked profile, launch (plugins/remote-gui/internal/browser/phase.go:98-150), and now Clear. The design does not say whether the mark is cleared on those exits. If it is left set, every Send in `handoff-failed` returns `clipboard-busy`, including after `browser-close-needs-owner`, when human-mode Chromium is still running. The design also does not say where Set reads the "current mode". Today that is `r.current.BrowserMode`, guarded by `r.mu`, which the handoff holds for its whole run (phase.go:95-97). A Set that holds the clipboard mutex and then takes `r.mu` deadlocks against a handoff that holds `r.mu` and waits for the clipboard mutex. Reading it without `r.mu` is a data race under CI's `go test -race`. The AC-06 race test covers only a handoff that succeeds.
+PROPOSAL: State that the clipboard mutex guards both the switch mark and its own copy of the browser mode, that every handoff exit clears the mark, and which mode Set compares against after a failed handoff. Add a failed-handoff case to the AC-06 concurrency test.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria, AC-11; Test Plan, AC-11; Context, Owner summary
+EVIDENCE: The design says "The panel shows the current browser mode, from the latest clipboard response". It defines no polling and no other refresh trigger. The viewer stays connected through a handoff, so no `disconnect` or `connect` event fires (plugins/remote-gui/internal/browser/phase.go:95-152, quit.go:19-29). After a handoff, the panel keeps showing the old mode, and the agent-mode warning stays missing or stays shown, until the next fetch or a refused Send. AC-11 and the summary say the panel "shows whether the human or the agent controls the shared browser", and the AC-11 proof asserts "the mode shown changes after a handoff" without saying what makes it change. The `expected_mode` refusal keeps sends safe, but correct code fails a fixture that asserts the change without a fetch.
+PROPOSAL: Say in AC-11 and the summary that the mode shown is as of the latest clipboard request. Have the AC-11 fixture press **Refresh**, or attempt a Send, after the handoff and before it asserts. Or define a trigger that refreshes the mode.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Scope; Acceptance Criteria, AC-03 and AC-08
+EVIDENCE: The design plans for phone viewers ("including when a phone keyboard resizes the viewport"). The session-restore evidence covers only Chromium 151 and Playwright Firefox (Background, the 2026-11-10 probe), and AC-03 says "Neither viewer browser saves panel text in its profile". A viewer on an iPhone or iPad runs WebKit whatever browser app it is, and nothing measures or names what WebKit saves from the send field. Scope and AC-08 do not say which viewer engines the privacy claim covers.
+PROPOSAL: State in Scope, and require in the README under AC-08, that the session-restore guarantee is verified for Chromium and Firefox viewers only. Alternatively, measure WebKit and add it to AC-03.
 
 ## Sources
 
