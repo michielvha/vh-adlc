@@ -6,6 +6,16 @@ Check the plugin version as well as the host: a successful run on an older versi
 does not establish support for a newer workflow. Installation instructions are in
 [Install vh-adlc](../get-started/installation.md).
 
+## Projects coordinator candidate
+
+The candidate operation requires Git, authenticated `gh`, Bun and explicit project configuration.
+Its Linux checks use native subprocess fixtures for pagination, identity, approvals and partial writes.
+A bounded Linux CLI trial at `9a535ea4ef6778143b440b0bdfc422b46249a3f6` passed actual board inventory,
+issue additions, field updates, repeated operations and conflict refusal. Independent read-back verified
+the results and cleanup. Installed-agent invocation and other host platforms remain unverified.
+See the [Projects reference](../../plugins/vh-adlc/references/projects.md) and
+[feature status](../specs/github-projects-coordinator.md). No unattended authority is included.
+
 ## Shared triage
 
 Shared triage is available from plugin 0.4.0. Both Codex CLI and
@@ -97,7 +107,7 @@ described under [host cleanup](#host-cleanup).
 
 ## Host cleanup
 
-`vh-adlc-clean` needs plugin 0.11.0 and a binary with the `clean` command, installed on the shell's `PATH`
+`vh-adlc-clean` needs plugin 0.13.0 and a binary with the `clean` command, installed on the shell's `PATH`
 as the [installation guide](../get-started/installation.md#host-cleanup) shows. The operation calls that
 binary unverified, so the allow rule can match it. `clean` and `env` run on Linux only, and `clean` needs
 Git 2.45 or newer, above the 2.35 the other commands need.
@@ -131,7 +141,7 @@ claiming that the whole scenario matrix passed.
 | VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Core GUI loop and explicit-model rejection passed; permission-mode caveat recorded separately | [Local GUI run](../../tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
 | Copilot CLI lifecycle intake and agent loop | Unsupported | [Copilot CLI evidence](../../tests/vh-adlc/evidence/copilot-cli/README.md) |
-| `vh-adlc-clean` host cleanup, plugin 0.11.0, Claude Code and Codex on Linux | Unverified until the AC-11 session runs and the AC-12 real-host sequence are recorded | [Host cleanup acceptance](../specs/host-cleanup.md); [AC-11 procedure](../../tests/vh-adlc/evidence/clean/procedure.md); [host cleanup](#host-cleanup) |
+| `vh-adlc-clean` host cleanup, plugin 0.13.0, Claude Code and Codex on Linux | Unverified until the AC-11 session runs and the AC-12 real-host sequence are recorded | [Host cleanup acceptance](../specs/host-cleanup.md); [AC-11 procedure](../../tests/vh-adlc/evidence/clean/procedure.md); [host cleanup](#host-cleanup) |
 | macOS arm64 | Core desktop GUI loop passed; other surfaces and full-matrix limits are listed separately | [Desktop GUI run](../../tests/vh-adlc/evidence/claude-desktop/gui-smoke.md), [binary and fixture checks](../../tests/vh-adlc/evidence/claude-code/S1.host.macos.md) |
 | Structural reviewer isolation | Unsupported: reviews record `procedural` | The reviewer has a shell, which can still write |
 | Choosing a specific reviewer model | Capability-dependent; a mismatch remains pending | A host must be able to pass the requested model and return a matching identity. A silently substituted model or an unavailable selector never counts as a match |

@@ -12,8 +12,8 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has fourteen skills: this entry,
-ten engineering operations, two content operations and one host-cleanup operation. Check
+repository and selects a procedure. The package has fifteen skills: this entry,
+eleven engineering operations, two content operations and one host-cleanup operation. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -42,6 +42,7 @@ see [installation](../get-started/installation.md).
 | --- | --- | --- |
 | Maintenance | `vh-adlc-maintenance` | Sweep dependency/security work, save a report and resume selected repairs under local project rules. |
 | Audit | `vh-adlc-audit` | Inspect recorded findings, reverify them, run a full audit, or repair a selected workstream. |
+| Projects | `vh-adlc-projects` | Inventory a configured cross-repository board and apply an explicitly approved issue/field batch; [setup and limits](../../plugins/vh-adlc/references/projects.md). |
 | Triage | `vh-adlc-triage` | Sweep a backlog, verify a shortlist, propose closures, or inspect stale/explicit issues; apply only approved exact actions. |
 | Investigate | `vh-adlc-investigate` | Measure an issue or failure and report; never fixes. |
 | Spec | `vh-adlc-spec` | Write or revise the feature document. Add `review <path>` for an independent spec review. |
