@@ -274,6 +274,11 @@ function outside(path: string, protectedPaths: string[]): void {
 
 /** Scanner artifacts belong to a private, explicitly selected location outside caller checkouts. */
 export function externalArtifactDirectory(directory: string, sourceRepo: string): string {
+  return artifactDirectoryScope(directory, sourceRepo).directory;
+}
+
+/** Reuse one caller inventory while checking the directory and each referenced artifact. */
+export function artifactDirectoryScope(directory: string, sourceRepo: string) {
   const canonical = realpathSync(directory);
   const stat = lstatSync(directory);
   if (!stat.isDirectory() || stat.isSymbolicLink() || canonical !== directory ||
@@ -281,8 +286,9 @@ export function externalArtifactDirectory(directory: string, sourceRepo: string)
   const worktrees = nulFields(readGit(sourceRepo, "worktree", "list", "--porcelain", "-z"))
     .filter(field => field.subarray(0, 9).equals(Buffer.from("worktree ")))
     .map(field => realpathSync(decodeUTF8(field.subarray(9))));
-  outside(canonical, [...worktrees, realpathSync(gitPath(sourceRepo, "--git-common-dir")), realpathSync(gitPath(sourceRepo, "--git-path", "objects"))]);
-  return canonical;
+  const protectedPaths = [...worktrees, realpathSync(gitPath(sourceRepo, "--git-common-dir")), realpathSync(gitPath(sourceRepo, "--git-path", "objects"))];
+  outside(canonical, protectedPaths);
+  return { directory: canonical, assertExternal(path: string) { outside(path, protectedPaths); } };
 }
 
 /** Record the exact assessment resource before creating or fetching into its new bare store. */

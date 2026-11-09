@@ -3,7 +3,7 @@ import { lstatSync, realpathSync } from "node:fs";
 import { readArtifact, type SealedPlan } from "./journal";
 import { verifyRoleIdentity, type NativeRoleEvidence, type RolePolicy } from "./manifests";
 import { canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
-import { externalArtifactDirectory } from "./snapshot";
+import { artifactDirectoryScope } from "./snapshot";
 
 function fail(reason: string): never { throw Error("docs-drift original evidence " + reason); }
 function object(value: unknown, keys: string[]): Record<string, unknown> {
@@ -14,10 +14,12 @@ function object(value: unknown, keys: string[]): Record<string, unknown> {
   return input;
 }
 
-function readFromRoot(root: string, value: unknown): Buffer {
+function readFromScope(scope: ReturnType<typeof artifactDirectoryScope>, value: unknown): Buffer {
+  const root = scope.directory;
   const reference = object(value, ["path", "sha256"]);
   if (typeof reference.path !== "string" || typeof reference.sha256 !== "string" || !/^[a-f0-9]{64}$/u.test(reference.sha256)) fail("artifact reference");
   const relative = protocolPath(reference.path), path = join(root, relative), owner = process.getuid?.();
+  scope.assertExternal(path);
   if (owner === undefined || realpathSync(path) !== path) fail("linked artifact");
   let parent = dirname(path);
   while (parent !== root) {
@@ -33,9 +35,9 @@ function readFromRoot(root: string, value: unknown): Buffer {
   return bytes;
 }
 
-/** Load the exact referenced bytes from private external storage. This authenticates no execution origin. */
+/** Load the referenced private bytes. The operator checks execution origin separately. */
 export function readBoundArtifact(options: { source_repo: string; artifact_root: string; reference: unknown }): Buffer {
-  return readFromRoot(externalArtifactDirectory(options.artifact_root, options.source_repo), options.reference);
+  return readFromScope(artifactDirectoryScope(options.artifact_root, options.source_repo), options.reference);
 }
 
 /** Read original role records and apply the existing identity protocol. Effect authority is separate. */
@@ -43,9 +45,9 @@ export function readNativeRoleArtifacts(options: {
   source_repo: string; artifact_root: string; references: unknown; binding: SealedPlan["roles"]["worker"]; policy: RolePolicy;
 }): NativeRoleEvidence {
   const references = object(options.references, ["native", "returned", "process"]);
-  const root = externalArtifactDirectory(options.artifact_root, options.source_repo);
-  const native = readFromRoot(root, references.native), returned = readFromRoot(root, references.returned);
-  const processBytes = readFromRoot(root, references.process);
+  const scope = artifactDirectoryScope(options.artifact_root, options.source_repo);
+  const native = readFromScope(scope, references.native), returned = readFromScope(scope, references.returned);
+  const processBytes = readFromScope(scope, references.process);
   let parsed: unknown;
   try {
     parsed = JSON.parse(decodeUTF8(processBytes));

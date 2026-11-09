@@ -1,4 +1,4 @@
-/** Synthetic original-artifact controls. These fixtures establish no native model execution. */
+/** Synthetic original-artifact controls for the file and model-metadata parsers. */
 import { afterAll, expect, test } from "bun:test";
 import { chmodSync, linkSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -8,6 +8,7 @@ import { sealPlan } from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import { validateReviewedManifest } from "../../../plugins/vh-adlc/scripts/docs-drift/manifests";
 import { publicationFixture } from "./publication-fixture";
 import { fixture, role } from "./manifest-fixture";
+import { git } from "./repository-fixture";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -37,6 +38,15 @@ test("bound evidence preserves literal nested artifact paths and bytes", () => {
   mkdirSync(join(f.artifacts, "private"), { mode: 0o700 });
   const reference = f.retain("private/literal\\name\nΣ", bytes);
   expect(readBoundArtifact({ ...f.options, reference })).toEqual(bytes);
+});
+
+test.each(["caller", "linked-peer"])("an ancestor artifact directory cannot supply a file from the %s checkout", location => {
+  const f = inputs(), directory = location === "caller" ? f.repo : join(f.root, "peer");
+  if (location === "linked-peer") { git(f.repo, "worktree", "add", "--detach", directory, "HEAD"); chmodSync(directory, 0o700); }
+  const path = join(directory, "private-proof.json");
+  writeFileSync(path, f.reviewed.worker.native, { mode: 0o600 });
+  const reference = { path: (location === "caller" ? "source" : "peer") + "/private-proof.json", sha256: sha256(f.reviewed.worker.native) };
+  expect(() => readBoundArtifact({ ...f.options, artifact_root: f.root, reference })).toThrow("owned resource overlaps");
 });
 
 test.each(["changed-native", "changed-returned", "incomplete-process", "wrong-model", "extra-field", "inline-process"] as const)("normal role evidence refuses %s", scenario => {

@@ -7,7 +7,7 @@ import type { ScanAssessment } from "./scan";
 import type { Settings } from "./settings";
 
 type Quote = { path: string; sha256: string; start: number; end: number; quote_sha256: string };
-type Edit = { id: string; path: string; action: "replace" | "create" | "delete" | "chmod"; start: number; end: number;
+export type Edit = { id: string; path: string; action: "replace" | "create" | "delete" | "chmod"; start: number; end: number;
   before_sha256: string | null; replacement_base64: string; after_mode: "100644" | "100755" | null };
 type Feedback = {
   cause: "detector" | "interpretation"; channel: "suppression" | "correction-history";
@@ -75,7 +75,7 @@ function quote(value: unknown): Quote {
   if (result.start >= result.end) fail("empty evidence quote");
   return result;
 }
-function edit(value: unknown): Edit {
+export function parseEdit(value: unknown): Edit {
   const input = object(value, ["id", "path", "action", "start", "end", "before_sha256", "replacement_base64", "after_mode"]);
   if (typeof input.replacement_base64 !== "string" || Buffer.from(input.replacement_base64, "base64").toString("base64") !== input.replacement_base64) fail("base64 edit");
   return { id: text(input.id), path: protocolPath(input.path), action: choice(input.action, ["replace", "create", "delete", "chmod"]),
@@ -124,16 +124,16 @@ function overlap(left: Edit, right: Edit): boolean {
   return left.start < right.end && left.end > right.start;
 }
 
-function changesFor(edits: Edit[], collection: ResolutionCollection): ResolutionChange[] {
+export function collectEditChanges(edits: Edit[], snapshot: Snapshot): ResolutionChange[] {
   const result: ResolutionChange[] = [], grouped = new Map<string, Edit[]>();
   for (const item of edits) grouped.set(item.path, [...grouped.get(item.path) ?? [], item]);
   for (const [path, group] of grouped) {
-    const source = collection.snapshot.blobs.find(blob => blob.path === path);
+    const source = snapshot.blobs.find(blob => blob.path === path);
     const before = source?.bytes ?? Buffer.alloc(0), beforeHash = source ? sha256(before) : null;
     const modes = new Set(group.map(item => item.after_mode));
     if (modes.size !== 1 || group.some(item => item.before_sha256 !== beforeHash || item.start > item.end || item.end > before.length)) fail("edit preimage or mode");
     for (const [index, item] of group.entries()) {
-      if (!collection.snapshot.settings.roots.some(root => withinPrefix(path, root)) && !collection.snapshot.settings.feedback_files.includes(path)) fail("correction path outside selected documentation");
+      if (!snapshot.settings.roots.some(root => withinPrefix(path, root)) && !snapshot.settings.feedback_files.includes(path)) fail("correction path outside selected documentation");
       if (group.slice(index + 1).some(other => overlap(item, other))) fail("conflicting selected edits");
       if (item.action === "create" ? source !== undefined || item.start !== 0 || item.end !== 0 || item.after_mode === null
         : source === undefined) fail("edit existence");
@@ -217,7 +217,7 @@ export async function buildResolution(options: ResolutionOptions): Promise<Resol
     const current = recheckResolutionInputs(options.inputs, options.collection);
     if (!current.fresh || !options.scan.complete || snapshot.blobs.some(blob => blob.path === path)) fail("current complete collection or new record path");
     if (!Array.isArray(options.decisions) || !Array.isArray(options.edits) || !Array.isArray(options.carry_decisions)) fail("selection arrays");
-    const decisions = options.decisions.map(decision), rawEdits = options.edits.map(edit), carries = options.carry_decisions.map(carry);
+    const decisions = options.decisions.map(decision), rawEdits = options.edits.map(parseEdit), carries = options.carry_decisions.map(carry);
     const edits = new Map(rawEdits.map(item => [item.id, item]));
     if (edits.size !== rawEdits.length) fail("duplicate edit ID");
     const units = new Map<string, ResolutionHunk | null>(options.inputs.proposals.flatMap<readonly [string, ResolutionHunk | null]>(proposal => proposal.hunks.length
@@ -251,7 +251,7 @@ export async function buildResolution(options: ResolutionOptions): Promise<Resol
       if (!unique.has(digest)) unique.set(digest, item);
     }
     const selectedEdits = [...unique.values()];
-    const changes = changesFor(selectedEdits, options.collection);
+    const changes = collectEditChanges(selectedEdits, snapshot);
     const protection = evaluateProtection(snapshot.repo, snapshot, selectedEdits.map(item => ({ path: item.path, start: item.start,
       end: item.end, before_sha256: item.before_sha256, action: item.action, after_mode: item.after_mode, replacement: Buffer.from(item.replacement_base64, "base64") })), options.protection_context);
     if (!protection.complete || protection.edits.some(item => !item.allowed)) fail("protected correction");

@@ -10,6 +10,9 @@ import { readNativeContext } from "./transport";
 import { prepareTrialFixture } from "./trial-setup";
 import { selectApprovedRuntime, selectCandidateRuntime } from "./bootstrap";
 import { collectProposals } from "./proposals";
+import { inspectPreparation, prepareEdits } from "./preparation";
+import { readBoundArtifact } from "./evidence-input";
+import { canonicalJSON, decodeUTF8 } from "./protocol";
 
 type Diagnostic = { code: string; message: string };
 export type CLIReport = {
@@ -20,6 +23,8 @@ export type CLIReport = {
   preparation?: ReturnType<typeof prepareTrialFixture>;
   runtime?: Awaited<ReturnType<typeof selectApprovedRuntime> | ReturnType<typeof selectCandidateRuntime>>;
   proposals?: ReturnType<typeof collectProposals>;
+  edit_inspection?: ReturnType<typeof inspectPreparation>;
+  prepared?: Awaited<ReturnType<typeof prepareEdits>>;
 };
 const usage = `Documentation drift helper protocol 1
 bun <plugin>/scripts/docs-drift/cli.ts scan --repo <repo> --source <full-commit>
@@ -36,6 +41,12 @@ bun <plugin>/scripts/docs-drift/cli.ts inspect-runtime --repo <repo>
   [--trial-definition <sha256>]
 bun <plugin>/scripts/docs-drift/cli.ts collect-proposals --repo <repo>
   --source <full-current-default-commit>
+bun <plugin>/scripts/docs-drift/cli.ts check-edits --repo <repo> --source <full-commit>
+  --artifact-root <private-external-directory> --selection <relative-packet-path>
+  --selection-sha256 <sha256>
+bun <plugin>/scripts/docs-drift/cli.ts prepare --repo <repo> --source <full-commit>
+  --artifact-root <private-external-directory> --selection <relative-packet-path>
+  --selection-sha256 <sha256>
 
 Prepare the locked verified binary and required knowledge before invoking this
 helper. The scanner reads the selected committed configuration and runs in its
@@ -52,15 +63,21 @@ It imports the committed synthetic fixture into a new owned directory.
 Runtime inspection verifies the approved retained selection, or the candidate
 bound by trial-definition. Actual model invocation and effect grants are separate.
 Proposal collection reads the configured shared and legacy PR inventory.
+Edit checks compute postimages and feature-protection decisions. Semantic
+verification, applying changes and publication have their own lifecycle steps.
+Prepare requires the selected run's local-edit authority. It scans the committed
+source, creates an owned preparation copy and applies the selected postimages.
+The later checkpoint, verification, review and publication steps have their own gates.
 `;
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals"].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = command === "scan" || command === "prepare-trial-fixture";
+  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare"].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare"].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
+  if (command === "check-edits" || command === "prepare") flags.push("--selection", "--selection-sha256");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const flag = argv[index], value = argv[index + 1];
@@ -73,7 +90,8 @@ function argumentsForCommand(argv: string[]) {
   if (!repo || !source || (needsArtifacts && !artifacts)) throw Error(command + " requires " + flags.join(", "));
   if (!/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(source)) throw Error(command + " requires a full immutable source commit");
   return { command, repo, source, artifacts, cache: values.get("--cache-root"), entry: values.get("--entry"),
-    launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition") };
+    launcher: values.get("--launcher"), settings: values.get("--settings"), definition: values.get("--trial-definition"),
+    selection: values.get("--selection"), selection_sha256: values.get("--selection-sha256") };
 }
 
 function nativeContext(repo: string, source: string) {
@@ -98,7 +116,25 @@ export async function main(argv: string[]): Promise<number> {
   let report: CLIReport;
   try {
     const options = argumentsForCommand(argv), repo = realpathSync(options.repo);
-    if (options.command === "trial-bindings") {
+    if (options.command === "check-edits" || options.command === "prepare") {
+      const artifacts = privateArtifacts(options.artifacts, repo);
+      const bytes = readBoundArtifact({ source_repo: repo, artifact_root: artifacts.root,
+        reference: { path: options.selection, sha256: options.selection_sha256 } });
+      let selection: unknown;
+      try {
+        selection = JSON.parse(decodeUTF8(bytes));
+        if (!canonicalJSON(selection).equals(bytes)) throw Error("noncanonical edit selection");
+      } catch { throw Error("invalid canonical edit selection JSON"); }
+      if (options.command === "prepare") {
+        const prepared = await prepareEdits({ repo, source: options.source, selection, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
+        report = { schema_version: 1, command: options.command, outcome: prepared.state === "incomplete" ? "incomplete" : "collected",
+          source_commit: options.source, diagnostics: prepared.diagnostics.map(message => ({ code: "preparation", message })), prepared };
+      } else {
+        const edit_inspection = inspectPreparation({ repo, source: options.source, selection });
+        report = { schema_version: 1, command: options.command, outcome: edit_inspection.complete ? "collected" : "incomplete",
+          source_commit: options.source, diagnostics: edit_inspection.diagnostics.map(message => ({ code: "edit-inspection", message })), edit_inspection };
+      }
+    } else if (options.command === "trial-bindings") {
       const trial = collectTrialBindings({ repo, current_default: options.source });
       report = { schema_version: 1, command: options.command, outcome: "collected", source_commit: options.source, diagnostics: [], trial };
     } else if (options.command === "check-upgrade-signals") {

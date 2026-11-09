@@ -4,11 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureRepositoryState } from "../../../plugins/vh-adlc/scripts/docs-drift/snapshot";
 import type { CLIReport } from "../../../plugins/vh-adlc/scripts/docs-drift/cli";
-import { populateRepository, put } from "./repository-fixture";
+import { commitAll, populateRepository, put } from "./repository-fixture";
 import { source, pin, write, commit, portableRecord, deliverRecord } from "./adoption-fixture";
 import { trialDefinitionFixture } from "./trial-definition-fixture";
 import { runtimeFixture } from "./runtime-fixture";
-import { canonicalJSON } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
+import { canonicalJSON, sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
 
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
@@ -216,6 +216,57 @@ test("the normal CLI scans the selected committed source and preserves dirty cal
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
+test.each(["matching", "wrong-preimage"])("normal edit checks preserve caller work for %s", scenario => {
+  const f = fixture(), replacement = Buffer.from("# Corrected guide\n");
+  const packet = canonicalJSON({ schema_version: 1, source_commit: f.commit, edits: [{ id: "guide-fix", path: "docs/guide.md", action: "replace",
+    start: 0, end: Buffer.byteLength("# Guide\n"), before_sha256: scenario === "matching" ? sha256(Buffer.from("# Guide\n")) : "0".repeat(64),
+    replacement_base64: replacement.toString("base64"), after_mode: "100644" }] });
+  writeFileSync(join(f.artifacts, "edits.json"), packet, { mode: 0o600 });
+  put(f.repo, "docs/guide.md", "Other writer's uncommitted guide\n");
+  const before = captureRepositoryState(f.repo);
+  const { result, report } = invoke(["check-edits", "--repo", f.repo, "--source", f.commit, "--artifact-root", f.artifacts,
+    "--selection", "edits.json", "--selection-sha256", sha256(packet)]);
+  expect(result.exitCode).toBe(scenario === "matching" ? 0 : 2);
+  expect(report.edit_inspection).toMatchObject({ authority: "none", complete: scenario === "matching" });
+  if (scenario === "matching") expect(report.edit_inspection?.changes).toMatchObject([{ path: "docs/guide.md", after_sha256: sha256(replacement) }]);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
+test("normal preparation applies the selected edit in its owned uncommitted source", () => {
+  const f = fixture(), replacement = Buffer.from("# Prepared guide\n");
+  const packet = canonicalJSON({ schema_version: 1, source_commit: f.commit, edits: [{ id: "guide-fix", path: "docs/guide.md", action: "replace",
+    start: 0, end: Buffer.byteLength("# Guide\n"), before_sha256: sha256(Buffer.from("# Guide\n")),
+    replacement_base64: replacement.toString("base64"), after_mode: "100644" }] });
+  writeFileSync(join(f.artifacts, "edits.json"), packet, { mode: 0o600 });
+  put(f.repo, "docs/guide.md", "Other writer's draft\n");
+  const before = captureRepositoryState(f.repo);
+  const { result, report } = invoke(["prepare", "--repo", f.repo, "--source", f.commit, "--artifact-root", f.artifacts,
+    "--selection", "edits.json", "--selection-sha256", sha256(packet)]);
+  expect(result.exitCode).toBe(0);
+  expect(report.prepared).toMatchObject({ state: "prepared-uncommitted", source_commit: f.commit });
+  if (!report.prepared?.checkout) throw Error("missing owned preparation source");
+  expect(report.prepared.checkout.startsWith(f.artifacts + "/")).toBe(true);
+  expect(readFileSync(join(report.prepared.checkout, "docs/guide.md"))).toEqual(replacement);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
+test.each(["digest", "noncanonical", "source", "authority-field", "escape", "symlink", "different-head"])("normal edit checks refuse %s input", scenario => {
+  const f = fixture(), selection = { schema_version: 1, source_commit: scenario === "source" ? "0".repeat(40) : f.commit, edits: [] };
+  if (scenario === "authority-field") Object.assign(selection, { approved: true });
+  const packet = scenario === "noncanonical" ? Buffer.from(JSON.stringify(selection, null, 2)) : canonicalJSON(selection);
+  writeFileSync(join(f.artifacts, "edits.json"), packet, { mode: 0o600 });
+  if (scenario === "symlink") symlinkSync("edits.json", join(f.artifacts, "alias.json"));
+  if (scenario === "different-head") { put(f.repo, "docs/guide.md", "Another committed guide\n"); commitAll(f.repo); }
+  const before = captureRepositoryState(f.repo);
+  const { result, report } = invoke(["check-edits", "--repo", f.repo, "--source", f.commit, "--artifact-root", f.artifacts,
+    "--selection", scenario === "escape" ? "../edits.json" : scenario === "symlink" ? "alias.json" : "edits.json",
+    "--selection-sha256", scenario === "digest" ? "0".repeat(64) : sha256(packet)]);
+  expect(result.exitCode).toBe(2);
+  expect(report.outcome).toBe("incomplete");
+  expect(report.diagnostics.length).toBeGreaterThan(0);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});
+
 test("the normal CLI retains incomplete collection and valid finding neighbors", () => {
   const f = fixture("mixed-findings");
   const { result, report } = invoke(["scan", "--repo", f.repo, "--source", f.commit, "--artifact-root", f.artifacts]);
@@ -237,7 +288,7 @@ test.each([
   expect(report.diagnostics.length).toBeGreaterThan(0);
 });
 
-test.each(["scan", "prepare-trial-fixture"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
+test.each(["scan", "prepare-trial-fixture", "check-edits"].flatMap(command => ["caller", "shared", "symlink"].map(kind => [command, kind])))("command %s refuses artifact root %s", (command, kind) => {
   const f = fixture(), before = captureRepositoryState(f.repo), native = nativeReader({ ...f, candidate: f.commit });
   let artifacts = kind === "caller" ? f.repo : f.artifacts;
   if (kind === "shared") chmodSync(artifacts, 0o755);
