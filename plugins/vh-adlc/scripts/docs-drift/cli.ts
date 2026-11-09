@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+import { collectCandidateReview } from "./candidate-review";
+import { collectReviewTarget } from "./review-target";
 import { randomUUID } from "node:crypto";
 import { lstatSync, realpathSync, writeSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -34,6 +36,8 @@ export type CLIReport = {
   edit_inspection?: ReturnType<typeof inspectPreparation>;
   worker_preparation?: Awaited<ReturnType<typeof collectWorkerPreparation>>;
   worker_inputs?: Awaited<ReturnType<typeof collectWorkerInputs>>;
+  candidate_review?: Awaited<ReturnType<typeof collectCandidateReview>>;
+  review_target?: Awaited<ReturnType<typeof collectReviewTarget>>;
   publication_bindings?: Awaited<ReturnType<typeof collectPublicationBindings>>;
   publication_inputs?: Awaited<ReturnType<typeof collectPublicationInputs>>;
   verification?: Awaited<ReturnType<typeof verifyCandidate>>;
@@ -87,6 +91,27 @@ bun <plugin>/scripts/docs-drift/cli.ts bind-publication --repo <assessment-repo>
   --source-verification <relative-record-path> --source-verification-sha256 <sha256>
   --candidate-verification <relative-record-path> --candidate-verification-sha256 <sha256>
   --decisions <relative-packet-path> --decisions-sha256 <sha256>
+  [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
+bun <plugin>/scripts/docs-drift/cli.ts collect-review-target --repo <assessment-repo> --source <full-commit>
+  --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
+  --artifact-root <private-external-directory> --selection <relative-packet-path>
+  --selection-sha256 <sha256> --cache-root <retained-cache>
+  --entry <hosted|copilot|claude> --launcher <invoked-launcher> --settings <invoked-settings>
+  --source-verification <relative-record-path> --source-verification-sha256 <sha256>
+  --candidate-verification <relative-record-path> --candidate-verification-sha256 <sha256>
+  --decisions <relative-packet-path> --decisions-sha256 <sha256>
+  --worker-capture <relative-original-capture-path> --worker-capture-sha256 <sha256>
+  [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
+bun <plugin>/scripts/docs-drift/cli.ts read-candidate-review --repo <assessment-repo> --source <full-commit>
+  --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
+  --artifact-root <private-external-directory> --selection <relative-packet-path>
+  --selection-sha256 <sha256> --cache-root <retained-cache>
+  --entry <hosted|copilot|claude> --launcher <invoked-launcher> --settings <invoked-settings>
+  --source-verification <relative-record-path> --source-verification-sha256 <sha256>
+  --candidate-verification <relative-record-path> --candidate-verification-sha256 <sha256>
+  --decisions <relative-packet-path> --decisions-sha256 <sha256>
+  --worker-capture <relative-original-capture-path> --worker-capture-sha256 <sha256>
+  --reviewer-capture <relative-original-capture-path> --reviewer-capture-sha256 <sha256>
   [--resolution-record <repo-relative-path> --resolution-sha256 <sha256>]
 bun <plugin>/scripts/docs-drift/cli.ts check-verification --repo <assessment-repo> --source <full-commit>
   --candidate-repo <candidate-repo> --candidate <full-checkpoint-commit>
@@ -163,6 +188,9 @@ current native proposals and the decision packet before deriving review bindings
 Source assessment retains the complete original scan without running baseline checks.
 Existing passing baseline verification records remain readable. Candidate checks
 must pass on the selected repaired checkpoint.
+Review-target collection materializes the original worker proposal and exact candidate
+into its independent review target. Reading candidate review reloads the original
+independent reviewer capture at that target. Both commands supply authority none.
 Bindings have authority none. Original role evidence, current required observations and actual effect grants
 follow in the controller. This collection has authority none.
 Verification, review and publication follow their own fresh owned-checkout gates.
@@ -170,18 +198,19 @@ Verification, review and publication follow their own fresh owned-checkout gates
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "assess-source", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "assess-source", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command);
+  if (!["scan", "assess-source", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication", "collect-review-target", "read-candidate-review"].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "assess-source", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication", "collect-review-target", "read-candidate-review"].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
-  if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) flags.push("--selection", "--selection-sha256");
-  if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
+  if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication", "collect-review-target", "read-candidate-review"].includes(command)) flags.push("--selection", "--selection-sha256");
+  if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication", "collect-review-target", "read-candidate-review"].includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
   if (command === "check-verification") flags.push("--verification", "--verification-sha256");
-  if (["collect-publication-inputs", "bind-publication", "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
-  if (command === "read-worker-preparation") flags.push("--worker-capture", "--worker-capture-sha256");
+  if (["collect-publication-inputs", "bind-publication", "collect-review-target", "read-candidate-review", "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
+  if (["read-worker-preparation", "collect-review-target", "read-candidate-review"].includes(command)) flags.push("--worker-capture", "--worker-capture-sha256");
   if (["collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256");
-  if (command === "bind-publication") flags.push("--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256");
+  if (["bind-publication", "collect-review-target", "read-candidate-review"].includes(command)) flags.push("--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256");
+  if (command === "read-candidate-review") flags.push("--reviewer-capture", "--reviewer-capture-sha256");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const flag = argv[index], value = argv[index + 1];
@@ -197,6 +226,8 @@ function argumentsForCommand(argv: string[]) {
     "check-verification": ["--verification", "--verification-sha256"],
     "collect-worker-inputs": ["--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256"],
     "read-worker-preparation": ["--source-verification", "--source-verification-sha256", "--decisions", "--decisions-sha256", "--worker-capture", "--worker-capture-sha256"],
+    "read-candidate-review": ["--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256", "--worker-capture", "--worker-capture-sha256", "--reviewer-capture", "--reviewer-capture-sha256"],
+    "collect-review-target": ["--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256", "--worker-capture", "--worker-capture-sha256"],
     "bind-publication": ["--source-verification", "--source-verification-sha256", "--candidate-verification", "--candidate-verification-sha256", "--decisions", "--decisions-sha256"],
   };
   const missing = (requiredReferences[command] ?? []).filter(flag => !values.has(flag));
@@ -207,6 +238,7 @@ function argumentsForCommand(argv: string[]) {
     source_verification: values.get("--source-verification"), source_verification_sha256: values.get("--source-verification-sha256"),
     candidate_verification: values.get("--candidate-verification"), candidate_verification_sha256: values.get("--candidate-verification-sha256"),
     decisions: values.get("--decisions"), decisions_sha256: values.get("--decisions-sha256"),
+    reviewer_capture: values.get("--reviewer-capture"), reviewer_capture_sha256: values.get("--reviewer-capture-sha256"),
     worker_capture: values.get("--worker-capture"), worker_capture_sha256: values.get("--worker-capture-sha256") };
 }
 
@@ -247,10 +279,10 @@ export async function main(argv: string[]): Promise<number> {
   let report: CLIReport;
   try {
     const options = argumentsForCommand(argv), repo = realpathSync(options.repo);
-    if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(options.command)) {
+    if (["check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication", "collect-review-target", "read-candidate-review"].includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo);
       let candidate: { repo: string; commit: string } | null = null;
-      if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(options.command)) {
+      if (["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication", "collect-review-target", "read-candidate-review"].includes(options.command)) {
         if (!options.candidate_repo || !options.candidate) throw Error("candidate inspection requires candidate-repo and candidate");
         candidate = { repo: realpathSync(options.candidate_repo), commit: options.candidate };
         artifactDirectoryScope(artifacts.root, candidate.repo).assertExternal(join(artifacts.root, protocolPath(options.selection)));
@@ -266,7 +298,7 @@ export async function main(argv: string[]): Promise<number> {
         if ((options.resolution_record === undefined) !== (options.resolution_sha256 === undefined)) throw Error("resolution record path and digest are required together");
         const resolution = options.resolution_record !== undefined && options.resolution_sha256 !== undefined
           ? { path: options.resolution_record, sha256: options.resolution_sha256 } : undefined;
-        if (["collect-publication-inputs", "bind-publication"].includes(options.command)) {
+        if (["collect-publication-inputs", "bind-publication", "collect-review-target", "read-candidate-review"].includes(options.command)) {
           const entry = options.entry;
           if ((entry !== "hosted" && entry !== "copilot" && entry !== "claude") || !options.cache || !options.launcher || !options.settings)
             throw Error("publication input collection requires cache-root, entry, launcher and settings");
@@ -274,7 +306,24 @@ export async function main(argv: string[]): Promise<number> {
           const input: Parameters<typeof collectPublicationInputs>[0] = { repo, source: options.source, selection, candidate_repo: candidate.repo, candidate: candidate.commit,
             resolution_record: resolution, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(), credential: nativeCredential(settings.hostname),
             cache_directory: resolve(options.cache), entry, launcher_path: resolve(options.launcher), settings_path: resolve(options.settings) };
-          if (options.command === "bind-publication") {
+          if (options.command === "read-candidate-review") {
+            const candidate_review = await collectCandidateReview({ ...input,
+              source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
+              candidate_verification: { path: options.candidate_verification, sha256: options.candidate_verification_sha256 },
+              decisions: { path: options.decisions, sha256: options.decisions_sha256 },
+              worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 },
+              reviewer_capture: { path: options.reviewer_capture, sha256: options.reviewer_capture_sha256 } });
+            report = { schema_version: 1, command: options.command, outcome: candidate_review.complete ? "collected" : "incomplete",
+              source_commit: options.source, candidate_review, diagnostics: candidate_review.diagnostics.map(message => ({ code: "candidate-review", message })) };
+          } else if (options.command === "collect-review-target") {
+            const review_target = await collectReviewTarget({ ...input,
+              source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
+              candidate_verification: { path: options.candidate_verification, sha256: options.candidate_verification_sha256 },
+              decisions: { path: options.decisions, sha256: options.decisions_sha256 },
+              worker_capture: { path: options.worker_capture, sha256: options.worker_capture_sha256 } });
+            report = { schema_version: 1, command: options.command, outcome: review_target.complete ? "collected" : "incomplete",
+              source_commit: options.source, review_target, diagnostics: review_target.diagnostics.map(message => ({ code: "review-target", message })) };
+          } else if (options.command === "bind-publication") {
             const publication_bindings = await collectPublicationBindings({ ...input,
               source_verification: { path: options.source_verification, sha256: options.source_verification_sha256 },
               candidate_verification: { path: options.candidate_verification, sha256: options.candidate_verification_sha256 },

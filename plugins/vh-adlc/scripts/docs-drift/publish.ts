@@ -19,7 +19,7 @@ function fail(reason: string): never { throw Error(`docs-drift publication ${rea
 
 export class PublicationScopeChanged extends Error {}
 
-export function validatePublicationShape(plan: SealedPlan, settings: Settings, draft: boolean): void {
+export function validatePublicationShape(plan: Pick<SealedPlan, "manifest" | "context" | "publication_kind">, settings: Settings, draft: boolean): void {
   const { manifest } = plan;
   if (plan.context === "production" ? draft !== (settings.publication.pr_state[plan.publication_kind] === "draft") : draft !== true) fail("declared production or trial draft policy");
   if (manifest.repository !== settings.repository || manifest.actor !== settings.publication.actor) fail("selected repository or actor");

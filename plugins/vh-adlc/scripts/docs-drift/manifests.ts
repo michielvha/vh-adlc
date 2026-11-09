@@ -307,14 +307,13 @@ export function requireReviewedManifest(value: ReviewedManifest): void {
   if (!reviewedInstances.has(value)) invalid("missing owned review result");
 }
 
-export function validateReviewedManifest(input: {
-  manifest: unknown; current: ActionManifest; grants: EffectGrant[];
+export function verifyReviewEvidence(input: {
+  manifest: unknown; current: ActionManifest;
   worker: NativeRoleEvidence; reviewer: NativeRoleEvidence; policy: { worker: RolePolicy; reviewer: RolePolicy };
 }) {
   const manifest = parseActionManifest(input.manifest);
   const hash = manifestDigest(manifest);
   if (hash !== manifestDigest(input.current)) invalid("changed current bindings or payload");
-  authorizeEffects(manifest, input.grants);
   const worker = verifyRoleIdentity(input.worker, input.policy.worker);
   const reviewer = verifyRoleIdentity(input.reviewer, input.policy.reviewer);
   if (worker.invocation_id === reviewer.invocation_id || worker.context_id === reviewer.context_id) invalid("independent review context");
@@ -327,7 +326,14 @@ export function validateReviewedManifest(input: {
   // The wrapper validates/stages the bounded edit manifest. Its unchanged original bytes are bound
   // above and reviewed together with the resulting checkpoint and complete publication payload.
   cleanReview(reviewer.records);
-  const result = freezeJSON({ manifest, manifest_sha256: hash, worker, reviewer });
+  return freezeJSON({ manifest, manifest_sha256: hash, worker, reviewer });
+}
+
+/** Only the effect-authorized result can enter the journal's sealed-plan path. */
+export function validateReviewedManifest(input: Parameters<typeof verifyReviewEvidence>[0] & { grants: EffectGrant[] }) {
+  const manifest = parseActionManifest(input.manifest);
+  authorizeEffects(manifest, input.grants);
+  const result = verifyReviewEvidence(input);
   reviewedInstances.add(result);
   return result;
 }

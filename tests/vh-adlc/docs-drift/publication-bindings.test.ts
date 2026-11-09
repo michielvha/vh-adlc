@@ -467,3 +467,91 @@ test.each(["legacy", "scan-only"])("worker input rechecks reuse their original a
   expect(second.diagnostics).toEqual([]); expect(second.facts?.store?.root).toBe(store.root);
   expect(inventory()).toEqual(before); expect(second.worker_input_sha256).toBe(first.worker_input_sha256);
 }, 60000);
+
+test.each(["matching", "cli", "changed-selection", "missing-proposal", "foreign-branch", "reviewer", "stale-reviewer", "same-reviewer-context", "findings-reviewer", "reviewer-cli"])("candidate review target retains the original author %s", async scenario => {
+  const { collectReviewTarget } = await import("../../../plugins/vh-adlc/scripts/docs-drift/review-target");
+  const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+  const { roleRuntimeDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-capture");
+  const { evidence, role } = await import("./manifest-fixture");
+  const { verifyRoleIdentity, manifestDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
+  let captured: { path: string; sha256: string } | null = null;
+  const f = await fixture(false, { role: { model: "opus", native_model: role.adopted_model, identity_source: role.identity_source }, beforeCandidate: async input => {
+    const current = await collectWorkerInputs(input.worker_options);
+    expect(current.complete, JSON.stringify(current.diagnostics)).toBe(true);
+    const edits = structuredClone((input.selection as { edits: unknown[] }).edits);
+    if (scenario === "changed-selection") (edits[0] as { id: string }).id = "another-worker-edit";
+    const publication = scenario === "missing-proposal" ? null : { operation_id: "original-operation", proposal: { kind: "pr-create", payload: {
+      base: "main", branch: scenario === "foreign-branch" ? "foreign/branch" : "docs-drift/original-operation", title: "Repair guide", body: "Reviewed source correction\n", labels: ["documentation"], draft: false } } };
+    const original = evidence("pre-candidate-author", current.worker_input_sha256!, canonicalJSON({ input_sha256: current.worker_input_sha256!, edits, publication }).toString());
+    const { records: _records, ...binding } = verifyRoleIdentity(original, role);
+    const retain = (name: string, bytes: Uint8Array) => { writeFileSync(join(input.artifacts, name), bytes, { mode: 0o600 }); return { path: name, sha256: sha256(bytes) }; };
+    const launch = { schema_version: 1, kind: "docs-drift-role-launch", role: "worker", invocation_id: original.invocation_id, context_id: original.context_id,
+      source_commit: input.source, runtime_sha256: roleRuntimeDigest(current.facts!.runtime!, "worker"), target_sha256: original.target_sha256, pid: original.process.pid };
+    captured = retain("review-author-capture.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-role-capture", role: "worker", source_commit: input.source,
+      runtime_sha256: launch.runtime_sha256, launch: retain("review-author-launch.json", canonicalJSON(launch)), binding, artifacts: {
+        native: retain("review-author-native.jsonl", original.native), returned: retain("review-author-returned.txt", original.returned), process: retain("review-author-process.json", canonicalJSON(original.process)) } }));
+  } });
+  const before = captureRepositoryState(f.repo), candidateBefore = captureRepositoryState(f.candidate);
+  const invokeReview = (command: string, extra: string[] = []) => {
+    if (!captured) throw Error("missing review-target author fixture");
+    const reference = captured as { path: string; sha256: string }, selection = canonicalJSON(f.selection), options = f.options;
+    writeFileSync(join(f.artifacts, "review-selection.json"), selection, { mode: 0o600 });
+    const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts");
+    const outcome = Bun.spawnSync([process.execPath, entry, command, "--repo", f.repo, "--source", f.source,
+      "--candidate-repo", f.candidate, "--candidate", f.head, "--artifact-root", f.artifacts, "--selection", "review-selection.json", "--selection-sha256", sha256(selection),
+      "--cache-root", options.cache_directory, "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path,
+      "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
+      "--candidate-verification", options.candidate_verification.path, "--candidate-verification-sha256", options.candidate_verification.sha256,
+      "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256,
+      "--worker-capture", reference.path, "--worker-capture-sha256", reference.sha256, ...extra], { env: f.native.environment, stdout: "pipe", stderr: "pipe", timeout: 60000 });
+    const report = JSON.parse(outcome.stdout.toString());
+    expect(outcome.exitCode, JSON.stringify(report.diagnostics) + outcome.stderr.toString()).toBe(0);
+    return report;
+  };
+  let result: Awaited<ReturnType<typeof collectReviewTarget>>;
+  if (scenario === "cli") result = invokeReview("collect-review-target").review_target;
+  else result = await collectReviewTarget({ ...f.options, worker_capture: captured });
+  if (["reviewer", "reviewer-cli", "stale-reviewer", "same-reviewer-context", "findings-reviewer"].includes(scenario)) {
+    expect(result.complete, JSON.stringify(result.diagnostics)).toBe(true);
+    const { collectCandidateReview } = await import("../../../plugins/vh-adlc/scripts/docs-drift/candidate-review");
+    const reviewer = evidence("candidate-reviewer", scenario === "stale-reviewer" ? sha256(Buffer.from("old candidate")) : result.manifest_sha256!,
+      scenario === "findings-reviewer" ? "FINDING: F-01\nKIND: factual\nSEVERITY: should-fix\nWHERE: candidate\nEVIDENCE: incomplete correction\nPROPOSAL: repair\n" : "NO FINDINGS\n");
+    if (scenario === "same-reviewer-context") reviewer.context_id = result.manifest!.worker.invocation_id + "-context";
+    const { records: _records, ...binding } = verifyRoleIdentity(reviewer, role);
+    const retain = (name: string, bytes: Uint8Array) => { writeFileSync(join(f.artifacts, name), bytes, { mode: 0o600 }); return { path: name, sha256: sha256(bytes) }; };
+    const launch = { schema_version: 1, kind: "docs-drift-role-launch", role: "reviewer", source_commit: f.source, runtime_sha256: result.reviewer_runtime_sha256,
+      target_sha256: reviewer.target_sha256, invocation_id: reviewer.invocation_id, context_id: reviewer.context_id, pid: reviewer.process.pid };
+    const reviewerCapture = retain("candidate-reviewer-capture.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-role-capture", role: "reviewer", source_commit: f.source,
+      runtime_sha256: launch.runtime_sha256, launch: retain("candidate-reviewer-launch.json", canonicalJSON(launch)), binding, artifacts: {
+        native: retain("candidate-reviewer-native.jsonl", reviewer.native), returned: retain("candidate-reviewer-returned.txt", reviewer.returned), process: retain("candidate-reviewer-process.json", canonicalJSON(reviewer.process)) } }));
+    const reviewed: Awaited<ReturnType<typeof collectCandidateReview>> = scenario === "reviewer-cli"
+      ? invokeReview("read-candidate-review", ["--reviewer-capture", reviewerCapture.path, "--reviewer-capture-sha256", reviewerCapture.sha256]).candidate_review
+      : await collectCandidateReview({ ...f.options, worker_capture: captured, reviewer_capture: reviewerCapture });
+    if (["reviewer", "reviewer-cli"].includes(scenario)) {
+      expect(reviewed.diagnostics).toEqual([]); expect(reviewed.review?.manifest_sha256).toBe(result.manifest_sha256!);
+      expect(reviewed.review?.reviewer.invocation_id).toBe("candidate-reviewer"); expect(Object.hasOwn(reviewed, "grants")).toBe(false);
+    } else {
+      const reasons = { "stale-reviewer": "original launch target or context changed", "same-reviewer-context": "independent review context", "findings-reviewer": "blocking review findings" };
+      expect(reviewed.diagnostics.join("\n")).toContain(reasons[scenario as keyof typeof reasons]);
+    }
+    expect(reviewed.complete).toBe(["reviewer", "reviewer-cli"].includes(scenario)); expect(reviewed.authority).toBe("none");
+    expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
+    return;
+  }
+  if (["matching", "cli"].includes(scenario)) {
+    expect(result.diagnostics).toEqual([]); expect(result.manifest_sha256).toBe(manifestDigest(result.manifest!));
+    expect(result.manifest?.bindings.candidate_commit).toBe(f.head);
+    expect(result.manifest?.worker.invocation_id).toBe("pre-candidate-author");
+    expect(result.manifest?.effects.map(effect => effect.kind)).toEqual(["lease-acquire", "receipt-retain", "push", "pr-create", "lease-release"]);
+    expect(result.manifest?.effects[2].payload.head).toBe(f.head);
+    expect(result.manifest?.effects[3].payload.body).toContain("Reviewed source correction\n");
+    expect(result.manifest?.effects[3].payload.body).toContain("original-operation");
+    expect(Object.hasOwn(result, "review_verdict")).toBe(false); expect(Object.hasOwn(result, "grants")).toBe(false);
+    expect(result.reviewer_runtime_sha256).toMatch(/^[a-f0-9]{64}$/);
+  } else {
+    const reasons = { "changed-selection": "Advisory decisions do not account for selected edits", "missing-proposal": "Original worker publication proposal required", "foreign-branch": "candidate branch scope" };
+    expect(result.diagnostics.join("\n")).toContain(reasons[scenario as keyof typeof reasons]);
+  }
+  expect(result.complete).toBe(["matching", "cli"].includes(scenario)); expect(result.authority).toBe("none");
+  expect(captureRepositoryState(f.repo)).toEqual(before); expect(captureRepositoryState(f.candidate)).toEqual(candidateBefore);
+}, 60000);

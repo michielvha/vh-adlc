@@ -215,3 +215,23 @@ test("a refreshed PR binds the exact original payload used for partial-update re
   update.payload.expected_payload.body = "Unreviewed source";
   expect(() => validateReviewedManifest(fixture(bindings, [update]))).toThrow("digest");
 });
+
+test.each(["clean", "findings", "same-context", "changed-current", "wrong-target"])("independent review evidence remains permission-free %s", async scenario => {
+  const { verifyReviewEvidence, requireReviewedManifest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
+  expect(typeof verifyReviewEvidence).toBe("function");
+  const input = fixture(), { grants: _grants, ...withoutPermission } = input;
+  if (scenario === "findings") withoutPermission.reviewer = evidence("reviewer", manifestDigest(input.manifest), "FINDING: F-01\nKIND: factual\nSEVERITY: should-fix\nWHERE: candidate\nEVIDENCE: incomplete repair\nPROPOSAL: repair first\n");
+  if (scenario === "same-context") withoutPermission.reviewer.context_id = withoutPermission.worker.context_id;
+  if (scenario === "changed-current") withoutPermission.current.effects[0].payload.head = "f".repeat(40);
+  if (scenario === "wrong-target") withoutPermission.reviewer.target_sha256 = hash("different candidate");
+  if (scenario === "clean") {
+    const result = verifyReviewEvidence(withoutPermission);
+    expect(result.manifest_sha256).toBe(manifestDigest(input.manifest));
+    expect(Object.hasOwn(result, "grants")).toBe(false);
+    expect(() => requireReviewedManifest(result)).toThrow("missing owned review result");
+    expect(validateReviewedManifest(input).manifest_sha256).toBe(result.manifest_sha256);
+  } else {
+    const reasons = { findings: "blocking review findings", "same-context": "independent review context", "changed-current": "changed current bindings or payload", "wrong-target": "review target" };
+    expect(() => verifyReviewEvidence(withoutPermission)).toThrow(reasons[scenario as keyof typeof reasons]);
+  }
+});
