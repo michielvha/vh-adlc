@@ -162,6 +162,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-09 | R-1 | spec | `8ff685a1883330fd0d50536c79788eae4cc0399f` | claude-opus-5-5 | procedural | Blocking x11vnc replacement health gap plus seven should-fix and nit findings. |
+| 2026-11-09 | R-2 | spec | `4891dcc7d97e9c725fbef93c83a7413f59321aa8` | claude-opus-5-5 | procedural | Blocking: the installed x11vnc moves no clipboard text in either direction; six should-fix findings. |
 
 ### R-1
 
@@ -220,6 +221,57 @@ SEVERITY: nit
 WHERE: Test Plan, AC-02 and AC-03
 EVIDENCE: The AC-02 proof grants clipboard-write in Chromium before clicking **Copy to this device**. With that permission, `writeText` succeeds without transient activation, so the real-browser run cannot detect a write made outside the click handler. That part of AC-03 then rests only on the stubbed unit test.
 PROPOSAL: Run the Chromium case without granting clipboard-write so that it uses transient activation as an owner would, or add a real-browser check that no write happens without a click.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Context, Owner summary and Background; Design, x11vnc selection flags; Acceptance Criteria, AC-01 and AC-02
+EVIDENCE: The summary says "noVNC library and x11vnc already exchange clipboard text", and Background says x11vnc 0.9.17 "polls PRIMARY and CLIPBOARD and sends changes to viewers, and sets both on text from viewers". The only cited source for that is the `x11vnc -help` text. I tested it on a scratch display. I ran Xvfb :2794, a scratch Chromium on a page that logs paste and copy events into document.title (read through /json/list), and $REMOTE_GUI_X11VNC 0.9.17 with the design's flags (`-noprimary -nosetprimary -debug_sel`). A raw RFB client set raw encoding, kept requesting framebuffer updates and parsed every server message. (1) Remote to viewer: I typed "freshcopy" in the page and pressed Ctrl+A, Ctrl+C. Chromium logged `copy`, XGetSelectionOwner showed CLIPBOARD owned by Chromium (0xc00000), and in 3 s the client got no ServerCutText ("cut texts from server: []"). The x11vnc log had no selection line at all. (2) Viewer to remote: the client sent ClientCutText "SENT-fresh". The x11vnc log shows `xcut_receive: 'SENT-fresh'` and `Set CLIPBOARD 'SENT-fresh'`, but CLIPBOARD stayed owned by Chromium, and Ctrl+V in the page logged `paste:freshcopy`. In an earlier run nothing owned CLIPBOARD (owner 0x0) and only CUT_BUFFER0 held the viewer text. Ctrl+V then logged an empty `paste:`, so Chromium does not fall back to the cut buffer. With x11vnc's default flags (no -noprimary or -nosetprimary) the outcome was the same: no Set PRIMARY line, no owner change, an empty paste and no ServerCutText. The installed x11vnc moves clipboard text in neither direction. Every box can be ticked in the design and AC-01 and AC-02 still fail.
+PROPOSAL: Replace the x11vnc premise with observed behavior. Settle in the design how text actually reaches the CLIPBOARD selection and comes back from it, for example a different VNC server build, x11vnc options that are proven to work, or an owned helper X client that owns and reads CLIPBOARD. Add a Context citation for a working round trip measured on this host before acceptance.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Viewer panel (Clear); Design, Glossary
+EVIDENCE: Design: "Clear ... sends an empty string with clipboardPasteFrom so the remote clipboard is empty too." The glossary defines Remote clipboard as "The CLIPBOARD selection and the root window's cut buffer". On scratch Xvfb :2793 with x11vnc 0.9.17 `-noprimary -nosetprimary`, a raw RFB client sent ClientCutText "SENT-clear", and `xprop -root CUT_BUFFER0` printed `CUT_BUFFER0(STRING) = "SENT-clear"`. A zero-length ClientCutText followed, and xprop still printed `CUT_BUFFER0(STRING) = "SENT-clear"`. No criterion or Test Plan row checks the remote side of Clear.
+PROPOSAL: Either drop the claim that Clear empties the remote clipboard, or define a mechanism that is proven to empty both CLIPBOARD and CUT_BUFFER0. Then add the remote effect to AC-03 and to its proof.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Background; Test Plan, AC-01
+EVIDENCE: Background: "The real-browser test reads page values through CDP after handing back to agent mode (tests/remote-gui/browser.e2e.test.ts:74-77)." Those lines attach CDP to a session that was started in agent mode (`cli('start','--ttl','2m')`, line 50) and read an input typed through the viewer. No handoff happens there. The only handoff test (lines 192-207) shows that sessionStorage survives the Chromium restart. It also shows that in-memory page state does not survive: `waitFor(() => memoryProofs.includes(false), 'in-memory-only fixture was incorrectly reported as retained')`. The AC-01 human-mode proof ("paste, hand off to agent, then read the same input through CDP") assumes that a typed input value survives the human-to-agent Chromium restart. No cited evidence shows that.
+PROPOSAL: Correct the citation. Make the human-mode proof observe the paste through something the existing test shows survives the handoff, for example a test fixture page that stores the pasted sentinel in sessionStorage. Alternatively, add a check that form values survive the restart.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-06
+EVIDENCE: The AC-06 proof checks CLIPBOARD by "paste into an agent-mode page input and read it through CDP ... assert both are empty". An empty input also results when a paste carries nothing for any other reason. Per F-01, viewer text never becomes the CLIPBOARD selection on this host, so this assertion would pass even if clearing did nothing. The proof has no positive control showing the sentinels were in CLIPBOARD and CUT_BUFFER0 before the handoff.
+PROPOSAL: Before the handoff, assert with an X client on the session display that the sentinel is in CUT_BUFFER0 and that CLIPBOARD returns it. After the handoff, assert that CUT_BUFFER0 is absent and that CLIPBOARD has no owner or returns no sentinel. Do not infer emptiness from an empty paste.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Clearing on human-to-agent handoff
+EVIDENCE: Step 1 waits for Chromium to exit, which in code is the tracked main process (`r.chrome.done`, plugins/remote-gui/internal/browser/phase.go:130-137). Step 2 then asserts "It is then the last X client, so Xvfb resets". I ran a scratch Chromium on Xvfb :2793 with `--disable-gpu --ozone-platform=x11`. `ss -xpn` showed four X connections: two held by the main process, and two held by child pid 2748886 (`--type=gpu-process`) and its broker. The GPU process is not a tracked child. If any X client outlives the main process, or a new one connects before Xvfb processes the old x11vnc's close, no reset happens and CUT_BUFFER0 stays. Review R-1 showed that, and nothing in the design detects it. (Six back-to-back x11vnc stop-and-start runs on an idle scratch display did reset each time, so this is a missing check, not an observed failure.)
+PROPOSAL: Before the agent-mode browser launches, have the handoff verify that the reset happened, for example by confirming that CUT_BUFFER0 is absent and that PRIMARY and CLIPBOARD have no owner. If they are not, fail into `handoff-failed` with an x11vnc or clipboard diagnostic.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-02 and AC-03
+EVIDENCE: The AC-02 proof says "click Copy to this device in Chromium without granting clipboard-write and in Firefox ... and assert the local clipboard value", but it does not say how the test reads the local clipboard. The document's own Background (line 43, [S3]) says that `readText` requests a permission in Chromium and shows a paste context menu in Firefox. So reading the value back either needs a grant that can also authorize writes without a click, which undoes the R-1 F-08 fix and the AC-03 real-browser check, or it has no stated mechanism in Firefox.
+PROPOSAL: Name the read-back method for each engine and show that it does not grant a write permission before the click, for example a native paste into a separate local test field after the click. Otherwise state that the check is a manual procedure.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, Intact text only; Acceptance Criteria, AC-04
+EVIDENCE: Design: "Text received from the remote side is shown as received." noVNC decodes standard ServerCutText as one byte per character (`rQshiftStr`, core/rfb.js:2217-2218), and the installed x11vnc has no extended clipboard (Background). Remote text with characters above U+00FF therefore reaches the panel replaced or garbled, and **Copy to this device** copies it with no warning. A copied credential could arrive altered. AC-04 covers only the send direction.
+PROPOSAL: Define what the panel does with remote text that may have been altered, for example a warning beside the copy button when the received text contains `?` or bytes outside printable Latin-1. Alternatively, raise the choice as an open question, and cover the chosen behavior in AC-04.
 
 ## Sources
 
