@@ -67,12 +67,14 @@ async function currentState(options: Options, inventory?: PublicationInventory, 
   const workerPolicy = readAdoptedRolePolicy({ repo: facts.store.root, current_default: facts.current_default, identity: facts.identity, runtime, role: "worker" });
   const reviewerPolicy = readAdoptedRolePolicy({ repo: facts.store.root, current_default: facts.current_default, identity: facts.identity, runtime, role: "reviewer" });
   const common = { source_repo: options.repo, candidate_repo: options.candidate_repo, artifact_root: options.artifact_root };
-  const worker = readNativeRoleCapture({ ...common, reference: options.worker_capture, policy: workerPolicy,
-    expected: { role: "worker", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: workerInputDigest(target.manifest.bindings) } });
-  const reviewer = readNativeRoleCapture({ ...common, reference: options.reviewer_capture, policy: reviewerPolicy,
-    expected: { role: "reviewer", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "reviewer"), target_sha256: manifestDigest(target.manifest) } });
+  let worker: ReturnType<typeof readNativeRoleCapture>;
+  let reviewer: ReturnType<typeof readNativeRoleCapture>;
   let authority: ReturnType<typeof readPublicationAuthority>;
   try {
+    worker = readNativeRoleCapture({ ...common, reference: options.worker_capture, policy: workerPolicy,
+      expected: { role: "worker", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: workerInputDigest(target.manifest.bindings) } });
+    reviewer = readNativeRoleCapture({ ...common, reference: options.reviewer_capture, policy: reviewerPolicy,
+      expected: { role: "reviewer", source_commit: options.source, runtime_sha256: roleRuntimeDigest(runtime, "reviewer"), target_sha256: manifestDigest(target.manifest) } });
     authority = readPublicationAuthority({ source_repo: options.repo, artifact_root: options.artifact_root, reference: options.authority, manifest: target.manifest,
       adopted_procedure: { repo: facts.store.root, current_default: facts.current_default, path: settings.project_procedure } });
   } catch (error) {

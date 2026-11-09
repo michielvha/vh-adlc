@@ -177,3 +177,41 @@ test.each(["authority", "actor"])("resume permanently records a binding change f
     for (const root of roots) rmSync(root, { recursive: true, force: true });
   } catch (error) { console.error("Preserved interrupted binding roots", JSON.stringify(roots)); throw error; }
 }, 365000);
+
+test.each(["worker", "reviewer"] as const)("a role capture changing after candidate review permanently invalidates the effect gate %s", async selectedRole => {
+  const roots: string[] = [];
+  try {
+    const f = await originalPublicationFixture(roots), service = installOwnedNativeService(f);
+    console.error("Owned original-role race roots", JSON.stringify(roots));
+    const controller = await import(join(f.retained.directory, "scripts/docs-drift/publication-controller.ts"));
+    const journal = await import(join(f.retained.directory, "scripts/docs-drift/journal.ts"));
+    const reviews = await import(join(f.retained.directory, "scripts/docs-drift/candidate-review.ts"));
+    const originalOutcome = journal.appendOutcome, originalReview = reviews.collectCandidateReview;
+    const path = join(f.artifacts, f[selectedRole].path), originalBytes = readFileSync(path);
+    let leased = false, changed = false;
+    const outcome = spyOn(journal, "appendOutcome").mockImplementation((current: unknown, id: string, result: unknown) => {
+      const appended = originalOutcome(current, id, result);
+      if (id === "lease") leased = true;
+      return appended;
+    });
+    const race = spyOn(reviews, "collectCandidateReview").mockImplementation(async (options: unknown) => {
+      const result = await originalReview(options);
+      if (leased && !changed && result.complete) {
+        changed = true;
+        writeFileSync(path, Buffer.concat([originalBytes, Buffer.from("\n")]));
+      }
+      return result;
+    });
+    let pending;
+    try { pending = await controller.publishPublication(f.publication); }
+    finally { outcome.mockRestore(); race.mockRestore(); }
+    expect(changed).toBe(true); expect(pending.state).toBe("pending");
+    expect(pending.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
+    writeFileSync(path, originalBytes);
+    const resumed = await controller.resumePublication({ ...f.publication, journal_directory: pending.journal.directory });
+    expect(resumed.state).toBe("pending"); expect(resumed.reason).toBe("reconciliation-only-no-replay");
+    expect(resumed.journal.events.some((event: { kind: string }) => event.kind === "invalidation")).toBe(true);
+    expect(JSON.parse(readFileSync(service.statePath, "utf8")).prs).toHaveLength(0);
+    for (const root of roots) rmSync(root, { recursive: true, force: true });
+  } catch (error) { console.error("Preserved original-role race roots", JSON.stringify(roots)); throw error; }
+}, 365000);
