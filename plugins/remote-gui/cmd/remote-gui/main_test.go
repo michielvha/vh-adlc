@@ -53,6 +53,10 @@ func TestPublicLifecycle(t *testing.T) {
 	if fields["result"] != "ready" || fields["local_target"] != upstream.URL+"/app" {
 		t.Fatal("missing public result or redacted target")
 	}
+	code, raw = invoke("handoff", started.ID, "--browser-mode", "human")
+	if code == 0 || !strings.Contains(raw, "handoff-requires-browser-session") {
+		t.Fatal("handoff did not reject the service-sharing session", raw)
+	}
 	for _, cmd := range []string{"status", "access"} {
 		code, raw = invoke(cmd, started.ID)
 		if code != 0 || strings.Contains(raw, "access_code") || strings.Contains(raw, "cli-query-sentinel") {

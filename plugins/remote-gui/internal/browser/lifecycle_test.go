@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
@@ -18,6 +19,43 @@ import (
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/session"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
+
+func TestHandoffRetainsLockedProfile(t *testing.T) {
+	c, id := setup(t)
+	profile := filepath.Join(c.Home, id, "profile")
+	if err := os.Mkdir(profile, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	lock := filepath.Join(profile, "SingletonLock")
+	if err := os.WriteFile(lock, []byte("owned-lock-sentinel"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	r := &runtime{home: c.Home, id: id, profile: profile}
+	r.current.BrowserMode = "human"
+	if _, err := r.handoff(context.Background(), "agent"); err == nil || !strings.Contains(err.Error(), "profile-still-locked") {
+		t.Fatalf("locked profile accepted: %v", err)
+	}
+	data, err := os.ReadFile(lock)
+	if err != nil || string(data) != "owned-lock-sentinel" || len(r.children) != 0 {
+		t.Fatal("profile lock modified or duplicate browser started")
+	}
+}
+
+func TestHandoffRejectsForeignBrowserIdentity(t *testing.T) {
+	c, id := setup(t)
+	self, err := state.Inspect(os.Getpid())
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &runtime{home: c.Home, id: id, chrome: &child{role: "browser", identity: self}}
+	r.current.BrowserMode = "human"
+	if _, err := r.handoff(context.Background(), "agent"); err == nil || !strings.Contains(err.Error(), "ownership-changed") {
+		t.Fatalf("foreign process accepted: %v", err)
+	}
+	if !state.Alive(self) {
+		t.Fatal("unowned process was disturbed")
+	}
+}
 
 func TestMain(m *testing.M) {
 	session.BrowserLauncher = Start
