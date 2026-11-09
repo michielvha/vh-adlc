@@ -205,6 +205,7 @@ None.
 | 2026-11-09 | R-2 | spec | `4891dcc7d97e9c725fbef93c83a7413f59321aa8` | claude-opus-5-5 | procedural | Blocking crash-restored session cookies plus eight should-fix and one nit finding. |
 | 2026-11-09 | R-3 | spec | `a5ef9e6204cad85777293bb5ec33b505f6311be4` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and five nits. |
 | 2026-11-09 | R-4 | spec | `05b51e9093dacbb1bc2df87bb88772e9555c1986` | claude-opus-5-5 | procedural | No blocking findings; two should-fix findings and two nits. |
+| 2026-11-10 | R-5 | spec | `c071bd4682d176391849c39b9eb873bdce972510` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and two nits. |
 
 ### R-1
 
@@ -451,6 +452,43 @@ SEVERITY: nit
 WHERE: Design (Single writer), AC-05
 EVIDENCE: Line 117 places the Chromium singleton check "Before Chromium launches" but does not say which process runs it. `profile delete` runs it in the CLI (line 94). If `start` runs it in `browser.Start`, the check happens after the session record, the guard, the supervisor and Xvfb already exist (plugins/remote-gui/internal/session/session.go:150-170, plugins/remote-gui/internal/browser/browser.go:303-338). `browser.Start` retries a failed runtime three times (browser.go:284-301), and the error reaches the caller as `session-start-failed: ...` with a failed record (session.go:189-190). AC-04 and AC-06 say what a refusal leaves behind, but AC-05 does not.
 PROPOSAL: Run the check in the CLI after the profile lock and before the session record is created, as `profile delete` does, and state in AC-05 that the refusal leaves no record or process. Otherwise, state the record outcome and that the check is not retried.
+
+### R-5
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Lifecycle), Context (Owner summary), AC-02, AC-16, Test Plan
+EVIDENCE: Lifecycle line 124 says that when the owned x11vnc Exit path does not close Chromium within two seconds, the stop "then sends SIGKILL to a Chromium that is still running". The owner summary (line 27) says without condition that "persistent cookies and site storage carry over". I ran Chromium 151.0.7922.137 (`--headless=new`, scratch profile) against a local fixture that sets `pers=1; Max-Age=86400`, and signalled the browser about 3 seconds after the page loaded. After SIGKILL, the relaunched profile sent no cookie to the fixture. After SIGTERM, it sent `pers=1`. SIGTERM also left `profile.exit_type` as `SessionEnded` and the three Singleton symlinks in place, so the next start's lock recovery and clean-exit mark would still apply. When Exit fails, for example because a dialog or a page has the keyboard, a sign-in finished shortly before stop or expiry is therefore lost. The usual case is an owner who signs in to set up a profile and then stops, which is the flow this feature exists for. The AC-02 and AC-16 real-browser rows exercise only a successful Exit, and the AC-16 stand-in checks only the SIGKILL timing, so every box can be ticked while this loss remains.
+PROPOSAL: After a failed Exit, send SIGTERM to Chromium alone and wait briefly before the SIGKILL and before the X server is stopped, keeping the total inside the guard's five-second deadline, and update AC-16 to match. Add a real-browser test in which Exit is blocked: the page sets a persistent cookie just before stop, and the next session must still see that cookie.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Single writer, Lifecycle), AC-02, AC-16, Test Plan
+EVIDENCE: Design line 116 says the guard clears the holder and updates `last used` "before it releases the lock". It does not order these steps against the record's `stopped` state. Today the guard's `finish` writes `r.State = "stopped"` as its final step (plugins/remote-gui/internal/session/daemon.go:198, called at :321 and :361). `Stop` returns as soon as the record reads `stopped` (plugins/remote-gui/internal/session/session.go:302-313). If the new bookkeeping and the lock release come after `finish`, a `start --profile` issued right after `stop` returns finds the lock still held. Line 116 makes that start fail "at once" with `profile-in-use`, and the report names the session that has just reported `stopped`, because its guard is still alive. The AC-02 proof ("stop; ... start session two") and AC-16 ("`stop` reports `stopped`, the holder is cleared") do not pin this order, so the test can be flaky and an agent that stops and restarts a profile session can be refused for no reason.
+PROPOSAL: State that once the owned processes are gone, the guard clears the holder and closes the lock descriptor before it records `stopped`. Add a test that starts a new session on the profile immediately after `stop` returns `stopped`.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Sign-in and hand-back, Storage), AC-11, AC-13
+EVIDENCE: Storage (line 112) treats profile files as "readable by anyone with the runtime's OS account or root", and Chromium keeps `--password-store=basic`, so the agent's own account can read the cookies of a reusable profile without starting a session. The goal (line 5) rests agent access to a signed-in profile on the owner's confirmation, and AC-11 limits the agent to opening "only a profile the owner named". Under this design those signed-in cookies stay on disk with no retention limit (line 126). Today they last at most one session of up to eight hours. The current skill forbids reading auth-refresh's "credential/profile/state files" and copying cookies (plugins/remote-gui/skills/remote-gui/SKILL.md:40). The Design's skill changes (line 132) and its auth-refresh section (line 136) add no matching rule for remote-gui's own profile store, and neither AC-11 nor AC-13 mentions one. An agent that reads or copies `chromium/` files bypasses the human-mode default, the approval flag and the owner-named rule.
+PROPOSAL: Have the skill forbid agents from listing, reading or copying files under the profile store, and require them to reach a profile only through a remote-gui session. Add that rule to AC-11 and the AC-13 README and skill items.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Sign-in and hand-back), AC-11, Test Plan (AC-11)
+EVIDENCE: Line 130 defines `--agent-start-approved` only together with `start --profile <name> --browser-mode agent`. It does not say what happens when the flag is given without `--profile`, without `--browser-mode agent` (line 130 says such a start runs in human mode), or on another command. Compatibility (line 140) records `agent_start_approved` "when given". The parser rejects other misplaced options, for example `--owner-login` and `--reveal` (plugins/remote-gui/internal/config/config.go, `Parse`). The AC-11 proof covers only the agent-mode cases.
+PROPOSAL: Say whether a misplaced `--agent-start-approved` is refused, as other misplaced options are, or ignored and left unrecorded. Add those cases to the AC-11 unit tests.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: The owner summary (lines 19-29) leaves out several defaults and trade-offs that Design settles. With an overridden sessions root, `start --profile` and the `profile` commands fail with `profile-home-required` unless a profile root is also given (line 100). That affects any setup that sets `REMOTE_GUI_HOME`, including the existing fixtures (tests/remote-gui/native-routing.e2e.test.ts:49). A profile last opened by a newer Chromium major version is refused (line 125). Stop and expiry kill Chromium after a two-second close attempt (line 124). The standard asks the summary to cover important defaults and trade-offs.
+PROPOSAL: Add one or two sentences to the owner summary covering the profile-home requirement, the newer-Chromium refusal and the bounded close on stop.
 
 ## Sources
 
