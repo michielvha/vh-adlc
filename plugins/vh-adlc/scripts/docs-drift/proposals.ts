@@ -126,6 +126,7 @@ export async function fetchProposalObjects(store: OwnedObjectStore, proposal: Pu
     PATH: options.environment.PATH ?? "/usr/bin:/bin", HOME: process.env.HOME,
     GH_CONFIG_DIR: options.environment.GH_CONFIG_DIR, GH_HOST: options.hostname,
     GH_TOKEN: options.environment.GH_TOKEN, GITHUB_TOKEN: options.environment.GITHUB_TOKEN,
+    GH_ENTERPRISE_TOKEN: options.environment.GH_ENTERPRISE_TOKEN,
     GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1",
     GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
   };

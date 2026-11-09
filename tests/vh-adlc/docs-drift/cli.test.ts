@@ -264,6 +264,7 @@ test.each(["digest", "noncanonical", "source", "authority-field", "escape", "sym
   expect(result.exitCode).toBe(2);
   expect(report.outcome).toBe("incomplete");
   expect(report.diagnostics.length).toBeGreaterThan(0);
+  if (scenario === "different-head") expect(report.diagnostics.some(item => item.code === "assessment-source")).toBe(true);
   expect(captureRepositoryState(f.repo)).toEqual(before);
 });
 
@@ -313,4 +314,32 @@ test("the normal scan entry keeps provider credentials out of the consumer scann
   expect(probe.environment.GH_TOKEN).toBeUndefined();
   expect(probe.environment.COPILOT_GITHUB_TOKEN).toBeUndefined();
   expect(result.stdout.toString()).not.toContain("synthetic-cli-gh-canary");
+});
+
+test("normal preparation reports the original application error and retained resources after recording fails", () => {
+  const f = fixture(), bin = join(f.root, "apply-failure-bin"), realGit = Bun.which("git");
+  if (!realGit) throw Error("native fixture requires Git");
+  mkdirSync(bin, { mode: 0o700 });
+  writeFileSync(join(bin, "git"), `#!${process.execPath}
+import { mkdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+const args = process.argv.slice(2), child = Bun.spawnSync([${JSON.stringify(realGit)}, ...args], { stdout: "inherit", stderr: "inherit" });
+if (child.exitCode === 0 && args.includes("apply") && !args.includes("--check")) {
+  mkdirSync(join(dirname(process.cwd()), "prepare-result.json"), { mode: 0o700 }); process.exit(78);
+}
+process.exit(child.exitCode);
+`, { mode: 0o700 });
+  const packet = canonicalJSON({ schema_version: 1, source_commit: f.commit, edits: [{ id: "guide-fix", path: "docs/guide.md", action: "replace",
+    start: 0, end: Buffer.byteLength("# Guide\n"), before_sha256: sha256(Buffer.from("# Guide\n")),
+    replacement_base64: Buffer.from("# Prepared guide\n").toString("base64"), after_mode: "100644" }] });
+  writeFileSync(join(f.artifacts, "edits.json"), packet, { mode: 0o600 });
+  const before = captureRepositoryState(f.repo);
+  const { result, report } = invoke(["prepare", "--repo", f.repo, "--source", f.commit, "--artifact-root", f.artifacts,
+    "--selection", "edits.json", "--selection-sha256", sha256(packet)], { ...process.env, PATH: bin + ":" + process.env.PATH });
+  expect(result.exitCode).toBe(2);
+  expect(report.diagnostics.some(item => item.message === "preparation Git apply failed")).toBe(true);
+  expect(report.retained_resources?.checkout?.startsWith(f.artifacts + "/")).toBe(true);
+  if (!report.retained_resources?.checkout) throw Error("missing failed preparation source");
+  expect(readFileSync(join(report.retained_resources.checkout, "docs/guide.md")).toString()).toBe("# Prepared guide\n");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
 });

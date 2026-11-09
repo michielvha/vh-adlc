@@ -167,3 +167,17 @@ test.each(["retained", "applied-response-lost", "recording-failed"])("failed app
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } finally { execution.mockRestore(); capture.mockRestore(); }
 });
+
+test.each(["* text eol=crlf\n", "* ident\n", "docs/guide.md working-tree-encoding=UTF-16LE\n"])("preparation applies raw blob bytes under committed attributes %j", async attributes => {
+  const f = fixture(); put(f.repo, ".gitattributes", attributes);
+  git(f.repo, "add", "--", ".gitattributes"); git(f.repo, "commit", "-qm", "synthetic conversion attributes");
+  const source = git(f.repo, "rev-parse", "HEAD"), replacement = Buffer.from("# Current guide $Id$\n");
+  const options = prepareOptions(f), before = captureRepositoryState(f.repo);
+  const result = await prepareEdits({ ...options, source, selection: { ...f.selection, source_commit: source,
+    edits: [{ ...f.edit, replacement_base64: replacement.toString("base64") }] } });
+  expect(result.diagnostics).toEqual([]);
+  expect(result.state).toBe("prepared-uncommitted");
+  if (!result.checkout) throw Error("missing attribute preparation source");
+  expect(readFileSync(join(result.checkout, f.edit.path))).toEqual(replacement);
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+});

@@ -10,7 +10,8 @@ import { readNativeContext } from "./transport";
 import { prepareTrialFixture } from "./trial-setup";
 import { selectApprovedRuntime, selectCandidateRuntime } from "./bootstrap";
 import { collectProposals } from "./proposals";
-import { inspectPreparation, prepareEdits } from "./preparation";
+import { inspectPreparation, prepareEdits, PreparationEvidenceError } from "./preparation";
+import { collectNativeResolution } from "./resolution-entry";
 import { readBoundArtifact } from "./evidence-input";
 import { canonicalJSON, decodeUTF8 } from "./protocol";
 
@@ -24,6 +25,8 @@ export type CLIReport = {
   runtime?: Awaited<ReturnType<typeof selectApprovedRuntime> | ReturnType<typeof selectCandidateRuntime>>;
   proposals?: ReturnType<typeof collectProposals>;
   edit_inspection?: ReturnType<typeof inspectPreparation>;
+  retained_resources?: { checkout: string | null; record_path: string | null };
+  resolution?: Awaited<ReturnType<typeof collectNativeResolution>>;
   prepared?: Awaited<ReturnType<typeof prepareEdits>>;
 };
 const usage = `Documentation drift helper protocol 1
@@ -42,6 +45,9 @@ bun <plugin>/scripts/docs-drift/cli.ts inspect-runtime --repo <repo>
 bun <plugin>/scripts/docs-drift/cli.ts collect-proposals --repo <repo>
   --source <full-current-default-commit>
 bun <plugin>/scripts/docs-drift/cli.ts check-edits --repo <repo> --source <full-commit>
+  --artifact-root <private-external-directory> --selection <relative-packet-path>
+  --selection-sha256 <sha256>
+bun <plugin>/scripts/docs-drift/cli.ts collect-resolution --repo <repo> --source <full-current-default-commit>
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
 bun <plugin>/scripts/docs-drift/cli.ts prepare --repo <repo> --source <full-commit>
@@ -63,6 +69,10 @@ It imports the committed synthetic fixture into a new owned directory.
 Runtime inspection verifies the approved retained selection, or the candidate
 bound by trial-definition. Actual model invocation and effect grants are separate.
 Proposal collection reads the configured shared and legacy PR inventory.
+Resolution collection fetches selected complete native PR diffs into a new owned
+object store, then rechecks their source and metadata. Its output grants no effects.
+Edit checks require caller HEAD to equal the selected source commit.
+A source mismatch returns the assessment-source diagnostic.
 Edit checks compute postimages and feature-protection decisions. Semantic
 verification, applying changes and publication have their own lifecycle steps.
 Prepare requires the selected run's local-edit authority. It scans the committed
@@ -72,12 +82,12 @@ The later checkpoint, verification, review and publication steps have their own 
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare"].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare"].includes(command);
+  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution"].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution"].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
-  if (command === "check-edits" || command === "prepare") flags.push("--selection", "--selection-sha256");
+  if (["check-edits", "prepare", "collect-resolution"].includes(command)) flags.push("--selection", "--selection-sha256");
   const values = new Map<string, string>();
   for (let index = 1; index < argv.length; index += 2) {
     const flag = argv[index], value = argv[index + 1];
@@ -110,29 +120,49 @@ function privateArtifacts(path: string | undefined, repo: string) {
   return { root, owner: "uid-" + owner };
 }
 
+function failureDiagnostics(error: unknown, code: string): Diagnostic[] {
+  const diagnostics: Diagnostic[] = [], seen = new Set<unknown>();
+  function visit(value: unknown): void {
+    if (seen.has(value)) return;
+    seen.add(value);
+    diagnostics.push({ code, message: value instanceof Error ? value.message : "Command input or setup unavailable" });
+    if (value instanceof AggregateError) for (const member of value.errors) visit(member);
+    if (value instanceof Error && value.cause !== undefined) visit(value.cause);
+  }
+  visit(error);
+  return diagnostics;
+}
+
 /** Technical collection feeds the controller's separate semantic decisions and effect grants. */
 export async function main(argv: string[]): Promise<number> {
   if (argv.length === 1 && ["--help", "help"].includes(argv[0])) { writeSync(1, usage); return 0; }
   let report: CLIReport;
   try {
     const options = argumentsForCommand(argv), repo = realpathSync(options.repo);
-    if (options.command === "check-edits" || options.command === "prepare") {
+    if (["check-edits", "prepare", "collect-resolution"].includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo);
       const bytes = readBoundArtifact({ source_repo: repo, artifact_root: artifacts.root,
         reference: { path: options.selection, sha256: options.selection_sha256 } });
       let selection: unknown;
       try {
         selection = JSON.parse(decodeUTF8(bytes));
-        if (!canonicalJSON(selection).equals(bytes)) throw Error("noncanonical edit selection");
-      } catch { throw Error("invalid canonical edit selection JSON"); }
-      if (options.command === "prepare") {
+        if (!canonicalJSON(selection).equals(bytes)) throw Error("noncanonical selection");
+      } catch { throw Error("invalid canonical selection JSON"); }
+      if (options.command === "collect-resolution") {
+        const settings = loadCommittedSettings(repo, options.source).settings;
+        const hosted = settings.hostname === "github.com" || settings.hostname.endsWith(".ghe.com");
+        const resolution = await collectNativeResolution({ repo, source: options.source, selection, artifact_root: artifacts.root,
+          owner: artifacts.owner, run: randomUUID(), credential: (hosted ? process.env.GH_TOKEN : process.env.GH_ENTERPRISE_TOKEN) ?? "" });
+        report = { schema_version: 1, command: options.command, outcome: resolution.complete ? "collected" : "incomplete", diagnostics: [],
+          source_commit: options.source, resolution };
+      } else if (options.command === "prepare") {
         const prepared = await prepareEdits({ repo, source: options.source, selection, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
         report = { schema_version: 1, command: options.command, outcome: prepared.state === "incomplete" ? "incomplete" : "collected",
           source_commit: options.source, diagnostics: prepared.diagnostics.map(message => ({ code: "preparation", message })), prepared };
       } else {
         const edit_inspection = inspectPreparation({ repo, source: options.source, selection });
         report = { schema_version: 1, command: options.command, outcome: edit_inspection.complete ? "collected" : "incomplete",
-          source_commit: options.source, diagnostics: edit_inspection.diagnostics.map(message => ({ code: "edit-inspection", message })), edit_inspection };
+          source_commit: options.source, diagnostics: [...(edit_inspection.protection?.diagnostics ?? []), ...edit_inspection.diagnostics.map(message => ({ code: "edit-inspection", message }))], edit_inspection };
       }
     } else if (options.command === "trial-bindings") {
       const trial = collectTrialBindings({ repo, current_default: options.source });
@@ -173,8 +203,8 @@ export async function main(argv: string[]): Promise<number> {
         bindings_sha256: snapshot.protocol.sha256, diagnostics: assessment.diagnostics, assessment };
     }
   } catch (error) {
-    report = { schema_version: 1, command: argv[0] ?? "", outcome: "incomplete", diagnostics: [{ code: argv[0] === "scan" ? "scan-setup-or-input" : "command-setup-or-input",
-      message: error instanceof Error ? error.message : "Command input or setup unavailable" }] };
+    report = { schema_version: 1, command: argv[0] ?? "", outcome: "incomplete", diagnostics: failureDiagnostics(error, argv[0] === "scan" ? "scan-setup-or-input" : "command-setup-or-input"),
+      ...(error instanceof PreparationEvidenceError ? { retained_resources: { checkout: error.checkout, record_path: error.record_path } } : {}) };
   }
   writeSync(1, JSON.stringify(report) + "\n");
   return report.outcome === "incomplete" ? 2 : report.outcome === "attention" ? 1 : 0;

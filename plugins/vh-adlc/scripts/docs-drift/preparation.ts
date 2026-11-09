@@ -62,6 +62,15 @@ type PreparedEdits = {
   checkout: string | null; record_path: string | null; inspection: EditInspection | null; scan: ScanRun | null;
 };
 
+export class PreparationEvidenceError extends AggregateError {
+  readonly checkout: string | null;
+  readonly record_path: string | null;
+  constructor(result: PreparedEdits, failure: unknown, recording: unknown) {
+    super(failure === null ? [recording] : [failure, recording], "Preparation evidence could not be retained", { cause: failure ?? recording });
+    this.checkout = result.checkout; this.record_path = result.record_path;
+  }
+}
+
 function writeDiffInput(root: string, path: string, bytes: Uint8Array, mode: string) {
   if (mode !== "100644" && mode !== "100755") throw Error("unsupported preparation file mode");
   const file = join(root, protocolPath(path));
@@ -113,9 +122,13 @@ export async function prepareEdits(input: {
       }
       const git = Bun.which("git");
       if (!git) throw Error("preparation Git unavailable");
-      const env = scannerEnvironment(git, git, temporary);
+      const env = { ...scannerEnvironment(git, git, temporary), GIT_ATTR_NOSYSTEM: "1" };
+      // Highest-precedence attributes keep this owned raw-blob copy byte-exact.
+      const info = join(scan.checkout, ".git", "info");
+      mkdirSync(info, { recursive: true, mode: 0o700 });
+      writeFileSync(join(info, "attributes"), "* -text -ident -filter -working-tree-encoding -eol\n", { flag: "wx", mode: 0o600 });
       async function runGit(phase: "diff" | "check" | "apply", cwd: string, args: string[], expectedExit: 0 | 1) {
-        const argv = gitReadArguments(["-c", "core.hooksPath=/dev/null", "-c", "credential.helper=", "-c", "http.extraHeader=", ...args]);
+        const argv = gitReadArguments(["-c", "core.attributesFile=/dev/null", "-c", "core.hooksPath=/dev/null", "-c", "credential.helper=", "-c", "http.extraHeader=", ...args]);
         const stdout = join(root, phase + "-stdout"), stderr = join(root, phase + "-stderr");
         const native = await executeOwnedProcess({ argv, cwd, env, capture: "memory", stdout, stderr, watched_outputs: [], timeout_ms: 30000,
           started: pid => publishArtifact(join(root, phase + "-owner.json"), canonicalJSON({ pid, argv_sha256: sha256(canonicalJSON(argv)) })) });
@@ -146,8 +159,7 @@ export async function prepareEdits(input: {
   try {
     if (result.record_path) publishArtifact(result.record_path, canonicalJSON(result));
   } catch (error) {
-    if (failure !== null) throw new AggregateError([failure, error], "Preparation failed and its evidence could not be retained", { cause: failure });
-    throw error;
+    throw new PreparationEvidenceError(result, failure, error);
   }
   return result;
 }
