@@ -113,12 +113,17 @@ binary unverified, so the allow rule can match it. `clean` and `env` run on Linu
 Git 2.45 or newer, above the 2.35 the other commands need.
 
 `clean` refuses with `pid-namespace` inside a PID-namespace sandbox, because `kill` and `/proc` give
-wrong answers there. A default `workspace-write` Codex session may be one; run the command in a terminal
-then. `DOCKER_HOST` values other than `unix://`, and Docker contexts, read as no engine. Age is the only
+wrong answers there; run the command in a terminal then. On Codex CLI 0.163.0 the documented allow rule
+ran `clean` outside the default `workspace-write` sandbox, while the same command inside `codex sandbox`
+reported `pid-namespace`. `DOCKER_HOST` values other than `unix://`, and Docker contexts, read as no engine. Age is the only
 protection against other users' processes, same-user processes whose `/proc` entries cannot be read,
 and Podman bind mounts.
 
-No host run of the operation is recorded yet. Until one passes, it is unverified on every host.
+The operation passed on one Linux host, `fedora-43`, on 2026-11-09: headless Claude Code 2.1.316 sessions
+in auto mode and Codex CLI 0.163.0 sessions in the default `workspace-write` sandbox, and a real-host
+sequence in disposable clones of this repository and Stackweaver. Both used a candidate binary built from
+the code this release ships. Interactive sessions, other Linux hosts and macOS, where `clean` does not run, are not
+covered.
 
 ## Support matrix
 
@@ -141,7 +146,7 @@ claiming that the whole scenario matrix passed.
 | VS Code Copilot Chat 1.142, Local harness, macOS arm64 | Core GUI loop and explicit-model rejection passed; permission-mode caveat recorded separately | [Local GUI run](../../tests/vh-adlc/evidence/vscode-local/gui-smoke.md) |
 | VS Code Copilot Chat, Copilot and Claude harnesses | Unsupported | Not tested |
 | Copilot CLI lifecycle intake and agent loop | Unsupported | [Copilot CLI evidence](../../tests/vh-adlc/evidence/copilot-cli/README.md) |
-| `vh-adlc-clean` host cleanup, plugin 0.13.0, Claude Code and Codex on Linux | Unverified until the AC-11 session runs and the AC-12 real-host sequence are recorded | [Host cleanup acceptance](../specs/host-cleanup.md); [AC-11 procedure](../../tests/vh-adlc/evidence/clean/procedure.md); [host cleanup](#host-cleanup) |
+| `vh-adlc-clean` host cleanup, plugin 0.13.0, Claude Code and Codex on Linux | Headless Claude Code 2.1.316 auto-mode and Codex CLI 0.163.0 `workspace-write` sessions and the real-host sequence passed on one Linux host; interactive sessions are not covered | [Host cleanup acceptance](../specs/host-cleanup.md); [AC-11 procedure](../../tests/vh-adlc/evidence/clean/procedure.md); [host cleanup](#host-cleanup) |
 | macOS arm64 | Core desktop GUI loop passed; other surfaces and full-matrix limits are listed separately | [Desktop GUI run](../../tests/vh-adlc/evidence/claude-desktop/gui-smoke.md), [binary and fixture checks](../../tests/vh-adlc/evidence/claude-code/S1.host.macos.md) |
 | Structural reviewer isolation | Unsupported: reviews record `procedural` | The reviewer has a shell, which can still write |
 | Choosing a specific reviewer model | Capability-dependent; a mismatch remains pending | A host must be able to pass the requested model and return a matching identity. A silently substituted model or an unavailable selector never counts as a match |
