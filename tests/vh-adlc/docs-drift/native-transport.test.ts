@@ -227,7 +227,7 @@ test("removed issue markers remain visible in the native absence inventory", asy
 });
 
 
-test("native refresh uses the exact old head and preserves competing heads", async () => {
+test("native refresh uses the exact old head and refuses a stale PR before dispatch", async () => {
   const f = setup(); await f.transport.identity();
   f.update(state => {
     state.refs["refs/heads/docs-drift/one"] = "e".repeat(40);
@@ -240,7 +240,10 @@ test("native refresh uses the exact old head and preserves competing heads", asy
   const callLog = readFileSync(f.calls, "utf8");
   expect(callLog).toContain('--force-with-lease=refs/heads/docs-drift/one:' + "e".repeat(40));
   f.update(state => { state.refs["refs/heads/docs-drift/one"] = "f".repeat(40); });
-  await expect(f.transport.execute(f.plan, refresh, f.objects)).rejects.toBeInstanceOf(PublicationExecutionError);
+  const failure = await f.transport.execute(f.plan, refresh, f.objects).then(() => null, (error: unknown) => error);
+  expect(failure).toBeInstanceOf(PublicationExecutionError);
+  if (!(failure instanceof PublicationExecutionError)) throw Error("Missing stale-PR refusal");
+  expect(failure.sent).toBe(false);
   expect(f.inspect().refs["refs/heads/docs-drift/one"]).toBe("f".repeat(40));
 });
 
@@ -2041,4 +2044,27 @@ test.each(["state", "head", "ref", "base"])("native refresh refuses a changed %s
   if (!(failure instanceof PublicationExecutionError)) throw Error("Missing pre-dispatch refusal");
   expect(failure.sent).toBe(false); expect(failure.reaped).toBe(true);
   expect(readFileSync(f.calls, "utf8").split("\n").filter(line => line.includes('"program":"git"') && line.includes('"push"'))).toHaveLength(0);
+});
+
+
+test("native refresh preserves a competing push after its fresh PR read", async () => {
+  const f = setup(); await f.transport.identity();
+  const ref = "refs/heads/docs-drift/one", oldHead = "e".repeat(40);
+  f.update(state => { state.refs[ref] = oldHead;
+    state.prs.push({ number: 501, state: "open", merged_at: null, user: { login: "fixture-bot", id: 20 },
+      head: { ref: "docs-drift/one", sha: oldHead, repo: { id: 10 } }, base: { ref: "main", repo: { id: 10 } } });
+    state.race = true;
+  });
+  const effect: Effect = { id: "racing-refresh", kind: "branch-refresh", payload: { number: 501, ref, expected_head: oldHead, head: f.commit } };
+  const failure = await f.transport.execute(f.plan, effect, f.objects).then(() => null, (error: unknown) => error);
+  expect(failure).toBeInstanceOf(PublicationExecutionError);
+  if (!(failure instanceof PublicationExecutionError)) throw Error("Missing atomic refresh rejection");
+  expect(failure.sent).toBe(true); expect(failure.reaped).toBe(true);
+  const calls = readFileSync(f.calls, "utf8").trim().split("\n").map(line => JSON.parse(line));
+  const push = calls.findIndex(call => call.program === "git" && call.args.includes("push"));
+  expect(push).toBeGreaterThan(0);
+  expect(calls[push].args).toContain("--force-with-lease=" + ref + ":" + oldHead);
+  expect(calls.slice(0, push).some(call => call.program === "gh" && call.args.includes("repos/fixture/docs/pulls/501"))).toBe(true);
+  expect(f.inspect().refs[ref]).toBe("f".repeat(40));
+  expect((f.inspect().prs[0].head as { sha: string }).sha).not.toBe(f.commit);
 });

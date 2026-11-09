@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { appendHandoff, appendInvalidation, appendIntent, appendOutcome, appendRetirement, appendRecoveryOnly, isObservationOnly, readJournal, writePlanObject, writePublicationObjects, createJournal, publishArtifact, readArtifact, readRetainedPlan, readVerifiedPlan, type Journal, type PlanPolicy, type SealedPlan } from "./journal";
-import { readLookup } from "./observations";
+import { readLookup, lookupFactsDigest, type AbsenceEvidence } from "./observations";
 import { canonicalJSON, freezeJSON, sha256 } from "./protocol";
 import { publicationMarker } from "./report-history";
 import { externalArtifactDirectory } from "./snapshot";
@@ -281,8 +281,10 @@ type ReconciliationAuthority = { scope_sha256: string; request_sha256: string };
 export async function reconcileAbsent(options: {
   source_repo: string; journal_directory: string; object_store: PublishOptions["object_store"]; settings: Settings;
   transport: PublicationTransport; retire_effect_ids: string[];
-  authorize: (scope: ReconciliationScope) => Promise<unknown>;
-}): Promise<PublishResult> {
+  authorize: (scope: ReconciliationScope) => Promise<unknown>; inspect_only?: true;
+  retirement_lookups?: Record<string, AbsenceEvidence>;
+}): Promise<PublishResult & { inspection_scopes?: ReconciliationScope[] }> {
+  const approvedLookups = structuredClone(options.retirement_lookups ?? {});
   let journal = readJournal(options.journal_directory, options.source_repo);
   if (dirname(journal.directory) !== externalArtifactDirectory(options.transport.artifact_root, options.source_repo)) throw Error("selected reconciliation artifact root changed");
   const { plan } = journal;
@@ -314,8 +316,10 @@ export async function reconcileAbsent(options: {
     if (plan.manifest.effects.slice(0, -1).every(effect => terminal(journal, effect.id) || isRetired(effect.id))) {
       const released = await options.transport.observe(plan, release, objects);
       if (released.state === "done") {
-        if (!intended(journal, release.id)) journal = appendIntent(journal, release.id);
-        journal = appendOutcome(journal, release.id, released.outcome);
+        if (!options.inspect_only) {
+          if (!intended(journal, release.id)) journal = appendIntent(journal, release.id);
+          journal = appendOutcome(journal, release.id, released.outcome);
+        }
         return result(journal.events.some(event => event.kind === "retired-absence") ? "retired" : "complete", null);
       }
     }
@@ -327,6 +331,22 @@ export async function reconcileAbsent(options: {
       plan_sha256: sha256(canonicalJSON(plan)), lease_ref: String(release.payload.ref), lease_object: objects.lease_object,
       release_effect_id: release.id, retire_effect_ids: [...ids], actor: identity.actor, actor_id: identity.actor_id,
       retain_receipt: retained.state === "absent" ? { effect_id: receipt.id, ref: String(receipt.payload.ref), object: receiptObject } : null };
+    if (options.inspect_only) {
+      const scopes: ReconciliationScope[] = [scope];
+      for (const id of ids) {
+        const effect = plan.manifest.effects.find(effect => effect.id === id)!;
+        if (terminal(journal, id) || isRetired(id)) continue;
+        const observation = await options.transport.observe(plan, effect, objects);
+        if (observation.state === "unknown") return blocked(observation.reason);
+        if (observation.state === "conflict") {
+          if (!observation.evidence || pendingAttempt(journal, effect, true)) return blocked("retirement-lookup-unavailable");
+          const lookup = readLookup({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
+            plan, effect, transport: options.transport.kind, state: "conflict" });
+          scopes.push({ ...scope, retirement: { effect_id: id, observed_state: "conflict", lookup } });
+        }
+      }
+      return { ...blocked("inspection-only"), inspection_scopes: scopes };
+    }
     const authorize = async (original?: ReconciliationAuthority, selectedScope = scope): Promise<ReconciliationAuthority> => {
       const scopeHash = sha256(canonicalJSON(selectedScope));
       const value = await options.authorize(structuredClone(selectedScope));
@@ -381,8 +401,14 @@ export async function reconcileAbsent(options: {
       const conflicting = observation.state === "conflict";
       const pending = pendingAttempt(journal, effect, true);
       if (pending) return blocked(pending);
-      const lookup = readLookup({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
+      let lookup = readLookup({ evidence: observation.evidence, artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
         plan, effect, transport: options.transport.kind, state: conflicting ? "conflict" : "absent" });
+      if (conflicting && Object.hasOwn(approvedLookups, effect.id)) {
+        const original = readLookup({ evidence: approvedLookups[effect.id], artifact_root: options.transport.artifact_root, source_repo: options.source_repo,
+          plan, effect, transport: options.transport.kind, state: "conflict" });
+        if (lookupFactsDigest(original.path) !== lookupFactsDigest(lookup.path)) return blocked("retirement-lookup-changed");
+        lookup = original;
+      }
       const retirementScope: ReconciliationScope = conflicting ? { ...scope,
         retirement: { effect_id: effect.id, observed_state: "conflict", lookup } } : scope;
       const retirementGrant = await authorize(grant, retirementScope);

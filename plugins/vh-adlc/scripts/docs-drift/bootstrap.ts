@@ -478,6 +478,23 @@ export async function selectApprovedRuntime(input: {
     adoption_sha256: adopted.adoption_sha256, protected_sha256: adopted.protected_sha256, entry: options.entry, ...runtime });
 }
 
+/** Select the original retained code for metadata recovery. Current publication policy and grants are separate. */
+export async function selectRecoveryRuntime(input: {
+  repo: string; source_commit: string; identity: PublicationIdentity; cache_directory: string;
+  entry: "hosted" | "copilot" | "claude"; adoption_sha256: string;
+}) {
+  const options = structuredClone(input);
+  inspectCacheLocation(options.cache_directory, options.repo);
+  const adopted = verifyRuntimeAdoption({ repo: options.repo, current_default: options.source_commit, identity: options.identity });
+  if (adopted.adoption_sha256 !== options.adoption_sha256) fail("original recovery adoption changed");
+  const bindings = collectAdoptionBindings(options.repo, options.source_commit), settings = bindings.settings;
+  const runtime = await retainedRuntimeEntry({ ...options, settings, pin: adopted.component_pin, identity: adopted.identity,
+    launcher_sha256: sha256(readGit(options.repo, "show", options.source_commit + ":" + settings.runtime_loader.launcher)),
+    settings_sha256: bindings.settings_sha256 });
+  return freezeJSON({ kind: "docs-drift-recovery-runtime", authority: "none", purpose: "metadata-recovery", source_commit: options.source_commit,
+    adoption_sha256: adopted.adoption_sha256, entry: options.entry, ...runtime });
+}
+
 /** Inspect a declared candidate only. An actual trial still needs its separately scoped authority. */
 export async function selectCandidateRuntime(input: {
   repo: string; current_default: string; identity: PublicationIdentity; cache_directory: string;

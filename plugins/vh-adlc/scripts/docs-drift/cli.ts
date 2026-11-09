@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { inspectRecovery, applyRecovery, recoveryInspectionOutput } from "./recovery-controller";
 import { readAssessmentReport, assessmentReportOutput } from "./assessment-report";
 import { checkPublication, publishPublication, resumePublication } from "./publication-controller";
 import { collectCandidateReview } from "./candidate-review";
@@ -29,6 +30,8 @@ import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
 type Diagnostic = { code: string; message: string };
 export type CLIReport = {
   schema_version: 1; command: string; outcome: "collected" | "attention" | "incomplete"; diagnostics: Diagnostic[];
+  recovery_inspection?: Awaited<ReturnType<typeof inspectRecovery>>;
+  recovery_effects?: Awaited<ReturnType<typeof applyRecovery>>;
   assessment_report?: ReturnType<typeof readAssessmentReport>; markdown?: string;
   source_commit?: string; settings_sha256?: string; bindings_sha256?: string; assessment?: ScanRun;
   signals?: ReturnType<typeof checkUpgradeSignals>;
@@ -155,6 +158,19 @@ bun <plugin>/scripts/docs-drift/cli.ts prepare --repo <repo> --source <full-comm
   --artifact-root <private-external-directory> --selection <relative-packet-path>
   --selection-sha256 <sha256>
 
+bun <original-retained-plugin>/scripts/docs-drift/cli.ts <inspect-recovery|acknowledge-delivery|reconcile-publication>
+  --repo <repo> --source <original-source-commit> --artifact-root <original-private-directory>
+  --cache-root <original-retained-cache> --entry <hosted|copilot|claude>
+  --journal-directory <original-journal-directory> --selection <relative-recovery-selection>
+  --selection-sha256 <sha256>
+  [--authority <relative-exact-current-authority> --authority-sha256 <sha256>] (writes only)
+
+Recovery inspection presents exact scopes and grants no effects. Recovery uses
+original retained code, policy and journal evidence while preserving current
+worktree policy and launchers. Acknowledgement requires a fresh exact owner
+request. Reconciliation requires its exact owner request or adopted procedure.
+Acknowledged and retired deliveries exit 1 and retain attention status.
+
 report-findings checks original source quotes and complete finding accounting.
 It emits caller-recorded judgments in JSON and Markdown. The workflow combines
 delivery and prior-attention evidence in its final run report.
@@ -216,6 +232,7 @@ follow in the controller. This collection has authority none.
 Verification, review and publication follow their own fresh owned-checkout gates.
 `;
 
+const recoveryCommands = ["inspect-recovery", "acknowledge-delivery", "reconcile-publication"];
 const finalPublicationCommands = ["check-publication", "publish", "resume"];
 const publicationCommands = ["bind-publication", "collect-review-target", "read-candidate-review", ...finalPublicationCommands];
 const candidateCommands = ["check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", ...publicationCommands];
@@ -223,12 +240,14 @@ const selectionCommands = ["check-edits", "prepare", "collect-resolution", "coll
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...selectionCommands].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...selectionCommands].includes(command);
+  if (!["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", ...selectionCommands, ...recoveryCommands].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "assess-source", "report-findings", "collect-worker-inputs", "read-worker-preparation", "prepare-trial-fixture", ...selectionCommands, ...recoveryCommands].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
-  if (selectionCommands.includes(command)) flags.push("--selection", "--selection-sha256");
+  if (recoveryCommands.includes(command)) flags.push("--cache-root", "--entry", "--journal-directory");
+  if (["acknowledge-delivery", "reconcile-publication"].includes(command)) flags.push("--authority", "--authority-sha256");
+  if ([...selectionCommands, ...recoveryCommands].includes(command)) flags.push("--selection", "--selection-sha256");
   if (candidateCommands.includes(command)) flags.push("--candidate-repo", "--candidate", "--resolution-record", "--resolution-sha256");
   if (command === "check-verification") flags.push("--verification", "--verification-sha256");
   if (["collect-publication-inputs", ...publicationCommands, "collect-worker-inputs", "read-worker-preparation"].includes(command)) flags.push("--cache-root", "--entry", "--launcher", "--settings");
@@ -261,6 +280,7 @@ function argumentsForCommand(argv: string[]) {
   };
   for (const name of finalPublicationCommands) requiredReferences[name] = [...requiredReferences["read-candidate-review"], "--authority", "--authority-sha256"];
   requiredReferences.resume.push("--journal-directory");
+  for (const name of recoveryCommands) requiredReferences[name] = ["--cache-root", "--entry", "--journal-directory", "--selection", "--selection-sha256", ...(name === "inspect-recovery" ? [] : ["--authority", "--authority-sha256"])];
   const missing = (requiredReferences[command] ?? []).filter(flag => !values.has(flag));
   if (missing.length) throw Error(command + " requires " + missing.join(", "));
   return { command, repo, source, artifacts, cache: values.get("--cache-root"), entry: values.get("--entry"),
@@ -312,7 +332,28 @@ export async function main(argv: string[]): Promise<number> {
   let report: CLIReport;
   try {
     const options = argumentsForCommand(argv), repo = realpathSync(options.repo);
-    if (selectionCommands.includes(options.command)) {
+    if (recoveryCommands.includes(options.command)) {
+      const artifacts = privateArtifacts(options.artifacts, repo), entry = options.entry;
+      if (entry !== "hosted" && entry !== "copilot" && entry !== "claude") throw Error("Recovery requires a retained entry selection");
+      const bytes = readBoundArtifact({ source_repo: repo, artifact_root: artifacts.root,
+        reference: { path: options.selection, sha256: options.selection_sha256 } });
+      const selection: unknown = JSON.parse(decodeUTF8(bytes));
+      if (!canonicalJSON(selection).equals(bytes)) throw Error("Invalid canonical recovery selection JSON");
+      const { settings } = loadCommittedSettings(repo, options.source);
+      const input: Parameters<typeof inspectRecovery>[0] = { repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID(),
+        credential: nativeCredential(settings.hostname), cache_directory: resolve(options.cache!), entry,
+        journal_directory: resolve(options.journal_directory!), selection };
+      if (options.command === "inspect-recovery") {
+        report = recoveryInspectionOutput(await inspectRecovery(input), options.source);
+      } else {
+        const recovery_effects = await applyRecovery({ ...input,
+          purpose: options.command === "acknowledge-delivery" ? "acknowledgement" : "reconciliation",
+          authority: { path: options.authority, sha256: options.authority_sha256 } });
+        report = { schema_version: 1, command: options.command, source_commit: options.source, recovery_effects,
+          outcome: ["acknowledged", "retired"].includes(recovery_effects.state) ? "attention" : recovery_effects.state === "complete" ? "collected" : "incomplete",
+          diagnostics: recovery_effects.reason ? [{ code: "recovery-effects", message: recovery_effects.reason }] : [] };
+      }
+    } else if (selectionCommands.includes(options.command)) {
       const artifacts = privateArtifacts(options.artifacts, repo);
       let candidate: { repo: string; commit: string } | null = null;
       if (candidateCommands.includes(options.command)) {

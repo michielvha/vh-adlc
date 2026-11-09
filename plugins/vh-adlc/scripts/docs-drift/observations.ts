@@ -52,3 +52,14 @@ export function retainAbsence(options: Omit<Parameters<typeof retainLookup>[0], 
 export function readAbsence(options: Omit<Parameters<typeof readLookup>[0], "state">): AbsenceEvidence {
   return readLookup({ ...options, state: "absent" });
 }
+
+
+/** Request timestamps change on revalidation. The observed facts and request destinations stay bound. */
+export function lookupFactsDigest(path: string): string {
+  const value = JSON.parse(decodeUTF8(readArtifact(path)));
+  if (Array.isArray(value.lookup?.requests)) value.lookup.requests = value.lookup.requests.map((request: Record<string, unknown>) => {
+    const { started_at: _started, observed_at: _observed, ...scope } = request;
+    return scope;
+  });
+  return sha256(canonicalJSON(value));
+}

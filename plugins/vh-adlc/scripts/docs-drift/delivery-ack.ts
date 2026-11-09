@@ -4,7 +4,7 @@ import { readAppliedDelivery } from "./delivery-proof";
 import { lookupAppliedDelivery, type DeliveryLookup } from "./delivery-lookup";
 import { readGitSuccess } from "./git-success";
 import { appendAcknowledgement, appendIntent, appendOutcome, appendRetirement, publishArtifact, readArtifact, readJournal, writePublicationObjects, type Journal, type ReconciliationGrant } from "./journal";
-import { readLookup } from "./observations";
+import { readLookup, lookupFactsDigest } from "./observations";
 import { readRejection } from "./rejections";
 import { canonicalJSON, sha256 } from "./protocol";
 import { captureRepositoryState, externalArtifactDirectory } from "./snapshot";
@@ -25,7 +25,7 @@ export type AcknowledgementScope = {
 type Options = {
   source_repo: string; journal_directory: string; object_store: PublishOptions["object_store"]; settings: Settings;
   transport: PublicationTransport; acknowledge_effect_ids: string[]; retire_effect_ids: string[];
-  authorize: (scope: AcknowledgementScope) => Promise<unknown>;
+  authorize: (scope: AcknowledgementScope) => Promise<unknown>; inspect_only?: true;
 };
 function terminal(journal: Journal, id: string) {
   return journal.events.find(event => event.effect_id === id && ["outcome", "acknowledged-delivery", "retired-absence"].includes(event.kind));
@@ -86,17 +86,8 @@ function releaseSettlement(options: Options, journal: Journal, objects: PlanObje
   return sha256(canonicalJSON(endings));
 }
 
-function lookupDigest(path: string): string {
-  const value = JSON.parse(readArtifact(path).toString());
-  // Revalidation has new request times. Compare the complete observed facts and request destinations.
-  if (Array.isArray(value.lookup?.requests)) value.lookup.requests = value.lookup.requests.map((request: Record<string, unknown>) => {
-    const { started_at: _started, observed_at: _observed, ...scope } = request; return scope;
-  });
-  return sha256(canonicalJSON(value));
-}
-
 /** The caller must bind authorize to the owner's actual current request, independently of adopted grants. */
-export async function acknowledgeDeliveries(options: Options): Promise<PublishResult> {
+export async function acknowledgeDeliveries(options: Options): Promise<PublishResult & { inspection_scope?: AcknowledgementScope }> {
   let journal = readJournal(options.journal_directory, options.source_repo);
   const { plan } = journal, objects = writePublicationObjects(options.object_store, plan, journal.header);
   const result = (state: PublishResult["state"], reason: string | null): PublishResult => ({ state, reason, journal, objects });
@@ -132,8 +123,10 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
       const observed = await options.transport.observe(plan, release, objects);
       refresh();
       if (observed.state === "done") {
-        if (!journal.events.some(event => event.kind === "intent" && event.effect_id === release.id)) journal = appendIntent(journal, release.id);
-        if (!terminal(journal, release.id)) journal = appendOutcome(journal, release.id, observed.outcome);
+        if (!options.inspect_only) {
+          if (!journal.events.some(event => event.kind === "intent" && event.effect_id === release.id)) journal = appendIntent(journal, release.id);
+          if (!terminal(journal, release.id)) journal = appendOutcome(journal, release.id, observed.outcome);
+        }
         return result("acknowledged", null);
       }
     }
@@ -163,7 +156,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
           const state = JSON.parse(readArtifact(evidence.path).toString()).state;
           if (state !== "absent" && state !== "conflict") throw Error("acknowledgement-retirement-evidence-changed");
           readLookup({ ...options, artifact_root: options.transport.artifact_root, plan, effect, transport: options.transport.kind, state, evidence });
-          retirements.push({ effect_id: effect.id, state, lookup_sha256: lookupDigest(evidence.path) });
+          retirements.push({ effect_id: effect.id, state, lookup_sha256: lookupFactsDigest(evidence.path) });
           continue;
         }
         if (completed) {
@@ -179,7 +172,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
         else {
           if (!retireIds.includes(effect.id) || observed.state === "unknown" || !observed.evidence || pendingAttempt(journal, effect, true)) throw Error("acknowledgement-remaining-effect-pending");
           readLookup({ ...options, artifact_root: options.transport.artifact_root, plan, effect, transport: options.transport.kind, state: observed.state, evidence: observed.evidence });
-          retirements.push({ effect_id: effect.id, state: observed.state, lookup_sha256: lookupDigest(observed.evidence.path) });
+          retirements.push({ effect_id: effect.id, state: observed.state, lookup_sha256: lookupFactsDigest(observed.evidence.path) });
         }
       }
       refresh();
@@ -193,6 +186,7 @@ export async function acknowledgeDeliveries(options: Options): Promise<PublishRe
       return { scope, observations, lookups };
     };
     const initial = await collect(), scopeHash = sha256(canonicalJSON(initial.scope));
+    if (options.inspect_only) return { ...result("pending", "inspection-only"), inspection_scope: initial.scope };
     const authorize = async (original?: ReconciliationGrant): Promise<ReconciliationGrant> => {
       const value = await options.authorize(structuredClone(initial.scope));
       if (value === null || typeof value !== "object" || Array.isArray(value)) throw Error("acknowledgement-owner-approval-required");

@@ -954,3 +954,47 @@ test("all-attempt liveness includes atomic receipt aliases and preserves settlem
   expect(hasInFlightAttempt(journal, receipt)).toBe(false);
   expect(pendingAttempt(journal, receipt, true)).toBe("attempt-not-reaped");
 });
+
+test("reconciliation inspection exposes its scope without retaining a receipt or changing the journal", async () => {
+  const f = setup(), interrupted = await legacyReceiptInterruption(f);
+  const before = readJournal(interrupted.journal.directory, f.repo), refs = [...f.refs], executed = [...f.executed];
+  let approvals = 0;
+  const inspected = await reconcileAbsent({ source_repo: f.repo, journal_directory: before.directory, object_store: f.store,
+    settings: f.settings, transport: f.transport, retire_effect_ids: ["push", "pr"], inspect_only: true,
+    authorize: async scope => { approvals++; return { scope_sha256: sha256(canonicalJSON(scope)), request_sha256: hash("actual current fixture cleanup") }; } });
+  expect(inspected.state).toBe("pending"); expect(inspected.reason).toBe("inspection-only");
+  expect(inspected.inspection_scopes?.[0].operation_id).toBe(f.plan.manifest.operation_id);
+  expect(approvals).toBe(0); expect(readJournal(before.directory, f.repo).digest).toBe(before.digest);
+  expect([...f.refs]).toEqual(refs); expect(f.executed).toEqual(executed);
+});
+
+test.each(["matching", "changed-facts", "changed-original", "unknown-current"])("reconciliation reuses only the freshly matching approved conflict lookup %s", async scenario => {
+  const { retainLookup } = await import("../../../plugins/vh-adlc/scripts/docs-drift/observations");
+  const f = setup(), interrupted = await legacyReceiptInterruption(f), observe = f.transport.observe;
+  let current = "original-conflict", unavailable = false;
+  f.transport.observe = async (plan, effect, objects) => {
+    if (effect.id !== "pr") return observe(plan, effect, objects);
+    if (unavailable) return { state: "unknown", reason: "current conflict unavailable" };
+    return { state: "conflict", reason: "known unapplied target changed", evidence: retainLookup({ artifact_root: f.artifacts, source_repo: f.repo,
+      plan, effect, transport: "collector", state: "conflict", lookup: { current, requests: [{ method: "GET", status: 200,
+        endpoint: "fixture/pr", started_at: new Date().toISOString(), observed_at: new Date().toISOString() }] } }) };
+  };
+  const common = { source_repo: f.repo, journal_directory: interrupted.journal.directory, object_store: f.store, settings: f.settings,
+    transport: f.transport, retire_effect_ids: ["push", "pr"] };
+  const inspected = await reconcileAbsent({ ...common, inspect_only: true, authorize: async () => { throw Error("Inspection requested authority"); } });
+  const scopes = inspected.inspection_scopes;
+  if (!scopes || scopes.length !== 2) throw Error("Missing complete inspected reconciliation scopes");
+  const lookup = scopes[1].retirement!.lookup, hashes = new Set(scopes.map(scope => sha256(canonicalJSON(scope))));
+  if (scenario === "changed-facts") current = "later-conflict";
+  if (scenario === "changed-original") writeFileSync(lookup.path, "{}\n");
+  if (scenario === "unknown-current") unavailable = true;
+  const result = await reconcileAbsent({ ...common, retirement_lookups: { pr: lookup }, authorize: async scope => {
+    const digest = sha256(canonicalJSON(scope));
+    if (!hashes.has(digest)) throw Error("Scope differs from the displayed owner-approved batch");
+    return { scope_sha256: digest, request_sha256: hash("actual approved reconciliation batch") };
+  } });
+  expect(result.state, result.reason ?? undefined).toBe(scenario === "matching" ? "retired" : "pending");
+  expect(f.executed.includes("pr")).toBe(false);
+  expect(f.refs.has(f.settings.publication.lease_ref)).toBe(scenario !== "matching");
+  expect(result.journal.events.some(event => event.kind === "retired-absence" && event.effect_id === "pr")).toBe(scenario === "matching");
+});

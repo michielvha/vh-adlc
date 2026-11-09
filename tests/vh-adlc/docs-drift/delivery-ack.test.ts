@@ -948,3 +948,33 @@ test(`an exact outcome recorded ${when} cannot be silently skipped as acknowledg
   expect(f.executed.includes("release")).toBe(false);
 });
 }
+
+test("acknowledgement inspection returns the exact scope without requesting authority or changing the journal", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const { f, options, resource } = await changedDeliveryFixture();
+  const before = readJournal(options.journal_directory, f.repo), refs = [...f.refs], executed = [...f.executed], body = resource.body;
+  let approvals = 0;
+  const inspected = await acknowledgeDeliveries({ ...options, inspect_only: true, authorize: async scope => { approvals++; return options.authorize(scope); } });
+  expect(inspected.state).toBe("pending"); expect(inspected.reason).toBe("inspection-only");
+  expect(inspected.inspection_scope?.kind).toBe("docs-drift-delivery-acknowledgement"); expect(approvals).toBe(0);
+  expect(readJournal(options.journal_directory, f.repo).digest).toBe(before.digest);
+  expect([...f.refs]).toEqual(refs); expect(f.executed).toEqual(executed); expect(resource.body).toBe(body);
+});
+
+test("inspection after an acknowledged remote release leaves its missing local outcome untouched", async () => {
+  const { acknowledgeDeliveries } = await import("../../../plugins/vh-adlc/scripts/docs-drift/recovery");
+  const artifacts = await import("../../../plugins/vh-adlc/scripts/docs-drift/journal");
+  const { f, options } = await changedDeliveryFixture(), append = artifacts.appendOutcome;
+  const fault = spyOn(artifacts, "appendOutcome").mockImplementation((journal, id, outcome) => {
+    if (id === "release") throw Error("Synthetic lost acknowledgement release outcome");
+    return append(journal, id, outcome);
+  });
+  let pending;
+  try { pending = await acknowledgeDeliveries(options); } finally { fault.mockRestore(); }
+  expect(pending.state).toBe("pending"); expect(f.refs.has(f.settings.publication.lease_ref)).toBe(false);
+  const before = readJournal(options.journal_directory, f.repo).digest, executed = [...f.executed];
+  const inspected = await acknowledgeDeliveries({ ...options, inspect_only: true });
+  expect(inspected.state).toBe("acknowledged"); expect(readJournal(options.journal_directory, f.repo).digest).toBe(before);
+  expect(f.executed).toEqual(executed);
+  expect((await acknowledgeDeliveries(options)).state).toBe("acknowledged");
+});
