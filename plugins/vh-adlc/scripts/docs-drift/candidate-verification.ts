@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, isAbsolute, join, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { publishArtifact, readArtifact } from "./journal";
 import { inspectCandidate } from "./preparation";
 import { executeOwnedProcess, type OwnedProcess } from "./owned-process";
 import { canonicalDigest, canonicalJSON, sha256 } from "./protocol";
+import { scanArtifactReferences } from "./scan-evidence";
 import { runScan, scannerEnvironment, type ScanRun } from "./scan";
 import { captureRepositoryState, captureSnapshot, externalArtifactDirectory, matchesRepositoryState } from "./snapshot";
 
@@ -33,9 +34,7 @@ export async function verifyCandidate(input: Parameters<typeof inspectCandidate>
     const snapshot = captureSnapshot(candidateRepo, options.candidate);
     result.scan = await runScan(snapshot, { artifact_root: root, owner: options.owner, run: options.run, timeout_ms: options.timeout_ms });
     if (!result.scan.complete) { result.diagnostics.push(...result.scan.diagnostics.map(item => item.message)); throw Error("Candidate scan incomplete"); }
-    const scanRoot = dirname(result.scan.output_path);
-    result.scan_artifacts = { report: reference(result.scan.output_path), start: reference(join(scanRoot, "process-start.json")), process: reference(join(scanRoot, "process-result.json")),
-      bindings: reference(join(scanRoot, "bindings.json")), record: reference(result.scan.record_path) };
+    result.scan_artifacts = scanArtifactReferences(result.scan, root);
     result.checkout_state_sha256 = canonicalDigest(captureRepositoryState(result.scan.checkout));
     const checkout = result.scan.checkout, directory = join(root, "candidate-checks-" + randomUUID());
     mkdirSync(directory, { mode: 0o700 });

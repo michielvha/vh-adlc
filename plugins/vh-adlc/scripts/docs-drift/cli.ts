@@ -12,6 +12,7 @@ import { selectApprovedRuntime, selectCandidateRuntime } from "./bootstrap";
 import { collectProposals } from "./proposals";
 import { inspectPreparation, inspectCandidate, prepareEdits, PreparationEvidenceError } from "./preparation";
 import { readCandidateVerificationArtifacts } from "./verification-evidence";
+import { assessSource } from "./source-assessment";
 import { verifyCandidate } from "./candidate-verification";
 import { collectPublicationBindings } from "./publication-bindings";
 import { collectPublicationInputs } from "./publication-inputs";
@@ -32,6 +33,7 @@ export type CLIReport = {
   publication_bindings?: Awaited<ReturnType<typeof collectPublicationBindings>>;
   publication_inputs?: Awaited<ReturnType<typeof collectPublicationInputs>>;
   verification?: Awaited<ReturnType<typeof verifyCandidate>>;
+  source_assessment?: Awaited<ReturnType<typeof assessSource>>;
   candidate_inspection?: ReturnType<typeof inspectCandidate>;
   retained_resources?: { checkout: string | null; record_path: string | null };
   closure?: Awaited<ReturnType<typeof collectNativeClosure>>;
@@ -40,6 +42,8 @@ export type CLIReport = {
 };
 const usage = `Documentation drift helper protocol 1
 bun <plugin>/scripts/docs-drift/cli.ts scan --repo <repo> --source <full-commit>
+  --artifact-root <private-external-directory>
+bun <plugin>/scripts/docs-drift/cli.ts assess-source --repo <repo> --source <full-commit>
   --artifact-root <private-external-directory>
 bun <plugin>/scripts/docs-drift/cli.ts check-upgrade-signals --repo <repo>
   --source <full-commit>
@@ -136,7 +140,9 @@ artifacts. Verification checks re-read those original bytes and current bindings
 Generators and semantic review follow their separately selected steps.
 Publication binding collection rechecks source and candidate verification artifacts,
 current native proposals and the decision packet before deriving review bindings.
-Source verification selects the assessment commit with an empty edit selection.
+Source assessment retains the complete original scan without running baseline checks.
+Existing passing baseline verification records remain readable. Candidate checks
+must pass on the selected repaired checkpoint.
 Bindings have authority none. Original role evidence, current required observations and actual effect grants
 follow in the controller. This collection has authority none.
 Verification, review and publication follow their own fresh owned-checkout gates.
@@ -144,8 +150,8 @@ Verification, review and publication follow their own fresh owned-checkout gates
 
 function argumentsForCommand(argv: string[]) {
   const command = argv[0];
-  if (!["scan", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) throw Error("unknown docs-drift command");
-  const needsArtifacts = ["scan", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command);
+  if (!["scan", "assess-source", "check-upgrade-signals", "trial-bindings", "prepare-trial-fixture", "inspect-runtime", "collect-proposals", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command)) throw Error("unknown docs-drift command");
+  const needsArtifacts = ["scan", "assess-source", "prepare-trial-fixture", "check-edits", "prepare", "collect-resolution", "collect-closure", "check-candidate", "collect-publication-inputs", "verify-candidate", "check-verification", "bind-publication"].includes(command);
   const flags = ["--repo", "--source"];
   if (needsArtifacts) flags.push("--artifact-root");
   if (command === "inspect-runtime") flags.push("--cache-root", "--entry", "--launcher", "--settings", "--trial-definition");
@@ -296,6 +302,11 @@ export async function main(argv: string[]): Promise<number> {
         report = { schema_version: 1, command: options.command, outcome: edit_inspection.complete ? "collected" : "incomplete",
           source_commit: options.source, diagnostics: [...protection, ...edit_inspection.diagnostics.filter(message => !protectionMessages.has(message)).map(message => ({ code: "edit-inspection", message }))], edit_inspection };
       }
+    } else if (options.command === "assess-source") {
+      const artifacts = privateArtifacts(options.artifacts, repo);
+      const source_assessment = await assessSource({ repo, source: options.source, artifact_root: artifacts.root, owner: artifacts.owner, run: randomUUID() });
+      report = { schema_version: 1, command: options.command, outcome: source_assessment.complete ? "collected" : "incomplete",
+        source_commit: options.source, source_assessment, diagnostics: source_assessment.diagnostics.map(message => ({ code: "source-assessment", message })) };
     } else if (options.command === "trial-bindings") {
       const trial = collectTrialBindings({ repo, current_default: options.source });
       report = { schema_version: 1, command: options.command, outcome: "collected", source_commit: options.source, diagnostics: [], trial };

@@ -1,9 +1,9 @@
-import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { artifactDirectoryScope, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { inspectCandidate } from "./preparation";
-import { assessScan } from "./scan";
+import { readOriginalScan, requireSuccessfulProcess } from "./scan-evidence";
 import { readBoundArtifact } from "./evidence-input";
-import { canonicalJSON, decodeUTF8, protocolPath, verifyProtocolBindings } from "./protocol";
+import { canonicalJSON, decodeUTF8, protocolPath } from "./protocol";
 import type { verifyCandidate } from "./candidate-verification";
 
 type Verification = Awaited<ReturnType<typeof verifyCandidate>>;
@@ -47,41 +47,7 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
   artifactDirectoryScope(scope.directory, options.repo).assertExternal(scan.checkout);
   if (!matchesRepositoryState(scan.checkout, value.checkout_state_sha256)) fail("owned verification source changed or unavailable");
   const snapshot = captureSnapshot(options.candidate_repo, options.candidate);
-  verifyProtocolBindings(read(originals.bindings), snapshot.protocol);
-  const assessment = assessScan(JSON.parse(decodeUTF8(read(originals.report))), snapshot);
-  if (!assessment.complete) fail("scan incomplete");
-  for (const key of Object.keys(assessment) as Array<keyof typeof assessment>) if (!same(assessment[key], scan[key])) fail("scan assessment changed");
-  const process = json(read(originals.process));
-  if (!same(process, scan.process)) fail("original scanner completion changed");
-  function complete(value: unknown): asserts value is NonNullable<Verification["commands"][number]["process"]> {
-    if (value === null || typeof value !== "object" || Array.isArray(value)) fail("process required");
-    const p = value as Record<string, unknown>;
-    if (Object.keys(p).sort().join(",") !== "cancelled,exit_code,output_limit,pid,reaped,timed_out"
-      || typeof p.pid !== "number" || !Number.isSafeInteger(p.pid) || p.pid < 1 || p.exit_code !== 0 || p.timed_out !== false
-      || p.cancelled !== null || p.output_limit !== false || p.reaped !== true) fail("successful reaped process required");
-  }
-  complete(process);
-  const scannerStart = json(read(originals.start));
-  if (scannerStart === null || typeof scannerStart !== "object" || Array.isArray(scannerStart)) fail("original scanner start required");
-  const launched = scannerStart as Record<string, unknown>, argv = launched.argv, configured = snapshot.settings.scanner.argv;
-  if (launched.pid !== process.pid || launched.source_commit !== options.candidate || !Array.isArray(argv) || typeof argv[0] !== "string"
-    || !same(argv.slice(1), [...configured.slice(1), "--protocol-bindings", join(dirname(scan.checkout), "bindings.json"), "--protocol-json", scan.output_path])
-    || (configured[0].includes("/") ? argv[0] !== (isAbsolute(configured[0]) ? configured[0] : join(scan.checkout, configured[0])) : basename(argv[0]) !== configured[0]))
-    fail("original scanner launch binding changed");
-  const allocation = json(read(originals.record));
-  if (allocation === null || typeof allocation !== "object" || Array.isArray(allocation)
-    || (allocation as Record<string, unknown>).kind !== "assessment-checkout"
-    || (allocation as Record<string, unknown>).source_commit !== options.candidate
-    || (allocation as Record<string, unknown>).checkout !== scan.checkout
-    || (allocation as Record<string, unknown>).root !== dirname(scan.checkout)
-    || (allocation as Record<string, unknown>).evidence_location !== scan.record_path
-    || (allocation as Record<string, unknown>).bindings_sha256 !== snapshot.protocol.sha256) fail("owned scanner allocation changed");
-  const scanRoot = dirname(scan.checkout);
-  if (scan.output_path !== join(scanRoot, "scan.json")
-    || relative(scope.directory, scan.output_path) !== originals.report.path || relative(scope.directory, scan.record_path) !== originals.record.path
-    || relative(scope.directory, join(scanRoot, "bindings.json")) !== originals.bindings.path
-    || relative(scope.directory, join(scanRoot, "process-result.json")) !== originals.process.path
-    || relative(scope.directory, join(scanRoot, "process-start.json")) !== originals.start.path) fail("original scanner artifact location changed");
+  readOriginalScan(snapshot, scan, originals, scope.directory, read);
   if (!Array.isArray(value.commands) || value.commands.length !== snapshot.settings.verification_commands.length) fail("complete configured verification required");
   for (const [index, command] of value.commands.entries()) {
     if (!same(command.argv, snapshot.settings.verification_commands[index])) fail("configured verification vector changed");
@@ -89,7 +55,7 @@ export function readCandidateVerificationArtifacts(options: Parameters<typeof in
     const directory = dirname(command.stdout.path);
     if ([command.stdout.path, command.stderr.path, command.start.path, command.completion.path].some((path, item) =>
       path !== join(directory, index + ["-stdout.log", "-stderr.log", "-start.json", "-process.json"][item]))) fail("original verification artifact location changed");
-    const completion = json(read(command.completion)); complete(completion);
+    const completion = json(read(command.completion)); requireSuccessfulProcess(completion);
     if (!same(completion, command.process)) fail("original verification completion changed");
     const start = json(read(command.start));
     if (start === null || typeof start !== "object" || Array.isArray(start)

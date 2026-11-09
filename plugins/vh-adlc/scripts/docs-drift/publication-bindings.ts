@@ -15,6 +15,7 @@ import { parseEdit, readResolutionRecord, resolutionSource } from "./resolve";
 import { collectResolutionInputs, readResolutionProposal, recheckResolutionInputs, type ResolutionCollection, type ResolutionInputs } from "./resolve-inputs";
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { readNativeContext } from "./transport";
+import { readSourceAssessmentArtifacts } from "./source-assessment";
 import { readCandidateVerificationArtifacts } from "./verification-evidence";
 
 type Options = Omit<Parameters<typeof collectPublicationInputs>[0], "object_store"> & {
@@ -25,7 +26,7 @@ type Result = {
   proposal_snapshot: { path: string; sha256: string } | null; proposal_snapshot_path: string | null; worker_input_sha256: string | null;
   candidate_verification_sha256: string | null;
   mode: "advisory" | "resolve" | null; bindings: Bindings | null; corrections: CorrectionInput[]; attention: AttentionProjection[];
-  source_verification: ReturnType<typeof readCandidateVerificationArtifacts> | null;
+  source_verification: ReturnType<typeof readSourceAssessmentArtifacts> | null;
   candidate_verification: ReturnType<typeof readCandidateVerificationArtifacts> | null;
   facts: Awaited<ReturnType<typeof collectPublicationInputs>> | null; proposals: ReturnType<typeof collectProposals> | null;
   resolution: ResolutionInputs | null;
@@ -76,8 +77,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
         || decisions.some(item => typeof item.id !== "string" || !expected.has(item.id) || typeof item.reason !== "string" || !item.reason.trim())) throw Error(reason);
     }
     const common = { repo, source: options.source, artifact_root: secondary.directory, owner: options.owner, run: options.run };
-    result.source_verification = readCandidateVerificationArtifacts({ ...common, candidate_repo: candidateRepo, candidate: options.source,
-      selection: { schema_version: 1, source_commit: options.source, edits: [] }, reference: options.source_verification });
+    result.source_verification = readSourceAssessmentArtifacts({ ...common, candidate_repo: candidateRepo, reference: options.source_verification });
     result.candidate_verification = readCandidateVerificationArtifacts({ ...common, candidate_repo: candidateRepo, candidate: options.candidate,
       selection: options.selection, resolution_record: options.resolution_record, reference: options.candidate_verification });
     const verified = result.candidate_verification, baseline = result.source_verification;
@@ -95,7 +95,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     if (!result.proposals.complete) { result.diagnostics.push(...result.proposals.diagnostics); throw Error("Complete current proposal inventory required"); }
     let resolutionCollection: ResolutionCollection | null = null;
     if (result.mode === "resolve") {
-      const sourceStore = baseline.inspection?.object_store;
+      const sourceStore = baseline.object_store;
       if (!sourceStore || !options.resolution_record) throw Error("Original assessed objects and resolve record required");
       const environment = { PATH: options.path, ...(snapshot.settings.hostname === "github.com" || snapshot.settings.hostname.endsWith(".ghe.com")
         ? { GH_TOKEN: options.credential } : { GH_ENTERPRISE_TOKEN: options.credential }) };
@@ -110,7 +110,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
       resolutionCollection = { snapshot, store: sourceStore, reader: context.repository, selected };
       result.resolution = collectResolutionInputs(resolutionCollection);
       if (!result.resolution.complete) { result.diagnostics.push(...result.resolution.diagnostics); throw Error("Selected native resolution inputs incomplete"); }
-      if (!canonicalJSON(result.resolution.proposals).equals(canonicalJSON(observed))) throw Error("Selected original inputs changed during binding collection");
+      if (!canonicalJSON(result.resolution.proposals).equals(canonicalJSON(observed))) throw Error("Selected original inputs changed between fetch and collection");
       const record = readResolutionRecord(readGit(candidateRepo, "show", options.candidate + ":" + protocolPath(options.resolution_record.path)), snapshot.settings);
       const originalBindings = result.resolution.proposals.map(proposal => ({ ...proposal,
         hunks: proposal.hunks.map(({ before_base64: _before, after_base64: _after, ...hunk }) => hunk) }));
@@ -148,7 +148,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
       candidate_commit: options.candidate, candidate_tree: candidate.candidate_tree, diff_sha256: candidate.diff_sha256,
       delivery_sha256: deliveryDigest(result.corrections, result.attention, result.candidate_verification_sha256) };
     if (resolutionCollection && result.resolution && !recheckResolutionInputs(result.resolution, resolutionCollection).fresh)
-      throw Error("Selected original inputs changed during binding collection");
+      throw Error("Selected original inputs changed during final recheck");
     const final = native(), proposals = collectProposals(final.repository, snapshot.settings);
     if (final.default_commit !== currentDefault || canonicalDigest(final.identity) !== canonicalDigest(identity) || !proposals.complete
       || canonicalDigest(proposals.proposals) !== canonicalDigest(result.proposals.proposals)) throw Error("Native source actor or proposals changed during binding collection");
