@@ -20,7 +20,7 @@ const SCHEDULE: Record<number, string[]> = {
   7: ["ship", "triage", "maintenance", "audit", "projects"],
 };
 const ALL_OPERATIONS = Object.values(SCHEDULE).flat();
-const CONTENT_OPERATIONS = ["blog", "docs-impact"];
+const UNGATED_OPERATIONS = ["blog", "docs-impact", "cloudflare"];
 
 function selectedPhase(): number {
   const raw = process.env.VH_ADLC_PHASE;
@@ -230,12 +230,12 @@ describe("manifest and marketplace", () => {
 });
 
 describe("skills", () => {
-  test("every skill is the entry, a gated operation or a declared content operation", () => {
+  test("every skill is the entry or a declared operation", () => {
 
     const dirs = existsSync(join(PKG, "skills")) ? readdirSync(join(PKG, "skills")).sort() : [];
     expect(dirs).toContain("vh-adlc");
-    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...CONTENT_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
-    for (const op of CONTENT_OPERATIONS) {
+    for (const d of dirs) expect(["vh-adlc",...[...ALL_OPERATIONS, ...UNGATED_OPERATIONS].map((op) => `vh-adlc-${op}`)]).toContain(d);
+    for (const op of UNGATED_OPERATIONS) {
       expect(dirs).toContain(`vh-adlc-${op}`);
       const fm = frontmatter(read(skillPath(op)));
       expect(fm?.name).toBe(`vh-adlc-${op}`);

@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const plugin = join(import.meta.dir, "../../../plugins/vh-adlc"), read = (path: string) => readFileSync(join(plugin, path), "utf8");
@@ -9,7 +9,6 @@ test("maintenance is a discoverable model-neutral operation with one canonical p
   expect(header.name).toBe("vh-adlc-maintenance"); expect(header).not.toHaveProperty("model"); expect(header).not.toHaveProperty("allowed-tools");
   expect(skill.length).toBeLessThan(5000);
   for (const path of ["references/maintenance.md", "references/maintenance-settings.md", "references/authority.md", "references/loop.md"]) { expect(skill).toContain(path); expect(read(path).length).toBeGreaterThan(0); }
-  expect(readdirSync(join(plugin, "skills"))).toHaveLength(14);
   expect(read("references/maintenance.md")).not.toMatch(/\b(?:AskUserQuestion|TodoWrite|mcp__|model:)\b/);
 });
 

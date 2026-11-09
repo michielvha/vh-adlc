@@ -12,8 +12,7 @@ Use vh-adlc to repair this regression and finish locally.
 ```
 
 The generic `vh-adlc` entry reads lifecycle intake, which inspects the request and
-repository and selects a procedure. The package has fourteen skills: this entry,
-eleven engineering operations and two content operations. Check
+repository and selects a procedure. Check
 [compatibility](../reference/compatibility.md) for the lifecycle trials and limits
 on your host.
 
@@ -53,6 +52,7 @@ see [installation](../get-started/installation.md).
 | Resume | `vh-adlc-resume` | Reconstruct the state and continue the next safe step. |
 | Documentation impact | `vh-adlc-docs-impact` | Find and review docs affected by selected code changes. |
 | Article | `vh-adlc-blog` | Draft, revise or review articles; `promote` also prepares social Markdown linking to the author's website. |
+| Cloudflare setup | `vh-adlc-cloudflare` | Open Cloudflare's official opt-in setup for Codex, Claude Code, or Copilot CLI. |
 
 Triage reports stay uncommitted unless requested. Every GitHub change, including comments and
 labels, waits for the report and approval of the exact batch. Local plan patches and their commit

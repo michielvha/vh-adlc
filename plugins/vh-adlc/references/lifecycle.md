@@ -49,6 +49,7 @@ fallback and report its limitation. Do not claim an unexecuted gate passed.
 | Requested result | Procedure |
 | --- | --- |
 | Answer or advice | Inspect the relevant source and answer with its practical limits. No saved artifact unless requested. |
+| Cloudflare agent setup | Use `skills/vh-adlc-cloudflare/SKILL.md` to find Cloudflare's official instructions for the selected harness. |
 | Cross-repository GitHub Projects coordination | Use `skills/vh-adlc-projects/SKILL.md` for inventory and approved issue membership/single-select updates; board state never grants repository or live authority. |
 | Backlog triage | Use `skills/vh-adlc-triage/SKILL.md` to verify scope, rank ready work and save a report; GitHub writes require exact triage approval; every published verdict and local assessment patch also needs current proof in the confined controller from [the boundary guide](triage-boundary.md). |
 | Persistent codebase audit or selected audit-finding repair | Use `skills/vh-adlc-audit/SKILL.md` for the named mode/ledger/source scope; status reads history, reverify/full proposes before selection, and selected fixes use `audit-record.md` and independent audit review. |
