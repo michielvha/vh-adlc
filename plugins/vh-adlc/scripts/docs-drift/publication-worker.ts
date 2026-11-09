@@ -7,6 +7,7 @@ import { advisoryDecisionIDs, parseDecisionPacket, projectAttentionProposals } f
 import { collectPublicationOriginals } from "./publication-originals";
 import { collectProposals, projectProposalBindings } from "./proposals";
 import { recheckResolutionInputs, type ResolutionCollection, type ResolutionInputs } from "./resolve-inputs";
+import { roleRuntimeDigest } from "./role-capture";
 import { readSourceAssessmentArtifacts } from "./source-assessment";
 import { readNativeContext } from "./transport";
 import type { AttentionProjection } from "./report";
@@ -43,7 +44,7 @@ export type WorkerCollectionOptions = Omit<Parameters<typeof collectPublicationI
 
 type WorkerCollection = {
   schema_version: 1; kind: "docs-drift-worker-inputs"; authority: "none"; complete: boolean; diagnostics: string[];
-  inputs: WorkerInputs | null; worker_input_sha256: string | null; attention: AttentionProjection[];
+  inputs: WorkerInputs | null; worker_input_sha256: string | null; worker_runtime_sha256: string | null; attention: AttentionProjection[];
   proposal_snapshot: { path: string; sha256: string } | null; proposal_snapshot_path: string | null;
   source_verification: ReturnType<typeof readSourceAssessmentArtifacts> | null;
   facts: Awaited<ReturnType<typeof collectPublicationInputs>> | null; proposals: ReturnType<typeof collectProposals> | null;
@@ -57,7 +58,7 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     cache_directory: input.cache_directory, entry: input.entry, launcher_path: input.launcher_path, settings_path: input.settings_path,
     source_verification: structuredClone(input.source_verification), decisions: structuredClone(input.decisions) };
   const result: WorkerCollection = { schema_version: 1, kind: "docs-drift-worker-inputs", authority: "none", complete: false, diagnostics: [],
-    inputs: null, worker_input_sha256: null, attention: [], proposal_snapshot: null, proposal_snapshot_path: null,
+    inputs: null, worker_input_sha256: null, worker_runtime_sha256: null, attention: [], proposal_snapshot: null, proposal_snapshot_path: null,
     source_verification: null, facts: null, proposals: null, resolution: null };
   const repo = realpathSync(options.repo), before = canonicalDigest(captureRepositoryState(repo));
   try {
@@ -72,11 +73,12 @@ export async function collectWorkerInputs(input: WorkerCollectionOptions): Promi
     result.source_verification = readSourceAssessmentArtifacts({ ...options, repo, candidate_repo: repo, reference: options.source_verification });
     const baseline = result.source_verification;
     if (!baseline.evidence || !baseline.scan_artifacts || !baseline.object_store) throw Error("Complete original source assessment required");
-    result.facts = await collectPublicationInputs({ ...options, repo, candidate_repo: repo, candidate: options.source,
+    result.facts = await collectPublicationInputs({ ...options, repo, candidate_repo: repo, candidate: options.source, object_store: baseline.object_store,
       selection: { schema_version: 1, source_commit: options.source, edits: [] } });
     if (!result.facts.complete) { result.diagnostics.push(...result.facts.diagnostics); throw Error("Current publication facts incomplete"); }
     const { identity, current_default: currentDefault } = result.facts;
-    if (!identity || !currentDefault) throw Error("Complete native source identity required");
+    if (!identity || !currentDefault || !result.facts.runtime) throw Error("Complete native source identity and runtime required");
+    result.worker_runtime_sha256 = roleRuntimeDigest(result.facts.runtime, "worker");
     const native = () => readNativeContext({ hostname: snapshot.settings.hostname, repository: snapshot.settings.repository, credential: options.credential, path: options.path });
     const context = native();
     if (context.default_commit !== currentDefault || canonicalDigest(context.identity) !== canonicalDigest(identity)) throw Error("Native source or actor changed before proposal collection");

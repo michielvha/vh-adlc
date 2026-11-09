@@ -117,7 +117,7 @@ for (const invalid of ["test-only", "missing-history", "incomplete-entry", "chan
     if (invalid === "test-only") record.receipts.copilot_entry!.evidence_kind = "test-only";
     if (invalid === "missing-history") delete record.receipts.history_read;
     if (invalid === "incomplete-entry") record.receipts.claude_entry!.observations.closure = false;
-    if (invalid === "changed-model") record.receipts.copilot_entry!.reviewer_model = "different-model";
+    if (invalid === "changed-model") record.receipts.copilot_entry!.reviewer_model = "different-model-2";
     if (invalid === "changed-client") record.receipts.copilot_entry!.client_bindings["copilot-linux"] = {
       ...f.configured.clients["copilot-linux"], distribution_sha256: "b".repeat(64) };
     if (invalid === "unknown-observation") record.receipts.hosted_advisory!.observations.silent_override = true;
@@ -425,4 +425,15 @@ test("combined observation names cannot substitute for required adoption observa
   const delivered = deliverRecord(f, record);
   expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivered, identity: runtimeIdentity }))
     .toThrow("incomplete recorded observations hosted_advisory fields");
+});
+
+
+// These observed-shaped records exercise metadata validation, without claiming real native trials.
+test.each(["alias-only", "unversioned", "missing-source"])("portable runtime adoption refuses incomplete native role identity %s", kind => {
+  const model = kind === "alias-only" ? "opus" : kind === "unversioned" ? "fixture-model" : "fixture-model-1";
+  const f = source({ role: { model, native_model: model, identity_source: kind === "missing-source" ? null
+    : { provider: "copilot", event_type: "assistant.message", field_path: ["data", "model"] } } });
+  const record = portableRecord(f), delivered = deliverRecord(f, record);
+  expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivered, identity: runtimeIdentity }))
+    .toThrow(kind === "missing-source" ? "recorded native identity source" : "native model identity");
 });

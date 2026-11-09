@@ -1,0 +1,79 @@
+import { readRecordedRoleModel, verifyRuntimeAdoption } from "./adoption";
+import type { selectApprovedRuntime } from "./bootstrap";
+import type { PublicationIdentity } from "./transport";
+import { join } from "node:path";
+import { readBoundArtifact, readNativeRoleArtifacts } from "./evidence-input";
+import type { SealedPlan } from "./journal";
+import { fullModel, modelMatches, type RolePolicy } from "./manifests";
+import { canonicalDigest, canonicalJSON, decodeUTF8, freezeJSON, protocolPath } from "./protocol";
+import { artifactDirectoryScope } from "./snapshot";
+
+type Role = "worker" | "reviewer";
+type Expected = { role: Role; source_commit: string; runtime_sha256: string; target_sha256: string };
+type Launch = Expected & { schema_version: 1; kind: "docs-drift-role-launch"; invocation_id: string; context_id: string; pid: number };
+function fail(reason: string): never { throw Error("docs-drift original role capture " + reason); }
+function record(value: unknown, keys: string[]): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) fail("object required");
+  const input = value as Record<string, unknown>;
+  if (Object.keys(input).length !== keys.length || keys.some(key => !Object.hasOwn(input, key))) fail("fields changed");
+  return input;
+}
+function json(bytes: Uint8Array): unknown {
+  const value: unknown = JSON.parse(decodeUTF8(bytes));
+  if (!canonicalJSON(value).equals(Buffer.from(bytes))) fail("canonical JSON required");
+  return value;
+}
+
+/** Reload the original launch target and native artifacts. Execution origin remains owner-attested. */
+export function readNativeRoleCapture(options: {
+  source_repo: string; candidate_repo?: string; artifact_root: string; reference: unknown; expected: Expected; policy: RolePolicy;
+}) {
+  const secondary = artifactDirectoryScope(options.artifact_root, options.candidate_repo ?? options.source_repo);
+  function outside(reference: unknown): void {
+    if (reference === null || typeof reference !== "object" || Array.isArray(reference)) fail("artifact reference required");
+    secondary.assertExternal(join(secondary.directory, protocolPath((reference as Record<string, unknown>).path)));
+  }
+  function read(reference: unknown): Buffer {
+    outside(reference);
+    return readBoundArtifact({ source_repo: options.source_repo, artifact_root: secondary.directory, reference });
+  }
+  const expected = options.expected;
+  if (!["worker", "reviewer"].includes(expected.role) || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(expected.source_commit)
+    || ![expected.target_sha256, expected.runtime_sha256].every(value => /^[a-f0-9]{64}$/u.test(value))) fail("expected bindings required");
+  const capture = record(json(read(options.reference)), ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "launch", "binding", "artifacts"]);
+  if (capture.schema_version !== 1 || capture.kind !== "docs-drift-role-capture" || capture.role !== expected.role
+    || capture.source_commit !== expected.source_commit || capture.runtime_sha256 !== expected.runtime_sha256) fail("captured context changed");
+  const launch = record(json(read(capture.launch)), ["schema_version", "kind", "role", "source_commit", "runtime_sha256", "target_sha256", "invocation_id", "context_id", "pid"]);
+  if (launch.schema_version !== 1 || launch.kind !== "docs-drift-role-launch" || launch.role !== expected.role
+    || launch.source_commit !== expected.source_commit || launch.runtime_sha256 !== expected.runtime_sha256 || launch.target_sha256 !== expected.target_sha256)
+    fail("original launch target or context changed");
+  const artifacts = record(capture.artifacts, ["native", "returned", "process"]);
+  for (const reference of Object.values(artifacts)) outside(reference);
+  if (capture.binding === null || typeof capture.binding !== "object" || Array.isArray(capture.binding)) fail("sealed role binding required");
+  // The shared loader validates this exact sealed binding against the original native records.
+  const binding = capture.binding as SealedPlan["roles"]["worker"];
+  const evidence = readNativeRoleArtifacts({ source_repo: options.source_repo, artifact_root: secondary.directory,
+    references: artifacts, binding, policy: options.policy });
+  if (evidence.target_sha256 !== expected.target_sha256 || launch.invocation_id !== evidence.invocation_id
+    || launch.context_id !== evidence.context_id || launch.pid !== evidence.process.pid) fail("original launch and native capture differ");
+  return { evidence, binding: freezeJSON(binding), launch: freezeJSON(launch as Launch) };
+}
+
+
+type Runtime = Awaited<ReturnType<typeof selectApprovedRuntime>>;
+
+/** Ordinary disjoint default advances preserve this retained execution contract. */
+export function roleRuntimeDigest(runtime: Runtime, role: Role): string {
+  return canonicalDigest({ adoption_sha256: runtime.adoption_sha256, component: runtime.component, entry: runtime.entry,
+    role, selected: runtime[role], loader: runtime.loader });
+}
+
+/** Read the adopted full model from its validated historical receipt, independently of the requested selector. */
+export function readAdoptedRolePolicy(options: { repo: string; current_default: string; identity: PublicationIdentity; runtime: Runtime; role: Role }): RolePolicy {
+  const adopted = verifyRuntimeAdoption(options);
+  if (adopted.adoption_sha256 !== options.runtime.adoption_sha256) fail("current adoption changed");
+  const name = options.runtime.entry === "hosted" ? "hosted_advisory" : options.runtime.entry === "copilot" ? "copilot_entry" : "claude_entry";
+  const native = fullModel(readRecordedRoleModel(adopted.receipts, name, options.role)), selected = options.runtime[options.role];
+  if (!selected.identity_source || !modelMatches(selected.model, native)) fail("adopted native role capability unavailable");
+  return { requested_model: selected.model, adopted_model: native, identity_source: selected.identity_source };
+}

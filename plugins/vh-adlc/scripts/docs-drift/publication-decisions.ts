@@ -1,3 +1,4 @@
+import { parseEdit } from "./resolve";
 import { canonicalJSON, decodeUTF8 } from "./protocol";
 import { attentionProjection, type AttentionInput, type AttentionProjection } from "./report";
 import type { Snapshot } from "./snapshot";
@@ -34,6 +35,14 @@ export function advisoryDecisionIDs(packet: DecisionPacket): string[] {
   if (decisions.some(item => typeof item.id !== "string" || !item.id.trim() || typeof item.reason !== "string" || !item.reason.trim())
     || new Set(decisions.map(item => item.id)).size !== decisions.length) throw Error(reason);
   return decisions.map(item => item.id as string);
+}
+
+export function validateAdvisorySelection(packet: DecisionPacket, value: unknown): void {
+  const reason = "Advisory decisions do not account for selected edits";
+  const selection = exactRecord(value, ["schema_version", "source_commit", "edits"], reason);
+  if (selection.schema_version !== 1 || selection.source_commit !== packet.source_commit || !Array.isArray(selection.edits)) throw Error(reason);
+  const ids = selection.edits.map(edit => parseEdit(edit).id), expected = new Set(ids), decisions = advisoryDecisionIDs(packet);
+  if (expected.size !== ids.length || decisions.length !== expected.size || decisions.some(id => !expected.has(id))) throw Error(reason);
 }
 
 export function projectAttentionProposals(values: unknown[], context: { repository: string; scope_sha256: string; inputs_sha256: string }): AttentionProjection[] {

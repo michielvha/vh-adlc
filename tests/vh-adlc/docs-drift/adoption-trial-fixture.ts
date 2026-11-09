@@ -12,7 +12,7 @@ import { commitAll, git, put } from "./repository-fixture";
 import { syntheticTrialFixture } from "./trial-fixture";
 
 export function trialAdoptionFixture(roots: string[]) {
-  const f = syntheticTrialFixture(roots);
+  const f = syntheticTrialFixture(roots, { bound_roles: true });
   const component = computeComponentIdentity(join(f.root, "component-source"), f.manifest.component.source_commit);
   const configured = { ...f.settings, component_pin: ".vh-adlc/docs-drift-components/synthetic.yaml",
     publication: { ...f.settings.publication, mode: "adopted" }, reports: { ...f.settings.reports, workflow_id: 19 } };

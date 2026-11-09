@@ -1,5 +1,5 @@
 import { afterAll, expect, spyOn, test } from "bun:test";
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import * as artifacts from "../../../plugins/vh-adlc/scripts/docs-drift/journal";
 import type { WorkerCollectionOptions } from "../../../plugins/vh-adlc/scripts/docs-drift/publication-worker";
@@ -12,11 +12,11 @@ import { commitAll, git, put } from "./repository-fixture";
 const roots: string[] = [];
 afterAll(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 async function fixture(incompleteInventory: boolean, options: {
-  sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean;
+  sourceInsideCandidate?: boolean; sourceCheckNeedsRepair?: boolean; role?: Parameters<typeof runtimeFixture>[3];
   beforeCandidate?: (input: { repo: string; source: string; artifacts: string; baseline: Awaited<ReturnType<typeof verifyCandidate>>; selection: unknown; decisions: Uint8Array; worker_options: WorkerCollectionOptions }) => void | Promise<void>;
 } = {}) {
   const { sourceInsideCandidate = false, sourceCheckNeedsRepair = false, beforeCandidate } = options;
-  const f = await runtimeFixture(roots, true), repo = f.repo;
+  const f = await runtimeFixture(roots, true, false, options.role), repo = f.repo;
   const scanner = readFileSync(join(import.meta.dir, "fixtures/scanner.js"), "utf8")
     .replace("__FIXTURE_CASE__", JSON.stringify("none")).replace("__FIXTURE_ENDPOINT__", JSON.stringify("http://127.0.0.1:1"));
   put(repo, "scripts/scan.js", scanner); put(repo, "docs/suppressions.yaml", "suppressions: []\n");
@@ -32,8 +32,8 @@ async function fixture(incompleteInventory: boolean, options: {
     put(candidate, "docs/guide.md", "# Current candidate guide\n"); head = commitAll(candidate);
   }
   const preimage = readFileSync(join(repo, "docs/guide.md")), replacement = Buffer.from("# Current candidate guide\n");
-  const selection = { schema_version: 1, source_commit: source, edits: [{ id: "guide-fix", path: "docs/guide.md", action: "replace", start: 0,
-    end: preimage.length, before_sha256: sha256(preimage), replacement_base64: replacement.toString("base64"), after_mode: "100644" }] };
+  const selection = { schema_version: 1 as const, source_commit: source, edits: [{ id: "guide-fix", path: "docs/guide.md", action: "replace" as const, start: 0,
+    end: preimage.length, before_sha256: sha256(preimage), replacement_base64: replacement.toString("base64"), after_mode: "100644" as const }] };
   const common = { artifact_root: artifacts, owner: "fixture-owner", run: "fixture-run" };
   const sourceArtifacts = sourceInsideCandidate ? join(candidate, "baseline-proof") : artifacts;
   if (sourceInsideCandidate) chmodSync(candidate, 0o700);
@@ -387,4 +387,83 @@ test("worker input snapshot retention failure preserves caller state and owned r
     expect(result.diagnostics).toContain("fixture worker snapshot retention failure");
     expect(captureRepositoryState(f.repo)).toEqual(before);
   } finally { failure.mockRestore(); }
+}, 60000);
+
+
+test.each(["matching", "cli", "alias", "alias-only-observed", "successor-model", "missing-edits", "wrong-returned-input", "changed-target", "outside-edit", "unknown-capability"])("normal preparation reads only the original worker handoff %s", async scenario => {
+  const { collectWorkerPreparation } = await import("../../../plugins/vh-adlc/scripts/docs-drift/worker-preparation");
+  const { roleRuntimeDigest } = await import("../../../plugins/vh-adlc/scripts/docs-drift/role-capture");
+  const { evidence, role } = await import("./manifest-fixture");
+  const { verifyRoleIdentity } = await import("../../../plugins/vh-adlc/scripts/docs-drift/manifests");
+  const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+  let captured: { path: string; sha256: string } | null = null;
+  const requested = ["alias", "alias-only-observed", "successor-model"].includes(scenario) ? "opus" : "claude-opus-5.5";
+  const configured = { model: requested, native_model: scenario === "alias-only-observed" ? "opus" : "claude-opus-5.5", identity_source: scenario === "unknown-capability" ? null : role.identity_source! };
+  const f = await fixture(false, { role: configured, beforeCandidate: async input => {
+    if (scenario === "unknown-capability" || scenario === "alias-only-observed") return;
+    const inputs = await collectWorkerInputs(input.worker_options);
+    expect(inputs.complete, JSON.stringify(inputs.diagnostics)).toBe(true);
+    const runtime = inputs.facts!.runtime!, target = inputs.worker_input_sha256!;
+    expect(inputs.worker_runtime_sha256).toBe(roleRuntimeDigest(runtime, "worker"));
+    expect(roleRuntimeDigest({ ...runtime, current_default: "e".repeat(40) }, "worker")).toBe(inputs.worker_runtime_sha256!);
+    expect(roleRuntimeDigest(runtime, "reviewer")).not.toBe(inputs.worker_runtime_sha256!);
+    const { parseEdit } = await import("../../../plugins/vh-adlc/scripts/docs-drift/resolve");
+    const edits = (input.selection as { edits: unknown[] }).edits.map(parseEdit);
+    if (scenario === "missing-edits") edits.length = 0;
+    if (scenario === "outside-edit") {
+      const bytes = readFileSync(join(input.repo, "README.md"));
+      Object.assign(edits[0], { path: "README.md", start: 0, end: bytes.length, before_sha256: sha256(bytes) });
+    }
+    const original = evidence("actual-worker-handoff", scenario === "changed-target" ? sha256(Buffer.from("another run")) : target,
+      canonicalJSON({ input_sha256: scenario === "wrong-returned-input" ? sha256(Buffer.from("unrelated input")) : target, edits, publication: null }).toString());
+    if (scenario === "successor-model") {
+      original.native = Buffer.from(Buffer.from(original.native).toString().replaceAll("claude-opus-5.5", "claude-opus-5.6"));
+      original.returned = Buffer.from(Buffer.from(original.returned).toString().replaceAll("claude-opus-5.5", "claude-opus-5.6"));
+      original.native_sha256 = sha256(original.native); original.returned_sha256 = sha256(original.returned);
+    }
+    const { records: _records, ...binding } = verifyRoleIdentity(original, { ...role, requested_model: configured.model,
+      adopted_model: scenario === "successor-model" ? "claude-opus-5.6" : "claude-opus-5.5" });
+    const retain = (name: string, bytes: Uint8Array) => { writeFileSync(join(input.artifacts, name), bytes, { mode: 0o600 }); return { path: name, sha256: sha256(bytes) }; };
+    const launch = { schema_version: 1, kind: "docs-drift-role-launch", role: "worker", invocation_id: original.invocation_id,
+      context_id: original.context_id, source_commit: input.source, runtime_sha256: roleRuntimeDigest(runtime, "worker"), target_sha256: original.target_sha256, pid: original.process.pid };
+    captured = retain("worker-capture.json", canonicalJSON({ schema_version: 1, kind: "docs-drift-role-capture", role: "worker", source_commit: input.source,
+      runtime_sha256: launch.runtime_sha256, launch: retain("worker-launch.json", canonicalJSON(launch)), binding, artifacts: {
+        native: retain("worker-native.jsonl", original.native), returned: retain("worker-returned.txt", original.returned), process: retain("worker-process.json", canonicalJSON(original.process)) } }));
+  } });
+  const before = captureRepositoryState(f.repo);
+  let result: Awaited<ReturnType<typeof collectWorkerPreparation>>;
+  if (scenario === "cli") {
+    if (!captured) throw Error("missing original worker fixture capture");
+    const entry = join(import.meta.dir, "../../../plugins/vh-adlc/scripts/docs-drift/cli.ts"), options = f.options;
+    const capture = captured as { path: string; sha256: string };
+    const outcome = Bun.spawnSync([process.execPath, entry, "read-worker-preparation", "--repo", f.repo, "--source", f.source,
+      "--artifact-root", f.artifacts, "--source-verification", options.source_verification.path, "--source-verification-sha256", options.source_verification.sha256,
+      "--decisions", options.decisions.path, "--decisions-sha256", options.decisions.sha256, "--cache-root", options.cache_directory,
+      "--entry", options.entry, "--launcher", options.launcher_path, "--settings", options.settings_path,
+      "--worker-capture", capture.path, "--worker-capture-sha256", capture.sha256], { env: f.native.environment, stdout: "pipe", stderr: "pipe", timeout: 60000 });
+    const report = JSON.parse(outcome.stdout.toString()); expect(outcome.exitCode, JSON.stringify(report.diagnostics)).toBe(0); result = report.worker_preparation;
+  } else result = await collectWorkerPreparation({ ...f.options, worker_capture: captured });
+  if (["matching", "cli", "alias"].includes(scenario)) { expect(result.diagnostics).toEqual([]); expect(result.selection).toEqual(f.selection); expect(result.publication).toBe(null); }
+  else {
+    const reasons: Record<string, string> = { "wrong-returned-input": "Original worker input target changed", "changed-target": "original launch target or context changed",
+      "outside-edit": "outside", "unknown-capability": "recorded native identity source", "alias-only-observed": "native model identity", "successor-model": "adopted native identity", "missing-edits": "Advisory decisions do not account for selected edits" };
+    expect(result.diagnostics.join("\n")).toContain(reasons[scenario]);
+  }
+  expect(result.complete).toBe(["matching", "cli", "alias"].includes(scenario)); expect(result.authority).toBe("none");
+  expect(captureRepositoryState(f.repo)).toEqual(before);
+}, 60000);
+
+
+test.each(["legacy", "scan-only"])("worker input rechecks reuse their original assessed store %s", async mode => {
+  const f = await fixture(false, { sourceCheckNeedsRepair: mode === "scan-only" });
+  const { collectWorkerInputs } = await import("../../../plugins/vh-adlc/scripts/docs-drift/publication-worker");
+  const store = mode === "scan-only" ? f.assessment?.object_store : f.baseline.inspection?.object_store;
+  if (!store) throw Error("missing original assessed fixture store");
+  const inventory = () => readdirSync(f.artifacts).filter(name => name.startsWith("docs-drift-objects-")).sort();
+  const before = inventory();
+  const first = await collectWorkerInputs(f.options);
+  expect(first.diagnostics).toEqual([]); expect(first.facts?.store?.root).toBe(store.root);
+  const second = await collectWorkerInputs(f.options);
+  expect(second.diagnostics).toEqual([]); expect(second.facts?.store?.root).toBe(store.root);
+  expect(inventory()).toEqual(before); expect(second.worker_input_sha256).toBe(first.worker_input_sha256);
 }, 60000);

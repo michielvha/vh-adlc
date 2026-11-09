@@ -3,14 +3,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import * as bootstrap from "../../../plugins/vh-adlc/scripts/docs-drift/bootstrap";
 import { sha256 } from "../../../plugins/vh-adlc/scripts/docs-drift/protocol";
-import { parseClientBinding } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
+import { parseClientBinding, type IdentitySource } from "../../../plugins/vh-adlc/scripts/docs-drift/settings";
 import { readGit } from "../../../plugins/vh-adlc/scripts/docs-drift/git";
 import { fullDefinitionUpgradeFixture, trialDefinitionFixture } from "./trial-definition-fixture";
 import { publicationFixture } from "./publication-fixture";
 import { commit, pin, runtimeIdentity, write } from "./adoption-fixture";
 import { settingsFixture } from "./settings-fixture";
 
-export async function runtimeFixture(roots: string[], upgrade = false, bounded = false) {
+export async function runtimeFixture(roots: string[], upgrade = false, bounded = false, role?: { model: string; identity_source: IdentitySource | null; native_model?: string }) {
   const shared = publicationFixture(roots), prefix = "plugins/vh-adlc/";
   write(shared.repo, prefix + ".claude-plugin/plugin.json", '{"name":"vh-adlc","version":"0.13.0"}\n');
   write(shared.repo, prefix + "scripts/runner.ts", "// Synthetic candidate worker\n");
@@ -21,7 +21,7 @@ export async function runtimeFixture(roots: string[], upgrade = false, bounded =
     distribution_sha256: sha256(distribution) });
   const candidateDistribution = upgrade ? Buffer.from(distribution.toString().replace("fixture-1.0.0", "fixture-2.0.0")) : distribution;
   const candidateClient = upgrade ? { ...client, version: "fixture-2.0.0", distribution_sha256: sha256(candidateDistribution) } : client;
-  const approvedSource = { pin: componentPin, client, bounded };
+  const approvedSource = { pin: componentPin, client, bounded, role };
   const f = upgrade ? fullDefinitionUpgradeFixture(roots, { approved: approvedSource, candidate_client: candidateClient })
     : trialDefinitionFixture(roots, { approved: approvedSource });
   const current = "policySource" in f ? f.policySource : f.staged;

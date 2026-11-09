@@ -1,4 +1,4 @@
-import { advisoryDecisionIDs, exactRecord, parseDecisionPacket, projectAttentionProposals } from "./publication-decisions";
+import { parseDecisionPacket, projectAttentionProposals, validateAdvisorySelection } from "./publication-decisions";
 import { collectPublicationOriginals } from "./publication-originals";
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
@@ -13,7 +13,7 @@ import { collectPublicationInputs } from "./publication-inputs";
 import { collectProposals, projectProposalBindings } from "./proposals";
 import { canonicalDigest, canonicalJSON, freezeJSON, protocolPath, sha256 } from "./protocol";
 import { deliveryDigest, type AttentionProjection, type CorrectionInput } from "./report";
-import { parseEdit, readResolutionRecord, resolutionSource } from "./resolve";
+import { readResolutionRecord, resolutionSource } from "./resolve";
 import { recheckResolutionInputs, type ResolutionCollection, type ResolutionInputs } from "./resolve-inputs";
 import { artifactDirectoryScope, captureRepositoryState, captureSnapshot, matchesRepositoryState } from "./snapshot";
 import { readNativeContext } from "./transport";
@@ -53,14 +53,7 @@ export async function collectPublicationBindings(input: Options): Promise<Result
     result.mode = packet.mode as "advisory" | "resolve";
     if (result.mode === "advisory" && (selected.length > 0 || options.resolution_record)) throw Error("Advisory decision packet contains a resolution selection");
     if (result.mode === "resolve" && (selected.length === 0 || !options.resolution_record)) throw Error("Resolve decision packet needs selected originals and its exact record");
-    if (result.mode === "advisory") {
-      const reason = "Advisory decisions do not account for selected edits";
-      const selection = exactRecord(options.selection, ["schema_version", "source_commit", "edits"], reason);
-      if (selection.schema_version !== 1 || selection.source_commit !== options.source || !Array.isArray(selection.edits)) throw Error(reason);
-      const ids = selection.edits.map(edit => parseEdit(edit).id), expected = new Set(ids);
-      const decisions = advisoryDecisionIDs(packet);
-      if (expected.size !== ids.length || decisions.length !== expected.size || decisions.some(id => !expected.has(id))) throw Error(reason);
-    }
+    if (result.mode === "advisory") validateAdvisorySelection(packet, options.selection);
     const common = { repo, source: options.source, artifact_root: secondary.directory, owner: options.owner, run: options.run };
     result.source_verification = readSourceAssessmentArtifacts({ ...common, candidate_repo: candidateRepo, reference: options.source_verification });
     result.candidate_verification = readCandidateVerificationArtifacts({ ...common, candidate_repo: candidateRepo, candidate: options.candidate,

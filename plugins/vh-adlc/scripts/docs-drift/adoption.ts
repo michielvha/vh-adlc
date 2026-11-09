@@ -1,3 +1,4 @@
+import { fullModel, modelMatches } from "./manifests";
 import { verifyCompatibleWorkerCaller } from "./worker-callers";
 import type { PublicationIdentity } from "./transport";
 import { readGit, collectionReaders, readAdoptionInput as committedInput } from "./git";
@@ -137,6 +138,18 @@ function parseAdoptionRecord(bytes: Uint8Array, boundary: AdoptionBoundary) {
   return record;
 }
 
+/** Read the observed field from a portable receipt set validated by the adoption gate. */
+export function readRecordedRoleModel(receipts: unknown, entry: "hosted_advisory" | "copilot_entry" | "claude_entry", role: "worker" | "reviewer"): unknown {
+  if (receipts === null || typeof receipts !== "object" || Array.isArray(receipts)) fail("recorded role receipts required");
+  const selected: unknown = (receipts as Record<string, unknown>)[entry];
+  if (selected === null || typeof selected !== "object" || Array.isArray(selected)) fail("recorded role receipt required");
+  return (selected as Record<string, unknown>)[role + "_model"];
+}
+
+function recordedModelMatches(requested: string | null, observed: unknown): boolean {
+  return requested === null ? observed === null : modelMatches(requested, fullModel(observed));
+}
+
 function verifyRecordedReceipts(repo: string, value: unknown, bindings: ReturnType<typeof collectAdoptionBindings>, candidate: string, identity: PublicationIdentity, deliveryTime: number, boundary: AdoptionBoundary, carried?: { names: string[]; receipts: unknown }): void {
   const receipts = object(value, Object.keys(receiptRequirements));
   const target = canonicalDigest({ schema_version: 1, repository: bindings.settings.repository,
@@ -193,7 +206,8 @@ function verifyRecordedReceipts(repo: string, value: unknown, bindings: ReturnTy
     const roles = entry === null ? null : bindings.settings.execution.entries[entry];
     const worker = name === "paired_review" || name === "history_read" ? null : roles?.worker.model ?? null;
     const reviewer = name === "history_read" ? null : roles?.reviewer.model ?? null;
-    if (receipt.worker_model !== worker || receipt.reviewer_model !== reviewer) fail("recorded role identity " + name);
+    if ((worker !== null && !roles?.worker.identity_source) || (reviewer !== null && !roles?.reviewer.identity_source)) fail("recorded native identity source " + name);
+    if (!recordedModelMatches(worker, receipt.worker_model) || !recordedModelMatches(reviewer, receipt.reviewer_model)) fail("recorded role identity " + name);
     const clientNames = roles === null || name === "history_read" ? []
       : name === "paired_review" ? [roles.reviewer.client] : [roles.worker.client, roles.reviewer.client];
     const clients = Object.fromEntries(Object.entries(bindings.settings.clients).filter(([id]) => clientNames.includes(id)));
@@ -303,7 +317,7 @@ function verifyComponentReview(value: unknown, previous: AdoptionResult, next: R
     || receipt.previous_protected_sha256 !== previous.protected_sha256
     || !canonicalJSON(receipt.previous_component).equals(canonicalJSON(previous.component_pin))
     || !canonicalJSON(receipt.next_component).equals(canonicalJSON(next.result.component_pin))
-    || receipt.reviewer_model !== next.original.settings.execution.entries.copilot.reviewer.model) fail("compatibility receipt bindings");
+    || receipt.reviewer_model !== readRecordedRoleModel(previous.receipts, "copilot_entry", "reviewer")) fail("compatibility receipt bindings");
   if (preservedEntries && !canonicalJSON(receipt.preserved_entries).equals(canonicalJSON(preservedEntries))) fail("component preservation inventory");
   if (receipt.classification !== "contract-preserving" && receipt.classification !== "contract-restoring") fail("compatibility classification");
   for (const field of ["artifact_sha256", "diff_sha256", "dependencies_sha256"]) adoptionDigest(receipt[field]);
@@ -402,7 +416,7 @@ function verifyTrialSuccessor(repo: string, link: ReturnType<typeof predecessorL
     || (boundary.kind === "test-only" && receipt.fixture_id !== boundary.fixture_id)
     || receipt.definition_path !== policy.definition_path || receipt.definition_sha256 !== definitionInput.sha256
     || receipt.source_candidate !== next.result.source_candidate || receipt.predecessor_adoption_sha256 !== previous.adoption_sha256
-    || receipt.reviewer_model !== next.original.settings.execution.entries.copilot.reviewer.model) fail("upgrade trial receipt bindings");
+    || receipt.reviewer_model !== readRecordedRoleModel(next.result.receipts, "copilot_entry", "reviewer")) fail("upgrade trial receipt bindings");
   if (componentEntries !== null) verifyComponentReview(receipt.component_review, previous, next, boundary, all.filter(entry => !componentEntries.includes(entry)));
   adoptionDigest(receipt.artifact_sha256);
   const observations = object(receipt.observations, ["definition_reviewed", "prospective_bindings_matched", "affected_roles_exercised",

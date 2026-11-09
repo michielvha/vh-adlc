@@ -258,3 +258,30 @@ test.each(["trial", "case", "entry", "history", "ancestor"] as const)("productio
     : scenario === "entry" ? "observed record receipt copilot_entry" : scenario === "history" ? "observed record receipt history_read" : "observed record receipt hosted_advisory";
   expect(() => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: copied, identity: runtimeIdentity })).toThrow(reason);
 });
+
+// Observed-shaped parser controls. These records establish no native host acceptance.
+test.each(["same-native", "changed-native"])("compatible alias reviews stay bound to the inherited full model %s", scenario => {
+  const f = source(roots, { role: { model: "opus", native_model: "claude-opus-5.5",
+    identity_source: { provider: "copilot", event_type: "assistant.message", field_path: ["data", "model"] } } });
+  write(f.repo, f.configured.execution.scheduled_workflow, canonicalJSON({ on: { schedule: [{ cron: "0 6 * * *" }], workflow_dispatch: null },
+    permissions: f.configured.execution.permissions, jobs: { worker: { uses: "./" + f.configured.execution.worker_workflow,
+      with: { component_pin: f.configured.component_pin, pr_draft: f.configured.publication.pr_state.advisory === "draft" },
+      secrets: { COPILOT_GITHUB_TOKEN: "${{ secrets.COPILOT_GITHUB_TOKEN }}" } } } }));
+  f.candidate = commit(f.repo, "synthetic alias predecessor");
+  const original = { source: f.repo, configured: f.configured, candidate: f.candidate, record: portableRecord(f),
+    manifest: { fixture_id: "00000000-0000-0000-0000-000000000001" } };
+  const successor = compatibleTrialUpgrade(original), record = successor.record, compatibility = record.predecessor.compatibility;
+  Reflect.deleteProperty(record, "fixture_id"); Reflect.deleteProperty(record.predecessor, "fixture_id"); record.predecessor.evidence_kind = "observed";
+  Reflect.deleteProperty(compatibility, "fixture_id"); compatibility.evidence_kind = "observed";
+  compatibility.reviewer_model = scenario === "same-native" ? "claude-opus-5.5" : "claude-opus-5.6";
+  for (const regression of compatibility.regressions) { Reflect.deleteProperty(regression, "fixture_id"); regression.evidence_kind = "observed"; }
+  for (const receipt of Object.values(record.receipts)) {
+    Reflect.deleteProperty(receipt, "fixture_id"); receipt.evidence_kind = "observed";
+    if (receipt.worker_model !== null) receipt.worker_model = "claude-opus-5.5";
+    if (receipt.reviewer_model !== null) receipt.reviewer_model = "claude-opus-5.5";
+  }
+  const delivered = trialAdoptionDelivery({ ...original, configured: successor.configured, candidate: successor.candidate, record });
+  const verify = () => adoption.verifyRuntimeAdoption({ repo: f.repo, current_default: delivered, identity: runtimeIdentity });
+  if (scenario === "same-native") expect(verify().evidence).toBe("owner-attestation");
+  else expect(verify).toThrow("compatibility receipt bindings");
+});

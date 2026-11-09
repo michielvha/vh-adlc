@@ -117,7 +117,7 @@ export function fullDefinitionUpgradeFixture(roots: string[], options: {
 } = {}) {
   const f = trialDefinitionFixture(roots, { approved: options.approved }), repo = f.repo, originalCandidate = f.bindings.source_commit;
   readGit(repo, "switch", "--detach", originalCandidate);
-  const original = portableRecord({ repo, configured: f.configured, candidate: originalCandidate });
+  const original = portableRecord({ repo, configured: f.configured, candidate: originalCandidate, native_model: f.native_model });
   write(repo, f.configured.publication.adoption_record, canonicalJSON(original));
   const originalDelivery = commit(repo, "synthetic full-definition predecessor"), predecessorHash = sha256(canonicalJSON(original));
   const candidateSettings = structuredClone(f.configured);
@@ -172,13 +172,13 @@ export function fullDefinitionUpgradeFixture(roots: string[], options: {
   write(repo, candidateSettings.execution.scheduled_workflow, canonicalJSON(futureCaller));
   write(repo, ".vh-adlc/docs-drift.yaml", canonicalJSON({ ...candidateSettings, trial: f.trial }));
   const candidate = commit(repo, "synthetic tested successor selection");
-  const fresh = portableRecord({ repo, configured: candidateSettings, candidate });
+  const fresh = portableRecord({ repo, configured: candidateSettings, candidate, native_model: f.native_model });
   fresh.receipts.quiescence = structuredClone(original.receipts.quiescence!);
   const record = { ...fresh, predecessor: { schema_version: 1, evidence_kind: "observed", route: "trial", default_commit: policySource,
     record_path: f.configured.publication.adoption_record, record_sha256: predecessorHash, carry_receipts: ["quiescence"],
     trial: { schema_version: 1, evidence_kind: "observed", definition_path: f.trial.definition_path,
       definition_sha256: f.trial.definition_sha256, source_candidate: candidate, predecessor_adoption_sha256: predecessorHash,
-      reviewer_model: candidateSettings.execution.entries.copilot.reviewer.model,
+      reviewer_model: f.native_model ?? candidateSettings.execution.entries.copilot.reviewer.model,
       artifact_sha256: sha256(Buffer.from("Synthetic full-definition trial artifact")),
       cases: changedRules.map(rule => ({ id: rule.id, evidence_kind: "observed", source_candidate: candidate,
         rule_sha256: canonicalDigest(rule), outcome_sha256: rule.new_expected_sha256,

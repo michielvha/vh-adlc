@@ -220,7 +220,7 @@ export function modelMatches(requested: string, observed: string): boolean {
   const family = /^(?:claude[-.])?(opus|sonnet|haiku)$/u.exec(alias)?.[1];
   return family !== undefined && new RegExp(`^claude[-.]${family}[-.]\\d`, "u").test(observed);
 }
-function fullModel(value: unknown): string {
+export function fullModel(value: unknown): string {
   if (typeof value !== "string" || !/^[A-Za-z][A-Za-z0-9_.:-]*[0-9][A-Za-z0-9_.:-]*$/u.test(value) || value === "unknown") invalid("native model identity");
   return value;
 }
