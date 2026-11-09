@@ -201,6 +201,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-09 | R-1 | spec | `8ff685a1883330fd0d50536c79788eae4cc0399f` | claude-opus-5-5 | procedural | Blocking startup-restore and stale Chromium lock gaps plus ten should-fix and nit findings. |
 | 2026-11-09 | R-2 | spec | `4891dcc7d97e9c725fbef93c83a7413f59321aa8` | claude-opus-5-5 | procedural | Blocking crash-restored session cookies plus eight should-fix and one nit finding. |
+| 2026-11-09 | R-3 | spec | `a5ef9e6204cad85777293bb5ec33b505f6311be4` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and five nits. |
 
 ### R-1
 
@@ -359,6 +360,64 @@ SEVERITY: nit
 WHERE: Design (Single writer, Lifecycle), Sources
 EVIDENCE: Several claims about Chromium internals have no citation: that `SingletonLock` is a symlink to `<hostname>-<pid>` (line 97), that the saved session lives in `chromium/Default/Sessions` (line 101), and the behavior of the `restore_on_startup` values (lines 101-102). Sources lists only S1 and a page that returned 503. The standard requires Design claims to be cited and Sources to list every external page read.
 PROPOSAL: Cite the Chromium sources, for example process_singleton_posix.cc for the lock format, plus profile_impl.cc and exit_type_service.cc for F-01, and add them to Sources.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Lifecycle), Design (Owner decisions), AC-16, Test Plan
+EVIDENCE: Line 122 says the graceful close "waits up to three seconds, then stops the remaining children as today. That fits inside the guard's five-second supervisor deadline". On expiry the guard SIGTERMs the supervisor and SIGKILLs it after 5 seconds (plugins/remote-gui/internal/session/daemon.go:312-319). Before the deferred `bundle.Stop()` (daemon.go:422) runs, the later-registered deferred `removeForward` runs (daemon.go:473-483), and it can wait up to 6 seconds for the state lock (daemon.go:123-125). The Exit path itself allows a 1 second dial and a 3 second handshake deadline (plugins/remote-gui/internal/browser/quit.go:29-37). If Chromium ignores Exit, "stops the remaining children as today" adds another 3 second SIGTERM wait before SIGKILL (browser.go:227-244). So 3 s + 3 s is already past the 5 s deadline. The guard then SIGKILLs the supervisor and `stopMembers` kills Chromium (daemon.go:88-118), and anything the supervisor was going to do after the close, such as updating `last used`, does not happen. On an explicit `stop` the guard has no deadline (daemon.go:295-303), so the AC-16 stand-in test, which covers only `stop`, cannot catch this. The choice to fit the close inside the existing deadlines instead of extending them is also missing from the owner decisions: line 87 applies the R-2 proposals only for deletion safety, the holder report, extra criteria and agent use, and not R-2 F-02.
+PROPOSAL: Bound the whole close inside the expiry deadline, for example by sending SIGKILL to Chromium straight after the graceful wait, or state that a slow close on expiry ends in the guard's SIGKILL and name the component that then updates `last used`. Add an expiry variant to the AC-16 stand-in test, and record the owner's choice or raise it as an open question.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Single writer, Lifecycle), AC-04, Test Plan
+EVIDENCE: Line 114: the `profile-in-use` report "names the holder's session ID from `meta.json`, or `holder: starting` while the winning session has not yet written it". Line 116 clears a dead holder only after the next winner has taken the lock. Line 122 says only that `last used` is updated at the end, and nothing clears the holder when a session ends. When two starts race on a profile that has been used before, `meta.json` still names the previous, finished session until the winner overwrites it, so the loser reports a dead session as the holder. Line 92 gives `profile list` a guard-liveness check, but the design gives none for the loser's report. The AC-04 row (line 176) uses only a fresh race, so it passes either way.
+PROPOSAL: Clear the holder in `meta.json` at session end, before the lock is released, and have the loser name a recorded holder only when its guard identity is alive, otherwise `holder: starting`. Add a race test on a profile whose `meta.json` holds a stale holder.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Single writer, Commands), AC-05, AC-13
+EVIDENCE: Line 116: a live Chromium on this host using the profile "stops the start, with `profile-browser-still-running`, and the owner stops that browser". Line 93 has `profile delete` refuse in the same state, so the profile can be neither used nor deleted. The design does not say how the owner stops that browser. The skill forbids "kill by executable name" (plugins/remote-gui/skills/remote-gui/SKILL.md:61) and forcing a launch (SKILL.md:53). Chromium outlives its controllers only after the guard and supervisor are both gone (Background line 44). Its identity is in that session's `Owned` list (browser.go:161-163), `status` reports such a record as `cleanup-pending` with "run cleanup" (session.go:96-101), and `cleanup` SIGTERMs the `Owned` processes of a dead-controller record (daemon.go:164-181, :671). That is a working recovery, but neither the diagnostic, AC-05 nor the AC-13 README and skill list mentions it.
+PROPOSAL: Have `profile-browser-still-running` name the session whose record owns that browser process when there is one, and name its recovery (`cleanup` for an orphaned remote-gui browser, or closing a browser the owner started). Add that recovery to the README and skill items in AC-13 and to the AC-05 tests.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Single writer)
+EVIDENCE: Line 114: "The CLI passes the locked descriptor to the guard, the way the guard already receives its reserved listener". The guard reserves the listener itself (daemon.go:248) and passes it to its supervisor through `ExtraFiles` (daemon.go:273-274). Background line 42 describes this correctly. Nothing in the code passes a descriptor into the guard today.
+PROPOSAL: Reword to "the way the guard already passes its reserved listener to its supervisor through ExtraFiles".
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Storage), AC-15
+EVIDENCE: Line 98: "When `REMOTE_GUI_HOME` or `--home` overrides the sessions root, `--profile` fails with `profile-home-required`". AC-15 (line 166) and its proof (line 187) also require `profile list` and `profile delete` to fail with `profile-home-required`. The Design never states that requirement for those two commands.
+PROPOSAL: Extend the Storage sentence to cover the `profile` commands, so that AC-15 matches the Design.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Sign-in and hand-back, Glossary), AC-11, AC-13
+EVIDENCE: The glossary defines "Reusable profile" (line 144), but line 128 and AC-11 (line 162) use "a session on a reused profile" and "A reused-profile session". This leaves open whether the first session, the one that creates the profile, starts in human mode. The AC-11 proof (line 183) says every `--profile` start without a mode is human, and AC-13 holds the README and skill to the glossary terms.
+PROPOSAL: Say "a session with `--profile`" in Design and AC-11, or add "reused profile" to the glossary with that meaning.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background), Sources
+EVIDENCE: The design's fix for crash-restored session cookies rests on a Sources entry (line 366) that says "This document did not read them directly". The standard requires a cited `file:line` or a command and its output, gathered when the claim was written. I ran the measurement in this review with the host's Chromium 151.0.7922.137 (`--headless=new`, scratch profile, local cookie fixture). While the browser runs and after a SIGKILL, `profile.exit_type` is `Crashed`. Relaunching that copy unchanged sent `sess=1; pers=1`. A copy with `exit_type` set to `Normal` and `restore_on_startup` set to 5 sent only `pers=1`, and a later relaunch with `restore_on_startup` 1 and `--restore-last-session` still sent only `pers=1`. A fresh profile first launched with `restore_on_startup` 5, closed with CDP `Browser.close`, then relaunched with 1 and `--restore-last-session` kept `sess=1`. The mechanism holds, but the document does not record that evidence.
+PROPOSAL: Replace the second-hand source with a measurement of this kind in Background, giving the command and the observed output, as line 33 does for the lock format.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan (AC-12)
+EVIDENCE: The AC-12 row proves "unread" with "recorded hashes and access times". `findmnt -no OPTIONS /home` shows `relatime`, and `/tmp` is a tmpfs, which also defaults to relatime. Under relatime a read updates atime only when the old atime is not later than mtime, and a newly written sentinel's atime is never earlier than its mtime, so the access-time check can pass even after a read.
+PROPOSAL: Set each sentinel's atime earlier than its mtime before the run so that any read updates it, or watch the trees for access events during the scenarios.
 
 ## Sources
 
