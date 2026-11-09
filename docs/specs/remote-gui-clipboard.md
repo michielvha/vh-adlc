@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Revised for review R-5 with the owner's answers; waits for the final spec review and acceptance."
+status: planned
+status_description: "Accepted by the owner against spec review R-6; next step is the task list."
 issue: https://github.com/michielvha/vh-adlc/issues/61
 goal: "The owner can move text between their own device and the shared remote browser through explicit viewer controls, and the text never reaches logs, records or retained evidence."
 covers:
@@ -207,6 +207,7 @@ None.
 | 2026-11-09 | R-4 | spec | `05b51e9093dacbb1bc2df87bb88772e9555c1986` | claude-opus-5-5 | procedural | Blocking: viewer browsers save the panel field in session-restore files; four should-fix and two nit findings. |
 | 2026-11-10 | R-5 | spec | `c071bd4682d176391849c39b9eb873bdce972510` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and three nits. |
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and two nits, left in the record at the owner's direction. |
+| 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | n/a | n/a | accepted by owner |
 
 ### R-1
 
