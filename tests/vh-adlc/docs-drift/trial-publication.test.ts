@@ -59,6 +59,20 @@ test("a synthetic request revalidates original role artifacts before every commo
   expect(git(f.source, "status", "--porcelain")).toBe("");
 }, 60000);
 
+test("the common publisher consumes original process artifact references", async () => {
+  const { context, request, path } = await publicationRequest();
+  const workerBytes = canonicalJSON(request.worker.process), reviewerBytes = canonicalJSON(request.reviewer.process);
+  writeFileSync(join(context.artifacts, "worker-process.json"), workerBytes, { mode: 0o600 });
+  writeFileSync(join(context.artifacts, "reviewer-process.json"), reviewerBytes, { mode: 0o600 });
+  const packet = { ...request, worker: { ...request.worker, process: { path: "worker-process.json", sha256: sha256(workerBytes) } },
+    reviewer: { ...request.reviewer, process: { path: "reviewer-process.json", sha256: sha256(reviewerBytes) } } };
+  writeFileSync(path, canonicalJSON(packet));
+  const publication = readTrialPublication(context, path);
+  expect((await publish(publication)).state).toBe("complete");
+  writeFileSync(join(context.artifacts, "reviewer-process.json"), canonicalJSON({ ...request.reviewer.process, reaped: false }));
+  expect(() => readTrialPublication(context, path)).toThrow("artifact changed");
+}, 60000);
+
 test.each(["missing-native", "changed-native", "unreaped", "wrong-context", "escaped-plan", "report-approval"] as const)("synthetic publication refuses %s before effects", async scenario => {
   const { f, context, request, path } = await publicationRequest();
   expect(() => readTrialPublication(context, path)).not.toThrow();

@@ -3,7 +3,8 @@ import { realpathSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { readGit } from "./git";
 import { readArtifact, readJournal, readVerifiedPlan, sealPlan, type PlanPolicy, type SealedPlan } from "./journal";
-import { effectDigest, manifestDigest, validateReviewedManifest, type NativeRoleEvidence } from "./manifests";
+import { effectDigest, manifestDigest, validateReviewedManifest, type NativeRoleEvidence, type RolePolicy } from "./manifests";
+import { readNativeRoleArtifacts } from "./evidence-input";
 import { canonicalJSON, decodeUTF8, protocolPath, sha256 } from "./protocol";
 import { PublicationScopeChanged, type PublicationGate, type PublishOptions, type PublishResult } from "./publish";
 import { loadTrialContext, type TrialContext } from "./trial-context";
@@ -34,8 +35,11 @@ function retained(context: TrialContext, value: unknown): Buffer {
   if (sha256(bytes) !== input.sha256) throw Error("synthetic publication original artifact changed");
   return bytes;
 }
-function nativeRole(context: TrialContext, value: unknown, binding: SealedPlan["roles"]["worker"]): NativeRoleEvidence {
+function nativeRole(context: TrialContext, value: unknown, binding: SealedPlan["roles"]["worker"], policy: RolePolicy): NativeRoleEvidence {
   const input = exact(value, ["native", "returned", "process"]);
+  if (input.process !== null && typeof input.process === "object" && Object.hasOwn(input.process, "path")) {
+    return readNativeRoleArtifacts({ source_repo: context.source, artifact_root: context.artifacts, references: input, binding, policy });
+  }
   const completion = exact(input.process, ["pid", "exit_code", "timed_out", "cancelled", "output_limit", "reaped"]);
   if (typeof completion.pid !== "number" || !Number.isSafeInteger(completion.pid) || completion.pid < 1
     || completion.exit_code !== 0 || completion.timed_out !== false || completion.cancelled !== null
@@ -73,7 +77,7 @@ export function readTrialPublication(selected: TrialContext, requestPath: string
     || readGit(context.store.root, "rev-parse", "--verify", "--end-of-options", candidate + "^{tree}").toString().trim() !== manifest.bindings.candidate_tree) throw Error("synthetic publication source or candidate changed");
   const review: PublicationGate["review"] = { manifest, current: manifest,
     grants: manifest.effects.map(effect => ({ manifest_sha256: manifestDigest(manifest), effect_id: effect.id, effect_sha256: effectDigest([effect]) })),
-    worker: nativeRole(context, request.worker, plan.roles.worker), reviewer: nativeRole(context, request.reviewer, plan.roles.reviewer),
+    worker: nativeRole(context, request.worker, plan.roles.worker, workerPolicy), reviewer: nativeRole(context, request.reviewer, plan.roles.reviewer, reviewerPolicy),
     policy: { worker: workerPolicy, reviewer: reviewerPolicy } };
   const checked = sealPlan({ reviewed: validateReviewedManifest(review), grants: review.grants, ...policy,
     corrections: plan.corrections, attention: plan.attention });
