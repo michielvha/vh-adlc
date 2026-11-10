@@ -808,10 +808,11 @@ and name the target, and no recorded run restricts it.
       readers reject `security_settings` and `security_settings_keep_off`, as they do for
       `security_policy`, and name the new plugin version as the minimum for adopting either key.
       Evidence: at T12 a scripted search found each clause on the pages it names; neither `references/maintenance.md` nor `references/maintenance-settings.md` still says only a configured or exactly declared match is `complete-unavailable`; `references/security-settings.md` links `conventions/repository-security.md` at d8f07c9dd69038375a535af8ad586086688f85ab, which `vh-adlc knowledge` resolved at T1; no `knowledge` page list names that page; the merged-branch deletion text only gained sentences after it.
-- [ ] AC-12: After a maintenance sweep of `michielvha/bg-remove`, its saved report has a
+- [x] AC-12: After a maintenance sweep of `michielvha/bg-remove`, its saved report has a
       `## Repository security settings` section that lists Dependabot alerts `already-on`,
       Dependabot security updates `left-off` with reason `renovate-present`, and secret scanning and
       push protection `already-on`.
+      Evidence: the T13 sweep's saved report lists `dependabot_alerts` `already-on`, `dependabot_security_updates` `left-off` with `renovate-present` (pull request #26), `secret_scanning` and `secret_scanning_push_protection` `already-on`, owner decisions "None.", and the `security_settings: apply` opt-in. The run did not commit or publish the report, as its request asked.
 - [x] AC-13: When alerts are not read back as on, `apply` makes no write to
       `automated-security-fixes` and lists Dependabot security updates as `not-changed` with reason
       `alerts-off`.
@@ -980,7 +981,8 @@ and name the target, and no recorded run restricts it.
       Evidence: `bun test tests/vh-adlc/security-settings tests/vh-adlc/maintenance` (/tmp/sec-t11-tests.log): 354 pass, 0 fail, including the 22 T10 fixtures; the helper typecheck exits 0, and an ad hoc `tsc --noEmit` over `collect.ts`, `report.ts` and `cli.ts` reports no error. AC-21 stays open until T12 states the skill's coverage handoff.
 - [x] T12 `plugins/vh-adlc/references/security-settings.md`, `plugins/vh-adlc/references/authority.md`, `plugins/vh-adlc/references/maintenance.md`, `plugins/vh-adlc/references/maintenance-settings.md`, `plugins/vh-adlc/references/loop.md`, `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - state every AC-11 clause on the pages it names, with the skill step, onboarding text and operations table; a read against AC-11's clause list finds each one and `bun test tests/vh-adlc` stays green (AC-11)
       Evidence: `bun test tests/vh-adlc --timeout 60000` (/tmp/sec-t12-tests.log): 1421 pass, 1 fail, the failure being the pre-existing host-binary fixtures test, where the installer rejects `/usr/local/bin/vh-adlc` 0.19.0 against the fixture lock; a scripted search of the nine pages against AC-11's clause list found every clause; the maintenance skill is 4919 characters, under the 5000 its discovery test allows.
-- [ ] T13 `docs/specs/repository-security-settings.md` - run a maintenance sweep of `michielvha/bg-remove` with the implemented plugin and record the saved report's security-settings section as evidence; the section shows the states AC-12 lists (AC-12)
+- [x] T13 `docs/specs/repository-security-settings.md` - run a maintenance sweep of `michielvha/bg-remove` with the implemented plugin and record the saved report's security-settings section as evidence; the section shows the states AC-12 lists (AC-12)
+      Evidence: on 2026-11-10 against `michielvha/bg-remove` at eafd404, run 851f2d34-8344-4644-bb2c-08f5026ffdfb with request `{"authorized_sweep": true, "no_commit": true}`: `security-settings-mode` printed `check` with `not-adopted`; the helper's `check` exited 0 and its JSON was saved in the run's private journal directory; `collect --run-id --security-settings` exited 0 with the Dependabot surface complete (2 alerts); `report --security-settings` saved a private draft whose `## Repository security settings` section follows `## Security alerts`.
 
 ## Open Questions
 
