@@ -876,6 +876,7 @@ None.
 | 2026-11-10 | R-21 | spec | `48bd339` | unknown | procedural | 2 findings: 2 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-22 | spec | `db12716` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-23 | spec | `dccdfb2` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-24 | spec | `9e3883b` | claude-opus-4.8 | procedural | 2 findings: 1 should-fix, 1 nit, none blocking |
 
 ### R-1
 
@@ -1622,6 +1623,22 @@ SEVERITY: nit
 WHERE: Test Plan (AC-21)
 EVIDENCE: The AC-21 proof (line 832) now has four fixtures, but its pass condition still says "`security-reconcile` accepts both inventories, reporting `coverage handoff pending` for the surface without a handoff and no such gap with one whose `assignment_handoff` names the next sweep". The phrase dates from 5e4f15b, when the row had two fixtures. The fourth fixture was added in 0aea08b. AC-21 says "The same holds when the file shows `dependabot_alerts` as `not-changed` with `api-error` after a write", which includes the reconcile behaviour. The proof does not say which inventories go to `security-reconcile`, or whether the fourth fixture's inventory is reconciled with and without a handoff. A passing subset never upgrades a composite criterion.
 PROPOSAL: Say that `security-reconcile` runs on the first, second and fourth inventories, each once without a handoff and once with the handoff the Design specifies. Each passes when it reports `coverage handoff pending` only in the run without a handoff.
+
+### R-24
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-24) and Test Plan (AC-24)
+EVIDENCE: After the R-23 fold, AC-24 (lines 786-790 at 9e3883b) says `security-settings-mode` prints `check` "when the repository is outside the run's recorded `scope.repositories`". The Design orders that case as `not-in-run-scope` (lines 574-576). The AC-24 proof (line 838) checks this case only through helper fixture (7): "a run started with `--repository` for another repository ... `apply` targeting the origin, `not-in-run-scope`". None of the `security-settings-mode` fixtures in `tests/vh-adlc/maintenance` uses a run narrowed with `start --repository` (`plugins/vh-adlc/scripts/maintenance/cli.ts:68`). The skill passes the command's printed mode and reason to the helper, so this case matters in practice. An implementation where the mode command ignores the run's scope would pass every listed mode fixture. The fixtures where "`apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link" pass on "each gives `check`" alone and never assert `not-adopted`, although R-21 F-01 asked for printed reasons to be asserted. A passing subset never upgrades a composite criterion, so AC-24 would be `untested`.
+PROPOSAL: Add a `security-settings-mode` fixture with a run started with `--repository` for a configured non-origin repository, committed settings that adopt `apply`, and `--repository` set to the origin. It passes when the output is `check` with `not-in-run-scope`. Also require `not-adopted` in the pass condition of the three working-tree, unmerged-branch and unlinked fixtures.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Helper) and Acceptance Criteria (AC-24)
+EVIDENCE: The Design (lines 334-338) says that when `apply` gets `--run-id`, "it also reads that run's recorded request and scope and refuses every write". It says what happens when the settings binding fails ("fails visibly when that binding does not resolve", line 329), but not when the run cannot be read. `readRun` throws for a missing run, an identity mismatch or a broken event chain (`plugins/vh-adlc/scripts/maintenance/journal.ts:171-185`). `security-settings-mode` has this covered because every nonzero exit leads to `check`. Nothing says the helper's `apply` must make no write when its `--run-id` cannot be read, and no AC-24 fixture tests that case. An implementation that treats an unreadable run as "no run", and so applies on the committed settings alone, would pass every listed fixture. The restriction would then rest on the skill again, which Q55 and Q60 set out to avoid.
+PROPOSAL: State that `apply` with a `--run-id` it cannot read makes no write and either fails visibly or reports its entries as `check` would, with a named reason. Add one AC-24 helper fixture with a run ID that does not exist.
 
 ## Sources
 
