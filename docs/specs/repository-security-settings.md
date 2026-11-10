@@ -860,6 +860,7 @@ None.
 | 2026-11-10 | R-19 | spec | `2ea72bd` | unknown | procedural | 3 findings: 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-20 | spec | `8675000` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-21 | spec | `48bd339` | unknown | procedural | 2 findings: 2 should-fix, none blocking; model identity not attested |
+| 2026-11-10 | R-22 | spec | `db12716` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1560,6 +1561,29 @@ SEVERITY: should-fix
 WHERE: Design (Procedure changes: user guide) and Acceptance Criteria (AC-11)
 EVIDENCE: The Design (line 615) says "`docs/user-guides/workflows.md` gets a section beside 'Stale branches' describing the default and the manual commands". The Background says the guide today "describes no other repository setting" (`docs/user-guides/workflows.md:143-145`). AC-11 lists `docs/user-guides/workflows.md` among the pages that "state the following". It then says "A clause that names no page needs to appear only in `references/security-settings.md`" (Q58), and that "a clause that names pages must appear in each of them". No clause in AC-11 names `docs/user-guides/workflows.md`, and no other criterion mentions it. The AC-11 proof confirms only "each listed rule is stated". So the implementation can tick every box and leave the user guide unchanged, without the new section, the `check` default, the `security_settings: apply` opt-in or the manual commands.
 PROPOSAL: Add an AC-11 clause naming `docs/user-guides/workflows.md`. It should require a section beside "Stale branches" that states the `check` default, the `security_settings: apply` opt-in and the manual commands, and links to `references/security-settings.md`. Or remove the user guide from the Design and from AC-11's page list.
+
+### R-22
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan (AC-01, AC-03, AC-04 and AC-16 rows)
+EVIDENCE: AC-03 (line 633) covers a repository "with a `.github/dependabot.yml` or `.github/dependabot.yaml`", and the Design (line 450) says Dependabot is configured when either file exists. Q6 and Q22 made both names part of the rule, and docs#30 at 4b2198d names both ("a `.github/dependabot.yml` or `.github/dependabot.yaml`"). The fixture for AC-03 (line 806) uses only `.github/dependabot.yml`. No row in the Test Plan has a `.github/dependabot.yaml` fixture. AC-16 (line 725) covers "a private or internal repository" and says "with either feature enabled, the same read leaves the surface incomplete", where the features are `advanced_security` and `code_security`. Its proof (line 827) has only private fixtures and only a `code_security` enabled fixture. It has no internal repository and no `advanced_security` enabled fixture. AC-05 tests an internal repository, but only in the helper, while AC-16 is about the separate collector rule in `collect.ts`. Three implementations would pass every listed fixture: a helper that looks only for `dependabot.yml`, a collector that tests `visibility === "private"`, and a collector that reads only `code_security`. A passing subset never upgrades a composite criterion, so AC-03 and AC-16 would be `untested` at implementation review.
+PROPOSAL: Add an AC-03 fixture with only `.github/dependabot.yaml` that expects security updates `enabled`. Add AC-16 collector fixtures for an internal admin repository with `security_and_analysis` null that expects `complete-unavailable`, and for a private admin repository with only `advanced_security` enabled that expects the surface to stay incomplete.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan (AC-24)
+EVIDENCE: The R-21 fold added a sixth helper fixture to the AC-24 proof (line 824). The proof now lists six `apply` fixtures: no adoption, a target that is not named, a `read_only` run, a pull-request run, no adoption with a `read_only` run, and `{"authorized_sweep": false}`. It then says "Pass: no write recorded, entries identical to `check` output with the same binding, with mode `check` and mode reason `not-adopted`, `not-in-committed-scope`, `request-restricted` naming `read_only`, and `pull-request-scope` respectively." That gives four reasons for six fixtures, so "respectively" does not map cleanly. The sixth fixture states only "expects no write and `not-authorized-sweep`". It is unclear whether the condition "entries identical to `check` output" and mode `check` also apply to it.
+PROPOSAL: Give each of the six helper fixtures its expected reason in one ordered list. Also state that the common pass condition (no write, entries identical to `check` with the same binding, mode `check`) applies to all six.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Procedure changes: coverage handoff)
+EVIDENCE: The Design (line 572) says the skill records a coverage handoff "whose `assignment_handoff` names the next maintenance sweep and whose `next_action` is to collect the surface again". A coverage handoff is parsed by `followUp` (`plugins/vh-adlc/scripts/maintenance/security.ts:53-56`). That function requires exactly the keys `reference`, `owner`, `assignment_handoff` and `next_action`, and `reference` must be non-empty text (`v.text(f.reference)`). The handoff list is also scoped by `repository` and `surface` (`plugins/vh-adlc/scripts/maintenance/security-io.ts:75`). The Design does not say what `reference` the skill records, or that `owner` is null. No reference page documents the handoff shape: a grep for `assignment_handoff` and `coverage_handoffs` in `plugins/vh-adlc/references/*.md` returns nothing. A skill text that follows the Design as written would produce a handoff that fails validation.
+PROPOSAL: State the complete handoff the skill records, for example `reference` set to the run ID or report path, `owner` null, `assignment_handoff` naming the next maintenance sweep and `next_action` to collect the surface again. Also state that it goes in `coverage_handoffs` with the repository and surface `dependabot`.
 
 ## Sources
 
