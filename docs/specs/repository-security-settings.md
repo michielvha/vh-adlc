@@ -800,6 +800,7 @@ None.
 | 2026-11-10 | R-13 | spec | `8286c54` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-14 | spec | `0aea08b` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-15 | spec | `27e821d` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-16 | spec | `73cf6b1` | unknown | procedural | 4 findings: 3 should-fix, 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1362,6 +1363,36 @@ SEVERITY: nit
 WHERE: Frontmatter (covers)
 EVIDENCE: `security-settings-mode` decides the mode from "the recorded request" and from whether "the run's scope has a pull request". `collect` and `report` accept a helper file only when it "carries the current run ID" and "names one repository in the sweep's scope". The skill saves each helper JSON "in the run's private journal directory". The request, the run scope and the private directory are defined in `plugins/vh-adlc/scripts/maintenance/journal.ts`: `request: JSONObject | null` at line 13, `createRun` at line 154, `readRun` at line 171 and `privateDirectory` at line 105. `covers` lists the other maintenance scripts the feature depends on, but not `journal.ts`. The standard says `covers` "lists every path whose change can affect the feature".
 PROPOSAL: Add `plugins/vh-adlc/scripts/maintenance/journal.ts` to `covers`.
+
+### R-16
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-11) and Test Plan (AC-11, AC-20)
+EVIDENCE: AC-11 opens with "`references/security-settings.md`, `references/authority.md`, `references/maintenance.md`, `references/maintenance-settings.md`, `references/loop.md`, `references/lifecycle.md`, the maintenance skill and `docs/user-guides/workflows.md` state:" and then lists clauses. Some clauses name the file that must carry them, for example "in `references/maintenance.md` and `references/maintenance-settings.md`" and "in the maintenance skill". Others name no file: "sweeps and onboarding run the helper before collection in the mode `security-settings-mode` prints", "the Renovate and Dependabot rules", "the private, archived and keep-off rules", "that `renovate-overlap`, `owner-choice-conflict` and `paused` go to the owner", "the precedence order" and "that no setting is ever turned off". The criterion can be read in two ways. In the first, every one of the eight files must state each unqualified clause, so `references/authority.md`, `references/loop.md`, `references/lifecycle.md` and `docs/user-guides/workflows.md` would each restate the precedence order and the detection rules. In the second, the clause only has to appear somewhere among the eight files. The Test Plan says only "confirms each listed rule is stated". The two readings lead to different verdicts in an implementation review. The first reading also conflicts with the Design, which puts the states, reasons and precedence in `references/security-settings.md` and links to it from the other pages.
+PROPOSAL: For each unqualified AC-11 clause, name the file or files that must carry it, for example in a small table that maps each statement to its pages. Alternatively, say that each unqualified clause needs to appear in `references/security-settings.md` only, and that the other pages link to it.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Procedure changes: report command and maintenance skill step) and AC-22
+EVIDENCE: The Design says the report command "gains `--security-settings FILE`, repeatable", that "The saved report then has a `## Repository security settings` section", and that "The section names every repository in scope, with a 'helper did not run' row for one without a file, so no repository drops out silently." It also says "A helper failure or exit 1 never blocks collection", and the skill passes only the JSON files it saved. Suppose the helper crashes or produces no valid JSON for every repository. This is the common case for a sweep whose scope is only the origin repository. The skill then calls `report` with no `--security-settings` flag at all, and nothing in the Design says the section is rendered in that case. The existing renderer shows how an absent input is usually handled: it prints "Security accounting: pending (no typed security snapshot supplied)." when no security revision is passed (`plugins/vh-adlc/scripts/maintenance/report.ts:124`). The AC-22 fixture uses three files for four repositories, so it does not cover a call with zero files.
+PROPOSAL: Say that every sweep report renders the section, with a "helper did not run" row for each repository in scope when no file is given. Add an AC-22 fixture that renders a report with no `--security-settings` flag and expects that section.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Helper; Procedure changes: mode function and authority row) and AC-24
+EVIDENCE: Q55 makes the helper's own `apply` refuse writes when the committed settings do not adopt `security_settings: apply` or do not name the target, "so the opt-in does not rest on the skill alone". Other rules also send a run to `check`: the request flags `read_only`, `draft_only`, `no_push` and `no_filesystem`, a recorded request without `authorized_sweep` true, and a run whose scope has a pull request. Only `security-settings-mode` applies these. The helper's `apply` also takes `--run-id`, but the Design uses it only to write the ID into the JSON. AC-24 defines no helper refusal for these cases. With no recorded request, `security-settings-mode` prints `apply` (AC-24: "also with no recorded request"). So a skill that leaves out `--run-id` when it calls the mode command, or that runs `apply` anyway, writes GitHub settings during a read-only or PR-scoped sweep. That breaks "Current restrictions win" (`plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md:24`) and the authority row.
+PROPOSAL: When `apply` gets `--run-id`, have it read that run's recorded request and scope and refuse every write under the same rules as `security-settings-mode`, with mode `check` and a named mode reason. Add a security-settings fixture for this, for example a run recorded with `read_only`. Otherwise, record in the document that the request and scope restrictions deliberately rest on the skill.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Helper; Settings) and AC-24
+EVIDENCE: The `check` command has no `--default-branch` or `--default-commit` flag (`check --repo PATH [--repository OWNER/NAME] [--run-id ID] [--mode-reason TEXT] [--format json|markdown]`), and "`--repo` is the checkout whose `.vh-adlc/maintenance.yaml` applies". Only `apply` is said to read `security_settings_keep_off` from the committed, linked settings. Rule 5 (keep-off) applies under both modes. AC-24 and its proof require that a refused `apply` "reports its entries exactly as `check` would" and that the "entries [are] identical to `check` output". Suppose `check` reads keep-off rows from the working tree. Then a keep-off row that differs between the working tree and the committed settings changes one entry: `check` gives `not-changed` with `check-only`, while the refused `apply` gives `left-off` with `owner-choice`, or the reverse. The two outputs are no longer identical, and the exit code differs too. The Design does not say where `check` reads its keep-off rows.
+PROPOSAL: State where `check` reads keep-off rows, either the working tree or the committed settings when it is given a binding. Then make "exactly as `check` would" mean that same source for the refused `apply`.
 
 ## Sources
 
