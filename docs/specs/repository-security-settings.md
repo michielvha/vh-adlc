@@ -887,8 +887,9 @@ and name the target, and no recorded run restricts it.
       cannot be read. The maintenance skill states that a
       current request forbidding filesystem writes selects `check` without calling
       `security-settings-mode`, with the helper's output kept in chat and no JSON saved.
-- [ ] AC-25: A consumer whose committed settings hold `security_settings` and
+- [x] AC-25: A consumer whose committed settings hold `security_settings` and
       `security_settings_keep_off` keeps an adopted standing report-publication grant.
+      Evidence: `bun test tests/vh-adlc/maintenance/settings.test.ts` at T3: "committed security settings keys keep an adopted standing publication grant" passes; `resolveStanding` returns `adopted` for a committed grant beside `security_settings: apply` and one keep-off row, and failed at T2 because the keys were rejected.
 - [ ] AC-26: Under `apply`, security updates read as `{"enabled":true,"paused":true}` are
       `already-on` with reason `paused`, with or without a Renovate signal, unless the keep-off list
       names them, which gives `owner-choice-conflict`. No write is made, the helper exits 0 when no
@@ -935,7 +936,8 @@ and name the target, and no recorded run restricts it.
       Evidence: `vh-adlc knowledge --page conventions/repository-security.md --page conventions/feature-documents.md --plugin-pin d8f07c9dd69038375a535af8ad586086688f85ab` returned `answered` at revision d8f07c9; `vh-adlc lint` on this document passed; `bun test tests/vh-adlc --timeout 60000` passed 1304 of 1305, the one failure being the host-binary fixtures test, where the installer rejects `/usr/local/bin/vh-adlc` 0.19.0 against the fixture lock (/tmp/sec-t1-full.log).
 - [x] T2 `tests/vh-adlc/maintenance/settings.test.ts` - failing tests from the AC-15 settings fixtures and the AC-25 row: `security_settings` accepts only `apply` or `check`, `security_settings_keep_off` rows are validated and an unknown setting name fails visibly, and `resolveStanding` keeps an adopted publication grant beside both keys; they fail because both keys are rejected today (AC-15, AC-25)
       Evidence: `bun test tests/vh-adlc/maintenance/settings.test.ts` at ff8d7fe plus these tests: 34 pass, 7 fail; every new case failed because `loadSettings` rejects `security_settings` and `security_settings_keep_off` as unsupported fields, and the standing case failed there before `resolveStanding` (/tmp/sec-t2-fail.log).
-- [ ] T3 `plugins/vh-adlc/scripts/maintenance/settings.ts`, `plugins/vh-adlc/scripts/maintenance/authority.ts` - add both keys to the settings and to the committed key list; T2 passes (AC-15, AC-25)
+- [x] T3 `plugins/vh-adlc/scripts/maintenance/settings.ts`, `plugins/vh-adlc/scripts/maintenance/authority.ts` - add both keys to the settings and to the committed key list; T2 passes (AC-15, AC-25)
+      Evidence: `bun test tests/vh-adlc/maintenance/settings.test.ts` passed 41 of 41, the T2 cases included; `bun test tests/vh-adlc/maintenance` passed 245 of 245 (/tmp/sec-t3-maint.log).
 - [ ] T4 `tests/vh-adlc/maintenance/security-settings-mode.test.ts` - failing `security-settings-mode` fixtures from the AC-24 and AC-27 rows: request flags, `authorized_sweep`, pull-request and run scope, committed adoption and scope, binding failures, invalid committed settings and a non-github.com host, each asserting the printed mode and reason; they fail because the command does not exist (AC-24, AC-27)
 - [ ] T5 `plugins/vh-adlc/scripts/maintenance/authority.ts`, `plugins/vh-adlc/scripts/maintenance/cli.ts` - the mode function with the ordered mode reasons and the `security-settings-mode` command with its flags; T4 passes (AC-24, AC-27)
 - [ ] T6 `tests/vh-adlc/security-settings/` - the fake `gh` the AC-01 row describes and the failing helper fixtures from the AC-01 to AC-10, AC-13, AC-14, AC-18, AC-19, AC-23 (helper part) and AC-26 rows; they fail because the helper does not exist (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-13, AC-14, AC-18, AC-19, AC-23, AC-26)
