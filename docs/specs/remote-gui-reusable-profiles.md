@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "Wording revised for review R-9; waits for a new spec review and acceptance."
+status: planned
+status_description: "Revision accepted by the owner against spec review R-10; implementation resumes at T9."
 branch: feat/remote-gui-reusable-profiles
 issue: https://github.com/michielvha/vh-adlc/issues/62
 goal: "An owner can opt in to a named browser profile bound to their identity, so provider sessions survive the end of a remote-gui session, while credential entry stays human-only and agent control of a signed-in profile always rests on the owner's confirmation."
@@ -245,6 +245,7 @@ None.
 | 2026-11-10 | R-8 | spec | `0da01c174635d7b85c8b9df6196919f7bb6cf786` | claude-opus-5-5 | procedural | Blocking: stop keystrokes can submit a provider form after Stay or in a popup window; one should-fix and one nit. |
 | 2026-11-10 | R-9 | spec | `77c2cba2f75ae3da0f2bdf260b1b5bc0c63b9e65` | claude-opus-5-5 | procedural | No blocking findings on the keyless stop; one should-fix finding and four wording nits. |
 | 2026-11-10 | R-10 | spec | `c482919f001d3afbbf765b782bb9232fea203cb1` | claude-opus-5-5 | procedural | No blocking findings; two should-fix findings and two nits, left in the record at the owner's direction. |
+| 2026-11-10 | R-10 | spec | `c482919f001d3afbbf765b782bb9232fea203cb1` | n/a | n/a | accepted by owner |
 
 ### R-1
 
