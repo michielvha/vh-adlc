@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { adminOnly, cliRun, dispose, entry, setup, writes } from "./harness";
+import type { FakeState } from "./fake-gh";
 import { renderSecuritySettings } from "../../../plugins/vh-adlc/scripts/security-settings/render";
 import type { Output } from "../../../plugins/vh-adlc/scripts/security-settings/security-settings";
 
@@ -47,7 +48,7 @@ test.each([
   ["a renovate key in package.json", { files: { ...dependabot, "package.json": JSON.stringify({ name: "x", renovate: { extends: ["config:recommended"] } }) } }, "package.json"],
   ["a Renovate pull request", { files: dependabot, pulls: [{ number: 24, user: bot("renovate[bot]") }] }, "pull request #24"],
   ["an open Dependency Dashboard issue", { files: dependabot, issues: [{ number: 3, title: "Dependency Dashboard", user: bot("renovate[bot]") }] }, "issue #3"],
-] as const)("%s keeps security updates off as renovate-present", (_, fakeState, evidence) => {
+] as [string, Partial<FakeState>, string][])("%s keeps security updates off as renovate-present", (_, fakeState, evidence) => {
   const f = setup(fakeState), { output } = f.helper("apply");
   expect(entry(output, "dependabot_security_updates")).toMatchObject({ state: "left-off", reason: "renovate-present", detail: evidence });
   expect(writes(f.calls).some(call => call.endpoint.endsWith("automated-security-fixes"))).toBe(false);

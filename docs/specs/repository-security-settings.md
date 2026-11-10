@@ -703,24 +703,28 @@ with every read and write succeeding, unless it names another case. Criteria abo
 assume no mode reason refuses it: the host is github.com, the committed settings adopt `apply`
 and name the target, and no recorded run restricts it.
 
-- [ ] AC-01: After `apply` on an unarchived repository where the caller is admin, Dependabot alerts are
+- [x] AC-01: After `apply` on an unarchived repository where the caller is admin, Dependabot alerts are
       off and the keep-off list does not name them,
       `GET repos/{r}/vulnerability-alerts` returns 204 and the output lists `dependabot_alerts` as
       `enabled`.
-- [ ] AC-02: After `apply` on a repository with any documented Renovate config location, an
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): the public admin fixture with every setting off recorded one `PUT vulnerability-alerts`, read it back and listed `dependabot_alerts` `enabled`.
+- [x] AC-02: After `apply` on a repository with any documented Renovate config location, an
       `app/renovate` pull request, or an open `app/renovate` Dependency Dashboard issue, Dependabot
       security updates are still off and listed as `left-off` with reason `renovate-present` and the
       matched path, pull request or issue.
-- [ ] AC-03: After `apply` on an unarchived repository with a `.github/dependabot.yml` or
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): one fixture per each of the 13 config locations, a `renovate` key in `package.json`, a `renovate[bot]` pull request and an open Dependency Dashboard issue each listed security updates `left-off` with `renovate-present` and the matched path, `pull request #24` or `issue #3`, with no `automated-security-fixes` write; look-alike authors and a dashboard pull request did not match.
+- [x] AC-03: After `apply` on an unarchived repository with a `.github/dependabot.yml` or
       `.github/dependabot.yaml` and no Renovate signal, where the caller is admin, alerts read back on
       and the keep-off list does not name security updates, Dependabot security
       updates are on and listed as `enabled`. With neither file and no Renovate signal, they stay off
       and are listed as `left-off` with reason `renovate-unknown`.
-- [ ] AC-04: After `apply` on an unarchived public repository where the caller is admin and the
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): `.github/dependabot.yml`, `.github/dependabot.yaml` and a `master` default branch fixture each gave security updates `enabled`; with neither file the entry was `left-off` with `renovate-unknown` and no write.
+- [x] AC-04: After `apply` on an unarchived public repository where the caller is admin and the
       keep-off list names neither, secret scanning and push protection are each listed as `enabled`
       or `already-on`, and no call to any `code-scanning`
       endpoint was made.
-- [ ] AC-05: After `apply` on an unarchived private or internal repository where the caller is admin
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): the first fixture listed both secret settings `enabled` after one `PATCH repos/{r}`, and no `code-scanning` call was recorded.
+- [x] AC-05: After `apply` on an unarchived private or internal repository where the caller is admin
       and every setting starts off,
       `dependabot_alerts` is read back on and listed as `enabled`, no write call was made for secret
       scanning or push protection, and those two entries are `unavailable` with reason
@@ -728,27 +732,33 @@ and name the target, and no recorded run restricts it.
       `unavailable` with the same reason; when it shows `code_security` enabled, the output has no
       `code_scanning` entry. On an archived repository, `apply` makes no write call and every entry
       is `unavailable` with reason `archived`.
-- [ ] AC-06: When the caller is not admin on an unarchived public repository, `apply` makes no write
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): private and internal fixtures with a null `security_and_analysis` recorded only the two Dependabot writes and listed secret scanning, push protection and `code_scanning` `unavailable` with `not-free-on-private`; a `code_security` fixture had no `code_scanning` entry; the archived fixture recorded no write and listed every entry `unavailable` with `archived`.
+- [x] AC-06: When the caller is not admin on an unarchived public repository, `apply` makes no write
       call and no admin-only read, lists every entry as `unknown` with reason `needs-admin`, and
       exits 1. `check` never makes a write
       call; it lists every off and free setting that rules 1 to 7 do not decide as `not-changed` with
       reason `check-only`, and exits 1 when there is at least one.
-- [ ] AC-07: `apply` never makes a write call that turns a setting off. After an `apply` that exited
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): the non-admin `apply` recorded no write and no admin-only read, listed four `unknown` `needs-admin` entries and exited 1; `check` recorded no write, listed four `not-changed` `check-only` entries and exited 1.
+- [x] AC-07: `apply` never makes a write call that turns a setting off. After an `apply` that exited
       0, a second `apply` on the same repository makes no write call
       and lists every setting as `already-on`, `left-off` or `unavailable`.
-- [ ] AC-08: When any Renovate detection lookup fails and no other lookup matches, Dependabot security
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): a second `apply` after a clean first run recorded no write and listed only `already-on`, `left-off` or `unavailable`; a first run with a failed pull request lookup exited 1; the harness rejects any DELETE or disabling body across every fixture and none was raised.
+- [x] AC-08: When any Renovate detection lookup fails and no other lookup matches, Dependabot security
       updates that are off stay off and are listed as `left-off` with reason
       `renovate-detection-failed` and the error. When every Renovate lookup succeeds without a match
       and the Dependabot config lookup fails, they stay off and are listed as `left-off` with reason
       `dependabot-detection-failed` and the error. In each case the helper exits 1.
-- [ ] AC-09: When one write fails, that setting is `not-changed` with reason `api-error` and the HTTP
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): all lookups failing and only `renovate.json` failing gave `renovate-detection-failed`, a failing `.github/dependabot.yml` lookup gave `dependabot-detection-failed`, each with 500 in the detail, no `automated-security-fixes` write and exit 1.
+- [x] AC-09: When one write fails, that setting is `not-changed` with reason `api-error` and the HTTP
       status, the remaining settings are still processed, and `apply` exits 1. A write that succeeds
       but is not read back as on gives `not-changed` with `api-error`, the write's status and
       "not on after write".
-- [ ] AC-10: `--format markdown` prints a `## Repository security settings` section with one row per
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): a 422 `PATCH repos/{r}` gave both secret entries `not-changed` `api-error` with 422 while the Dependabot entries were `enabled`, exit 1; a no-op `PUT automated-security-fixes` gave `api-error` with 204 and "not on after write", exit 1.
+- [x] AC-10: `--format markdown` prints a `## Repository security settings` section with one row per
       entry giving its state and reason, followed by an "Owner decisions" list holding exactly the
       entries with reason `renovate-overlap`, `owner-choice-conflict` or `paused`, matching the JSON output for
       the same run.
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): for the first fixture and the AC-14 fixture, `renderSecuritySettings` printed one row per JSON entry with its state and reason and an owner decisions list matching the JSON entries, or "None."; the CLI with `--format markdown` printed the section and exited 0.
 - [ ] AC-11: `references/security-settings.md`, `references/authority.md`, `references/maintenance.md`,
       `references/maintenance-settings.md`, `references/loop.md`, `references/lifecycle.md`, the
       maintenance skill and `docs/user-guides/workflows.md` state the following. A clause that names
@@ -801,12 +811,14 @@ and name the target, and no recorded run restricts it.
       `## Repository security settings` section that lists Dependabot alerts `already-on`,
       Dependabot security updates `left-off` with reason `renovate-present`, and secret scanning and
       push protection `already-on`.
-- [ ] AC-13: When alerts are not read back as on, `apply` makes no write to
+- [x] AC-13: When alerts are not read back as on, `apply` makes no write to
       `automated-security-fixes` and lists Dependabot security updates as `not-changed` with reason
       `alerts-off`.
-- [ ] AC-14: When Renovate is present and Dependabot security updates are already on, `apply` leaves
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): a 403 alerts write recorded no `automated-security-fixes` write and listed security updates `not-changed` with `alerts-off`, exit 1.
+- [x] AC-14: When Renovate is present and Dependabot security updates are already on, `apply` leaves
       them on, lists them as `already-on` with reason `renovate-overlap`, and the Markdown output
       lists them under owner decisions.
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): a `renovate.json` fixture with security updates on recorded no write, listed `already-on` with `renovate-overlap`, and the Markdown owner decisions named it.
 - [ ] AC-15: On an unarchived public repository where the caller is admin, an off setting listed for
       the target repository in `security_settings_keep_off` is never written and is listed as
       `left-off` with reason `owner-choice` and the configured reason. A
@@ -821,12 +833,13 @@ and name the target, and no recorded run restricts it.
       written, is listed as `already-on` with reason `owner-choice-conflict`, and appears in the
       Markdown owner decisions list, including when the committed settings are unlinked or absent
       and the row is in the working tree's settings.
-- [ ] AC-18: On an unarchived public repository where the caller is admin, when the read of a setting
+- [x] AC-18: On an unarchived public repository where the caller is admin, when the read of a setting
       fails with a status other than the 404 that means off, that entry is `unknown` with reason
       `api-error` and the status, even when the keep-off list names it, no write is made for it, the
       other settings are still processed, and `apply` exits 1. A 404 from either `GET` endpoint, and
       a 200 from `GET automated-security-fixes` with `enabled` false, are treated as off.
-- [ ] AC-19: When several rules apply to one entry, its state and reason come from the first that
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): a 500 `GET automated-security-fixes`, with and without a keep-off row, gave `unknown` `api-error` with 500, no write to it, alerts still `enabled`, exit 1; a 404 alerts read led to the write and `enabled`; a 404 security updates read led to a write; `{"enabled":false}` led to the write and `enabled`.
+- [x] AC-19: When several rules apply to one entry, its state and reason come from the first that
       applies in the numbered order under "Rules applied before any write", and under `check` an off
       security-updates entry the Renovate and Dependabot rules would enable is `not-changed` with
       `check-only` even while alerts are off. In a repository with `dependabot.yml`, no Renovate,
@@ -834,6 +847,7 @@ and name the target, and no recorded run restricts it.
       updates `left-off` with `owner-choice` and exits 0. On a public repository with both secret
       settings off and a keep-off row for `secret_scanning` only, `apply` leaves both `left-off`
       with `owner-choice` and writes neither.
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): archived private non-admin gave every entry `unavailable` `archived`, no admin-only read, exit 0; a private keep-off row for secret scanning still gave `not-free-on-private`; private non-admin gave the two secret settings `not-free-on-private` and the rest `needs-admin`; `check` gave security updates `check-only`; a `dependabot_alerts` keep-off row left both Dependabot settings `left-off` `owner-choice` with no write, exit 0; a `secret_scanning` row left both secret settings `left-off` with no `PATCH`.
 - [x] AC-20: `AGENTS.md` and `plugins/vh-adlc/knowledge.md` pin the vhco-pro/docs revision where #30
       merged, both `plugin.json` files carry the same new minor version, and
       `vh-adlc knowledge --page conventions/repository-security.md` resolves the page at that pin.
@@ -890,10 +904,11 @@ and name the target, and no recorded run restricts it.
 - [x] AC-25: A consumer whose committed settings hold `security_settings` and
       `security_settings_keep_off` keeps an adopted standing report-publication grant.
       Evidence: `bun test tests/vh-adlc/maintenance/settings.test.ts` at T3: "committed security settings keys keep an adopted standing publication grant" passes; `resolveStanding` returns `adopted` for a committed grant beside `security_settings: apply` and one keep-off row, and failed at T2 because the keys were rejected.
-- [ ] AC-26: Under `apply`, security updates read as `{"enabled":true,"paused":true}` are
+- [x] AC-26: Under `apply`, security updates read as `{"enabled":true,"paused":true}` are
       `already-on` with reason `paused`, with or without a Renovate signal, unless the keep-off list
       names them, which gives `owner-choice-conflict`. No write is made, the helper exits 0 when no
       other entry fails, and the Markdown owner decisions list names the entry.
+      Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): paused security updates with `dependabot.yml`, with `renovate.json`, and with a keep-off row gave `already-on` with `paused`, `paused` and `owner-choice-conflict`, no write, exit 0, each in the Markdown owner decisions.
 - [ ] AC-27: When the maintenance settings' `hostname` is not github.com, `security-settings-mode`
       prints `check` with `not-github-com` even when the committed settings adopt `apply`; the
       helper's `apply` makes no write and reports that mode reason; the helper never gives an entry
@@ -944,7 +959,8 @@ and name the target, and no recorded run restricts it.
       Evidence: `bun test tests/vh-adlc/maintenance/security-settings-mode.test.ts` passed 15 of 15; `bun test tests/vh-adlc/maintenance` passed 260 of 260 (/tmp/sec-t5-maint.log).
 - [x] T6 `tests/vh-adlc/security-settings/` - the fake `gh` the AC-01 row describes and the failing helper fixtures from the AC-01 to AC-10, AC-13, AC-14, AC-18, AC-19, AC-23 (helper part) and AC-26 rows; they fail because the helper does not exist (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-13, AC-14, AC-18, AC-19, AC-23, AC-26)
       Evidence: `bun test tests/vh-adlc/security-settings` at 6205f97 plus this directory: 0 pass, 1 fail, the test file rejected with "Cannot find module '../../../plugins/vh-adlc/scripts/security-settings/render'" because the helper does not exist (/tmp/sec-t6-fail.log).
-- [ ] T7 `plugins/vh-adlc/scripts/security-settings/` - the helper's `check` and `apply`: reads and writes through `gh api --hostname`, Renovate and Dependabot detection, the ordered rules, JSON and Markdown output and exit codes; T6 passes and the helper typechecks (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-13, AC-14, AC-18, AC-19, AC-23, AC-26)
+- [x] T7 `plugins/vh-adlc/scripts/security-settings/` - the helper's `check` and `apply`: reads and writes through `gh api --hostname`, Renovate and Dependabot detection, the ordered rules, JSON and Markdown output and exit codes; T6 passes and the helper typechecks (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-09, AC-10, AC-13, AC-14, AC-18, AC-19, AC-23, AC-26)
+      Evidence: `bun test tests/vh-adlc/security-settings tests/vh-adlc/maintenance --timeout 60000` passed 305 of 305, the 44 T6 helper cases included (/tmp/sec-t7-tests.log); `bash plugins/vh-adlc/scripts/security-settings/typecheck.sh` exited 0 under the locked strict compiler.
 - [ ] T8 `tests/vh-adlc/security-settings/` - failing fixtures for keep-off rows (AC-15, AC-17, including the working-tree fallbacks), every helper `apply` refusal fixture in the AC-24 row, and the helper part of the AC-27 row; they fail because the helper does not yet bind committed settings or read the run (AC-15, AC-17, AC-24, AC-27)
 - [ ] T9 `plugins/vh-adlc/scripts/security-settings/`, `plugins/vh-adlc/scripts/maintenance/journal.ts` - bind the committed settings at `--default-commit`, read keep-off rows with the Design's fallbacks, and refuse `apply` with the ordered mode reasons, failing visibly on an unresolved binding, invalid committed settings or an unreadable run; T8 passes and T6 still passes (AC-15, AC-17, AC-24, AC-27)
 - [ ] T10 `tests/vh-adlc/maintenance/security-settings-collect.test.ts` - failing collector, report and reconcile fixtures from the AC-16, AC-21, AC-22, AC-23 (collector part) and AC-27 (collector part) rows, plus repeated `--security-settings` and `--applied-repository` flags; they fail because the flags and rules do not exist (AC-16, AC-21, AC-22, AC-23, AC-27)
