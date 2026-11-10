@@ -848,6 +848,7 @@ None.
 | 2026-11-10 | R-17 | spec | `0919a89` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-18 | spec | `d62f5b5` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-19 | spec | `2ea72bd` | unknown | procedural | 3 findings: 3 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-20 | spec | `8675000` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1509,6 +1510,29 @@ SEVERITY: nit
 WHERE: Design (Helper)
 EVIDENCE: Both commands accept `[--mode-reason TEXT]` (`check ... [--mode-reason TEXT]`, `apply ... [--mode-reason TEXT]`). The only meaning given is: "`check` also accepts `--mode-reason`, the reason `security-settings-mode` printed". The helper also chooses mode reasons itself. `apply` refuses with `not-adopted`, `not-in-committed-scope` or a run-derived reason, and `check` "reports `committed-settings-unresolved` with the cause as its mode reason" when its binding fails. The skill always passes the binding to `check`, including when it chose `check` itself with `request-restricted` for `no_filesystem` or a restricted onboarding request. So `--mode-reason request-restricted` and an unresolved binding can occur together. Nothing says which reason the JSON shows, or what `apply` does with a passed `--mode-reason`, such as `adopted`, when it then refuses.
 PROPOSAL: State one rule: the helper's own refusal or binding-failure reason takes precedence over `--mode-reason`, or both are shown. Either say what `apply` does with `--mode-reason` or remove the flag from `apply`.
+
+### R-20
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-22) and Test Plan (AC-22, AC-23)
+EVIDENCE: The R-19 fold added this clause to AC-22 (lines 754-756): "The section names the `security_settings: apply` opt-in unless at least one helper file is accepted and every accepted file's mode is `apply`; a rejected file's claimed mode does not count." The Design matches it (line 594-596). The AC-22 proof (line 812) covers only four cases: a first report where one accepted file is in `check`, a third report where every file is in `apply`, a report with no files, and the no-flag report. The AC-23 proof (line 813) adds bad files to `collect` and `report`, but it checks only "helper did not run" and that no `alerts-enabled-this-run` comes from them. It never checks the opt-in line. No fixture covers a report where a rejected file claims `check` and every accepted file is `apply`, or a report where every given file is rejected. Suppose an implementation counts a rejected file's claimed mode. It passes every listed fixture and still breaks the clause. Because a passing subset never upgrades a composite criterion, AC-22 would be `untested` at implementation review.
+PROPOSAL: Add two AC-22 report fixtures. In the first, every accepted file is in `apply` and one rejected file, such as one with another run ID, claims `check`; it passes when the section has no opt-in line. In the second, every given file is rejected and claims `apply`; it passes when the section names the opt-in.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-24), Design (Helper; Procedure changes: mode reasons) and Test Plan (AC-24)
+EVIDENCE: AC-24 (lines 778-782) says: "The helper's `apply` makes no write, and reports its entries exactly as `check` would, with mode `check` and mode reason `not-adopted` or `not-in-committed-scope`, when the bound committed settings do not adopt `security_settings: apply` or do not name the target, or when its `--run-id` names a run whose recorded request or scope selects `check`." So the criterion requires `not-adopted` or `not-in-committed-scope` for the run-based refusals too. The AC-24 proof (line 814) expects the `--run-id` fixtures to give "`request-restricted` naming `read_only`, and `pull-request-scope` respectively". The Design (line 326) gives that refusal "the reason that command would print". An implementation can satisfy the criterion or the proof, but not both. The Design also leaves open which reason the helper's `apply` prints when the committed settings do not adopt `apply` and the run is `read_only`. Line 321 says `not-adopted`. Line 326 and the order at line 561 give `request-restricted`. The proof's `read_only` run fixture does not say whether its committed settings adopt `apply`.
+PROPOSAL: Reword the AC-24 clause so the helper's refusal reason is the first that applies in the ordered list at line 561, the same reason `security-settings-mode` would print. State in the Design that `apply` uses that order. In the proof, say the `read_only` and pull-request `--run-id` fixtures use committed settings that adopt `apply`, and add one helper fixture that does not adopt `apply` and has a `read_only` run, expecting `request-restricted`.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Frontmatter (goal)
+EVIDENCE: The goal (line 5) says "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts ...". The Owner summary (line 51) and the Design (line 554) say "only a full authorized sweep writes; a PR-scoped assessment checks". A request with `read_only`, `draft_only`, `no_push`, `no_filesystem` or no `authorized_sweep` true also gives `check` (Q26, Q41). A repository that the committed settings do not name gets `not-in-committed-scope` (Q48), and keep-off rows are never written (Q10). The goal names none of these limits. With every box ticked, an opted-in consumer's PR-scoped or read-only sweep turns nothing on, which the goal as worded does not allow.
+PROPOSAL: Narrow the goal to "every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each repository its committed settings name and except what its keep-off list names, ...", to match the Owner summary.
 
 ## Sources
 
