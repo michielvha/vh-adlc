@@ -1,8 +1,8 @@
 ---
 status: draft
-status_description: "Spec review R-3 at 44aea8d returned 7 findings, none blocking. Its factual corrections are applied; Q23 to Q27 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Q23 to Q27 from spec review R-3 answered with every recommendation; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
-goal: "Every maintenance sweep and onboarding leaves a repository with each GitHub security setting its plan offers for free turned on, without duplicating Renovate's pull requests, and reports what it changed."
+goal: "Every maintenance sweep and onboarding of an opted-in repository leaves it with each GitHub security setting its plan offers for free turned on, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
   - AGENTS.md
   - plugins/vh-adlc/knowledge.md
@@ -14,6 +14,7 @@ covers:
   - plugins/vh-adlc/scripts/maintenance/types.ts
   - plugins/vh-adlc/scripts/maintenance/report.ts
   - plugins/vh-adlc/scripts/maintenance/cli.ts
+  - plugins/vh-adlc/scripts/maintenance/authority.ts
   - plugins/vh-adlc/references/security-settings.md
   - plugins/vh-adlc/references/maintenance.md
   - plugins/vh-adlc/references/maintenance-settings.md
@@ -29,7 +30,7 @@ covers:
 # Plan: Repository security settings
 
 Maintenance sweeps and onboarding turn on the GitHub security settings a repository's plan includes
-at no cost, instead of only reporting that they are off. Dependabot security updates stay off where
+at no cost where the consumer opts in, and report them everywhere. Dependabot security updates stay off where
 Renovate opens the fix pull requests.
 
 ## Context
@@ -40,8 +41,9 @@ A sweep on `michielvha/bg-remove` found Dependabot alerts off: a coverage gap, a
 security fixes, since Renovate reads the alerts. Once the owner enabled them, GitHub
 listed 47 alerts and Renovate opened two security pull requests.
 
-A new helper automates that step. Every maintenance sweep runs it before collecting alerts,
-and so does onboarding. It turns on what is off and free:
+A new helper automates that step. Sweeps run it before collecting alerts, and so does onboarding.
+In a repository whose committed `.vh-adlc/maintenance.yaml` opts in with `security_settings: apply`,
+it turns on what is off and free; elsewhere, or under a restricting request, it only checks:
 
 - Dependabot alerts, with the dependency graph, in every repository, private ones too.
 - On public repositories, secret scanning and push protection.
@@ -55,24 +57,22 @@ private repository whose paid features read as off, it lists code scanning as un
 plan, not as a coverage gap.
 
 The helper never turns a setting off. It skips public-only settings on private repositories,
-writes nothing to archived ones, and reports a setting it cannot read as `unknown`. A
-per-repository list in `.vh-adlc/maintenance.yaml` stops it from enabling chosen settings, and a
-request that forbids live changes runs a read-only check. After a clean run, a second run changes
-nothing; a failed write is retried next time.
+writes nothing to archived ones, and reports what it cannot read as `unknown`. A keep-off list
+stops it from enabling chosen settings. A failure in one repository never stops the sweep, and
+alerts enabled during a sweep count as incomplete until the next one.
 
-The rules follow the convention proposed in vhco-pro/docs#30, now changed to the same
-security-updates rule. CodeQL and Scorecard come from its reusable workflows, so the helper never
-turns on CodeQL default setup. Implementation waits for docs#30 to merge, then moves both docs pins
+The rules follow vhco-pro/docs#30, changed to match. CodeQL and Scorecard come from its reusable
+workflows, so the helper never turns on CodeQL default setup. Implementation waits for docs#30 to merge, then moves both docs pins
 with a plugin minor version bump.
 
 These owner decisions widen the authority table. Today the only repository setting vh-adlc
 changes is merged-branch deletion, with authorization.
 
-Proof is planned, not observed: Bun tests against a fake `gh` for each repository shape, and a live
-sweep of bg-remove. No live run shows a sweep enabling alerts and collecting them in the same run.
-Reviews R-1 to R-3 found nothing blocking; R-3's questions Q23 to Q27 are open. Acceptance authorizes tasks, implementation on a feature branch, the pin move, the version
-bump and that live sweep. A release and changes to any other repository outside a sweep or
-onboarding need separate approval.
+Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
+Reviews R-1 to R-3 found nothing blocking, and the owner answered their questions. Acceptance
+authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
+sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
+or onboarding need separate approval.
 
 ### Background
 
@@ -157,6 +157,13 @@ Owner decisions on 2026-11-10:
   helper's output in its own section through a new report input (Q21); and the owner's acceptance
   of this feature is the standing agreement the onboarding guide asks for, with docs#30 naming both
   Dependabot config file names since `106ecfb` (Q22).
+- Q23 to Q27, from spec review R-3, answered on 2026-11-10 with every recommended option: a
+  Dependabot surface whose alerts were enabled in the same run is incomplete with
+  `alerts-enabled-this-run` (Q23); a helper failure is reported and never stops the sweep (Q24);
+  settings are written only in consumers that adopt `security_settings: apply` in their committed
+  settings, and every other consumer gets `check` (Q25, which narrows Q3 and the sweep default);
+  `read_only`, `draft_only`, `no_push` and `no_filesystem` select `check` (Q26); and a criterion
+  proves sweeps do not request the new page (Q27).
 
 ## Scope
 
@@ -170,9 +177,11 @@ In scope:
 - A read-only code scanning entry that marks private and internal repositories as unavailable for
   the plan when an admin read shows their paid features off, and the collector rule that records
   their code scanning surface the same way.
-- A per-repository keep-off list in `.vh-adlc/maintenance.yaml`.
-- Running the helper in every maintenance sweep before collection and during onboarding, with the
-  outcome in the sweep report, rendered from the helper's JSON, or the onboarding report.
+- A per-repository keep-off list and a `security_settings` opt-in in `.vh-adlc/maintenance.yaml`.
+- Running the helper in every maintenance sweep before collection and during onboarding, with
+  `apply` only where the consumer opted in and no restricting request applies, and the outcome in
+  the sweep report, rendered from the helper's JSON, or the onboarding report.
+- The collector rule for a Dependabot surface whose alerts were enabled in the same run.
 - Moving the `AGENTS.md` pin and the plugin pin in `plugins/vh-adlc/knowledge.md` to the revision
   where vhco-pro/docs#30 merged, with a plugin minor version bump in both `plugin.json` files.
 - The authority row, maintenance skill step, onboarding text, reference pages and user-guide section
@@ -265,8 +274,10 @@ endpoint.
 
 ### Rules applied before any write
 
-The helper first reads `repos/{r}`, which any caller can read. Each entry then takes the state and
-reason of the first rule below that applies to it:
+The helper first reads `repos/{r}`, which any caller can read. When that read fails, every one of
+the four writable entries is `unknown` with reason `api-error` and the status or error, the helper
+makes no other read or write, and it exits 1. Otherwise each entry takes the state and reason of
+the first rule below that applies to it:
 
 1. Archived (`archived`): the helper makes no admin-only read and no write, and every entry is
    `unavailable`.
@@ -340,6 +351,12 @@ internal, the caller is admin, `security_and_analysis` shows neither `advanced_s
 `code_security` with status `enabled` (a null block included), and the code scanning alerts read
 fails with 403 or 404. In every other case a failed read stays incomplete, as today. A successful
 read still wins.
+
+The `collect` command gains `--security-settings FILE`, repeatable, taking the helper's JSON. When
+a file lists `dependabot_alerts` as `enabled` for a repository, the collector records that
+repository's Dependabot surface as incomplete with reason `alerts-enabled-this-run` and the count it
+read, since GitHub fills the list after the write. The next sweep, where alerts are `already-on`,
+records it as usual.
 `references/maintenance.md:80` changes to name this rule beside the configured exact match.
 
 ### Settings
@@ -349,31 +366,42 @@ read still wins.
 declared scope, `settings` lists names from the four writable entries, and `reason` is required
 text. Unknown setting names and duplicate repositories fail visibly, as for the other fields.
 
+They also gain `security_settings`, `apply` or `check`, default `check`. Like the other standing
+grants, it is read only from the consumer's committed default branch
+(`plugins/vh-adlc/references/maintenance-settings.md:51-57`).
+
 ### Procedure changes
 
 - `references/security-settings.md` (new) documents the commands, states, reasons, the endpoint
   responses that mean on and off, detection rules, keep-off list, precedence and authority. For
   which features a repository should have, it links to `conventions/repository-security.md` at the
   pinned docs revision instead of restating it.
-- The maintenance skill gets a step before collection: run `apply` for each repository in scope, or
-  `check` when the current request forbids live or remote changes, then collect, so alerts enabled in
-  this run are collected in the same run. When alerts were enabled in this run, the report says the
-  alert list may still be filling. The step saves each repository's JSON output and passes the
-  files to the report.
+- `scripts/maintenance/authority.ts` gains a mode function, and the maintenance CLI a
+  `security-settings-mode` command that prints it with its reason. The mode is `check` when the
+  recorded request has `read_only`, `draft_only`, `no_push` or `no_filesystem`
+  (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`), or when the committed settings do not
+  adopt `security_settings: apply` and the current request does not ask to apply. Otherwise it is
+  `apply`. `no_commit` alone does not select `check`, because a settings change is not a commit.
+- The maintenance skill gets a step before collection: for each repository in scope, run the helper
+  in that mode, save its JSON, then collect with those files. A helper failure or exit 1 never
+  blocks collection. Under `check`, the report says how to opt in.
+- The maintenance skill's and onboarding's `vh-adlc knowledge` page lists do not include
+  `conventions/repository-security.md`, so a consumer pinned before docs#30 still sweeps.
 - The maintenance CLI's report command gains `--security-settings FILE`, repeatable, taking the
   helper's JSON output, and `renderReport` in `scripts/maintenance/report.ts` gains a matching input.
   The saved report then has a `## Repository security settings` section after `## Security alerts`:
   one table per repository, rendered by the same function as the helper's Markdown, and one
-  "Owner decisions" list across all repositories. Without the option the section says the helper
-  did not run. `references/maintenance.md` documents the section.
+  "Owner decisions" list across all repositories. The section names every repository in scope,
+  with a "helper did not run" row for one without a file, so no repository drops out silently.
+  `references/maintenance.md` documents the section.
 - `references/authority.md` gets a row: a maintenance sweep or onboarding may enable these settings
-  on a repository in its scope with `apply`. A current request that forbids live or remote changes
-  wins, and the procedure then runs `check`. Nothing grants turning a setting off. The owner's
-  acceptance of this feature is the standing agreement that `guides/onboard-a-repository.md` in
-  vhco-pro/docs asks for before turning these settings on, and
-  `references/security-settings.md` says so.
-- `references/loop.md:70-73` and `references/lifecycle.md:64` add that onboarding runs `apply` and
-  reports its output beside the merged-branch deletion check. Like that check, it is a repository
+  with `apply` on a repository in its scope only when the consumer's committed settings adopt
+  `security_settings: apply` or the current request asks to apply. A request with a flag that
+  selects `check` wins. Nothing grants turning a setting off. That adoption is the owner's
+  agreement that `guides/onboard-a-repository.md` in vhco-pro/docs asks for before turning these
+  settings on, and `references/security-settings.md` says so.
+- `references/loop.md:70-73` and `references/lifecycle.md:64` add that onboarding runs the helper in
+  the same mode and reports its output beside the merged-branch deletion check. Like that check, it is a repository
   change, not a commit, and never holds up the onboarding commit.
 - `docs/user-guides/workflows.md` gets a section beside "Stale branches" describing the default and
   the manual commands. The merged-branch deletion text stays as it is.
@@ -429,14 +457,16 @@ with every read and write succeeding, unless it names another case.
       the same run.
 - [ ] AC-11: `references/security-settings.md`, `references/authority.md`, `references/maintenance.md`,
       `references/maintenance-settings.md`, `references/loop.md`, `references/lifecycle.md`, the
-      maintenance skill and `docs/user-guides/workflows.md` state: sweeps run `apply` before
-      collection, or `check` under a restricting request; onboarding runs `apply`; the Renovate and
-      Dependabot rules; the private, archived and keep-off rules; that `renovate-overlap` goes to the
-      owner; the precedence order; that no setting is ever turned off; and, in the authority row and
-      `references/security-settings.md`, that the owner's acceptance of this feature is the agreement
-      the onboarding guide asks for.
+      maintenance skill and `docs/user-guides/workflows.md` state: sweeps and onboarding run the
+      helper before collection in the mode `security-settings-mode` prints; the `security_settings`
+      opt-in and the flags that select `check`; the Renovate and Dependabot rules; the private,
+      archived and keep-off rules; that `renovate-overlap` and `owner-choice-conflict` go to the
+      owner; the precedence order; that a helper failure never blocks collection; that no setting is
+      ever turned off; and, in the authority row and `references/security-settings.md`, that adopting
+      `security_settings: apply` is the agreement the onboarding guide asks for.
       `references/security-settings.md` links to `conventions/repository-security.md` at the plugin
-      pin, and that revision contains the page.
+      pin, and that revision contains the page. The maintenance skill's and onboarding's
+      `vh-adlc knowledge` page lists do not include `conventions/repository-security.md`.
 - [ ] AC-12: After a maintenance sweep of `michielvha/bg-remove`, its saved report has a
       `## Repository security settings` section that lists Dependabot alerts `already-on`,
       Dependabot security updates `left-off` with reason `renovate-present`, and secret scanning and
@@ -472,14 +502,23 @@ with every read and write succeeding, unless it names another case.
 - [ ] AC-20: `AGENTS.md` and `plugins/vh-adlc/knowledge.md` pin the vhco-pro/docs revision where #30
       merged, both `plugin.json` files carry the same new minor version, and
       `vh-adlc knowledge --page conventions/repository-security.md` resolves the page at that pin.
-- [ ] AC-21: When a sweep starts on a repository with Dependabot alerts off, `apply` runs before the
-      collector, and the collector then lists the repository's open Dependabot alerts with the
-      Dependabot surface complete.
+- [ ] AC-21: When `apply` enables Dependabot alerts and the collector then runs with the helper's
+      JSON, the collector lists the open alerts it reads and records the Dependabot surface as
+      incomplete with reason `alerts-enabled-this-run`, also when the list is still empty. With
+      alerts `already-on`, a successful read stays complete.
 - [ ] AC-22: A sweep report saved with `--security-settings` files has a
-      `## Repository security settings` section after `## Security alerts`, with one table per
-      repository whose rows match that repository's JSON entries, and an "Owner decisions" list
+      `## Repository security settings` section after `## Security alerts` that names every
+      repository in scope: one table per repository with a file, whose rows match its JSON entries,
+      a "helper did not run" row for each repository without one, and an "Owner decisions" list
       holding exactly the entries with `renovate-overlap` or `owner-choice-conflict` across all files.
-      Without the option, the section says the helper did not run.
+- [ ] AC-23: When the helper's `repos/{r}` read fails, every writable entry is `unknown` with reason
+      `api-error` and the status, no other read or write is made, and the helper exits 1. In a sweep,
+      a helper failure or exit 1 for one repository does not stop collection for any repository.
+- [ ] AC-24: `security-settings-mode` prints `check` when the recorded request has `read_only`,
+      `draft_only`, `no_push` or `no_filesystem`, or when the committed settings do not adopt
+      `security_settings: apply` and the request does not ask to apply; otherwise it prints `apply`.
+      A request with only `no_commit` gets `apply` when the settings adopt it. A `security_settings`
+      value other than `apply` or `check` fails visibly.
 
 ## Test Plan
 
@@ -493,7 +532,7 @@ with every read and write succeeding, unless it names another case.
 | AC-08 | Same suite, public admin fixtures with security updates off and `.github/dependabot.yml`: every Renovate lookup fails; only the `renovate.json` lookup fails and the others match nothing; every Renovate lookup succeeds without a match and the `.github/dependabot.yml` lookup fails. Pass: no write to `automated-security-fixes` in any; the first two give `left-off` with `renovate-detection-failed` and the error, the third `left-off` with `dependabot-detection-failed` and the error. |
 | AC-09 | Same suite, fixture where the `PATCH repos/{r}` write returns 422. Pass: secret scanning entries `not-changed` with `api-error` and 422, other settings still `enabled`, exit code 1. |
 | AC-10 | Same suite: run the first fixture and the AC-14 fixture with both formats. Pass: the Markdown section has one row per JSON entry with the same state and reason, and its owner decisions list holds exactly the JSON entries with `renovate-overlap` or `owner-choice-conflict`, or "None." |
-| AC-11, AC-20 | The reviewer reads the eight files, `AGENTS.md`, `plugins/vh-adlc/knowledge.md` and both `plugin.json` files at the implementation commit, confirms each listed rule is stated, the merged-branch deletion rule is unchanged, both pins name the docs#30 merge revision and both versions match a minor bump, then runs `vh-adlc knowledge --page conventions/repository-security.md` with the new plugin pin. Pass: the page resolves. |
+| AC-11, AC-20 | The reviewer reads the eight files, `AGENTS.md`, `plugins/vh-adlc/knowledge.md` and both `plugin.json` files at the implementation commit, confirms each listed rule is stated, the maintenance skill's and onboarding's `knowledge` page lists omit `conventions/repository-security.md`, the merged-branch deletion rule is unchanged, both pins name the docs#30 merge revision and both versions match a minor bump, then runs `vh-adlc knowledge --page conventions/repository-security.md` with the new plugin pin. Pass: the page resolves. |
 | AC-12 | Manual: run a maintenance sweep of `michielvha/bg-remove` with the implemented plugin and read the saved report. Pass: the section shows the listed states. Limit: every setting there is already on or left off, so no live run shows a sweep enabling alerts and collecting them in the same run; the AC-21 fixture covers that path. |
 | AC-13 | Same suite, fixture where the alerts write returns 403. Pass: no `automated-security-fixes` write recorded, entry `not-changed` with `alerts-off`, exit code 1. |
 | AC-14 | Same suite, fixture with a Renovate config file and security updates already on. Pass: no write recorded, entry `already-on` with `renovate-overlap`, and the Markdown output lists it under owner decisions. |
@@ -501,9 +540,11 @@ with every read and write succeeding, unless it names another case.
 | AC-17 | `bun test tests/vh-adlc/security-settings`, fixture: public repository with push protection on and a keep-off row for it. Pass: no write recorded for it, entry `already-on` with `owner-choice-conflict`, listed in the Markdown owner decisions. |
 | AC-18 | Same suite, public admin fixtures with `.github/dependabot.yml` and no Renovate: `GET automated-security-fixes` returns 500, once without and once with a keep-off row for it; `GET vulnerability-alerts` returns 404; `GET automated-security-fixes` returns 200 with `{"enabled":false,"paused":false}`. Pass: the 500 runs give that entry `unknown` with `api-error` and 500, no write to it, other settings processed, exit code 1; the 404 run writes alerts and reports `enabled`; the 200 run writes security updates and reports `enabled`. |
 | AC-19 | Same suite, fixtures: archived private repository run by a non-admin; private admin repository with a keep-off row for secret scanning; private non-admin repository; `check` on a public admin repository with alerts off, `dependabot.yml` and no Renovate. Pass: every entry `unavailable` with `archived` and no admin-only read, exit code 0; secret scanning `unavailable` with `not-free-on-private`; secret scanning and push protection `unavailable` with `not-free-on-private`, alerts, security updates and `code_scanning` `unknown` with `needs-admin`; security updates `not-changed` with `check-only`. |
-| AC-22 | `bun test tests/vh-adlc/maintenance`: render a report with two `--security-settings` files, one holding a `renovate-overlap` entry, and one without the option. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the owner decisions list holds exactly the `renovate-overlap` entry, and the second report says the helper did not run. |
+| AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for three repositories in scope with two `--security-settings` files, one holding a `renovate-overlap` entry. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the third repository has a "helper did not run" row, and the owner decisions list holds exactly the `renovate-overlap` entry. |
+| AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository sweep fixture where the helper exits 1 for the first. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection still covers both repositories. |
+| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings that do not adopt it, with and without a request to apply; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `check` then `apply` for the next two, and a visible failure naming the field for the last. |
 | AC-16 | `bun test tests/vh-adlc/maintenance` with collector fixtures for a private admin repository with `security_and_analysis` null whose code scanning read returns 403, and one returning 404. Pass: the surface is `complete-unavailable` with `not-free-on-private` and the status. Fixtures with the same 403 on a public repository, on a private repository read without admin, and on a private repository with `code_security` enabled stay incomplete. |
-| AC-21 | `bun test tests/vh-adlc/maintenance` with one fake `gh` state shared by the helper and the collector: public admin repository, alerts off, three open Dependabot alerts that the alerts endpoint returns only once alerts are on. Run `apply`, then the collector. Pass: the collection lists the three alerts and the Dependabot surface is complete. |
+| AC-21 | `bun test tests/vh-adlc/maintenance` with one fake `gh` state shared by the helper and the collector: public admin repository, alerts off, three open Dependabot alerts that the alerts endpoint returns only once alerts are on; a second fixture whose endpoint returns an empty list on the first read after the write; a third with alerts already on. Run `apply`, then the collector with the helper's JSON. Pass: the first lists three alerts and the second none, both with the surface incomplete and `alerts-enabled-this-run`; the third is complete. |
 
 ## Tasks
 
@@ -511,71 +552,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q23: How should a sweep report alerts it enabled in the same run?
-
-From R-3 F-01: right after the alerts write, the alerts list can still be empty, and the collector records any successful read as `complete` with its count (`plugins/vh-adlc/scripts/maintenance/collect.ts:88-90`, `:131`). On bg-remove, 47 alerts appeared about 20 seconds after the write.
-
-**Recommendation:** A. The report never shows a filling list as a complete zero.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. When the helper JSON has `dependabot_alerts` `enabled` in this run, the Dependabot surface is recorded as incomplete with reason `alerts-enabled-this-run` and the count read; a criterion and a fixture with a delayed alert list check it** | An honest coverage line; the next sweep collects the full list | The sweep's security accounting stays incomplete for that repository until the next run |
-| **B. Keep the surface `complete` and require a "may still be filling" note in the report, with a criterion and a delayed-list fixture** | Complete accounting in the same run | A complete surface that may undercount |
-
-**Why this is yours:** It decides whether a same-run enable counts as complete coverage.
-
-### Q24: What happens when the helper fails for one repository in a sweep?
-
-From R-3 F-02: no rule covers a failed `repos/{r}` read, and the sweep step does not say whether a helper failure stops the sweep or drops that repository from the report.
-
-**Recommendation:** A. One repository's failure is visible and never stops the rest of the sweep.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. A failed `repos/{r}` read makes every entry `unknown` with `api-error` and exit 1; a helper failure or exit 1 never blocks collection; the report section names every repository in scope and shows a "helper did not run" row for one with no output; a criterion and a fixture check it** | Complete, visible results across a multi-repository sweep | One more rule, criterion and fixture |
-| **B. Any helper failure stops the sweep before collection** | Simpler | One flaky repository blocks every other repository's sweep |
-
-**Why this is yours:** It decides how partial failures affect a sweep.
-
-### Q25: Which consumers does the standing agreement to apply settings cover?
-
-From R-3 F-03: the plugin is distributed through marketplaces, other standing grants come from a consumer's own adopted declaration (`plugins/vh-adlc/references/authority.md`, `references/maintenance-settings.md:51-57`), and the convention names only `michielvha` and `vhco-pro`.
-
-**Recommendation:** C. Settings are never written in someone else's repository without that owner opting in, and your repositories need one line each.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Every consumer: `apply` by default everywhere** | No setup anywhere | Writes settings in other owners' repositories after an upgrade, without their agreement |
-| **B. Only repositories owned by `michielvha` or `vhco-pro`; others run `check`** | No setup for your accounts | Hard-codes account names in a distributed plugin |
-| **C. Only consumers whose committed `.vh-adlc/maintenance.yaml` adopts `security_settings: apply`; others run `check` and the report says how to opt in** | Matches every other standing grant | One settings line per consumer, including bg-remove |
-
-**Why this is yours:** It sets the reach of a standing authority grant.
-
-### Q26: Which recorded request flags make the helper run `check`?
-
-From R-3 F-04: the run records `read_only`, `draft_only`, `no_commit`, `no_push` and `no_filesystem` (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`), and `references/maintenance.md:38-40` gives them different meanings.
-
-**Recommendation:** A. Any restriction on remote effects stops remote setting writes.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. `read_only`, `draft_only`, `no_push` and `no_filesystem` select `check`; `no_commit` alone does not, because a settings write is not a commit; a criterion runs each flag and records no write** | Clear mapping, tested | A `no_push` sweep cannot enable alerts |
-| **B. Only `read_only` selects `check`** | More sweeps enable settings | A `no_push` or `draft_only` request still changes GitHub |
-
-**Why this is yours:** It decides which restrictions block a remote change.
-
-### Q27: Should a criterion prove that sweeps do not request the new page?
-
-From R-3 F-07: an operation stops on `missing-page` (`plugins/vh-adlc/references/loop.md:59-61`, `:75-76`), and the page is missing at `a4e3d592`.
-
-**Recommendation:** A. A consumer pinned before docs#30 keeps sweeping.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. AC-11 and its proof add that the maintenance skill and onboarding `knowledge` page lists do not include `conventions/repository-security.md`** | A checked guarantee | One more line in AC-11 |
-| **B. Leave it to the design text** | Nothing to add | An implementation could add the page and break older consumers |
-
-**Why this is yours:** It decides whether a design assumption is tested.
+None.
 
 ## Review Log
 
