@@ -715,6 +715,7 @@ None.
 | 2026-11-10 | R-8 | spec | `ec05a26` | unknown | procedural | 3 findings: 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-9 | spec | `c1a8587` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-10 | spec | `0c85c0b` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-11 | spec | `b0a2159` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1141,6 +1142,29 @@ SEVERITY: nit
 WHERE: Context (Owner summary)
 EVIDENCE: The summary says the helper turns settings on when the committed settings opt in, and that "elsewhere, or under a restricting request, it only checks". It does not mention the Q41 limits: a recorded request without `authorized_sweep` true checks, a PR-scoped run checks, and a continuation does not run the helper again. A pull request scope is not a restricting request. The summary also says "Reviews R-1 to R-9 found nothing blocking, and the owner answered their questions". The Q41 to Q43 bullet says these R-9 decisions were "taken with the reviewer's proposal under that instruction" and were not put to the owner as questions.
 PROPOSAL: Add one sentence to the summary saying that only a full authorized sweep or onboarding may apply, and that PR-scoped runs only check. Say that the R-9 findings were folded under the owner's standing instruction.
+
+### R-11
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Settings, Procedure changes: mode function and maintenance skill step, Helper CLI) and AC-24
+EVIDENCE: Design (Settings) says "Under `apply`, the keep-off rows and the list of repositories the sweep may write to are read from the same committed, linked settings" and "A repository in the working tree's scope that the committed settings do not name gets `check`". The AC-24 proof expects `check` for that repository from `bun test tests/vh-adlc/maintenance` ("the working tree adds a repository to `repositories` (pass: `check` for that repository)"). The only mode interface defined is a `security-settings-mode` command that "takes an optional `--run-id` and prints the mode with its reason". It has no repository argument and returns one mode per run. The skill step then runs the helper for "each repository in scope ... in that mode". No text says which component downgrades one repository to `check`, or what the helper output shows when that happens. The committed read also lacks an input. `resolveStanding` takes `{ default_branch, default_commit }` and fails unless `refs/remotes/origin/<branch>` equals that commit (`plugins/vh-adlc/scripts/maintenance/authority.ts:88-92`). The `report` command supplies these through `--default-commit` and the inventory's observed default branch (`plugins/vh-adlc/scripts/maintenance/cli.ts:93-96`). `security-settings-mode` runs before collection and has neither. The helper's `apply`, which must read committed keep-off rows, has no such flag. The run scope always includes the origin repository (`cli.ts:68`), and the optional `repository` key does not name it. The document does not say whether that repository counts as named by the committed settings.
+PROPOSAL: Define the interface. For example, `security-settings-mode` could take `--repository` (or print one mode per repository in the run's scope) plus `--default-branch` and `--default-commit`, with the helper's `apply` taking the same committed binding for its keep-off rows. Say that the origin repository always counts as named, and state the output for a repository downgraded to `check`.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Procedure changes: onboarding and authority row) and AC-11
+EVIDENCE: Onboarding is the step whose first change "adds the pinned `AGENTS.md`" when `knowledge` reports source `plugin` (`plugins/vh-adlc/references/loop.md:63-69`). In the usual case, the committed default branch therefore has no `AGENTS.md` link to `.vh-adlc/maintenance.yaml` yet, and `resolveStanding` returns unadopted (`authority.ts:95-96`). The design's onboarding then runs the helper under `check` and "reports its output". After the pin move, the guide that onboarding reads and applies "within the selected task's authority" (`plugins/vh-adlc/references/lifecycle.md:64`) says "With the owner's agreement, turn on Dependabot alerts in every repository" and gives the `gh api -X PUT` and `PATCH` commands. Its checklist item 6 requires "Confirm the security features match the repository's visibility, or that the owner chose otherwise" (`/tmp/vhco-docs-30/guides/onboard-a-repository.md` at `4b2198d`). The design says only that adopting `security_settings: apply` is that agreement. It does not say whether, under `check`, onboarding may run the guide's commands or the helper's `apply` on an in-session yes, as it does for merged-branch deletion (`loop.md:70-73`). It also does not say how checklist item 6 is recorded when the owner neither adopts the setting nor declines. AC-11 does not require loop.md or lifecycle.md to state either point.
+PROPOSAL: State in the Design and AC-11 what onboarding does under `check`. One option is to report the states, say how to opt in, record item 6 as pending the owner's choice, and never run the guide's manual commands. Note in the Owner summary that onboarding usually checks, because the onboarding commit is what links the settings.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Rules applied before any write, rule 2 and the closing paragraph)
+EVIDENCE: Rule 2 makes private secret scanning and push protection "`unavailable` unless the admin read shows them on", and it comes before rule 3 (`needs-admin`). For a private repository read without admin, no admin read exists, and AC-19's proof expects "secret scanning and push protection `unavailable` with `not-free-on-private`" there. GitHub returns `security_and_analysis` only to admins, so the helper did not see whether those features are on. The closing paragraph still says "Rules 1 to 4 need no reading of the setting, or report that the read failed, so no entry claims a state the helper could not see." For `code_scanning`, rule 2 requires admin evidence (Q19), so the two paid features are treated differently.
+PROPOSAL: Reword the closing sentence so it says that rule 2 infers `unavailable` from visibility alone when no admin read exists. Alternatively, make non-admin private secret scanning entries `unknown` with `needs-admin`, as `code_scanning` is.
 
 ## Sources
 
