@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-11 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "R-12 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -40,13 +40,13 @@ Renovate opens the fix pull requests.
 
 ### Owner summary
 
-A bg-remove sweep found Dependabot alerts off: a coverage gap, and no Renovate security fixes.
-Once enabled, GitHub listed 47 alerts and Renovate opened two security pull requests.
+A bg-remove sweep found Dependabot alerts off: a coverage gap. Once enabled, GitHub listed 47
+alerts and Renovate opened two security pull requests.
 
 A new helper automates that step. Sweeps run it before collecting alerts, and so does onboarding.
 When the sweeping repository's committed `.vh-adlc/maintenance.yaml` opts in with
-`security_settings: apply`, it turns these on when off in every repository the sweep covers, except
-what the keep-off list names. Only a full authorized sweep, or onboarding, may write; onboarding
+`security_settings: apply`, it turns these on when off in every covered repository those committed
+settings name (the origin always counts), except what the keep-off list names. Only a full authorized sweep, or onboarding, may write; onboarding
 usually checks, since its commit links the settings. Restricted or pull-request-scoped runs check:
 
 - Dependabot alerts, with the dependency graph, in every repository, private ones too.
@@ -72,7 +72,7 @@ then moves both docs pins with a minor version bump.
 This widens the authority table; today vh-adlc changes only merged-branch deletion.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-11 found nothing blocking; later findings were folded under the owner's
+Reviews R-1 to R-12 found nothing blocking; later findings were folded under the owner's
 standing instruction to take each recommendation. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
@@ -210,6 +210,10 @@ Owner decisions on 2026-11-10:
   the committed scope is `check` with `not-in-committed-scope` (Q48); and onboarding under `check`
   reports, says how to opt in, records the guide's checklist item as pending and never applies on an
   in-session yes (Q49).
+- Q50 and Q51, from spec review R-12, taken with the reviewer's proposal under that instruction:
+  `collect` takes the repositories run in `apply` and records a Dependabot surface without an
+  accepted helper file as incomplete with `helper-receipt-missing` (Q50); and the opt-in needs only
+  the committed settings link, not `project_procedure` (Q51).
 
 ## Scope
 
@@ -435,6 +439,15 @@ repository in the sweep's scope, and is the only file for that repository. Any o
 every file for a repository named more than once, is ignored for collection and shown in the
 report as "helper did not run" with the reason. A bad file never fails either command.
 
+`collect` also takes `--applied-repository OWNER/NAME`, repeatable, naming each repository for
+which `security-settings-mode` printed `apply`. A named repository without an accepted helper file
+gets its Dependabot surface recorded as incomplete with reason `helper-receipt-missing` and a null
+count, since an alerts write may have happened without a receipt.
+
+The operations table in `references/maintenance-settings.md:103-123` gains a
+`security-settings-mode` row with its flags, and its `collect` and `report` rows gain the new
+flags.
+
 `references/maintenance-settings.md:46-48` and `references/maintenance.md:78-80` today say that only
 a configured exact match is `complete-unavailable` and that a bare 403 or 404 is unknown. Both
 change to name the `not-free-on-private` rule beside that match, and `references/maintenance.md`
@@ -449,7 +462,10 @@ text. Unknown setting names and duplicate repositories fail visibly, as for the 
 
 They also gain `security_settings`, `apply` or `check`, default `check`. Like the other standing
 grants, it is read only from the consumer's committed default branch
-(`plugins/vh-adlc/references/maintenance-settings.md:51-57`). `resolveStanding` checks committed
+(`plugins/vh-adlc/references/maintenance-settings.md:51-57`). Unlike them, it needs only the
+committed `AGENTS.md` link to a valid committed `.vh-adlc/maintenance.yaml`, with no
+`project_procedure` or publication declaration, which `resolveStanding` requires
+(`plugins/vh-adlc/scripts/maintenance/authority.ts:103`). `resolveStanding` checks committed
 settings against a fixed key list (`plugins/vh-adlc/scripts/maintenance/authority.ts:100`) and
 returns `invalid` for any other key, so that list gains `security_settings` and
 `security_settings_keep_off`; otherwise committing either would void the consumer's standing
@@ -495,7 +511,8 @@ for adopting either.
   surface (`plugins/vh-adlc/scripts/maintenance/security.ts:143`,
   `plugins/vh-adlc/references/maintenance.md:327`).
 - The maintenance skill gets a step before collection: for each repository in scope, run the helper
-  in that mode with the run ID, save its JSON, then collect with those files. A helper failure or exit 1 never
+  in that mode with the run ID, save its JSON, then collect with those files and an
+  `--applied-repository` for each repository run in `apply`. A helper failure or exit 1 never
   blocks collection. Under `check`, the report says how to opt in. A request that forbids
   filesystem writes creates no recorded run (`plugins/vh-adlc/scripts/maintenance/cli.ts:66-67`),
   so for it the skill selects `check` without calling `security-settings-mode`, keeps the helper's
@@ -590,7 +607,9 @@ with every read and write succeeding, unless it names another case.
       archived and keep-off rules; that `renovate-overlap`, `owner-choice-conflict` and `paused` go to the
       owner; the precedence order; the `not-free-on-private` and `alerts-enabled-this-run`
       collector rules, in `references/maintenance.md` and `references/maintenance-settings.md`
-      without the old "only a configured exact match" wording; that a helper failure never blocks
+      without the old "only a configured exact match" wording; the operations table in
+      `references/maintenance-settings.md` listing `security-settings-mode` with its flags and the
+      new `collect` and `report` flags; that a helper failure never blocks
       collection, stated in the maintenance skill's step; that the security-settings helper's
       `apply` is an exception to "Report helpers never ... mutate GitHub", with the recorded run as
       intent and the JSON saved in the run's private journal directory as receipt; that no setting is
@@ -665,7 +684,8 @@ with every read and write succeeding, unless it names another case.
       collector covers every repository in scope when given helper files for only some of them.
       A helper file that is malformed, names a repository outside the scope, repeats a repository
       or carries another run ID changes no surface, fails neither `collect` nor `report`, and shows
-      as "helper did not run" with the reason.
+      as "helper did not run" with the reason. A repository passed with `--applied-repository` and
+      no accepted helper file gets an incomplete Dependabot surface with `helper-receipt-missing`.
 - [ ] AC-24: `security-settings-mode` prints `check` when the recorded request has `read_only`,
       `draft_only`, `no_push` or `no_filesystem`, or when the committed settings do not adopt
       `security_settings: apply`, or when the recorded request lacks `authorized_sweep` true, or
@@ -708,8 +728,8 @@ with every read and write succeeding, unless it names another case.
 | AC-18 | Same suite, public admin fixtures with `.github/dependabot.yml` and no Renovate: `GET automated-security-fixes` returns 500, once without and once with a keep-off row for it; `GET vulnerability-alerts` returns 404; `GET automated-security-fixes` returns 200 with `{"enabled":false,"paused":false}`. Pass: the 500 runs give that entry `unknown` with `api-error` and 500, no write to it, other settings processed, exit code 1; the 404 run writes alerts and reports `enabled`; the 200 run writes security updates and reports `enabled`. |
 | AC-19 | Same suite, fixtures: archived private repository run by a non-admin; private admin repository with a keep-off row for secret scanning; private non-admin repository; `check` on a public admin repository with alerts off, `dependabot.yml` and no Renovate. Pass: every entry `unavailable` with `archived` and no admin-only read, exit code 0; secret scanning `unavailable` with `not-free-on-private`; secret scanning and push protection `unavailable` with `not-free-on-private`, alerts, security updates and `code_scanning` `unknown` with `needs-admin`; security updates `not-changed` with `check-only`. A further `apply` fixture: public admin repository with `dependabot.yml`, no Renovate, alerts and security updates off, and a keep-off row for `dependabot_alerts`. Pass: both `left-off` with `owner-choice`, no write recorded, exit code 0. Another `apply` fixture: public admin repository, secret scanning and push protection off, a keep-off row for `secret_scanning` only. Pass: both `left-off` with `owner-choice`, no `PATCH repos/{r}` recorded. |
 | AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for four repositories in scope with three `--security-settings` files, holding a `renovate-overlap`, a `paused` and an `owner-choice-conflict` entry in different repositories. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the fourth repository has a "helper did not run" row, and the owner decisions list holds exactly those three entries. |
-| AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository collector fixture given a helper file for the second repository only. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection covers both repositories. Further `collect` and `report` fixtures each add one bad file listing `dependabot_alerts` as `enabled`: malformed JSON, an out-of-scope repository, a second file for the same repository, and another run ID. Pass: both commands exit 0, no surface gets `alerts-enabled-this-run` from the bad file, and the report shows "helper did not run" with the reason. |
-| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures with committed settings adopting `apply` and a committed keep-off row for secret scanning: the working tree drops that row (pass: secret scanning not written, `left-off` with `owner-choice`), and the working tree adds a repository to `repositories` (pass: `check` with `not-in-committed-scope` for that repository, `apply` for the origin repository, and the helper's JSON for the added repository shows that mode and reason). Further fixtures with settings adopting `apply`: a request `{ "authorized_sweep": false }`, and an authorized run scoped to one pull request; each gives `check`. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. The reviewer also reads the maintenance skill step at the implementation commit and confirms the `no_filesystem` rule is stated. |
+| AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository collector fixture given a helper file for the second repository only. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection covers both repositories. Further `collect` and `report` fixtures each add one bad file listing `dependabot_alerts` as `enabled`: malformed JSON, an out-of-scope repository, a second file for the same repository, and another run ID. Pass: both commands exit 0, no surface gets `alerts-enabled-this-run` from the bad file, and the report shows "helper did not run" with the reason. A last `collect` fixture passes `--applied-repository` for a repository whose alerts endpoint returns alerts and whose helper file is missing. Pass: that Dependabot surface is incomplete with `helper-receipt-missing` and a null count. |
+| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures with committed settings adopting `apply` and a committed keep-off row for secret scanning: the working tree drops that row (pass: secret scanning not written, `left-off` with `owner-choice`), and the working tree adds a repository to `repositories` (pass: `check` with `not-in-committed-scope` for that repository, `apply` for the origin repository, and the helper's JSON for the added repository shows that mode and reason). Further fixtures with settings adopting `apply`: a request `{ "authorized_sweep": false }`, and an authorized run scoped to one pull request; each gives `check`. A fixture adopting `apply` in committed settings with no `project_procedure` gives `apply`. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. The reviewer also reads the maintenance skill step at the implementation commit and confirms the `no_filesystem` rule is stated. |
 | AC-26 | `bun test tests/vh-adlc/security-settings`, public admin fixtures with alerts on and `automated-security-fixes` returning `{"enabled":true,"paused":true}`: one with `dependabot.yml` and no Renovate, one with `renovate.json`, one with a keep-off row for security updates. Pass: `paused`, `paused`, then `owner-choice-conflict`, all `already-on`; no `PUT automated-security-fixes` recorded; exit code 0; each appears in the Markdown owner decisions list. |
 | AC-25 | `bun test tests/vh-adlc/maintenance`: `resolveStanding` on committed settings with an adopted publication grant plus `security_settings: apply` and one `security_settings_keep_off` row. Pass: the grant resolves as adopted, not `invalid`. |
 | AC-16 | `bun test tests/vh-adlc/maintenance` with collector fixtures for a private admin repository with `security_and_analysis` null whose code scanning read returns 403, and one returning 404. Pass: the surface is `complete-unavailable` with `not-free-on-private` and the status. Fixtures with the same 403 on a public repository, on a private repository read without admin, and on a private repository with `code_security` enabled stay incomplete. |
