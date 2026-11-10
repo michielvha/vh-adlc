@@ -164,6 +164,41 @@ and branches in use by a worktree are kept, each with its reason. Clean worktree
 are removed only when you ask for worktree cleanup. See the
 [branch hygiene guide](../../plugins/vh-adlc/references/branches.md).
 
+## Repository security settings
+
+GitHub's free security settings, such as Dependabot alerts and secret scanning, are
+off until someone turns them on. vh-adlc checks them in every maintenance sweep and
+when it onboards a repository, and reports each setting's state in the sweep report.
+By default it only checks. To let a full sweep or onboarding turn on the free ones,
+commit this in the `.vh-adlc/maintenance.yaml` that `AGENTS.md` links on the default
+branch:
+
+```yaml
+security_settings: apply
+```
+
+Committing it is your agreement to have them turned on. It never turns a setting
+off. Dependabot security updates stay off beside Renovate, and settings that are not
+free on private repositories are reported as unavailable. List a setting under
+`security_settings_keep_off` to keep it off in one repository.
+
+To check or switch them on yourself, as the onboarding guide in vhco-pro/docs shows:
+
+```bash
+gh api repos/OWNER/NAME --jq .security_and_analysis
+gh api -i repos/OWNER/NAME/vulnerability-alerts
+gh api -X PUT repos/OWNER/NAME/vulnerability-alerts
+gh api -X PATCH repos/OWNER/NAME \
+  -f 'security_and_analysis[secret_scanning][status]=enabled' \
+  -f 'security_and_analysis[secret_scanning_push_protection][status]=enabled'
+gh api -X PUT repos/OWNER/NAME/automated-security-fixes
+```
+
+The second command returns `204` when alerts are on and `404` when they are off.
+Secret scanning and push protection apply to public repositories. Turn on security
+updates only where the repository has a Dependabot config and no Renovate. See the
+[security settings reference](../../plugins/vh-adlc/references/security-settings.md).
+
 ## Host cleanup
 
 Ask `Use vh-adlc-clean to free space`. The operation runs `vh-adlc clean --dry-run`,

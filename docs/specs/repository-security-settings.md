@@ -759,7 +759,7 @@ and name the target, and no recorded run restricts it.
       entries with reason `renovate-overlap`, `owner-choice-conflict` or `paused`, matching the JSON output for
       the same run.
       Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): for the first fixture and the AC-14 fixture, `renderSecuritySettings` printed one row per JSON entry with its state and reason and an owner decisions list matching the JSON entries, or "None."; the CLI with `--format markdown` printed the section and exited 0.
-- [ ] AC-11: `references/security-settings.md`, `references/authority.md`, `references/maintenance.md`,
+- [x] AC-11: `references/security-settings.md`, `references/authority.md`, `references/maintenance.md`,
       `references/maintenance-settings.md`, `references/loop.md`, `references/lifecycle.md`, the
       maintenance skill and `docs/user-guides/workflows.md` state the following. A clause that names
       no page needs to appear only in `references/security-settings.md`, which the other listed
@@ -807,6 +807,7 @@ and name the target, and no recorded run restricts it.
       `references/maintenance-settings.md` and `docs/reference/compatibility.md` state that older
       readers reject `security_settings` and `security_settings_keep_off`, as they do for
       `security_policy`, and name the new plugin version as the minimum for adopting either key.
+      Evidence: at T12 a scripted search found each clause on the pages it names; neither `references/maintenance.md` nor `references/maintenance-settings.md` still says only a configured or exactly declared match is `complete-unavailable`; `references/security-settings.md` links `conventions/repository-security.md` at d8f07c9dd69038375a535af8ad586086688f85ab, which `vh-adlc knowledge` resolved at T1; no `knowledge` page list names that page; the merged-branch deletion text only gained sentences after it.
 - [ ] AC-12: After a maintenance sweep of `michielvha/bg-remove`, its saved report has a
       `## Repository security settings` section that lists Dependabot alerts `already-on`,
       Dependabot security updates `left-off` with reason `renovate-present`, and secret scanning and
@@ -855,7 +856,7 @@ and name the target, and no recorded run restricts it.
       merged, both `plugin.json` files carry the same new minor version, and
       `vh-adlc knowledge --page conventions/repository-security.md` resolves the page at that pin.
       Evidence: at the T1 commit `AGENTS.md:4` and `plugins/vh-adlc/knowledge.md:5,7` name d8f07c9dd69038375a535af8ad586086688f85ab, where vhco-pro/docs#30 merged; both `plugin.json` files read 0.16.0; `vh-adlc knowledge --page conventions/repository-security.md` with that plugin pin returned `answered` at d8f07c9.
-- [ ] AC-21: When `apply` enables Dependabot alerts and the collector then runs with the helper's
+- [x] AC-21: When `apply` enables Dependabot alerts and the collector then runs with the helper's
       JSON, the collector keeps the open alerts it reads and records the Dependabot surface as
       incomplete with reason `alerts-enabled-this-run` and a null count, also when the list is still
       empty. `security-reconcile` accepts that inventory and reports the gap
@@ -863,6 +864,7 @@ and name the target, and no recorded run restricts it.
       it; the maintenance skill records one naming the next sweep. The same holds when the file shows
       `dependabot_alerts` as `not-changed` with `api-error` after a write. With alerts
       `already-on`, a successful read stays complete.
+      Evidence: `bun test tests/vh-adlc/maintenance/security-settings-collect.test.ts` at T11 (/tmp/sec-t11-tests.log): after `apply` enabled alerts, with three alerts, an empty list, and a write that did not read back, the collector kept the alerts read and recorded the surface `incomplete` with `alerts-enabled-this-run` and a null count; `security-reconcile` reported "coverage handoff pending: example/project/dependabot" without a handoff and not with one; alerts `already-on` stayed complete. At T12 the maintenance skill's step 3 states the `coverage_handoffs` row naming the next sweep.
 - [x] AC-22: Every sweep report, with or without `--security-settings` files, has a
       `## Repository security settings` section after `## Security alerts` that names every
       repository in scope: one table per repository with a file, whose rows match its JSON entries,
@@ -880,7 +882,7 @@ and name the target, and no recorded run restricts it.
       as "helper did not run" with the reason. A repository passed with `--applied-repository` and
       no accepted helper file gets an incomplete Dependabot surface with `helper-receipt-missing`.
       Evidence: Helper part: `bun test tests/vh-adlc/security-settings` at T7 (/tmp/sec-t7-tests.log), a 500 `repos/{r}` gave four `unknown` `api-error` entries with 500, no other call, exit 1. Collector part: `bun test tests/vh-adlc/maintenance/security-settings-collect.test.ts` at T11 (/tmp/sec-t11-tests.log): a file for the second repository only still covered both; malformed JSON, an out-of-scope repository, a second file for the same repository and another run ID each left the Dependabot surface complete, and the report showed "helper did not run" with the reason; the CLI `collect` with repeated flags and a malformed file exited 0 with empty stderr, and `report` rendered both accepted tables; `--applied-repository` with no file gave `helper-receipt-missing` with a null count.
-- [ ] AC-24: `security-settings-mode` prints `check` when the recorded request has `read_only`,
+- [x] AC-24: `security-settings-mode` prints `check` when the recorded request has `read_only`,
       `draft_only`, `no_push` or `no_filesystem`, or when the committed settings do not adopt
       `security_settings: apply`, or when the recorded request lacks `authorized_sweep` true, or
       when the run's scope has a pull request, or when the repository is outside the run's recorded
@@ -906,6 +908,7 @@ and name the target, and no recorded run restricts it.
       cannot be read. The maintenance skill states that a
       current request forbidding filesystem writes selects `check` without calling
       `security-settings-mode`, with the helper's output kept in chat and no JSON saved.
+      Evidence: the mode fixtures at T5 (/tmp/sec-t5-maint.log) and the helper refusal and binding fixtures at T9 (/tmp/sec-t9-tests.log) pass for every case in the AC-24 row. At T12 the maintenance skill's step 3 states that `no_filesystem` selects `check` without calling `security-settings-mode`, keeps the helper's output in chat and saves no JSON.
 - [x] AC-25: A consumer whose committed settings hold `security_settings` and
       `security_settings_keep_off` keeps an adopted standing report-publication grant.
       Evidence: `bun test tests/vh-adlc/maintenance/settings.test.ts` at T3: "committed security settings keys keep an adopted standing publication grant" passes; `resolveStanding` returns `adopted` for a committed grant beside `security_settings: apply` and one keep-off row, and failed at T2 because the keys were rejected.
@@ -975,7 +978,8 @@ and name the target, and no recorded run restricts it.
       Evidence: `bun test tests/vh-adlc/maintenance/security-settings-collect.test.ts` (/tmp/sec-t10-fail.log): 16 of 22 fail on their assertions: code scanning stays incomplete with no `not-free-on-private`, no surface gets `alerts-enabled-this-run` or `helper-receipt-missing`, the report has no `## Repository security settings` section, and `collect` rejects a repeated flag with "maintenance invalid or duplicate argument". The 6 that pass are the incomplete AC-16 and AC-27 cases and the already-on read, which today's collector already serves.
 - [x] T11 `plugins/vh-adlc/scripts/maintenance/collect.ts`, `plugins/vh-adlc/scripts/maintenance/report.ts`, `plugins/vh-adlc/scripts/maintenance/types.ts`, `plugins/vh-adlc/scripts/maintenance/cli.ts`, `plugins/vh-adlc/scripts/maintenance/security-io.ts`, `plugins/vh-adlc/scripts/maintenance/security.ts` - the `not-free-on-private`, `alerts-enabled-this-run` and `helper-receipt-missing` rules, the repeatable flags and the report section rendered in every sweep report; T10 passes and `bun test tests/vh-adlc/maintenance` stays green (AC-16, AC-21, AC-22, AC-23, AC-27)
       Evidence: `bun test tests/vh-adlc/security-settings tests/vh-adlc/maintenance` (/tmp/sec-t11-tests.log): 354 pass, 0 fail, including the 22 T10 fixtures; the helper typecheck exits 0, and an ad hoc `tsc --noEmit` over `collect.ts`, `report.ts` and `cli.ts` reports no error. AC-21 stays open until T12 states the skill's coverage handoff.
-- [ ] T12 `plugins/vh-adlc/references/security-settings.md`, `plugins/vh-adlc/references/authority.md`, `plugins/vh-adlc/references/maintenance.md`, `plugins/vh-adlc/references/maintenance-settings.md`, `plugins/vh-adlc/references/loop.md`, `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - state every AC-11 clause on the pages it names, with the skill step, onboarding text and operations table; a read against AC-11's clause list finds each one and `bun test tests/vh-adlc` stays green (AC-11)
+- [x] T12 `plugins/vh-adlc/references/security-settings.md`, `plugins/vh-adlc/references/authority.md`, `plugins/vh-adlc/references/maintenance.md`, `plugins/vh-adlc/references/maintenance-settings.md`, `plugins/vh-adlc/references/loop.md`, `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - state every AC-11 clause on the pages it names, with the skill step, onboarding text and operations table; a read against AC-11's clause list finds each one and `bun test tests/vh-adlc` stays green (AC-11)
+      Evidence: `bun test tests/vh-adlc --timeout 60000` (/tmp/sec-t12-tests.log): 1421 pass, 1 fail, the failure being the pre-existing host-binary fixtures test, where the installer rejects `/usr/local/bin/vh-adlc` 0.19.0 against the fixture lock; a scripted search of the nine pages against AC-11's clause list found every clause; the maintenance skill is 4919 characters, under the 5000 its discovery test allows.
 - [ ] T13 `docs/specs/repository-security-settings.md` - run a maintenance sweep of `michielvha/bg-remove` with the implemented plugin and record the saved report's security-settings section as evidence; the section shows the states AC-12 lists (AC-12)
 
 ## Open Questions
