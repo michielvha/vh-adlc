@@ -185,3 +185,30 @@ test("after-merge of a fork PR leaves a same-named branch of this repository alo
   expect(heads(f.origin)).toContain("patch-1");
   expect(locals(f.work)).toContain("patch-1");
 });
+
+test("auto-delete reports the setting, enables it only on request and confirms it from GitHub's answer", () => {
+  const f = fixture(), calls = () => readFileSync(f.state + ".calls", "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line) as string[]);
+  const shim = join(f.dir, "bin");
+  mkdirSync(shim); writeFileSync(join(shim, "gh"), `#!/bin/sh\nexec bun ${JSON.stringify(fakeGh)} "$@"\n`, { mode: 0o755 });
+  const cmd = (...args: string[]) => {
+    const r = Bun.spawnSync(["bun", cli, "auto-delete", ...args], { stdout: "pipe", stderr: "pipe", env: { ...process.env, PATH: shim + delimiter + process.env.PATH, BRANCHES_FIXTURE: f.state } });
+    return { code: r.exitCode, out: r.exitCode === 2 ? {} : JSON.parse(r.stdout.toString() || "{}"), err: r.stderr.toString() };
+  };
+  const patched = () => calls().filter(c => c.includes("PATCH")).length;
+
+  const off = cmd("--repo", f.work, "--repository", "acme/demo");
+  expect([off.code, off.out.delete_branch_on_merge, off.out.changed, patched()]).toEqual([1, false, false, 0]);
+
+  f.write({ ignore_patch: true });
+  const ignored = cmd("--repository", "acme/demo", "--enable");
+  expect([ignored.code, ignored.out.delete_branch_on_merge, ignored.out.detail]).toEqual([1, false, "setting did not change"]);
+
+  f.write({});
+  const enabled = cmd("--repository", "acme/demo", "--enable");
+  expect([enabled.code, enabled.out.delete_branch_on_merge, enabled.out.changed]).toEqual([0, true, true]);
+  expect(JSON.parse(readFileSync(f.state, "utf8")).repo.delete_branch_on_merge).toBe(true);
+
+  const before = patched(), again = cmd("--repo", f.work, "--repository", "acme/demo", "--enable");
+  expect([again.code, again.out.changed, patched()]).toEqual([0, false, before]);
+  expect(cmd().code).toBe(2);
+});

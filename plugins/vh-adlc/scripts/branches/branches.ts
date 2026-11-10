@@ -210,14 +210,20 @@ function absent(o: Observation, op: Operation): boolean {
   }
 }
 
+type Target = { hostname: string; repository: string };
+/** Turn on GitHub's delete_branch_on_merge and confirm it from GitHub's answer, not from the request. */
+function enableAutoDelete(target: Target, run: Run): Outcome {
+  const op: Operation = { kind: "enable-auto-delete" };
+  const result = run(["gh", "api", "--hostname", target.hostname, "-X", "PATCH", `repos/${target.repository}`, "-F", "delete_branch_on_merge=true"]);
+  if (result.code !== 0) return { operation: op, status: "failed", detail: redact(result.stderr) || `exit ${result.code}` };
+  return object(JSON.parse(result.stdout), "repository").delete_branch_on_merge === true ? { operation: op, status: "done" } : { operation: op, status: "failed", detail: "setting did not change" };
+}
+
 function perform(checkout: Checkout, op: Operation, run: Run): Outcome {
   const git = (args: string[]) => run(["git", "-C", checkout.root, ...args]);
   let result: Result;
   switch (op.kind) {
-    case "enable-auto-delete":
-      result = run(["gh", "api", "--hostname", checkout.hostname, "-X", "PATCH", `repos/${checkout.repository}`, "-F", "delete_branch_on_merge=true"]);
-      if (result.code === 0 && object(JSON.parse(result.stdout), "repository").delete_branch_on_merge !== true) return { operation: op, status: "failed", detail: "setting did not change" };
-      break;
+    case "enable-auto-delete": return enableAutoDelete(checkout, run);
     // The server applies the lease atomically, so a tip that moved after observation is refused.
     case "delete-remote": result = git(["push", "--porcelain", `--force-with-lease=refs/heads/${op.branch}:${op.oid}`, "origin", `:refs/heads/${op.branch}`]); break;
     case "prune-tracking": result = git(["update-ref", "-d", op.ref, op.oid]); break;
@@ -258,6 +264,23 @@ export function apply(options: Options, text: string, approvedDigest: string) {
   const plan = parsePlan(text);
   const outcomes = execute({ ...options, repository: plan.repository, worktrees: plan.worktrees }, plan.operations);
   return { repository: plan.repository, complete: complete(outcomes), outcomes };
+}
+
+/**
+ * Report GitHub's delete_branch_on_merge; `enable` turns it on. Without `repo`, `repository` names the
+ * github.com repository directly, so an uncloned repository can be checked. Complete means the setting is on.
+ */
+export function autoDelete(options: { repo?: string; repository?: string; enable?: boolean; run?: Run }) {
+  const run = options.run ?? spawn;
+  if (options.repo === undefined && !/^[^/\s]+\/[^/\s]+$/.test(options.repository ?? "")) throw new Error("pass --repo PATH or --repository OWNER/NAME");
+  const target: Target = options.repo === undefined ? { hostname: "github.com", repository: options.repository! } : new Checkout({ repo: options.repo, repository: options.repository, run });
+  const read = run(["gh", "api", "--hostname", target.hostname, `repos/${target.repository}`]);
+  if (read.code !== 0) throw new Error("GitHub request repos failed; verify access, network and rate limits");
+  const on = object(JSON.parse(read.stdout), "repository").delete_branch_on_merge === true;
+  const base = { repository: target.repository, hostname: target.hostname };
+  if (on || !options.enable) return { ...base, delete_branch_on_merge: on, changed: false, complete: on, ...(on ? {} : { note: "Merged PR branches stay on GitHub until this is on; ask the owner to enable it" }) };
+  const outcome = enableAutoDelete(target, run);
+  return { ...base, delete_branch_on_merge: outcome.status === "done", changed: outcome.status === "done", complete: outcome.status === "done", ...(outcome.detail ? { detail: outcome.detail } : {}) };
 }
 
 /** Finish one owner-authorized merge: remove that PR's head branch remotely and locally once proven merged. */

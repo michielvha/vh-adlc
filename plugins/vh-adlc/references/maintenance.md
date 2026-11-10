@@ -121,7 +121,13 @@ cases. Analysis does not grant a manager rewrite, dependency change or configura
 
 ## Stale branches
 
-Every normal sweep also checks branch hygiene in each repository in scope that has a local checkout,
+Every normal sweep checks GitHub's automatic merged-branch deletion in each repository in scope with
+`auto-delete` from [branches.md](branches.md). A repository without a local checkout is checked with
+`--repository`. Report the setting first and offer to enable it in each repository where it is off;
+with the setting off, every later merge can leave another branch behind. A failed check is a visible
+coverage gap.
+
+The sweep also checks branch hygiene in each repository in scope that has a local checkout,
 using the plan step in [branches.md](branches.md). This reads GitHub and fetches; it deletes
 nothing. Store the plan file in the run's private journal directory. Record in the report the
 automatic-deletion setting, each proposed operation with its proof, each kept branch with its

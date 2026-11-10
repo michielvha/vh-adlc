@@ -29,7 +29,8 @@ additional execution or publication permission.
 | Tag, release, deploy, restart an unrelated/shared app, end a live session | Separate approval for that exact action; audit grants none of these effects |
 | Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
 | Run `vh-adlc clean`, which removes `/tmp` entries and the project's temp root | The user's request for cleanup, or a session blocked on space; passing `--compose` or `--kind` needs the user's request for that flag |
-| Enabling automatic merged-branch deletion or cleaning stale merged branches | Owner approval of the exact plan digest from [branches.md](branches.md), or a sweep request that already asks for stale-branch removal; worktree removal needs the owner to ask for it |
+| Enabling automatic merged-branch deletion | The owner's yes to enabling it for that repository with `auto-delete --enable`, a request that already asks for it, or an approved plan digest that includes it, all from [branches.md](branches.md) |
+| Cleaning stale merged branches | Owner approval of the exact plan digest from [branches.md](branches.md), or a sweep request that already asks for stale-branch removal; worktree removal needs the owner to ask for it |
 | Another repository, account or feature | A new scope decision |
 
 Scoped audit `live-verify` covers only the owned development target, temporary test resources and

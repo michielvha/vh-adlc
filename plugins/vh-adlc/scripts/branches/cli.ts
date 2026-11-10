@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 import { readFileSync, writeFileSync, writeSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { afterMerge, apply, digest, observe } from "./branches";
+import { afterMerge, apply, autoDelete, digest, observe } from "./branches";
 
-const usage = "usage: cli.ts plan --repo PATH --output FILE [--repository OWNER/NAME] [--worktrees true|false]\n       cli.ts apply --repo PATH --plan FILE --approved-digest SHA256\n       cli.ts after-merge --repo PATH --pull NUMBER [--repository OWNER/NAME] [--worktrees true|false]";
+const usage = "usage: cli.ts plan --repo PATH --output FILE [--repository OWNER/NAME] [--worktrees true|false]\n       cli.ts apply --repo PATH --plan FILE --approved-digest SHA256\n       cli.ts after-merge --repo PATH --pull NUMBER [--repository OWNER/NAME] [--worktrees true|false]\n       cli.ts auto-delete (--repo PATH [--repository OWNER/NAME] | --repository OWNER/NAME) [--enable]";
 const flag = (value: string | undefined) => {
   if (value === undefined || value === "false") return false;
   if (value === "true") return true;
@@ -12,15 +12,15 @@ const flag = (value: string | undefined) => {
 
 try {
   const { values, positionals } = parseArgs({ args: process.argv.slice(2), allowPositionals: true, strict: true, options: {
-    repo: { type: "string", default: "." }, repository: { type: "string" }, worktrees: { type: "string" },
+    repo: { type: "string" }, enable: { type: "boolean" }, repository: { type: "string" }, worktrees: { type: "string" },
     output: { type: "string" }, plan: { type: "string" }, "approved-digest": { type: "string" }, pull: { type: "string" },
   } });
   const mode = positionals[0];
-  if (positionals.length !== 1 || !["plan", "apply", "after-merge"].includes(mode!)) throw new Error(usage);
-  const allowed: Record<string, string[]> = { plan: ["repo", "repository", "worktrees", "output"], apply: ["repo", "plan", "approved-digest"], "after-merge": ["repo", "repository", "worktrees", "pull"] };
+  if (positionals.length !== 1 || !["plan", "apply", "after-merge", "auto-delete"].includes(mode!)) throw new Error(usage);
+  const allowed: Record<string, string[]> = { plan: ["repo", "repository", "worktrees", "output"], apply: ["repo", "plan", "approved-digest"], "after-merge": ["repo", "repository", "worktrees", "pull"], "auto-delete": ["repo", "repository", "enable"] };
   const extra = Object.keys(values).filter(key => values[key as keyof typeof values] !== undefined && !allowed[mode!]!.includes(key));
   if (extra.length) throw new Error(`${mode} does not accept --${extra.join(", --")}`);
-  const options = { repo: values.repo!, repository: values.repository, worktrees: flag(values.worktrees) };
+  const options = { repo: values.repo ?? ".", repository: values.repository, worktrees: flag(values.worktrees) };
   let result: { complete?: boolean };
   if (mode === "plan") {
     if (!values.output) throw new Error("plan requires --output FILE");
@@ -30,6 +30,8 @@ try {
   } else if (mode === "apply") {
     if (!values.plan || !values["approved-digest"]) throw new Error("apply requires --plan FILE and --approved-digest SHA256");
     result = apply({ repo: options.repo }, readFileSync(values.plan, "utf8"), values["approved-digest"]);
+  } else if (mode === "auto-delete") {
+    result = autoDelete({ repo: values.repo, repository: values.repository, enable: values.enable === true });
   } else {
     if (!values.pull || !/^[1-9]\d*$/.test(values.pull)) throw new Error("after-merge requires --pull NUMBER");
     result = afterMerge(options, Number(values.pull));

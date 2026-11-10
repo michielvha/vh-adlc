@@ -67,6 +67,10 @@ for the next operation that writes. A review that committed onboarding first wou
 same pages plus `guides/onboard-a-repository.md`, and read it. Their first change then adds the pinned
 `AGENTS.md` and its bridges as that guide describes, merged into any local instructions, in its own
 commit. Local instructions win over the central pages; report every conflict between them.
+Onboarding also checks GitHub's automatic deletion of merged PR branches with `auto-delete` from
+`references/branches.md` and reports the setting. When it is off, ask the owner whether to turn it
+on; enable it only after they say yes. The setting is a repository change, not a commit, so it never
+holds up the onboarding commit.
 
 Every page the loop needs is requested on every call, so a pin older than the plugin's pages stops with
 `missing-page`: always include `conventions/feature-documents.md` and `guides/humanize-prose.md`.

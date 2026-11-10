@@ -34,7 +34,8 @@ are unavailable; missing inputs remain blockers. Normal runs follow these steps.
    Treat packet receipts as procedural evidence; they grant no selection, dismissal or publication.
    A read-tools host needs the trusted operator's verified typed result for reconciliation; without
    it, keep its analysis and security accounting visibly pending.
-6. Check stale branches in every sweep with `references/branches.md`: plan, report the plan and its
+6. Check stale branches in every sweep with `references/branches.md`. First run `auto-delete` and
+   offer to enable GitHub's automatic merged-branch deletion where it is off. Then plan, report the plan and its
    digest, and apply it once selected, or right away when the request already asked for removal.
    After any merge this run performs, run `after-merge` for that PR.
 

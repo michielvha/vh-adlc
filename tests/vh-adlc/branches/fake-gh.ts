@@ -4,7 +4,7 @@ import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 const path = process.env.BRANCHES_FIXTURE;
 if (!path) throw new Error("fixture path missing");
 type Pull = { number: number; state: string; merged_at: string | null; head: { ref: string; sha: string; repo: { full_name: string } }; base: { ref: string } };
-const state = JSON.parse(readFileSync(path, "utf8")) as { repository: string; repo: Record<string, unknown>; protected: string[]; pulls: Pull[]; fail?: string[] };
+const state = JSON.parse(readFileSync(path, "utf8")) as { repository: string; repo: Record<string, unknown>; protected: string[]; pulls: Pull[]; fail?: string[]; ignore_patch?: boolean };
 const args = process.argv.slice(2);
 appendFileSync(path + ".calls", JSON.stringify(args) + "\n");
 const method = args.includes("-X") ? args[args.indexOf("-X") + 1] : "GET";
@@ -18,7 +18,7 @@ const emit = (value: unknown) => {
   process.stdout.write(lines + "\n");
 };
 if (route === base && method === "PATCH") {
-  state.repo.delete_branch_on_merge = true;
+  if (!state.ignore_patch) state.repo.delete_branch_on_merge = true;
   writeFileSync(path, JSON.stringify(state));
   emit(state.repo);
 } else if (route === base) emit(state.repo);

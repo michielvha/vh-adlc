@@ -1,8 +1,26 @@
 # Branch hygiene
 
-Merged branches get removed at two points. Each merge removes its own PR branch right away, and a
-maintenance sweep finds and removes the ones earlier merges left behind. Both use
-`scripts/branches/cli.ts`. The plugin root is two directories above a skill's own directory.
+GitHub's `delete_branch_on_merge` repository setting is the only guarantee: with it on, GitHub deletes
+the head branch of every merged PR, whoever merges it. vh-adlc checks the setting when it onboards a
+repository and in every maintenance sweep, and offers to turn it on. Two cleanups cover what the
+setting does not: each merge removes its own PR branch and local copies right away, and a maintenance
+sweep removes what earlier merges left behind. All of this uses `scripts/branches/cli.ts`. The plugin
+root is two directories above a skill's own directory.
+
+## Repository setting
+
+```bash
+bun <plugin>/scripts/branches/cli.ts auto-delete --repo <checkout> [--enable]
+bun <plugin>/scripts/branches/cli.ts auto-delete --repository <owner/name> [--enable]
+```
+
+Without `--enable` it only reads the setting. It exits 0 when the setting is on and 1 when it is off,
+so the answer never depends on reading prose. With `--enable` it turns the setting on and confirms
+the new value from GitHub's response, which needs admin rights on the repository. `--repository`
+alone checks a github.com repository that has no local checkout. Report the setting in one line.
+When it is off, ask the owner whether to enable it, and pass `--enable` only after they say yes.
+GitHub copies no settings from a template repository, so a repository created from a template starts
+with the setting off.
 
 ## What counts as merged
 
@@ -46,8 +64,7 @@ It touches only that PR's head branch: the remote branch if GitHub did not alrea
 stale tracking ref, and local branches named after it or tracking it. The only accepted proof is that
 each tip is contained in the head GitHub recorded for that merged PR, so a branch with commits pushed
 after the merge is kept. A PR from a fork has no branch in this repository, and nothing is deleted. Report each outcome and kept reason. When the result says GitHub's automatic
-head-branch deletion is off, tell the owner and suggest a branch-hygiene plan; enabling the setting
-needs that plan's approval.
+head-branch deletion is off, ask the owner whether to turn it on with `auto-delete --enable`.
 
 ## Sweep
 
@@ -60,7 +77,7 @@ bun <plugin>/scripts/branches/cli.ts apply --repo <checkout> --plan <private fil
 
 `plan` fetches from origin but deletes nothing. It writes the plan and prints it with its digest. The
 plan proposes turning on GitHub's `delete_branch_on_merge` when it is off, so later merges clean up
-after themselves even without vh-adlc. Write the plan outside the repository, for example in the run's
+after themselves even without vh-adlc; approving the digest enables it too. Write the plan outside the repository, for example in the run's
 private journal directory.
 
 `apply` needs the exact approved bytes. It observes again and performs an approved operation only
