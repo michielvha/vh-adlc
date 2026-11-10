@@ -276,6 +276,7 @@ None.
 | 2026-11-10 | R-4 | spec | `c648b53d1d17d5c1f6c4026bbec735c0373df0ad` | claude-opus-4.8 | procedural | Three should-fix factual findings and three nits (two factual, one judgement), none blocking; model reported by the reviewer, not requested. |
 | 2026-11-10 | R-5 | spec | `8f9aba05ac58d02989b483293064597bf17cff4c` | unknown | procedural | One should-fix factual finding and one factual nit, none blocking; model identity not attested. |
 | 2026-11-10 | R-6 | spec | `7cf545ffec4c3eb8c9edf5290fc6223cd917d7f0` | unknown | procedural | Three should-fix factual findings and one factual nit, none blocking; model identity not attested. |
+| 2026-11-10 | R-7 | spec | `038146bca5d105691d47219cb16f8efaacb4eb2a` | claude-opus-4.8 | procedural | One should-fix factual finding and one factual nit, none blocking; model reported by the reviewer, not requested. |
 
 ### R-1
 
@@ -561,3 +562,19 @@ SEVERITY: nit
 WHERE: Context, Owner summary; frontmatter
 EVIDENCE: Line 28 says `onboard` installs "a password-protected daemon reachable only over SSH". The summary never mentions `--publish`, which adds a tailnet HTTPS route (Scope, onboard step 4, AC-02). Line 34 says "R-2 to R-4 found none", and `status_description` (line 3) says "R-4 findings applied". At this commit, R-5 is recorded and its findings are applied.
 PROPOSAL: Name the `--publish` opt-in and its tailnet HTTPS exposure in the summary, and update both review-status texts to R-5.
+
+### R-7
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria, AC-07
+EVIDENCE: AC-07 says "With the server unreachable, `remove --skip-server` removes every recorded client's app entry and alias block and the registry files". The R-6 F-03 fix changed Design, unlink and remove, which now says "A client it cannot reach is dropped and reported with the app entry and alias block left on it". The AC-07 Test Plan row also asserts that "`remove --skip-server` with the server and one client unreachable drops and reports that client and completes". In that tested case the unreachable client keeps its app entry and alias block. Read as written, AC-07 is false for that case. An implementation review would therefore get evidence against a criterion while the code does what the Design says.
+PROPOSAL: Reword the AC-07 `--skip-server` clause to say that it removes the app entry and alias block of every recorded client it can reach, and drops and reports any client it cannot reach, which keeps its entry and block.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Desktop app entry step 5
+EVIDENCE: Step 5 says "Chromium commits localStorage to disk up to 5 seconds late (`local_storage_impl.cc`, `kCommitDefaultDelaySecs`)". Five seconds is only the minimum delay. In chromium/chromium storage_area_impl.cc, `ComputeCommitDelay` returns `std::max(default_commit_delay_, std::max(commit_rate_limiter_.ComputeDelayNeeded(elapsed_time), ...))`. The commit rate limiter is built with `kMaxCommitsPerHour = 60` (local_storage_impl.cc:53) over `base::Hours(1)` (storage_area_impl.cc:79), with float `samples_ / rate_`. So once the app has made one commit after relaunch, the next commit can wait until about 60 seconds after the storage area opened. Only a graceful shutdown flushes pending writes (`LocalStorageImpl::ShutDown`, "Flush any uncommitted data", `ScheduleImmediateCommit`). The 8 second wait does not guarantee the write is on disk. A force-stop at 20 seconds can drop it, although step 6 would then catch the lost entry on the success path.
+PROPOSAL: Fix the rationale: say that the graceful quit is what persists the write, and that the wait only covers the default delay. State that a link or unlink that needed a force-stop fails unless step 6, or a re-read after relaunch, confirms the result.
