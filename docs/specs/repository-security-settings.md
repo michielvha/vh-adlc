@@ -974,6 +974,7 @@ None.
 | 2026-11-10 | R-33 | spec | `20498af` | unknown | procedural | 2 findings: 1 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-34 | spec | `07b95a5` | unknown | procedural | 4 findings: 1 should-fix, 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-35 | spec | `87c0032` | unknown | procedural | 2 findings: 1 should-fix, 1 nit, none blocking; model identity not attested |
+| 2026-11-10 | R-36 | spec | `3f4f479` | unknown | procedural | no findings; model identity not attested |
 
 ### R-1
 
@@ -1919,6 +1920,10 @@ SEVERITY: nit
 WHERE: Test Plan (AC-08) compared with Design (Renovate and Dependabot detection)
 EVIDENCE: The Q82 fold added this to the AC-08 row (line 899): "every Renovate lookup fails with 500; ... A 404 is not a failure for these lookups." In that row, "these lookups" covers every Renovate lookup, including the pull request and issue lookups. The Design (line 510 to 513) treats only "a 404 from a config-file lookup" as a successful lookup with no match. It counts "any failed Renovate lookup" as failed. So the row says a 404 from the pull request or issue lookup is not a failure, while the Design says it is one.
 PROPOSAL: Change the row to "A 404 from a config-file lookup is not a failure".
+
+### R-36
+
+NO FINDINGS
 
 ## Sources
 
