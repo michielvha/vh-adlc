@@ -1,8 +1,8 @@
 ---
 status: draft
-status_description: "Q31 and Q32 from spec review R-5 answered with every recommendation; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Spec review R-6 at 4cf4ae6 returned 8 findings, none blocking. Its factual corrections are applied; Q33 to Q36 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
-goal: "Every maintenance sweep and onboarding of an opted-in repository turns on Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
+goal: "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
   - AGENTS.md
   - plugins/vh-adlc/knowledge.md
@@ -45,8 +45,9 @@ security fixes, since Renovate reads the alerts. Once the owner enabled them, Gi
 listed 47 alerts and Renovate opened two security pull requests.
 
 A new helper automates that step. Sweeps run it before collecting alerts, and so does onboarding.
-In a repository whose committed `.vh-adlc/maintenance.yaml` opts in with `security_settings: apply`,
-it turns these on when off; elsewhere, or under a restricting request, it only checks:
+When the sweeping repository's committed `.vh-adlc/maintenance.yaml` opts in with
+`security_settings: apply`, it turns these on when off in every repository the sweep covers, except
+what the keep-off list names; elsewhere, or under a restricting request, it only checks:
 
 - Dependabot alerts, with the dependency graph, in every repository, private ones too.
 - On public repositories, secret scanning and push protection.
@@ -72,7 +73,7 @@ These owner decisions widen the authority table. Today the only repository setti
 changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-5 found nothing blocking, and the owner answered their questions. Acceptance
+Reviews R-1 to R-6 found nothing blocking; R-6's questions Q33 to Q36 are open. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
 or onboarding need separate approval.
@@ -84,7 +85,8 @@ The maintenance collector reads open Dependabot and code scanning alerts per rep
 leaves that surface incomplete (`plugins/vh-adlc/references/maintenance.md:80`). Nothing in the
 plugin changes a security setting. The only repository setting it writes is merged-branch deletion,
 through `autoDelete` (`plugins/vh-adlc/scripts/branches/branches.ts:273-284`), and only with the
-owner's yes (`plugins/vh-adlc/references/authority.md:32`, `plugins/vh-adlc/references/loop.md:70-73`,
+owner's authorization: a yes, a request that asks for it, or an approved plan digest
+(`plugins/vh-adlc/references/authority.md:32`, `plugins/vh-adlc/references/loop.md:70-73`,
 `plugins/vh-adlc/references/lifecycle.md:64`, `plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md:37-38`).
 The user guide says vh-adlc "checks it when it onboards a repository and in every maintenance sweep,
 and offers to turn it on", and describes no other repository setting
@@ -164,7 +166,8 @@ Owner decisions on 2026-11-10:
   Dependabot surface whose alerts were enabled in the same run is incomplete with
   `alerts-enabled-this-run` (Q23); a helper failure is reported and never stops the sweep (Q24);
   settings are written only in consumers that adopt `security_settings: apply` in their committed
-  settings, and every other consumer gets `check` (Q25, which narrows Q3 and the sweep default);
+  settings, and every other consumer gets `check` (Q25, which narrows Q3 and the sweep default,
+  and makes that adoption, in place of acceptance of this feature, the agreement Q22 names);
   `read_only`, `draft_only`, `no_push` and `no_filesystem` select `check` (Q26); and a criterion
   proves sweeps do not request the new page (Q27).
 - Q28 to Q30, from spec review R-4, answered on 2026-11-10 with every recommended option: tests
@@ -423,7 +426,12 @@ for adopting either.
   blocks collection. Under `check`, the report says how to opt in. A request that forbids
   filesystem writes creates no recorded run (`plugins/vh-adlc/scripts/maintenance/cli.ts:66-67`),
   so for it the skill selects `check` without calling `security-settings-mode`, keeps the helper's
-  output in chat and saves no JSON.
+  output in chat and saves no JSON. Otherwise the skill saves each helper JSON in the run's private
+  journal directory, as the branch plan is (`plugins/vh-adlc/references/branches.md:80-81`). The
+  recorded run and its request are the intent for the helper's writes, and the saved JSON is their
+  receipt, meeting the intent-then-receipt rule (`plugins/vh-adlc/references/maintenance.md:55`).
+- `references/maintenance.md:218-219` says report helpers never mutate GitHub except the branch
+  helper. That sentence gains the security-settings helper's `apply`, under the authority row below.
 - The maintenance skill's and onboarding's `vh-adlc knowledge` page lists do not include
   `conventions/repository-security.md`, so a consumer pinned before docs#30 still sweeps.
 - The maintenance CLI's report command gains `--security-settings FILE`, repeatable, taking the
@@ -502,7 +510,9 @@ with every read and write succeeding, unless it names another case.
       owner; the precedence order; the `not-free-on-private` and `alerts-enabled-this-run`
       collector rules, in `references/maintenance.md` and `references/maintenance-settings.md`
       without the old "only a configured exact match" wording; that a helper failure never blocks
-      collection, stated in the maintenance skill's step; that no setting is
+      collection, stated in the maintenance skill's step; that the security-settings helper's
+      `apply` is an exception to "Report helpers never ... mutate GitHub", with the recorded run as
+      intent and the JSON saved in the run's private journal directory as receipt; that no setting is
       ever turned off; and, in the authority row and `references/security-settings.md`, that adopting
       `security_settings: apply` is the agreement the onboarding guide asks for.
       `references/security-settings.md` links to `conventions/repository-security.md` at the plugin
@@ -606,7 +616,57 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q33: Does a failed Renovate or Dependabot detection count as a failed run?
+
+From R-6 F-03: a detection lookup failure gives `left-off` with `renovate-detection-failed` or `dependabot-detection-failed`, the run exits 0, and a later run with working lookups may write security updates, against AC-07.
+
+**Recommendation:** A. The helper could not decide the entry, so the run did not finish cleanly.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Both detection-failed reasons make the helper exit 1 and do not count as a clean first run for AC-07; AC-07 gains a fixture whose first run has a failed lookup** | Exit code and AC-07 agree | A transient GitHub error shows as a failed run |
+| **B. Keep exit 0 and only exclude the two reasons from AC-07's clean condition** | Quieter runs | A run that could not decide still looks clean |
+
+**Why this is yours:** It sets what counts as a failed run.
+
+### Q34: What does push protection show when secret scanning is kept off?
+
+From R-6 F-04: GitHub's push protection page has secret scanning enabled first, but rule 5 handles that kind of dependency only for alerts (Q32), so a keep-off row for secret scanning alone would have `apply` write push protection.
+
+**Recommendation:** A. Same treatment as Q32 for the same kind of dependency.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Rule 5: a keep-off row for `secret_scanning` also leaves push protection read as off `left-off` with `owner-choice`, never written; AC-19 gains the fixture** | No write that could turn on a kept-off setting, and a clean exit | One more sentence in rule 5 |
+| **B. Write push protection anyway and report what GitHub returns** | No rule change | Possible exit 1 every run, or secret scanning turned on against the owner's choice |
+
+**Why this is yours:** It decides how an owner choice propagates to a dependent setting.
+
+### Q35: How do `collect` and `report` treat a bad or stale helper file?
+
+From R-6 F-05: nothing says what happens with an empty, malformed, out-of-scope, duplicate or earlier-run file. Failing would block collection (against Q24); accepting silently could mark a complete surface `alerts-enabled-this-run`.
+
+**Recommendation:** A. A bad file never blocks the sweep and never changes a surface silently.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. The skill passes the run ID to the helper, which writes it into its JSON. `collect` and `report` accept only files that parse against the helper's schema, carry the current run ID, name one repository in scope and appear once per repository. Any other file is ignored for collection and shown as "helper did not run" with the reason. AC-23 gains fixtures for a malformed, an out-of-scope, a duplicate and a stale file** | A sweep that always finishes, with every bad file visible | `collect` and the helper each gain a `--run-id` input |
+| **B. A bad file fails the command visibly** | Strict input, like other helpers | A bad helper file blocks collection, against Q24 |
+
+**Why this is yours:** It balances strict input against Q24's promise that the helper never blocks a sweep.
+
+### Q36: How is a paused security-updates setting reported?
+
+From R-6 F-08: `automated-security-fixes` also returns `paused`, and the design reads only `enabled`, so a paused setting reads as `already-on` with no sign.
+
+**Recommendation:** A. The owner sees that no fix pull requests will open, without a failing run.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. `{"enabled":true,"paused":true}` is `already-on` with reason `paused`, listed under Owner decisions, exit 0; the helper never unpauses it** | Visible pause, no write | A new reason |
+| **B. Treat paused as on with no reason** | No change | A paused setting looks healthy |
+
+**Why this is yours:** It decides what the owner is asked to look at.
 
 ## Review Log
 
