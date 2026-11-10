@@ -1,6 +1,6 @@
 ---
 status: complete
-status_description: "Implemented and reviewed: implementation review R-7 met every criterion. Waiting for the owner's ship request."
+status_description: "Implemented and reviewed: implementation review R-8 met every criterion. Waiting for the owner's ship request."
 branch: feat/remote-gui-clipboard
 issue: https://github.com/michielvha/vh-adlc/issues/61
 goal: "The owner can move text between their own device and the shared remote browser through explicit viewer controls, and the text never reaches logs, records or retained evidence."
@@ -251,6 +251,7 @@ None.
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and two nits, left in the record at the owner's direction. |
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | n/a | n/a | accepted by owner |
 | 2026-11-10 | R-7 | implementation | `a99ac6ee4c7a3ec394040461de91636647b14888` | claude-opus-5-5 | procedural | All twelve criteria met; one should-fix finding on recording AC-08 evidence and two nits. |
+| 2026-11-10 | R-8 | implementation | `c0ae75bbe6812336295e0be99adafabc35db85e0` | claude-opus-5-5 | procedural | All twelve criteria met after the docs-impact fixes; one should-fix on a flaky handoff test and three nits. |
 
 ### R-1
 
@@ -630,6 +631,84 @@ EVIDENCE: TestRealHandoffClearsTheRemoteClipboard logged `racing sends: map[200:
 PROPOSAL: No code change needed. Name this in the AC-06 evidence limitation, so the real test is not read as proof of the switch-mark refusal.
 
 Files: /home/m/code/vh-adlc-remote-gui-clipboard/docs/specs/remote-gui-clipboard.md, /home/m/code/vh-adlc-remote-gui-clipboard/plugins/remote-gui/internal/xclip/xclip.go, /home/m/code/vh-adlc-remote-gui-clipboard/plugins/remote-gui/internal/browser/phase.go, /home/m/code/vh-adlc-remote-gui-clipboard/plugins/remote-gui/internal/proxy/proxy.go, /home/m/code/vh-adlc-remote-gui-clipboard/plugins/remote-gui/internal/proxy/viewer.go. The repository was left unchanged (clean status, HEAD a99ac6e). I removed every scratch home, TMPDIR, origin/main copy and the built binary I created, plus one empty rg-session temp directory my unit run left in /tmp. The Xvfb and x11vnc on :97 belong to another session and were not touched.
+
+### R-8
+
+CRITERION: AC-01 In a fresh Chromium viewer and a fresh Firefox viewer, the owner can paste text into the panel, send it, and paste it into a page in the remote browser with Ctrl+V, in both human and agent modes.
+VERDICT: met
+EVIDENCE: At c0ae75b I ran `REMOTE_GUI_VIEWER_E2E=1 REMOTE_GUI_BROWSER_E2E=1 bun test tests/remote-gui/browser.e2e.test.ts` with the runtime.env tools, a binary built from this tree into a scratch dir and REMOTE_GUI_FIREFOX set to Playwright firefox-1569. Result: 6 pass, 0 fail, including `viewer clipboard round trip in both browser modes` for chromium and firefox. That case pastes a `€ ✓` sentinel natively into **Text for the remote browser**, sends it in agent mode and pastes it on the canvas with Ctrl+V. After a handoff to human it sends a second sentinel and pastes it with Ctrl+2 and Ctrl+V, then reads both through CDP. Basis: `git diff --stat a99ac6e c0ae75b` lists only CONTRIBUTING.md, docs/reference/marketplace.md, the feature document and tests/remote-gui/README.md, and `git diff a99ac6e c0ae75b -- plugins tests ':!tests/remote-gui/README.md'` is empty, so production and test code are those R-7 reviewed. Limitations: headless Playwright viewers on a loopback session; Tailscale transport is not exercised.
+
+CRITERION: AC-02 Text copied inside the remote browser appears when the owner opens the panel or presses **Refresh**, and **Copy to this device** places it on the viewer device's clipboard in Chromium and Firefox.
+VERDICT: met
+EVIDENCE: The same browser.e2e run at c0ae75b passed the round-trip case in both engines. In that case a CDP `copy` on the remote fixture page shows up when the panel opens and again on **Refresh**. **Copy to this device**, with no clipboard permission granted, puts it on the device clipboard, read back by a native Ctrl+V into a separate local field. A send followed by **Refresh** returns the held text within the test's bound. Code basis as in AC-01: unchanged since a99ac6e. Limitations: the remote copy comes from a CDP editing command, not a human keystroke through the canvas.
+
+CRITERION: AC-03 The viewer never reads the local clipboard without the owner's paste gesture, never writes it without a click on **Copy to this device**, and keeps clipboard text only in page memory, which is empty after a send, **Clear**, disconnect and session stop. Neither viewer browser saves panel text in its profile, and after **Clear** the remote clipboard has no owner.
+VERDICT: met
+EVIDENCE: At c0ae75b, `REMOTE_GUI_VIEWER_E2E=1 bun test tests/remote-gui/viewer-page.e2e.test.ts` gave 2 pass (chromium, firefox). That test covers the recording `navigator.clipboard` (no `readText`, `writeText` only during a click), empty page state after send, **Clear**, disconnect and stop, and no sentinel in storage APIs. The browser.e2e privacy case passed in both engines with non-private persistent profiles: the plain textarea control was found, and neither the send-field sentinel nor the remote-area sentinel was. In `REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser ./internal/xclip -count=1 -v`, TestRealHandoffClearsTheRemoteClipboard passed in most runs; after the DELETE route a second connection sees no CLIPBOARD owner. Code basis as in AC-01: unchanged since a99ac6e. Limitations: disconnect and stop in the page test are simulated on a stub. The profile guarantee is measured only for Chromium and Playwright Firefox. That real test failed intermittently in its handoff step before reaching the Clear check (see F-01).
+
+CRITERION: AC-04 Text up to 64 KiB, including characters outside Latin-1, arrives unchanged in both directions, and larger text in either direction is refused with a message in the panel.
+VERDICT: met
+EVIDENCE: At c0ae75b, `REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/xclip -count=1 -v` passed TestRoundTrip, TestOversizedRemoteText, TestLatin1Fallback, TestClearAndProbes and TestWrongCookieRefused in all seven full runs. Ungated `go test -race -count=1 ./...` passed every package, including the proxy Clipboard route tests (64 KiB accepted, one more byte gives 413). Viewer-page e2e passed in both engines, including both size-refusal messages. browser.e2e carried `€ ✓` sentinels both ways. Code basis as in AC-01: unchanged since a99ac6e. Limitations: the panel messages come from stub 413 replies. The remote-to-viewer 64 KiB case uses a second helper as owner, not Chromium. I did not repeat R-7's manual curl check of the 64 KiB route.
+
+CRITERION: AC-05 Synthetic clipboard sentinels sent in both directions appear in no remote-gui command output, state record, diagnostic, supervisor or child log, test artifact or retained evidence file, and none remains in the session directory once the session has stopped and its remote browser profile is deleted.
+VERDICT: met
+EVIDENCE: The browser.e2e run at c0ae75b passed in both engines. Its stop, cleanup and sweep runs after the round trip and after the privacy case: it requires `cleanup` to report `stopped` and the remote profile to be gone. It then searches captured CLI stdout and stderr, every file under the session home and the persistent viewer profile, and finds no sentinel. Code basis as in AC-01: unchanged since a99ac6e. Per R-7's reading of browser.go, children run with Stdout and Stderr nil. Limitations: no supervisor or child log file exists to search, so that clause rests on code inspection.
+
+CRITERION: AC-06 After a human-to-agent handoff, CLIPBOARD and PRIMARY have no owner and `CUT_BUFFER0` is absent on the session display, and the viewer stays connected. A Send during a handoff, or one pressed for a browser mode that has since changed, is refused and never reaches the agent's browser. A failed clear leaves a `handoff-failed` record without an agent-mode browser, and a retried handoff then succeeds.
+VERDICT: met
+EVIDENCE: At c0ae75b, `REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser ./internal/xclip -count=1 -v` and loops of the real tests ran TestRealHandoffClearsTheRemoteClipboard about 31 times. Every run whose handoff completed passed every assertion: no CLIPBOARD or PRIMARY owner and no CUT_BUFFER0 after the handoff, the proxied WebSocket still open, racing sends `map[200:1 409:1]`, a 409 `clipboard-busy` for the old mode, and an empty display. TestRealFailedClearRetriesIntoAgentMode passed in every run. Ungated `go test -race ./...` passed TestFailedClipboardClearBlocksAgentLaunch, TestClipboardSetRefusedDuringSwitchOrModeChange, TestEveryHandoffExitClearsTheSwitchMark and TestFailedClearHandoffSurvivesSupervisorHealthTicks. Limitations: in 2 of about 31 runs the handoff itself failed before any clipboard assertion, with `handoff to agent: browser-close-needs-owner` on the one run whose message I captured. That flake is F-01; it does not contradict the criterion, because a failed close starts no agent browser. As R-7 noted, the switch-mark refusal is proven only with a double, and the `handoff-failed` record check uses a fake handle.
+
+CRITERION: AC-07 Existing service shares, owner-restricted access, loopback native-code access, browser phases, legacy records and private cleanup keep their supported behavior, and the module's race tests, vet, pinned lint and tidy checks pass.
+VERDICT: met
+EVIDENCE: In plugins/remote-gui at c0ae75b with the REMOTE_GUI_* tool paths unset: `go test -race -count=1 ./...` passed all 9 packages, `go vet ./...` and `go mod tidy -diff` exited 0, and `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0` `config verify` and `run` reported 0 issues. `bun test tests/remote-gui` gave 10 pass, 35 skip, 0 fail. `REMOTE_GUI_VIEWER_E2E=1 bun test tests/remote-gui/service.e2e.test.ts tests/remote-gui/origin-auth.e2e.test.ts` gave 3 pass. The gated browser and xclip packages passed in 5 of 7 full runs. Limitations: the one TestRealHeadedBrowser failure ("temporary profile survived stop") also occurs on an origin/main archive: 3 of 205 runs there against 7 of 245 on this branch, so it predates this feature (F-02). The other failure is F-01. I did not rerun native-routing.e2e. Under the unchanged-code basis in AC-01 I rely on R-7, which observed it pass 21 of 21 at a99ac6e.
+
+CRITERION: AC-08 The viewer, README and skill use the glossary labels, and the README and skill describe the panel with the glossary terms, the privacy and clearing rules, the browser permission behavior and the size limit, and contain no claim that the clipboard syncs automatically.
+VERDICT: met
+EVIDENCE: At c0ae75b, viewer-page e2e passed in both engines. It checks **Clipboard**, **Text for the remote browser**, **Copied in the remote browser**, **Send to remote browser**, **Copy to this device**, **Refresh** and **Clear** by exact role and label. A grep of plugins/remote-gui/README.md and skills/remote-gui/SKILL.md finds every panel label, `64 KiB`, `clipboard panel` and `remote clipboard` in both, `clipboard helper` in the README, no automatic or sync clipboard wording and no em or en dash. README lines 54 to 67 describe Refresh, Copy, Clear, the mode warning, the permission behavior and the handoff clearing in line with the Design. `bun test tests/remote-gui` (which includes package.test.ts) passed. `bun test tests/vh-adlc --timeout 60000` gave 1288 pass and 1 fail, in fixtures.test.ts: `/usr/local/bin/vh-adlc reports vh-adlc 0.19.0 but its digest does not match the lock`. Under `bwrap --dev-bind / / --tmpfs /usr/local/bin`, fixtures.test.ts passes 13 of 13. Limitations: the full tests/vh-adlc suite passes on this host only with the root-owned host binary hidden. The branch changes nothing under tests/vh-adlc or plugins/vh-adlc.
+
+CRITERION: AC-09 Typing or pasting in the panel never reaches the remote browser, including across reconnects and viewport resizes, and **Send to remote browser** neither clears the field nor confirms a send that did not succeed.
+VERDICT: met
+EVIDENCE: At c0ae75b, viewer-page e2e passed in both engines: with focus in the send field, `connect` and a resize leave focus in the panel, no key reaches the RFB stub, and refused sends keep the field with no Ctrl+V confirmation. In browser.e2e, panel typing and a native paste added no key to the remote fixture page in both engines. Code basis as in AC-01: unchanged since a99ac6e. Limitations: a reconnect is simulated by firing `connect` on a stub.
+
+CRITERION: AC-10 The panel's same-origin requests succeed in Chromium and Firefox, while clipboard routes refuse requests without the owner's authentication, with a different `Origin`, with a `Sec-Fetch-Site` other than `same-origin`, or without the clipboard header, and return no clipboard text in those refusals.
+VERDICT: met
+EVIDENCE: At c0ae75b, browser.e2e passed the round trip in both engines; that case asserts 200 for the panel's GET, POST and DELETE. Ungated `go test -race ./...` passed the proxy package, which contains TestClipboardRoutesRefuseUnsafeRequests, TestClipboardRoutesServeTheOwner, TestClipboardRouteAbsentWithoutClipboard and TestClipboardRouteNeedsOwnerIdentity. Code basis as in AC-01: unchanged since a99ac6e. Limitations: the Tailscale identity path is tested through a proxy double, not real Tailscale Serve. I did not repeat R-7's manual 401 and 403 curl checks.
+
+CRITERION: AC-11 The panel shows whether the human or the agent controls the shared browser, warns in agent mode that sent text is readable by the agent, and names the mode in each send confirmation.
+VERDICT: met
+EVIDENCE: At c0ae75b, viewer-page e2e passed in both engines: the mode follows the latest response, the warning appears only in agent mode and the confirmation names the mode. The browser.e2e round trip passed in both engines: agent with the warning first, still agent after the handoff until **Refresh**, then human without it, with confirmations naming agent and human. Code basis as in AC-01: unchanged since a99ac6e. Limitations: loopback transport only.
+
+CRITERION: AC-12 Remote clipboard text is always shown as literal text in the viewer, never interpreted as markup.
+VERDICT: met
+EVIDENCE: At c0ae75b, viewer-page e2e passed in both engines. Its markup case returns `<img src=x onerror=alert(1)><b>x</b>` and requires those exact characters in **Copied in the remote browser**, no element inside the area, no `img` and no page error. viewer.go is unchanged since a99ac6e, where R-7 read `showRemote` as the only writer, using `textContent`. Limitations: I did not repeat the innerHTML mutation check.
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-06; plugins/remote-gui/internal/browser/browser_test.go TestRealHandoffClearsTheRemoteClipboard
+EVIDENCE: At c0ae75b the test failed in 2 of about 31 runs. One failure came in the first of seven full runs of `REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser ./internal/xclip -count=1 -v` (16.20s, message not captured). The other came in a 12-iteration loop of the four real tests, which printed `browser_test.go:445: handoff to agent: browser-close-needs-owner` after 12.66s. Twelve isolated iterations passed. The test hands off from a freshly started human Chromium. quitBrowser sends Alt+F, waits 150 ms, then sends X through RFB, and phase.go returns `browser-close-needs-owner` when Chromium has not exited within 8 seconds. CI runs this test in its real-browser step, so it will fail CI intermittently.
+PROPOSAL: Have the test wait until the human browser is up (for example its first page has loaded) before the handoff, or retry the handoff once on `browser-close-needs-owner`, as the product allows. Keep every clipboard assertion unchanged.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: plugins/remote-gui/internal/browser/browser_test.go TestRealHeadedBrowser; browser.go runtime.stop
+EVIDENCE: `go test -race ./internal/browser -run 'TestRealHeadedBrowser$'` intermittently fails with `temporary profile survived stop`. The record is left `cleanup-pending` with diagnostic `browser-private-cleanup-pending`, and `profile/Default/Network Persistent State` remains. On a `git archive origin/main` copy it failed 3 of 205 runs; at c0ae75b it failed 7 of 245, plus once in 7 full runs. The flake predates this feature.
+PROPOSAL: Track it separately from this feature. It looks like a Chromium descendant writing into the profile while RemoveAll runs.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: tests/remote-gui/README.md, paragraph after the `go test` block
+EVIDENCE: The new text says "The browser package adds real handoff checks that the remote clipboard is empty before the agent's browser starts." TestRealHandoffClearsTheRemoteClipboard checks for no owner only after `session.Handoff` returns with the agent browser running. The clear-before-launch ordering is proven by the ungated double test TestFailedClipboardClearBlocksAgentLaunch and by Clear's own verification. The rest of the new README, CONTRIBUTING.md and marketplace.md text matches the code and .github/workflows/ci.yml, which runs `go test -race ./internal/browser ./internal/xclip -count=1` and `bun test tests/remote-gui/browser.e2e.test.ts tests/remote-gui/viewer-page.e2e.test.ts`.
+PROPOSAL: Reword it to "real handoff checks that the remote clipboard is empty after the handoff to agent mode", or name the ordering test.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter, status_description
+EVIDENCE: status_description says "implementation review R-7 met every criterion". `vh-adlc fresh` at c0ae75b reports R-7 stale (`covered path tests/remote-gui/README.md changed since the reviewed commit`), and `vh-adlc gate complete` fails only `impl_review_fresh`. `vh-adlc lint` passes.
+PROPOSAL: When this review is recorded, update status_description to name it instead of R-7.
 
 ## Sources
 
