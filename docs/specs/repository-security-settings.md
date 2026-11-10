@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Q28 to Q30 from spec review R-4 answered with every recommendation; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Spec review R-5 at 2198c88 returned 4 findings, none blocking. Its factual corrections are applied; Q31 and Q32 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding of an opted-in repository turns on Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -71,7 +71,7 @@ These owner decisions widen the authority table. Today the only repository setti
 changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-4 found nothing blocking, and the owner answered their questions. Acceptance
+Reviews R-1 to R-5 found nothing blocking; R-5's questions Q31 and Q32 are open. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
 or onboarding need separate approval.
@@ -224,9 +224,9 @@ a reviewed plugin change with a version bump (`plugins/vh-adlc/knowledge.md:7-9`
 `plugins/vh-adlc/references/loop.md:41-64`). Both are `a4e3d592`, where `vh-adlc knowledge --page
 conventions/repository-security.md` returns `missing-page`. Both move to the revision where docs#30
 merged, with a minor version bump in `plugins/vh-adlc/plugin.json` and
-`plugins/vh-adlc/.claude-plugin/plugin.json`, so every consumer resolves the page. Sweeps and
-onboarding do not request the page through `vh-adlc knowledge`, so a consumer whose own older pin
-lacks it still sweeps normally. If docs#30
+`plugins/vh-adlc/.claude-plugin/plugin.json`, so consumers without their own pin, or with a pin
+at or after the docs#30 merge, resolve the page. Sweeps and onboarding do not request the page
+through `vh-adlc knowledge`, so a consumer whose own older pin lacks it still sweeps normally. If docs#30
 closes unmerged or changes the rules this design applies, the document returns to the owner before
 implementation continues.
 
@@ -407,7 +407,10 @@ publication grant.
   request, so it runs the command without one and the committed settings alone decide.
 - The maintenance skill gets a step before collection: for each repository in scope, run the helper
   in that mode, save its JSON, then collect with those files. A helper failure or exit 1 never
-  blocks collection. Under `check`, the report says how to opt in.
+  blocks collection. Under `check`, the report says how to opt in. A request that forbids
+  filesystem writes creates no recorded run (`plugins/vh-adlc/scripts/maintenance/cli.ts:66-67`),
+  so for it the skill selects `check` without calling `security-settings-mode`, keeps the helper's
+  output in chat and saves no JSON.
 - The maintenance skill's and onboarding's `vh-adlc knowledge` page lists do not include
   `conventions/repository-security.md`, so a consumer pinned before docs#30 still sweeps.
 - The maintenance CLI's report command gains `--security-settings FILE`, repeatable, taking the
@@ -546,7 +549,9 @@ with every read and write succeeding, unless it names another case.
       request with only `no_commit` gets `apply` when the settings adopt it. A `security_settings`
       value other than `apply` or `check` fails visibly. A value of `apply` present only in the
       working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link gives
-      `check`.
+      `check`. The maintenance skill states that a current request forbidding filesystem writes
+      selects `check` without calling `security-settings-mode`, with the helper's output kept in
+      chat and no JSON saved.
 - [ ] AC-25: A consumer whose committed settings hold `security_settings` and
       `security_settings_keep_off` keeps an adopted standing report-publication grant.
 
@@ -572,7 +577,7 @@ with every read and write succeeding, unless it names another case.
 | AC-19 | Same suite, fixtures: archived private repository run by a non-admin; private admin repository with a keep-off row for secret scanning; private non-admin repository; `check` on a public admin repository with alerts off, `dependabot.yml` and no Renovate. Pass: every entry `unavailable` with `archived` and no admin-only read, exit code 0; secret scanning `unavailable` with `not-free-on-private`; secret scanning and push protection `unavailable` with `not-free-on-private`, alerts, security updates and `code_scanning` `unknown` with `needs-admin`; security updates `not-changed` with `check-only`. |
 | AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for three repositories in scope with two `--security-settings` files, one holding a `renovate-overlap` entry. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the third repository has a "helper did not run" row, and the owner decisions list holds exactly the `renovate-overlap` entry. |
 | AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository collector fixture given a helper file for the second repository only. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection covers both repositories. |
-| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. |
+| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe`. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. The reviewer also reads the maintenance skill step at the implementation commit and confirms the `no_filesystem` rule is stated. |
 | AC-25 | `bun test tests/vh-adlc/maintenance`: `resolveStanding` on committed settings with an adopted publication grant plus `security_settings: apply` and one `security_settings_keep_off` row. Pass: the grant resolves as adopted, not `invalid`. |
 | AC-16 | `bun test tests/vh-adlc/maintenance` with collector fixtures for a private admin repository with `security_and_analysis` null whose code scanning read returns 403, and one returning 404. Pass: the surface is `complete-unavailable` with `not-free-on-private` and the status. Fixtures with the same 403 on a public repository, on a private repository read without admin, and on a private repository with `code_security` enabled stay incomplete. |
 | AC-21 | `bun test tests/vh-adlc/maintenance` with one fake `gh` state shared by the helper and the collector: public admin repository, alerts off, three open Dependabot alerts that the alerts endpoint returns only once alerts are on; a second fixture whose endpoint returns an empty list on the first read after the write; a third with alerts already on. Run `apply`, then the collector with the helper's JSON. Pass: the first keeps three alerts and the second none, both with the surface incomplete, `alerts-enabled-this-run` and a null count, and `security-reconcile` accepts both inventories; the third is complete. |
@@ -583,7 +588,31 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q31: How are older plugin versions warned about the two new settings keys?
+
+From R-5 F-02: older helpers reject any unlisted settings key (`plugins/vh-adlc/scripts/maintenance/settings.ts:12-14`) before every maintenance command (`cli.ts:57`). The `security_policy` precedent carries an older-reader note in `references/maintenance-settings.md:97` and `docs/reference/compatibility.md:96-97`.
+
+**Recommendation:** A. It follows the precedent for a new settings key.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Both pages gain the same older-reader note for `security_settings` and `security_settings_keep_off`, naming the new plugin version as the minimum; `docs/reference/compatibility.md` joins covers and AC-11** | Consumers know adopting a key needs the new plugin | One more covered file |
+| **B. No note** | Smaller change | An adopting consumer on an old plugin fails every maintenance command with no guidance |
+
+**Why this is yours:** It sets the compatibility promise for adopting the new keys.
+
+### Q32: What does security updates show when alerts are kept off on purpose?
+
+From R-5 F-04: when the keep-off list names `dependabot_alerts` in a Dependabot repository, rule 9 makes security updates `not-changed` with `alerts-off`, so every `apply` run exits 1 because of a recorded owner choice.
+
+**Recommendation:** A. A recorded owner choice should not read as a failure.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. A new rule before rule 6: when the keep-off list names `dependabot_alerts`, security updates is `left-off` with `owner-choice` unless read as on; AC-19 gains the case** | Clean runs for owners who keep alerts off | One more rule |
+| **B. Keep exit 1 and document it as intended** | No rule change | A permanent failing exit for a deliberate choice |
+
+**Why this is yours:** It decides how an owner choice propagates to a dependent setting.
 
 ## Review Log
 
