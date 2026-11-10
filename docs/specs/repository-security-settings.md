@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-35 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status: planned
+status_description: "Accepted by the owner at R-36 (no findings); tasks are next. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each github.com repository its committed settings name and except what its keep-off list names, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -975,6 +975,7 @@ None.
 | 2026-11-10 | R-34 | spec | `07b95a5` | unknown | procedural | 4 findings: 1 should-fix, 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-35 | spec | `87c0032` | unknown | procedural | 2 findings: 1 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-36 | spec | `3f4f479` | unknown | procedural | no findings; model identity not attested |
+| 2026-11-10 | R-36 | spec | `3f4f479` | n/a | n/a | accepted by owner |
 
 ### R-1
 
