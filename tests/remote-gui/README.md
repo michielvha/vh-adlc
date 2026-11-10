@@ -15,17 +15,17 @@ export REMOTE_GUI_PLAYWRIGHT_MODULE="$PWD/tests/remote-gui/node_modules/playwrig
 REMOTE_GUI_VIEWER_E2E=1 bun test tests/remote-gui
 ```
 
-These cases retain explicit-loopback verification: actual noVNC canvas input followed by CDP reattachment, shared-app compatibility and native HTTP authentication in Chromium/Firefox. Tailscale identity verification is exercised separately below. An unmanaged handler on another port receives the non-bearer binding cookie but no HTTP credential, even when it copies the protected realm. Replaying either proof alone fails. Browser contexts are created fresh, recordings are disabled and temporary code values are kept out of reported results.
+`viewer-page.e2e.test.ts` drives the viewer page's clipboard panel in Chromium, and in Firefox when `REMOTE_GUI_FIREFOX` is set, against a stub noVNC module and stub clipboard routes. `browser.e2e.test.ts` adds real clipboard round trips through a session, including a search of persistent viewer profiles for panel text. These cases retain explicit-loopback verification: actual noVNC canvas input followed by CDP reattachment, shared-app compatibility and native HTTP authentication in Chromium/Firefox. Tailscale identity verification is exercised separately below. An unmanaged handler on another port receives the non-bearer binding cookie but no HTTP credential, even when it copies the protected realm. Replaying either proof alone fails. Browser contexts are created fresh, recordings are disabled and temporary code values are kept out of reported results.
 
 The human-phase fixture starts the actual CLI with debugging disabled, types through noVNC and signs into a loopback test app. Its nonpersistent HttpOnly cookie and original tab's sessionStorage must survive human/agent/human transitions. Fresh uncached requests establish authentication after each transition. Additional tabs must restore, while JavaScript-only memory is observed lost. A revoked provider session must return 401 even with healthy host transport. The viewer URL and expiry must remain fixed, human status must omit CDP, and stop must delete the profile. This synthetic sign-in is separate from owner-performed Google/Tailscale acceptance.
 
 Run the GUI component crash and expiry checks from the plugin module with the same existing GUI tool paths:
 
 ```sh
-REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser -count=1
+REMOTE_GUI_BROWSER_E2E=1 go test -race ./internal/browser ./internal/xclip -count=1
 ```
 
-These checks kill only recorded process identities through pidfds. They verify closed viewer sockets, dead owned processes and private-session descendants, and deleted profiles. Loss of the guard exercises the documented next-lifecycle cleanup path.
+The `internal/xclip` tests start their own Xvfb display and check the clipboard helper: Unicode and 64 KiB round trips, oversized and INCR replies, and clearing CLIPBOARD, PRIMARY and `CUT_BUFFER0`. The browser package adds real handoff checks that the remote clipboard is empty before the agent's browser starts. These checks kill only recorded process identities through pidfds. They verify closed viewer sockets, dead owned processes and private-session descendants, and deleted profiles. Loss of the guard exercises the documented next-lifecycle cleanup path.
 
 Ubuntu CI runs the real browser lifecycle and noVNC fixtures with the runner's sandboxed Google Chrome, distribution GUI tools and the locked Playwright core package. Browser tests remain opt-in locally. The runtime itself never installs these tools.
 
