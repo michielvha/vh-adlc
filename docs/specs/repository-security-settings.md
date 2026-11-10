@@ -854,6 +854,7 @@ None.
 | 2026-11-10 | R-18 | spec | `d62f5b5` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-19 | spec | `2ea72bd` | unknown | procedural | 3 findings: 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-20 | spec | `8675000` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
+| 2026-11-10 | R-21 | spec | `48bd339` | unknown | procedural | 2 findings: 2 should-fix, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1538,6 +1539,22 @@ SEVERITY: nit
 WHERE: Frontmatter (goal)
 EVIDENCE: The goal (line 5) says "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts ...". The Owner summary (line 51) and the Design (line 554) say "only a full authorized sweep writes; a PR-scoped assessment checks". A request with `read_only`, `draft_only`, `no_push`, `no_filesystem` or no `authorized_sweep` true also gives `check` (Q26, Q41). A repository that the committed settings do not name gets `not-in-committed-scope` (Q48), and keep-off rows are never written (Q10). The goal names none of these limits. With every box ticked, an opted-in consumer's PR-scoped or read-only sweep turns nothing on, which the goal as worded does not allow.
 PROPOSAL: Narrow the goal to "every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each repository its committed settings name and except what its keep-off list names, ...", to match the Owner summary.
+
+### R-21
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-24) and Test Plan (AC-24)
+EVIDENCE: AC-24 (lines 787-791 at 48bd339) says the helper's `apply` makes no write "when its `--run-id` names a run whose recorded request or scope selects `check`; its mode reason is the first that applies in the ordered mode reasons, the same reason `security-settings-mode` would print". The Design (line 565) orders the mode reasons as `request-restricted`, `not-authorized-sweep`, `pull-request-scope`, `not-adopted`, `not-in-committed-scope`. The AC-24 proof (line 819) has only three helper `--run-id` fixtures: a `read_only` run, a pull-request run and a `read_only` run without adoption. None has a recorded request without `authorized_sweep` true, and the helper checks that condition separately from the request flags. A run with `{"authorized_sweep": false}` can be recorded, because `start` stores whatever `--request` it is given (`plugins/vh-adlc/scripts/maintenance/cli.ts:66-69`). The mode-command fixtures for `{ "authorized_sweep": false }`, for the pull-request run and for "settings that do not adopt it and no request" pass on "each gives `check`" or "`check`" alone. They never assert the printed reasons `not-authorized-sweep`, `pull-request-scope` or `not-adopted`. The skill passes that printed reason to `check`. An implementation whose helper `apply` ignores `authorized_sweep`, or whose mode command prints the wrong reason, passes every listed fixture. A passing subset never upgrades a composite criterion, so AC-24 would be `untested`.
+PROPOSAL: Add a security-settings fixture that runs `apply` with `--run-id` for a run recorded with `{"authorized_sweep": false}` and committed settings that adopt `apply`, and expect no write and `not-authorized-sweep`. In the mode-command fixtures, assert the printed reason as well as `check`: `not-authorized-sweep`, `pull-request-scope` and `not-adopted`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Procedure changes: user guide) and Acceptance Criteria (AC-11)
+EVIDENCE: The Design (line 615) says "`docs/user-guides/workflows.md` gets a section beside 'Stale branches' describing the default and the manual commands". The Background says the guide today "describes no other repository setting" (`docs/user-guides/workflows.md:143-145`). AC-11 lists `docs/user-guides/workflows.md` among the pages that "state the following". It then says "A clause that names no page needs to appear only in `references/security-settings.md`" (Q58), and that "a clause that names pages must appear in each of them". No clause in AC-11 names `docs/user-guides/workflows.md`, and no other criterion mentions it. The AC-11 proof confirms only "each listed rule is stated". So the implementation can tick every box and leave the user guide unchanged, without the new section, the `check` default, the `security_settings: apply` opt-in or the manual commands.
+PROPOSAL: Add an AC-11 clause naming `docs/user-guides/workflows.md`. It should require a section beside "Stale branches" that states the `check` default, the `security_settings: apply` opt-in and the manual commands, and links to `references/security-settings.md`. Or remove the user guide from the Design and from AC-11's page list.
 
 ## Sources
 
