@@ -934,6 +934,7 @@ None.
 | 2026-11-10 | R-29 | spec | `cb5444a` | unknown | procedural | 1 finding: 1 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-30 | spec | `5ed12e1` | unknown | procedural | 1 finding: 1 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-31 | spec | `cfa455e` | unknown | procedural | 1 finding: 1 should-fix, none blocking; model identity not attested |
+| 2026-11-10 | R-32 | spec | `202642a` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1794,6 +1795,29 @@ SEVERITY: should-fix
 WHERE: Design (Helper; Renovate and Dependabot detection; Rules applied before any write; Collector) and Scope
 EVIDENCE: Maintenance supports GitHub hosts other than github.com. `plugins/vh-adlc/scripts/maintenance/settings.ts` `loadSettings` fails only when a "nonstandard GitHub hostname requires explicit identity". `references/maintenance-settings.md:16` documents the `hostname` setting. `scripts/github-read.ts:18` maps a non-github.com hostname to its own API host. The branch helper passes `--hostname target.hostname` on every `gh api` call (`scripts/branches/branches.ts:217`, `:279`). At cfa455e the document never says "hostname", Enterprise Server or which host the helper calls (`grep -i hostname` over Context to Test Plan finds nothing). Its rules use github.com facts. Renovate detection "looks only for the managed Renovate App's `app/renovate` login". The private-repository rules (rule 2 and the collector's `not-free-on-private`) apply github.com plan terms from the cited "About GitHub Advanced Security" page and from docs#30, which says it was "written for the `michielvha` and `vhco-pro` accounts". Take a consumer on another host that runs self-hosted Renovate without a config file (bg-remove shows Renovate can open pull requests without one) and has a `.github/dependabot.yml`. That host has no `app/renovate` author, so the "no signal, configured" row writes Dependabot security updates beside Renovate. That is the duplicate pull requests the goal rules out. The collector rule could also mark such a host's private code scanning gap `complete-unavailable` because of plan terms that do not apply to it. Every criterion can be ticked with github.com fixtures while this case stays undefined.
 PROPOSAL: State the helper's host handling. Either limit `apply`, the Renovate detection rows and the `not-free-on-private` collector rule to github.com and give any other host `check` with a named reason, with one fixture to prove it, or raise the non-github.com behaviour as an open question.
+
+### R-32
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Rules applied before any write, rule 2; Helper) and Scope, compared with AC-27 and its Test Plan row
+EVIDENCE: After the Q79 fold, Scope (line 297 at 202642a) says: "github.com only for writes and plan rules. On any other host, `apply` is refused with mode reason `not-github-com`, and the `not-free-on-private` rule does not apply, since the Renovate App login and the plan terms are github.com facts." The fold added the host condition only to the collector rule ("and the repository is on github.com"). The helper's rule 2 (line 437) still has no host condition. It makes private and internal secret scanning and push protection `unavailable` with `not-free-on-private`, and it gives the `code_scanning` entry `unavailable` with the same reason. The Helper output paragraph (line 390) also adds that entry on every private and internal repository. On another host, the helper's `check` therefore applies the github.com plan terms that Scope says do not apply. In the same sweep report, the helper's table would list `code_scanning` as `unavailable` with `not-free-on-private`, while the collector leaves that surface incomplete. AC-27 covers only `security-settings-mode`, the helper's `apply` refusal and the collector. Its Test Plan row has no private-repository helper fixture on `ghe.example.com`. Every criterion can be ticked while the helper still applies rule 2 off github.com.
+PROPOSAL: Limit rule 2 and the `code_scanning` entry to github.com, and say what those entries show on another host (for example `unknown` or `not-changed` with `check-only`). Add to AC-27, and to its proof, a private admin helper fixture on `ghe.example.com` that has no `not-free-on-private` entry.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Helper; Reads and writes) and Test Plan (AC-27)
+EVIDENCE: R-31 asked the document to "State the helper's host handling". The fold defines a mode reason, but it still does not say which API host the helper calls. The helper synopsis has no host flag. "Reads and writes" (line 412) says only "All through `gh api`". Existing plugin code passes the host explicitly on every call. The branch helper uses `gh api --hostname this.hostname` (`plugins/vh-adlc/scripts/branches/branches.ts:80`, `:85`, `:217`), and `ghRead` builds `["gh", "api", "--hostname", hostname, ...]` (`plugins/vh-adlc/scripts/github-read.ts:54`). The host comes from the validated origin (`plugins/vh-adlc/scripts/maintenance/settings.ts:63-75`). Without `--hostname`, `gh api` uses `GH_HOST` or github.com. A helper written to this text could therefore run `check` against github.com for a `ghe.example.com` consumer and report another repository's settings. A github.com consumer with `GH_HOST` set could also have its `apply` writes sent to another host. The AC-27 proof compares the helper's refused `apply` with `check` "with the same binding", and both would read the same wrong host, so the proof does not catch this. The Helper section also lists `apply`'s own refusal conditions (adoption and committed scope, plus run rules with `--run-id`, around line 359). It does not include the host, but Scope and AC-27 require that refusal without a run, as in onboarding.
+PROPOSAL: State that every helper read and write passes `--hostname` with the validated origin host. Add `not-github-com` to the Helper section's list of `apply` refusals that apply with or without `--run-id`. In the AC-27 proof, assert that every recorded `gh` call carries `--hostname ghe.example.com`.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter goal and Context (Owner summary)
+EVIDENCE: The goal says "Every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each repository its committed settings name and except what its keep-off list names, Dependabot alerts ...". The summary (line 50) says that with `security_settings: apply` "it turns these on when off in every covered repository those committed settings name". Q68 put the committed-scope and keep-off limits into the goal. Q79 adds another limit: on any host other than github.com, an opted-in consumer always gets `check` with `not-github-com`. Neither the goal nor the owner summary mentions this, so both promise writes that Scope and AC-27 rule out for those consumers.
+PROPOSAL: Add "on github.com" to the goal's outcome. Add one sentence to the owner summary saying that other hosts are check-only, with the reason `not-github-com`.
 
 ## Sources
 
