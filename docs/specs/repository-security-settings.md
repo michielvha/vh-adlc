@@ -671,6 +671,7 @@ None.
 | 2026-11-10 | R-6 | spec | `4cf4ae6` | unknown | procedural | 8 findings: 5 should-fix, 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-7 | spec | `b5612ad` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-8 | spec | `ec05a26` | unknown | procedural | 3 findings: 3 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-9 | spec | `c1a8587` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1044,6 +1045,29 @@ SEVERITY: nit
 WHERE: Test Plan (AC-22)
 EVIDENCE: AC-22 requires an "Owner decisions" list across all files that holds "exactly the entries with `renovate-overlap`, `owner-choice-conflict` or `paused`". The AC-22 proof renders a report with only one `renovate-overlap` entry. AC-17 and AC-26 check `owner-choice-conflict` and `paused` only in the helper's own Markdown. The report's cross-repository list is a separate aggregation in `renderReport`. If that aggregation filtered out `paused` or `owner-choice-conflict`, AC-22 would still pass.
 PROPOSAL: Add a `paused` entry and an `owner-choice-conflict` entry to the AC-22 fixture files, placed in different repositories, and expect all three entries in the report's owner decisions list.
+
+### R-9
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Procedure changes, mode function and maintenance skill step) and AC-24
+EVIDENCE: The recorded request type is `ReportRequest = { authorized_sweep: boolean; read_only?; draft_only?; no_commit?; no_push?; no_filesystem?; ... }` (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`). The standing publication grant applies only when `request.authorized_sweep` is true (`authority.ts:126`), and `tests/vh-adlc/maintenance/publication.test.ts:110` checks that `{ authorized_sweep: false }` gives no commit and no push. The document's mode is `check` only for `read_only`, `draft_only`, `no_push` or `no_filesystem`, or when the settings do not adopt `apply`. "Otherwise it is `apply`." The skill step runs the helper "before collection" for "each repository in scope". The skill also covers PR assessment, "selected repair or continuation" (`plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md:22`), and `collect` takes a single `--pull` scope (`plugins/vh-adlc/scripts/maintenance/cli.ts:62-64`). The goal and the authority row grant writes to a "maintenance sweep". As written, a recorded request with `authorized_sweep: false`, or a PR-scoped assessment or continuation in an opted-in consumer, gets `apply` and writes GitHub settings. AC-24 has no case for either.
+PROPOSAL: Make the mode `check` unless the recorded request has `authorized_sweep` true. Say whether the helper runs, or runs only under `check`, for a PR-scoped collection or a continuation. Add an AC-24 case for `{ "authorized_sweep": false }` with settings that adopt `apply`.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (state table, rule 10) and Test Plan (AC-09)
+EVIDENCE: Rule 10 says "a write that fails, or a setting not read back as on, is `not-changed` with the status". The state table gives `not-changed` the reason "`api-error` with the HTTP status". When a write succeeds, for example `PUT automated-security-fixes` 204 or `PATCH repos/{r}` 200, but the read-back still shows the setting off, no HTTP call failed. The document does not say which status or detail that entry carries. The only fixture is AC-09's `PATCH` 422, so no test covers a successful write that does not take effect.
+PROPOSAL: Give the read-back case its own detail, for example `api-error` with the write status and "not on after write", or a separate reason. Add a fixture where the write succeeds but the read-back shows the setting off.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: AC-21 and Context (Owner summary)
+EVIDENCE: AC-21 requires that "the sweep's security reconciliation accepts that inventory", and the summary says alerts enabled during a sweep "count as incomplete until the next one". The reconciler adds a gap `coverage handoff pending` for each incomplete coverage row without a tracked handoff (`plugins/vh-adlc/scripts/maintenance/security.ts:143`, `tracked` at `:117`). `plugins/vh-adlc/references/maintenance.md:327` says "`reconciled` requires ... an explicit handoff for coverage gaps". So each sweep that enables alerts leaves accounting pending unless the agent records a handoff. The document never names that handoff or the expected reconciliation result, so "accepts" in AC-21 is not stated as an observable result.
+PROPOSAL: State the expected `security-reconcile` result for an `alerts-enabled-this-run` surface: pending with that coverage gap, or reconciled when a handoff names the next sweep. Have AC-21's proof check that result.
 
 ## Sources
 
