@@ -834,9 +834,10 @@ and name the target, and no recorded run restricts it.
       updates `left-off` with `owner-choice` and exits 0. On a public repository with both secret
       settings off and a keep-off row for `secret_scanning` only, `apply` leaves both `left-off`
       with `owner-choice` and writes neither.
-- [ ] AC-20: `AGENTS.md` and `plugins/vh-adlc/knowledge.md` pin the vhco-pro/docs revision where #30
+- [x] AC-20: `AGENTS.md` and `plugins/vh-adlc/knowledge.md` pin the vhco-pro/docs revision where #30
       merged, both `plugin.json` files carry the same new minor version, and
       `vh-adlc knowledge --page conventions/repository-security.md` resolves the page at that pin.
+      Evidence: at the T1 commit `AGENTS.md:4` and `plugins/vh-adlc/knowledge.md:5,7` name d8f07c9dd69038375a535af8ad586086688f85ab, where vhco-pro/docs#30 merged; both `plugin.json` files read 0.16.0; `vh-adlc knowledge --page conventions/repository-security.md` with that plugin pin returned `answered` at d8f07c9.
 - [ ] AC-21: When `apply` enables Dependabot alerts and the collector then runs with the helper's
       JSON, the collector keeps the open alerts it reads and records the Dependabot surface as
       incomplete with reason `alerts-enabled-this-run` and a null count, also when the list is still
@@ -930,7 +931,8 @@ and name the target, and no recorded run restricts it.
 
 ## Tasks
 
-- [ ] T1 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - move both docs pins to `d8f07c9dd69038375a535af8ad586086688f85ab`, where vhco-pro/docs#30 merged, and bump both versions from 0.15.1 to 0.16.0; `vh-adlc knowledge --page conventions/repository-security.md` with the new plugin pin answers, and `vh-adlc lint` on this document still passes (AC-20)
+- [x] T1 `AGENTS.md`, `plugins/vh-adlc/knowledge.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json` - move both docs pins to `d8f07c9dd69038375a535af8ad586086688f85ab`, where vhco-pro/docs#30 merged, and bump both versions from 0.15.1 to 0.16.0; `vh-adlc knowledge --page conventions/repository-security.md` with the new plugin pin answers, and `vh-adlc lint` on this document still passes (AC-20)
+      Evidence: `vh-adlc knowledge --page conventions/repository-security.md --page conventions/feature-documents.md --plugin-pin d8f07c9dd69038375a535af8ad586086688f85ab` returned `answered` at revision d8f07c9; `vh-adlc lint` on this document passed; `bun test tests/vh-adlc --timeout 60000` passed 1304 of 1305, the one failure being the host-binary fixtures test, where the installer rejects `/usr/local/bin/vh-adlc` 0.19.0 against the fixture lock (/tmp/sec-t1-full.log).
 - [ ] T2 `tests/vh-adlc/maintenance/settings.test.ts` - failing tests from the AC-15 settings fixtures and the AC-25 row: `security_settings` accepts only `apply` or `check`, `security_settings_keep_off` rows are validated and an unknown setting name fails visibly, and `resolveStanding` keeps an adopted publication grant beside both keys; they fail because both keys are rejected today (AC-15, AC-25)
 - [ ] T3 `plugins/vh-adlc/scripts/maintenance/settings.ts`, `plugins/vh-adlc/scripts/maintenance/authority.ts` - add both keys to the settings and to the committed key list; T2 passes (AC-15, AC-25)
 - [ ] T4 `tests/vh-adlc/maintenance/security-settings-mode.test.ts` - failing `security-settings-mode` fixtures from the AC-24 and AC-27 rows: request flags, `authorized_sweep`, pull-request and run scope, committed adoption and scope, binding failures, invalid committed settings and a non-github.com host, each asserting the printed mode and reason; they fail because the command does not exist (AC-24, AC-27)
