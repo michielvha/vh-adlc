@@ -824,12 +824,13 @@ and name the target, and no recorded run restricts it.
       `left-off` with reason `owner-choice` and the configured reason. A
       settings file naming an unknown setting fails visibly.
       Evidence: `bun test tests/vh-adlc/security-settings` at T9 (/tmp/sec-t9-tests.log): a committed keep-off row for secret scanning left it `left-off` with `owner-choice` and "Owner choice" and recorded no `PATCH`; a committed row naming `code_scanning` threw "security_settings_keep_off settings" with no write, and `settings.test.ts` rejects an unknown setting at T3.
-- [ ] AC-16: In a maintenance collection of a private or internal repository where the caller is
+- [x] AC-16: In a maintenance collection of a private or internal repository where the caller is
       admin, `security_and_analysis` shows neither `advanced_security` nor `code_security` enabled,
       and the code scanning alerts read returns 403 or 404, the code scanning surface is
       `complete-unavailable` with reason `not-free-on-private` and that status, without a
       `surface_expectations` entry. Without admin, or with either feature enabled, the same read
       leaves the surface incomplete.
+      Evidence: `bun test tests/vh-adlc/maintenance/security-settings-collect.test.ts` at T11 (22 pass, /tmp/sec-t11-tests.log): private admin repositories with `security_and_analysis` null and a 403 or 404 code scanning read, and an internal one with a 403, were `complete-unavailable` with `not-free-on-private`, that status and null alerts; the same 403 on a public repository, a private one without admin, one with `code_security` and one with only `advanced_security` stayed incomplete.
 - [x] AC-17: A setting listed in `security_settings_keep_off` that the first read shows on is not
       written, is listed as `already-on` with reason `owner-choice-conflict`, and appears in the
       Markdown owner decisions list, including when the committed settings are unlinked or absent
@@ -862,7 +863,7 @@ and name the target, and no recorded run restricts it.
       it; the maintenance skill records one naming the next sweep. The same holds when the file shows
       `dependabot_alerts` as `not-changed` with `api-error` after a write. With alerts
       `already-on`, a successful read stays complete.
-- [ ] AC-22: Every sweep report, with or without `--security-settings` files, has a
+- [x] AC-22: Every sweep report, with or without `--security-settings` files, has a
       `## Repository security settings` section after `## Security alerts` that names every
       repository in scope: one table per repository with a file, whose rows match its JSON entries,
       a "helper did not run" row for each repository without one, and an "Owner decisions" list
@@ -870,13 +871,15 @@ and name the target, and no recorded run restricts it.
       The section names the `security_settings: apply` opt-in unless at least one helper file is
       accepted and every accepted file's mode is `apply`; a rejected file's claimed mode does not
       count.
-- [ ] AC-23: When the helper's `repos/{r}` read fails, every writable entry is `unknown` with reason
+      Evidence: `bun test tests/vh-adlc/maintenance/security-settings-collect.test.ts` at T11 (/tmp/sec-t11-tests.log): with four repositories and three files, the heading after `## Security alerts` was `## Repository security settings`, each table's rows matched its file's entries, the fourth repository had "helper did not run", the owner decisions held exactly the `renovate-overlap`, `owner-choice-conflict` and `paused` entries, and the opt-in was named with one file in `check`; with no files every repository had "helper did not run" and the opt-in was named; all-`apply` files, and all-`apply` files plus a rejected `check` file from another run, had no opt-in; all-rejected files claiming `apply` named it.
+- [x] AC-23: When the helper's `repos/{r}` read fails, every writable entry is `unknown` with reason
       `api-error` and the status, no other read or write is made, and the helper exits 1. The
       collector covers every repository in scope when given helper files for only some of them.
       A helper file that is malformed, names a repository outside the scope, repeats a repository
       or carries another run ID changes no surface, fails neither `collect` nor `report`, and shows
       as "helper did not run" with the reason. A repository passed with `--applied-repository` and
       no accepted helper file gets an incomplete Dependabot surface with `helper-receipt-missing`.
+      Evidence: Helper part: `bun test tests/vh-adlc/security-settings` at T7 (/tmp/sec-t7-tests.log), a 500 `repos/{r}` gave four `unknown` `api-error` entries with 500, no other call, exit 1. Collector part: `bun test tests/vh-adlc/maintenance/security-settings-collect.test.ts` at T11 (/tmp/sec-t11-tests.log): a file for the second repository only still covered both; malformed JSON, an out-of-scope repository, a second file for the same repository and another run ID each left the Dependabot surface complete, and the report showed "helper did not run" with the reason; the CLI `collect` with repeated flags and a malformed file exited 0 with empty stderr, and `report` rendered both accepted tables; `--applied-repository` with no file gave `helper-receipt-missing` with a null count.
 - [ ] AC-24: `security-settings-mode` prints `check` when the recorded request has `read_only`,
       `draft_only`, `no_push` or `no_filesystem`, or when the committed settings do not adopt
       `security_settings: apply`, or when the recorded request lacks `authorized_sweep` true, or
@@ -911,12 +914,13 @@ and name the target, and no recorded run restricts it.
       names them, which gives `owner-choice-conflict`. No write is made, the helper exits 0 when no
       other entry fails, and the Markdown owner decisions list names the entry.
       Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): paused security updates with `dependabot.yml`, with `renovate.json`, and with a keep-off row gave `already-on` with `paused`, `paused` and `owner-choice-conflict`, no write, exit 0, each in the Markdown owner decisions.
-- [ ] AC-27: When the maintenance settings' `hostname` is not github.com, `security-settings-mode`
+- [x] AC-27: When the maintenance settings' `hostname` is not github.com, `security-settings-mode`
       prints `check` with `not-github-com` even when the committed settings adopt `apply`; the
       helper's `apply` makes no write and reports that mode reason; the helper never gives an entry
       reason `not-free-on-private` and has no `code_scanning` entry for that host; every `gh` call it
       makes passes `--hostname` with that host; and the collector never records
       `not-free-on-private` for that host.
+      Evidence: Mode at T5 and helper at T7 and T9 (`bun test tests/vh-adlc/maintenance tests/vh-adlc/security-settings`): `security-settings-mode` printed `check` with `not-github-com`, the helper's `apply` wrote nothing and reported that reason, gave no `not-free-on-private` reason and no `code_scanning` entry, and every recorded `gh` call carried `--hostname ghe.example.com` with `GH_HOST` set elsewhere. Collector at T11 (/tmp/sec-t11-tests.log): a private admin 403 on that host without either paid feature stayed incomplete, not `not-free-on-private`.
 
 ## Test Plan
 
@@ -969,7 +973,8 @@ and name the target, and no recorded run restricts it.
       Evidence: `bun test tests/vh-adlc/security-settings tests/vh-adlc/maintenance --timeout 60000` passed 332 of 332, the 27 T8 and 44 T6 fixtures included (/tmp/sec-t9-tests.log); `bash plugins/vh-adlc/scripts/security-settings/typecheck.sh` exited 0 after `committedSecuritySettings` gave its `invalid` helper an explicit `never` type. `journal.ts` needed no change: the helper reads the run through the existing `readRun`.
 - [x] T10 `tests/vh-adlc/maintenance/security-settings-collect.test.ts` - failing collector, report and reconcile fixtures from the AC-16, AC-21, AC-22, AC-23 (collector part) and AC-27 (collector part) rows, plus repeated `--security-settings` and `--applied-repository` flags; they fail because the flags and rules do not exist (AC-16, AC-21, AC-22, AC-23, AC-27)
       Evidence: `bun test tests/vh-adlc/maintenance/security-settings-collect.test.ts` (/tmp/sec-t10-fail.log): 16 of 22 fail on their assertions: code scanning stays incomplete with no `not-free-on-private`, no surface gets `alerts-enabled-this-run` or `helper-receipt-missing`, the report has no `## Repository security settings` section, and `collect` rejects a repeated flag with "maintenance invalid or duplicate argument". The 6 that pass are the incomplete AC-16 and AC-27 cases and the already-on read, which today's collector already serves.
-- [ ] T11 `plugins/vh-adlc/scripts/maintenance/collect.ts`, `plugins/vh-adlc/scripts/maintenance/report.ts`, `plugins/vh-adlc/scripts/maintenance/types.ts`, `plugins/vh-adlc/scripts/maintenance/cli.ts`, `plugins/vh-adlc/scripts/maintenance/security-io.ts`, `plugins/vh-adlc/scripts/maintenance/security.ts` - the `not-free-on-private`, `alerts-enabled-this-run` and `helper-receipt-missing` rules, the repeatable flags and the report section rendered in every sweep report; T10 passes and `bun test tests/vh-adlc/maintenance` stays green (AC-16, AC-21, AC-22, AC-23, AC-27)
+- [x] T11 `plugins/vh-adlc/scripts/maintenance/collect.ts`, `plugins/vh-adlc/scripts/maintenance/report.ts`, `plugins/vh-adlc/scripts/maintenance/types.ts`, `plugins/vh-adlc/scripts/maintenance/cli.ts`, `plugins/vh-adlc/scripts/maintenance/security-io.ts`, `plugins/vh-adlc/scripts/maintenance/security.ts` - the `not-free-on-private`, `alerts-enabled-this-run` and `helper-receipt-missing` rules, the repeatable flags and the report section rendered in every sweep report; T10 passes and `bun test tests/vh-adlc/maintenance` stays green (AC-16, AC-21, AC-22, AC-23, AC-27)
+      Evidence: `bun test tests/vh-adlc/security-settings tests/vh-adlc/maintenance` (/tmp/sec-t11-tests.log): 354 pass, 0 fail, including the 22 T10 fixtures; the helper typecheck exits 0, and an ad hoc `tsc --noEmit` over `collect.ts`, `report.ts` and `cli.ts` reports no error. AC-21 stays open until T12 states the skill's coverage handoff.
 - [ ] T12 `plugins/vh-adlc/references/security-settings.md`, `plugins/vh-adlc/references/authority.md`, `plugins/vh-adlc/references/maintenance.md`, `plugins/vh-adlc/references/maintenance-settings.md`, `plugins/vh-adlc/references/loop.md`, `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - state every AC-11 clause on the pages it names, with the skill step, onboarding text and operations table; a read against AC-11's clause list finds each one and `bun test tests/vh-adlc` stays green (AC-11)
 - [ ] T13 `docs/specs/repository-security-settings.md` - run a maintenance sweep of `michielvha/bg-remove` with the implemented plugin and record the saved report's security-settings section as evidence; the section shows the states AC-12 lists (AC-12)
 

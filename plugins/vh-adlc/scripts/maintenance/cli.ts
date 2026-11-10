@@ -13,9 +13,9 @@ import { adoptionPreflight } from "./migration";
 import { beginCandidate, candidateSnapshot, commitCandidate, promoteOriginal, publicationReadiness, type Candidate } from "./report-candidate";
 
 const commands: Record<string, string[]> = {
-  settings: [], collect: ["--repository", "--pull", "--terminal"], start: ["--repository", "--pull", "--request"], resume: ["--run-id"],
+  settings: [], collect: ["--repository", "--pull", "--terminal", "--run-id", "--security-settings", "--applied-repository"], start: ["--repository", "--pull", "--request"], resume: ["--run-id"],
   checkpoint: ["--run-id", "--revision", "--digest", "--state", "--kind"],
-  report: ["--run-id", "--inventory", "--default-commit", "--default-branch", "--request", "--report-output", "--metadata", "--analysis", "--security"],
+  report: ["--run-id", "--inventory", "--default-commit", "--default-branch", "--request", "--report-output", "--metadata", "--analysis", "--security", "--security-settings"],
   "security-reconcile": ["--run-id", "--input"],
   append: ["--run-id", "--update", "--request"], history: ["--default-commit", "--observations"],
   authority: ["--run-id", "--default-commit", "--default-branch", "--request", "--later-update"],
@@ -28,16 +28,19 @@ const commands: Record<string, string[]> = {
   "store-collection": ["--run-id", "--inventory", "--step-id", "--request"],
   "security-settings-mode": ["--repository", "--default-branch", "--default-commit", "--run-id"],
 };
+// The only flags that may repeat; every other flag is rejected when given twice.
+const REPEATABLE = ["--security-settings", "--applied-repository"];
 function argumentsFor(argv: string[]) {
   const [operation, ...values] = argv;
   if (!Object.hasOwn(commands, operation)) throw Error("maintenance expects a documented local/GET operation; no remote mutation command is available");
-  const args: Record<string, string> = {}, allowed = ["--repo", "--settings", ...commands[operation]];
+  const args: Record<string, string> = {}, lists: Record<string, string[]> = {}, allowed = ["--repo", "--settings", ...commands[operation]];
   for (let index = 0; index < values.length; index += 2) {
     const key = values[index], value = values[index + 1];
-    if (!allowed.includes(key) || !value || value.startsWith("--") || Object.hasOwn(args, key)) throw Error("maintenance invalid or duplicate argument");
-    args[key] = value;
+    if (!allowed.includes(key) || !value || value.startsWith("--") || !REPEATABLE.includes(key) && Object.hasOwn(args, key)) throw Error("maintenance invalid or duplicate argument");
+    if (REPEATABLE.includes(key)) (lists[key] ??= []).push(value);
+    else args[key] = value;
   }
-  return { operation, args };
+  return { operation, args, lists };
 }
 function input(path: string | undefined): any {
   if (!path) throw Error("maintenance required input file missing");
@@ -55,14 +58,19 @@ function verified<T>(check: () => T): T {
 }
 function flag(value: string | undefined) { if (value !== undefined && !["true", "false"].includes(value)) throw Error("maintenance boolean flags take true or false"); return value === "true"; }
 export async function main(argv = process.argv.slice(2)) {
-  const { operation, args } = argumentsFor(argv), config = loadSettings(args["--repo"] ?? process.cwd(), args["--settings"] ? { settingsPath: args["--settings"] } : {});
+  const { operation, args, lists } = argumentsFor(argv), config = loadSettings(args["--repo"] ?? process.cwd(), args["--settings"] ? { settingsPath: args["--settings"] } : {});
   if (operation === "settings") return config;
   if (operation === "adoption-preflight") {
     const result = adoptionPreflight(input(required(args, "--input"))); if (!result.pass) process.exitCode = 1; return result;
   }
   const selected = args["--repository"], pull = args["--pull"] === undefined ? undefined : number(args["--pull"]);
   if (pull === 0) throw Error("maintenance pull must be positive");
-  if (operation === "collect") return collect(config, { scope: { repository: selected, pull }, terminal:args["--terminal"]?input(args["--terminal"]):undefined });
+  if (operation === "collect") {
+    if (lists["--security-settings"] && !args["--run-id"]) throw Error("maintenance collect --security-settings requires --run-id");
+    if (lists["--applied-repository"]?.some(repository => new Set(lists["--applied-repository"]).size !== lists["--applied-repository"].length || !/^[a-z0-9][a-z0-9-]*\/[a-z0-9_.-]+$/.test(repository))) throw Error("maintenance invalid --applied-repository");
+    return collect(config, { scope: { repository: selected, pull }, terminal:args["--terminal"]?input(args["--terminal"]):undefined,
+      run_id: args["--run-id"], security_settings: lists["--security-settings"], applied_repositories: lists["--applied-repository"] });
+  }
   if (operation === "start") {
     const request = parseReportRequest(args["--request"] ? input(args["--request"]) : { authorized_sweep: true });
     if (request.no_filesystem === true) return { persisted: false, mode: "chat-only", reason: "current request forbids filesystem writes" };
@@ -109,7 +117,7 @@ export async function main(argv = process.argv.slice(2)) {
     const analysis = args["--analysis"] ? readFileSync(args["--analysis"], "utf8") : undefined;
     const claimed=args["--security"]?input(args["--security"]):null,securityResult=claimed?verified(()=>verifySecurityResult(config,id,claimed)):null;
     const security=securityResult?securityResult.revision.snapshot_revision===1?createSecurityRevision(securityResult.revision.snapshot,null,digest(canonicalJSON(portableObservations(run,inventory)))):securityResult.revision:undefined;
-    const text = renderReport(config, run, inventory, { metadata: args["--metadata"] ? input(args["--metadata"]) : undefined, analysis, security });
+    const text = renderReport(config, run, inventory, { metadata: args["--metadata"] ? input(args["--metadata"]) : undefined, analysis, security, security_settings: lists["--security-settings"] });
     if (authority.save === "chat") return { saved: false, text, authority };
     if(securityResult && security)storeSecurity(config,id,securityResult,security);
     const requestRun=readRun(config,id);
