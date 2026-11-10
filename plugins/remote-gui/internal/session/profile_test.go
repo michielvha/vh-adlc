@@ -111,6 +111,12 @@ func newProfileFixture(t *testing.T) profileFixture {
 	}
 	t.Setenv("REMOTE_GUI_TEST_FAKE_BROWSER", f.fake)
 	t.Setenv("REMOTE_GUI_CHROMIUM", chromium)
+	// The CLI only checks that a launcher exists; the supervisor runs the fake.
+	previous := BrowserLauncher
+	BrowserLauncher = func(_ context.Context, c config.Config, id string) (BrowserHandle, error) {
+		return fakeBrowser(f.fake, c, id)
+	}
+	t.Cleanup(func() { BrowserLauncher = previous })
 	t.Cleanup(func() {
 		ids, _ := state.IDs(home)
 		for _, id := range ids {
@@ -122,9 +128,9 @@ func newProfileFixture(t *testing.T) profileFixture {
 
 func (f profileFixture) config(t *testing.T, name string, extra ...string) config.Config {
 	t.Helper()
-	args := append([]string{"start", "--home", f.home, "--profile-home", f.profiles, "--transport", "loopback", "--ttl", "1m"}, extra...)
+	args := append([]string{"start", "--home", f.home, "--transport", "loopback", "--ttl", "1m"}, extra...)
 	if name != "" {
-		args = append(args, "--profile", name)
+		args = append(args, "--profile", name, "--profile-home", f.profiles)
 	}
 	c, err := config.Parse(args)
 	if err != nil {

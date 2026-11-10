@@ -89,6 +89,23 @@ func (h *Held) Release() {
 	h.File = nil
 }
 
+// Close drops this process's descriptor without unlocking, so a child that
+// inherited the same open file keeps the lock.
+func (h *Held) Close() {
+	if h == nil || h.File == nil {
+		return
+	}
+	_ = h.File.Close()
+	h.File = nil
+}
+
+// Matches reports whether the descriptor still refers to the profile's lock
+// file, for a process that inherited it.
+func (h *Held) Matches() bool {
+	var opened, current syscall.Stat_t
+	return h.File != nil && syscall.Fstat(int(h.File.Fd()), &opened) == nil && syscall.Lstat(filepath.Join(h.Dir(), ".lock"), &current) == nil && opened.Dev == current.Dev && opened.Ino == current.Ino
+}
+
 // Remove deletes the whole profile directory while the lock is held, then
 // releases it. The directory itself was checked not to be a symlink.
 func (h *Held) Remove() error {

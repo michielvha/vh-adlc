@@ -39,6 +39,7 @@ type Forward struct {
 	Web       json.RawMessage `json:"web"`
 }
 type Record struct {
+	ProfileRecovery   string        `json:"profile_recovery,omitempty"`
 	CleanupDiagnostic string        `json:"cleanup_diagnostic,omitempty"`
 	OwnerLogin        string        `json:"owner_login,omitempty"`
 	ServePeer         Peer          `json:"serve_peer,omitempty"`

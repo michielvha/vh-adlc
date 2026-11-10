@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/profile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/proxy"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/tailnet"
@@ -151,7 +152,12 @@ func privateCleanup(home, id string) error {
 	return nil
 }
 
-func finish(home, id string, controller bool) error {
+func finish(home, id string, controller bool) error { return finishProfile(home, id, controller, nil) }
+
+// finishProfile ends a session. Once its owned processes are gone, the guard
+// clears the profile holder and releases the lock before it records stopped,
+// so a start issued right after stop returns finds the profile free.
+func finishProfile(home, id string, controller bool, held *profile.Held) error {
 	r, err := state.Load(home, id)
 	if err != nil {
 		return err
@@ -193,6 +199,7 @@ func finish(home, id string, controller bool) error {
 	if err = privateCleanup(home, id); err != nil {
 		return err
 	}
+	releaseProfile(held)
 	return update(home, id, func(r *state.Record) {
 		if r.Diagnostic == "" {
 			r.State = "stopped"
@@ -236,6 +243,15 @@ func guard(home, id string) int {
 	r, err := awaitRole(ctx, home, id, "guard")
 	if err != nil {
 		return 1
+	}
+	var held *profile.Held
+	if r.Config.Profile != "" {
+		syscall.CloseOnExec(3)
+		if held, err = inheritProfile(r); err != nil {
+			_ = update(home, id, func(r *state.Record) { r.State = "failed"; r.Diagnostic = "profile-lock-unavailable" })
+			return 1
+		}
+		defer held.Release()
 	}
 	if r.Config.Transport == "tailscale" {
 		if err = update(home, id, func(current *state.Record) {
@@ -318,7 +334,7 @@ func guard(home, id string) int {
 			<-wait
 		}
 	}
-	if err = finish(home, id, true); err == nil {
+	if err = finishProfile(home, id, true, held); err == nil {
 		return 0
 	}
 	markPending(home, id, err)
@@ -358,7 +374,7 @@ func guard(home, id string) int {
 		case <-trigger:
 		case <-ticker.C:
 		}
-		if err = finish(home, id, true); err == nil {
+		if err = finishProfile(home, id, true, held); err == nil {
 			return 0
 		}
 		markPending(home, id, err)
@@ -405,6 +421,22 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	var bundle BrowserHandle
 	var browserState *browserControl
 	target := r.Config.Target
+	client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
+	var ownerLogin string
+	var servePeer state.Peer
+	resolved := false
+	if r.Kind == "browser" && r.Config.Profile != "" {
+		// Chromium never launches on a profile whose owner is not matched here.
+		if r.Config.Transport == "tailscale" {
+			if ownerLogin, servePeer, err = client.ResolveOwner(ctx, r.Config.OwnerLogin); err != nil {
+				return err
+			}
+			resolved = true
+		}
+		if err = checkProfileOwner(r, ownerLogin); err != nil {
+			return err
+		}
+	}
 	if r.Kind == "share" {
 		if !bindingAlive(r) {
 			return errors.New("upstream-ownership-changed")
@@ -433,14 +465,12 @@ func serve(ctx context.Context, r state.Record) (result error) {
 		browserState = &browserControl{home: home, id: id, handle: bundle, guard: r.Guard, supervisor: r.Supervisor}
 	}
 	origin := "http://" + r.ProxyAddress
-	client := tailnet.New(os.Getenv("REMOTE_GUI_TAILSCALE_SOCKET"))
 	var forward *state.Forward
-	var ownerLogin string
-	var servePeer state.Peer
 	if r.Config.Transport == "tailscale" {
-		ownerLogin, servePeer, err = client.ResolveOwner(ctx, r.Config.OwnerLogin)
-		if err != nil {
-			return err
+		if !resolved {
+			if ownerLogin, servePeer, err = client.ResolveOwner(ctx, r.Config.OwnerLogin); err != nil {
+				return err
+			}
 		}
 		if err = update(home, id, func(current *state.Record) { current.OwnerLogin = ownerLogin; current.ServePeer = servePeer }); err != nil {
 			return err
