@@ -948,6 +948,7 @@ None.
 | 2026-11-10 | R-30 | spec | `5ed12e1` | unknown | procedural | 1 finding: 1 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-31 | spec | `cfa455e` | unknown | procedural | 1 finding: 1 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-32 | spec | `202642a` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
+| 2026-11-10 | R-33 | spec | `20498af` | unknown | procedural | 2 findings: 1 should-fix, 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1831,6 +1832,22 @@ SEVERITY: nit
 WHERE: Frontmatter goal and Context (Owner summary)
 EVIDENCE: The goal says "Every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each repository its committed settings name and except what its keep-off list names, Dependabot alerts ...". The summary (line 50) says that with `security_settings: apply` "it turns these on when off in every covered repository those committed settings name". Q68 put the committed-scope and keep-off limits into the goal. Q79 adds another limit: on any host other than github.com, an opted-in consumer always gets `check` with `not-github-com`. Neither the goal nor the owner summary mentions this, so both promise writes that Scope and AC-27 rule out for those consumers.
 PROPOSAL: Add "on github.com" to the goal's outcome. Add one sentence to the owner summary saying that other hosts are check-only, with the reason `not-github-com`.
+
+### R-33
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-24) and Design (Procedure changes, `security-settings-mode` bullet), compared with AC-27 and the ordered mode reasons
+EVIDENCE: The Q79 and Q80 folds added `not-github-com` to the ordered mode reasons (line 622 at 20498af) and to AC-27 (line 871): "When the maintenance settings' `hostname` is not github.com, `security-settings-mode` prints `check` with `not-github-com` even when the committed settings adopt `apply`". The two sentences that define when the command prints `apply` were not updated. AC-24 (lines 838-843) lists the request flags, non-adoption, a missing `authorized_sweep`, a pull-request scope and a target outside the run's scope, and then says "otherwise it prints `apply`, also with no recorded request." The Design bullet (lines 604-610) lists the same conditions and then says "Otherwise it is `apply`. So among maintenance runs only a full authorized sweep writes". Neither sentence has the host condition. Read literally, AC-24 requires `apply` for an adopted, unrestricted consumer on `ghe.example.com`, and AC-27 requires `check` for the same consumer. AC-24 is a composite criterion, so an implementation reviewer who reads its "otherwise" clause literally cannot mark both criteria met. An implementer who works from the Design bullet's condition list can also leave the host out of the mode function.
+PROPOSAL: Add "or when the maintenance settings' `hostname` is not github.com" to AC-24's list of `check` conditions and to the Design bullet before "Otherwise it is `apply`". Alternatively, reword both "otherwise" clauses to say "when none of the ordered mode reasons applies".
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Renovate and Dependabot detection)
+EVIDENCE: Line 503 says "Renovate has no signal only when every Renovate lookup succeeded and none matched. Any failed Renovate lookup with no match elsewhere counts as failed, as does a failed Dependabot config lookup." For setting reads, rule 4 explicitly excludes "the 404 that means off". The document never says what counts as a successful lookup with no match. On GitHub, the contents API answers 404 for an absent file, and R-1's evidence (line 979 region) records "the contents API returned 404 for every Renovate config location" on bg-remove. If an implementation treats that 404 as a failed lookup, every repository without a Renovate config file gets `renovate-detection-failed` and exit 1, and security updates are never enabled. The fixtures leave the fake's response for an absent file to the implementer, so a fake that answers absent files differently would let AC-03 and AC-08 pass anyway. AC-12's live run also misses this, because bg-remove matches on its `app/renovate` pull requests first. The document also does not say that "the default branch" for these lookups is the target repository's own `default_branch` from `repos/{r}`, not the helper's `--default-branch`, which binds the consumer checkout.
+PROPOSAL: State that a 404 from a config-file lookup on the target's default branch means the file is absent, and counts as a successful lookup with no match. Add that the AC-03 and AC-08 fakes answer absent files with 404, as GitHub does.
 
 ## Sources
 
