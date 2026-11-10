@@ -899,6 +899,7 @@ None.
 | 2026-11-10 | R-24 | spec | `9e3883b` | claude-opus-4.8 | procedural | 2 findings: 1 should-fix, 1 nit, none blocking |
 | 2026-11-10 | R-25 | spec | `ef3ebb6` | unknown | procedural | 2 findings: 2 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-26 | spec | `fd18d71` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
+| 2026-11-10 | R-27 | spec | `3eab6e7` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1700,6 +1701,29 @@ SEVERITY: nit
 WHERE: Design (Collector) and Acceptance Criteria (AC-11)
 EVIDENCE: The Design (lines 513-516) adds the collector reason `helper-receipt-missing` for a repository passed with `--applied-repository` that has no accepted helper file. AC-11 requires only "the `not-free-on-private` and `alerts-enabled-this-run` collector rules" to be documented (line 697). No criterion asks any reference page to define `helper-receipt-missing`, although sweep reports and `security-reconcile` gaps will show it. Separately, the Design (line 525) says only `references/maintenance.md` names `alerts-enabled-this-run`. AC-11 requires both collector rules in `references/maintenance.md` and in `references/maintenance-settings.md`.
 PROPOSAL: Add `helper-receipt-missing` to the AC-11 collector-rule clause. Make the Design and AC-11 agree on which pages name `alerts-enabled-this-run`.
+
+### R-27
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Helper; Settings), AC-15, AC-17 and Context (Owner summary)
+EVIDENCE: The Design says "`check` reads keep-off rows from the committed settings when given `--default-branch` and `--default-commit`, which the skill always passes, and from the working tree otherwise". It falls back to the working tree only "when the binding does not resolve or the committed settings are invalid". The Design does not say what happens when the binding resolves but the committed settings are unlinked or absent. That is the `unadopted` result `resolveStanding` returns when `AGENTS.md` does not link `.vh-adlc/maintenance.yaml` (`plugins/vh-adlc/scripts/maintenance/authority.ts:95-97`). AC-24 treats this case as `not-adopted`, not as a binding failure. It is the usual case for consumers in `check`: `gh api repos/michielvha/bg-remove/contents/AGENTS.md` returns 404, and onboarding "usually runs in `check`, because its own commit is what links the settings". If `check` reads only committed, linked rows, a keep-off row in such a consumer's `.vh-adlc/maintenance.yaml` is ignored. A kept-off setting that reads as on is then `already-on` with no reason, not `owner-choice-conflict`. A kept-off setting that reads as off is `not-changed` with `check-only` and makes the helper exit 1. AC-15 and AC-17 apply to any setting "listed in `security_settings_keep_off`" in any mode, and the summary says the owner decisions list names "keep-off settings found on". Both readings fit the Design's text, so the implementation reviewer cannot decide the AC-15 and AC-17 verdicts for this case.
+PROPOSAL: State where `check` reads keep-off rows when the committed settings are unlinked or absent: from the working tree, as on a binding failure, or nowhere. Add an AC-17 fixture with an unlinked committed settings file and a keep-off row for a setting that reads as on. It passes on the outcome you choose.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Procedure changes: authority row) and AC-11
+EVIDENCE: The Q74 fold changed AC-11 and the mode bullet to "among maintenance runs only a full sweep whose request has `authorized_sweep` true may apply, onboarding applies only as the committed settings decide". The Design's authority row bullet still says "a maintenance sweep or onboarding may enable these settings ... A request with a flag that selects `check`, a request without `authorized_sweep` true, and a pull-request scope each give `check`." An onboarding request never carries `authorized_sweep` ("Onboarding has no recorded maintenance request"). Read literally, the row the Design describes therefore makes onboarding `check`, while AC-11 requires the same row to say onboarding applies as the committed settings decide.
+PROPOSAL: Scope the authority row's `authorized_sweep` and pull-request sentence to maintenance runs, matching the reworded AC-11 clause.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Helper), AC-24 and Test Plan (AC-24)
+EVIDENCE: The Design says that when `apply` "cannot read its `--run-id` (missing, mismatched or broken run), it makes no write and exits nonzero naming the run". AC-24 says the same for a `--run-id` that "cannot be read". The proof's eighth `apply` fixture covers only "a `--run-id` that does not exist". `readRun` rejects a missing run, an identity mismatch and a broken event chain separately (`plugins/vh-adlc/scripts/maintenance/journal.ts:171-185`). Suppose an implementation checks only that the run directory exists and then reads the header's request without validating the chain. It passes the eighth fixture and still applies under a corrupt or forked run. A passing subset never upgrades a composite criterion.
+PROPOSAL: Add an `apply` fixture whose run has a broken or noncontiguous event chain, or a mismatched identity. It passes when no write is recorded and the exit is nonzero naming the run.
 
 ## Sources
 
