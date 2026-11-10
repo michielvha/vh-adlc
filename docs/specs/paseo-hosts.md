@@ -281,7 +281,8 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
   - Evidence: `go test ./internal/registry` failed before (no non-test Go files) and `go test -race ./internal/registry` passes after; the module verification passes.
 - [x] T8 `internal/config/config_test.go` - every variable's default and override, and exit 3 naming `PASEO_HOSTS_CLIENT` for `link` without a client; fails (AC-08)
   - Evidence: `go test ./internal/config` fails with `no non-test Go files in .../internal/config`, as intended until T9.
-- [ ] T9 `internal/config/config.go` - configuration from flags and variables only; T8 passes (AC-08)
+- [x] T9 `internal/config/config.go` - configuration from flags and variables only; T8 passes (AC-08)
+  - Evidence: `go test ./internal/config` failed before (no non-test Go files) and `go test -race ./internal/config` passes after; the module verification passes.
 - [ ] T10 `internal/testenv/` - stand-in `ssh`, `npm`, `systemctl`, `loginctl`, `tailscale`, `osascript`, `open` and daemon, with `pwsh` for `.ps1` snippets and an ACL recorder; its self-test runs a snippet under a temporary home and records every argument list (AC-08, AC-10)
 - [ ] T11 `internal/runtime/runtime_test.go` - install `@getpaseo/cli` into `runtime/<version>/` with `npm install --prefix`, exit 3 naming a missing `node` or `npm`, and hash a password passed on standard input; fails (AC-01, AC-08, AC-10)
 - [ ] T12 `internal/runtime/runtime.go` - the local runtime and `hashDaemonPassword` call; T11 passes (AC-01, AC-08, AC-10)
