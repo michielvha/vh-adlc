@@ -269,6 +269,7 @@ None.
 | 2026-11-10 | R-1 | spec | `43cc4f95a8aa696194d3c5cbad3d8f210bb57d98` | unknown | procedural | Two blocking and five should-fix factual or judgement findings, four nits; model identity not attested. |
 | 2026-11-10 | R-2 | spec | `ca547a83a2d5768315eee7e0c33961c072c7fb29` | unknown | procedural | Six should-fix findings (five factual, one judgement) and two nits, none blocking; model identity not attested. |
 | 2026-11-10 | R-3 | spec | `8e5c51499cf9073e6507099d1c694f5ae61d0667` | unknown | procedural | Five should-fix findings (three factual, two judgement) and three nits, none blocking; model identity not attested. |
+| 2026-11-10 | R-4 | spec | `c648b53d1d17d5c1f6c4026bbec735c0373df0ad` | claude-opus-4.8 | procedural | Three should-fix factual findings and three nits (two factual, one judgement), none blocking; model reported by the reviewer, not requested. |
 
 ### R-1
 
@@ -464,3 +465,47 @@ SEVERITY: nit
 WHERE: Design, link; Acceptance Criteria
 EVIDENCE: Line 177 makes `status <alias>` the replacement for the handoff notes, which the owner chose to drop. With `--no-app` it is also where the owner sees the Remote SSH value for each client. No criterion or Test Plan row checks what `status` prints. AC-09 checks only that it "works" on a local-tool registry.
 PROPOSAL: Add the fields `status` must print to AC-09 or AC-11, with a reporter test that asserts them.
+
+### R-4
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, unlink and remove; Acceptance Criteria AC-07; Context, Owner summary
+EVIDENCE: Line 202 says `unlink --server-only` "deletes the server's `authorized_keys` lines with the comment `paseo-hosts:<client>`". The local tool wrote its key line as `printf '...command="/bin/false" %s\n' "$port" "$pub"` (paseo-host:371), where `$pub` is the client's `.pub` file created with `-C "paseo@$(scutil --get LocalHostName ...)"` (paseo-host:500). That line's comment is `paseo@<host>`, not `paseo-hosts:<client>`. The real server was linked to the Mac by the local tool (Context, line 46). For a client the local tool linked that is now gone or lost, `--server-only` deletes nothing and drops nothing from `PASEO_CLIENTS`, yet nothing in the Design makes it fail. The client's key still opens the tunnel, and the lost client's app still holds the password. AC-07 (line 226) says `unlink --server-only` "removes that client's key line ... after which `remove` completes". In this case `remove` instead stops with exit 3 on the unattributed line (line 204). The Owner summary (line 28) says `--server-only` "revokes one that is gone".
+PROPOSAL: Have `unlink --server-only` exit 1 when no line carries the client's comment and name the remaining tunnel-only lines that no recorded client owns. Alternatively, let it select a line by key fingerprint or comment. Either way, state the local-tool case in the Design and AC-07.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, unlink and remove; Acceptance Criteria AC-07
+EVIDENCE: Line 208 deletes the server's entry from "every `app-registry-*.backup.json` in `PASEO_HOSTS_DIR`", and AC-07 (line 226) requires that "no app backup in `PASEO_HOSTS_DIR` holds the server's entry". The local tool writes its backup to `$PASEO_HOSTS_DIR/mac-app-registry.backup.json` (paseo-host:455, `backupFile`), with mode 600 and the app's full previous host list, passwords included (lib/mac-app-register.mjs:122). That name does not match the glob. On the operator host that ran the local tool, `remove` leaves that backup with any server entry it holds, and AC-07 fails as worded. AC-09 requires local-tool state to work unchanged with `remove`.
+PROPOSAL: Include the local tool's `mac-app-registry.backup.json` in the backup cleanup, or name it in the Design and AC-07 as a file `remove` leaves in place.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Plugin layout and link; Test Plan intro
+EVIDENCE: Line 125 sends the snippets "to `ssh` on standard input, never as arguments", and line 169 runs "a PowerShell probe" on Windows. The Design never says what the Windows client runs that input with. Microsoft's OpenSSH Server configuration page says "The initial default in Windows is the Windows command prompt (cmd.exe)", and its example shell is `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`. Windows ships Windows PowerShell 5.1, not PowerShell 7. A PowerShell script piped to the default shell goes to cmd.exe. The Test Plan (line 238) runs the snippets under `pwsh` 7.6.9 on Linux, so a snippet that uses syntax only PowerShell 7 accepts, such as `&&`, `??` or the ternary operator, passes every automated test and then fails on the client.
+PROPOSAL: State the remote command that runs the Windows snippets, for example `powershell.exe -NoProfile -NonInteractive -Command -`, and that snippets keep to Windows PowerShell 5.1 syntax. Alternatively, require `pwsh` on the client and have the probe report it missing.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, unlink and remove; Acceptance Criteria AC-07
+EVIDENCE: Line 206 says `remove --skip-server` "unlinks the clients as above ... skips every step on the server". The check that stops `remove` with exit 3 for unattributed key lines (line 204) reads the server, so it cannot run here. On a local-tool registry, where a missing `PASEO_CLIENTS` "means none recorded" (line 152), `--skip-server` therefore unlinks no client. It deletes the registry and leaves the Mac's app entry, with its password, without a warning. That contradicts "So it never leaves an app entry behind silently" (line 204). Line 208 cleans backups by "the server's entry", but the Design does not say how a backup entry is matched when the `serverId` cannot be read. Line 208 also follows the `--skip-server` paragraph and begins "On the server it then stops", so it reads as part of the `--skip-server` path.
+PROPOSAL: When `PASEO_CLIENTS` is absent and no `--client` or `--no-clients` is given, have `--skip-server` stop with exit 3. Match backup entries by connection host in that path, and move the server-step paragraph before the `--skip-server` paragraph.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Design, link; Acceptance Criteria AC-09
+EVIDENCE: Line 177 lists the `status` output as "the server, exposure, port, Remote SSH value per linked client, and agent CLIs". AC-09 (line 228) adds `PASEO_URL` and requires the fields "under the same names in `--json`". Line 77 records the owner's choice of "a fixed set of `status` fields". Neither section names those fields or their JSON keys.
+PROPOSAL: List the `status` fields once in the Design with their JSON key names, including `PASEO_URL`, and have AC-09 refer to that list.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary
+EVIDENCE: The summary does not mention three decisions taken after R-3 and recorded on line 77: `remove --skip-server` for a server that is gone, Windows snippets tested under a real `pwsh` with Windows otherwise proven only by the manual run, and the fixed `status` fields. Line 32 says "`link`, `unlink` and `remove` restart the desktop app twice". Under line 175, `link --no-app` leaves the app alone, and `unlink --server-only` (line 202) does not contact the client.
+PROPOSAL: Add the three R-3 decisions to the summary, and say that `link --no-app` and `unlink --server-only` do not restart the app.
