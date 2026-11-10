@@ -241,6 +241,7 @@ None.
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | n/a | n/a | accepted by owner |
 | 2026-11-10 | R-7 | spec | `decf88498d33e30c3d8f5fc43bdf87fa4baec437` | claude-opus-5-5 | procedural | No blocking findings on the post-T9 revision; two should-fix findings and four nits. |
 | 2026-11-10 | R-8 | spec | `0da01c174635d7b85c8b9df6196919f7bb6cf786` | claude-opus-5-5 | procedural | Blocking: stop keystrokes can submit a provider form after Stay or in a popup window; one should-fix and one nit. |
+| 2026-11-10 | R-9 | spec | `77c2cba2f75ae3da0f2bdf260b1b5bc0c63b9e65` | claude-opus-5-5 | procedural | No blocking findings on the keyless stop; one should-fix finding and four wording nits. |
 
 ### R-1
 
@@ -635,6 +636,43 @@ SEVERITY: nit
 WHERE: AC-16
 EVIDENCE: AC-16 (line 176) says a Chromium that has not exited "within four seconds on `stop` or three on expiry is terminated and then killed within the supervisor deadline". On `stop` there is no supervisor deadline. The `/stop` request goes to the supervisor's control socket, and the guard then waits on `case clean := <-wait:` with no timer (plugins/remote-gui/internal/session/daemon.go:312). The five-second SIGTERM-to-SIGKILL deadline exists only for a signal and for expiry (daemon.go:320, :328). On `stop`, only the ten-second `stop` wait applies (plugins/remote-gui/internal/session/session.go:334). The owner summary already ties the five-second deadline to expiry.
 PROPOSAL: In AC-16, tie "within the supervisor deadline" to expiry, and for `stop` say "before `stop` stops waiting".
+
+### R-9
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, Background), Design (Lifecycle)
+EVIDENCE: Owner summary line 28 says "A sign-in made in the last moments before a stop may be lost", and Lifecycle line 133 says a cookie "set in the last moments may be lost", so wait "about half a minute". Context gives no command or output for the 30-second figure. The only stop measurement (Background line 43) covers a cookie set "just before the stop". I measured the new keyless close with a scratch harness (/tmp/claude-1000/-home-m-code-stackweaver/4ab9a05b-51f5-5b4a-a95c-c55054044bbd/scratchpad/r9/measure.py and measure_ls.py). It used host Chromium 151.0.7922.137 headed on a private Xvfb with the browserArgs launch flags from phase.go, a loopback fixture that sets a persistent cookie with Set-Cookie, SIGTERM D seconds later (SIGKILL after 2 s), then a relaunch that echoes the Cookie header. Chromium exited 0.03 to 0.17 s after SIGTERM, and `profile.exit_type` read `SessionEnded` every time. Cookie kept: D=1 s 4 of 5, D=10 s 3 of 5, D=20 s 2 of 3, D=28 to 32 s 18 of 18, and 12 of 12 at D=25 to 31 s when the cookie was set 38 s after an earlier one. localStorage was kept 9 of 9 at 1, 10 and 30 s. A cookie 10 to 20 seconds old can therefore be lost, which is not "the last moments". The half-minute advice and the AC-16 30-second test match what I observed, but the document does not show that evidence, and the summary understates the window the owner needs to know about.
+PROPOSAL: Add a Background bullet with the measured loss window after SIGTERM (command, Chromium version, delays and counts). Replace "last moments" in the summary and Lifecycle with a statement that a cookie written up to about half a minute before the stop may be lost.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: AC-16, AC-03, Context (Owner summary), Test Plan (AC-16)
+EVIDENCE: AC-16 (line 178) ends "and the next session sees a clean previous exit". AC-03 (line 165) and the summary (line 30) speak of "a clean stop". Every stop is now a SIGTERM, and in every one of my runs above, Chromium recorded `profile.exit_type` `SessionEnded`, not `Normal`. The only clean mark is the one remote-gui writes before the next first launch (Lifecycle line 131, MergePreferences in plugins/remote-gui/internal/profile/profile.go:401-402), and the AC-16 row checks it only as "the next first launch sets `profile.exit_type` to `Normal`". Read literally, "sees a clean previous exit" describes something Chromium never records under this design.
+PROPOSAL: Reword AC-16 to "the next session's first launch marks the previous exit `Normal`", and say "a `stop`" instead of "a clean stop" in AC-03 and the summary.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Lifecycle), AC-16
+EVIDENCE: Lifecycle line 133 says "On expiry the browser close therefore ends within about two seconds, inside the guard's five-second supervisor deadline", and AC-16 promises a terminate and "after two seconds, a kill if needed, within the supervisor deadline on expiry". On expiry the forward-removal defer (plugins/remote-gui/internal/session/daemon.go:503-505) runs before the deferred `bundle.Stop()` (daemon.go:454). removeForward can wait up to 6 s (daemon.go:124). The guard SIGKILLs the supervisor 5 s after SIGTERM (daemon.go:328-333), and stopMembers then gives Chromium about 300 ms before SIGKILL (daemon.go:94-108). The previous revision covered this with "If the supervisor is killed first, the guard's group stop ends Chromium as today". This revision removed that sentence, so the design and AC-16 now claim the two-second grace in a case where it is not given.
+PROPOSAL: Restore the fallback sentence in Lifecycle and limit AC-16's two-second clause to a browser stop that starts before the guard's deadline.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Owner decisions)
+EVIDENCE: Line 95 says the R-8 decision "replaces the leave-prompt confirmation, the Ctrl+1 focus and the longer exit window". Lines 96 and 97 still list, as current owner decisions, "focus the connection tab with Ctrl+1 before the stop keys, use a four-second exit window on `stop` and three on expiry" and "confirm up to two \"Leave site?\" prompts on stop". Both contradict Lifecycle line 133. The list is also out of order (R-8, R-7, T9, then R-5).
+PROPOSAL: Mark the R-7 and T9 bullets as superseded, keeping only their parts that still apply (the R-7 wording fixes and the `cleanup` recovery wording), and put the list in chronological order.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: Line 28 says "a test proves that a sign-in made 30 seconds before the stop survives every time". That test is T14 and has not been written or run (Tasks line 220, unticked), and line 30 says "Validation is planned, not run". A ten-run test (Test Plan AC-16) also cannot prove "every time". The standard asks the summary to distinguish planned checks from observed proof.
+PROPOSAL: Say instead that a planned test checks, in ten of ten runs, that a cookie set 30 seconds before `stop` is present in the next session.
 
 ## Sources
 
