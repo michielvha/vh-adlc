@@ -238,6 +238,7 @@ None.
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | claude-opus-5-5 | procedural | No blocking findings; one should-fix finding and four nits, left in the record at the owner's direction. |
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | n/a | n/a | accepted by owner |
 | 2026-11-10 | R-7 | spec | `decf88498d33e30c3d8f5fc43bdf87fa4baec437` | claude-opus-5-5 | procedural | No blocking findings on the post-T9 revision; two should-fix findings and four nits. |
+| 2026-11-10 | R-8 | spec | `0da01c174635d7b85c8b9df6196919f7bb6cf786` | claude-opus-5-5 | procedural | Blocking: stop keystrokes can submit a provider form after Stay or in a popup window; one should-fix and one nit. |
 
 ### R-1
 
@@ -602,6 +603,36 @@ SEVERITY: nit
 WHERE: Context (Background)
 EVIDENCE: The new T9 bullet (line 41) is the basis for both changes in this revision, but it gives no command, test name or committed harness. The only harness is the uncommitted plugins/remote-gui/internal/browser/browser_test.go. Several older Background citations also no longer resolve at decf884, because T6 and T8 shifted the code. Line 35 cites browser.go:303-321 for the profile and Preferences write, but at this commit those lines are the end of closeReusable and the start of the `Start` retry loop, and the write is at browser.go:340-367. Line 36 cites browser.go:219-260 for stop, which is now browser.go:222-276. Line 42 cites session.go:302-313, which is now session.go:334-345.
 PROPOSAL: Name the command or test that produced the T9 numbers, and either refresh the line citations to this commit or say which commit they were gathered at.
+
+### R-8
+
+FINDING: F-01
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Lifecycle), Context (Owner summary), AC-16, Test Plan (AC-16)
+EVIDENCE: Lifecycle line 131 says "A Return that finds no prompt lands on the connection tab, which has no form", and the owner summary (line 28) and AC-16 (line 176) promise that "while the connection tab is open, no stop key reaches another page". I measured this in a scratch harness (/tmp/claude-1000/-home-m-code-stackweaver/4ab9a05b-51f5-5b4a-a95c-c55054044bbd/scratchpad/m/drive.py, experiment m4). It used the host Chromium 151 with the remote-gui launch arguments on a private Xvfb :211, and sent keys over RFB through x11vnc the way quitBrowser does (plugins/remote-gui/internal/browser/quit.go). Tabs: the connection-style page, then provider tabs A and B, each with a form and with a `beforeunload` handler armed by a real click. B was active. The stop keys were Ctrl+1, a 0.4 s pause, then Alt+F and X. Esc stood in for the owner clicking Stay, and the design's next Return followed. Fixture log: Ctrl+1 gave "conn focus / conn vis visible", then the Exit keys reached conn. When the first prompt appeared, "conn vis hidden" was logged. After Stay, "A vis visible", "A focus", and the Return gave "A keydown Enter" and "A SUBMIT". Chromium was still running. Chromium makes the prompting tab the active tab to show "Leave site?". After Stay, that provider tab keeps focus while the connection tab stays open, and the design sends its Returns "While Chromium is still running" whether or not a prompt is still showing. That is the R-7 F-01 case, and this revision does not solve it: a Return submits a provider form the owner may be filling in, with no confirmation from the owner or the agent. This conflicts with the goal (line 6) that credential entry stays human-only. The AC-16 proof row asks for exactly this Stay case to show no Return reaching the provider, so the design as written cannot pass its own test.
+PROPOSAL: Send a Return only when the stop can confirm that a leave dialog is what will receive it, or replace the Returns with a mechanism that cannot submit page content. Then state in the summary and in AC-16 what happens after the owner clicks Stay. Make the AC-16 Stay case explicitly put the provider tab under the prompt, with the pass condition that no form is submitted.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: blocking
+WHERE: Design (Lifecycle), Context (Owner summary), AC-16, Test Plan (AC-16)
+EVIDENCE: Lifecycle line 131 considers only the owner closing or moving the connection tab ("Ctrl+1 focuses another page"). It does not consider a second browser window, such as a popup a provider opens with `window.open` for sign-in. Same harness, experiment m3: provider tab A opened a popup window with a form after a real click, and the popup had focus. Then the design's sequence ran: Ctrl+1, the Exit keys, and a Return about a second later followed by a second one. Fixture log: "popup keydown Control", "popup keydown 1", "popup keydown Alt", "popup keydown f", "popup keydown x", then "popup keydown Enter", "popup SUBMIT value=x", and again "popup keydown Enter", "popup SUBMIT value=x". Chromium was still running afterwards, so the terminate would follow. Ctrl+1 does not leave a popup window, and the popup has no app menu, so X is typed into the focused field and both Returns submit the provider's form, here a sign-in form with an extra character. The owner summary's claim that "no stray key reaches a provider page while the connection tab is open" is false in this case, because the connection tab is open in the main window. The README limitation in the design covers only a closed or moved tab.
+PROPOSAL: Specify what the stop does when the focused window is not the window holding the connection tab, for example skip all keys and go straight to the terminate path. Add a popup-window case to AC-16 and its proof row, with the pass condition that no key and no submit reach the popup.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Lifecycle), AC-16, Test Plan (AC-16), Tasks (T14, T15)
+EVIDENCE: AC-16 says "no stop key reaches another page" while the connection tab is open, and the proof row asks a provider tab that "logs key events" to see none. Ctrl+1 is itself a stop key, and it is delivered to the focused page before Chromium switches tabs. In experiments m1 and m2 (same harness), active provider tab A logged "keydown Control ctrl=true" and "keydown 1 ctrl=true" in every run. Calling preventDefault on Ctrl+1 did not block the switch. The design also does not say how long to wait between Ctrl+1 and the Exit keys. In a first m4 run with a 0.1 s pause, provider tab B logged "keydown f alt=true" and "keydown Alt" before "conn focus". The Exit menu did not open, X landed in the connection page's input, and Chromium kept running. With a 0.4 s pause the switch settled first. The Test Plan also says "A Return sent with no prompt showing reaches no page", while Lifecycle says such a Return "lands on the connection tab", and the connection page has an autofocused input (plugins/remote-gui/internal/browser/phase.go, serveMarker). Read literally, the criterion and its proof cannot both be met, and an implementation review would have to guess which keys count.
+PROPOSAL: Reword the AC-16 clause and its proof so that only Ctrl+1 may reach the page that had focus. Require the close to confirm that the switch happened, or to wait a stated, measured settle time, before sending the Exit keys. Make the no-prompt Return statements in Lifecycle and the Test Plan agree.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: AC-16
+EVIDENCE: AC-16 (line 176) says a Chromium that has not exited "within four seconds on `stop` or three on expiry is terminated and then killed within the supervisor deadline". On `stop` there is no supervisor deadline. The `/stop` request goes to the supervisor's control socket, and the guard then waits on `case clean := <-wait:` with no timer (plugins/remote-gui/internal/session/daemon.go:312). The five-second SIGTERM-to-SIGKILL deadline exists only for a signal and for expiry (daemon.go:320, :328). On `stop`, only the ten-second `stop` wait applies (plugins/remote-gui/internal/session/session.go:334). The owner summary already ties the five-second deadline to expiry.
+PROPOSAL: In AC-16, tie "within the supervisor deadline" to expiry, and for `stop` say "before `stop` stops waiting".
 
 ## Sources
 
