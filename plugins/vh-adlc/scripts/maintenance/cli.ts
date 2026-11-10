@@ -44,6 +44,14 @@ function input(path: string | undefined): any {
 }
 function required(args: Record<string, string>, key: string) { if (!args[key]) throw Error(`maintenance requires ${key}`); return args[key]; }
 function number(value: string) { if (!/^(?:0|[1-9]\d*)$/.test(value) || !Number.isSafeInteger(Number(value))) throw Error("maintenance invalid integer argument"); return Number(value); }
+function verified<T>(check: () => T): T {
+  try { return check(); }
+  catch (error) {
+    // Security checks throw fixed messages; system and parser errors can quote paths or file contents.
+    const cause = error instanceof Error && error.constructor === Error && !("code" in error) ? error.message : "unreadable security input";
+    throw Error(`maintenance security verification failed: ${cause}`);
+  }
+}
 function flag(value: string | undefined) { if (value !== undefined && !["true", "false"].includes(value)) throw Error("maintenance boolean flags take true or false"); return value === "true"; }
 export async function main(argv = process.argv.slice(2)) {
   const { operation, args } = argumentsFor(argv), config = loadSettings(args["--repo"] ?? process.cwd(), args["--settings"] ? { settingsPath: args["--settings"] } : {});
@@ -70,7 +78,8 @@ export async function main(argv = process.argv.slice(2)) {
   const id = required(args, "--run-id"), run = readRun(config, id);
   if(operation==="security-reconcile")return reconcileSecurityPacket(config,id,required(args,"--input"));
   if (operation === "resume") {
-    if(typeof run.state.report?.path==="string")validateReportSecurity(config,id,readFileSync(run.state.report.path,"utf8"));
+    const path = run.state.report?.path;
+    if (typeof path === "string") { const text = readFileSync(path, "utf8"); verified(() => validateReportSecurity(config, id, text)); }
     return run;
   }
   if (operation === "pending-outcomes") return pendingOutcomes(config, id);
@@ -91,7 +100,7 @@ export async function main(argv = process.argv.slice(2)) {
     let authority = reportPermission(config, standing, request, { run_id: id, report_path: relative, later_update: flag(args["--later-update"]) });
     if (operation === "authority") return authority;
     const analysis = args["--analysis"] ? readFileSync(args["--analysis"], "utf8") : undefined;
-    const securityResult=args["--security"]?verifySecurityResult(config,id,input(args["--security"])):null;
+    const claimed=args["--security"]?input(args["--security"]):null,securityResult=claimed?verified(()=>verifySecurityResult(config,id,claimed)):null;
     const security=securityResult?securityResult.revision.snapshot_revision===1?createSecurityRevision(securityResult.revision.snapshot,null,digest(canonicalJSON(portableObservations(run,inventory)))):securityResult.revision:undefined;
     const text = renderReport(config, run, inventory, { metadata: args["--metadata"] ? input(args["--metadata"]) : undefined, analysis, security });
     if (authority.save === "chat") return { saved: false, text, authority };
@@ -111,7 +120,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (request.no_filesystem || (request.read_only || request.draft_only || request.no_commit) && run.state.report?.kind === "checkout-draft") throw Error("maintenance current request requires private outcome capture instead of editing this report");
     const update=input(required(args,"--update"));
     if(typeof update.security==="string"){
-      const security=verifySecurityResult(config,id,input(update.security));storeSecurity(config,id,security,security.revision);update.security=security.revision;
+      const claimed=input(update.security),security=verified(()=>verifySecurityResult(config,id,claimed));storeSecurity(config,id,security,security.revision);update.security=security.revision;
     }else if(update.security!==undefined)throw Error("maintenance typed security update requires a verified result file");
     return appendReport(config, id, update);
   }
