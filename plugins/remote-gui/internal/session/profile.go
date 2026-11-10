@@ -93,7 +93,7 @@ func browserCheck(home string, held *profile.Held) error {
 		return err
 	}
 	if id := browserOwner(home, running.PID); id != "" {
-		return errors.New("profile-browser-still-running: session " + id + " owns the browser that uses this profile; run remote-gui cleanup until that session reports stopped, then retry")
+		return errors.New("profile-browser-still-running: session " + id + " owns the browser that uses this profile; run remote-gui cleanup until that session is no longer cleanup-pending and reports stopped or failed, then retry")
 	}
 	return errors.New("profile-browser-still-running: a browser on this host still uses this profile; close the browser, then retry")
 }
