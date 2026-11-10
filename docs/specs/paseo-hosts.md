@@ -265,7 +265,8 @@ Manual procedure on the operator host, a test server, the Mac and a Windows PC w
 
 Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-hosts/`.
 
-- [ ] T1 `plugin.json`, `.claude-plugin/plugin.json`, `go.mod`, `go.sum`, `.golangci.yml`, `cmd/paseo-hosts/main.go` - the module skeleton at version 0.1.0 with `github.com/michielvha/logger` v0.1.0; `go build ./cmd/paseo-hosts`, `go vet ./...` and golangci-lint pass and `paseo-hosts --help` exits 0 (Design)
+- [x] T1 `plugin.json`, `.claude-plugin/plugin.json`, `go.mod`, `go.sum`, `.golangci.yml`, `cmd/paseo-hosts/main.go` - the module skeleton at version 0.1.0 with `github.com/michielvha/logger` v0.1.0; `go build ./cmd/paseo-hosts`, `go vet ./...` and golangci-lint pass and `paseo-hosts --help` exits 0 (Design)
+  - Evidence: `go build ./plugins/paseo-hosts/cmd/paseo-hosts` failed before (directory not found) and the module skeleton now builds; `go build ./cmd/paseo-hosts && go test -race ./... && go vet ./...`, golangci-lint v2.15.0 `config verify` and `run`, and `go mod tidy -diff` pass in plugins/paseo-hosts, and `paseo-hosts --help` exits 0.
 - [ ] T2 `tests/paseo-hosts/package.json`, `tests/paseo-hosts/package.test.ts` - the installed-copy test; fails because `scripts/paseo-hosts.sh` does not exist (AC-14)
 - [ ] T3 `scripts/paseo-hosts.sh` - the wrapper builds into `PASEO_HOSTS_CACHE/builds` with `GOTOOLCHAIN=local` and `-mod=readonly`; `bun test tests/paseo-hosts` passes (AC-14)
 - [ ] T4 `internal/report/report_test.go` - reporter tests for every outcome on a terminal and a pipe, each `NO_COLOR` value, `--plain`, `--json` fields and exit codes; fail because the package is empty (AC-11)
