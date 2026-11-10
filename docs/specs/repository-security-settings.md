@@ -962,6 +962,7 @@ None.
 | 2026-11-10 | R-32 | spec | `202642a` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-33 | spec | `20498af` | unknown | procedural | 2 findings: 1 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-34 | spec | `07b95a5` | unknown | procedural | 4 findings: 1 should-fix, 3 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-35 | spec | `87c0032` | unknown | procedural | 2 findings: 1 should-fix, 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1891,6 +1892,22 @@ SEVERITY: nit
 WHERE: Acceptance Criteria (preamble, AC-01, AC-03 to AC-05, AC-09, AC-13)
 EVIDENCE: The preamble (line 686) says: "Each criterion covers the entries no earlier rule under 'Rules applied before any write' decides, with every read and write succeeding, unless it names another case." The helper's `apply` refusals are mode reasons, not numbered rules: `not-github-com`, `not-adopted`, `not-in-committed-scope` and the run restrictions (Design, Helper: "These are mode reasons, not entry reasons"). AC-01 (line 689) reads "After `apply` on an unarchived repository where the caller is admin, Dependabot alerts are off ... the output lists `dependabot_alerts` as `enabled`" with no host or adoption condition. AC-27 says that on another host "the helper's `apply` makes no write", and AC-24 says it makes no write when the committed settings do not adopt it. Read literally, AC-01 and the other write criteria claim writes in exactly the cases that AC-24 and AC-27 forbid.
 PROPOSAL: Extend the preamble to say that criteria about `apply` also assume no mode reason refuses it, that is github.com, committed adoption naming the target, and no restricting run.
+
+### R-35
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Renovate and Dependabot detection; Reads and writes) and Test Plan (AC-02)
+EVIDENCE: Line 501 to 503 say detection matches "a pull request in any state authored by `app/renovate`; or an open issue authored by `app/renovate`" and "looks only for the managed Renovate App's `app/renovate` login". "Reads and writes" (line 423) says every call goes "through `gh api`", but its list names only the settings endpoints. It names no endpoint for the pull request and issue lookups. The login form depends on the endpoint. On 2026-11-10, `gh api 'repos/michielvha/bg-remove/pulls?state=all&per_page=50' --jq '.[] | select(.user.type=="Bot") | [.number,.user.login,.user.type]'` gave `26 renovate[bot] Bot`, `25 renovate[bot] Bot` and `24 renovate[bot] Bot`. `gh api 'repos/michielvha/bg-remove/issues?state=open'` also gave `renovate[bot]`. Only the search API accepts `author:app/renovate`: `search/issues?q=repo:michielvha/bg-remove+is:pr+author:app/renovate` returned total_count 24. The plugin already maps both forms to one name with `normalizeLogin` (`plugins/vh-adlc/scripts/maintenance/settings.ts:51-52`), but the document does not mention it. Suppose an implementation reads `repos/{r}/pulls` and compares `user.login` with the literal `app/renovate`. It never finds Renovate from pull requests or the Dependency Dashboard issue. On a repository that has a `dependabot.yml` and whose only Renovate signal is its pull requests, as on bg-remove, it would then turn on Dependabot security updates beside Renovate. That is the duplicate pull requests the goal rules out. The AC-02 fixtures are built from the document's `app/renovate` wording, and the fake's response shape is left to the implementer, so every Bun proof can pass anyway. Only the final live AC-12 run would catch it.
+PROPOSAL: Name the endpoints used for the pull request and issue lookups and the login each returns (`renovate[bot]` with `user.type` Bot in REST, or `author:app/renovate` in search). Have the AC-02 fake return the REST shape that GitHub returns.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan (AC-08) compared with Design (Renovate and Dependabot detection)
+EVIDENCE: The Q82 fold added this to the AC-08 row (line 899): "every Renovate lookup fails with 500; ... A 404 is not a failure for these lookups." In that row, "these lookups" covers every Renovate lookup, including the pull request and issue lookups. The Design (line 510 to 513) treats only "a 404 from a config-file lookup" as a successful lookup with no match. It counts "any failed Renovate lookup" as failed. So the row says a 404 from the pull request or issue lookup is not a failure, while the Design says it is one.
+PROPOSAL: Change the row to "A 404 from a config-file lookup is not a failure".
 
 ## Sources
 
