@@ -386,6 +386,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-10 | R-1 | spec | `1a93d2f` | claude-opus-4.8 | procedural | 12 findings: 8 should-fix, 4 nits, none blocking |
+| 2026-11-10 | R-2 | spec | `812a0aa` | claude-opus-4.8 | procedural | 7 findings: 5 should-fix, 2 nits, none blocking |
 
 ### R-1
 
@@ -472,6 +473,57 @@ SEVERITY: nit
 WHERE: Acceptance Criteria (AC-05) and Test Plan
 EVIDENCE: AC-05 says "Dependabot alerts are still enabled", but its fixture starts with every setting off, so "still" does not fit. The AC-05 pass condition only requires writes to `vulnerability-alerts` and `automated-security-fixes`. It never checks that the alerts entry is read back on and reported `enabled`.
 PROPOSAL: Reword AC-05 to say `dependabot_alerts` is `enabled`. Add that read-back and state to the AC-05 pass condition for the private and internal fixtures.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Order of work, Procedure changes), AC-11, Test Plan (AC-11, AC-12) and covers
+EVIDENCE: The plugin reads its conventions through its own pin. `plugins/vh-adlc/knowledge.md` says "The plugin reads its conventions from `vhco-pro/docs` at this revision: ...a4e3d592..." and "Moving this pin is a reviewed plugin change with a version bump". `references/loop.md:41-64` uses the repository's pin when there is one and the plugin pin otherwise. michielvha/bg-remove has no AGENTS.md, because `gh api repos/michielvha/bg-remove/contents/AGENTS.md` returned 404, so the AC-12 sweep there resolves conventions at the plugin pin. `vh-adlc knowledge --repo /tmp/vh-adlc-sec-20261110 --plugin-pin a4e3d592... --page conventions/repository-security.md` returned `missing-page`: "conventions/repository-security.md does not exist at vhco-pro/docs@a4e3d592...". The design moves only "this repository's `AGENTS.md`" pin. AC-11 checks the link only against "the docs revision `AGENTS.md` pins". `covers` lists neither `AGENTS.md`, `plugins/vh-adlc/knowledge.md` nor `plugins/vh-adlc/plugin.json`. If every box is ticked, `references/security-settings.md` still points consumers such as bg-remove at a revision without the page. If the maintenance skill adds the page to its `knowledge` request, those sweeps stop with `missing-page`.
+PROPOSAL: Decide whether the plugin pin in `knowledge.md` moves with a version bump, and add that file, `plugin.json` and `AGENTS.md` to covers and Scope. State whether sweeps and onboarding request `conventions/repository-security.md` through `knowledge`, and how a consumer whose pin predates docs#30 behaves. Make AC-11 check the link at the revision the plugin actually uses.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context (Owner summary, Owner decisions) and Sources
+EVIDENCE: `conventions/repository-security.md` at 5b73d9e says "Where Renovate owns no ecosystem in the repository, turn on Dependabot security updates so each alert with an available patch gets a fix PR." The design leaves them off with `renovate-unknown` when there is no Renovate signal and no `dependabot.yml` (Design, detection table row "no signal | not configured"). The Owner summary still says "The rules follow the convention proposed in vhco-pro/docs#30". The Sources entry summarizes the convention as "repositories without Renovate turn them on" and names no difference. Order of work sends the document back to the owner only when docs#30 "changes the rules this design applies", which suggests the design already applies that rule. `references/security-settings.md` would then link to a convention whose updater rule it contradicts.
+PROPOSAL: State in the Owner summary and the Design that the Q6 rule is stricter than the convention and why. Either have `references/security-settings.md` name that difference next to its link, or ask for docs#30 to adopt the positive-signal rule before it merges.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary), Design (Rules applied before any write) and AC-15
+EVIDENCE: The Owner summary says the keep-off list "keeps chosen settings off for good". The Design says a listed setting "is `left-off` with reason `owner-choice` and is never written", and the state table defines `left-off` as "Deliberately not enabled". Nothing says what happens when the listed setting is already on. bg-remove shows `secret_scanning` and `secret_scanning_push_protection` enabled (`gh api repos/michielvha/bg-remove --jq .security_and_analysis`), and GitHub enables these by default on public repositories. A keep-off row for push protection there would report `left-off` while the setting stays on, because the helper never turns anything off. The owner's chosen setting is not off, and the report says it is.
+PROPOSAL: Define the state for a keep-off setting that reads as on, for example `already-on` with reason `owner-choice-conflict`, and send it to the owner decisions the way `renovate-overlap` is. Reword the summary so it says the list stops the helper from enabling a setting and does not keep it off. Add a fixture for this case under AC-15.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Context (Owner summary) and AC-07
+EVIDENCE: AC-07 says "A second `apply` on the same repository makes no write call and lists every setting as `already-on`, `left-off` or `unavailable`", and the summary says "A second run changes nothing." The design's own rules contradict this in several cases. A non-admin repository lists every entry as `unknown` on every run (AC-06). After a failed write (AC-09, AC-13), the setting is still off and free, so a second `apply` writes it again. The Test Plan checks AC-07 only on the first fixture's resulting state. An implementation that follows AC-06, AC-09 and AC-13 cannot satisfy AC-07 as worded.
+PROPOSAL: Limit AC-07 and the summary to a repository whose first `apply` left no entry `not-changed` or `unknown`, or say plainly that a second run retries failed writes.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (states, Reads and writes)
+EVIDENCE: The state table gives `unknown` only the reason `needs-admin`, and `not-changed` covers only a setting known to be "Off and free". No state covers an admin caller whose first read fails with a 5xx, a rate limit or a network error. The same gap applies when the `repos/{r}` read fails, when the `security_and_analysis` block is missing, or when the contents lookup for `dependabot.yml` fails. The Design also never says that `GET vulnerability-alerts` returning 404 means "off". The docs#30 onboarding guide says "The last command returns `204` when Dependabot alerts are on and `404` when they are off". So an implementation could just as well treat that 404 as an error. The fake `gh` is described only as one that "keeps settings state", so no test pins down either behaviour.
+PROPOSAL: Define a state and reason for a failed read, for example `unknown` with `api-error` and the status, and its exit code. State that a 404 from `GET vulnerability-alerts` means off. Add a fixture where an admin read fails.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Rules applied before any write) and AC-06
+EVIDENCE: The rules give no order of precedence when more than one applies. A non-admin caller on an archived repository could get `unknown` (`needs-admin`) or `unavailable` (`archived`). A private archived repository could get `not-free-on-private` or `archived`. A keep-off row could clash with `renovate-present`. Under `check`, Dependabot security updates on the first fixture could get `check-only`, which AC-06 requires for "every off and free setting", or `alerts-off`, because alerts are never written in `check` and "Security updates are tried only when alerts read back as on".
+PROPOSAL: Add one line that sets the precedence of the rules and reasons, including which reason `check` gives security updates while alerts are off.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Helper) and AC-10, AC-14
+EVIDENCE: The Helper section says `--format markdown` prints "a `## Repository security settings` section with one table row per entry", and AC-10 requires the Markdown to match the JSON row for row. AC-14 also requires "the Markdown output lists them under owner decisions". The Design puts owner decisions in the maintenance skill ("Entries with `renovate-overlap` go to the report's owner decisions") and gives the helper's Markdown no owner-decisions part.
+PROPOSAL: Describe the owner-decisions part of the helper's Markdown output in the Helper section, or move the AC-14 check to the sweep report.
 
 ## Sources
 
