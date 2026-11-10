@@ -33,7 +33,7 @@ Side effects: `link`, `unlink` and `remove` restart the desktop app twice (not `
 
 Planned checks: Go tests against SSH and DevTools stand-ins, CI lint and race checks, an installed-copy build in CI, and a manual run on a server, Mac, Windows PC and fresh agent session. Windows scripts run under `pwsh` on Linux; Windows itself is proven only manually. Nothing is implemented. R-1's blocking gaps are fixed; R-2 to R-8 found none.
 
-Acceptance authorizes implementing on a feature branch through the vh-adlc gates; finishing waits on the logger PR being merged and tagged. Opening or merging PRs, including the logger's, and touching real machines in tests need separate approval.
+Acceptance authorizes implementing on a feature branch through the vh-adlc gates; the logger option shipped in [v0.1.0](https://github.com/michielvha/logger/tree/v0.1.0). Opening or merging PRs, including the logger's, and touching real machines in tests need separate approval.
 
 ### Background
 
