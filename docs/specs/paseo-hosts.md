@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-1 findings applied and five answers folded in; Q2 on vendoring is open; a new spec review is needed."
+status_description: "R-1 findings applied and the owner's answers folded in; a new spec review is needed."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
 covers:
@@ -27,7 +27,7 @@ Excluded: phones, the web UI, the Linux desktop app, relay pairing, installing a
 
 Side effects to know: `link`, `unlink` and `remove` quit and restart the desktop app twice, briefly enable its debugging port on loopback, and keep a backup of the app's host list, which holds passwords, in the registry directory. If the app rejects the change, the previous list is restored. On Windows the app is started through a scheduled task in the signed-in session, which needs a signed-in user and OpenSSH Server on the PC.
 
-The proposed checks are Go tests that run the CLI against SSH and DevTools stand-ins, the repository's Go lint and race checks in CI, and a manual run on a real server, Mac, Windows PC and fresh agent session. The Mac flow was observed with the Bash tool; nothing in this plugin is implemented, Windows is unmeasured, and the first independent review (R-1) found two blocking gaps, now addressed, so a new review is needed. The owner answered five of the six questions R-1 raised; how the build gets its Go dependencies is still open.
+The proposed checks are Go tests that run the CLI against SSH and DevTools stand-ins, the repository's Go lint and race checks in CI, and a manual run on a real server, Mac, Windows PC and fresh agent session. The Mac flow was observed with the Bash tool; nothing in this plugin is implemented, Windows is unmeasured, and the first independent review (R-1) found two blocking gaps, now addressed, so a new review is needed. The owner answered all six questions R-1 raised; no questions are open.
 
 Acceptance authorizes implementing the plugin on a feature branch through the vh-adlc gates. Opening a PR, merging, merging the logger PR, and touching real servers or desktops during tests still need separate approval.
 
@@ -70,7 +70,7 @@ Repository and convention facts:
 
 The owner made these decisions in the session that produced the local tool: servers default to SSH-only with the relay off, and HTTPS publication is an opt-in for phones and browsers; plaintext passwords stay on the operator host; linking the desktop app needs no manual step.
 
-The owner decided on 2026-11-10, in answer to this document's first questions: the CLI is written in Go, the repository's established pattern, and logs through `michielvha/logger`; Windows is the second client platform; removing a server is in the first version; new servers use Paseo's default port 6767, which the owner left to the recommendation; the feature is tracked in issue #71; the handoff note files are dropped in favour of `status`; and `link` keeps the app host-list backup after success. Later the same day the owner decided that the wrapper builds the binary on the operator host as remote-gui does, that the DevTools step uses `github.com/coder/websocket`, and that `remove` keeps the server's Paseo state and workspace unless `--purge` is given. After review R-1 the owner chose, on 2026-11-10: send logs to standard error by extending `michielvha/logger` with a writer option (draft PR michielvha/logger#8); desktops reach a server by its tailnet name, else the `ssh -G` host name, with `--client-host` to override; rollback is proven live through fault injection that only a `paseotest` build honours; an unsupported client exits 4; and the skill uses the default registry directory and asks only for a missing client alias.
+The owner decided on 2026-11-10, in answer to this document's first questions: the CLI is written in Go, the repository's established pattern, and logs through `michielvha/logger`; Windows is the second client platform; removing a server is in the first version; new servers use Paseo's default port 6767, which the owner left to the recommendation; the feature is tracked in issue #71; the handoff note files are dropped in favour of `status`; and `link` keeps the app host-list backup after success. Later the same day the owner decided that the wrapper builds the binary on the operator host as remote-gui does, that the DevTools step uses `github.com/coder/websocket`, and that `remove` keeps the server's Paseo state and workspace unless `--purge` is given. After review R-1 the owner chose, on 2026-11-10: send logs to standard error by extending `michielvha/logger` with a writer option (draft PR michielvha/logger#8); desktops reach a server by its tailnet name, else the `ssh -G` host name, with `--client-host` to override; rollback is proven live through fault injection that only a `paseotest` build honours; an unsupported client exits 4; and the skill uses the default registry directory and asks only for a missing client alias. The owner also chose to let the build download its dependencies through Go's module proxy rather than commit a `vendor/` directory.
 
 ## Scope
 
@@ -119,7 +119,7 @@ Out of scope:
 - `plugin.json` and `.claude-plugin/plugin.json` at version 0.1.0, `README.md`, and `skills/paseo-hosts/SKILL.md`.
 - A Go module `github.com/michielvha/vh-adlc/plugins/paseo-hosts` with the Go version of `plugins/remote-gui/go.mod`, `cmd/paseo-hosts/main.go` for wiring only, packages under `internal/`, and `.golangci.yml` copied from remote-gui.
 - The shell and PowerShell snippets that run on servers and clients, as files under `internal/` embedded with `go:embed`. They are sent to `ssh` on standard input, never as arguments, so they can be linted and tested on their own.
-- `scripts/paseo-hosts.sh`, a wrapper that builds the module into `${XDG_CACHE_HOME:-~/.cache}/paseo-hosts/builds` and runs it. Like `scripts/remote-gui.sh` it sets `GOTOOLCHAIN=local`, `GOPROXY=off` and `GOSUMDB=off`, so it downloads nothing; the module's dependencies are committed under `vendor/` and the build uses `-mod=vendor` (see Q2).
+- `scripts/paseo-hosts.sh`, a wrapper that builds the module into `${XDG_CACHE_HOME:-~/.cache}/paseo-hosts/builds` and runs it. Like `scripts/remote-gui.sh` it sets `GOTOOLCHAIN=local` and builds with `-mod=readonly`. Unlike remote-gui it leaves `GOPROXY` and `GOSUMDB` at Go's defaults, so the first build downloads the two dependencies through the module proxy and checks them against the committed `go.sum`; later builds reuse the module cache.
 
 Both marketplace catalogs (`.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`) and the plugin table in `docs/reference/marketplace.md` list the plugin. A `paseo-hosts` job in `.github/workflows/ci.yml` runs the same build, `go test -race`, `go vet`, golangci-lint and `go mod tidy -diff` steps as the remote-gui job, and the `version` job waits for it.
 
@@ -203,7 +203,7 @@ On the server it then stops, disables and deletes `paseo.service`, deletes the S
 
 ### Delivery
 
-Both catalogs point at `./plugins/paseo-hosts` on the default branch, as they do for `remote-gui`, so merging is the release path for the plugin; the wrapper builds the binary on the operator host. The feature is delivered when a fresh install from each catalog after the merge builds and runs `paseo-hosts --help` with an empty Go module cache. The vh-adlc binary release workflow does not change. The logger release with `InitWithOptions` comes first, and the module pins it.
+Both catalogs point at `./plugins/paseo-hosts` on the default branch, as they do for `remote-gui`, so merging is the release path for the plugin; the wrapper builds the binary on the operator host. The feature is delivered when a fresh install from each catalog after the merge builds and runs `paseo-hosts --help` starting from an empty Go module cache. The vh-adlc binary release workflow does not change. The logger release with `InitWithOptions` comes first, and the module pins it.
 
 ## Acceptance Criteria
 
@@ -220,7 +220,7 @@ Both catalogs point at `./plugins/paseo-hosts` on the default branch, as they do
 - [ ] AC-11: Human output meets `conventions/terminal-output.md`: labelled status lines on standard error, no colour when `NO_COLOR` is non-empty or the stream is not a terminal, and ASCII words with `--plain`. With `--json`, standard output holds only one JSON object per command with the documented fields, and the exit code matches the documented meaning.
 - [ ] AC-12: The plugin installs from the vhco-tools marketplace in Codex and Claude, and in a new session a request to add a Paseo server leads the agent to the skill, which runs `onboard` and `link` and reports the result without showing the password.
 - [ ] AC-13: The README, the skill and the CLI help use the terms in Design with those meanings, and the plugin's marketplace row describes it in the same terms.
-- [ ] AC-14: The wrapper in an installed copy of the plugin, outside the repository, builds and runs `paseo-hosts --help` with an empty Go module cache and no network access.
+- [ ] AC-14: The wrapper in an installed copy of the plugin, outside the repository, builds and runs `paseo-hosts --help` starting from an empty Go module cache, fetching its dependencies through the module proxy and verifying them against `go.sum`.
 
 ## Test Plan
 
@@ -238,7 +238,7 @@ Go tests run the CLI's commands with a stand-in `ssh` on `PATH` that executes th
 | AC-11 | Reporter tests capture success, failure, skip and partial outcomes with a terminal and a pipe, with `NO_COLOR` absent, empty, `0` and `1`, and with `--plain`; assert no ANSI bytes in plain captures and that `--json` output parses with the documented fields and exit codes. |
 | AC-12 | Manual: install `paseo-hosts@vhco-tools` in Codex and in Claude, start a new session on the operator host, ask to add a named server, and record that the agent loaded the skill, ran both commands, and showed no password. |
 | AC-13 | Implementation review compares the README, `SKILL.md`, `paseo-hosts --help` and the marketplace row with the Terms table and records each mismatch. |
-| AC-14 | A CI test copies `plugins/paseo-hosts` to a temporary directory, runs `scripts/paseo-hosts.sh --help` with an empty `GOMODCACHE`, `GOFLAGS` unset and `GOPROXY=off`, and asserts it exits 0, as `tests/remote-gui/package.test.ts` does for remote-gui. |
+| AC-14 | A CI test copies `plugins/paseo-hosts` to a temporary directory, runs `scripts/paseo-hosts.sh --help` with an empty temporary `GOMODCACHE`, `GOFLAGS` unset and the default `GOPROXY`, and asserts it exits 0 and that both dependencies are now in that cache, as `tests/remote-gui/package.test.ts` does for remote-gui. |
 
 Manual procedure on the operator host, a test server, the Mac and a Windows PC with OpenSSH Server and a signed-in user: (1) `onboard` the server and record the unit, config and Serve state; (2) re-run `onboard` and confirm the password file is unchanged; (3) `onboard --publish`, check the route and health, then `onboard` again and confirm the route is gone; (4) `link` the Mac, then from the Mac try a shell command and `ssh -W 127.0.0.1:22` with the key and confirm both fail; (5) check the Mac app's host list and tunnel process, check that no app process has `--remote-debugging-port` and the debugging port refuses connections, then run `link` again with a `paseotest` build and `PASEO_HOSTS_TEST_REJECT_ENTRY=1`, confirm it exits non-zero, the previous host list is back and no debugging port remains; (6) repeat steps 4 and 5 for the Windows PC and confirm the app window is on the user's desktop; (7) `unlink` the Windows PC, then `remove` the server, and record the clients, server and registry.
 
@@ -248,16 +248,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q2: How should the wrapper get the Go dependencies
-
-**Recommendation:** A. Commit `vendor/` and build with `-mod=vendor`, so the wrapper keeps remote-gui's rule that it downloads nothing.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Vendor** | Offline, reproducible builds; the reviewed code is the built code | Vendored files in the repository; Renovate updates touch `vendor/` |
-| **B. Allow the module proxy** | No vendored files | Builds need network access and trust the proxy and checksum database at install time |
-
-**Why this is yours:** it trades repository size against a network dependency at install.
+None.
 
 ## Review Log
 
