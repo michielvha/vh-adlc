@@ -22,6 +22,7 @@ and check [existing feature documents](docs/specs/) before starting a feature.
 | --- | --- |
 | `cmd/vh-adlc/`, `internal/` | Go binary and its tests. |
 | `plugins/remote-gui/` | Independent Go runtime, source build helper and remote-access skill. |
+| `plugins/paseo-hosts/` | Independent Go CLI, source build helper and the skill for Paseo servers and clients. |
 | `plugins/vh-adlc/` | Shared skills, reviewer, workflow references, and binary lock. |
 | `plugins/github-app-registration/` | GitHub App registration plugin and Bun scripts. |
 | `.agents/plugins/`, `.claude-plugin/` | Native marketplace catalogs. |
@@ -68,3 +69,8 @@ For remote-gui, run the Go checks above from `plugins/remote-gui/`, including
 `go test -race ./...`, then run `bun test tests/remote-gui` from the repository root.
 Its optional headed-browser test uses only existing host dependencies and fresh
 profiles with `REMOTE_GUI_BROWSER_E2E=1`. See the [plugin setup](plugins/remote-gui/README.md).
+
+For paseo-hosts, run the same Go checks from `plugins/paseo-hosts/`, including
+`go test -race ./...`, then run `bun test tests/paseo-hosts` from the repository root.
+The PowerShell snippet tests need `pwsh` on `PATH` and skip without it. See the
+[plugin README](plugins/paseo-hosts/README.md).

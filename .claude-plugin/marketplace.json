@@ -32,6 +32,11 @@
       "name": "remote-gui",
       "source": "./plugins/remote-gui",
       "description": "Share task-local apps over the tailnet and hand a fresh browser to the human."
+    },
+    {
+      "name": "paseo-hosts",
+      "source": "./plugins/paseo-hosts",
+      "description": "Onboard Linux servers as SSH-only Paseo daemons and link the Paseo desktop app on Macs and Windows PCs to them."
     }
   ]
 }
