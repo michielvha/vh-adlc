@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Two reviews with a named model (422e79a, 869b5fe) stayed pending and unstored because the reviewer reported MODEL: unknown; their findings are applied and the owner answered Q19 to Q22. A new spec review with the host default model is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Spec review R-3 at 44aea8d returned 7 findings, none blocking. Its factual corrections are applied; Q23 to Q27 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding leaves a repository with each GitHub security setting its plan offers for free turned on, without duplicating Renovate's pull requests, and reports what it changed."
 covers:
@@ -70,7 +70,7 @@ changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh` for each repository shape, and a live
 sweep of bg-remove. No live run shows a sweep enabling alerts and collecting them in the same run.
-Reviews R-1 and R-2 found nothing blocking; the owner answered their questions. Acceptance authorizes tasks, implementation on a feature branch, the pin move, the version
+Reviews R-1 to R-3 found nothing blocking; R-3's questions Q23 to Q27 are open. Acceptance authorizes tasks, implementation on a feature branch, the pin move, the version
 bump and that live sweep. A release and changes to any other repository outside a sweep or
 onboarding need separate approval.
 
@@ -108,12 +108,9 @@ Observed on `michielvha/bg-remove` during maintenance run `7ece4509` on 2026-11-
 On the private repository `michielvha/vitepress`, `gh api repos/michielvha/vitepress` returned
 `visibility` private, `permissions.admin` true and `security_and_analysis` null on 2026-11-10.
 
-vhco-pro/docs#30 (open, head `89d567a`) proposes `conventions/repository-security.md`. Its feature
+vhco-pro/docs#30 (open, head `4b2198d`) proposes `conventions/repository-security.md`. Its feature
 list by visibility and its updater rule are the ones this design applies; see Sources. It is not yet
 in the docs revision this repository pins (`a4e3d592`), so this document cites the PR.
-
-The configured bot authors default to `renovate` and `dependabot`
-(`plugins/vh-adlc/scripts/maintenance/settings.ts:109`).
 
 Plan availability, from GitHub's documentation (see Sources): the dependency graph and Dependabot
 alerts are included in all plans. Dependabot security updates need only those two. Code scanning and
@@ -159,7 +156,7 @@ Owner decisions on 2026-11-10:
   `renovate-detection-failed` or `dependabot-detection-failed` (Q20); the sweep report renders the
   helper's output in its own section through a new report input (Q21); and the owner's acceptance
   of this feature is the standing agreement the onboarding guide asks for, with docs#30 naming both
-  Dependabot config file names since `4b2198d` (Q22).
+  Dependabot config file names since `106ecfb` (Q22).
 
 ## Scope
 
@@ -308,7 +305,9 @@ Renovate documents (`renovate.json`, `renovate.jsonc`, `renovate.json5` at the r
 `.github/` and `.gitlab/`, `.renovaterc`, `.renovaterc.json`, `.renovaterc.jsonc`,
 `.renovaterc.json5`, or a `renovate` key in the root `package.json`); a pull request in any state
 authored by `app/renovate`; or an open issue authored by `app/renovate` whose title contains
-"Dependency Dashboard". The output names the matched path, pull request or issue.
+"Dependency Dashboard". The output names the matched path, pull request or issue. Detection
+looks only for the managed Renovate App's `app/renovate` login and does not read the sweep's
+`bot_authors` setting.
 
 Dependabot is configured when `.github/dependabot.yml` or `.github/dependabot.yaml` exists on the
 default branch.
@@ -512,7 +511,71 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q23: How should a sweep report alerts it enabled in the same run?
+
+From R-3 F-01: right after the alerts write, the alerts list can still be empty, and the collector records any successful read as `complete` with its count (`plugins/vh-adlc/scripts/maintenance/collect.ts:88-90`, `:131`). On bg-remove, 47 alerts appeared about 20 seconds after the write.
+
+**Recommendation:** A. The report never shows a filling list as a complete zero.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. When the helper JSON has `dependabot_alerts` `enabled` in this run, the Dependabot surface is recorded as incomplete with reason `alerts-enabled-this-run` and the count read; a criterion and a fixture with a delayed alert list check it** | An honest coverage line; the next sweep collects the full list | The sweep's security accounting stays incomplete for that repository until the next run |
+| **B. Keep the surface `complete` and require a "may still be filling" note in the report, with a criterion and a delayed-list fixture** | Complete accounting in the same run | A complete surface that may undercount |
+
+**Why this is yours:** It decides whether a same-run enable counts as complete coverage.
+
+### Q24: What happens when the helper fails for one repository in a sweep?
+
+From R-3 F-02: no rule covers a failed `repos/{r}` read, and the sweep step does not say whether a helper failure stops the sweep or drops that repository from the report.
+
+**Recommendation:** A. One repository's failure is visible and never stops the rest of the sweep.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. A failed `repos/{r}` read makes every entry `unknown` with `api-error` and exit 1; a helper failure or exit 1 never blocks collection; the report section names every repository in scope and shows a "helper did not run" row for one with no output; a criterion and a fixture check it** | Complete, visible results across a multi-repository sweep | One more rule, criterion and fixture |
+| **B. Any helper failure stops the sweep before collection** | Simpler | One flaky repository blocks every other repository's sweep |
+
+**Why this is yours:** It decides how partial failures affect a sweep.
+
+### Q25: Which consumers does the standing agreement to apply settings cover?
+
+From R-3 F-03: the plugin is distributed through marketplaces, other standing grants come from a consumer's own adopted declaration (`plugins/vh-adlc/references/authority.md`, `references/maintenance-settings.md:51-57`), and the convention names only `michielvha` and `vhco-pro`.
+
+**Recommendation:** C. Settings are never written in someone else's repository without that owner opting in, and your repositories need one line each.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Every consumer: `apply` by default everywhere** | No setup anywhere | Writes settings in other owners' repositories after an upgrade, without their agreement |
+| **B. Only repositories owned by `michielvha` or `vhco-pro`; others run `check`** | No setup for your accounts | Hard-codes account names in a distributed plugin |
+| **C. Only consumers whose committed `.vh-adlc/maintenance.yaml` adopts `security_settings: apply`; others run `check` and the report says how to opt in** | Matches every other standing grant | One settings line per consumer, including bg-remove |
+
+**Why this is yours:** It sets the reach of a standing authority grant.
+
+### Q26: Which recorded request flags make the helper run `check`?
+
+From R-3 F-04: the run records `read_only`, `draft_only`, `no_commit`, `no_push` and `no_filesystem` (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`), and `references/maintenance.md:38-40` gives them different meanings.
+
+**Recommendation:** A. Any restriction on remote effects stops remote setting writes.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. `read_only`, `draft_only`, `no_push` and `no_filesystem` select `check`; `no_commit` alone does not, because a settings write is not a commit; a criterion runs each flag and records no write** | Clear mapping, tested | A `no_push` sweep cannot enable alerts |
+| **B. Only `read_only` selects `check`** | More sweeps enable settings | A `no_push` or `draft_only` request still changes GitHub |
+
+**Why this is yours:** It decides which restrictions block a remote change.
+
+### Q27: Should a criterion prove that sweeps do not request the new page?
+
+From R-3 F-07: an operation stops on `missing-page` (`plugins/vh-adlc/references/loop.md:59-61`, `:75-76`), and the page is missing at `a4e3d592`.
+
+**Recommendation:** A. A consumer pinned before docs#30 keeps sweeping.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. AC-11 and its proof add that the maintenance skill and onboarding `knowledge` page lists do not include `conventions/repository-security.md`** | A checked guarantee | One more line in AC-11 |
+| **B. Leave it to the design text** | Nothing to add | An implementation could add the page and break older consumers |
+
+**Why this is yours:** It decides whether a design assumption is tested.
 
 ## Review Log
 
@@ -716,6 +779,7 @@ PROPOSAL: Add to AC-11 and its proof that the maintenance skill and the onboardi
 - [Dependabot alerts](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-alerts): repository administrators can enable alerts, and GitHub then generates the dependency graph and alerts. Read 2026-11-10.
 - [Dependabot security updates](https://docs.github.com/en/code-security/concepts/supply-chain-security/dependabot-security-updates): available where the dependency graph and alerts are enabled; when on, Dependabot tries to open a pull request for every open alert with a patch. Read 2026-11-10.
 - [Configuring default setup for code scanning](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/configure-code-scanning/configuring-default-setup-for-code-scanning): switching to default setup disables an existing CodeQL workflow file and blocks CodeQL analysis uploads. Read 2026-11-10.
-- [vhco-pro/docs#30, `conventions/repository-security.md` at 89d567a](https://github.com/vhco-pro/docs/blob/89d567a/conventions/repository-security.md): the proposed convention. Public repositories get the dependency graph, Dependabot alerts, secret scanning and push protection, plus CodeQL and Scorecard through reusable workflows in `vhco-pro/.github`. Private repositories get the dependency graph and Dependabot alerts, and reports list the rest as unavailable. Renovate repositories keep Dependabot security updates off; they are turned on only with a `.github/dependabot.yml` or `.github/dependabot.yaml` and no sign of Renovate (changed in `89d567a` for Q13). Open, not merged, read 2026-11-10.
+- [vhco-pro/docs#30, `conventions/repository-security.md` at 4b2198d](https://github.com/vhco-pro/docs/blob/4b2198d/conventions/repository-security.md): the proposed convention, written for the `michielvha` and `vhco-pro` accounts. Public repositories get the dependency graph, Dependabot alerts, secret scanning and push protection, plus CodeQL and Scorecard through reusable workflows in `vhco-pro/.github`. Private repositories get the dependency graph and Dependabot alerts, and reports list the rest as unavailable. Renovate repositories keep Dependabot security updates off; they are turned on only with a `.github/dependabot.yml` or `.github/dependabot.yaml` and no sign of Renovate (changed in `89d567a` for Q13). Open, not merged, read 2026-11-10.
+- [vhco-pro/docs#30, `guides/onboard-a-repository.md` at 4b2198d](https://github.com/vhco-pro/docs/blob/4b2198d/guides/onboard-a-repository.md): the onboarding commands; `GET vulnerability-alerts` returns 204 when alerts are on and 404 when off; "With the owner's agreement, turn on Dependabot alerts in every repository"; security updates only with `.github/dependabot.yml` or `.github/dependabot.yaml` and no sign of Renovate (since `106ecfb`). Open, not merged, read 2026-11-10.
 - [GitHub REST API description, `api.github.com.json`](https://github.com/github/rest-api-description/blob/main/descriptions/api.github.com/api.github.com.json): `GET /repos/{owner}/{repo}/vulnerability-alerts` answers 204 when alerts are enabled and 404 when not; `GET /repos/{owner}/{repo}/automated-security-fixes` answers 200 with `enabled` and `paused` booleans, or 404 when Dependabot is not enabled; the `security-and-analysis` schema includes `advanced_security` and `code_security`. Read 2026-11-10.
 - [Renovate configuration options](https://docs.renovatebot.com/configuration-options/): the documented config file locations, including a `renovate` section in `package.json`, and that `vulnerabilityAlerts` reads GitHub's alerts only when the dependency graph and Dependabot alerts are enabled. Read 2026-11-10.
