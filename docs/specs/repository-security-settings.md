@@ -773,6 +773,7 @@ None.
 | 2026-11-10 | R-11 | spec | `b0a2159` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-12 | spec | `12be951` | unknown | procedural | 4 findings: 1 should-fix, 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-13 | spec | `8286c54` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-14 | spec | `0aea08b` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1275,6 +1276,36 @@ SEVERITY: nit
 WHERE: Design (Procedure changes: coverage handoff) and AC-21
 EVIDENCE: `security-reconcile` treats a coverage handoff as tracked only when `owner` or `assignment_handoff` is set: `function tracked(f: FollowUp | null): boolean { return !!f && !!(f.owner || f.assignment_handoff); }` (`plugins/vh-adlc/scripts/maintenance/security.ts:117`). It pushes `coverage handoff pending` for an incomplete surface whose handoff is not tracked (`security.ts:143`). A handoff is `{ reference, owner, assignment_handoff, next_action }` (`security.ts:7`), supplied through `coverage_handoffs` rows `{repository, surface, handoff}` (`plugins/vh-adlc/scripts/maintenance/security-io.ts:75`). The Design says only that the skill "records a coverage handoff naming the next sweep". AC-21's proof expects "no such gap with one naming the next sweep". A handoff that names the next sweep only in `next_action`, with null `owner` and `assignment_handoff`, still produces the gap, so the skill text and the fixture can disagree.
 PROPOSAL: State the handoff's fields, for example `assignment_handoff` naming the next maintenance sweep and `next_action` re-collecting the surface. Make the AC-21 fixture and the skill instruction use exactly that shape.
+
+### R-14
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-11, AC-24) and Design (Helper)
+EVIDENCE: The R-13 fold added this to the Design (Helper): "When the binding fails or the committed settings are invalid, `security-settings-mode` exits nonzero naming the cause, and the skill handles that like a helper failure: it runs the helper in `check` with that cause as the mode reason and never runs `apply`." Q53 records the same decision. The AC-24 Test Plan row now checks "one that also commits `security_policy` gives `apply`; one whose `--default-commit` differs from `origin/<branch>` exits nonzero naming the cause". The AC-24 criterion text covers neither case. Its only failure case is "A `security_settings` value other than `apply` or `check` fails visibly". AC-11 lists the statements the maintenance skill, `references/loop.md` and `references/lifecycle.md` must carry. None of them says that a nonzero `security-settings-mode` exit selects `check` with the cause as the mode reason and never `apply`. Onboarding also calls the command (Design, Procedure changes), and the document does not say what onboarding does when the command fails. So an implementation can meet every criterion as written and still leave out the Q53 skill behaviour. A reviewer judging AC-24 by its text would also not require the two new fixtures.
+PROPOSAL: Add to AC-24 that a binding failure or invalid committed settings make `security-settings-mode` exit nonzero naming the cause, and that a committed `security_policy` key does not prevent `apply`. Add to AC-11 that the maintenance skill, `references/loop.md` and `references/lifecycle.md` state that such a failure leads to `check` with the cause as the mode reason and never to `apply`.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Helper; Procedure changes: mode function and authority row)
+EVIDENCE: The only writer is the helper's `apply`. The Design says `apply` "reads `security_settings_keep_off` from the committed, linked settings at `--default-commit` on `--default-branch`" and "fails visibly when that binding does not resolve". It does not say that `apply` checks whether those same committed settings adopt `security_settings: apply`, or whether they name the `--repository` target. Those checks are made only in `security-settings-mode`, and the skill text then decides which helper command to run. These rules are therefore enforced only by the skill: the authority row ("only when the consumer's committed settings adopt `security_settings: apply`"), Q48 (`not-in-committed-scope`), Q49 (onboarding "never runs ... the helper's `apply` on an in-session yes") and Q53 (a failed mode read "never runs `apply`"). The helper already holds the bound committed file. Even so, an agent that misreads the mode output, or that runs `apply` after an in-session yes, writes GitHub settings in a consumer that never opted in. AC-24 tests only the mode command, and no fixture runs `apply` against committed settings that do not adopt it.
+PROPOSAL: Make the helper's `apply` refuse every write, and report the entries as `check` would with a named reason, when the bound committed settings do not adopt `security_settings: apply` or do not name the target (the origin always counts). Add a fixture that runs `apply` against committed settings that do not adopt it and records no write.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Collector)
+EVIDENCE: The document says "The operations table in `references/maintenance-settings.md:103-123`". At `0aea08b`, `git show 0aea08b:plugins/vh-adlc/references/maintenance-settings.md | nl -ba` shows the header `| Operation | Inputs and result |` at line 103 and the last row, `adoption-preflight`, at line 124. Line 125 is blank.
+PROPOSAL: Cite `references/maintenance-settings.md:103-124`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter (covers) and AC-21
+EVIDENCE: AC-21 requires that "`security-reconcile` accepts that inventory and reports the gap `coverage handoff pending` ... unless the analysis records a coverage handoff". The Design cites the code that decides this: `tracked` at `plugins/vh-adlc/scripts/maintenance/security.ts:117` and the gap at `security.ts:143`. `covers` lists `security-io.ts`, `collect.ts`, `authority.ts` and other maintenance scripts, but not `plugins/vh-adlc/scripts/maintenance/security.ts`. The standard says `covers` "lists every path whose change can affect the feature".
+PROPOSAL: Add `plugins/vh-adlc/scripts/maintenance/security.ts` to `covers`.
 
 ## Sources
 
