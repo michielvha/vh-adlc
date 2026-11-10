@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Q37 and Q38 from spec review R-7 answered with every recommendation; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Spec review R-8 at ec05a26 returned 3 nits, none blocking. Its factual correction is applied; Q39 and Q40 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -73,7 +73,7 @@ These owner decisions widen the authority table. Today the only repository setti
 changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-7 found nothing blocking, and the owner answered their questions. Acceptance
+Reviews R-1 to R-8 found nothing blocking; R-8's questions Q39 and Q40 are open. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
 or onboarding need separate approval.
@@ -335,16 +335,16 @@ the first rule below that applies to it:
    only for rows that do not write; the "no signal, configured, off" row falls through to rules 7
    to 10.
 7. Already on: an entry read as on is `already-on`.
-
-An entry has one reason. Security updates read as on with `paused` true take reason `paused` in
-rule 6's "When on" cells and in rule 7, in place of `renovate-overlap` or no reason. Rule 5's
-`owner-choice-conflict` comes first, since rule 5 decides the entry before rule 6.
 8. Check mode (`check-only`): under `check`, an off and free entry is `not-changed`. This includes
    security updates the Renovate and Dependabot rules would enable, even while alerts are off.
 9. Alerts off (`alerts-off`): under `apply`, security updates are `not-changed` when alerts are not
    read back as on, and no write is made for them.
 10. Failed write (`api-error`): a write that fails, or a setting not read back as on, is
     `not-changed` with the status. The helper still processes the remaining settings.
+
+An entry has one reason. Security updates read as on with `paused` true take reason `paused` in
+rule 6's "When on" cells and in rule 7, in place of `renovate-overlap` or no reason. Rule 5's
+`owner-choice-conflict` comes first, since rule 5 decides the entry before rule 6.
 
 Rules 1 to 4 need no reading of the setting, or report that the read failed, so no entry claims a
 state the helper could not see.
@@ -652,7 +652,31 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q39: Does a failed detection lookup make the run fail when security updates are already on?
+
+From R-8 F-01: the detection-failed reasons exist only in the "When off" column, so when security updates are already on, a failed lookup gives `already-on` and exit 0, while the Q33 bullet says any failed detection exits 1.
+
+**Recommendation:** A. With the setting already on, nothing waited on the lookup, and the next sweep repeats it.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Reword the Q33 bullet: only an entry with a detection-failed reason makes the helper exit 1; an entry already on stays `already-on` with exit 0** | No change to the design | A missed `renovate-overlap` for that one sweep |
+| **B. The "When on" cell of the failed-lookup rows gets reason `detection-failed`, placed after `paused` and before `renovate-overlap` in the Q37 order, with exit 1** | Every failed lookup shows | A new reason and more exit 1 runs |
+
+**Why this is yours:** It sets what counts as a failed run.
+
+### Q40: Does the report test cover every owner-decision reason?
+
+From R-8 F-03: the AC-22 fixture holds only a `renovate-overlap` entry, so the report's cross-repository list could drop `paused` or `owner-choice-conflict` and still pass.
+
+**Recommendation:** A. The test then proves the whole list.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. The AC-22 fixtures add a `paused` and an `owner-choice-conflict` entry in different repositories, and the pass expects all three in the report's list** | Full proof of the aggregation | Two more fixture entries |
+| **B. Keep the single entry** | Smaller test | The aggregation is only partly proved |
+
+**Why this is yours:** It sets how much proof the report needs.
 
 ## Review Log
 
