@@ -363,8 +363,9 @@ scanner requirement or execution. A history supersession names every conflicting
 current `authority` evidence with result `supersedes-history`; timestamps alone are insufficient.
 
 Resume and report-candidate commits revalidate current packet/source/policy/evidence bindings. The
-run's own saved report is read for its revisions before the one being checked, so later appends do not
-invalidate an earlier result. Uncommitted history reports carry a `local:` provenance label. A typed
+report at the run's recorded path is read for its revisions before the one being checked, so later
+appends do not invalidate an earlier result. Its open alerts stay unresolved observations while none of
+those revisions exist. Uncommitted history reports carry a `local:` provenance label. A typed
 snapshot can never gain success from mutable report status text. Keep unresolved source/target,
 approval and capability handoffs explicit. Raw packet and operator receipts are procedural records,
 not execution attestations, signature verification or a new permission boundary.

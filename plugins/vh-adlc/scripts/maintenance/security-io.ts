@@ -103,9 +103,10 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
   const primary=inventory.repositories.find(r=>r.repository===config.repository),defaultBranch=primary?.identity?.default_branch??git(config.root,"symbolic-ref","--short","refs/remotes/origin/HEAD").replace(/^origin\//,"");
   const defaultCommit=git(config.root,"rev-parse",`refs/remotes/origin/${defaultBranch}`);
   const committed=readHistory(config,defaultCommit);
-  const history=[...committed.map(report=>({bytes:Buffer.from(report.text),entry:{sha256:report.digest},report:true,
-      provenance:report.provenance==="published"?`commit:${report.commit}:${report.path}:${report.digest}`:`local:${report.path}:${report.digest}`})),
-    ...v.list(packet.history).map(item=>{const file=reference(base,item);return{...file,report:false,provenance:`local:${file.entry.sha256}`};})];
+  const ownPath=readRun(config,id).state.report?.relative_path;
+  const history=[...committed.map(report=>{const label=report.provenance==="published"?`commit:${report.commit}:${report.path}`:`local:${report.path}`;
+      return{bytes:Buffer.from(report.text),entry:{sha256:report.digest},own:typeof ownPath==="string"&&report.path===ownPath,label,provenance:`${label}:${report.digest}`};}),
+    ...v.list(packet.history).map(item=>{const file=reference(base,item),label=`local:${file.entry.sha256}`;return{...file,own:false,label,provenance:label};})];
   // Verification replays the revisions that preceded the claimed one; later appends to this run's report are not its inputs.
   const earlier=(r:SecurityRevision)=>r.run_id!==id||options.before===undefined||r.snapshot_revision<options.before;
   // A copy of this run's report may repeat a revision the report itself supplies; the same digest is one revision, not a fork.
@@ -116,16 +117,17 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
     const markdown=file.bytes.toString(),found=readSecurityRevisions(markdown);
     // Older reports remain evidence of outstanding observations, never proof of their resolution.
     const legacy=parseObservation(markdown);
-    // This run's own saved report changes with every append, so it contributes only its earlier revisions.
-    if(file.report&&legacy?.run_id===id){add(found.filter(earlier));continue;}
-    historySeen.add(file.entry.sha256);provenance.push(file.provenance);
-    add(found);
-    if(!found.length && legacy)for(const observation of legacy.observations){
+    // This run's recorded report changes with every append, so it contributes only its earlier revisions
+    // and its observations are referenced by path rather than by a digest that a later append replaces.
+    const own=file.own&&legacy?.run_id===id,kept=own?found.filter(earlier):found;
+    if(!own){historySeen.add(file.entry.sha256);provenance.push(file.provenance);}
+    add(kept);
+    if(!kept.length && legacy)for(const observation of legacy.observations){
       if(observation.hostname!==input.hostname||!input.scope.repositories.includes(observation.repository))continue;
       for(const alert of observation.alerts??[]){const identity=`${observation.hostname}/${observation.repository}/${alert.identity}`;
         if(!input.observations.some(o=>o.id===identity))input.observations.push({id:identity,hostname:observation.hostname,repository:observation.repository,surface:observation.surface,provider_id:String(alert.number),provider_state:"unknown",target:{kind:"source",reference:null,platform:"unknown"},
           package:alert.package,ecosystem:null,version:null,location:alert.manifest,severity:alert.severity,advisory_ids:[],affected_range:null,fixed_versions:[],relationship:null,dependency_scope:null,rule:null,observed_at:observation.observed_at,
-          raw_digest:digest(canonicalJSON(alert)),raw_reference:`${file.provenance}#${alert.identity}`,complete:false,synthetic:false,reactivated:false});}
+          raw_digest:digest(canonicalJSON(alert)),raw_reference:`${own?file.label:file.provenance}#${alert.identity}`,complete:false,synthetic:false,reactivated:false});}
     }
   }
   const sameRun=revisions.filter(r=>r.run_id===id),chain=selectSecurityChain(sameRun);

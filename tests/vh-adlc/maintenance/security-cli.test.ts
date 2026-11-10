@@ -190,3 +190,27 @@ test("uncommitted history is labelled local and a failed resume names its securi
   expect(run.exitCode).toBe(1);
   expect(run.stderr.toString()).toContain("maintenance security verification failed: security reconciliation result changed or falsely reconciled");
 });
+test("an alert a checkout draft recorded stays open when a later collection of the same run omits it",async()=>{
+  const f=setup(),args=["--repo",f.root,"--run-id",f.run.header.run_id];f.write(".tools/request.json",JSON.stringify({authorized_sweep:true}));
+  const saved=reportResult(await main(["report",...args,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json")]));expect(saved.path.startsWith(join(f.root,f.config.history_dir)+"/")).toBe(true);
+  const repo=f.inventory.repositories[0],later={...f.inventory,repositories:[{...repo,dependabot:{coverage:{...repo.dependabot.coverage,count:0},alerts:[]}}]};
+  f.write(".tools/inventory2.json",JSON.stringify(later));f.packet.inventory={path:"inventory2.json",sha256:digest(readFileSync(join(f.root,".tools/inventory2.json")))};f.save();
+  const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
+  expect(result.revision.snapshot).toMatchObject({accounting_state:"pending",open_remediation_count:1});
+  expect(result.revision.snapshot.input.observations.find(o=>o.provider_id==="1")).toMatchObject({provider_state:"unknown",raw_reference:`local:${f.config.history_dir}/${saved.path.split("/").pop()}#dependabot:1`});
+  f.write(".tools/update.json",JSON.stringify({expected_digest:digest(readFileSync(saved.path)),step_id:randomUUID(),at:new Date().toISOString(),append:"Later collection recorded."}));
+  await main(["append",...args,"--update",join(f.root,".tools/update.json")]);
+  expect(verifySecurityResult(f.config,f.run.header.run_id,result)).toEqual(result);
+  await main(["resume",...args]);
+});
+test("another history file that names the run keeps its provenance and its revisions",async()=>{
+  const f=setup(),{args,saved}=await checkoutDraft(f),[applied]=readSecurityRevisions(readFileSync(saved.path,"utf8"));
+  const forked=createSecurityRevision(reconcileSecurity({...applied.snapshot.input,evaluated_at:new Date(Date.parse(applied.snapshot.input.evaluated_at)+1000).toISOString()}));
+  const markdown=readFileSync(saved.path,"utf8").replace(/```maintenance-security-v1\n[\s\S]*?\n```/,'```maintenance-security-v1\n'+JSON.stringify(forked,null,2)+'\n```');
+  expect(readSecurityRevisions(markdown)[0].digest).toBe(forked.digest);
+  f.write(f.config.history_dir+"/fork.md",markdown);
+  await expect(main(["resume",...args])).rejects.toThrow("maintenance security verification failed");
+  const next=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
+  expect(next.revision.snapshot.input.history_gaps).toContain("forked snapshot revision");
+  expect(next.revision.snapshot.input.history_provenance).toContain(`local:${f.config.history_dir}/fork.md:${digest(markdown)}`);
+});
