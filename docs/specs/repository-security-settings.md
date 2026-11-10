@@ -956,6 +956,7 @@ None.
 | 2026-11-10 | R-31 | spec | `cfa455e` | unknown | procedural | 1 finding: 1 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-32 | spec | `202642a` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-33 | spec | `20498af` | unknown | procedural | 2 findings: 1 should-fix, 1 nit, none blocking; model identity not attested |
+| 2026-11-10 | R-34 | spec | `07b95a5` | unknown | procedural | 4 findings: 1 should-fix, 3 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1855,6 +1856,36 @@ SEVERITY: nit
 WHERE: Design (Renovate and Dependabot detection)
 EVIDENCE: Line 503 says "Renovate has no signal only when every Renovate lookup succeeded and none matched. Any failed Renovate lookup with no match elsewhere counts as failed, as does a failed Dependabot config lookup." For setting reads, rule 4 explicitly excludes "the 404 that means off". The document never says what counts as a successful lookup with no match. On GitHub, the contents API answers 404 for an absent file, and R-1's evidence (line 979 region) records "the contents API returned 404 for every Renovate config location" on bg-remove. If an implementation treats that 404 as a failed lookup, every repository without a Renovate config file gets `renovate-detection-failed` and exit 1, and security updates are never enabled. The fixtures leave the fake's response for an absent file to the implementer, so a fake that answers absent files differently would let AC-03 and AC-08 pass anyway. AC-12's live run also misses this, because bg-remove matches on its `app/renovate` pull requests first. The document also does not say that "the default branch" for these lookups is the target repository's own `default_branch` from `repos/{r}`, not the helper's `--default-branch`, which binds the consumer checkout.
 PROPOSAL: State that a 404 from a config-file lookup on the target's default branch means the file is absent, and counts as a successful lookup with no match. Add that the AC-03 and AC-08 fakes answer absent files with 404, as GitHub does.
+
+### R-34
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Renovate and Dependabot detection) and Test Plan (AC-01, AC-03, AC-04 and AC-02, AC-08 rows)
+EVIDENCE: The Q81 fold (line 506 at 07b95a5) says: "The default branch for these lookups is the target repository's own `default_branch` from `repos/{r}`, not the helper's `--default-branch`, which binds the consumer checkout. A 404 from a config-file lookup there means the file is absent." No criterion or fixture checks which ref the lookups use. Every helper fixture in rows 889 to 912 is a single repository whose default branch is never named. In those fixtures the consumer's `--default-branch` and the target's `default_branch` are the same, or the fake ignores `ref`. Suppose an implementation passes `ref=<--default-branch>`, and a non-origin target's default branch differs, for example `master` with a `.github/dependabot.yml`. GitHub then answers 404 for every config-file lookup. Under the new rule that 404 means absent, so the entry is `left-off` with `renovate-unknown` and exit 0. The report shows a deliberate choice, but Dependabot security updates were never enabled where Dependabot is the updater, which the goal and AC-03 require. A Renovate config file on that branch would also be missed. Every listed fixture still passes.
+PROPOSAL: Add a helper fixture whose target default branch (for example `master`, holding `.github/dependabot.yml`) differs from the `--default-branch` passed, with a fake that answers a contents lookup on any other ref with 404. It passes when security updates are `enabled`. Alternatively, have the fake reject any contents lookup whose `ref` is not the target's `default_branch`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan (AC-08)
+EVIDENCE: Since Q81, a 404 from a config-file lookup counts as a successful lookup with no match (line 506 to 509). The AC-08 row (line 894) still describes its fixtures only as "every Renovate lookup fails", "only the `renovate.json` lookup fails" and "the `.github/dependabot.yml` lookup fails", with no status. The fake described in line 889 "answers a lookup of an absent file with 404". If a fixture makes a lookup "fail" with 404, the Design requires no signal, not the `renovate-detection-failed` or `dependabot-detection-failed` outcome that the row expects. The row and the Design then contradict each other, and the outcome depends on which status the implementer picks.
+PROPOSAL: State the failing status in the AC-08 fixtures, for example 500 or a network error, and say that a 404 is not a failure for these lookups.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria (AC-24) and Test Plan (AC-24, AC-27)
+EVIDENCE: The Q81 fold added "or when the maintenance settings' `hostname` is not github.com" to AC-24's list of `check` conditions (line 850). AC-24's Test Plan row (line 907) has no fixture for that condition, and the words "hostname", "github.com" and "ghe." do not appear in it. The only `not-github-com` mode fixture is in the AC-27 row (line 909), whose first column names only AC-27. AC-24 is a composite criterion, and a passing subset never upgrades one. An implementation reviewer who works from AC-24's own row would find no check for this new clause.
+PROPOSAL: Add AC-24 to the first column of the AC-27 row, or add a sentence to the AC-24 row naming the AC-27 `security-settings-mode` fixture that prints `check` with `not-github-com`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria (preamble, AC-01, AC-03 to AC-05, AC-09, AC-13)
+EVIDENCE: The preamble (line 686) says: "Each criterion covers the entries no earlier rule under 'Rules applied before any write' decides, with every read and write succeeding, unless it names another case." The helper's `apply` refusals are mode reasons, not numbered rules: `not-github-com`, `not-adopted`, `not-in-committed-scope` and the run restrictions (Design, Helper: "These are mode reasons, not entry reasons"). AC-01 (line 689) reads "After `apply` on an unarchived repository where the caller is admin, Dependabot alerts are off ... the output lists `dependabot_alerts` as `enabled`" with no host or adoption condition. AC-27 says that on another host "the helper's `apply` makes no write", and AC-24 says it makes no write when the committed settings do not adopt it. Read literally, AC-01 and the other write criteria claim writes in exactly the cases that AC-24 and AC-27 forbid.
+PROPOSAL: Extend the preamble to say that criteria about `apply` also assume no mode reason refuses it, that is github.com, committed adoption naming the target, and no restricting run.
 
 ## Sources
 
