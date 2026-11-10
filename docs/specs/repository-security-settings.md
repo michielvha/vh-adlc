@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Implementation claimed on feat/repository-security-settings; vhco-pro/docs#30 merged at d8f07c9."
+status: complete
+status_description: "Implemented on feat/repository-security-settings and reviewed clean in R-37; waits for a ship request."
 branch: feat/repository-security-settings
 issue: null
 goal: "Every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each github.com repository its committed settings name and except what its keep-off list names, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
