@@ -2,6 +2,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { delimiter, join, resolve } from "node:path";
 import { fixture, git } from "../maintenance/fixtures";
+import { loadSettings } from "../../../plugins/vh-adlc/scripts/maintenance/settings";
+import { appendRun, createRun, type RunScope } from "../../../plugins/vh-adlc/scripts/maintenance/journal";
 import { handle, state, type Call, type FakeState } from "./fake-gh";
 import { securitySettings, type Output } from "../../../plugins/vh-adlc/scripts/security-settings/security-settings";
 
@@ -10,15 +12,16 @@ export const cli = resolve(import.meta.dir, "../../../plugins/vh-adlc/scripts/se
 const projects: ReturnType<typeof fixture>[] = [], scratch: string[] = [];
 export function dispose() { for (const f of projects.splice(0)) f.dispose(); for (const dir of scratch.splice(0)) rmSync(dir, { recursive: true, force: true }); }
 
-export type Setup = { settings?: Record<string, unknown> | null; link?: boolean; host?: string };
+export type Setup = { settings?: Record<string, unknown> | null; link?: boolean; host?: string; agentsOnly?: boolean };
 /** A consumer checkout whose committed, linked default-branch settings are `settings`, and a fake GitHub. */
 export function setup(fakeState: Partial<FakeState> = {}, options: Setup = {}) {
   const f = fixture(); projects.push(f);
   if (options.host) git(f.root, "remote", "set-url", "origin", `https://${options.host}/example/project.git`);
   if (options.settings !== null) {
     f.write("AGENTS.md", options.link === false ? "No maintenance settings link here.\n" : "Use [maintenance settings](.vh-adlc/maintenance.yaml).\n");
+    if (options.agentsOnly) { git(f.root, "add", "AGENTS.md"); git(f.root, "commit", "-qm", "docs: link maintenance settings"); }
     f.settings({ schema_version: 1, ...(options.settings ?? { security_settings: "apply" }) });
-    git(f.root, "add", "-A"); git(f.root, "commit", "-qm", "docs: maintenance settings");
+    if (!options.agentsOnly) { git(f.root, "add", "-A"); git(f.root, "commit", "-qm", "docs: maintenance settings"); }
   }
   const commit = git(f.root, "rev-parse", "HEAD");
   git(f.root, "update-ref", "refs/remotes/origin/main", commit);
@@ -52,4 +55,11 @@ export function cliRun(f: ReturnType<typeof setup>, args: string[], env: Record<
     env: { ...process.env, ...env, PATH: shim + delimiter + process.env.PATH, SECURITY_SETTINGS_FIXTURE: path } });
   const calls = readFileSync(path + ".calls", "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line) as Call & { gh_host: string | null });
   return { code: result.exitCode, stdout: result.stdout.toString(), stderr: result.stderr.toString(), calls };
+}
+
+/** Records a maintenance run for the checkout, with an optional request, as a sweep's `start` would. */
+export function recordRun(root: string, request: Record<string, unknown> | null, scope?: RunScope) {
+  const config = loadSettings(root), created = createRun(config, scope ? { scope } : {});
+  if (request) appendRun(config, created.header.run_id, created, { ...created.state, request: request as never });
+  return created.header.run_id;
 }
