@@ -759,6 +759,7 @@ None.
 | 2026-11-10 | R-10 | spec | `0c85c0b` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-11 | spec | `b0a2159` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-12 | spec | `12be951` | unknown | procedural | 4 findings: 1 should-fix, 3 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-13 | spec | `8286c54` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1238,6 +1239,29 @@ SEVERITY: nit
 WHERE: Context (Owner summary)
 EVIDENCE: The summary says that, with the committed opt-in, "it turns these on when off in every repository the sweep covers, except what the keep-off list names." The run's scope comes from the working tree's `repositories` (`plugins/vh-adlc/scripts/maintenance/cli.ts:68`). The Design (Settings, Q48) says "A repository in the working tree's scope that the committed settings do not name gets `check`", with reason `not-in-committed-scope`. The summary leaves out that limit.
 PROPOSAL: Reword the sentence to say it turns them on in every repository the sweep covers that the committed settings name, apart from the origin repository, which always counts as named, and except what the keep-off list names.
+
+### R-13
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Collector; Rules applied before any write, rule 10) and AC-21, AC-23
+EVIDENCE: The Collector section says "When a file lists `dependabot_alerts` as `enabled` for a repository, the collector records that repository's Dependabot surface as incomplete with reason `alerts-enabled-this-run`". `helper-receipt-missing` applies only to a repository "without an accepted helper file". Rule 10 says "a write that fails is `not-changed` with its status". It also says "A write that succeeds but whose setting is not read back as on is `not-changed` with the write's status and the detail 'not on after write'". So a valid helper file can record `dependabot_alerts` as `not-changed` after a `PUT vulnerability-alerts` that GitHub accepted. Two examples are a 204 followed by a lagging 404 read-back, and a write that timed out but took effect. For that repository, `collect` reads the now-enabled alerts endpoint through `alertSurface` (`plugins/vh-adlc/scripts/maintenance/collect.ts:108-115`). It records the surface `complete` with whatever partial count it gets, and `security-reconcile` raises a coverage gap only for an incomplete surface (`plugins/vh-adlc/scripts/maintenance/security.ts:143`). The Background records 47 alerts listed "about 20 seconds later" after the PUT, so a partial list just after a write is the observed behaviour. This is the coverage gap the feature exists to close.
+PROPOSAL: Have `collect` record the Dependabot surface as incomplete whenever the helper file shows that an alerts write was attempted. That covers `enabled`, and `not-changed` with `api-error` after a write. Add an AC-21 or AC-23 fixture where the PUT returns 204, the read-back returns 404 and the alerts endpoint then returns a partial list.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Procedure changes: mode function; Settings) and AC-24
+EVIDENCE: `security-settings-mode` reads "the committed settings through the same binding as `resolveStanding`", and the helper's `apply` "fails visibly when that binding does not resolve". That binding throws when `refs/remotes/origin/<branch>` differs from the given commit (`plugins/vh-adlc/scripts/maintenance/authority.ts:92`). It treats a committed file holding any key outside its fixed list as invalid (`authority.ts:100-101`, `:111`). That list lacks `security_policy`, which `plugins/vh-adlc/scripts/maintenance/settings.ts:71` accepts, and the Design adds only the two new keys. Because of Q51 the mode read cannot simply reuse `resolveStanding`'s result, so it needs its own validation. The document does not say which key list that validation uses. It also does not say what the mode command prints, or what the skill then does, when the binding throws or the committed settings are invalid. One example is a consumer that committed both `security_policy` and `security_settings: apply`. AC-24 covers only a `security_settings` value other than `apply` or `check`.
+PROPOSAL: Say which key list the mode read validates against. State that a binding failure or invalid committed settings gives `check` with a named reason, or a visible failure that the skill handles like a helper failure without running `apply`. Add an AC-24 fixture for that case.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Procedure changes: coverage handoff) and AC-21
+EVIDENCE: `security-reconcile` treats a coverage handoff as tracked only when `owner` or `assignment_handoff` is set: `function tracked(f: FollowUp | null): boolean { return !!f && !!(f.owner || f.assignment_handoff); }` (`plugins/vh-adlc/scripts/maintenance/security.ts:117`). It pushes `coverage handoff pending` for an incomplete surface whose handoff is not tracked (`security.ts:143`). A handoff is `{ reference, owner, assignment_handoff, next_action }` (`security.ts:7`), supplied through `coverage_handoffs` rows `{repository, surface, handoff}` (`plugins/vh-adlc/scripts/maintenance/security-io.ts:75`). The Design says only that the skill "records a coverage handoff naming the next sweep". AC-21's proof expects "no such gap with one naming the next sweep". A handoff that names the next sweep only in `next_action`, with null `owner` and `assignment_handoff`, still produces the gap, so the skill text and the fixture can disagree.
+PROPOSAL: State the handoff's fields, for example `assignment_handoff` naming the next maintenance sweep and `next_action` re-collecting the surface. Make the AC-21 fixture and the skill instruction use exactly that shape.
 
 ## Sources
 
