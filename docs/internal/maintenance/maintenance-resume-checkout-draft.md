@@ -67,6 +67,14 @@ WHERE: plugins/vh-adlc/scripts/maintenance/security-io.ts:113 (`add`); record De
 EVIDENCE: The Definition says "Identical same-run revisions from the report and a copy count once" and "Any other file that names the run keeps its provenance and all its revisions". The `add` helper is wider than that. It skips every same-run revision whose digest is already present, whichever file supplied it, so it also applies to two ordinary history files. I ran a throwaway probe from the test file's `setup()` fixture. It saved a private draft (read_only request) holding revision 1, wrote two copies of it to the history directory (`copy1.md`, and `copy2.md` with one extra newline), then ran `security-reconcile`. At base 07217be the result had `history_gaps` `["forked snapshot revision"]`. At target b8f0f89 it had `history_gaps` `[]`. Both results had snapshot_revision 2 and accounting `pending`. Duplicates of a same-run revision in files other than the run's report therefore no longer produce a gap. The Definition and the R-1 response do not disclose this behavior change, and no test covers it. The identical content is not a real fork, so this is not a safety regression, but the code now departs from the Definition, which is the review baseline.
 PROPOSAL: Limit the digest dedupe to revisions that the run's own report supplies, matching the Definition. Alternatively, amend the Definition and maintenance.md to say that identical same-run revisions from any history source count once, and add a test for two non-own files.
 
+### R-3
+
+Target: `00cf14e` on `fix/maintenance-resume-checkout-draft`
+Model: claude-opus-4.8 (reported by the reviewer; no model was requested)
+Isolation: procedural
+
+NO FINDINGS
+
 ## State
 
-Review pending.
+Locally complete. R-3 has no findings. Nothing is pushed; publishing and closing #68 need the owner's request. Receipts computed before this repair that include uncommitted history entries carry the old `commit:undefined` label and no longer verify, so those runs need a fresh `security-reconcile`.
