@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/app"
@@ -44,6 +45,8 @@ func openProfile(c config.Config) (*profile.Held, profile.Meta, string, error) {
 	if m, err := profile.ReadMeta(c.ProfileHome, c.Profile); err == nil && !ownerMatches(m, owner, c.Transport) {
 		return nil, none, "", errOwnerMismatch
 	}
+	_, statErr := os.Lstat(filepath.Join(c.ProfileHome, c.Profile))
+	created := os.IsNotExist(statErr)
 	held, err := profile.Acquire(c.ProfileHome, c.Profile)
 	if err != nil {
 		return nil, none, "", err
@@ -66,9 +69,7 @@ func openProfile(c config.Config) (*profile.Held, profile.Meta, string, error) {
 		recovery = "cleared-stale-holder " + m.HolderID
 		m.HolderID, m.HolderGuard = "", nil
 	}
-	if err = held.SaveMeta(m); err == nil {
-		err = browserCheck(c.Home, held)
-	}
+	err = browserCheck(c.Home, held)
 	if err == nil {
 		var installed int
 		if installed, err = profile.InstalledMajor(app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser")); err == nil {
@@ -77,8 +78,17 @@ func openProfile(c config.Config) (*profile.Held, profile.Meta, string, error) {
 			}
 		}
 	}
+	// A new profile's metadata, and with it the owner binding, is written only
+	// once every refusal has passed; a refused first start leaves nothing.
+	if err == nil {
+		err = held.SaveMeta(m)
+	}
 	if err != nil {
-		held.Release()
+		if created && !exists {
+			_ = held.Remove()
+		} else {
+			held.Release()
+		}
 		return nil, none, "", err
 	}
 	return held, m, recovery, nil
