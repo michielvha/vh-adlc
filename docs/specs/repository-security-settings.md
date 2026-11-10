@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-34 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "R-35 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each github.com repository its committed settings name and except what its keep-off list names, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -74,7 +74,7 @@ then moves both docs pins with a minor version bump.
 This widens the authority table; today vh-adlc changes only merged-branch deletion.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-34 found nothing blocking; later findings were folded with each
+Reviews R-1 to R-35 found nothing blocking; later findings were folded with each
 recommendation, as the owner instructed. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
@@ -286,6 +286,9 @@ Owner decisions on 2026-11-10:
 - Q82, from spec review R-34, taken with the reviewer's proposals under that instruction: a fixture
   whose target default branch differs from `--default-branch`; AC-08 failures use 500; the AC-27
   row also proves AC-24's host clause; the criteria preamble assumes no mode reason refuses `apply`.
+- Q83, from spec review R-35, taken with the reviewer's proposals under that instruction: the
+  detection lookups name their REST endpoints and match `renovate[bot]` through `normalizeLogin`,
+  and the AC-02 fake returns that shape; the AC-08 row limits the 404 rule to config files.
 
 ## Scope
 
@@ -502,6 +505,14 @@ authored by `app/renovate`; or an open issue authored by `app/renovate` whose ti
 "Dependency Dashboard". The output names the matched path, pull request or issue. Detection
 looks only for the managed Renovate App's `app/renovate` login and does not read the sweep's
 `bot_authors` setting.
+
+The lookups are `GET repos/{r}/contents/{path}?ref=<default_branch>` for each config location;
+`GET repos/{r}/pulls?state=all&per_page=100` with `--paginate` for pull requests; and
+`GET repos/{r}/issues?state=open&per_page=100` with `--paginate` for issues, skipping entries that
+carry `pull_request`. REST returns the App's login as `renovate[bot]` with `user.type` `Bot`
+(`gh api 'repos/michielvha/bg-remove/pulls?state=all'` on 2026-11-10 gave `renovate[bot]` for
+#24 to #26), so an author matches when `user.type` is `Bot` and `normalizeLogin`
+(`plugins/vh-adlc/scripts/maintenance/settings.ts:51-52`) maps its login to `renovate`.
 
 Dependabot is configured when `.github/dependabot.yml` or `.github/dependabot.yaml` exists on the
 default branch.
@@ -892,11 +903,11 @@ and name the target, and no recorded run restricts it.
 | Criterion | Proof |
 | --- | --- |
 | AC-01, AC-03, AC-04 | `bun test tests/vh-adlc/security-settings` with a fake `gh` that records every call, keeps settings state, and denies admin-only reads, rejects a security-updates write while alerts are off and answers a lookup of an absent file with 404, as GitHub does. Fixture: public repository, admin, every setting off, `.github/dependabot.yml`, no Renovate. Pass: the four settings written once, read back on and reported `enabled`, and no `code-scanning` call recorded. A second fixture with no `dependabot.yml` passes when security updates are `left-off` with `renovate-unknown` and no `automated-security-fixes` write was recorded. A third fixture identical to the first but with only `.github/dependabot.yaml` passes when security updates are `enabled`. A fourth fixture is a target whose `default_branch` is `master`, holding `.github/dependabot.yml`, run with `--default-branch main`, against a fake that answers a contents lookup on any ref other than the target's `default_branch` with 404; it passes when security updates are `enabled`. |
-| AC-02 | Same suite, one fixture per documented config location, one with a `renovate` key in `package.json`, one with only an `app/renovate` pull request, and one with only an open Dependency Dashboard issue. Pass: no write to `automated-security-fixes`, entry `left-off` with `renovate-present` and the matched evidence. |
+| AC-02 | Same suite, one fixture per documented config location, one with a `renovate` key in `package.json`, one with only an `app/renovate` pull request, and one with only an open Dependency Dashboard issue. The fake returns those authors in the REST shape, `user.login` `renovate[bot]` with `user.type` `Bot`. Pass: no write to `automated-security-fixes`, entry `left-off` with `renovate-present` and the matched evidence. |
 | AC-05 | Same suite, fixtures: private repository, internal repository and archived public repository, each with every setting off. `security_and_analysis` is null in the private and internal fixtures, and a third private fixture shows `code_security` enabled. Pass: the private and internal runs record writes only to `vulnerability-alerts` and `automated-security-fixes`, `dependabot_alerts` is read back and `enabled`, and secret scanning, push protection and `code_scanning` are `unavailable` with `not-free-on-private`; the third has no `code_scanning` entry; the archived run records no writes and every entry is `unavailable` with `archived`. |
 | AC-06 | Same suite, unarchived public fixture with `permissions.admin: false` run with `apply`, and the first fixture run with `check`. Pass: zero write calls in both and no admin-only read in the first; entries `unknown` with `needs-admin`, or `not-changed` with `check-only`; exit code 1. |
 | AC-07 | Same suite: a second `apply` on the first fixture's resulting state, after a first run that exited 0, records no writes and reports only `already-on`, `left-off` or `unavailable`. A further fixture whose first run has a failed Renovate lookup: that run exits 1. Across every fixture, no recorded write has a body or endpoint that disables a setting. |
-| AC-08 | Same suite, public admin fixtures with security updates off and `.github/dependabot.yml`: every Renovate lookup fails with 500; only the `renovate.json` lookup fails with 500 and the others match nothing; every Renovate lookup succeeds without a match and the `.github/dependabot.yml` lookup fails with 500. A 404 is not a failure for these lookups. Pass: no write to `automated-security-fixes` in any; the first two give `left-off` with `renovate-detection-failed` and the error, the third `left-off` with `dependabot-detection-failed` and the error; exit code 1 in all three. |
+| AC-08 | Same suite, public admin fixtures with security updates off and `.github/dependabot.yml`: every Renovate lookup fails with 500; only the `renovate.json` lookup fails with 500 and the others match nothing; every Renovate lookup succeeds without a match and the `.github/dependabot.yml` lookup fails with 500. A 404 from a config-file lookup is not a failure. Pass: no write to `automated-security-fixes` in any; the first two give `left-off` with `renovate-detection-failed` and the error, the third `left-off` with `dependabot-detection-failed` and the error; exit code 1 in all three. |
 | AC-09 | Same suite, fixture where the `PATCH repos/{r}` write returns 422. Pass: secret scanning entries `not-changed` with `api-error` and 422, other settings still `enabled`, exit code 1. A second fixture where `PUT automated-security-fixes` returns 204 but the read-back gives `{"enabled":false,"paused":false}`. Pass: security updates `not-changed` with `api-error`, 204 and "not on after write", exit code 1. |
 | AC-10 | Same suite: run the first fixture and the AC-14 fixture with both formats. Pass: the Markdown section has one row per JSON entry with the same state and reason, and its owner decisions list holds exactly the JSON entries with `renovate-overlap`, `owner-choice-conflict` or `paused`, or "None." |
 | AC-11, AC-20 | The reviewer reads the eight files, `docs/reference/compatibility.md`, `AGENTS.md`, `plugins/vh-adlc/knowledge.md` and both `plugin.json` files at the implementation commit, confirms each listed rule is stated, the maintenance skill's and onboarding's `knowledge` page lists omit `conventions/repository-security.md`, the merged-branch deletion rule is unchanged, both pins name the docs#30 merge revision and both versions match a minor bump, then runs `vh-adlc knowledge --page conventions/repository-security.md` with the new plugin pin. Pass: the page resolves. |
