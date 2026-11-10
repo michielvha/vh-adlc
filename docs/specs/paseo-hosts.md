@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-2 factual findings applied; Q1 on the Windows clipboard is open; a new spec review is needed."
+status_description: "R-2 findings applied; no questions open; a new spec review is needed."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
 covers:
@@ -27,11 +27,11 @@ The owner runs Paseo daemons on Linux servers and uses them from the Paseo deskt
 
 This feature rebuilds it as a Go CLI in a new `paseo-hosts` plugin in the vhco-tools marketplace, like remote-gui, except that the first build on a machine downloads two Go libraries through Go's module proxy, checked against the committed `go.sum`. Asked to add a server, the skill runs `onboard` and `link`. `onboard` installs a password-protected daemon reachable only over SSH, relay off. `link` gives a macOS or Windows desktop a key that opens only the daemon tunnel and adds the server to its Paseo app with no manual step. `unlink` takes one desktop off a server, or with `--server-only` revokes one that is gone. `remove` unlinks every desktop and deletes the daemon service, its config and the local password, keeping the server's Paseo state and workspace unless `--purge` is given. Settings come from environment variables and flags; plaintext passwords stay on the operator host and in each app.
 
-Excluded: phones, the web UI, the Linux app, relay pairing, installing agent CLIs and the operator host's own daemon. New servers use port 6767; existing registry files keep theirs. Adding the logger to the Go convention is a separate docs change.
+Excluded: phones, the web UI, the Linux app, relay pairing, installing agent CLIs and the operator host's own daemon. New servers use port 6767; existing registry files keep theirs.
 
 Side effects: `link`, `unlink` and `remove` restart the desktop app twice, briefly open its debugging port on loopback, and keep a backup of its host list, which holds passwords, in the registry directory. A rejected change restores the old list. Windows needs OpenSSH Server and a signed-in user.
 
-Planned checks: Go tests against SSH and DevTools stand-ins, CI lint and race checks, a CI build from an installed copy with an empty module cache, and a manual run on a real server, Mac, Windows PC and fresh agent session. Nothing is implemented and Windows is unmeasured. R-1's two blocking gaps are fixed; R-2 found none, its factual findings are applied, and one question on the Windows clipboard is open.
+Planned checks: Go tests against SSH and DevTools stand-ins, CI lint and race checks, a CI build from an installed copy with an empty module cache, and a manual run on a real server, Mac, Windows PC and fresh agent session. Nothing is implemented and Windows is unmeasured. R-1's two blocking gaps are fixed; R-2 found none and its findings are applied.
 
 Acceptance authorizes implementing on a feature branch through the vh-adlc gates; finishing waits on the logger PR being merged and tagged. Opening a PR, merging, merging the logger PR and touching real servers or desktops in tests need separate approval.
 
@@ -74,7 +74,7 @@ Repository and convention facts:
 
 The owner made these decisions in the session that produced the local tool: servers default to SSH-only with the relay off, and HTTPS publication is an opt-in for phones and browsers; plaintext passwords stay on the operator host; linking the desktop app needs no manual step.
 
-The owner decided on 2026-11-10, in answer to this document's first questions: the CLI is written in Go, the repository's established pattern, and logs through `michielvha/logger`; Windows is the second client platform; removing a server is in the first version; new servers use Paseo's default port 6767, which the owner left to the recommendation; the feature is tracked in issue #71; the handoff note files are dropped in favour of `status`; and `link` keeps the app host-list backup after success. Later the same day the owner decided that the wrapper builds the binary on the operator host as remote-gui does, that the DevTools step uses `github.com/coder/websocket`, and that `remove` keeps the server's Paseo state and workspace unless `--purge` is given. After review R-1 the owner chose, on 2026-11-10: send logs to standard error by extending `michielvha/logger` with a writer option (draft PR michielvha/logger#8); desktops reach a server by its tailnet name, else the `ssh -G` host name, with `--client-host` to override; rollback is proven live through fault injection that only a `paseotest` build honours; an unsupported client exits 4; and the skill uses the default registry directory and asks only for a missing client alias. The owner also chose to let the build download its dependencies through Go's module proxy rather than commit a `vendor/` directory.
+The owner decided on 2026-11-10, in answer to this document's first questions: the CLI is written in Go, the repository's established pattern, and logs through `michielvha/logger`; Windows is the second client platform; removing a server is in the first version; new servers use Paseo's default port 6767, which the owner left to the recommendation; the feature is tracked in issue #71; the handoff note files are dropped in favour of `status`; and `link` keeps the app host-list backup after success. Later the same day the owner decided that the wrapper builds the binary on the operator host as remote-gui does, that the DevTools step uses `github.com/coder/websocket`, and that `remove` keeps the server's Paseo state and workspace unless `--purge` is given. After review R-1 the owner chose, on 2026-11-10: send logs to standard error by extending `michielvha/logger` with a writer option (draft PR michielvha/logger#8); desktops reach a server by its tailnet name, else the `ssh -G` host name, with `--client-host` to override; rollback is proven live through fault injection that only a `paseotest` build honours; an unsupported client exits 4; and the skill uses the default registry directory and asks only for a missing client alias. After R-2 the owner set the rule that every path runs unattended, so `link --no-app` sets up SSH access only and puts no password on a clipboard for a manual entry. The owner also chose to let the build download its dependencies through Go's module proxy rather than commit a `vendor/` directory.
 
 ## Scope
 
@@ -172,7 +172,7 @@ Before any change, the CLI probes the client over SSH. It runs `uname -s`; `Darw
 2. On the server, back up `~/.ssh/authorized_keys`, remove any line with that key, and append `restrict,port-forwarding,permitopen="127.0.0.1:<port>",command="/bin/false" <key> paseo-hosts:<client>`, whose comment names the client. `restrict` alone still allows commands, so the forced command stays.
 3. Write those host keys to the client's `known_hosts` as plain entries for `PASEO_CLIENT_HOST`, as `[host]:port` when `PASEO_CLIENT_PORT` is not 22, replacing earlier entries for that name. Then write a `paseo-<alias>` block between `# BEGIN paseo-hosts paseo-<alias>` and `# END paseo-hosts paseo-<alias>` markers in the client's SSH config, replacing an earlier block or one with the local tool's `paseo-host` markers, with `IdentitiesOnly yes` and `StrictHostKeyChecking yes`. On Windows these files are in `%USERPROFILE%\.ssh`, and the CLI keeps the private key readable only by the user, as Windows OpenSSH requires.
 4. From the client, check that the tunnel returns HTTP 200 from `/api/health` and that a shell command is refused.
-5. Add the server to the desktop app unless `--no-app` is given, as described below, and add the client to `PASEO_CLIENTS`. With `--no-app`, copy the password to the client clipboard (`pbcopy` or `Set-Clipboard`) and print the Remote SSH values for a manual entry.
+5. Add the server to the desktop app unless `--no-app` is given, as described below, and add the client to `PASEO_CLIENTS`. With `--no-app`, `link` sets up SSH access only: it leaves the app and the clipboard alone and prints no password, and a later `link` without `--no-app` adds the app entry unattended.
 
 `status <alias>` prints the facts the local tool's handoff notes held: the server, exposure, port, Remote SSH value per linked client, and agent CLIs. The plugin writes no handoff files.
 
@@ -195,7 +195,7 @@ The client app stores the password in its own local storage, as it does for a ho
 
 `unlink <alias> --client <client>` takes one client off a server:
 
-1. Delete the server's entry from the client's desktop app with the same probe, quit, debug, write, verify and relaunch steps as `link`, keeping every other host.
+1. Delete the server's entry from the client's desktop app with the same probe, quit, debug, write, verify and relaunch steps as `link`, keeping every other host. When the probe finds no Paseo app on the client, skip this step.
 2. Delete the `paseo-<alias>` block from the client's SSH config, including one with the local tool's `paseo-host` markers. The client key stays, since other servers use it.
 3. Delete the key's line from the server's `authorized_keys` and drop the client from `PASEO_CLIENTS`.
 
@@ -229,6 +229,7 @@ Both catalogs point at `./plugins/paseo-hosts` on the default branch, as they do
 - [ ] AC-12: The plugin installs from the vhco-tools marketplace in Codex and Claude, and in a new session a request to add a Paseo server leads the agent to the skill, which runs `onboard` and `link` and reports the result without showing the password.
 - [ ] AC-13: The README, the skill and the CLI help use the terms in Design with those meanings, and the plugin's marketplace row describes it in the same terms.
 - [ ] AC-14: The wrapper in an installed copy of the plugin, outside the repository, builds and runs `paseo-hosts --help` starting from an empty Go module cache, fetching its dependencies through the module proxy and verifying them against `go.sum`.
+- [ ] AC-15: `link --no-app` sets up the key, host key and alias block as `link` does, records the client, changes neither the desktop app nor the clipboard and prints no password; a later `link` without `--no-app` adds the app entry, and `unlink` of a client without the app removes its block and key line.
 
 ## Test Plan
 
@@ -247,6 +248,7 @@ Go tests run the CLI's commands with a stand-in `ssh` on `PATH` that executes th
 | AC-12 | Manual: install `paseo-hosts@vhco-tools` in Codex and in Claude, start a new session on the operator host, ask to add a named server, and record that the agent loaded the skill, ran both commands, and showed no password. |
 | AC-13 | Implementation review compares the README, `SKILL.md`, `paseo-hosts --help` and the marketplace row with the Terms table and records each mismatch. |
 | AC-14 | `tests/paseo-hosts/package.test.ts`, run by the `bun test tests/paseo-hosts` step of the `paseo-hosts` CI job, copies `plugins/paseo-hosts` to a temporary directory, runs `scripts/paseo-hosts.sh --help` with an empty temporary `GOMODCACHE`, `GOFLAGS` unset and the default `GOPROXY`, and asserts it exits 0 and that both dependencies are now in that cache, as `tests/remote-gui/package.test.ts` does for remote-gui. |
+| AC-15 | `internal/link` tests with a stand-in client without the app: `link --no-app` writes the key line, host key and block, calls no clipboard or app command and keeps the password out of every stream; a later `link` with the app present adds the entry; `unlink` skips the app step and removes the block and key line. |
 
 Manual procedure on the operator host, a test server, the Mac and a Windows PC with OpenSSH Server and a signed-in user: (1) `onboard` the server and record the unit, config and Serve state; (2) re-run `onboard` and confirm the password file is unchanged; (3) `onboard --publish`, check the route and health, then `onboard` again and confirm the route is gone; (4) `link` the Mac, then from the Mac try a shell command and `ssh -W 127.0.0.1:22` with the key and confirm both fail; (5) check the Mac app's host list and tunnel process, check that no app process has `--remote-debugging-port` and the debugging port refuses connections, then run `link` again with a `paseotest` build and `PASEO_HOSTS_TEST_REJECT_ENTRY=1`, confirm it exits non-zero, the previous host list is back and no debugging port remains; (6) repeat steps 4 and 5 for the Windows PC and confirm the app window is on the user's desktop; (7) `unlink` the Windows PC, then `remove` the server, and record the clients, server and registry; (8) run the forbidden-names test with `PASEO_HOSTS_FORBIDDEN_NAMES` set to the operator host's machine, user and tailnet names, and record that it passed.
 
@@ -256,17 +258,7 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-### Q1: What should `link --no-app` do with the password on Windows
-
-**Recommendation:** B. On Windows, print the Remote SSH values and tell the owner to run `paseo-hosts password <alias>` on the operator host; keep `pbcopy` on macOS, which the local tool used over SSH. The fallback stays simple and no password file is written for a scheduled task. A new criterion holds the chosen result.
-
-| Option | You get | It costs |
-| --- | --- | --- |
-| **A. Clipboard through the scheduled task** | The same one-paste fallback on both platforms | The password must reach the task through a temporary file or task argument; unmeasured like the app launch |
-| **B. No clipboard on Windows** | No password handling outside SSH standard input | One extra step for the owner when the app step is skipped on Windows |
-| **C. No clipboard anywhere** | One behaviour on both platforms | Drops a macOS fallback that works today |
-
-**Why this is yours:** it trades convenience in a fallback path against password handling on Windows.
+None.
 
 ## Review Log
 
