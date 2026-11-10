@@ -1,7 +1,7 @@
 # Repository instructions
 
 Read the personal conventions at
-https://github.com/vhco-pro/docs/blob/f781ee7b0404e80194aa568af3284888cc222017/AGENTS.md
+https://github.com/vhco-pro/docs/blob/a4e3d592e2ebb17295e0adf37747878f0c207b93/AGENTS.md
 and follow the task routes there before implementation.
 
 For all code, read conventions/coding.md at that revision.

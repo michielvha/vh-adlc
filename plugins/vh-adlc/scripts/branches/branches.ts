@@ -294,6 +294,6 @@ export function afterMerge(options: Options, number: number) {
   return {
     repository: observed.plan.repository, pull: number, branch: pr.head, complete: complete(outcomes), outcomes, kept: observed.plan.kept,
     delete_branch_on_merge: observed.plan.delete_branch_on_merge,
-    ...(observed.plan.delete_branch_on_merge ? {} : { note: "GitHub automatic head-branch deletion is off; a branch-hygiene plan proposes enabling it" }),
+    ...(observed.plan.delete_branch_on_merge ? {} : { note: "GitHub automatic head-branch deletion is off; ask the owner whether to enable it with auto-delete --enable" }),
   };
 }
