@@ -921,3 +921,46 @@ func TestRealReusableProfileCookieSetBeforeStop(t *testing.T) {
 		}
 	}
 }
+
+func TestRealReusableProfileDeleteWhileBrowserRuns(t *testing.T) {
+	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
+		t.Skip("set REMOTE_GUI_BROWSER_E2E=1 with existing host GUI dependencies")
+	}
+	b := newProfileBase(t)
+	v := b.mustStart(t, "3m")
+	chrome := owned(t, b.home, v.ID, "browser")
+	for _, role := range []string{"guard", "supervisor"} {
+		if err := state.Signal(owned(t, b.home, v.ID, role), syscall.SIGKILL); err != nil {
+			t.Fatal(err)
+		}
+	}
+	time.Sleep(300 * time.Millisecond)
+	if !state.Alive(chrome) {
+		t.Fatal("Chromium did not outlive its controllers")
+	}
+	dir := filepath.Join(b.profiles, "work")
+	_, err := session.ProfileDelete(b.home, b.profiles, "work")
+	if err == nil || !strings.Contains(err.Error(), "profile-browser-still-running") || !strings.Contains(err.Error(), v.ID) {
+		t.Fatalf("deleted a profile a running Chromium uses: %v", err)
+	}
+	for _, path := range []string{"meta.json", ".lock", "chromium/Default/Preferences", "chromium/SingletonLock"} {
+		if _, e := os.Lstat(filepath.Join(dir, path)); e != nil {
+			t.Fatalf("refused delete changed the profile: %s %v", path, e)
+		}
+	}
+	if !state.Alive(chrome) {
+		t.Fatal("refused delete disturbed the browser")
+	}
+	cleanupUntilEnded(t, b.home, v.ID)
+	waitDead(t, chrome)
+	deleted, err := session.ProfileDelete(b.home, b.profiles, "work")
+	if err != nil || deleted.Result != "deleted" {
+		t.Fatalf("delete after cleanup: %+v %v", deleted, err)
+	}
+	if _, err = os.Lstat(dir); !os.IsNotExist(err) {
+		t.Fatal("deleted profile directory remains")
+	}
+	if listed, e := session.ProfileList(b.profiles); e != nil || len(listed) != 0 {
+		t.Fatalf("deleted profile still listed: %+v %v", listed, e)
+	}
+}
