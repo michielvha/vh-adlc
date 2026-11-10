@@ -28,7 +28,7 @@ function unique(values: string[], field: string): string[] {
 function strings(value: unknown, field: string): string[] {
   return unique(list(value, field).map(item => text(item, field)), field);
 }
-function repository(value: unknown, field: string): string {
+export function repository(value: unknown, field: string): string {
   const result = text(value, field).toLowerCase();
   if (!/^[a-z0-9][a-z0-9-]*\/[a-z0-9_.-]+$/.test(result) || result.split("/").some(p => p === "." || p === "..")) fail(field);
   return result;

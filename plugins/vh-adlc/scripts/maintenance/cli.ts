@@ -5,7 +5,7 @@ import { collect } from "./collect";
 import { appendRun, canonicalJSON, createRun, digest, readRun } from "./journal";
 import { appendReport, renderReport, reserveReport, saveReport, portableObservations } from "./report";
 import { compareHistory, parseObservation, readHistory } from "./history";
-import { parseReportRequest, reportPermission, resolveStanding } from "./authority";
+import { parseReportRequest, reportPermission, resolveStanding, securitySettingsMode } from "./authority";
 import { capturePendingOutcome, pendingOutcomes, storeCollection, storeSecurity, validateReportSecurity } from "./artifacts";
 import { reconcileSecurityPacket, verifySecurityResult } from "./security-io";
 import { createSecurityRevision } from "./security-history";
@@ -26,6 +26,7 @@ const commands: Record<string, string[]> = {
   "adoption-preflight": ["--input"],
   "pending-outcome": ["--run-id", "--update", "--request"], "pending-outcomes": ["--run-id"],
   "store-collection": ["--run-id", "--inventory", "--step-id", "--request"],
+  "security-settings-mode": ["--repository", "--default-branch", "--default-commit", "--run-id"],
 };
 function argumentsFor(argv: string[]) {
   const [operation, ...values] = argv;
@@ -74,6 +75,12 @@ export async function main(argv = process.argv.slice(2)) {
   }
   if (operation === "analysis-input") {
     const { exportAnalysisInput } = await import("./analysis-input"); return exportAnalysisInput(config, input(args["--input"]));
+  }
+  if (operation === "security-settings-mode") {
+    const run = args["--run-id"] ? readRun(config, args["--run-id"]) : null;
+    const { committed: _, ...mode } = securitySettingsMode(config, required(args, "--repository"), { default_branch: required(args, "--default-branch"), default_commit: required(args, "--default-commit") },
+      run ? { request: run.state.request, scope: run.header.scope } : undefined);
+    return mode;
   }
   const id = required(args, "--run-id"), run = readRun(config, id);
   if(operation==="security-reconcile")return reconcileSecurityPacket(config,id,required(args,"--input"));
