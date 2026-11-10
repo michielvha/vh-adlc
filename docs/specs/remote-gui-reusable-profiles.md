@@ -234,6 +234,7 @@ None.
 | 2026-11-10 | R-5 | spec | `c071bd4682d176391849c39b9eb873bdce972510` | claude-opus-5-5 | procedural | No blocking findings; three should-fix findings and two nits. |
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | claude-opus-5-5 | procedural | No blocking findings; one should-fix finding and four nits, left in the record at the owner's direction. |
 | 2026-11-10 | R-6 | spec | `f7e3793255d966b726ecc76dc9a59d0b92b8b65b` | n/a | n/a | accepted by owner |
+| 2026-11-10 | R-7 | spec | `decf88498d33e30c3d8f5fc43bdf87fa4baec437` | claude-opus-5-5 | procedural | No blocking findings on the post-T9 revision; two should-fix findings and four nits. |
 
 ### R-1
 
@@ -554,6 +555,50 @@ SEVERITY: nit
 WHERE: AC-05, Test Plan (AC-05)
 EVIDENCE: AC-05 (line 159) names the case where "the supervisor and Chromium of a profile session are killed with SIGKILL". In that case the guard survives, its finish path records the session `failed` (daemon.go:296-303, :196-201), and under the new design it clears the holder and releases the lock. The AC-05 real-browser row (line 180) kills the guard as well, which tests a different path: the kernel releases the lock and the next CLI clears a dead holder. No row exercises the guard-alive bookkeeping after an unclean supervisor exit, and no row checks recovery of the singleton files that path leaves behind.
 PROPOSAL: Add an AC-05 variant that SIGKILLs only the supervisor and Chromium. Assert that the guard clears the holder and releases the lock before it records the session, and that the next start removes the stale singleton files and reaches ready.
+
+### R-7
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Lifecycle), AC-16, Test Plan (AC-16)
+EVIDENCE: Lifecycle line 128 sends one Return "While Chromium is still running" about a second after the Exit keys, and a second Return a second later "if needed". Nothing checks that a leave prompt is actually showing. Background line 41 says "The existing Exit keys do reach the focused page, and in 1 of 12 trials the menu did not open, so Exit failed and the terminate ran". It does not say whether a Return was sent in that trial or what it reached. When the menu fails to open, Chromium is still running, so the design sends the Return, and nothing sits between it and the focused page. The same happens when the owner clicks "Stay" on the prompt in the viewer before the second Return goes out. The stop close does not focus a safe page first: closeReusable (plugins/remote-gui/internal/browser/browser.go:282-304) calls quitBrowser directly, while the handoff path first activates remote-gui's own marker tab through CDP (plugins/remote-gui/internal/browser/phase.go:124-130). On a signed-in provider page, a stray Return can submit a sign-in form the owner has filled in or confirm a focused button, with no confirmation from the owner or the agent. That conflicts with the goal that credential entry stays human and agent action rests on the owner's confirmation. The AC-16 row only checks "A Return sent with no prompt showing reaches no page" during an Exit that succeeds, so every box can be ticked while this path remains.
+PROPOSAL: Send a Return only after confirming that a leave prompt is showing (for example by checking the owned display for Chromium's dialog), or after making the session's own marker page the focused tab where CDP exists. Add a criterion clause and a test in which the Exit menu fails or the prompt is dismissed, and assert that no Return reaches the page.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Lifecycle), Context (Background), AC-16, Test Plan (AC-16)
+EVIDENCE: Lifecycle line 128 limits the Exit phase to three seconds from the start of the close and then sends SIGTERM. Background line 41 measured clean exits with two prompting tabs "at 2.65 to 2.93 s", which leaves 0.07 to 0.35 s before the terminate. Background line 41 also shows that after a terminate, a cookie set just before the stop was missing in 4 of 12 manual runs and 2 of 5 test runs. A slightly slower host or a larger profile flush therefore pushes the two-prompt case into the cookie-loss path that this revision exists to avoid, and the AC-16 real-browser assertion "no SIGTERM was sent" for two tabs becomes timing dependent. The longer close also narrows the expiry margin from two seconds to one. On expiry, proxy revocation and removeForward run before the deferred bundle.Stop (plugins/remote-gui/internal/session/daemon.go:503-512 against :454), and removeForward may wait up to 6 s for the state lock (daemon.go:123-125). If the guard's five-second deadline passes, stopMembers sends SIGKILL about 300 ms after its SIGTERM (daemon.go:88-118), while Background measures 0.4 to 0.7 s for Chromium to exit after SIGTERM.
+PROPOSAL: Give the two-prompt case a stated, measured margin. For example, send the second Return as soon as the first prompt is gone, or lengthen the Exit phase on `stop`, where only the ten-second wait applies. Run the AC-16 two-tab real-browser test repeatedly so that it shows no SIGTERM under that margin.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Tasks (T15), Test Plan (AC-03, AC-16)
+EVIDENCE: T15 changes plugins/remote-gui/internal/browser/quit.go. quitBrowser is shared with the handoff close (plugins/remote-gui/internal/browser/phase.go:129). Its comment says "An outstanding browser confirmation is left to the owner instead of killing it" (quit.go:17-18), and a blocked handoff returns `browser-close-needs-owner` (phase.go:136-138). Design confirms prompts only on stop and expiry, but no Test Plan row checks that a handoff with a `beforeunload` prompt still leaves it to the owner. Putting the Returns inside quitBrowser would silently confirm leave prompts during handoffs.
+PROPOSAL: State that the Returns live in the stop close only, and add a check to the AC-03 or AC-16 row that a handoff with a leave prompt still ends in `browser-close-needs-owner` and sends no Return.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: Line 30 opens with "Validation is planned, not run", yet the T2 to T8 evidence lines (lines 201-213) record executed race tests, unit tests and the real-browser runs `TestRealHeadedBrowser` and `TestRealHumanBrowserHandoff`. The summary also leaves out two material changes since the accepted R-6 scope: the Exit window grows from two seconds to three, and this revision reset the ticks and evidence of AC-04, AC-06, AC-07 and AC-15 (visible in `git diff 53803ad decf884`). The standard asks the summary to separate planned checks from observed proof and to explain material changes since the last accepted scope.
+PROPOSAL: Say that task-level tests ran during T1 to T8, that criterion evidence was reset by this revision and must be gathered again, and that the Exit phase moves from two to three seconds.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: nit
+WHERE: Test Plan (AC-16)
+EVIDENCE: AC-16 (line 173) includes "the README says a very recent sign-in may then be lost". The AC-16 proof row (line 194) contains only real-browser and unit tests and names no README check, and the AC-13 criterion list (line 170) does not name this limitation. An implementation review of AC-16 therefore has no named proof for that clause.
+PROPOSAL: Add a README review step for the forced-terminate limitation to the AC-16 row, or add the limitation to AC-13 and its row.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: The new T9 bullet (line 41) is the basis for both changes in this revision, but it gives no command, test name or committed harness. The only harness is the uncommitted plugins/remote-gui/internal/browser/browser_test.go. Several older Background citations also no longer resolve at decf884, because T6 and T8 shifted the code. Line 35 cites browser.go:303-321 for the profile and Preferences write, but at this commit those lines are the end of closeReusable and the start of the `Start` retry loop, and the write is at browser.go:340-367. Line 36 cites browser.go:219-260 for stop, which is now browser.go:222-276. Line 42 cites session.go:302-313, which is now session.go:334-345.
+PROPOSAL: Name the command or test that produced the T9 numbers, and either refresh the line citations to this commit or say which commit they were gathered at.
 
 ## Sources
 
