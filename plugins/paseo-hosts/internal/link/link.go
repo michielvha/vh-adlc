@@ -183,15 +183,26 @@ func Run(ctx context.Context, o Options) (*Result, error) {
 // Probe identifies a client's platform and, with needApp, checks for the
 // desktop app.
 func Probe(ctx context.Context, alias string, needApp bool) (Client, error) {
+	return probe(ctx, alias, yesNo(needApp))
+}
+
+// ProbeForApp identifies a client's platform and finds the desktop app,
+// leaving App empty when it is not installed.
+func ProbeForApp(ctx context.Context, alias string) (Client, error) {
+	return probe(ctx, alias, "optional")
+}
+
+// probe takes needApp as yes, no or optional.
+func probe(ctx context.Context, alias, needApp string) (Client, error) {
 	c := Client{Alias: alias}
 	out, err := remote.Command(ctx, alias, "uname", "-s")
 	if errors.Is(err, remote.ErrUnreachable) {
-		return c, report.Errorf(report.ExitFailed, "%v", err)
+		return c, &report.Error{Code: report.ExitFailed, Msg: err.Error(), Err: err}
 	}
 	if err == nil && strings.TrimSpace(out.Text) == "Darwin" {
 		c.Kind = Darwin
-		if needApp {
-			app, err := remote.Bash(ctx, alias, darwinAppScript, nil)
+		if needApp != "no" {
+			app, err := remote.Bash(ctx, alias, darwinAppScript, remote.Vars{"need_app": needApp})
 			if err != nil {
 				return c, remoteError("probe", err)
 			}
@@ -200,7 +211,7 @@ func Probe(ctx context.Context, alias string, needApp bool) (Client, error) {
 		return c, nil
 	}
 	answer := strings.TrimSpace(out.Text)
-	ps, err := remote.PowerShell(ctx, alias, probeScript, remote.Vars{"need_app": yesNo(needApp)})
+	ps, err := remote.PowerShell(ctx, alias, probeScript, remote.Vars{"need_app": needApp})
 	if ps.Values["OS"] != "Windows_NT" {
 		if answer == "" {
 			answer = "no answer"

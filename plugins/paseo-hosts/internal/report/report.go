@@ -32,9 +32,13 @@ var results = map[int]string{
 type Error struct {
 	Code int
 	Msg  string
+	// Err is the cause, when callers need to test for it.
+	Err error
 }
 
 func (e *Error) Error() string { return e.Msg }
+
+func (e *Error) Unwrap() error { return e.Err }
 
 // Errorf returns an error that exits with code.
 func Errorf(code int, format string, args ...any) *Error {
