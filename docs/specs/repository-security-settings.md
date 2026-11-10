@@ -520,6 +520,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-10 | R-1 | spec | `1a93d2f` | claude-opus-4.8 | procedural | 12 findings: 8 should-fix, 4 nits, none blocking |
 | 2026-11-10 | R-2 | spec | `812a0aa` | claude-opus-4.8 | procedural | 7 findings: 5 should-fix, 2 nits, none blocking |
+| 2026-11-10 | R-3 | spec | `44aea8d` | unknown | procedural | 7 findings: 4 should-fix, 3 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -657,6 +658,57 @@ SEVERITY: nit
 WHERE: Design (Helper) and AC-10, AC-14
 EVIDENCE: The Helper section says `--format markdown` prints "a `## Repository security settings` section with one table row per entry", and AC-10 requires the Markdown to match the JSON row for row. AC-14 also requires "the Markdown output lists them under owner decisions". The Design puts owner decisions in the maintenance skill ("Entries with `renovate-overlap` go to the report's owner decisions") and gives the helper's Markdown no owner-decisions part.
 PROPOSAL: Describe the owner-decisions part of the helper's Markdown output in the Helper section, or move the AC-14 check to the sweep report.
+
+### R-3
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Procedure changes), AC-11, AC-21, AC-22 and Test Plan (AC-21)
+EVIDENCE: Background says that after the alerts write, `dependabot/alerts?state=open` "listed 47 alerts about 20 seconds later". In `plugins/vh-adlc/scripts/maintenance/collect.ts:88-90` and `:131`, a successful read is `complete` with the parsed count, so an empty 200 page right after the write is `complete` with count 0. The Design's safeguard is a single sentence: "When alerts were enabled in this run, the report says the alert list may still be filling." No criterion requires that sentence. AC-11 does not list it, and AC-22 checks only the table and the owner decisions. The AC-21 fixture returns the three alerts "only once alerts are on", with no delay, so it cannot observe the gap. With every box ticked, a sweep that turns on alerts can still report the Dependabot surface as complete with zero or a partial count and give no warning. That is close to the original coverage gap.
+PROPOSAL: Add a criterion and a fixture with a delayed alert list for the "may still be filling" note, keyed to an `enabled` alerts entry in the helper JSON. Alternatively, raise an Open Question on whether a Dependabot surface whose alerts were enabled in the same run is recorded as incomplete instead of complete.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Helper, Rules applied before any write, Procedure changes) and AC-22
+EVIDENCE: Rule 4 covers only "a read of a setting's own state". The first `repos/{r}` read decides archived, visibility and admin, and no rule says what happens when it fails. The helper is modelled on `autoDelete`, which throws on that failure (`plugins/vh-adlc/scripts/branches/branches.ts:277-278`). The sweep step says "run `apply` for each repository in scope ... then collect" and "saves each repository's JSON output". It does not say whether exit 1 or a run with no output stops the sweep, skips collection, or leaves that repository out of the report. AC-22 only separates "saved with `--security-settings` files" from "Without the option". In a multi-repository sweep, one failed helper run can therefore drop that repository from the section without any notice, and every criterion still passes.
+PROPOSAL: Define the output for a failed `repos/{r}` read, for example every entry `unknown` with `api-error`. State that a helper failure or exit 1 never blocks collection. Require the report section to name every repository in scope and to show a row for any repository with no helper output. Add a criterion and a fixture for this.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Procedure changes, authority row), Context (Owner decisions, Q22) and Scope
+EVIDENCE: Elsewhere the plugin requires a consumer's own adopted declaration, or a current request, before it makes a remote effect in that consumer. `plugins/vh-adlc/references/authority.md` requires "An adopted `Standing maintenance report publication` declaration" and an "adopted `Standing audit workflow authorization`", and `references/maintenance-settings.md:51-57` takes standing grants only from the consumer's committed default branch. The proposed guide at docs#30 head `4b2198d` (guides/onboard-a-repository.md:100-101) says "With the owner's agreement, turn on Dependabot alerts", meaning the target repository's owner. The design makes `apply` the default in every sweep and onboarding of any consumer, offers only a per-repository opt-out, and treats "the owner's acceptance of this feature" as that agreement. The convention it follows names only `michielvha` and `vhco-pro` (conventions/repository-security.md:10-13 at `4b2198d`). The plugin is distributed through `.claude-plugin/marketplace.json` and `.agents/plugins/marketplace.json`, so a consumer repository with a different owner gets security settings written on its first sweep after an upgrade, without that owner agreeing.
+PROPOSAL: Raise an Open Question that sets the scope of the standing agreement: every consumer, only repositories under the accounts the convention names, or only consumers that adopt a declaration in `.vh-adlc/maintenance.yaml`. Have the authority row state the chosen limit.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Procedure changes) and AC-11
+EVIDENCE: The design switches to `check` "when the current request forbids live or remote changes". The maintenance run records its request as typed flags: `ReportRequest = { authorized_sweep; read_only?; draft_only?; no_commit?; no_push?; no_filesystem?; ... }` (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`). `references/maintenance.md:38-40` gives `read-only`, `draft-only`, `no-commit` and `no-push` different meanings, and says that "`no-push` can still permit an isolated local report commit". The document never says which of these flags count as forbidding a GitHub settings write. AC-11 only checks the text "or `check` under a restricting request". An implementation could therefore run `apply` during a `no-push` or `draft-only` sweep and still satisfy every criterion.
+PROPOSAL: Name the recorded request flags that select `check`. Add a criterion with a test showing that a run recorded with each of those flags makes no write call.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background, Owner decisions Q22) and Sources
+EVIDENCE: `gh pr view 30 -R vhco-pro/docs` returns state OPEN and headRefOid `4b2198d7...`, but Background says "vhco-pro/docs#30 (open, head `89d567a`)". Q22 says docs#30 names both Dependabot config file names "since `4b2198d`". The compare 89d567a...4b2198d shows that change in `guides/onboard-a-repository.md` from commit 106ecfb ("name both Dependabot config file names in onboarding"); 4b2198d only reflowed the sentence. Design (Procedure changes) and Q22 depend on that guide's "owner's agreement" sentence, but Sources lists only `conventions/repository-security.md`. The standard says "Sources lists every external page read, each with the claim it supports."
+PROPOSAL: Update the head to `4b2198d`, credit the file-name change to `106ecfb`, and add a Sources entry for `guides/onboard-a-repository.md` at `4b2198d` with the claims the document takes from it.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background) and Design (Renovate and Dependabot detection)
+EVIDENCE: Background cites "The configured bot authors default to `renovate` and `dependabot` (`plugins/vh-adlc/scripts/maintenance/settings.ts:109`)". The detection rules check only a hard-coded `app/renovate` for pull requests and the Dependency Dashboard issue, and never use `bot_authors`. A consumer that sets `bot_authors` for a Renovate under another login gets no Renovate signal from that bot's pull requests, so the citation suggests a link the design does not have.
+PROPOSAL: Either say that detection ignores `bot_authors` and why, or derive the Renovate pull request and issue authors from the configured value. If the citation supports nothing, remove it.
+
+FINDING: F-07
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Order of work), AC-11 and Test Plan (AC-11, AC-20)
+EVIDENCE: The design depends on "Sweeps and onboarding do not request the page through `vh-adlc knowledge`, so a consumer whose own older pin lacks it still sweeps normally". `references/loop.md:59-61` and `:75-76` say an operation stops on `missing-page`. `vh-adlc knowledge --page conventions/repository-security.md` at `a4e3d592` returned `missing-page` with exit 5. No criterion or Test Plan row checks that the maintenance skill's and onboarding's `knowledge` page lists leave this page out.
+PROPOSAL: Add to AC-11 and its proof that the maintenance skill and the onboarding `knowledge` requests do not list `conventions/repository-security.md`, so a consumer pinned before docs#30 still sweeps.
 
 ## Sources
 
