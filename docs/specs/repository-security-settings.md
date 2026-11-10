@@ -788,6 +788,7 @@ None.
 | 2026-11-10 | R-12 | spec | `12be951` | unknown | procedural | 4 findings: 1 should-fix, 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-13 | spec | `8286c54` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-14 | spec | `0aea08b` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-15 | spec | `27e821d` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1320,6 +1321,36 @@ SEVERITY: nit
 WHERE: Frontmatter (covers) and AC-21
 EVIDENCE: AC-21 requires that "`security-reconcile` accepts that inventory and reports the gap `coverage handoff pending` ... unless the analysis records a coverage handoff". The Design cites the code that decides this: `tracked` at `plugins/vh-adlc/scripts/maintenance/security.ts:117` and the gap at `security.ts:143`. `covers` lists `security-io.ts`, `collect.ts`, `authority.ts` and other maintenance scripts, but not `plugins/vh-adlc/scripts/maintenance/security.ts`. The standard says `covers` "lists every path whose change can affect the feature".
 PROPOSAL: Add `plugins/vh-adlc/scripts/maintenance/security.ts` to `covers`.
+
+### R-15
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Helper: state table and "Rules applied before any write") and AC-24
+EVIDENCE: The R-14 fold added this to Design (Helper): "`apply` also makes no write, and reports its entries as `check` would with reason `not-adopted` or `not-in-committed-scope`". AC-24 says the same, and its Test Plan row passes when "entries reported with `not-adopted` and `not-in-committed-scope`". The state table gives the only `not-changed` reasons as "`check-only`, `alerts-off` or `api-error` with the HTTP status". Rules 1 to 10 have no step that gives `not-adopted` or `not-in-committed-scope`. Rule 8 gives `check-only` to an off and free entry under `check`. The same string `not-in-committed-scope` is also a mode reason: `security-settings-mode` prints it, the skill passes it to `check` through `--mode-reason`, and the output shows it as "the mode and that reason". So it is unclear whether the refusal replaces each entry's `check-only` reason, sets only the mode reason, or does both. It is also unclear where the refusal sits in the precedence order, for example for an entry already on or kept off. The same situation, a target outside the committed scope, then gives different entry reasons on the mode path and on the helper-refusal path. `references/security-settings.md` must list "states, reasons ... precedence", and AC-10 and AC-22 compare reasons between JSON and Markdown. An implementer who builds the reason set from the state table would reject `not-adopted`.
+PROPOSAL: Say whether `not-adopted` and `not-in-committed-scope` are entry reasons or mode reasons. If they are entry reasons, add them to the `not-changed` row of the state table and give them a place in the numbered rules, for example as a refusal step just before rule 8 that replaces `check-only`. If they are mode reasons only, change the Helper text and AC-24 to say the entries keep `check-only` and the output's mode reason names the refusal.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Collector; Procedure changes: report command) and AC-11
+EVIDENCE: The Design makes `--security-settings FILE` repeatable on both `collect` and `report`, and makes `--applied-repository OWNER/NAME` repeatable on `collect`. The maintenance CLI rejects any repeated flag: `if (!allowed.includes(key) || !value || value.startsWith("--") || Object.hasOwn(args, key)) throw Error("maintenance invalid or duplicate argument");` (`plugins/vh-adlc/scripts/maintenance/cli.ts:36`). Its arguments are stored as `Record<string, string>` (`cli.ts:33`). The reference page says "All flags take a value, including `true`/`false` booleans. Reject duplicate or unknown flags." (`plugins/vh-adlc/references/maintenance-settings.md:100`). Neither the Design nor AC-11 says that the parser or that sentence changes. An implementation that matches the Design would either break the documented duplicate-flag rule without saying so, or have no way to pass more than one helper file.
+PROPOSAL: State that the maintenance CLI accepts these two flags more than once as a named exception, and that `references/maintenance-settings.md:100` says so. Add that statement to AC-11. Alternatively, take one argument that lists several files or repositories, and keep the duplicate-flag rule as it is.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria (AC-11)
+EVIDENCE: AC-11 requires the collector rules "in `references/maintenance.md` and `references/maintenance-settings.md` without the old 'only a configured exact match' wording". Searching for `only a configured exact match` and `configured exact` in `plugins/vh-adlc/references/` and `plugins/vh-adlc/skills/` found one hit. It is in `references/maintenance.md:78`, which says "Only the configured exact status/literal-message/evidence match is complete-unavailable". `references/maintenance-settings.md:46-48` says "Only the exact declared surface/status and matching message receive `complete-unavailable`... A bare 403/404 is unknown." The quoted phrase appears in neither file, so the check "without the old wording" passes even if neither sentence is changed.
+PROPOSAL: Quote the two current sentences exactly, or reword the criterion so that neither page says that only a configured match, or only the exact declared match, is `complete-unavailable`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Frontmatter (covers)
+EVIDENCE: `security-settings-mode` decides the mode from "the recorded request" and from whether "the run's scope has a pull request". `collect` and `report` accept a helper file only when it "carries the current run ID" and "names one repository in the sweep's scope". The skill saves each helper JSON "in the run's private journal directory". The request, the run scope and the private directory are defined in `plugins/vh-adlc/scripts/maintenance/journal.ts`: `request: JSONObject | null` at line 13, `createRun` at line 154, `readRun` at line 171 and `privateDirectory` at line 105. `covers` lists the other maintenance scripts the feature depends on, but not `journal.ts`. The standard says `covers` "lists every path whose change can affect the feature".
+PROPOSAL: Add `plugins/vh-adlc/scripts/maintenance/journal.ts` to `covers`.
 
 ## Sources
 
