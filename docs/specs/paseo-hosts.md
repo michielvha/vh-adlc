@@ -262,7 +262,36 @@ Manual procedure on the operator host, a test server, the Mac and a Windows PC w
 
 ## Tasks
 
-None yet; written once the document is planned.
+Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-hosts/`.
+
+- [ ] T1 `plugin.json`, `.claude-plugin/plugin.json`, `go.mod`, `go.sum`, `.golangci.yml`, `cmd/paseo-hosts/main.go` - the module skeleton at version 0.1.0 with `github.com/michielvha/logger` v0.1.0; `go build ./cmd/paseo-hosts`, `go vet ./...` and golangci-lint pass and `paseo-hosts --help` exits 0 (Design)
+- [ ] T2 `tests/paseo-hosts/package.json`, `tests/paseo-hosts/package.test.ts` - the installed-copy test; fails because `scripts/paseo-hosts.sh` does not exist (AC-14)
+- [ ] T3 `scripts/paseo-hosts.sh` - the wrapper builds into `PASEO_HOSTS_CACHE/builds` with `GOTOOLCHAIN=local` and `-mod=readonly`; `bun test tests/paseo-hosts` passes (AC-14)
+- [ ] T4 `internal/report/report_test.go` - reporter tests for every outcome on a terminal and a pipe, each `NO_COLOR` value, `--plain`, `--json` fields and exit codes; fail because the package is empty (AC-11)
+- [ ] T5 `internal/report/report.go`, `cmd/paseo-hosts/main.go` - labelled lines on standard error, JSON on standard output, exit codes 0 to 4, and the logger initialised on standard error; T4 passes (AC-11)
+- [ ] T6 `internal/registry/registry_test.go` - parse the local tool's format, apply the defaults for missing keys, and reject a command substitution line without running it; fails (AC-09, AC-03)
+- [ ] T7 `internal/registry/registry.go` - the parser and writer with modes 700 and 600; T6 passes (AC-09, AC-03, AC-01)
+- [ ] T8 `internal/config/config_test.go` - every variable's default and override, and exit 3 naming `PASEO_HOSTS_CLIENT` for `link` without a client; fails (AC-08)
+- [ ] T9 `internal/config/config.go` - configuration from flags and variables only; T8 passes (AC-08)
+- [ ] T10 `internal/testenv/` - stand-in `ssh`, `npm`, `systemctl`, `loginctl`, `tailscale`, `osascript`, `open` and daemon, with `pwsh` for `.ps1` snippets and an ACL recorder; its self-test runs a snippet under a temporary home and records every argument list (AC-08, AC-10)
+- [ ] T11 `internal/runtime/runtime_test.go` - install `@getpaseo/cli` into `runtime/<version>/` with `npm install --prefix`, exit 3 naming a missing `node` or `npm`, and hash a password passed on standard input; fails (AC-01, AC-08, AC-10)
+- [ ] T12 `internal/runtime/runtime.go` - the local runtime and `hashDaemonPassword` call; T11 passes (AC-01, AC-08, AC-10)
+- [ ] T13 `internal/onboard/onboard_test.go` - the AC-01 to AC-03 rows of the Test Plan; fail (AC-01, AC-02, AC-03)
+- [ ] T14 `internal/onboard/onboard.go`, `internal/onboard/snippets/*.sh` - preflight, password, install, exposure, registry and verification with 503 retry; T13 passes (AC-01, AC-02, AC-03)
+- [ ] T15 `internal/link/link_test.go`, `internal/snippets/ps1_syntax_test.go` - the AC-04 and AC-15 rows for both platforms, the client probe with exit 4, and the PowerShell 7 syntax ban; fail (AC-04, AC-15)
+- [ ] T16 `internal/link/link.go`, `internal/link/snippets/*.sh`, `internal/link/snippets/*.ps1` - probe, client record, key, key line, host keys, alias block and tunnel checks; T15 passes (AC-04, AC-15)
+- [ ] T17 `internal/clientapp/clientapp_test.go`, `internal/clientapp/fakedevtools_test.go` - the AC-05 and AC-06 rows against the fake DevTools endpoint, including the 8 second commit wait, the graceful quit and the force-stop exit; fail (AC-05, AC-06)
+- [ ] T18 `go.mod`, `go.sum`, `internal/clientapp/*.go`, `internal/clientapp/snippets/*`, `internal/clientapp/inject_paseotest.go` - quit, debug relaunch, upsert, verify, rollback, relaunch and tunnel process check with `github.com/coder/websocket`, and the `paseotest` fault injection; T17 passes and a release build has no `PASEO_HOSTS_TEST_REJECT_ENTRY` string (AC-05, AC-06)
+- [ ] T19 `internal/remove/remove_test.go` - the AC-07 row of the Test Plan; fails (AC-07)
+- [ ] T20 `internal/remove/*.go`, `internal/remove/snippets/*` - `unlink`, `--server-only`, `remove` with `--client`, `--no-clients`, `--skip-server` and `--purge`, and backup cleanup; T19 passes (AC-07)
+- [ ] T21 `cmd/paseo-hosts/main_test.go` - the AC-08, AC-09 and AC-10 rows: every command against a local-tool fixture and against only the documented variables, and the password in no argument list, log record or stream; fails (AC-08, AC-09, AC-10)
+- [ ] T22 `cmd/paseo-hosts/*.go` - wire `onboard`, `link`, `unlink`, `remove`, `verify`, `status`, `list` and `password` with their flags and help; T21 passes (AC-08, AC-09, AC-10, AC-13)
+- [ ] T23 `cmd/paseo-hosts/forbidden_names_test.go` - searches the plugin files for the names in `PASEO_HOSTS_FORBIDDEN_NAMES` and skips when it is unset; passes (AC-08)
+- [ ] T24 `skills/paseo-hosts/SKILL.md`, `README.md` - the skill and README in the Design terms, with the restart and built-in daemon warning; the help, skill and README use the Terms table (AC-12, AC-13)
+- [ ] T25 `.claude-plugin/marketplace.json`, `.agents/plugins/marketplace.json`, `docs/reference/marketplace.md`, `README.md`, `CONTRIBUTING.md` - list the plugin and its checks; `bun test tests/vh-adlc` passes (AC-12, AC-13)
+- [ ] T26 `.github/workflows/ci.yml`, `cmd/vh-adlc/workflow_test.go` - the `paseo-hosts` job and the `version` job's needs; `go test ./cmd/vh-adlc` passes (AC-14)
+- [ ] T27 `docs/specs/paseo-hosts.md` - manual steps 1 to 5, 7 and 8 against a test server and the Mac, and AC-12 in Codex and Claude, recorded as evidence; each step's pass condition holds (AC-01, AC-02, AC-03, AC-04, AC-05, AC-06, AC-07, AC-08, AC-12)
+- [ ] T28 `docs/specs/paseo-hosts.md` - manual step 6 on the Windows PC once it accepts SSH, recorded as evidence; the app window is on the user's desktop and the tunnel is open (AC-04, AC-05, AC-06)
 
 ## Open Questions
 
