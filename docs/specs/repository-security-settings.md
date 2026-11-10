@@ -692,6 +692,7 @@ None.
 | 2026-11-10 | R-7 | spec | `b5612ad` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-8 | spec | `ec05a26` | unknown | procedural | 3 findings: 3 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-9 | spec | `c1a8587` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-10 | spec | `0c85c0b` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1088,6 +1089,36 @@ SEVERITY: nit
 WHERE: AC-21 and Context (Owner summary)
 EVIDENCE: AC-21 requires that "the sweep's security reconciliation accepts that inventory", and the summary says alerts enabled during a sweep "count as incomplete until the next one". The reconciler adds a gap `coverage handoff pending` for each incomplete coverage row without a tracked handoff (`plugins/vh-adlc/scripts/maintenance/security.ts:143`, `tracked` at `:117`). `plugins/vh-adlc/references/maintenance.md:327` says "`reconciled` requires ... an explicit handoff for coverage gaps". So each sweep that enables alerts leaves accounting pending unless the agent records a handoff. The document never names that handoff or the expected reconciliation result, so "accepts" in AC-21 is not stated as an observable result.
 PROPOSAL: State the expected `security-reconcile` result for an `alerts-enabled-this-run` surface: pending with that coverage gap, or reconciled when a handoff names the next sweep. Have AC-21's proof check that result.
+
+### R-10
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Settings, Helper, Procedure changes) and AC-15, AC-24
+EVIDENCE: The Design says `security_settings` "is read only from the consumer's committed default branch" (`plugin.../maintenance-settings.md:51-57` says "A declaration in task data, an uncommitted edit or an unmerged branch is unadopted"). The keep-off list and the write scope do not follow the same rule. `security_settings_keep_off` is added to `scripts/maintenance/settings.ts`. Its `loadSettings` (`settings.ts:61-75`) reads the checkout's working-tree `.vh-adlc/maintenance.yaml`, or any `--settings` path. The helper's `--repo` "is the checkout whose `.vh-adlc/maintenance.yaml` applies", and the sweep's repositories come from the same working-tree `repositories` field (`cli.ts:68`). In an opted-in consumer, an uncommitted deletion of a committed keep-off row lets `apply` enable a setting the owner chose to keep off. An uncommitted `repositories` row also makes a repository the committed settings never named a write target. No criterion or fixture covers either case. The AC-15 fixture does not say whether its keep-off row is committed.
+PROPOSAL: Say where `apply` reads its keep-off rows and target scope. Either read them from the same committed, linked settings as the opt-in, or select `check` when the working tree's keep-off or repository scope widens the committed values. Add AC-24 or AC-15 fixtures for an uncommitted keep-off removal and an uncommitted added repository.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Procedure changes), AC-11, AC-21 and Test Plan (AC-11, AC-21)
+EVIDENCE: The Q41 fold adds three rules: "The helper runs once, before a new run's collection; a continuation reuses that run's saved files and does not run it again", "a PR-scoped assessment checks", and "only a full authorized sweep writes". AC-11 lists the statements the reference pages and skill must carry, and none of these three is among them. The authority row in the Design still says only that "A request with a flag that selects `check` wins", and a pull request scope is not a flag. AC-21 is a composite that includes "the maintenance skill records one naming the next sweep". Its only proof is a `bun test tests/vh-adlc/maintenance` fixture that runs `security-reconcile` with and without a handoff. A Bun test cannot observe what the skill text instructs, so an implementation review would find that part of AC-21 untested.
+PROPOSAL: Add to AC-11, and to its reviewer read, that the maintenance skill and `references/security-settings.md` state the authorized-sweep and pull-request-scope rules and the once-per-run continuation rule, and that the authority row names them. Add the skill's coverage-handoff instruction to AC-11, or add a reviewer read of the skill step to the AC-21 proof.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Rules applied before any write, rule 2, and the state table)
+EVIDENCE: Rule 2 (`not-free-on-private`) makes private secret scanning and push protection "`unavailable` unless the admin read shows them on, which makes them `already-on`". The rules say each entry "takes the state and reason of the first rule below that applies". So such an entry would carry `already-on` with `not-free-on-private`. The state table lists only `renovate-overlap`, `owner-choice-conflict` and `paused` as reasons for `already-on`. Because rule 2 comes before rule 5, a keep-off row for a paid setting found on in a private repository never gives `owner-choice-conflict` and never reaches the owner decisions list. Q14 says that "a keep-off setting found on is `already-on` with `owner-choice-conflict`".
+PROPOSAL: State the reason, or say there is none, for a private entry that rule 2 finds on. Also say whether a keep-off row for that entry still gives `owner-choice-conflict`, or record that rule 2 deliberately overrides Q14 for paid settings.
+
+FINDING: F-04
+KIND: judgement
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: The summary says the helper turns settings on when the committed settings opt in, and that "elsewhere, or under a restricting request, it only checks". It does not mention the Q41 limits: a recorded request without `authorized_sweep` true checks, a PR-scoped run checks, and a continuation does not run the helper again. A pull request scope is not a restricting request. The summary also says "Reviews R-1 to R-9 found nothing blocking, and the owner answered their questions". The Q41 to Q43 bullet says these R-9 decisions were "taken with the reviewer's proposal under that instruction" and were not put to the owner as questions.
+PROPOSAL: Add one sentence to the summary saying that only a full authorized sweep or onboarding may apply, and that PR-scoped runs only check. Say that the R-9 findings were folded under the owner's standing instruction.
 
 ## Sources
 
