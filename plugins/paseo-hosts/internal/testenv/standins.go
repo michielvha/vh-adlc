@@ -84,6 +84,7 @@ func hostEnv(dir string) []string {
 	env := []string{
 		"HOME=" + home, "USER=" + user, "LOGNAME=" + user, "LANG=C.UTF-8", "PATH=" + path,
 		"TMPDIR=" + filepath.Join(dir, "tmp"), envRoot + "=" + root(), envHost + "=" + name,
+		"GORACE=" + os.Getenv("GORACE"),
 	}
 	if k, _ := marker(dir, "kind"); k == Windows {
 		env = append(env, "USERPROFILE="+home, "USERNAME="+user, "PASEO_TESTENV_HOSTDIR="+dir)

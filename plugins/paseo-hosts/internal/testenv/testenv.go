@@ -122,6 +122,8 @@ func New(t *testing.T) *Env {
 	t.Setenv("HOME", e.Home)
 	t.Setenv("USER", "operator")
 	t.Setenv("PATH", e.Bin+string(os.PathListSeparator)+e.Sys)
+	// Race-enabled stand-ins otherwise wait one second before they exit.
+	t.Setenv("GORACE", "atexit_sleep_ms=0")
 	for _, k := range []string{
 		"XDG_CACHE_HOME", "XDG_CONFIG_HOME", "PASEO_HOSTS_DIR", "PASEO_HOSTS_CLIENT", "PASEO_HOSTS_VERSION",
 		"PASEO_HOSTS_LISTEN_PORT", "PASEO_HOSTS_SERVE_PORT", "PASEO_HOSTS_CACHE", "PASEO_HOSTS_CLIENT_KEY",
