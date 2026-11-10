@@ -66,8 +66,7 @@ merged-branch deletion, with the owner's yes.
 
 Proof is planned, not observed: Bun tests against a fake `gh` for each repository shape, and a live
 sweep of bg-remove. No live run shows a sweep enabling alerts and collecting them in the same run.
-Reviews R-1 and R-2 found nothing blocking; the owner answered their questions, and a new review is
-due. Acceptance authorizes tasks, implementation on a feature branch, the pin move, the version
+Reviews R-1 and R-2 found nothing blocking; the owner answered their questions. Acceptance authorizes tasks, implementation on a feature branch, the pin move, the version
 bump and that live sweep. A release and changes to any other repository outside a sweep or
 onboarding need separate approval.
 
