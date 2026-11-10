@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-
 	"github.com/michielvha/vh-adlc/plugins/paseo-hosts/internal/testenv"
 )
 

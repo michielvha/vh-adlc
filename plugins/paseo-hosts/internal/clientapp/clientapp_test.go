@@ -137,7 +137,9 @@ func TestAddUpsertsTheNormalizedEntry(t *testing.T) {
 	} {
 		t.Run(strconv.Itoa(tc.port), func(t *testing.T) {
 			// A release build ignores the fault injection switch.
-			t.Setenv("PASEO_HOSTS_TEST_REJECT_ENTRY", "1")
+			if !injectionBuilt {
+				t.Setenv(rejectSwitch(), "1")
+			}
 			before := "[" + otherHost + "," + staleHost + "]"
 			w := newWorld(t, tc.port, before)
 			if err := w.ca.Add(context.Background(), w.client(), w.entry, w.pw); err != nil {
@@ -186,10 +188,20 @@ func TestAddUpsertsTheNormalizedEntry(t *testing.T) {
 	}
 }
 
+// rejectSwitch is built at run time so that no binary holds the name
+// unless the paseotest code does.
+func rejectSwitch() string {
+	return strings.Join([]string{"PASEO_HOSTS_TEST", "REJECT", "ENTRY"}, "_")
+}
+
 func TestRejectedEntryIsRolledBack(t *testing.T) {
 	before := "[" + otherHost + "]"
 	w := newWorld(t, 6767, before)
-	w.app.reject = func(h map[string]any) bool { return h["serverId"] == "srv_srv" }
+	if injectionBuilt {
+		t.Setenv(rejectSwitch(), "1")
+	} else {
+		w.app.reject = func(h map[string]any) bool { return h["serverId"] == "srv_srv" }
+	}
 	err := w.ca.Add(context.Background(), w.client(), w.entry, w.pw)
 	if err == nil || report.Code(err) == report.ExitOK {
 		t.Fatalf("Add = %v, want a failure", err)
