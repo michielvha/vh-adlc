@@ -244,6 +244,7 @@ None.
 | 2026-11-10 | R-7 | spec | `decf88498d33e30c3d8f5fc43bdf87fa4baec437` | claude-opus-5-5 | procedural | No blocking findings on the post-T9 revision; two should-fix findings and four nits. |
 | 2026-11-10 | R-8 | spec | `0da01c174635d7b85c8b9df6196919f7bb6cf786` | claude-opus-5-5 | procedural | Blocking: stop keystrokes can submit a provider form after Stay or in a popup window; one should-fix and one nit. |
 | 2026-11-10 | R-9 | spec | `77c2cba2f75ae3da0f2bdf260b1b5bc0c63b9e65` | claude-opus-5-5 | procedural | No blocking findings on the keyless stop; one should-fix finding and four wording nits. |
+| 2026-11-10 | R-10 | spec | `c482919f001d3afbbf765b782bb9232fea203cb1` | claude-opus-5-5 | procedural | No blocking findings; two should-fix findings and two nits, left in the record at the owner's direction. |
 
 ### R-1
 
@@ -675,6 +676,36 @@ SEVERITY: nit
 WHERE: Context (Owner summary)
 EVIDENCE: Line 28 says "a test proves that a sign-in made 30 seconds before the stop survives every time". That test is T14 and has not been written or run (Tasks line 220, unticked), and line 30 says "Validation is planned, not run". A ten-run test (Test Plan AC-16) also cannot prove "every time". The standard asks the summary to distinguish planned checks from observed proof.
 PROPOSAL: Say instead that a planned test checks, in ten of ten runs, that a cookie set 30 seconds before `stop` is present in the next session.
+
+### R-10
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-02), Test Plan (AC-02), Tasks (T9)
+EVIDENCE: AC-02 (line 166) says "A persistent cookie set in one `--profile` session is present in a later session on the same profile after the first session stopped", with no timing condition. The AC-02 proof row (line 187) says "a local fixture sets a persistent cookie in session one on profile `t-reuse`; stop; ... assert the fixture sees the cookie", with no wait between setting the cookie and `stop`, and T9 (line 221) repeats this. Lifecycle (line 135) and the R-9 Background bullet (line 45) accept that "one written up to about half a minute before the stop may be lost". I observed this myself with host Chromium 151.0.7922.137 headed on a private Xvfb, the browserArgs flags, a loopback Set-Cookie fixture, SIGTERM D seconds after the cookie was set and SIGKILL 2 s later, then a relaunch that echoes the Cookie header (scratch harness /tmp/claude-1000/-home-m-code-stackweaver/4ab9a05b-51f5-5b4a-a95c-c55054044bbd/scratchpad/rv10/m.py). Results: D=1 s kept 7 of 8, D=15 s kept 4 of 6, D=30 s kept 6 of 6, with Chromium exiting 0.06 to 0.27 s after SIGTERM. Under the keyless close, the AC-02 test as written fails in some runs. Read literally, AC-02 promises something the design says it does not give, and an implementation review could not mark it met from the named proof.
+PROPOSAL: Qualify AC-02 to a cookie set at least 30 seconds before the stop, or one Chromium has written to disk, and add the 30-second wait to the AC-02 proof row and to T9, so that AC-02 matches Lifecycle and AC-16.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-16), Test Plan (AC-16), Design (Lifecycle)
+EVIDENCE: AC-16 (line 180) says the close ends Chromium "with a terminate and, after two seconds, a kill if needed, whenever its browser stop starts before the guard's deadline, and otherwise through the guard's group stop". The AC-16 proof row (line 201) has unit tests only for the case where "the supervisor finishes before the guard's deadline" and real-browser tests for an ordinary stop and expiry. No row exercises the "otherwise through the guard's group stop" clause, for example a delayed forward removal on expiry. I found no existing test of that path either: `grep -rn 'stopMembers\|groupMembers' plugins/remote-gui --include=*.go` matches only plugins/remote-gui/internal/session/daemon.go. Under the standard, a passing subset never upgrades a composite criterion, so AC-16 can only be `untested` in an implementation review. The two-second clause also overclaims. A browser stop that starts less than two seconds before the deadline does not get two seconds: the guard SIGKILLs the supervisor 5 s after SIGTERM (daemon.go:321-337), and stopMembers then sends Chromium SIGTERM and SIGKILL about 300 ms apart (daemon.go:89-112). Lifecycle (line 135) covers only the case where the guard kills the supervisor "before its browser stop starts".
+PROPOSAL: Limit the two-second clause to a browser stop that starts at least two seconds before the guard's deadline, and say in Lifecycle that a later start falls to the group stop. Add a proof for the fallback, such as a unit test with a supervisor delayed past the deadline that asserts no key is sent and Chromium is ended by the group stop.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: Line 30 opens with "Validation is planned, not run: lock, ownership and name tests, real-browser tests ...". The same paragraph says "Tasks T1 to T8 are implemented on the feature branch, and their task-level tests ran and passed". The T1, T3, T5 and T6 evidence lines (lines 206, 210, 214, 216) record executed name, lock and owner-mismatch tests. What is still planned is the criterion-level evidence, which is all unticked. The standard asks the summary to separate planned checks from observed proof.
+PROPOSAL: Say that criterion-level validation is planned and not yet run, while the task-level lock, ownership and name tests ran during T1 to T8.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Background)
+EVIDENCE: Line 34 says "the T9 measurement names its own harness". The R-8 bullet (line 44) and the new R-9 bullet (line 45) give a method but no command, test or harness. The standard says Context cites its claims with "a `file:line`, or a command and its output". The harness paths exist only in the R-8 and R-9 records in the Review Log. R-9 F-01 asked for the command to appear in the Background bullet.
+PROPOSAL: Name the harness or command in each bullet, or say that it is recorded in the R-8 and R-9 review records.
 
 ## Sources
 
