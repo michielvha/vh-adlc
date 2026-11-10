@@ -1,6 +1,6 @@
 ---
-status: planned
-status_description: "Revision accepted by the owner against spec review R-10; implementation resumes at T9."
+status: in-progress
+status_description: "Implementation resumed at T9 on feat/remote-gui-reusable-profiles after the accepted revision."
 branch: feat/remote-gui-reusable-profiles
 issue: https://github.com/michielvha/vh-adlc/issues/62
 goal: "An owner can opt in to a named browser profile bound to their identity, so provider sessions survive the end of a remote-gui session, while credential entry stays human-only and agent control of a signed-in profile always rests on the owner's confirmation."
