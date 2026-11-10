@@ -266,6 +266,7 @@ None.
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-10 | R-1 | spec | `43cc4f95a8aa696194d3c5cbad3d8f210bb57d98` | unknown | procedural | Two blocking and five should-fix factual or judgement findings, four nits; model identity not attested. |
 | 2026-11-10 | R-2 | spec | `ca547a83a2d5768315eee7e0c33961c072c7fb29` | unknown | procedural | Six should-fix findings (five factual, one judgement) and two nits, none blocking; model identity not attested. |
+| 2026-11-10 | R-3 | spec | `8e5c51499cf9073e6507099d1c694f5ae61d0667` | unknown | procedural | Five should-fix findings (three factual, two judgement) and three nits, none blocking; model identity not attested. |
 
 ### R-1
 
@@ -403,3 +404,61 @@ SEVERITY: nit
 WHERE: Test Plan, AC-08 and manual procedure
 EVIDENCE: The AC-08 row (line 235) says the forbidden-names search uses `PASEO_HOSTS_FORBIDDEN_NAMES`, "which the live run sets". None of manual steps (1) to (7) (line 243) runs that test or sets the variable. In CI the variable is unset, so the search checks nothing.
 PROPOSAL: Add a manual step that runs the search test with `PASEO_HOSTS_FORBIDDEN_NAMES` set to the operator host's machine, user and tailnet names and records the result.
+
+### R-3
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, onboard and Configuration; Context, Owner summary
+EVIDENCE: Onboard step 2 (line 159) hashes the password "with `hashDaemonPassword` from the pinned Paseo runtime in `PASEO_HOSTS_CACHE`". Line 145 says that cache holds the "Local Paseo runtime used for hashing and verification". Step 6 and Desktop app entry step 1 (line 183) also run the local `paseo` CLI over `PASEO_URL`. The document does not say what installs that runtime, or that the operator host needs Node and npm and access to the npm registry. The local tool relied on a runtime that was already installed in an unrelated checkout (paseo-host:10) and ran `node` in it (paseo-host:320-321). AC-08 expects a fresh operator host. The Owner summary (line 28) names only "two Go libraries" as first-run downloads, but the CLI also has to fetch `@getpaseo/cli` and its dependency tree from npm. The Test Plan uses a stand-in `npm`, so no check covers this install.
+PROPOSAL: Say how and when the CLI installs the pinned `@getpaseo/cli` into `PASEO_HOSTS_CACHE`, for example with `npm install --prefix` at the exact version on first use. List Node and npm on the operator host as prerequisites with a clear exit when they are missing. Mention the npm download in the Owner summary, and include an empty-cache case in the AC-08 proof.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, link step 5 and remove; AC-07
+EVIDENCE: Line 204 says `remove` stops with exit 3 only "When neither names a client", so that "it never leaves an app entry behind silently". The real server was linked to the Mac by the local tool, which records no `PASEO_CLIENTS` (paseo-host:340-352). If the owner then links the Windows PC with the plugin, as planned, `PASEO_CLIENTS` names only Windows. `remove` then unlinks Windows, the sweep deletes the Mac's key line, and the Mac keeps its app entry with the password and its `paseo-host` alias block, without any warning. AC-07 checks only "no client it unlinked", so it passes in that case. Separately, link step 5 (line 175) records the client only after the key line, host key and alias block are written. A `link` that fails at step 4 or in the app step leaves a client that `remove` cannot find.
+PROPOSAL: Before `remove` changes anything, have it count the server's tunnel-only key lines that have no `paseo-hosts:<client>` comment for a client it will unlink. If any exist, stop with exit 3 unless `--client` or `--no-clients` covers them. Record the client in `PASEO_CLIENTS` before link step 2. Add the mixed-registry case to the AC-07 proof.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, unlink and remove
+EVIDENCE: `unlink` step 1 (line 198) deletes the app entry using "the same ... steps as `link`". `link` identifies the entry by the `serverId` it reads from the live daemon with `paseo daemon status --json` (lines 183, 185). If a server's daemon is down or the server no longer exists, `unlink` cannot find the entry to delete. `remove` then stops at the first failure (line 204) before it deletes the registry files (line 206). The document gives a path for a client that is gone (`--server-only`) but none for a server that is gone. In that case the owner has to edit the registry and every app by hand, and `list` and the skill keep reporting the server.
+PROPOSAL: Raise as an open question whether `unlink` should also match entries by the `paseo-<alias>` connection host when the daemon cannot be reached, and whether to add a client-only `remove` path for a server that cannot be reached, mirroring `--server-only`.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Test Plan, AC-09
+EVIDENCE: AC-09 (line 226) says local-tool registry files "work unchanged with `verify`, `status`, `list`, `link`, `unlink` and `remove`". Its proof (line 245) only parses the format and rejects a command substitution. None of `verify`, `status`, `list`, `link` or `unlink` is run against a local-tool registry. In particular, no test checks that `link` falls back to `PASEO_DNS` and port 22 when `PASEO_CLIENT_HOST` and `PASEO_CLIENT_PORT` are missing (Registry, line 151). The AC-03 and AC-07 rows cover only `onboard` and `remove`.
+PROPOSAL: Extend the AC-09 row to run each named command against a fixture written in the local tool's format. Assert that `link` writes the client entries under `PASEO_DNS` with no port.
+
+FINDING: F-05
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Test Plan, AC-04 and AC-15
+EVIDENCE: The Test Plan intro (line 236) runs the embedded snippets through a stand-in `ssh` with a "stand-in ... `powershell`". The AC-04 row (line 241) asserts results "for both platforms against temporary files". The Windows client snippets that write the SSH config, `known_hosts`, the key and its ACL are PowerShell, and a stand-in does not run them. Windows is not measured live yet (Context, line 66), so these tests are the only automated evidence for Windows. As written, they could pass without ever running a Windows snippet.
+PROPOSAL: Say that the PowerShell snippets run under a real `pwsh` in the Go tests and in CI, with ACL steps faked where Linux cannot run them. If that is not possible, state in AC-04, AC-15 and the Owner summary that the Windows snippets are proven only by manual step 6.
+
+FINDING: F-06
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Plugin layout and Configuration
+EVIDENCE: Line 126 says the wrapper builds into `${XDG_CACHE_HOME:-~/.cache}/paseo-hosts/builds`. Line 145 says `PASEO_HOSTS_CACHE` is also "the build cache". The document does not say whether the wrapper reads `PASEO_HOSTS_CACHE`, so the two places can disagree when the variable is set.
+PROPOSAL: Either have the wrapper build into `${PASEO_HOSTS_CACHE}/builds`, or remove "and the build cache" from the table row.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Desktop app entry and remove; AC-07
+EVIDENCE: Line 185 keeps `app-registry-<client>.backup.json` in `PASEO_HOSTS_DIR` after success. That file holds the client's full host list, passwords included. Line 206 and AC-07 (line 224) say the "registry files and password are gone" after `remove`. Terms defines the registry as only the `.env` and `.password` files, and nothing deletes or rewrites the backups. The removed server's plaintext password therefore stays on the operator host, and restoring a backup would bring the removed host back.
+PROPOSAL: State what happens to the backups on `unlink` and `remove`, for example deleting the removed entry from each backup. Otherwise, narrow the AC-07 wording to the `<alias>` files.
+
+FINDING: F-08
+KIND: judgement
+SEVERITY: nit
+WHERE: Design, link; Acceptance Criteria
+EVIDENCE: Line 177 makes `status <alias>` the replacement for the handoff notes, which the owner chose to drop. With `--no-app` it is also where the owner sees the Remote SSH value for each client. No criterion or Test Plan row checks what `status` prints. AC-09 checks only that it "works" on a local-tool registry.
+PROPOSAL: Add the fields `status` must print to AC-09 or AC-11, with a reporter test that asserts them.
