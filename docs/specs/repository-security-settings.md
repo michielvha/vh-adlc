@@ -890,6 +890,7 @@ None.
 | 2026-11-10 | R-23 | spec | `dccdfb2` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-24 | spec | `9e3883b` | claude-opus-4.8 | procedural | 2 findings: 1 should-fix, 1 nit, none blocking |
 | 2026-11-10 | R-25 | spec | `ef3ebb6` | unknown | procedural | 2 findings: 2 should-fix, none blocking; model identity not attested |
+| 2026-11-10 | R-26 | spec | `fd18d71` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1668,6 +1669,29 @@ SEVERITY: should-fix
 WHERE: Acceptance Criteria (AC-24) and Test Plan (AC-24)
 EVIDENCE: The Design says the helper's `apply` "fails visibly when that binding does not resolve" (line 332). The R-24 fold (Q72) adds: "When `apply` cannot read its `--run-id` (missing, mismatched or broken run), it makes no write and exits nonzero naming the run" (lines 341-342). AC-24 (lines 805-810) states only that `apply` makes no write when the bound committed settings do not adopt `apply` or do not name the target, or when the run's recorded request or scope selects `check`. It says nothing about an unreadable run or a failed binding. The Test Plan's eighth helper fixture (line 842) tests the unreadable run, but no criterion text carries it. No fixture runs the helper's `apply` with a failed binding: the `--default-commit` mismatch fixture runs only the mode command and the helper's `check`. If an implementation treats an unreadable run as "no run", or falls back to the working-tree settings when the binding fails and then writes, it meets every criterion as worded. The opt-in would again rest on the skill alone, which Q55, Q60 and Q72 set out to avoid.
 PROPOSAL: Add to AC-24 that the helper's `apply` makes no write and exits nonzero naming the cause when its binding does not resolve, when the committed settings are invalid, or when its `--run-id` cannot be read. Add a helper `apply` fixture whose `--default-commit` differs from `origin/<branch>`. It passes when no write is recorded and the exit is nonzero.
+
+### R-26
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Helper), Acceptance Criteria (AC-24) and Test Plan (AC-24)
+EVIDENCE: The R-25 fold (Q73) added this to AC-24 (lines 816-818 at fd18d71): the helper's `apply` "makes no write and exits nonzero naming the cause when its binding does not resolve, the committed settings are invalid, or its `--run-id` cannot be read". The Design gives `apply` only two failure cases. It "fails visibly when that binding does not resolve" (lines 335-336), and it exits nonzero for an unreadable run (lines 341-342). For invalid committed settings, the Design states the nonzero exit only for `security-settings-mode` (line 350). It says nothing about `apply`. The Test Plan covers the binding case with the ninth helper fixture (`--default-commit` differs from `origin/<branch>`) and the run case with the eighth (a missing run). It has no helper `apply` fixture with invalid committed settings. The only committed `security_settings: maybe` fixture runs `security-settings-mode` and the helper's `check`. Under Q62, `check` falls back to the working tree's settings when the committed settings are invalid. An `apply` that shares that fallback, or that treats an invalid committed value as `not-adopted` and exits by its entries, passes every listed fixture and still breaks AC-24 as worded. A passing subset never upgrades a composite criterion, so AC-24 would be `untested`.
+PROPOSAL: State in the Design that `apply` makes no write and exits nonzero naming the cause when the committed settings are invalid. Add a helper `apply` fixture that commits `security_settings: maybe` (or an unknown keep-off setting name) beside a valid working tree that adopts `apply`. It passes when no write is recorded and the exit is nonzero naming the field.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-11) and Design (Procedure changes)
+EVIDENCE: The Owner summary (line 51) says "Only a full authorized sweep, or onboarding, may write". The Design's authority row (lines 621-622) says "a maintenance sweep or onboarding may enable these settings with `apply`". Onboarding "runs the command without one and the committed settings alone decide" (lines 576-578), so it gets `apply` when the committed settings adopt it. AC-11 (lines 711-713) requires the maintenance skill, `references/security-settings.md` and the authority row to state "that only a full sweep whose request has `authorized_sweep` true may apply". The Design's mode bullet (line 573) also says "So only a full authorized sweep writes". Onboarding has no maintenance request and no `authorized_sweep`. An authority row and reference page written to AC-11's wording would therefore forbid onboarding writes. At the same time, AC-11 requires `references/loop.md` and `references/lifecycle.md` to say onboarding runs the helper in the mode the command prints. The implementation reviewer would have to pass two pages that contradict each other on whether onboarding may write.
+PROPOSAL: Reword the AC-11 clause and line 573 to "among maintenance runs, only a full sweep whose request has `authorized_sweep` true may apply; onboarding applies only as the committed settings decide". Alternatively, scope the clause explicitly to sweeps so the authority row still allows onboarding.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Design (Collector) and Acceptance Criteria (AC-11)
+EVIDENCE: The Design (lines 513-516) adds the collector reason `helper-receipt-missing` for a repository passed with `--applied-repository` that has no accepted helper file. AC-11 requires only "the `not-free-on-private` and `alerts-enabled-this-run` collector rules" to be documented (line 697). No criterion asks any reference page to define `helper-receipt-missing`, although sweep reports and `security-reconcile` gaps will show it. Separately, the Design (line 525) says only `references/maintenance.md` names `alerts-enabled-this-run`. AC-11 requires both collector rules in `references/maintenance.md` and in `references/maintenance-settings.md`.
+PROPOSAL: Add `helper-receipt-missing` to the AC-11 collector-rule clause. Make the Design and AC-11 agree on which pages name `alerts-enabled-this-run`.
 
 ## Sources
 
