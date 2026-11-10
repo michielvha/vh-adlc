@@ -284,8 +284,8 @@ func TestBrowserComponentsCrashAndExpire(t *testing.T) {
 	}
 }
 
-// fakeVNC accepts x11vnc's password handshake and ignores every key, so the
-// native Exit request reaches it and Chromium never quits.
+// fakeVNC accepts x11vnc's password handshake, ignores every key and logs
+// each key event to <file>.keys, so a test can prove that no key was sent.
 func fakeVNC(file string) int {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -323,10 +323,10 @@ func fakeVNC(file string) int {
 				if _, err := io.ReadFull(conn, buffer[:8]); err != nil {
 					return
 				}
-				if buffer[0] == 4 && buffer[1] == 1 && buffer[7] == 'x' {
-					f, e := os.OpenFile(file+".exit", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+				if buffer[0] == 4 {
+					f, e := os.OpenFile(file+".keys", os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 					if e == nil {
-						_, _ = io.WriteString(f, "exit-requested\n")
+						_, _ = io.WriteString(f, strconv.Itoa(int(buffer[7]))+"\n")
 						_ = f.Close()
 					}
 				}
@@ -389,7 +389,7 @@ func termTimes(file string) []time.Time {
 	return times
 }
 
-func TestReusableStopTerminatesThenKillsAStubbornBrowser(t *testing.T) {
+func TestReusableStopSendsNoKeyAndTerminatesThenKills(t *testing.T) {
 	c, id := setup(t)
 	dir := t.TempDir()
 	vnc := helper(t, "vnc", "REMOTE_GUI_TEST_FAKE_VNC", filepath.Join(dir, "vnc"))
@@ -413,8 +413,8 @@ func TestReusableStopTerminatesThenKillsAStubbornBrowser(t *testing.T) {
 	begin := time.Now()
 	r.stop()
 	elapsed := time.Since(begin)
-	if _, err = os.Stat(filepath.Join(dir, "vnc.exit")); err != nil {
-		t.Fatal("the native Exit request was not sent")
+	if keys, e := os.ReadFile(filepath.Join(dir, "vnc.keys")); e == nil {
+		t.Fatalf("stop sent keys to the display: %q", keys)
 	}
 	terms := termTimes(filepath.Join(dir, "term"))
 	if len(terms) == 0 {
@@ -426,11 +426,11 @@ func TestReusableStopTerminatesThenKillsAStubbornBrowser(t *testing.T) {
 	default:
 		t.Fatal("stubborn browser survived stop")
 	}
-	if wait := terms[0].Sub(begin); wait < 1900*time.Millisecond || wait > 2600*time.Millisecond {
-		t.Fatalf("SIGTERM after %v, want about two seconds", wait)
+	if wait := terms[0].Sub(begin); wait > 300*time.Millisecond {
+		t.Fatalf("SIGTERM after %v, want it first", wait)
 	}
-	if wait := death.Sub(terms[0]); wait < 900*time.Millisecond || wait > 1600*time.Millisecond {
-		t.Fatalf("SIGKILL %v after SIGTERM, want about one second", wait)
+	if wait := death.Sub(terms[0]); wait < 1900*time.Millisecond || wait > 2600*time.Millisecond {
+		t.Fatalf("SIGKILL %v after SIGTERM, want about two seconds", wait)
 	}
 	if elapsed > 4500*time.Millisecond {
 		t.Fatalf("stop took %v, past the guard's five-second supervisor deadline", elapsed)
@@ -551,6 +551,9 @@ func standInLauncher(_ context.Context, c config.Config, id string) (session.Bro
 	r.current = session.BrowserHandle{BrowserMode: c.Mode(), Target: "http://" + listener.Addr().String() + "/vnc.html", Assets: dir, Password: "fixture"}
 	handle := r.snapshot()
 	handle.Stop = func() {
+		if delay, e := time.ParseDuration(os.Getenv("REMOTE_GUI_TEST_STOP_DELAY")); e == nil {
+			time.Sleep(delay)
+		}
 		r.stop()
 		_ = viewer.Close()
 		_ = os.WriteFile(filepath.Join(dir, "stopped-"+id), nil, 0o600)
@@ -599,11 +602,12 @@ func TestReusableProfileStopAndExpiryWithStubbornBrowser(t *testing.T) {
 					chrome = p.Identity
 				}
 			}
+			began := record.Expires
 			if ending == "stop" {
-				begin := time.Now()
+				began = time.Now()
 				end, err := session.Stop(home, v.ID)
-				if err != nil || end.State != "stopped" || time.Since(begin) > 10*time.Second {
-					t.Fatalf("stop: %+v %v after %v", end, err, time.Since(begin))
+				if err != nil || end.State != "stopped" || time.Since(began) > 10*time.Second {
+					t.Fatalf("stop: %+v %v after %v", end, err, time.Since(began))
 				}
 			} else {
 				deadline := time.Now().Add(15 * time.Second)
@@ -621,8 +625,15 @@ func TestReusableProfileStopAndExpiryWithStubbornBrowser(t *testing.T) {
 			if _, err = os.Stat(filepath.Join(dir, "stopped-"+v.ID)); err != nil {
 				t.Fatal("the supervisor did not finish its browser stop before the guard's deadline")
 			}
-			if len(termTimes(filepath.Join(dir, "term-"+v.ID))) == 0 || state.Alive(chrome) {
+			terms := termTimes(filepath.Join(dir, "term-"+v.ID))
+			if len(terms) == 0 || state.Alive(chrome) {
 				t.Fatal("the stubborn browser was not terminated and killed")
+			}
+			if wait := terms[0].Sub(began); wait > time.Second {
+				t.Fatalf("SIGTERM reached the browser %v after the %s began, want it first", wait, ending)
+			}
+			if keys, e := os.ReadFile(filepath.Join(dir, "vnc-"+v.ID+".keys")); e == nil {
+				t.Fatalf("%s sent keys to the display: %q", ending, keys)
 			}
 			held, err := profile.Acquire(profiles, "work")
 			if err != nil {
@@ -657,5 +668,79 @@ func TestReusableProfileStopAndExpiryWithStubbornBrowser(t *testing.T) {
 				t.Fatalf("next first launch did not mark a clean exit: %s", data)
 			}
 		})
+	}
+}
+
+// When forward removal or anything else delays the supervisor past the guard's
+// deadline, its browser stop never starts: no key is sent and the guard's
+// group stop ends Chromium.
+func TestDelayedSupervisorLeavesChromiumToTheGuard(t *testing.T) {
+	base, err := os.MkdirTemp("/tmp", "rg-standin-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(base) })
+	home, profiles, dir := filepath.Join(base, "s"), filepath.Join(base, "p"), filepath.Join(base, "d")
+	if err = os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	version := filepath.Join(dir, "chromium")
+	if err = os.WriteFile(version, []byte("#!/bin/sh\necho 'Chromium 151.0.7922.137'\n"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("REMOTE_GUI_TEST_STANDIN", dir)
+	t.Setenv("REMOTE_GUI_TEST_STOP_DELAY", "8s")
+	t.Setenv("REMOTE_GUI_CHROMIUM", version)
+	c, err := config.Parse([]string{"start", "--home", home, "--profile-home", profiles, "--profile", "work", "--transport", "loopback", "--ttl", "4s"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, err := session.Start(c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = session.Stop(home, v.ID) })
+	record, err := state.Load(home, v.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var chrome state.Identity
+	for _, p := range record.Owned {
+		if p.Role == "browser" {
+			chrome = p.Identity
+		}
+	}
+	deadline := time.Now().Add(20 * time.Second)
+	for {
+		end, e := session.Read(home, v.ID)
+		if e == nil && (end.State == "stopped" || end.State == "failed") {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expiry past the supervisor deadline did not end the session: %+v %v", end, e)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if _, err = os.Stat(filepath.Join(dir, "stopped-"+v.ID)); err == nil {
+		t.Fatal("the delayed supervisor finished its browser stop")
+	}
+	if keys, e := os.ReadFile(filepath.Join(dir, "vnc-"+v.ID+".keys")); e == nil {
+		t.Fatalf("keys were sent to the display: %q", keys)
+	}
+	terms := termTimes(filepath.Join(dir, "term-"+v.ID))
+	if len(terms) == 0 || state.Alive(chrome) {
+		t.Fatal("the guard's group stop did not end the browser")
+	}
+	if wait := terms[0].Sub(record.Expires); wait < 4500*time.Millisecond || wait > 7*time.Second {
+		t.Fatalf("SIGTERM %v after expiry, want the guard's group stop after its five-second deadline", wait)
+	}
+	held, err := profile.Acquire(profiles, "work")
+	if err != nil {
+		t.Fatalf("profile still held: %v", err)
+	}
+	m, _, err := held.Meta()
+	held.Release()
+	if err != nil || m.HolderID != "" {
+		t.Fatalf("holder not cleared: %+v %v", m, err)
 	}
 }

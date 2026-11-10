@@ -1,9 +1,13 @@
 package browser
 
 import (
+	"bufio"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -279,9 +283,10 @@ func TestFailedDisplayStartupRollsBack(t *testing.T) {
 
 type cookieFixture struct {
 	*httptest.Server
-	mu    sync.Mutex
-	seen  map[string]string
-	count atomic.Int64
+	mu     sync.Mutex
+	seen   map[string]string
+	inputs []string
+	count  atomic.Int64
 }
 
 func newCookieFixture(t *testing.T) *cookieFixture {
@@ -300,6 +305,15 @@ func newCookieFixture(t *testing.T) *cookieFixture {
 			f.seen[r.URL.Query().Get("n")] = r.Header.Get("Cookie")
 			f.mu.Unlock()
 			_, _ = io.WriteString(w, "<!doctype html><title>fixture-check</title><p>check")
+		case "/setp":
+			http.SetCookie(w, &http.Cookie{Name: r.URL.Query().Get("name"), Value: "1", Path: "/", MaxAge: 86400})
+			_, _ = io.WriteString(w, "<!doctype html><title>fixture-setp</title><p>set")
+		case "/form":
+			_, _ = io.WriteString(w, `<!doctype html><title>fixture-form</title><form action="/submit"><input name="q" autofocus></form><script>addEventListener('keydown',e=>navigator.sendBeacon('/key?k='+encodeURIComponent(e.key)))</script>`)
+		case "/key", "/submit":
+			f.mu.Lock()
+			f.inputs = append(f.inputs, r.URL.String())
+			f.mu.Unlock()
 		case "/download":
 			w.Header().Set("Content-Type", "application/octet-stream")
 			w.Header().Set("Content-Disposition", `attachment; filename="fixture.txt"`)
@@ -367,6 +381,87 @@ func (f *cookieFixture) cookies(t *testing.T, cdp string) string {
 		t.Fatal("fixture saw no check request")
 	}
 	return cookie
+}
+
+// cdpCall sends one DevTools command over a fresh WebSocket and returns its
+// result. It sends no Origin header, which Chromium accepts on loopback.
+func cdpCall(t *testing.T, endpoint, method string, params any) json.RawMessage {
+	t.Helper()
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := net.DialTimeout("tcp", u.Host, 3*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = conn.Close() }()
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+	key := make([]byte, 16)
+	_, _ = rand.Read(key)
+	_, err = fmt.Fprintf(conn, "GET %s HTTP/1.1\r\nHost: %s\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: %s\r\n\r\n", u.RequestURI(), u.Host, base64.StdEncoding.EncodeToString(key))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader := bufio.NewReader(conn)
+	response, err := http.ReadResponse(reader, nil)
+	if err != nil || response.StatusCode != http.StatusSwitchingProtocols {
+		t.Fatalf("DevTools WebSocket refused: %v", err)
+	}
+	payload, _ := json.Marshal(map[string]any{"id": 1, "method": method, "params": params})
+	if len(payload) >= 1<<16 {
+		t.Fatal("DevTools command too large")
+	}
+	frame := []byte{0x81}
+	if n := len(payload); n < 126 {
+		frame = append(frame, 0x80|byte(n))
+	} else {
+		frame = append(frame, 0x80|126, byte(n>>8), byte(n))
+	}
+	mask := make([]byte, 4)
+	_, _ = rand.Read(mask)
+	frame = append(frame, mask...)
+	for i, b := range payload {
+		frame = append(frame, b^mask[i%4])
+	}
+	if _, err = conn.Write(frame); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		header := make([]byte, 2)
+		if _, err = io.ReadFull(reader, header); err != nil {
+			t.Fatalf("DevTools %s: %v", method, err)
+		}
+		size := uint64(header[1] & 0x7f)
+		switch size {
+		case 126:
+			var extended [2]byte
+			_, err = io.ReadFull(reader, extended[:])
+			size = uint64(binary.BigEndian.Uint16(extended[:]))
+		case 127:
+			var extended [8]byte
+			_, err = io.ReadFull(reader, extended[:])
+			size = binary.BigEndian.Uint64(extended[:])
+		}
+		if err != nil || size > 1<<24 {
+			t.Fatal("invalid DevTools frame")
+		}
+		body := make([]byte, size)
+		if _, err = io.ReadFull(reader, body); err != nil {
+			t.Fatal(err)
+		}
+		var message struct {
+			ID     int             `json:"id"`
+			Result json.RawMessage `json:"result"`
+			Error  json.RawMessage `json:"error"`
+		}
+		if json.Unmarshal(body, &message) == nil && message.ID == 1 {
+			if message.Error != nil {
+				t.Fatalf("DevTools %s: %s", method, message.Error)
+			}
+			return message.Result
+		}
+	}
 }
 
 type profileBase struct {
@@ -749,5 +844,80 @@ func TestRealReusableProfileStillRunning(t *testing.T) {
 	next := b.mustStart(t, "3m")
 	if _, err = session.Stop(b.home, next.ID); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestRealReusableProfileStopSendsNoKeys(t *testing.T) {
+	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
+		t.Skip("set REMOTE_GUI_BROWSER_E2E=1 with existing host GUI dependencies")
+	}
+	b := newProfileBase(t)
+	fixture := newCookieFixture(t)
+	v := b.mustStart(t, "3m", "--browser-mode", "agent", "--agent-start-approved")
+	openTab(t, v.CDPAddress, fixture.URL+"/form", "fixture-form")
+	response, err := http.Get(v.CDPAddress + "/json/version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var version struct{ WebSocketDebuggerURL string }
+	err = json.NewDecoder(response.Body).Decode(&version)
+	_ = response.Body.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A provider sign-in popup: its own focused window holding a form.
+	cdpCall(t, version.WebSocketDebuggerURL, "Target.createTarget", map[string]any{"url": fixture.URL + "/form?popup=1", "newWindow": true})
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		found := false
+		for _, p := range devtoolsPages(t, v.CDPAddress) {
+			found = found || (p.URL == fixture.URL+"/form?popup=1" && p.Title == "fixture-form")
+		}
+		if found {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("popup window did not load")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	time.Sleep(500 * time.Millisecond)
+	if end, err := session.Stop(b.home, v.ID); err != nil || end.State != "stopped" {
+		t.Fatalf("stop: %+v %v", end, err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	fixture.mu.Lock()
+	defer fixture.mu.Unlock()
+	if len(fixture.inputs) != 0 {
+		t.Fatalf("stop sent input to a page: %v", fixture.inputs)
+	}
+}
+
+func TestRealReusableProfileCookieSetBeforeStop(t *testing.T) {
+	if os.Getenv("REMOTE_GUI_BROWSER_E2E") != "1" {
+		t.Skip("set REMOTE_GUI_BROWSER_E2E=1 with existing host GUI dependencies")
+	}
+	b := newProfileBase(t)
+	fixture := newCookieFixture(t)
+	previous := ""
+	for run := 0; run <= 10; run++ {
+		v := b.mustStart(t, "3m", "--browser-mode", "agent", "--agent-start-approved")
+		if previous != "" {
+			if cookie := fixture.cookies(t, v.CDPAddress); !strings.Contains(cookie, previous+"=1") {
+				t.Fatalf("run %d: cookie set 30 seconds before stop was lost: %q", run, cookie)
+			}
+		}
+		if run == 10 {
+			if _, err := session.Stop(b.home, v.ID); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+		previous = "c" + strconv.Itoa(run)
+		openTab(t, v.CDPAddress, fixture.URL+"/setp?name="+previous, "fixture-setp")
+		time.Sleep(30 * time.Second)
+		if end, err := session.Stop(b.home, v.ID); err != nil || end.State != "stopped" {
+			t.Fatalf("run %d stop: %+v %v", run, end, err)
+		}
 	}
 }
