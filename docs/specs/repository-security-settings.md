@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-32 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "R-33 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every full authorized maintenance sweep and onboarding by a consumer that opts in turns on, in each github.com repository its committed settings name and except what its keep-off list names, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -74,7 +74,7 @@ then moves both docs pins with a minor version bump.
 This widens the authority table; today vh-adlc changes only merged-branch deletion.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-32 found nothing blocking; later findings were folded with each
+Reviews R-1 to R-33 found nothing blocking; later findings were folded with each
 recommendation, as the owner instructed. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
@@ -280,6 +280,9 @@ Owner decisions on 2026-11-10:
   helper `gh` call passes `--hostname` with the validated origin host; rule 2 and the
   `code_scanning` entry apply only on github.com; `apply` refuses with `not-github-com` with or
   without a run; the goal and owner summary name the github.com limit.
+- Q81, from spec review R-33, taken with the reviewer's proposals under that instruction: AC-24
+  and the mode bullet list the non-github.com host among the `check` conditions; a 404 from a
+  config-file lookup on the target's own default branch means absent, and the fakes answer so.
 
 ## Scope
 
@@ -500,7 +503,10 @@ looks only for the managed Renovate App's `app/renovate` login and does not read
 Dependabot is configured when `.github/dependabot.yml` or `.github/dependabot.yaml` exists on the
 default branch.
 
-Renovate has no signal only when every Renovate lookup succeeded and none matched. Any failed
+The default branch for these lookups is the target repository's own `default_branch` from
+`repos/{r}`, not the helper's `--default-branch`, which binds the consumer checkout. A 404 from a
+config-file lookup there means the file is absent and counts as a successful lookup with no
+match. Renovate has no signal only when every Renovate lookup succeeded and none matched. Any failed
 Renovate lookup with no match elsewhere counts as failed, as does a failed Dependabot config lookup.
 
 For `dependabot_security_updates`, with no write in any row except the second:
@@ -606,7 +612,8 @@ for adopting either.
   passes the printed reason to the helper's `check`; `apply` shows `adopted`. With a run, the mode is `check` when the recorded request lacks `authorized_sweep` true,
   has `read_only`, `draft_only`, `no_push` or `no_filesystem`
   (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`), or when the run's scope has a pull
-  request or does not include the repository, and also when the committed settings do not adopt `security_settings: apply`. Otherwise
+  request or does not include the repository, and also when the maintenance settings' `hostname`
+  is not github.com or the committed settings do not adopt `security_settings: apply`. Otherwise
   it is `apply`. So among maintenance runs only a full authorized sweep writes, and onboarding
   writes only as the committed settings decide; a PR-scoped assessment checks. The helper
   runs once, before a new run's collection; a continuation reuses that run's saved files and does
@@ -840,8 +847,8 @@ with every read and write succeeding, unless it names another case.
       `draft_only`, `no_push` or `no_filesystem`, or when the committed settings do not adopt
       `security_settings: apply`, or when the recorded request lacks `authorized_sweep` true, or
       when the run's scope has a pull request, or when the repository is outside the run's recorded
-      `scope.repositories`; otherwise it prints `apply`, also with no recorded
-      request. A
+      `scope.repositories`, or when the maintenance settings' `hostname` is not github.com;
+      otherwise it prints `apply`, also with no recorded request. A
       request with only `no_commit` gets `apply` when the settings adopt it. A `security_settings`
       value other than `apply` or `check` fails visibly. A value of `apply` present only in the
       working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link gives
@@ -879,7 +886,7 @@ with every read and write succeeding, unless it names another case.
 
 | Criterion | Proof |
 | --- | --- |
-| AC-01, AC-03, AC-04 | `bun test tests/vh-adlc/security-settings` with a fake `gh` that records every call, keeps settings state, and denies admin-only reads and rejects a security-updates write while alerts are off, as GitHub does. Fixture: public repository, admin, every setting off, `.github/dependabot.yml`, no Renovate. Pass: the four settings written once, read back on and reported `enabled`, and no `code-scanning` call recorded. A second fixture with no `dependabot.yml` passes when security updates are `left-off` with `renovate-unknown` and no `automated-security-fixes` write was recorded. A third fixture identical to the first but with only `.github/dependabot.yaml` passes when security updates are `enabled`. |
+| AC-01, AC-03, AC-04 | `bun test tests/vh-adlc/security-settings` with a fake `gh` that records every call, keeps settings state, and denies admin-only reads, rejects a security-updates write while alerts are off and answers a lookup of an absent file with 404, as GitHub does. Fixture: public repository, admin, every setting off, `.github/dependabot.yml`, no Renovate. Pass: the four settings written once, read back on and reported `enabled`, and no `code-scanning` call recorded. A second fixture with no `dependabot.yml` passes when security updates are `left-off` with `renovate-unknown` and no `automated-security-fixes` write was recorded. A third fixture identical to the first but with only `.github/dependabot.yaml` passes when security updates are `enabled`. |
 | AC-02 | Same suite, one fixture per documented config location, one with a `renovate` key in `package.json`, one with only an `app/renovate` pull request, and one with only an open Dependency Dashboard issue. Pass: no write to `automated-security-fixes`, entry `left-off` with `renovate-present` and the matched evidence. |
 | AC-05 | Same suite, fixtures: private repository, internal repository and archived public repository, each with every setting off. `security_and_analysis` is null in the private and internal fixtures, and a third private fixture shows `code_security` enabled. Pass: the private and internal runs record writes only to `vulnerability-alerts` and `automated-security-fixes`, `dependabot_alerts` is read back and `enabled`, and secret scanning, push protection and `code_scanning` are `unavailable` with `not-free-on-private`; the third has no `code_scanning` entry; the archived run records no writes and every entry is `unavailable` with `archived`. |
 | AC-06 | Same suite, unarchived public fixture with `permissions.admin: false` run with `apply`, and the first fixture run with `check`. Pass: zero write calls in both and no admin-only read in the first; entries `unknown` with `needs-admin`, or `not-changed` with `check-only`; exit code 1. |
