@@ -908,6 +908,7 @@ None.
 | 2026-11-10 | R-25 | spec | `ef3ebb6` | unknown | procedural | 2 findings: 2 should-fix, none blocking; model identity not attested |
 | 2026-11-10 | R-26 | spec | `fd18d71` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-27 | spec | `3eab6e7` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-28 | spec | `3b5e3d7` | unknown | procedural | 1 finding: 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1732,6 +1733,15 @@ SEVERITY: nit
 WHERE: Design (Helper), AC-24 and Test Plan (AC-24)
 EVIDENCE: The Design says that when `apply` "cannot read its `--run-id` (missing, mismatched or broken run), it makes no write and exits nonzero naming the run". AC-24 says the same for a `--run-id` that "cannot be read". The proof's eighth `apply` fixture covers only "a `--run-id` that does not exist". `readRun` rejects a missing run, an identity mismatch and a broken event chain separately (`plugins/vh-adlc/scripts/maintenance/journal.ts:171-185`). Suppose an implementation checks only that the run directory exists and then reads the header's request without validating the chain. It passes the eighth fixture and still applies under a corrupt or forked run. A passing subset never upgrades a composite criterion.
 PROPOSAL: Add an `apply` fixture whose run has a broken or noncontiguous event chain, or a mismatched identity. It passes when no write is recorded and the exit is nonzero naming the run.
+
+### R-28
+
+FINDING: F-01
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria (AC-17) and Test Plan (AC-17)
+EVIDENCE: The Q75 fold adds this to AC-17 (lines 769-772): "including when the committed settings are unlinked or absent and the row is in the working tree's settings". The Design (lines 366-368) says that when "the binding resolves but the committed settings are unlinked or absent, `check` also reads keep-off rows from the working tree". `resolveStanding` reaches that state on three separate paths. At line 96 it returns when there is no committed `AGENTS.md`, and also when `AGENTS.md` does not link `.vh-adlc/maintenance.yaml`. At line 98 it returns when `AGENTS.md` links the file but the file is not at the commit (`plugins/vh-adlc/scripts/maintenance/authority.ts:96`, `:98`). The new AC-17 proof (line 861) covers only "a resolved binding whose `AGENTS.md` does not link the settings". It also does not say the keep-off row exists only in the working tree. Suppose an implementation reads rows from an unlinked but committed `.vh-adlc/maintenance.yaml`, or falls back only when `AGENTS.md` exists without the link. It passes that fixture whenever the committed file and the working tree hold the same row. It would still miss the case where the file is absent, which is the bg-remove case: `gh api repos/michielvha/bg-remove/contents/AGENTS.md` and `.../contents/.vh-adlc` both return 404 today. A passing subset never upgrades a composite criterion.
+PROPOSAL: In the AC-17 fixture, put the keep-off row only in the working tree. Add a second `check` fixture with no committed `AGENTS.md` or settings file, or one whose `AGENTS.md` links a settings file that was never committed. Each passes with the same `owner-choice-conflict` outcome.
 
 ## Sources
 
