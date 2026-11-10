@@ -1,6 +1,6 @@
 ---
-status: draft
-status_description: "R-9 review found nothing; awaiting owner acceptance."
+status: planned
+status_description: "Accepted by the owner at R-9; tasks are next."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
 covers:
@@ -281,6 +281,7 @@ None.
 | 2026-11-10 | R-7 | spec | `038146bca5d105691d47219cb16f8efaacb4eb2a` | claude-opus-4.8 | procedural | One should-fix factual finding and one factual nit, none blocking; model reported by the reviewer, not requested. |
 | 2026-11-10 | R-8 | spec | `c1ae6fe96c0d3ce22320142d6b553268e84c33aa` | unknown | procedural | One should-fix factual finding, not blocking; model identity not attested. |
 | 2026-11-10 | R-9 | spec | `b3e5b4ce742b346b17d45cb0d2fbc30017d5ae39` | unknown | procedural | No findings; model identity not attested. |
+| 2026-11-10 | R-9 | spec | `b3e5b4ce742b346b17d45cb0d2fbc30017d5ae39` | n/a | n/a | accepted by owner |
 
 ### R-1
 
