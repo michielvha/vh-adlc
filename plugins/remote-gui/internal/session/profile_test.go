@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -30,6 +31,9 @@ import (
 // The supervisor is a re-executed test binary, so the fake browser is selected
 // through the inherited environment. It never starts a display or Chromium.
 func init() {
+	if file := os.Getenv("REMOTE_GUI_TEST_STUBBORN"); file != "" {
+		os.Exit(stubbornBrowser(file))
+	}
 	if dir := os.Getenv("REMOTE_GUI_TEST_FAKE_BROWSER"); dir != "" {
 		BrowserLauncher = func(ctx context.Context, c config.Config, id string) (BrowserHandle, error) {
 			return fakeBrowser(dir, c, id)
@@ -81,6 +85,39 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 		_ = conn.Close()
 	})}
 	go func() { _ = server.Serve(listener) }()
+	closeBrowser := func() {}
+	if c.Profile != "" && os.Getenv("REMOTE_GUI_TEST_STUBBORN_STOP") != "" {
+		// A browser that ignores SIGTERM, closed like a reusable profile's
+		// browser stop: SIGTERM, then SIGKILL two seconds later.
+		cmd := exec.Command(os.Args[0], "-test.run=^$")
+		cmd.Env = append(os.Environ(), "REMOTE_GUI_TEST_STUBBORN="+filepath.Join(dir, "term-"+id))
+		if err := cmd.Start(); err != nil {
+			return BrowserHandle{}, err
+		}
+		done := make(chan struct{})
+		go func() { _ = cmd.Wait(); close(done) }()
+		identity, err := state.Inspect(cmd.Process.Pid)
+		if err != nil {
+			return BrowserHandle{}, err
+		}
+		data, _ := json.Marshal(identity)
+		if err = os.WriteFile(filepath.Join(dir, "browser-"+id), data, 0o600); err != nil {
+			return BrowserHandle{}, err
+		}
+		time.Sleep(100 * time.Millisecond)
+		closeBrowser = func() {
+			stamp(filepath.Join(dir, "stop-begin-"+id))
+			_ = cmd.Process.Signal(syscall.SIGTERM)
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+				_ = cmd.Process.Kill()
+				<-done
+			}
+			stamp(filepath.Join(dir, "stop-end-"+id))
+		}
+	}
+	var once sync.Once
 	return BrowserHandle{
 		BrowserMode: c.Mode(),
 		Target:      "http://" + listener.Addr().String() + "/vnc.html",
@@ -88,10 +125,30 @@ func fakeBrowser(dir string, c config.Config, id string) (BrowserHandle, error) 
 		Password:    "fixture",
 		Alive:       func() bool { return true },
 		Stop: func() {
-			_ = server.Close()
-			_ = os.WriteFile(filepath.Join(dir, "stopped-"+id), nil, 0o600)
+			once.Do(func() {
+				closeBrowser()
+				_ = server.Close()
+				_ = os.WriteFile(filepath.Join(dir, "stopped-"+id), nil, 0o600)
+			})
 		},
 	}, nil
+}
+
+func stamp(file string) {
+	_ = os.WriteFile(file, []byte(strconv.FormatInt(time.Now().UnixNano(), 10)), 0o600)
+}
+
+func stubbornBrowser(file string) int {
+	terms := make(chan os.Signal, 4)
+	signal.Notify(terms, syscall.SIGTERM)
+	for range terms {
+		f, err := os.OpenFile(file, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err == nil {
+			_, _ = io.WriteString(f, strconv.FormatInt(time.Now().UnixNano(), 10)+"\n")
+			_ = f.Close()
+		}
+	}
+	return 0
 }
 
 type profileFixture struct {
@@ -584,5 +641,132 @@ func TestProfileListAndDelete(t *testing.T) {
 	again, err := ProfileDelete(f.home, f.profiles, "work")
 	if err != nil || again.Result != "missing" {
 		t.Fatalf("repeated delete: %+v %v", again, err)
+	}
+}
+
+func termTimes(file string) []time.Time {
+	data, _ := os.ReadFile(file)
+	var times []time.Time
+	for _, line := range strings.Fields(string(data)) {
+		if n, err := strconv.ParseInt(line, 10, 64); err == nil {
+			times = append(times, time.Unix(0, n))
+		}
+	}
+	return times
+}
+
+// When forward removal is delayed, here by holding the state lock that it
+// must take, a reusable profile's browser stop starts once the proxy has
+// rejected access, without waiting for the removal, so the browser gets its
+// SIGTERM and its kill two seconds later, never the guard's group stop.
+func TestProfileBrowserStopDoesNotWaitForForwardRemoval(t *testing.T) {
+	for _, ending := range []string{"expiry", "stop"} {
+		t.Run(ending, func(t *testing.T) {
+			f := newProfileFixture(t)
+			t.Setenv("REMOTE_GUI_TEST_STUBBORN_STOP", "1")
+			v, err := Start(f.config(t, "work", "--ttl", map[string]string{"expiry": "5s", "stop": "1m"}[ending]))
+			if err != nil {
+				t.Fatal(err)
+			}
+			record, err := state.Load(f.home, v.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var browser state.Identity
+			data, err := os.ReadFile(filepath.Join(f.fake, "browser-"+v.ID))
+			if err != nil || json.Unmarshal(data, &browser) != nil {
+				t.Fatal("stand-in browser identity missing")
+			}
+			access, err := Access(f.home, v.ID, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			grant := auth(t, access, access.AccessCode)
+			viewer := func() int {
+				request, _ := http.NewRequest(http.MethodGet, access.URL, nil)
+				request.AddCookie(grant.Cookie)
+				request.SetBasicAuth("viewer", grant.Code)
+				client := &http.Client{Timeout: time.Second, Transport: &http.Transport{Proxy: nil}}
+				defer client.Transport.(*http.Transport).CloseIdleConnections()
+				response, e := client.Do(request)
+				if e != nil {
+					return 0
+				}
+				_ = response.Body.Close()
+				return response.StatusCode
+			}
+			if code := viewer(); code != http.StatusOK {
+				t.Fatalf("enrolled viewer rejected before the stop: %d", code)
+			}
+			held := make(chan func(), 1)
+			hold := func() {
+				release, e := state.Lock(context.Background(), f.home)
+				if e != nil {
+					t.Error(e)
+					held <- func() {}
+					return
+				}
+				held <- release
+				time.Sleep(4 * time.Second)
+				release()
+			}
+			began := record.Expires
+			stopped := make(chan View, 1)
+			if ending == "expiry" {
+				time.Sleep(time.Until(record.Expires.Add(-30 * time.Millisecond)))
+				go hold()
+			} else {
+				began = time.Now()
+				go func() { end, _ := Stop(f.home, v.ID); stopped <- end }()
+				for {
+					if current, e := state.Load(f.home, v.ID); e == nil && current.State == "stopping" {
+						break
+					}
+					if time.Since(began) > 3*time.Second {
+						t.Fatal("stop was not accepted")
+					}
+				}
+				go hold()
+			}
+			<-held
+			var terms []time.Time
+			for deadline := time.Now().Add(8 * time.Second); len(terms) == 0; time.Sleep(5 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("the stand-in browser got no SIGTERM")
+				}
+				terms = termTimes(filepath.Join(f.fake, "term-"+v.ID))
+			}
+			if code := viewer(); code == http.StatusOK {
+				t.Fatal("viewer access was still accepted once the browser stop began")
+			}
+			if wait := terms[0].Sub(began); wait > 800*time.Millisecond {
+				t.Fatalf("SIGTERM %v after the %s began: the browser stop waited for forward removal", wait, ending)
+			}
+			for deadline := time.Now().Add(6 * time.Second); state.Alive(browser); time.Sleep(5 * time.Millisecond) {
+				if time.Now().After(deadline) {
+					t.Fatal("the stand-in browser survived")
+				}
+			}
+			died := time.Now()
+			if wait := died.Sub(terms[0]); wait < 1900*time.Millisecond || wait > 2700*time.Millisecond {
+				t.Fatalf("the browser died %v after its SIGTERM, want the kill two seconds later", wait)
+			}
+			if got := termTimes(filepath.Join(f.fake, "term-"+v.ID)); len(got) != 1 {
+				t.Fatalf("the browser got %d SIGTERMs: the guard's group stop ended it", len(got))
+			}
+			if _, err = os.Stat(filepath.Join(f.fake, "stop-end-"+v.ID)); err != nil {
+				t.Fatal("the supervisor did not finish its browser stop")
+			}
+			if ending == "stop" {
+				if end := <-stopped; end.State != "stopped" {
+					t.Fatalf("stop reported %+v", end)
+				}
+			} else {
+				waitEnd(t, f.home, v.ID)
+			}
+			if m, e := profile.ReadMeta(f.profiles, "work"); e != nil || m.HolderID != "" {
+				t.Fatalf("holder not cleared: %+v %v", m, e)
+			}
+		})
 	}
 }
