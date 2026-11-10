@@ -502,6 +502,17 @@ func serve(ctx context.Context, r state.Record) (result error) {
 	// Remove remote exposure while the lifetime guard still reserves this listener.
 	defer func() {
 		p.Revoke()
+		// A reusable profile's browser stop starts once access is rejected,
+		// alongside forward removal, so a slow removal cannot leave it to the
+		// guard's group stop. Without a profile the existing order stays.
+		var browserStopped chan struct{}
+		if r.Kind == "browser" && r.Config.Profile != "" && bundle.Stop != nil {
+			browserStopped = make(chan struct{})
+			go func() { bundle.Stop(); close(browserStopped) }()
+		}
+		if browserStopped != nil {
+			defer func() { <-browserStopped }()
+		}
 		if e := removeForward(home, id); e != nil {
 			markPending(home, id, e)
 			current, loadErr := state.Load(home, id)

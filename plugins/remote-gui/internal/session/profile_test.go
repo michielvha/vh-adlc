@@ -754,8 +754,14 @@ func TestProfileBrowserStopDoesNotWaitForForwardRemoval(t *testing.T) {
 			if got := termTimes(filepath.Join(f.fake, "term-"+v.ID)); len(got) != 1 {
 				t.Fatalf("the browser got %d SIGTERMs: the guard's group stop ended it", len(got))
 			}
-			if _, err = os.Stat(filepath.Join(f.fake, "stop-end-"+v.ID)); err != nil {
-				t.Fatal("the supervisor did not finish its browser stop")
+			// The supervisor records the end of its browser stop just after the browser dies.
+			for deadline := time.Now().Add(2 * time.Second); ; time.Sleep(10 * time.Millisecond) {
+				if _, err = os.Stat(filepath.Join(f.fake, "stop-end-"+v.ID)); err == nil {
+					break
+				}
+				if time.Now().After(deadline) {
+					t.Fatal("the supervisor did not finish its browser stop")
+				}
 			}
 			if ending == "stop" {
 				if end := <-stopped; end.State != "stopped" {
