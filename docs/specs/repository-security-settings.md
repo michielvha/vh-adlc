@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Q33 to Q36 from spec review R-6 answered with every recommendation; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "Spec review R-7 at b5612ad returned 3 findings, none blocking. Its factual correction is applied; Q37 and Q38 wait for the owner, then a new review. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -56,7 +56,7 @@ what the keep-off list names; elsewhere, or under a restricting request, it only
   no signal either way it leaves them off, so the bots never open competing pull requests.
 
 The sweep report gets a section with each setting's state and reason. Its owner decisions list
-names Dependabot security updates left on beside Renovate, and keep-off settings found on. On a
+names Dependabot security updates left on beside Renovate or paused, and keep-off settings found on. On a
 private repository whose paid features read as off, it lists code scanning as unavailable for the
 plan, not as a coverage gap.
 
@@ -65,7 +65,7 @@ writes nothing to archived ones, and reports what it cannot read as `unknown`. A
 stops it from enabling chosen settings. A failure in one repository never stops the sweep, and
 alerts enabled during a sweep count as incomplete until the next one.
 
-The rules follow vhco-pro/docs#30, changed to match. CodeQL and Scorecard come from its reusable
+The rules follow vhco-pro/docs#30. CodeQL and Scorecard come from its reusable
 workflows, so the helper never turns on CodeQL default setup. Implementation waits for docs#30 to merge, then moves both docs pins
 with a plugin minor version bump.
 
@@ -73,7 +73,7 @@ These owner decisions widen the authority table. Today the only repository setti
 changes is merged-branch deletion, with authorization.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-6 found nothing blocking, and the owner answered their questions. Acceptance
+Reviews R-1 to R-7 found nothing blocking; R-7's questions Q37 and Q38 are open. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
 or onboarding need separate approval.
@@ -637,7 +637,31 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q37: Where does `paused` sit in the rule order?
+
+From R-7 F-01: Q36 added reason `paused`, but no numbered rule produces it, and the order against `renovate-overlap` and `owner-choice-conflict` is unstated, so it could go unimplemented with every box ticked.
+
+**Recommendation:** A. A recorded owner choice comes first, and a pause matters more than overlap, since a paused setting opens no competing pull requests.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. One reason per entry. Rule 5 keeps `owner-choice-conflict`; otherwise rule 6's "When on" cells and rule 7 give `paused` when security updates read `paused` true, before `renovate-overlap`. New AC-26 with a `{"enabled":true,"paused":true}` fixture, alone and beside Renovate: `already-on` with `paused`, no write, exit 0, listed under Owner decisions** | A defined, tested outcome | One criterion |
+| **B. `renovate-overlap` before `paused`** | Renovate overlap stays the headline | A pause hidden behind overlap |
+
+**Why this is yours:** It decides which signal the owner sees first.
+
+### Q38: Does a restricted onboarding request still write settings?
+
+From R-7 F-02: onboarding calls `security-settings-mode` with no recorded request, so a read-only or no-change onboarding in a consumer that already adopted `apply` would still write settings.
+
+**Recommendation:** A. Restrictions mean the same in onboarding as in a sweep (Q26).
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Onboarding selects `check` without calling `security-settings-mode` when its current request is read-only, draft-only, or forbids pushing or filesystem writes; AC-11 requires `references/loop.md` and `references/lifecycle.md` to say so** | One meaning for restrictions everywhere | A sentence in two references |
+| **B. Onboarding always uses `check`; only sweeps apply** | Simplest, never writes during onboarding | Settings wait for the first sweep |
+
+**Why this is yours:** It decides whether onboarding may write settings.
 
 ## Review Log
 
