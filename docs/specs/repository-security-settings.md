@@ -649,6 +649,7 @@ None.
 | 2026-11-10 | R-4 | spec | `5528322` | unknown | procedural | 7 findings: 5 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-5 | spec | `2198c88` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-6 | spec | `4cf4ae6` | unknown | procedural | 8 findings: 5 should-fix, 3 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-7 | spec | `b5612ad` | unknown | procedural | 3 findings: 2 should-fix, 1 nit, none blocking; model identity not attested |
 
 ### R-1
 
@@ -976,6 +977,29 @@ SEVERITY: nit
 WHERE: Design (Reads and writes, state table)
 EVIDENCE: The REST description defines `check-automated-security-fixes` with a required `paused` boolean, "Whether Dependabot security updates are paused for the repository". The design reads only `enabled`, so `{"enabled":true,"paused":true}` is reported as `already-on` with exit 0. In a Dependabot-only repository no fix pull requests are then opened, and the sweep report gives no sign of it.
 PROPOSAL: Show `paused` in the security-updates entry, for example as an `already-on` reason, or record that paused is treated as on.
+
+### R-7
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (state table, Reads and writes, Rules applied before any write), AC-19 and Test Plan
+EVIDENCE: The state table says `already-on` takes "`paused` when security updates read `paused` true", and Reads and writes says the `paused` boolean "when true on an entry read as on, gives reason `paused`". The precedence section says "each entry takes the state and reason of the first rule below that applies to it", and none of rules 1 to 10 assigns `paused`. Rule 6 decides every "When on" cell of the Renovate and Dependabot table, because only the "no signal, configured, off" row falls through. Those cells give `already-on` with no reason, or `renovate-overlap`. Rule 5 gives `owner-choice-conflict`. Under the numbered rules, which AC-19 makes binding, `paused` is therefore never produced. The document also does not say which reason wins when an entry is paused and also has `renovate-overlap` or `owner-choice-conflict`. No criterion states that paused security updates are `already-on` with `paused`. No fixture returns `{"enabled":true,"paused":true}`: the only `automated-security-fixes` 200 fixture is AC-18's `{"enabled":false,"paused":false}`. AC-10 and AC-22 list `paused` in the owner decisions but use only `renovate-overlap` fixtures. So with every box ticked, Q36 can be left unimplemented.
+PROPOSAL: Put `paused` into the numbered rules, for example inside rule 6's "When on" cells and rule 7, and state its order against `renovate-overlap` and `owner-choice-conflict`. Add a criterion and a fixture with `paused` true that expects `already-on` with `paused`, no write, exit 0, and an entry in the Markdown owner decisions list.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design (Procedure changes, authority row), Context (Owner summary) and AC-24
+EVIDENCE: The Owner summary says that "elsewhere, or under a restricting request, it only checks", and the authority row says "A request with a flag that selects `check` wins". The Design says "Onboarding has no recorded maintenance request, so it runs the command without one and the committed settings alone decide". AC-24 says it "prints `apply`, also with no recorded request". The maintenance-only `no_filesystem` path (R-5 F-01) is handled only in the maintenance skill. Nothing in `references/loop.md`, `references/lifecycle.md` or the onboarding text turns a read-only, draft-only or no-change onboarding request into `check`. In a consumer that has already committed `security_settings: apply`, for example during a re-onboarding, a restricted onboarding request still writes GitHub settings.
+PROPOSAL: State that onboarding selects `check` without calling `security-settings-mode` when its current request forbids repository changes, as the skill does for `no_filesystem`. Add that rule to the onboarding text in AC-11, or add an AC-24 case for it.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Context (Owner summary)
+EVIDENCE: The summary says "Its owner decisions list names Dependabot security updates left on beside Renovate, and keep-off settings found on." Q36, the Helper section and AC-10 and AC-22 also send entries with reason `paused` to that list. The summary does not mention paused security updates.
+PROPOSAL: Add paused Dependabot security updates to the summary's description of the owner decisions list.
 
 ## Sources
 
