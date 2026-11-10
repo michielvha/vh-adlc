@@ -275,6 +275,7 @@ None.
 | 2026-11-10 | R-3 | spec | `8e5c51499cf9073e6507099d1c694f5ae61d0667` | unknown | procedural | Five should-fix findings (three factual, two judgement) and three nits, none blocking; model identity not attested. |
 | 2026-11-10 | R-4 | spec | `c648b53d1d17d5c1f6c4026bbec735c0373df0ad` | claude-opus-4.8 | procedural | Three should-fix factual findings and three nits (two factual, one judgement), none blocking; model reported by the reviewer, not requested. |
 | 2026-11-10 | R-5 | spec | `8f9aba05ac58d02989b483293064597bf17cff4c` | unknown | procedural | One should-fix factual finding and one factual nit, none blocking; model identity not attested. |
+| 2026-11-10 | R-6 | spec | `7cf545ffec4c3eb8c9edf5290fc6223cd917d7f0` | unknown | procedural | Three should-fix factual findings and one factual nit, none blocking; model identity not attested. |
 
 ### R-1
 
@@ -530,3 +531,33 @@ SEVERITY: nit
 WHERE: Test Plan, AC-07
 EVIDENCE: AC-07 (line 228) is composite. It includes these clauses: `unlink --server-only` "for a client whose key line has no `paseo-hosts:<client>` comment ... exits 1 and changes nothing"; `remove --skip-server` "with no client recorded or named ... exits 3 unless `--no-clients` is given"; and "no app backup in `PASEO_HOSTS_DIR` holds the server's entry", which line 210 extends to the local tool's `mac-app-registry.backup.json`. The AC-07 row (line 247) and manual step 7 (line 257) cover none of these three clauses. Under the standard, a passing subset never upgrades a composite criterion, so AC-07 would be reviewed as `untested` even when the code is correct.
 PROPOSAL: Add these three assertions to the existing `internal/remove` cases in the AC-07 row. They need no new test file or CI step.
+
+### R-6
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Desktop app entry steps 2, 4 and 5
+EVIDENCE: Line 186 says that on Windows the CLI "stops the `Paseo` process". Step 5 (line 189) then quits the app straight after step 3 writes the entry or step 4 writes the previous value back. Chromium writes localStorage to disk in batches. chromium/chromium components/services/storage/dom_storage/local_storage_impl.cc sets `default_commit_delay = kCommitDefaultDelaySecs`, with `kCommitDefaultDelaySecs = base::Seconds(5)`. A forced stop skips Electron's shutdown, so a write less than 5 seconds old can be lost. On the success path the new entry is gone after the relaunch. On the rollback path the app has already removed the whole `@paseo:daemon-registry` key (line 62). If the restore write is lost too, the app has no hosts left, which contradicts AC-06. The local tool quits through AppleScript (paseo-host:418) and waits about 8 seconds after its write (lib/mac-app-register.mjs:124-129). On Windows the app quits on its own when its last window closes (main.js:876-879, app.asar 0.15.3).
+PROPOSAL: In step 5, quit the app gracefully on both platforms once the commit delay has passed, for example by closing its window from the signed-in session on Windows, and force-stop it only after a timeout. State that this also applies to the rollback path.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, Plugin layout; Test Plan intro
+EVIDENCE: Line 125 keeps the Windows snippets "to Windows PowerShell 5.1 syntax". The Test Plan (line 242) runs them under `pwsh` 7.6.9, with one test that rejects five PowerShell 7 operators. Syntax is not the only difference. Microsoft's about_Character_Encoding page for 5.1 says `Out-File`, `>` and `>>` create UTF-16LE files, `-Encoding UTF8` always writes a BOM, and `Set-Content` on a new file uses the ANSI code page. PowerShell 6 and later default to utf8NoBOM. Local OpenSSH 10.0p2 rejects both 5.1 forms. `ssh -G -F` on a config file with a UTF-8 BOM printed `Bad configuration option: \357\273\277host`, and on a UTF-16 file it printed `no argument after keyword "\377\376h"`. Windows PowerShell 5.1 also drops an empty string argument to a native command (PowerShell/PowerShell#1995), so `ssh-keygen -N ""` loses its empty passphrase, while pwsh 7 on Linux passes it. The pwsh tests would pass snippets that break link steps 1 and 3 on every Windows client.
+PROPOSAL: State in the Design that the Windows snippets write `config`, `known_hosts` and key files through .NET as UTF-8 without a BOM, and pass no empty native arguments. Add the file-writing cmdlets and redirections to the existing forbidden-syntax test instead of adding a new test.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, unlink and remove; Acceptance Criteria AC-07
+EVIDENCE: Line 206 says `remove` stops at a client it cannot reach, "naming `unlink --server-only`", "so a re-run continues where it stopped". Line 210 says `--skip-server` unlinks the clients "as above". `unlink --server-only` (line 204) deletes the client's lines on the server, and exits 1 with nothing changed when no line carries `paseo-hosts:<client>`. Two cases have no way out. First, when the server is gone and a recorded client is offline, `remove --skip-server` stops at that client, and the `unlink --server-only` it names needs the server it cannot reach. Second, `link` records a client before its key line exists (line 171). If that `link` failed before step 2, the client has no key line. Once the client is unreachable, `unlink --server-only` exits 1 and `remove` keeps stopping at it. In both cases the registry and password stay, although AC-07 says `remove` completes after `--server-only`.
+PROPOSAL: Let `unlink --server-only` drop a recorded client that has no key line. Let `remove --skip-server` drop an unreachable client and report what stays on it, because its key opens nothing once the server is gone. Add both cases to the existing AC-07 assertions.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: nit
+WHERE: Context, Owner summary; frontmatter
+EVIDENCE: Line 28 says `onboard` installs "a password-protected daemon reachable only over SSH". The summary never mentions `--publish`, which adds a tailnet HTTPS route (Scope, onboard step 4, AC-02). Line 34 says "R-2 to R-4 found none", and `status_description` (line 3) says "R-4 findings applied". At this commit, R-5 is recorded and its findings are applied.
+PROPOSAL: Name the `--publish` opt-in and its tailnet HTTPS exposure in the summary, and update both review-status texts to R-5.
