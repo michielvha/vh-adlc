@@ -833,6 +833,7 @@ None.
 | 2026-11-10 | R-15 | spec | `27e821d` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-16 | spec | `73cf6b1` | unknown | procedural | 4 findings: 3 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-17 | spec | `0919a89` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-18 | spec | `d62f5b5` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1448,6 +1449,29 @@ SEVERITY: nit
 WHERE: Design (Procedure changes: maintenance skill step) and Acceptance Criteria
 EVIDENCE: The Design says: "Under `check`, the report says how to opt in." No criterion or Test Plan row checks this for sweeps. AC-22 and its proof check only the section's tables, the "helper did not run" rows and the owner decisions list. AC-11 covers opt-in guidance only for onboarding, in `references/loop.md` and `references/lifecycle.md`. A sweep report in a consumer that has not opted in can satisfy every criterion without telling the owner how to opt in.
 PROPOSAL: Add to AC-22 that when any repository's mode is `check`, the section names the `security_settings: apply` opt-in. Add a matching pass condition to the AC-22 proof. Otherwise, remove the sentence from the Design.
+
+### R-18
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Acceptance Criteria (AC-24) and Test Plan (AC-24)
+EVIDENCE: AC-24 (docs/specs/repository-security-settings.md:762-765 at d62f5b5) says: "A binding failure or invalid committed settings make `security-settings-mode` exit nonzero naming the cause, and the helper's `check` given that binding still reports its entries, with mode reason `committed-settings-unresolved`." The Design (lines 328-330) says that in this case `check` "reads keep-off rows from the working tree". The AC-24 proof (line 801) has one fixture for this clause: "one whose `--default-commit` differs from `origin/<branch>` exits nonzero naming the cause, and the helper's `check` with that same binding then exits as usual". No fixture commits invalid settings, such as an unknown key or `security_settings: maybe`, while the working tree stays valid. The `security_settings: maybe` fixture does not say whether the value is committed or in the working tree. If it is in the working tree, `loadSettings` fails first (`plugins/vh-adlc/scripts/maintenance/settings.ts:68-70`). So the invalid-committed-settings half of this composite clause is never exercised, for either the mode exit or the helper's `check` fallback to working-tree keep-off rows. Under the review standard, a passing subset does not upgrade a composite criterion, so AC-24 would be `untested` at implementation review.
+PROPOSAL: Add an AC-24 fixture whose committed settings are invalid, for example a committed `security_settings: maybe` with a valid working tree that has a keep-off row. It passes when `security-settings-mode` exits nonzero naming the field, and the helper's `check` with that binding reports entries using the working-tree keep-off row and mode reason `committed-settings-unresolved`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan (AC-22)
+EVIDENCE: The AC-22 proof (line 799) describes "A second report rendered with no `--security-settings` flag", which passes when "the section is present with a 'helper did not run' row for each repository in scope". It then adds: "In both reports, with a file whose mode is `check`, the section names the `security_settings: apply` opt-in." The second report has no helper file, so it cannot have "a file whose mode is `check`". AC-22 (line 743) ties the opt-in line to "any repository's mode is `check`", and no mode is known when no file is given. The pass condition contradicts itself for the second report, and no fixture shows that the opt-in line is absent when every file is in `apply`.
+PROPOSAL: Limit the opt-in pass condition to the first report, which includes one file in `check` mode. Then either add a report whose files are all in `apply` and expect no opt-in line, or say what a report with no files shows about the opt-in.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: nit
+WHERE: Acceptance Criteria (AC-11) and Design (Helper; Procedure changes: mode reasons)
+EVIDENCE: AC-11 (lines 682-684) requires the maintenance skill, `references/loop.md` and `references/lifecycle.md` to state "that a nonzero `security-settings-mode` exit leads to `check` with the cause as the mode reason and never to `apply`." The R-17 fold changed the Design (lines 326-328) to: "it runs the helper in `check` with mode reason `committed-settings-unresolved` and the cause", and line 555-556 adds "the binding-failure fallback uses `committed-settings-unresolved` with the cause". A skill text that passes only the cause as `--mode-reason` satisfies AC-11 but contradicts the Design. The Design also covers only a binding failure or invalid committed settings. AC-11 covers any nonzero exit, such as an unreadable `--run-id` or invalid working-tree settings, and no named reason is given for those.
+PROPOSAL: Reword the AC-11 clause to "leads to `check` with mode reason `committed-settings-unresolved` and the cause". Either say that every nonzero exit of the command uses that reason, or name the reason for exits with other causes.
 
 ## Sources
 
