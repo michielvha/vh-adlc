@@ -67,8 +67,8 @@ stops it from enabling chosen settings. A failure in one repository never stops 
 alerts enabled during a sweep count as incomplete until the next one.
 
 The rules follow vhco-pro/docs#30. CodeQL comes from its reusable workflows,
-so the helper never turns on CodeQL default setup. Implementation waits for docs#30 to merge, then moves both docs pins
-with a plugin minor version bump.
+so the helper never turns on CodeQL default setup. Implementation waits for docs#30 to merge,
+then moves both docs pins with a minor version bump.
 
 This widens the authority table; today vh-adlc changes only merged-branch deletion.
 
