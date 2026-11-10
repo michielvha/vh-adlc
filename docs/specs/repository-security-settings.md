@@ -819,20 +819,22 @@ and name the target, and no recorded run restricts it.
       them on, lists them as `already-on` with reason `renovate-overlap`, and the Markdown output
       lists them under owner decisions.
       Evidence: `bun test tests/vh-adlc/security-settings` at T7 (44 pass, /tmp/sec-t7-tests.log): a `renovate.json` fixture with security updates on recorded no write, listed `already-on` with `renovate-overlap`, and the Markdown owner decisions named it.
-- [ ] AC-15: On an unarchived public repository where the caller is admin, an off setting listed for
+- [x] AC-15: On an unarchived public repository where the caller is admin, an off setting listed for
       the target repository in `security_settings_keep_off` is never written and is listed as
       `left-off` with reason `owner-choice` and the configured reason. A
       settings file naming an unknown setting fails visibly.
+      Evidence: `bun test tests/vh-adlc/security-settings` at T9 (/tmp/sec-t9-tests.log): a committed keep-off row for secret scanning left it `left-off` with `owner-choice` and "Owner choice" and recorded no `PATCH`; a committed row naming `code_scanning` threw "security_settings_keep_off settings" with no write, and `settings.test.ts` rejects an unknown setting at T3.
 - [ ] AC-16: In a maintenance collection of a private or internal repository where the caller is
       admin, `security_and_analysis` shows neither `advanced_security` nor `code_security` enabled,
       and the code scanning alerts read returns 403 or 404, the code scanning surface is
       `complete-unavailable` with reason `not-free-on-private` and that status, without a
       `surface_expectations` entry. Without admin, or with either feature enabled, the same read
       leaves the surface incomplete.
-- [ ] AC-17: A setting listed in `security_settings_keep_off` that the first read shows on is not
+- [x] AC-17: A setting listed in `security_settings_keep_off` that the first read shows on is not
       written, is listed as `already-on` with reason `owner-choice-conflict`, and appears in the
       Markdown owner decisions list, including when the committed settings are unlinked or absent
       and the row is in the working tree's settings.
+      Evidence: `bun test tests/vh-adlc/security-settings` at T9 (/tmp/sec-t9-tests.log): push protection on with a committed keep-off row was not written, was `already-on` with `owner-choice-conflict` and appeared in the Markdown owner decisions; `check` gave the same outcome from a working-tree row with an unlinked `AGENTS.md`, with nothing committed, and with a link to a never-committed settings file.
 - [x] AC-18: On an unarchived public repository where the caller is admin, when the read of a setting
       fails with a status other than the 404 that means off, that entry is `unknown` with reason
       `api-error` and the status, even when the keep-off list names it, no write is made for it, the
@@ -963,7 +965,8 @@ and name the target, and no recorded run restricts it.
       Evidence: `bun test tests/vh-adlc/security-settings tests/vh-adlc/maintenance --timeout 60000` passed 305 of 305, the 44 T6 helper cases included (/tmp/sec-t7-tests.log); `bash plugins/vh-adlc/scripts/security-settings/typecheck.sh` exited 0 under the locked strict compiler.
 - [x] T8 `tests/vh-adlc/security-settings/` - failing fixtures for keep-off rows (AC-15, AC-17, including the working-tree fallbacks), every helper `apply` refusal fixture in the AC-24 row, and the helper part of the AC-27 row; they fail because the helper does not yet bind committed settings or read the run (AC-15, AC-17, AC-24, AC-27)
       Evidence: `bun test tests/vh-adlc/security-settings/binding.test.ts` at 8c7d857 plus these fixtures: 7 pass, 20 fail; every refusal, binding, run, keep-off fallback and GitHub Enterprise fixture failed on its assertions because `apply` wrote, reported mode `apply` with no reason or did not throw, since the helper reads only the working tree and no run; the 7 that pass are the keep-off and working-tree cases T7 already serves (/tmp/sec-t8-fail.log).
-- [ ] T9 `plugins/vh-adlc/scripts/security-settings/`, `plugins/vh-adlc/scripts/maintenance/journal.ts` - bind the committed settings at `--default-commit`, read keep-off rows with the Design's fallbacks, and refuse `apply` with the ordered mode reasons, failing visibly on an unresolved binding, invalid committed settings or an unreadable run; T8 passes and T6 still passes (AC-15, AC-17, AC-24, AC-27)
+- [x] T9 `plugins/vh-adlc/scripts/security-settings/`, `plugins/vh-adlc/scripts/maintenance/journal.ts` - bind the committed settings at `--default-commit`, read keep-off rows with the Design's fallbacks, and refuse `apply` with the ordered mode reasons, failing visibly on an unresolved binding, invalid committed settings or an unreadable run; T8 passes and T6 still passes (AC-15, AC-17, AC-24, AC-27)
+      Evidence: `bun test tests/vh-adlc/security-settings tests/vh-adlc/maintenance --timeout 60000` passed 332 of 332, the 27 T8 and 44 T6 fixtures included (/tmp/sec-t9-tests.log); `bash plugins/vh-adlc/scripts/security-settings/typecheck.sh` exited 0 after `committedSecuritySettings` gave its `invalid` helper an explicit `never` type. `journal.ts` needed no change: the helper reads the run through the existing `readRun`.
 - [ ] T10 `tests/vh-adlc/maintenance/security-settings-collect.test.ts` - failing collector, report and reconcile fixtures from the AC-16, AC-21, AC-22, AC-23 (collector part) and AC-27 (collector part) rows, plus repeated `--security-settings` and `--applied-repository` flags; they fail because the flags and rules do not exist (AC-16, AC-21, AC-22, AC-23, AC-27)
 - [ ] T11 `plugins/vh-adlc/scripts/maintenance/collect.ts`, `plugins/vh-adlc/scripts/maintenance/report.ts`, `plugins/vh-adlc/scripts/maintenance/types.ts`, `plugins/vh-adlc/scripts/maintenance/cli.ts`, `plugins/vh-adlc/scripts/maintenance/security-io.ts`, `plugins/vh-adlc/scripts/maintenance/security.ts` - the `not-free-on-private`, `alerts-enabled-this-run` and `helper-receipt-missing` rules, the repeatable flags and the report section rendered in every sweep report; T10 passes and `bun test tests/vh-adlc/maintenance` stays green (AC-16, AC-21, AC-22, AC-23, AC-27)
 - [ ] T12 `plugins/vh-adlc/references/security-settings.md`, `plugins/vh-adlc/references/authority.md`, `plugins/vh-adlc/references/maintenance.md`, `plugins/vh-adlc/references/maintenance-settings.md`, `plugins/vh-adlc/references/loop.md`, `plugins/vh-adlc/references/lifecycle.md`, `plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md`, `docs/user-guides/workflows.md`, `docs/reference/compatibility.md` - state every AC-11 clause on the pages it names, with the skill step, onboarding text and operations table; a read against AC-11's clause list finds each one and `bun test tests/vh-adlc` stays green (AC-11)

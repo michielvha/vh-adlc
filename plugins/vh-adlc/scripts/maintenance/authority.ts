@@ -159,7 +159,7 @@ export function committedSecuritySettings(config: Settings, observed: { default_
   const agents = blob(config.root, commit, "AGENTS.md");
   if (!agents || !links(agents.text).includes(".vh-adlc/maintenance.yaml")) return unlinked;
   const raw = blob(config.root, commit, ".vh-adlc/maintenance.yaml"); if (!raw) return unlinked;
-  const invalid = (field: string): never => { throw Error(`invalid maintenance settings: committed ${field}`); };
+  const invalid: (field: string) => never = field => { throw Error(`invalid maintenance settings: committed ${field}`); };
   let input: Record<string, unknown>;
   try { input = object(readYAML(Buffer.from(raw.text), invalid)); } catch { invalid("settings are unreadable"); }
   if (Object.keys(input).some(key => !SETTINGS_KEYS.includes(key))) invalid("settings contain unsupported fields");

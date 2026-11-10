@@ -1,3 +1,5 @@
+import { committedSecuritySettings, securitySettingsMode, type CommittedSecuritySettings } from "../maintenance/authority";
+import { readRun } from "../maintenance/journal";
 import { loadSettings, normalizeLogin, repository as repositoryName } from "../maintenance/settings";
 import type { SecurityKeepOff, WritableSecuritySetting } from "../maintenance/types";
 
@@ -88,15 +90,47 @@ function detect(api: Api, base: string, branch: string): { renovate: Lookup; dep
   return { renovate: found, dependabot: { status: "not-configured" } };
 }
 
+type Binding = { mode: "check" | "apply"; mode_reason: string | null; mode_detail?: string; keep_off: SecurityKeepOff[] };
+const message = (error: unknown) => error instanceof Error ? error.message : String(error);
+/**
+ * Binds keep-off rows and the mode to the committed, linked default-branch settings. `apply` never falls
+ * back to the working tree and throws when the binding, the committed settings or its run cannot be read;
+ * `check` falls back to the working tree's keep-off rows and reports why.
+ */
+function bind(config: ReturnType<typeof loadSettings>, target: string, options: Options): Binding {
+  const tree = config.security_settings_keep_off ?? [];
+  const observed = options.default_branch !== undefined && options.default_commit !== undefined
+    ? { default_branch: options.default_branch, default_commit: options.default_commit } : null;
+  if (options.command === "apply") {
+    if (!observed) throw Error("apply requires --default-branch and --default-commit");
+    let run: ReturnType<typeof readRun> | undefined;
+    if (options.run_id !== undefined) {
+      try { run = readRun(config, options.run_id); } catch (error) { throw Error(`maintenance run ${options.run_id} cannot be read: ${message(error)}`); }
+    }
+    const decided = securitySettingsMode(config, target, observed, run ? { request: run.state.request, scope: run.header.scope } : undefined);
+    const keep_off = decided.committed.linked ? decided.committed.keep_off : tree;
+    return { mode: decided.mode, mode_reason: decided.reason, ...(decided.detail ? { mode_detail: decided.detail } : {}), keep_off };
+  }
+  const passed = options.mode_reason ?? null;
+  if (!observed) return { mode: "check", mode_reason: passed, keep_off: tree };
+  let committed: CommittedSecuritySettings;
+  try { committed = committedSecuritySettings(config, observed); }
+  catch (error) {
+    return { mode: "check", mode_reason: "committed-settings-unresolved", mode_detail: message(error) + (passed ? `; passed mode reason: ${passed}` : ""), keep_off: tree };
+  }
+  return { mode: "check", mode_reason: passed, keep_off: committed.linked ? committed.keep_off : tree };
+}
+
 /** Reads, and under apply enables, the free security settings of one repository; see references/security-settings.md. */
 export function securitySettings(options: Options): { output: Output; exit_code: 0 | 1 } {
   const config = loadSettings(options.repo), hostname = config.hostname;
   const target = options.repository === undefined ? config.repository : repositoryName(options.repository, "--repository");
-  const keepOff: SecurityKeepOff | undefined = (config.security_settings_keep_off ?? []).find(row => row.repository === target);
-  const mode = options.command;
+  const bound = bind(config, target, options);
+  const keepOff: SecurityKeepOff | undefined = bound.keep_off.find(row => row.repository === target);
+  const mode = bound.mode;
   const api = client(options.run ?? ghRun, hostname), base = `repos/${target}`, github = hostname === "github.com";
   const output: Output = { schema_version: 1, repository: target, hostname, ...(options.run_id ? { run_id: options.run_id } : {}), command: options.command, mode,
-    mode_reason: options.mode_reason ?? null, visibility: null, archived: null, admin: null,
+    mode_reason: bound.mode_reason, ...(bound.mode_detail ? { mode_detail: bound.mode_detail } : {}), visibility: null, archived: null, admin: null,
     detection: { renovate: { status: "not-checked" }, dependabot: { status: "not-checked" } }, entries: [] };
   const finish = () => {
     const failed = output.entries.some(item => item.state === "not-changed" || item.state === "unknown" ||
