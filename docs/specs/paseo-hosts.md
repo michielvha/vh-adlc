@@ -275,7 +275,8 @@ Paths under `internal/`, `cmd/`, `scripts/` and `skills/` are in `plugins/paseo-
   - Evidence: `go test ./internal/report` fails with `no non-test Go files in .../internal/report`, as intended until T5.
 - [x] T5 `internal/report/report.go`, `cmd/paseo-hosts/main.go` - labelled lines on standard error, JSON on standard output, exit codes 0 to 4, and the logger initialised on standard error; T4 passes (AC-11)
   - Evidence: `go test ./internal/report` failed before (no non-test Go files) and `go test -race ./internal/report` passes after; the module verification (build, `go test -race ./...`, `go vet ./...`, golangci-lint v2.15.0 `config verify` and `run`, `go mod tidy -diff`) passes. Terminal detection is a character-device check on standard error, exercised only through the `Terminal` option in tests, not under a real terminal.
-- [ ] T6 `internal/registry/registry_test.go` - parse the local tool's format, apply the defaults for missing keys, and reject a command substitution line without running it; fails (AC-09, AC-03)
+- [x] T6 `internal/registry/registry_test.go` - parse the local tool's format, apply the defaults for missing keys, and reject a command substitution line without running it; fails (AC-09, AC-03)
+  - Evidence: `go test ./internal/registry` fails with `no non-test Go files in .../internal/registry`, as intended until T7.
 - [ ] T7 `internal/registry/registry.go` - the parser and writer with modes 700 and 600; T6 passes (AC-09, AC-03, AC-01)
 - [ ] T8 `internal/config/config_test.go` - every variable's default and override, and exit 3 naming `PASEO_HOSTS_CLIENT` for `link` without a client; fails (AC-08)
 - [ ] T9 `internal/config/config.go` - configuration from flags and variables only; T8 passes (AC-08)
