@@ -818,6 +818,7 @@ None.
 | 2026-11-10 | R-14 | spec | `0aea08b` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-15 | spec | `27e821d` | unknown | procedural | 4 findings: 2 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-16 | spec | `73cf6b1` | unknown | procedural | 4 findings: 3 should-fix, 1 nit, none blocking; model identity not attested |
+| 2026-11-10 | R-17 | spec | `0919a89` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1410,6 +1411,29 @@ SEVERITY: nit
 WHERE: Design (Helper; Settings) and AC-24
 EVIDENCE: The `check` command has no `--default-branch` or `--default-commit` flag (`check --repo PATH [--repository OWNER/NAME] [--run-id ID] [--mode-reason TEXT] [--format json|markdown]`), and "`--repo` is the checkout whose `.vh-adlc/maintenance.yaml` applies". Only `apply` is said to read `security_settings_keep_off` from the committed, linked settings. Rule 5 (keep-off) applies under both modes. AC-24 and its proof require that a refused `apply` "reports its entries exactly as `check` would" and that the "entries [are] identical to `check` output". Suppose `check` reads keep-off rows from the working tree. Then a keep-off row that differs between the working tree and the committed settings changes one entry: `check` gives `not-changed` with `check-only`, while the refused `apply` gives `left-off` with `owner-choice`, or the reverse. The two outputs are no longer identical, and the exit code differs too. The Design does not say where `check` reads its keep-off rows.
 PROPOSAL: State where `check` reads keep-off rows, either the working tree or the committed settings when it is given a binding. Then make "exactly as `check` would" mean that same source for the refused `apply`.
+
+### R-17
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design (Helper) and AC-24, AC-11
+EVIDENCE: The Design says: "When the binding fails or the committed settings are invalid, `security-settings-mode` exits nonzero naming the cause, and the skill handles that like a helper failure: it runs the helper in `check` with that cause as the mode reason and never runs `apply`." The R-16 fold added: "`check` reads keep-off rows from the committed settings when given `--default-branch` and `--default-commit`, which the skill always passes, and from the working tree otherwise." So in this fallback, `check` gets the same binding that just failed. Examples are a `--default-commit` that differs from the tracking tip (`plugins/vh-adlc/scripts/maintenance/authority.ts:92` throws "default commit differs from recorded tracking tip") and committed settings with an invalid key or a `security_settings: maybe` value. The Design says only that `apply` "fails visibly when that binding does not resolve". It does not say what `check` does with an unresolved binding or invalid committed settings. AC-15 requires that a settings file naming an unknown setting fails visibly. If `check` fails in the same way, the fallback that AC-11 requires ("a nonzero `security-settings-mode` exit leads to `check` with the cause as the mode reason") produces no JSON, and the report shows only "helper did not run". The AC-24 proof tests the binding failure only for `security-settings-mode`, not for the helper's `check` that follows it.
+PROPOSAL: State what `check` does when its binding fails or the committed settings are invalid. One option is to read keep-off rows from the working tree, or to use none, and report the cause as the mode reason. Another is for the skill to leave out the binding in this fallback. Then add an AC-24 fixture that runs the fallback `check` after a binding failure and expects entries with that mode reason.
+
+FINDING: F-02
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Helper; Procedure changes: mode function) and Test Plan (AC-24)
+EVIDENCE: The Design names only two mode reasons, `not-adopted` and `not-in-committed-scope`. The helper's `--run-id` refusal uses "the reason that command would print" for "request flags, missing `authorized_sweep`, a pull-request scope". The AC-24 proof passes on "the `read_only` reason and the pull-request reason". Those reasons are not named anywhere in the document. The document also gives no order for choosing one when several causes apply, for example committed settings that do not adopt `apply` together with a `read_only` request. Yet `references/security-settings.md` must document the reasons and the precedence (AC-11).
+PROPOSAL: Name each mode reason, for example `request-restricted`, `not-authorized-sweep` and `pull-request-scope`, and give one order for choosing among them. Use those names in the AC-24 pass condition.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Procedure changes: maintenance skill step) and Acceptance Criteria
+EVIDENCE: The Design says: "Under `check`, the report says how to opt in." No criterion or Test Plan row checks this for sweeps. AC-22 and its proof check only the section's tables, the "helper did not run" rows and the owner decisions list. AC-11 covers opt-in guidance only for onboarding, in `references/loop.md` and `references/lifecycle.md`. A sweep report in a consumer that has not opted in can satisfy every criterion without telling the owner how to opt in.
+PROPOSAL: Add to AC-22 that when any repository's mode is `check`, the section names the `security_settings: apply` opt-in. Add a matching pass condition to the AC-22 proof. Otherwise, remove the sentence from the Design.
 
 ## Sources
 
