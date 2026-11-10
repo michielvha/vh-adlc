@@ -6,7 +6,7 @@ Outcome: Repair issue #68. `maintenance resume` must accept a run whose security
 
 Preserved contract: `docs/specs/maintenance-security-resolution.md` (AC-08 and the history rules) and `plugins/vh-adlc/references/maintenance.md`. Resume and report-candidate commits still revalidate packet, source, policy and evidence bindings. Packet, source and policy drift still invalidates a receipt, and a claimed reconciliation that the packet does not produce is still rejected. Local-only history stays labelled local. The stored security result, its `validation` receipt and the report block formats are unchanged.
 
-Task base: `07217be07b85cfbb933000512f63d28c4bf6cb38` (origin/main).
+Task base: `334c361a4071d2de2a44ffd9f58a9c8b962c66f8` (origin/main after PR #69). The repair was first written and reviewed on `07217be07b85cfbb933000512f63d28c4bf6cb38`.
 
 Affected paths: `plugins/vh-adlc/scripts/maintenance/security-io.ts`, `plugins/vh-adlc/scripts/maintenance/cli.ts`, `tests/vh-adlc/maintenance/security-cli.test.ts`, `plugins/vh-adlc/references/maintenance.md`, `plugins/vh-adlc/plugin.json`, `plugins/vh-adlc/.claude-plugin/plugin.json`, and this record.
 
@@ -31,6 +31,8 @@ Final checks: `tests/vh-adlc/maintenance/security-cli.test.ts` passes 14 of 14. 
 R-1 response. F-01 is fixed: while the own report has no revision below the claimed one, its open alerts are imported as unresolved observations again. Their `raw_reference` is `local:<path>#<alert>`, without the file digest. F-02 is fixed: the own report is the file at `run.state.report.relative_path` whose observation block names the run, and any other file keeps its provenance and all its revisions. Two tests cover them. One saves a draft without `--security`, reconciles a later collection that omits the alert, appends to the draft, verifies the stored result and resumes. The other adds a second file that names the run with a forked revision 1. Both failed at `dbddbe3` (log `/tmp/vh-adlc-issue68-red2.log`) and pass now. `tests/vh-adlc/maintenance` passes 236 of 236. `bun test tests/vh-adlc --timeout 60000` passes 1293 of 1294 (log `/tmp/vh-adlc-issue68-full2.log`); the one failure is the same host-binary `tests/vh-adlc/fixtures.test.ts` failure seen at the task base. The CI documentation-impact typecheck passes and `git diff --check` is clean.
 
 R-2 response. F-01 is fixed: identical same-run revisions now count once only when the run's own report supplies that revision, as the Definition says. Duplicates elsewhere still produce a fork gap, as at the task base. The new test `two history copies of a run's revision outside its report still count as a fork` failed at `b8f0f89` (log `/tmp/vh-adlc-issue68-red3.log`) and passes now. `tests/vh-adlc/maintenance` passes 237 of 237. `bun test tests/vh-adlc --timeout 60000` passes 1294 of 1295 (log `/tmp/vh-adlc-issue68-full3.log`), and the one failure is again the host-binary fixtures test. The CI documentation-impact typecheck passes and `git diff --check` is clean.
+
+Rebase. The owner asked to merge the repair. Meanwhile origin/main gained PR #69 and plugin version 0.15.0, so the branch was rebased onto `334c361` and the manifests set to 0.15.1. The diff of the scripts, references and tests is identical to the reviewed `00cf14e` diff. After the rebase, `bun test tests/vh-adlc --timeout 60000` passes 1304 of 1305 (log `/tmp/vh-adlc-issue68-full4.log`). The one failure is the host-binary fixtures test. The CI documentation-impact typecheck passes and `git diff --check` is clean.
 
 ## Reviews
 
@@ -77,4 +79,4 @@ NO FINDINGS
 
 ## State
 
-Locally complete. R-3 has no findings. Nothing is pushed; publishing and closing #68 need the owner's request. Receipts computed before this repair that include uncommitted history entries carry the old `commit:undefined` label and no longer verify, so those runs need a fresh `security-reconcile`.
+Review pending for the rebased commit. R-3 had no findings before the rebase. Nothing is pushed; publishing and closing #68 need the owner's request. Receipts computed before this repair that include uncommitted history entries carry the old `commit:undefined` label and no longer verify, so those runs need a fresh `security-reconcile`.
