@@ -109,19 +109,20 @@ export function reconcileSecurityPacket(config:Settings,id:string,packetPath:str
     ...v.list(packet.history).map(item=>{const file=reference(base,item),label=`local:${file.entry.sha256}`;return{...file,own:false,label,provenance:label};})];
   // Verification replays the revisions that preceded the claimed one; later appends to this run's report are not its inputs.
   const earlier=(r:SecurityRevision)=>r.run_id!==id||options.before===undefined||r.snapshot_revision<options.before;
+  // This run's recorded report changes with every append, so it contributes only its earlier revisions
+  // and its observations are referenced by path rather than by a digest that a later append replaces.
+  const parsed=history.map(file=>{const markdown=file.bytes.toString(),found=readSecurityRevisions(markdown),legacy=parseObservation(markdown),own=file.own&&legacy?.run_id===id;
+    return{...file,legacy,own,kept:own?found.filter(earlier):found};});
   // A copy of this run's report may repeat a revision the report itself supplies; the same digest is one revision, not a fork.
-  const add=(found:SecurityRevision[])=>{for(const r of found)if(r.run_id!==id||!revisions.some(o=>o.digest===r.digest))revisions.push(r);};
+  const ownDigests=new Set(parsed.filter(file=>file.own).flatMap(file=>file.kept.map(r=>r.digest)));
+  const add=(found:SecurityRevision[])=>{for(const r of found)if(r.run_id!==id||!ownDigests.has(r.digest)||!revisions.some(o=>o.digest===r.digest))revisions.push(r);};
   const historySeen=new Set<string>(),provenance:string[]=[];
-  for(const file of history){
+  for(const file of parsed){
     if(historySeen.has(file.entry.sha256))continue;
-    const markdown=file.bytes.toString(),found=readSecurityRevisions(markdown);
-    // Older reports remain evidence of outstanding observations, never proof of their resolution.
-    const legacy=parseObservation(markdown);
-    // This run's recorded report changes with every append, so it contributes only its earlier revisions
-    // and its observations are referenced by path rather than by a digest that a later append replaces.
-    const own=file.own&&legacy?.run_id===id,kept=own?found.filter(earlier):found;
+    const {legacy,own,kept}=file;
     if(!own){historySeen.add(file.entry.sha256);provenance.push(file.provenance);}
     add(kept);
+    // Older reports remain evidence of outstanding observations, never proof of their resolution.
     if(!kept.length && legacy)for(const observation of legacy.observations){
       if(observation.hostname!==input.hostname||!input.scope.repositories.includes(observation.repository))continue;
       for(const alert of observation.alerts??[]){const identity=`${observation.hostname}/${observation.repository}/${alert.identity}`;

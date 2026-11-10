@@ -214,3 +214,13 @@ test("another history file that names the run keeps its provenance and its revis
   expect(next.revision.snapshot.input.history_gaps).toContain("forked snapshot revision");
   expect(next.revision.snapshot.input.history_provenance).toContain(`local:${f.config.history_dir}/fork.md:${digest(markdown)}`);
 });
+test("two history copies of a run's revision outside its report still count as a fork",async()=>{
+  const f=setup(),args=["--repo",f.root,"--run-id",f.run.header.run_id];
+  const result=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
+  f.write(".tools/security.json",JSON.stringify(result));f.write(".tools/request.json",JSON.stringify({authorized_sweep:true,read_only:true}));
+  const saved=reportResult(await main(["report",...args,"--inventory",join(f.root,".tools/inventory.json"),"--default-commit",f.run.header.source_commit,"--default-branch","main","--request",join(f.root,".tools/request.json"),"--security",join(f.root,".tools/security.json")]));
+  expect(saved.path.startsWith(join(f.root,f.config.history_dir)+"/")).toBe(false);
+  const markdown=readFileSync(saved.path,"utf8");f.write(f.config.history_dir+"/copy1.md",markdown);f.write(f.config.history_dir+"/copy2.md",markdown+"\n");
+  const next=verifySecurityResult(f.config,f.run.header.run_id,await main(["security-reconcile",...args,"--input",join(f.root,".tools/packet.json")]));
+  expect(next.revision.snapshot.input.history_gaps).toContain("forked snapshot revision");
+});
