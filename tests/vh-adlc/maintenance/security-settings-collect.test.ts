@@ -59,7 +59,7 @@ function save(f: Project, name: string, value: unknown) {
 }
 function output(repository: string, run_id: string, mode: "check" | "apply", entries: Entry[]): Output {
   return { schema_version: 1, repository, hostname: "github.com", run_id, command: mode, mode, mode_reason: mode === "apply" ? "adopted" : "not-adopted",
-    visibility: "public", archived: false, admin: true, detection: { renovate: { status: "none" }, dependabot: { status: "none" } }, entries };
+    visibility: "public", archived: false, admin: true, detection: { renovate: { status: "none" }, dependabot: { status: "not-configured" } }, entries };
 }
 const enabled = (repository: string, run_id: string) => output(repository, run_id, "apply", [{ setting: "dependabot_alerts", state: "enabled" }]);
 const section = (text: string) => {
@@ -154,6 +154,13 @@ const badFiles: [string, (f: Project, id: string) => string[], string][] = [
   ["an out-of-scope repository", (f, id) => [save(f, "bad.json", enabled("other/elsewhere", id))], "outside the sweep's scope"],
   ["a second file for the same repository", (f, id) => [save(f, "one.json", enabled("example/project", id)), save(f, "two.json", enabled("example/project", id))], "more than one helper file"],
   ["another run ID", f => [save(f, "bad.json", enabled("example/project", "00000000-0000-4000-8000-000000000000"))], "another run ID"],
+  ...([
+    ["a numeric Renovate evidence", { detection: { renovate: { status: "present", evidence: 26 }, dependabot: { status: "not-checked" } } }],
+    ["an unknown detection status", { detection: { renovate: { status: "maybe" }, dependabot: { status: "not-checked" } } }],
+    ["an extra detection key", { detection: { renovate: { status: "none", note: "x" }, dependabot: { status: "not-checked" } } }],
+    ["a numeric mode detail", { mode_detail: 7 }],
+  ] as const).map(([name, change]): [string, (f: Project, id: string) => string[], string] =>
+    [name, (f, id) => [save(f, "bad.json", { ...enabled("example/project", id), ...change })], "not valid helper JSON"]),
 ];
 test.each(badFiles)("a helper file with %s changes no surface and shows as helper did not run in the report", (_, files, reason) => {
   const f = setup(), id = recordRun(f.root, { authorized_sweep: true }), config = loadSettings(f.root), paths = files(f, id);

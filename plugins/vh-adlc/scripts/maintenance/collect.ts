@@ -287,13 +287,21 @@ function collectRepository(config: Settings, reader: GitHubReader, repository: s
 }
 
 const STATES = ["already-on", "enabled", "left-off", "unavailable", "not-changed", "unknown"];
+function lookup(value: unknown, statuses: string[]) {
+  const row = object(value);
+  if (Object.keys(row).some(key => !["status", "evidence", "error"].includes(key)) || !statuses.includes(String(row.status)) ||
+    ![row.evidence, row.error].every(item => item === undefined || typeof item === "string")) throw Error("invalid helper detection");
+}
 function helperOutput(value: unknown): Output {
   const row = object(value), allowed = ["schema_version", "repository", "hostname", "run_id", "command", "mode", "mode_reason", "mode_detail", "visibility", "archived", "admin", "detection", "entries"];
   if (Object.keys(row).some(key => !allowed.includes(key)) || row.schema_version !== 1 || typeof row.repository !== "string" || typeof row.hostname !== "string" ||
     !["check", "apply"].includes(String(row.command)) || !["check", "apply"].includes(String(row.mode)) || !(row.mode_reason === null || typeof row.mode_reason === "string") ||
     !(row.run_id === undefined || typeof row.run_id === "string") || !(row.visibility === null || typeof row.visibility === "string") ||
+    !(row.mode_detail === undefined || typeof row.mode_detail === "string") ||
     !(row.archived === null || typeof row.archived === "boolean") || !(row.admin === null || typeof row.admin === "boolean")) throw Error("invalid helper output");
-  const detection = object(row.detection); object(detection.renovate); object(detection.dependabot);
+  const detection = object(row.detection);
+  if (Object.keys(detection).some(key => !["renovate", "dependabot"].includes(key))) throw Error("invalid helper detection");
+  lookup(detection.renovate, ["present", "none", "failed", "not-checked"]); lookup(detection.dependabot, ["configured", "not-configured", "failed", "not-checked"]);
   if (!Array.isArray(row.entries)) throw Error("invalid helper entries");
   const seen = new Set<string>();
   for (const value of row.entries) {
