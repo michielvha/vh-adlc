@@ -839,6 +839,7 @@ None.
 | 2026-11-10 | R-16 | spec | `73cf6b1` | unknown | procedural | 4 findings: 3 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-17 | spec | `0919a89` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
 | 2026-11-10 | R-18 | spec | `d62f5b5` | unknown | procedural | 3 findings: 1 should-fix, 2 nits, none blocking; model identity not attested |
+| 2026-11-10 | R-19 | spec | `2ea72bd` | unknown | procedural | 3 findings: 3 nits, none blocking; model identity not attested |
 
 ### R-1
 
@@ -1477,6 +1478,29 @@ SEVERITY: nit
 WHERE: Acceptance Criteria (AC-11) and Design (Helper; Procedure changes: mode reasons)
 EVIDENCE: AC-11 (lines 682-684) requires the maintenance skill, `references/loop.md` and `references/lifecycle.md` to state "that a nonzero `security-settings-mode` exit leads to `check` with the cause as the mode reason and never to `apply`." The R-17 fold changed the Design (lines 326-328) to: "it runs the helper in `check` with mode reason `committed-settings-unresolved` and the cause", and line 555-556 adds "the binding-failure fallback uses `committed-settings-unresolved` with the cause". A skill text that passes only the cause as `--mode-reason` satisfies AC-11 but contradicts the Design. The Design also covers only a binding failure or invalid committed settings. AC-11 covers any nonzero exit, such as an unreadable `--run-id` or invalid working-tree settings, and no named reason is given for those.
 PROPOSAL: Reword the AC-11 clause to "leads to `check` with mode reason `committed-settings-unresolved` and the cause". Either say that every nonzero exit of the command uses that reason, or name the reason for exits with other causes.
+
+### R-19
+
+FINDING: F-01
+KIND: judgement
+SEVERITY: nit
+WHERE: Acceptance Criteria (AC-22) and Design (Procedure changes: report section)
+EVIDENCE: The R-18 fold changed AC-22 to: "When any repository's mode is `check`, or no file is given, the section names the `security_settings: apply` opt-in; when every file is in `apply`, it does not." The Design's report paragraph covers `renderReport`, the section, the "helper did not run" rows and "Every sweep report renders the section, also with no `--security-settings` flag". It does not mention the opt-in line or when it appears. The only Design sentence on this is in the skill step: "Under `check`, the report says how to opt in." The Design also says a rejected file (malformed, out of scope, repeated, or from another run) "is ignored for collection and shown in the report as 'helper did not run'". Neither the Design nor AC-22 says whether a rejected file's claimed mode counts toward "any repository's mode is `check`" or "every file is in `apply`". The criterion also does not say what happens when files are given but every one is rejected.
+PROPOSAL: Add the AC-22 opt-in rule to the Design's report paragraph as `renderReport` behaviour, and word it in terms of accepted files. For example: the section names the opt-in unless at least one file is accepted and every accepted file's mode is `apply`.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan (AC-24)
+EVIDENCE: The R-18 fold added this fixture: "Another commits `security_settings: maybe` with a valid working tree holding a keep-off row for secret scanning. Pass: ... the helper's `check` with that binding reports secret scanning `left-off` with `owner-choice` from the working-tree row". The fixture does not say whether the committed file also holds that keep-off row. If it does, an implementation that still reads keep-off rows from the invalid committed YAML passes, even though the Design says that in this case `check` "reads keep-off rows from the working tree". The fixture also does not say the repository is public with admin and secret scanning off. Rule 2 would make a private repository `unavailable`, and rules 5 and 7 would make secret scanning that reads as on `owner-choice-conflict`, so `left-off` with `owner-choice` depends on those details.
+PROPOSAL: State that the committed settings have no keep-off row for secret scanning, or have a different one, and that the fixture is a public admin repository with secret scanning off.
+
+FINDING: F-03
+KIND: judgement
+SEVERITY: nit
+WHERE: Design (Helper)
+EVIDENCE: Both commands accept `[--mode-reason TEXT]` (`check ... [--mode-reason TEXT]`, `apply ... [--mode-reason TEXT]`). The only meaning given is: "`check` also accepts `--mode-reason`, the reason `security-settings-mode` printed". The helper also chooses mode reasons itself. `apply` refuses with `not-adopted`, `not-in-committed-scope` or a run-derived reason, and `check` "reports `committed-settings-unresolved` with the cause as its mode reason" when its binding fails. The skill always passes the binding to `check`, including when it chose `check` itself with `request-restricted` for `no_filesystem` or a restricted onboarding request. So `--mode-reason request-restricted` and an unresolved binding can occur together. Nothing says which reason the JSON shows, or what `apply` does with a passed `--mode-reason`, such as `adopted`, when it then refuses.
+PROPOSAL: State one rule: the helper's own refusal or binding-failure reason takes precedence over `--mode-reason`, or both are shown. Either say what `apply` does with `--mode-reason` or remove the flag from `apply`.
 
 ## Sources
 
