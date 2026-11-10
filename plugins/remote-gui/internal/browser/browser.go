@@ -22,6 +22,7 @@ import (
 
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/app"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/config"
+	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/profile"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/session"
 	"github.com/michielvha/vh-adlc/plugins/remote-gui/internal/state"
 )
@@ -35,6 +36,8 @@ type runtime struct {
 	mu           sync.Mutex
 	current      session.BrowserHandle
 	profile      string
+	downloads    string
+	reusable     bool
 	env          []string
 	vncAddress   string
 	chrome       *child
@@ -224,6 +227,9 @@ func (r *runtime) stop() {
 		if r.markerServer != nil {
 			_ = r.markerServer.Close()
 		}
+		if r.reusable && r.chrome != nil && state.Alive(r.chrome.identity) {
+			r.closeReusable()
+		}
 		for i := len(r.children) - 1; i >= 0; i-- {
 			_ = state.Signal(r.children[i].identity, syscall.SIGTERM)
 		}
@@ -269,6 +275,34 @@ func (r *runtime) stop() {
 	})
 }
 
+// closeReusable lets Chromium save a reusable profile before the display
+// stops: the native Exit request within two seconds, then SIGTERM to Chromium
+// alone for up to one second, then SIGKILL. It fits the guard's five-second
+// supervisor deadline on expiry.
+func (r *runtime) closeReusable() {
+	chrome := r.chrome
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if r.quitBrowser(ctx) == nil {
+		select {
+		case <-chrome.done:
+			return
+		case <-ctx.Done():
+		}
+	}
+	for _, step := range []syscall.Signal{syscall.SIGTERM, syscall.SIGKILL} {
+		if !state.Alive(chrome.identity) {
+			return
+		}
+		_ = state.Signal(chrome.identity, step)
+		select {
+		case <-chrome.done:
+			return
+		case <-time.After(time.Second):
+		}
+	}
+}
+
 func Start(ctx context.Context, c config.Config, id string) (session.BrowserHandle, error) {
 	var empty session.BrowserHandle
 	if err := syscall.Setrlimit(syscall.RLIMIT_CORE, &syscall.Rlimit{Cur: 0, Max: 0}); err != nil {
@@ -300,24 +334,47 @@ func Start(ctx context.Context, c config.Config, id string) (session.BrowserHand
 	return empty, err
 }
 
+// prepare selects the Chromium user data directory. A reusable profile lives
+// in the profile store and is kept; otherwise a fresh disposable profile is
+// created in the session directory. Downloads are always per session.
+func (r *runtime) prepare(c config.Config) error {
+	directory := filepath.Join(c.Home, r.id)
+	r.downloads = filepath.Join(directory, "downloads")
+	if c.Profile != "" {
+		r.reusable = true
+		r.profile = filepath.Join(c.ProfileHome, c.Profile, "chromium")
+		if err := state.Private(r.profile, 0o700); err != nil {
+			return errors.New("reusable-browser-profile-unavailable")
+		}
+		if err := os.Mkdir(r.downloads, 0o700); err != nil {
+			return errors.New("browser-download-directory-unavailable")
+		}
+		return nil
+	}
+	r.profile = filepath.Join(directory, "profile")
+	if err := os.Mkdir(r.profile, 0o700); err != nil {
+		return errors.New("fresh-browser-profile-unavailable")
+	}
+	if err := os.Mkdir(r.downloads, 0o700); err != nil {
+		return errors.New("browser-download-directory-unavailable")
+	}
+	if err := os.Mkdir(filepath.Join(r.profile, "Default"), 0o700); err != nil {
+		return errors.New("browser-preferences-unavailable")
+	}
+	preferences, _ := json.Marshal(map[string]any{"download": map[string]any{"default_directory": r.downloads, "prompt_for_download": false}, "credentials_enable_service": false, "profile": map[string]any{"password_manager_enabled": false}, "session": map[string]any{"restore_on_startup": 1}})
+	if err := os.WriteFile(filepath.Join(r.profile, "Default", "Preferences"), preferences, 0o600); err != nil {
+		return errors.New("browser-preferences-unavailable")
+	}
+	return nil
+}
+
 func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHandle, error) {
 	var empty session.BrowserHandle
 	directory := filepath.Join(c.Home, r.id)
-	profile := filepath.Join(directory, "profile")
 	auth := filepath.Join(directory, "Xauthority")
 	passwordFile := filepath.Join(directory, "vnc.passwd")
-	if err := os.Mkdir(profile, 0o700); err != nil {
-		return empty, errors.New("fresh-browser-profile-unavailable")
-	}
-	if err := os.Mkdir(filepath.Join(directory, "downloads"), 0o700); err != nil {
-		return empty, errors.New("browser-download-directory-unavailable")
-	}
-	if err := os.Mkdir(filepath.Join(profile, "Default"), 0o700); err != nil {
-		return empty, errors.New("browser-preferences-unavailable")
-	}
-	preferences, _ := json.Marshal(map[string]any{"download": map[string]any{"default_directory": filepath.Join(directory, "downloads"), "prompt_for_download": false}, "credentials_enable_service": false, "profile": map[string]any{"password_manager_enabled": false}, "session": map[string]any{"restore_on_startup": 1}})
-	if err := os.WriteFile(filepath.Join(profile, "Default", "Preferences"), preferences, 0o600); err != nil {
-		return empty, errors.New("browser-preferences-unavailable")
+	if err := r.prepare(c); err != nil {
+		return empty, err
 	}
 	if err := os.WriteFile(auth, nil, 0o600); err != nil {
 		return empty, errors.New("private-x-authority-unavailable")
@@ -400,10 +457,30 @@ func (r *runtime) start(ctx context.Context, c config.Config) (session.BrowserHa
 	}
 	initial := "http://" + markerListener.Addr().String() + "/"
 	r.current = session.BrowserHandle{Target: "http://" + bridgeAddress + "/vnc.html", Marker: marker, MarkerURL: initial, Password: password, Assets: app.Tool("REMOTE_GUI_NOVNC", "/usr/share/novnc")}
-	r.profile, r.env, r.vncAddress = profile, env, vncAddress
+	r.env, r.vncAddress = env, vncAddress
 	r.markerServer = &http.Server{ReadHeaderTimeout: 3 * time.Second, WriteTimeout: 3 * time.Second, Handler: http.HandlerFunc(r.serveMarker)}
 	go func() { _ = r.markerServer.Serve(markerListener) }()
 	return r.launch(ctx, c.Mode())
+}
+
+// prepareLaunch returns Chromium's arguments for one launch. A reusable
+// profile's first launch in a session opens only the connection page and marks
+// the previous exit clean, so tabs and session-only cookies from an earlier
+// session never return; later handoff launches restore the last session.
+func (r *runtime) prepareLaunch(mode string, generation uint64) ([]string, error) {
+	initialURL := ""
+	if generation == 1 {
+		initialURL = r.current.MarkerURL
+	}
+	restore := true
+	if r.reusable {
+		first := generation == 1
+		if err := profile.MergePreferences(r.profile, r.downloads, first); err != nil {
+			return nil, err
+		}
+		restore = !first
+	}
+	return browserArgs(r.profile, initialURL, mode, restore), nil
 }
 
 func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandle, error) {
@@ -415,11 +492,11 @@ func (r *runtime) launch(ctx context.Context, mode string) (session.BrowserHandl
 	if err := os.Remove(filepath.Join(r.profile, "DevToolsActivePort")); err != nil && !os.IsNotExist(err) {
 		return empty, errors.New("stale-browser-control-file-unavailable")
 	}
-	initialURL := ""
-	if generation == 1 {
-		initialURL = r.current.MarkerURL
+	args, err := r.prepareLaunch(mode, generation)
+	if err != nil {
+		return empty, err
 	}
-	chrome, err := r.spawn("browser", app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser"), browserArgs(r.profile, initialURL, mode), r.env)
+	chrome, err := r.spawn("browser", app.Tool("REMOTE_GUI_CHROMIUM", "chromium-browser"), args, r.env)
 	if err != nil {
 		return empty, err
 	}

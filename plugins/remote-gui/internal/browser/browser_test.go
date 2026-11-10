@@ -75,7 +75,7 @@ func TestBrowserPhaseArguments(t *testing.T) {
 	const marker = "http://127.0.0.1:12345/"
 	for _, mode := range []string{"human", "agent"} {
 		t.Run(mode, func(t *testing.T) {
-			args := browserArgs(profile, marker, mode)
+			args := browserArgs(profile, marker, mode, true)
 			foundProfile, foundMarker, foundAutomation, foundDebug := false, false, false, false
 			for _, arg := range args {
 				foundProfile = foundProfile || arg == "--user-data-dir="+profile
