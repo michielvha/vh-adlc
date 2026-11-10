@@ -173,7 +173,7 @@ func TestLocalToolRegistry(t *testing.T) {
 		t.Fatalf("list:\n%s", list)
 	}
 	s.ok("link", "srv", "--client", "mac", "--no-app")
-	if cfg := mac.Read(".ssh/config"); !strings.Contains(cfg, "HostName srv.tail.test") || strings.Contains(cfg, "Port ") {
+	if cfg := mac.Read(".ssh/config"); !strings.Contains(cfg, "HostName srv.tail.test") || !strings.Contains(cfg, "Port 22\n") {
 		t.Fatalf("the alias block does not use PASEO_DNS on port 22:\n%s", cfg)
 	}
 	if kh := mac.Read(".ssh/known_hosts"); !strings.HasPrefix(kh, "srv.tail.test ") {

@@ -1,13 +1,8 @@
 package main
 
-import (
-	"os"
-
-	"github.com/michielvha/logger"
-)
+import "os"
 
 func main() {
-	logger.InitWithOptions(logger.Options{Output: os.Stderr})
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr, isTerminal(os.Stderr)))
 }
 
