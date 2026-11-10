@@ -1035,6 +1035,7 @@ None.
 | 2026-11-10 | R-35 | spec | `87c0032` | unknown | procedural | 2 findings: 1 should-fix, 1 nit, none blocking; model identity not attested |
 | 2026-11-10 | R-36 | spec | `3f4f479` | unknown | procedural | no findings; model identity not attested |
 | 2026-11-10 | R-36 | spec | `3f4f479` | n/a | n/a | accepted by owner |
+| 2026-11-10 | R-37 | implementation | `ffe0399` | unknown | procedural | all 27 criteria met; model identity not attested |
 
 ### R-1
 
@@ -1984,6 +1985,169 @@ PROPOSAL: Change the row to "A 404 from a config-file lookup is not a failure".
 ### R-36
 
 NO FINDINGS
+
+### R-37
+
+CRITERION: AC-01 After `apply` on an unarchived repository where the caller is admin, Dependabot alerts are off and the keep-off list does not name them, `GET repos/{r}/vulnerability-alerts` returns 204 and the output lists `dependabot_alerts` as `enabled`.
+VERDICT: met
+EVIDENCE: Ran `BUN_RUNTIME_TRANSPILER_CACHE_PATH=0 bun test tests/vh-adlc/security-settings tests/vh-adlc/maintenance --timeout 60000` at ffe0399. 358 passed and 0 failed, including the helper.test.ts AC-01 case, which runs the fake gh. That case checks that the PUT to vulnerability-alerts is followed by a GET that returns 204 and that `dependabot_alerts` is `enabled`. Reading security-settings.ts shows the alerts write and its read-back. Limitation: this uses the fake gh only, with no live write.
+
+CRITERION: AC-02 After `apply` on a repository with any documented Renovate config location, an `app/renovate` pull request, or an open `app/renovate` Dependency Dashboard issue, Dependabot security updates are still off and listed as `left-off` with reason `renovate-present` and the matched path, pull request or issue.
+VERDICT: met
+EVIDENCE: In the same targeted run, the helper.test.ts AC-02 cases passed for each documented config path, for an app/renovate pull request and for an open Dependency Dashboard issue. Each shows `left-off` with `renovate-present`, the matched detail and no automated-security-fixes write. Limitation: the fake gh only.
+
+CRITERION: AC-03 After `apply` on an unarchived repository with a `.github/dependabot.yml` or `.github/dependabot.yaml` and no Renovate signal, where the caller is admin, alerts read back on and the keep-off list does not name security updates, Dependabot security updates are on and listed as `enabled`. With neither file and no Renovate signal, they stay off and are listed as `left-off` with reason `renovate-unknown`.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-03 cases passed. With either Dependabot file name, the PUT to automated-security-fixes is read back and the entry is `enabled`. With neither file, the entry is `left-off` with `renovate-unknown` and no write is made. Limitation: the fake gh only.
+
+CRITERION: AC-04 After `apply` on an unarchived public repository where the caller is admin and the keep-off list names neither, secret scanning and push protection are each listed as `enabled` or `already-on`, and no call to any `code-scanning` endpoint was made.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-04 case passed. It shows one PATCH with status enabled, a read-back showing both entries `enabled`, and a call log with no `code-scanning` path. Reading the source confirms the helper never builds a code-scanning endpoint. Limitation: the fake gh only.
+
+CRITERION: AC-05 After `apply` on an unarchived private or internal repository where the caller is admin and every setting starts off, `dependabot_alerts` is read back on and listed as `enabled`, no write call was made for secret scanning or push protection, and those two entries are `unavailable` with reason `not-free-on-private`. When `security_and_analysis` is null, the `code_scanning` entry is `unavailable` with the same reason; when it shows `code_security` enabled, the output has no `code_scanning` entry. On an archived repository, `apply` makes no write call and every entry is `unavailable` with reason `archived`.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-05 cases passed for private and internal visibility, null `security_and_analysis`, `code_security` enabled and an archived repository. Each case had the asserted states and reasons, made no PATCH, and the archived case made no write at all. Limitation: the fake gh only.
+
+CRITERION: AC-06 When the caller is not admin on an unarchived public repository, `apply` makes no write call and no admin-only read, lists every entry as `unknown` with reason `needs-admin`, and exits 1. `check` never makes a write call; it lists every off and free setting that rules 1 to 7 do not decide as `not-changed` with reason `check-only`, and exits 1 when there is at least one.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-06 cases passed. Without admin, only `repos/{r}` is called, every entry is `needs-admin` and the exit code is 1. Under `check`, the harness fails on any write, the off entries show `check-only` and the exit code is 1. Reading the source confirms the non-admin return happens before any other read. Limitation: the fake gh only.
+
+CRITERION: AC-07 `apply` never makes a write call that turns a setting off. After an `apply` that exited 0, a second `apply` on the same repository makes no write call and lists every setting as `already-on`, `left-off` or `unavailable`.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts idempotence case passed: the second apply made no write, and every state was in the allowed set. Reading security-settings.ts shows only three writes: PUT vulnerability-alerts, PUT automated-security-fixes and a PATCH whose status is "enabled". harness.ts throws on any DELETE or "disabled" body in every test. Limitation: the fake gh only.
+
+CRITERION: AC-08 When any Renovate detection lookup fails and no other lookup matches, Dependabot security updates that are off stay off and are listed as `left-off` with reason `renovate-detection-failed` and the error. When every Renovate lookup succeeds without a match and the Dependabot config lookup fails, they stay off and are listed as `left-off` with reason `dependabot-detection-failed` and the error. In each case the helper exits 1.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-08 cases passed. They inject a failed Renovate lookup and, separately, a failed Dependabot config lookup. Each shows `left-off` with the error detail and exit code 1, and neither writes automated-security-fixes. Limitation: the fake gh only. The Dependabot lookup stops at the first failed path, which the criterion permits.
+
+CRITERION: AC-09 When one write fails, that setting is `not-changed` with reason `api-error` and the HTTP status, the remaining settings are still processed, and `apply` exits 1. A write that succeeds but is not read back as on gives `not-changed` with `api-error`, the write's status and "not on after write".
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-09 cases passed. A failed write gives `api-error` with its status, the later settings are still written, and the exit code is 1. A successful write that is read back off gives "not on after write" with the write status. Limitation: the fake gh only.
+
+CRITERION: AC-10 `--format markdown` prints a `## Repository security settings` section with one row per entry giving its state and reason, followed by an "Owner decisions" list holding exactly the entries with reason `renovate-overlap`, `owner-choice-conflict` or `paused`, matching the JSON output for the same run.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts markdown case passed, comparing the rows and owner decisions with the JSON from the same run. I also ran the read-only helper `check --repo /home/m/code/bg-remove --repository michielvha/bg-remove --format markdown` live. It printed the section, four rows, "Owner decisions: None." and exit code 0. Limitation: the live run had no owner-decision entries.
+
+CRITERION: AC-11 `references/security-settings.md`, `references/authority.md`, `references/maintenance.md`, `references/maintenance-settings.md`, `references/loop.md`, `references/lifecycle.md`, the maintenance skill and `docs/user-guides/workflows.md` state the following. A clause that names no page needs to appear only in `references/security-settings.md`, which the other listed pages link to; a clause that names pages must appear in each of them. Sweeps and onboarding run the helper before collection in the mode `security-settings-mode` prints; the `security_settings` opt-in and the flags that select `check`, in sweeps and, in `references/loop.md` and `references/lifecycle.md`, in onboarding; the Renovate and Dependabot rules; the private, archived and keep-off rules; that `renovate-overlap`, `owner-choice-conflict` and `paused` go to the owner; the precedence order; that `apply` and the `not-free-on-private` rule hold only on github.com, with `not-github-com` elsewhere; the `not-free-on-private`, `alerts-enabled-this-run` and `helper-receipt-missing` collector rules, in `references/maintenance.md` and `references/maintenance-settings.md` such that neither page still says only a configured or exactly declared match is `complete-unavailable`; that `--security-settings` and `--applied-repository` are a named exception to the duplicate-flag rule in `references/maintenance-settings.md`; the operations table in `references/maintenance-settings.md` listing `security-settings-mode` with its flags and the new `collect` and `report` flags; that a helper failure never blocks collection, stated in the maintenance skill's step; in the maintenance skill's step, that it runs the helper and passes its files with `--security-settings` to `collect` and `report` and `--applied-repository` to `collect`; in `references/maintenance.md`, that its "one exception" sentence lists the security-settings helper's `apply` beside the branch helper, with the recorded run as intent and the JSON saved in the run's private journal directory as receipt, and that it documents the `## Repository security settings` report section; that no setting is ever turned off; and, in the authority row and `references/security-settings.md`, that adopting `security_settings: apply` is the agreement the onboarding guide asks for; in the maintenance skill, `references/security-settings.md` and the authority row, that among maintenance runs only a full sweep whose request has `authorized_sweep` true may apply, onboarding applies only as the committed settings decide, a pull-request-scoped run checks, and a continuation reuses the run's helper files without running it again; and, in the maintenance skill, that an `alerts-enabled-this-run` surface gets a row in `coverage_handoffs` with the repository, surface `dependabot` and a handoff of `reference` set to the run ID, `owner` null, `assignment_handoff` naming the next maintenance sweep and `next_action` to collect the surface again; and, in `references/loop.md` and `references/lifecycle.md`, that onboarding under `check` reports the states, says how to opt in, records the guide's security checklist item as pending the owner's choice, and never runs the guide's manual commands or `apply` on an in-session yes; and, in the maintenance skill, `references/loop.md` and `references/lifecycle.md`, that a nonzero `security-settings-mode` exit, whatever its cause, leads to `check` with mode reason `committed-settings-unresolved` and the cause, and never to `apply`; and, in `docs/user-guides/workflows.md`, a section beside "Stale branches" stating the `check` default, the `security_settings: apply` opt-in and the manual commands, and linking to `references/security-settings.md`. `references/security-settings.md` links to `conventions/repository-security.md` at the plugin pin, and that revision contains the page. The maintenance skill's and onboarding's `vh-adlc knowledge` page lists do not include `conventions/repository-security.md`. `references/maintenance-settings.md` and `docs/reference/compatibility.md` state that older readers reject `security_settings` and `security_settings_keep_off`, as they do for `security_policy`, and name the new plugin version as the minimum for adopting either key.
+VERDICT: met
+EVIDENCE: I read the eight listed pages and compatibility.md at ffe0399, plus their diffs, and checked each clause.
+- security-settings.md holds the general rules, precedence order, owner decisions, the github.com-only rule, the agreement clause and the run-type clauses. It links repository-security.md at d8f07c9.
+- The authority row holds the agreement, full-sweep, onboarding, pull-request and continuation clauses.
+- maintenance.md and maintenance-settings.md hold the three collector rules. "Only the configured exact" became "A configured exact", and "Only the exact declared" became "The exact declared". maintenance.md lists the helper's apply in the exception sentence, with the run as intent and the private journal JSON as receipt, and documents the report section.
+- maintenance-settings.md names the repeat-flag exception and has the operations table row and new flags.
+- loop.md:81-84 and lifecycle.md:64 hold the onboarding check, nonzero-exit and pending-checklist clauses.
+- SKILL.md step 3 holds the helper run, the flags, the never-blocks rule, continuation reuse, the coverage_handoffs row and the no_filesystem rule.
+- workflows.md:167 adds "## Repository security settings" right after "## Stale branches", with the default, the opt-in yaml, the manual gh commands and the link.
+- Grep found repository-security only in security-settings.md, so no knowledge list includes it.
+- maintenance-settings.md and compatibility.md name 0.16.0 for older readers.
+- `vh-adlc knowledge --page conventions/repository-security.md --plugin-pin d8f07c9...` returned answered.
+
+Limitation: the skill's wording is close to the criterion but not identical: "applies as committed settings decide" and "reuses the saved files" within a step limited to new runs.
+
+CRITERION: AC-12 After a maintenance sweep of `michielvha/bg-remove`, its saved report has a `## Repository security settings` section that lists Dependabot alerts `already-on`, Dependabot security updates `left-off` with reason `renovate-present`, and secret scanning and push protection `already-on`.
+VERDICT: met
+EVIDENCE: I read /home/m/code/bg-remove/.git/vh-adlc/maintenance/runs/851f2d34-8344-4644-bb2c-08f5026ffdfb/drafts/report.md. Its headings run Inventory (16), Security alerts (29), Repository security settings (93), Analysis (114). The section shows mode check (not-adopted), `dependabot_alerts` already-on, `dependabot_security_updates` left-off with renovate-present (pull request #26), and `secret_scanning` and `secret_scanning_push_protection` already-on. A live read-only `check` run now gives the same four states with exit code 0. Limitation: the report is the private draft from a check-mode sweep, and I did not run apply.
+
+CRITERION: AC-13 When alerts are not read back as on, `apply` makes no write to `automated-security-fixes` and lists Dependabot security updates as `not-changed` with reason `alerts-off`.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-13 case passed. With alerts read back off, the call log has no automated-security-fixes PUT and the entry is `not-changed` with `alerts-off`. The source branch matches. Limitation: the fake gh only.
+
+CRITERION: AC-14 When Renovate is present and Dependabot security updates are already on, `apply` leaves them on, lists them as `already-on` with reason `renovate-overlap`, and the Markdown output lists them under owner decisions.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-14 case passed. It shows no write, `already-on` with `renovate-overlap`, and the Markdown owner decisions listing the entry. Limitation: the fake gh only.
+
+CRITERION: AC-15 On an unarchived public repository where the caller is admin, an off setting listed for the target repository in `security_settings_keep_off` is never written and is listed as `left-off` with reason `owner-choice` and the configured reason. A settings file naming an unknown setting fails visibly.
+VERDICT: met
+EVIDENCE: In the targeted run, these cases passed:
+- helper.test.ts and binding.test.ts keep-off cases: no write, `left-off` with owner-choice and the configured reason.
+- the binding.test.ts committed `code_scanning` row, which fails with "security_settings_keep_off settings".
+- the settings.test.ts unknown-setting rejection cases.
+
+Limitation: fixtures only.
+
+CRITERION: AC-16 In a maintenance collection of a private or internal repository where the caller is admin, `security_and_analysis` shows neither `advanced_security` nor `code_security` enabled, and the code scanning alerts read returns 403 or 404, the code scanning surface is `complete-unavailable` with reason `not-free-on-private` and that status, without a `surface_expectations` entry. Without admin, or with either feature enabled, the same read leaves the surface incomplete.
+VERDICT: met
+EVIDENCE: In the targeted run, the security-settings-collect.test.ts cases passed for private and internal visibility with 403 and 404. Each gives complete-unavailable with not-free-on-private and the status, and no surface_expectations entry. The non-admin, advanced_security and code_security variants stay incomplete. collect.ts matches. Limitation: the fake collector inputs only.
+
+CRITERION: AC-17 A setting listed in `security_settings_keep_off` that the first read shows on is not written, is listed as `already-on` with reason `owner-choice-conflict`, and appears in the Markdown owner decisions list, including when the committed settings are unlinked or absent and the row is in the working tree's settings.
+VERDICT: met
+EVIDENCE: In the targeted run, these cases passed:
+- helper.test.ts owner-choice-conflict cases, with no write and the entry in the Markdown owner decisions.
+- binding.test.ts working-tree fallback cases for unlinked and absent committed settings, with a keep-off row only in the working tree, giving owner-choice-conflict.
+
+Limitation: fixtures only.
+
+CRITERION: AC-18 On an unarchived public repository where the caller is admin, when the read of a setting fails with a status other than the 404 that means off, that entry is `unknown` with reason `api-error` and the status, even when the keep-off list names it, no write is made for it, the other settings are still processed, and `apply` exits 1. A 404 from either `GET` endpoint, and a 200 from `GET automated-security-fixes` with `enabled` false, are treated as off.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts AC-18 cases passed. A failed read with a 500 or 403, including one on a keep-off-listed setting, gives unknown with api-error and the status, no write for that entry, the other entries still processed and exit code 1. A 404 from both GETs and a 200 with enabled false are treated as off. Limitation: the fake gh only.
+
+CRITERION: AC-19 When several rules apply to one entry, its state and reason come from the first that applies in the numbered order under "Rules applied before any write", and under `check` an off security-updates entry the Renovate and Dependabot rules would enable is `not-changed` with `check-only` even while alerts are off. In a repository with `dependabot.yml`, no Renovate, both off and a keep-off row for `dependabot_alerts`, `apply` leaves alerts and security updates `left-off` with `owner-choice` and exits 0. On a public repository with both secret settings off and a keep-off row for `secret_scanning` only, `apply` leaves both `left-off` with `owner-choice` and writes neither.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts precedence cases passed for:
+- check-only with alerts off;
+- an alerts keep-off giving both entries owner-choice, exit code 0;
+- a `secret_scanning` keep-off giving both secret entries owner-choice, with no PATCH.
+
+The rule order in the code matches the documented order. Limitation: the fake gh only.
+
+CRITERION: AC-20 `AGENTS.md` and `plugins/vh-adlc/knowledge.md` pin the vhco-pro/docs revision where #30 merged, both `plugin.json` files carry the same new minor version, and `vh-adlc knowledge --page conventions/repository-security.md` resolves the page at that pin.
+VERDICT: met
+EVIDENCE:
+- `gh pr view 30 -R vhco-pro/docs` shows MERGED, with mergeCommit d8f07c9dd69038375a535af8ad586086688f85ab.
+- AGENTS.md:4 and plugins/vh-adlc/knowledge.md:5,7 at ffe0399 name d8f07c9.
+- Both plugin.json files moved from 0.15.1 to 0.16.0.
+- `/usr/local/bin/vh-adlc knowledge --repo . --plugin-pin d8f07c9... --page conventions/repository-security.md` returned answered at d8f07c9.
+
+No limitations.
+
+CRITERION: AC-21 When `apply` enables Dependabot alerts and the collector then runs with the helper's JSON, the collector keeps the open alerts it reads and records the Dependabot surface as incomplete with reason `alerts-enabled-this-run` and a null count, also when the list is still empty. `security-reconcile` accepts that inventory and reports the gap `coverage handoff pending` for the surface unless the analysis records a coverage handoff for it; the maintenance skill records one naming the next sweep. The same holds when the file shows `dependabot_alerts` as `not-changed` with `api-error` after a write. With alerts `already-on`, a successful read stays complete.
+VERDICT: met
+EVIDENCE: In the targeted run, the security-settings-collect.test.ts cases passed for:
+- enabled with alerts present and with an empty list, giving incomplete, alerts-enabled-this-run, a null count and the alerts kept;
+- not-changed with api-error after a write;
+- already-on staying complete;
+- security-reconcile with and without a coverage handoff over three inventories, giving "coverage handoff pending" only without one.
+
+SKILL.md step 3 names the coverage_handoffs row. Limitation: fixtures only.
+
+CRITERION: AC-22 Every sweep report, with or without `--security-settings` files, has a `## Repository security settings` section after `## Security alerts` that names every repository in scope: one table per repository with a file, whose rows match its JSON entries, a "helper did not run" row for each repository without one, and an "Owner decisions" list holding exactly the entries with `renovate-overlap`, `owner-choice-conflict` or `paused` across all files. The section names the `security_settings: apply` opt-in unless at least one helper file is accepted and every accepted file's mode is `apply`; a rejected file's claimed mode does not count.
+VERDICT: met
+EVIDENCE: In the targeted run, the security-settings-collect.test.ts report cases passed. They cover a four-repository report with mixed files, no files, all-apply files and a rejected file claiming apply, and check section order, rows, owner decisions and the opt-in note. The bg-remove draft report shows the section between Security alerts and Analysis, with the opt-in sentence. Limitation: fixtures plus one live report.
+
+CRITERION: AC-23 When the helper's `repos/{r}` read fails, every writable entry is `unknown` with reason `api-error` and the status, no other read or write is made, and the helper exits 1. The collector covers every repository in scope when given helper files for only some of them. A helper file that is malformed, names a repository outside the scope, repeats a repository or carries another run ID changes no surface, fails neither `collect` nor `report`, and shows as "helper did not run" with the reason. A repository passed with `--applied-repository` and no accepted helper file gets an incomplete Dependabot surface with `helper-receipt-missing`.
+VERDICT: met
+EVIDENCE: In the targeted run, these cases passed:
+- helper.test.ts repos read failure: one call, all entries unknown with api-error, exit code 1;
+- security-settings-collect.test.ts partial files;
+- malformed, out-of-scope, duplicate and wrong-run-id files, each with exit code 0 and "helper did not run" with the reason;
+- --applied-repository without an accepted file, giving helper-receipt-missing.
+
+Limitation: fixtures only.
+
+CRITERION: AC-24 `security-settings-mode` prints `check` when the recorded request has `read_only`, `draft_only`, `no_push` or `no_filesystem`, or when the committed settings do not adopt `security_settings: apply`, or when the recorded request lacks `authorized_sweep` true, or when the run's scope has a pull request, or when the repository is outside the run's recorded `scope.repositories`, or when the maintenance settings' `hostname` is not github.com; otherwise it prints `apply`, also with no recorded request. A request with only `no_commit` gets `apply` when the settings adopt it. A `security_settings` value other than `apply` or `check` fails visibly. A value of `apply` present only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link gives `check`, both from `security-settings-mode` and from the helper's `apply`, which never reads adoption from the working tree. Under `apply`, a keep-off row present in the committed settings but removed in the working tree still applies, and a repository added only in the working tree's `repositories` gets `check` with reason `not-in-committed-scope`, while the origin repository always counts as named. A committed `security_policy` key does not prevent `apply`. A binding failure or invalid committed settings make `security-settings-mode` exit nonzero naming the cause, and the helper's `check` given that binding still reports its entries, with mode reason `committed-settings-unresolved`. The helper's `apply` makes no write, and reports its entries exactly as `check` would, with mode `check`, when the bound committed settings do not adopt `security_settings: apply` or do not name the target, or when its `--run-id` names a run whose recorded request or scope selects `check`; its mode reason is the first that applies in the ordered mode reasons, the same reason `security-settings-mode` would print. It makes no write and exits nonzero naming the cause when its binding does not resolve, the committed settings are invalid, or its `--run-id` cannot be read. The maintenance skill states that a current request forbidding filesystem writes selects `check` without calling `security-settings-mode`, with the helper's output kept in chat and no JSON saved.
+VERDICT: met
+EVIDENCE: In the targeted run, these cases passed:
+- security-settings-mode.test.ts: each restriction flag, not-adopted, missing authorized_sweep, pull-request scope, out-of-scope repository, non-github.com host, no request, no_commit only, an invalid value, working-tree-only, unmerged-branch and unlinked adoption, keep-off removed only in the working tree, not-in-committed-scope, origin always named, security_policy, and a nonzero exit naming binding and settings causes;
+- binding.test.ts: helper apply parity with check, the seven refusal fixtures, a missing run, a broken chain, the tracking-tip mismatch and committed-settings-unresolved under check.
+
+authority.ts mode order matches. SKILL.md:26 states the no_filesystem rule. Limitation: fixtures only.
+
+CRITERION: AC-25 A consumer whose committed settings hold `security_settings` and `security_settings_keep_off` keeps an adopted standing report-publication grant.
+VERDICT: met
+EVIDENCE: In the targeted run, settings.test.ts:169 "committed security settings keys keep an adopted standing publication grant" passed. It commits both keys with a standing publication table, and resolveStanding gives adopted. authority.ts adds both keys to the known list. Limitation: fixture only.
+
+CRITERION: AC-26 Under `apply`, security updates read as `{"enabled":true,"paused":true}` are `already-on` with reason `paused`, with or without a Renovate signal, unless the keep-off list names them, which gives `owner-choice-conflict`. No write is made, the helper exits 0 when no other entry fails, and the Markdown owner decisions list names the entry.
+VERDICT: met
+EVIDENCE: In the targeted run, the helper.test.ts paused cases passed with and without Renovate and with a keep-off row. They show no write, exit code 0, `paused` or owner-choice-conflict as applicable, and the entry in the Markdown owner decisions. Limitation: the fake gh only.
+
+CRITERION: AC-27 When the maintenance settings' `hostname` is not github.com, `security-settings-mode` prints `check` with `not-github-com` even when the committed settings adopt `apply`; the helper's `apply` makes no write and reports that mode reason; the helper never gives an entry reason `not-free-on-private` and has no `code_scanning` entry for that host; every `gh` call it makes passes `--hostname` with that host; and the collector never records `not-free-on-private` for that host.
+VERDICT: met
+EVIDENCE: In the targeted run, these cases passed:
+- security-settings-mode.test.ts: a GHE host gives not-github-com despite adopting apply;
+- binding.test.ts: a GHE apply with GH_HOST set to github.com makes no write, reports not-github-com, has no not-free-on-private and no code_scanning, and passes --hostname with the GHE host on every call;
+- security-settings-collect.test.ts: a GHE private repository gets no not-free-on-private.
+
+Limitation: fixtures only. The targeted suite passed 358 of 358. The helper typecheck exited 0. The full `bun test tests/vh-adlc` run passed 1425 and failed 1, the known host-binary fixtures lock rejection of /usr/local/bin/vh-adlc 0.19.0, which is unrelated.
 
 ## Sources
 
