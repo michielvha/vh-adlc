@@ -1,6 +1,6 @@
 ---
-status: in-progress
-status_description: "Claimed for implementation on feat/remote-gui-reusable-profiles."
+status: draft
+status_description: "Back in draft for a revision found during T9: confirm the leave prompt on stop and correct the cleanup recovery wording."
 branch: feat/remote-gui-reusable-profiles
 issue: https://github.com/michielvha/vh-adlc/issues/62
 goal: "An owner can opt in to a named browser profile bound to their identity, so provider sessions survive the end of a remote-gui session, while credential entry stays human-only and agent control of a signed-in profile always rests on the owner's confirmation."
