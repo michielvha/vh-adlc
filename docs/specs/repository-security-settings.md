@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "Owner answered Q1 to Q3 on 2026-11-10 and aligned the design with vhco-pro/docs#30; waiting for the first spec review."
+status_description: "Spec review R-1 at 1a93d2f returned 12 findings, none blocking. Factual ones are applied; the judgement ones are Q4 to Q11 for the owner, then a new review."
 issue: null
 goal: "Every maintenance sweep and onboarding leaves a repository with each GitHub security setting its plan offers for free turned on, without duplicating Renovate's pull requests, and reports what it changed."
 covers:
@@ -55,12 +55,12 @@ rule.
 
 The owner decided all of this on 2026-11-10, answering Q1 to Q3 with the recommended option and then
 asking for the design to follow vhco-pro/docs#30, which moves CodeQL to a workflow. It widens the
-authority table, which today lets vh-adlc change one repository setting, and only after the owner
-says yes.
+authority table, which today lets vh-adlc change one repository setting, and only with the owner's
+authorization: a yes, a request that asks for it, or an approved plan digest.
 
 Proof is planned, not observed: Bun tests drive the helper against a fake `gh` for each repository
-shape, and a live sweep of `michielvha/bg-remove` checks the report section. No spec review has run
-yet. Acceptance authorizes tasks, implementation on a feature branch and that live sweep. A release, a plugin version bump and changes to any other repository outside a sweep or
+shape, and a live sweep of `michielvha/bg-remove` checks the report section. Spec review R-1 found
+no blocking problem; its judgement findings wait as Q4 to Q11. Acceptance authorizes tasks, implementation on a feature branch and that live sweep. A release, a plugin version bump and changes to any other repository outside a sweep or
 onboarding still need separate approval.
 
 ### Background
@@ -72,7 +72,8 @@ plugin changes a security setting. The only repository setting it writes is merg
 through `autoDelete` (`plugins/vh-adlc/scripts/branches/branches.ts:273-284`), and only with the
 owner's yes (`plugins/vh-adlc/references/authority.md:32`, `plugins/vh-adlc/references/loop.md:70-73`,
 `plugins/vh-adlc/references/lifecycle.md:64`, `plugins/vh-adlc/skills/vh-adlc-maintenance/SKILL.md:37-38`).
-The user guide says merged-branch deletion "is the only setting" vh-adlc checks
+The user guide says vh-adlc "checks it when it onboards a repository and in every maintenance sweep,
+and offers to turn it on", and describes no other repository setting
 (`docs/user-guides/workflows.md:143-145`).
 
 Observed on `michielvha/bg-remove` during maintenance run `7ece4509` on 2026-11-10:
@@ -86,8 +87,8 @@ Observed on `michielvha/bg-remove` during maintenance run `7ece4509` on 2026-11-
 - `gh api 'repos/michielvha/bg-remove/dependabot/alerts?state=open'` listed 47 alerts about 20
   seconds later.
 - `gh pr list -R michielvha/bg-remove --author app/renovate --state all` showed PR #24 (`vite` to
-  8.1.6 `[security]`) and PR #25 (`vitest` to 4.1.11 `[security]`), opened at 07:14 UTC after the
-  alerts were enabled.
+  8.1.6 `[security]`) and PR #25 (`vitest` to 4.1.11 `[security]`), opened at 07:14 and 07:15 UTC
+  after the alerts were enabled.
 - The repository has no Renovate config file, yet Renovate opens its pull requests, so a rule that
   looks only for a config file would miss it.
 
@@ -223,7 +224,7 @@ Procedure changes:
   reports its output beside the merged-branch deletion check. Like that check, it is a repository
   change, not a commit, and never holds up the onboarding commit.
 - `docs/user-guides/workflows.md` gets a section beside "Stale branches" describing the default and
-  the manual commands, and corrects the sentence that calls merged-branch deletion the only setting.
+  the manual commands. The merged-branch deletion text stays as it is.
 
 ## Acceptance Criteria
 
@@ -288,7 +289,110 @@ None yet; written once the document is planned.
 
 ## Open Questions
 
-None.
+### Q4: What should the helper report when the caller is not an admin and cannot read the settings?
+
+From R-1 F-02: GitHub shows `security_and_analysis` and answers the alerts and security-updates reads only for admins.
+
+**Recommendation:** A. It reports what is actually known and keeps a sweep by a non-admin visible.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. A new state `unknown` with reason `needs-admin` for each unreadable setting, exit 1** | The report says which settings could not be read; the test fixture denies those reads as GitHub does | One more state in the table and the report |
+| **B. Skip the helper and print one `needs-admin` line** | Simplest output | No per-setting detail, even for settings a non-admin could see |
+
+**Why this is yours:** It decides how a partial result looks in every sweep run without admin rights.
+
+### Q5: Should security updates wait for alerts to be read back as on?
+
+From R-1 F-03: GitHub offers security updates only where alerts are on.
+
+**Recommendation:** A. A failed alerts write then explains the second failure instead of hiding it.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Write alerts first; try security updates only when alerts read back on, otherwise `not-changed` with reason `alerts-off`** | A clear cause in the report, and a fake `gh` that rejects the out-of-order write | One more reason and one more fixture |
+| **B. No fixed order** | Fewer rules | A failed alerts write shows up as an unexplained `api-error` on security updates |
+
+**Why this is yours:** It adds a rule and a reason to the helper's contract.
+
+### Q6: How should the helper detect a Renovate App that has not opened any pull request yet?
+
+From R-1 F-04: bg-remove has no config file, so only its PR history shows Renovate. A new repository covered by the App, with no PR yet, would look Renovate-free and get security updates turned on. A repository that moved off Renovate keeps its old PRs and never gets them.
+
+**Recommendation:** A. A wrong `enabled` creates duplicate PRs that nothing turns off later, while a wrong `left-off` only delays security updates until the next sweep.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Also count an open "Dependency Dashboard" issue; with no signal at all, leave security updates `left-off` with reason `renovate-unknown` until a later sweep finds a signal or a `.github/dependabot.yml`** | No duplicate PRs in a fresh repository | A repository with neither Renovate nor a `dependabot.yml` never gets security updates automatically |
+| **B. Keep the rule as accepted in Q2** | Security updates on in every repository without a Renovate trace | Possible duplicate PRs in new App-covered repositories |
+| **C. A or B, and an old Renovate PR stops counting once a `.github/dependabot.yml` exists and no config file does** | Recovers repositories that moved to Dependabot | One more rule to test |
+
+**Why this is yours:** It trades duplicate PRs against missing security updates, which Q2 already weighed once.
+
+### Q7: What should the report say when Renovate is present and Dependabot security updates are already on?
+
+From R-1 F-05: the convention says to keep them off there, and the helper never turns a setting off.
+
+**Recommendation:** A. The owner sees the overlap without the helper ever disabling anything.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. `already-on` with reason `renovate-overlap`, listed in the report as an owner decision, exit 0** | The duplicate-PR risk is visible in every sweep until someone turns them off | One more reason, criterion and fixture |
+| **B. Plain `already-on`** | No change | The overlap stays silent |
+
+**Why this is yours:** It decides what the sweep asks the owner about.
+
+### Q8: Should private repositories' code scanning surface be reported as unavailable for the plan?
+
+From R-1 F-06: the convention says reports list code scanning on private repositories as unavailable, not as a gap, but today an unmatched 403 or 404 leaves that surface incomplete.
+
+**Recommendation:** A. It makes the sweep match the convention without a per-repository setting.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. The helper adds a read-only `code_scanning` entry, `unavailable` with `not-free-on-private` on private and internal repositories, and the sweep records that surface as complete-unavailable from it** | Private repositories stop showing a code scanning coverage gap | Touches the collector and `references/maintenance.md`, which this document now keeps out of scope |
+| **B. Keep it out of scope and name it as a known difference from the convention** | Smaller feature | Private sweeps keep reporting incomplete code scanning coverage, unless `surface_expectations` lists each repository |
+
+**Why this is yours:** It widens the scope into the collector.
+
+### Q9: What does this feature do while vhco-pro/docs#30 is still open?
+
+From R-1 F-07: the convention page does not exist at the pinned docs revision `a4e3d592` or on the docs default branch.
+
+**Recommendation:** A. The plugin then links to a page every pinned consumer can resolve.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Implementation waits for docs#30 to merge; its first task moves this repository's docs pin to the merged revision, and the reference links to that page** | One source for the policy, at a pinned revision | Implementation is blocked until docs#30 merges |
+| **B. Link to the docs#30 commit `5b73d9e` now and fix the link after the merge** | No wait | A link to an unmerged commit, and a follow-up change |
+
+**Why this is yours:** It sets an order between two repositories and includes a docs pin change.
+
+### Q10: Should a repository be able to keep a setting off permanently?
+
+From R-1 F-08: without an opt-out, every sweep turns back on a setting the owner turned off on purpose.
+
+**Recommendation:** A. The owner's choice for one repository survives later sweeps.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. A maintenance settings entry listing settings to keep off for that repository; the helper reports them `left-off` with reason `owner-choice`** | A persistent, visible exception | One more settings field, criterion and fixture |
+| **B. No opt-out** | Every repository converges on the convention | Turning a setting off for good means stopping the sweeps there |
+
+**Why this is yours:** It decides whether the standard allows exceptions.
+
+### Q11: How strong should the live proof be?
+
+From R-1 F-09 and F-12: on bg-remove every setting is already on or left off, so no live run shows a sweep turning alerts on and collecting them in the same run. AC-05 also says "still enabled" for a fixture that starts with alerts off.
+
+**Recommendation:** B. A scratch repository needs creating and deleting, and the Bun fixtures already cover the write path.
+
+| Option | You get | It costs |
+| --- | --- | --- |
+| **A. Add an owner-approved manual run on a scratch repository with alerts off** | Live proof of the original failure fixed | Creating and deleting a repository, which needs separate approval |
+| **B. Fix AC-05 to require `dependabot_alerts` read back and `enabled`, and state the live limit in the Test Plan** | Accurate criteria and a stated limit | The enable-then-collect path is proven only against the fake `gh` |
+
+**Why this is yours:** It decides whether proof needs a live repository change.
 
 ## Review Log
 
