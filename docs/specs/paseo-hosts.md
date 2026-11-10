@@ -255,6 +255,7 @@ None.
 | Date | Review | Kind | Commit | Model | Isolation | Outcome |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-11-10 | R-1 | spec | `43cc4f95a8aa696194d3c5cbad3d8f210bb57d98` | unknown | procedural | Two blocking and five should-fix factual or judgement findings, four nits; model identity not attested. |
+| 2026-11-10 | R-2 | spec | `ca547a83a2d5768315eee7e0c33961c072c7fb29` | unknown | procedural | Six should-fix findings (five factual, one judgement) and two nits, none blocking; model identity not attested. |
 
 ### R-1
 
@@ -334,3 +335,61 @@ SEVERITY: nit
 WHERE: Design, Skill
 EVIDENCE: Line 195 says the skill "checks that `PASEO_HOSTS_DIR` exists" and otherwise asks the owner. The Configuration table gives it the default `~/.config/paseo-hosts`, and AC-08 expects a "fresh `PASEO_HOSTS_DIR`". On a first run the skill would ask for a value the CLI already defaults and creates.
 PROPOSAL: Have the skill ask only when the variable is unset and the owner has not accepted the default, and let `onboard` create the directory.
+
+### R-2
+
+FINDING: F-01
+KIND: factual
+SEVERITY: should-fix
+WHERE: Frontmatter covers; Design, Plugin layout; Test Plan, AC-14
+EVIDENCE: Line 124 says the `version` job waits for the new `paseo-hosts` job. cmd/vh-adlc/workflow_test.go:106 requires `version.Needs` to equal exactly `[]string{"verify", "checker", "checker-macos", "remote-gui"}`, so that change fails the root `go test ./...` unless the test also changes. The covers list (lines 6-11) leaves out cmd/vh-adlc/workflow_test.go. It also leaves out the AC-14 test path; remote-gui keeps the equivalent test in tests/remote-gui/package.test.ts, and CI runs it as a separate `bun test tests/remote-gui` step (ci.yml:111-112). It also leaves out README.md:86 and CONTRIBUTING.md:24 and :67-68, which list each plugin and its checks. The remote-gui document lists all of these in its covers (docs/specs/remote-gui.md:8-15). Line 124 names only the build, test, vet, lint and tidy steps for the new CI job, and the AC-14 row (line 241) does not say where its test lives or which CI step runs it.
+PROPOSAL: Add the workflow test, the AC-14 test directory (for example tests/paseo-hosts/), README.md and CONTRIBUTING.md to covers and to the Design. Say that the CI job runs the installed-copy test and that workflow_test.go expects the new needs list.
+
+FINDING: F-02
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, onboard and Registry; Acceptance Criteria AC-03
+EVIDENCE: Onboard step 5 (line 156) says "Write the registry file" and works out `PASEO_CLIENT_HOST` again from `--client-host`, then `PASEO_DNS`, then `ssh -G`. No step says that a re-run reads the existing entry, so a re-run drops `PASEO_CLIENTS`, which `remove` depends on (line 196). A re-run without the earlier `--client-host` also changes `PASEO_CLIENT_HOST`, while linked clients keep the old name in their alias blocks. The port table (line 139) applies 6767 only "for a newly onboarded server", but no onboard step says that a re-run keeps the registry's port, for example 6867 on the server the local tool onboarded. Preflight step 1 (line 152) requires "a free daemon port", but on a re-run `paseo.service` already holds that port. The local tool allowed this case (paseo-host:173). AC-03 (line 212) checks only the password, the unit, the route and verification.
+PROPOSAL: Say that re-running `onboard` reads the existing entry and keeps its port, `PASEO_CLIENTS` and `PASEO_CLIENT_HOST` unless a flag overrides them, and that preflight accepts a port held by `paseo.service`. Extend AC-03 and its proof to cover these, including a re-run on a local-tool registry at 6867.
+
+FINDING: F-03
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, unlink and remove
+EVIDENCE: Line 196 says `remove` "stops at the first failure" while it unlinks the clients. The same line says the later sweep of key lines covers "clients it could not reach", but `remove` never reaches that sweep when a client cannot be reached. `unlink` (lines 190-194) starts with the same probe as `link`, and that probe requires the app to be installed (line 163), so it cannot drop a client that is offline for good, has no app or was linked with `--no-app`. No command removes such a client from `PASEO_CLIENTS`. `--no-clients` is defined only for a registry that names no clients. As written, one retired PC in `PASEO_CLIENTS` blocks `remove` for that server permanently.
+PROPOSAL: Define a path for a client that cannot be reached or has no app, for example `unlink --server-only` or `remove --skip-client <c>`, which removes the server key line and the `PASEO_CLIENTS` entry and reports what stays on the client. Fix the "could not reach" wording and add a proof case for this path.
+
+FINDING: F-04
+KIND: factual
+SEVERITY: should-fix
+WHERE: Design, link step 3; Registry
+EVIDENCE: Line 167 copies "the operator host's known-hosts entry for the server" to the client. It does not say which name it looks up or which name the client gets, and does not say what happens when no entry exists. The client checks `PASEO_CLIENT_HOST` with `StrictHostKeyChecking yes`, and checks `[host]:port` when `PASEO_CLIENT_PORT` is not 22. After R-1, `PASEO_CLIENT_HOST` is often a name the operator host never connects by: the tailnet name even when the operator's alias uses another HostName, or `--client-host`, which line 156 defines as the case where the client uses a different name. The local tool looked up only `PASEO_DNS` and stopped when it found no entry (paseo-host:508-509). An entry written with HashKnownHosts cannot be renamed either.
+PROPOSAL: Specify that the host key is looked up by the name the operator host uses, then written on the client under `PASEO_CLIENT_HOST` and `PASEO_CLIENT_PORT` (or that it is read from the server's own host key files over the trusted connection), and state the failure when no key is found. Cover a non-22 port and a `--client-host` value in the AC-04 tests.
+
+FINDING: F-05
+KIND: factual
+SEVERITY: should-fix
+WHERE: Context, Owner summary
+EVIDENCE: The summary says the plugin is built "following the remote-gui pattern" (line 24) and lists the proposed checks as Go tests, CI lint and race checks, and a manual run (line 30). It does not say that, unlike remote-gui, the first build downloads modules from Go's module proxy and checksum database (line 122), a decision the owner made after R-1 (line 73). It also leaves out the new AC-14 installed-copy check (line 223). It does not say that the build needs a logger release that does not exist yet (line 206; the latest tag is v0.0.5, and PR michielvha/logger#8 is an open draft), while line 32 says merging that PR needs separate approval. Together these mean implementation cannot finish until that approval is given.
+PROPOSAL: In the summary, say that the build needs network access to the module proxy on first run and that go.sum verifies the downloads. Name AC-14 among the planned checks, and say that implementation waits on the logger PR's merge and tag.
+
+FINDING: F-06
+KIND: judgement
+SEVERITY: should-fix
+WHERE: Design, link step 5
+EVIDENCE: Line 169 copies the password with `Set-Clipboard` on Windows when `--no-app` is given. Line 61 says it is unmeasured whether an app started from an OpenSSH session reaches the signed-in desktop, and line 178 avoids that risk for the app with a scheduled task. A clipboard set from a Windows OpenSSH session has the same session limit, but the Design takes no such step for it. No criterion or Test Plan row covers `--no-app` on either platform, so the manual fallback could ship broken.
+PROPOSAL: Use the same interactive-session method for the Windows clipboard, or drop the Windows clipboard copy and print only the manual values. Add a criterion and proof for the `--no-app` result.
+
+FINDING: F-07
+KIND: factual
+SEVERITY: nit
+WHERE: Design, Desktop app entry; Test Plan
+EVIDENCE: Line 184 says "Release builds do not contain this code" about the `PASEO_HOSTS_TEST_REJECT_ENTRY` fault injection. No criterion or Test Plan row checks that a build from the wrapper ignores that variable.
+PROPOSAL: Add a test that runs a default build with `PASEO_HOSTS_TEST_REJECT_ENTRY=1` against the fake DevTools page and checks that the written entry is valid.
+
+FINDING: F-08
+KIND: factual
+SEVERITY: nit
+WHERE: Test Plan, AC-08 and manual procedure
+EVIDENCE: The AC-08 row (line 235) says the forbidden-names search uses `PASEO_HOSTS_FORBIDDEN_NAMES`, "which the live run sets". None of manual steps (1) to (7) (line 243) runs that test or sets the variable. In CI the variable is unset, so the search checks nothing.
+PROPOSAL: Add a manual step that runs the search test with `PASEO_HOSTS_FORBIDDEN_NAMES` set to the operator host's machine, user and tailnet names and records the result.
