@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-8 findings applied; a new spec review is needed."
+status_description: "R-9 review found nothing; awaiting owner acceptance."
 issue: https://github.com/michielvha/vh-adlc/issues/71
 goal: "An owner can ask an agent to add a Paseo server, and the vhco-tools paseo-hosts plugin installs a password-protected SSH-only daemon there and links the owner's macOS and Windows Paseo desktop apps to it, with all host-specific configuration supplied from the operator host's environment."
 covers:
@@ -280,6 +280,7 @@ None.
 | 2026-11-10 | R-6 | spec | `7cf545ffec4c3eb8c9edf5290fc6223cd917d7f0` | unknown | procedural | Three should-fix factual findings and one factual nit, none blocking; model identity not attested. |
 | 2026-11-10 | R-7 | spec | `038146bca5d105691d47219cb16f8efaacb4eb2a` | claude-opus-4.8 | procedural | One should-fix factual finding and one factual nit, none blocking; model reported by the reviewer, not requested. |
 | 2026-11-10 | R-8 | spec | `c1ae6fe96c0d3ce22320142d6b553268e84c33aa` | unknown | procedural | One should-fix factual finding, not blocking; model identity not attested. |
+| 2026-11-10 | R-9 | spec | `b3e5b4ce742b346b17d45cb0d2fbc30017d5ae39` | unknown | procedural | No findings; model identity not attested. |
 
 ### R-1
 
@@ -590,3 +591,7 @@ SEVERITY: should-fix
 WHERE: Context, Owner summary (Side effects); Design, Desktop app entry steps 2 and 5; Design, Skill
 EVIDENCE: Line 32 lists the side effects of restarting the desktop app twice: the debugging port and the host list backup. Line 216 has the skill tell the owner only that the app "will restart twice". Neither section says what a graceful quit does inside the app. In app 0.15.3, main.js:844-852 wires `before-quit` to `stopDesktopManagedDaemonOnQuitIfNeeded` with `stopDaemon: () => stopDesktopDaemonViaCli("quit")`. In dist/daemon/quit-lifecycle.js, `shouldStopDesktopManagedDaemonOnQuit` returns `!settings.daemon.keepRunningAfterQuit`. dist/settings/desktop-settings.js:18-19 sets the defaults to `manageBuiltInDaemon: true` and `keepRunningAfterQuit: false`. The same before-quit path calls `installAppUpdateOnQuit` before `app.exit(0)`. The quits in step 5 (AppleScript on macOS, `window.close()` and then `app.quit` on Windows through main.js:876-879) and the macOS SIGTERM fallback, which `registerExternalQuitSignals` turns into `app.quit()`, all take this path. So with default settings, every `link`, `unlink` and `remove` stops the Mac's or Windows PC's own built-in Paseo daemon, and any agents running in it, up to twice per client. A pending app update can also be installed during the CLI's restart. The owner is not told about either.
 PROPOSAL: Add to the Owner summary side effects, the Desktop app entry design and the skill's pre-run warning that, under default app settings, the restart stops the client's built-in daemon and its running agents and may apply a downloaded app update. Do this at least by stating the consequence. Alternatively, have the probe report when the app manages a running built-in daemon.
+
+### R-9
+
+NO FINDINGS
