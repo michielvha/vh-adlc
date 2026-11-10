@@ -87,7 +87,7 @@ func hostEnv(dir string) []string {
 		"GORACE=" + os.Getenv("GORACE"),
 	}
 	if k, _ := marker(dir, "kind"); k == Windows {
-		env = append(env, "USERPROFILE="+home, "USERNAME="+user, "PASEO_TESTENV_HOSTDIR="+dir)
+		env = append(env, "OS=Windows_NT", "USERPROFILE="+home, "USERNAME="+user, "PASEO_TESTENV_HOSTDIR="+dir)
 	}
 	return env
 }
