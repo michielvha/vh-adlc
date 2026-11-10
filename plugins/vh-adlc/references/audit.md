@@ -210,11 +210,12 @@ pre-squash Verified source as the sole comparison baseline.
 
 Ordinary cleanup covers clean owned audit-ledger and audit-repair roles only after evidence/outcomes
 are retained/published/safely superseded. Keep pending/unpublished ledger commits and evidence refs.
-If the actual adopted/current merge policy explicitly includes disposal of its own just-merged
-remote head, first observe the selected base, merged reviewed head and unchanged current remote tip.
-Use an expected-tip conditional deletion and reconcile an absent head after lost acknowledgement.
-A changed/unknown tip stops; this creates no general branch-cleanup or repository-setting permission.
-If non-forced local branch deletion refuses after squash, retain the ref and report it. Never prune, reset,
+After a permitted merge, confirm the PR's merged head is the reviewed head and its base is the selected
+base, then run `after-merge` from [branches.md](branches.md) for that PR. It removes the just-merged
+head remotely and locally with expected-tip conditional deletion, only while each tip is contained in
+the head GitHub recorded for that merged PR.
+Reconcile an absent head after lost acknowledgement. A changed/unknown tip is kept and reported; this
+creates no general branch-cleanup or repository-setting permission. Never prune, reset,
 force-delete or clean unrelated worktrees/index entries. Cleanup cannot discard a pending resource intent.
 
 ### Native journal completion and pending inspection

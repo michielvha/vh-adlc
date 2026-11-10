@@ -24,12 +24,13 @@ additional execution or publication permission.
 | Repair selected audit findings and deliver a selected batch | Eligible selected local repair follows `audit.md` and `audit-record.md`; live/remote effects additionally need exact current permission or adopted `Standing audit workflow authorization`, current selection/restrictions and all retained gates |
 | Create a tracking issue | Included in acceptance, or requested; a triage-created issue must be in its exact approved batch |
 | Push the feature branch, create or update its PR, update the linked issue | An explicit ship request, whether directly named or selected through intake |
-| Merge | Separate approval for that exact action, or the explicitly selected audit batch's current/adopted `conditional-merge` permission and all retained gates in [audit.md](audit.md) |
+| Merge | Separate approval for that exact action, or the explicitly selected audit batch's current/adopted `conditional-merge` permission and all retained gates in [audit.md](audit.md). Either one also covers that PR's `after-merge` branch cleanup in [branches.md](branches.md) |
 | Rebuild/restart an owned audit verification runtime | Current explicit permission or adopted `live-verify` naming that exact owned development target and method, with all local ownership/restriction gates |
 | Tag, release, deploy, restart an unrelated/shared app, end a live session | Separate approval for that exact action; audit grants none of these effects |
 | Destructive Git or data operations, history rewrites, credential changes | Separate approval for that exact action |
 | Run `vh-adlc clean`, which removes `/tmp` entries and the project's temp root | The user's request for cleanup, or a session blocked on space; passing `--compose` or `--kind` needs the user's request for that flag |
-| Enabling automatic merged-branch deletion or cleaning stale merged branches | Owner-authorized repository configuration or branch cleanup; verify current tips are merged and preserve active worktrees |
+| Enabling automatic merged-branch deletion | The owner's yes to enabling it for that repository with `auto-delete --enable`, a request that already asks for it, or an approved plan digest that includes it, all from [branches.md](branches.md) |
+| Cleaning stale merged branches | Owner approval of the exact plan digest from [branches.md](branches.md), or a sweep request that already asks for stale-branch removal; worktree removal needs the owner to ask for it |
 | Another repository, account or feature | A new scope decision |
 
 Scoped audit `live-verify` covers only the owned development target, temporary test resources and
@@ -77,7 +78,9 @@ staged as it was. A conflicting concurrent edit to the same file stops the run w
 
 Work on a feature only in its owning worktree, found with `git worktree list --porcelain`; run branch
 checks, `fresh` and `gate` there. Outside the maintenance and audit roles below, never create, remove, prune, reset or force-move a worktree,
-and never repoint an unrelated branch. Another session continues a feature only after the owner confirms the
+and never repoint an unrelated branch. The one exception is the branch helper in [branches.md](branches.md):
+under the authority above, it deletes branches and refs whose tips it proved merged, and removes
+completely clean worktrees only when the owner asked for worktree cleanup. Another session continues a feature only after the owner confirms the
 earlier writer has stopped and hands it over; a pushed claim advertises the branch, it is not a lock.
 Missing committed state blocks the feature; it is never a reason to restart it.
 

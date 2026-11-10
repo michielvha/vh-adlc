@@ -2,8 +2,8 @@
 
 The plugin reads its conventions from `vhco-pro/docs` at this revision:
 
-https://github.com/vhco-pro/docs/blob/f781ee7b0404e80194aa568af3284888cc222017/AGENTS.md
+https://github.com/vhco-pro/docs/blob/a4e3d592e2ebb17295e0adf37747878f0c207b93/AGENTS.md
 
-Pass `f781ee7b0404e80194aa568af3284888cc222017` as `--plugin-pin` to every `vh-adlc` command.
+Pass `a4e3d592e2ebb17295e0adf37747878f0c207b93` as `--plugin-pin` to every `vh-adlc` command.
 `vh-adlc knowledge` decides whether the repository's own pin or this one applies, and every
 operation reports its answer. Moving this pin is a reviewed plugin change with a version bump.
