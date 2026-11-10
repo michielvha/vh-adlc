@@ -38,14 +38,14 @@ A sweep on `michielvha/bg-remove` found Dependabot alerts off: a coverage gap, a
 security fixes, since Renovate reads the alerts. Once the owner enabled them, GitHub
 listed 47 alerts and Renovate opened two security pull requests.
 
-A new helper makes that step automatic. Every maintenance sweep runs it before collecting alerts,
+A new helper automates that step. Every maintenance sweep runs it before collecting alerts,
 and so does onboarding. It turns on what is off and free:
 
 - Dependabot alerts, with the dependency graph, in every repository, private ones too.
 - On public repositories, secret scanning and push protection.
 - Dependabot security updates only where the repository has a `dependabot.yml` and no sign of
   Renovate: a config file, a pull request or a Dependency Dashboard issue from `app/renovate`. With
-  no signal either way it leaves them off, so the two bots never open competing pull requests.
+  no signal either way it leaves them off, so the bots never open competing pull requests.
 
 The sweep report gets a section with each setting's state and reason. Its owner decisions list
 names Dependabot security updates left on beside Renovate, and keep-off settings found on. On a
