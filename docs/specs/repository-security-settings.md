@@ -1,6 +1,6 @@
 ---
 status: draft
-status_description: "R-18 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
+status_description: "R-19 findings folded with the recommended options per the owner's standing instruction; a new spec review is due. Implementation waits for vhco-pro/docs#30 to merge."
 issue: null
 goal: "Every maintenance sweep and onboarding by a consumer that opts in turns on, in each repository of its scope, Dependabot alerts wherever the plan offers them, secret scanning and push protection on public repositories, and Dependabot security updates where Dependabot is the updater, without duplicating Renovate's pull requests; every sweep reports each setting's state and what it changed."
 covers:
@@ -74,7 +74,7 @@ then moves both docs pins with a minor version bump.
 This widens the authority table; today vh-adlc changes only merged-branch deletion.
 
 Proof is planned, not observed: Bun tests against a fake `gh`, and a live sweep of bg-remove.
-Reviews R-1 to R-18 found nothing blocking; later findings were folded under the owner's
+Reviews R-1 to R-19 found nothing blocking; later findings were folded under the owner's
 standing instruction to take each recommendation. Acceptance
 authorizes tasks, implementation on a feature branch, the pin move, the version bump and that live
 sweep. A release, adopting `apply` in bg-remove, and changes to other repositories outside a sweep
@@ -238,6 +238,9 @@ Owner decisions on 2026-11-10:
 - Q65, from spec review R-18, taken with the reviewer's proposal under that instruction: every
   nonzero exit of `security-settings-mode` leads to `check` with `committed-settings-unresolved`,
   and a report with no helper file names the opt-in.
+- Q66 and Q67, from spec review R-19, taken with the reviewer's proposal under that instruction:
+  the report's opt-in line depends only on accepted files (Q66); and the helper's own reason takes
+  precedence over `--mode-reason`, which `apply` no longer takes (Q67).
 
 ## Scope
 
@@ -303,7 +306,7 @@ New helper `plugins/vh-adlc/scripts/security-settings/`, shaped like the branch 
 
 ```text
 bun <plugin>/scripts/security-settings/cli.ts check --repo PATH [--default-branch BRANCH --default-commit SHA] [--repository OWNER/NAME] [--run-id ID] [--mode-reason TEXT] [--format json|markdown]
-bun <plugin>/scripts/security-settings/cli.ts apply --repo PATH --default-branch BRANCH --default-commit SHA [--repository OWNER/NAME] [--run-id ID] [--mode-reason TEXT] [--format json|markdown]
+bun <plugin>/scripts/security-settings/cli.ts apply --repo PATH --default-branch BRANCH --default-commit SHA [--repository OWNER/NAME] [--run-id ID] [--format json|markdown]
 ```
 
 `--repo` is the checkout whose `.vh-adlc/maintenance.yaml` applies. `--repository` selects the target
@@ -332,7 +335,9 @@ cause, and never runs `apply`. Every nonzero exit of the command, whatever its c
 this way. `check` never fails on its binding: when the binding does not
 resolve or the committed settings are invalid, it reads keep-off rows from the working tree and
 reports `committed-settings-unresolved` with the cause as its mode reason.
-`check` also accepts `--mode-reason`, the reason `security-settings-mode` printed;
+`check` also accepts `--mode-reason`, the reason `security-settings-mode` printed or the skill
+chose; `apply` does not take it. The helper's own refusal or binding-failure reason takes
+precedence over `--mode-reason`, and the output then shows both, the passed reason as detail;
 the JSON and Markdown show the mode and that reason. The default JSON output holds the repository, its visibility, whether it is archived, the caller's
 admin permission, the Renovate and Dependabot detection results with their evidence, and one entry
 for each of `dependabot_alerts`, `dependabot_security_updates`, `secret_scanning` and
@@ -542,7 +547,7 @@ for adopting either.
   committed settings through the same binding as `resolveStanding`. The origin repository always
   counts as named; another repository is `check` with reason `not-in-committed-scope` unless the
   committed `repositories` names it. The skill calls the command once per repository in scope and
-  passes the printed reason to the helper. With a run, the mode is `check` when the recorded request lacks `authorized_sweep` true,
+  passes the printed reason to the helper's `check`; `apply` shows `adopted`. With a run, the mode is `check` when the recorded request lacks `authorized_sweep` true,
   has `read_only`, `draft_only`, `no_push` or `no_filesystem`
   (`plugins/vh-adlc/scripts/maintenance/authority.ts:13`), or when the run's scope has a pull
   request, and also when the committed settings do not adopt `security_settings: apply`. Otherwise
@@ -586,7 +591,9 @@ for adopting either.
   "Owner decisions" list across all repositories. The section names every repository in scope,
   with a "helper did not run" row for one without a file, so no repository drops out silently.
   Every sweep report renders the section, also with no `--security-settings` flag, when it then
-  holds a "helper did not run" row for each repository in scope.
+  holds a "helper did not run" row for each repository in scope. `renderReport` names the
+  `security_settings: apply` opt-in unless at least one file is accepted and every accepted file's
+  mode is `apply`; a rejected file's claimed mode does not count.
   `references/maintenance.md` documents the section.
 - `references/authority.md` gets a row: a maintenance sweep or onboarding may enable these settings
   with `apply` on a repository in its scope only when the consumer's committed settings adopt
@@ -744,8 +751,9 @@ with every read and write succeeding, unless it names another case.
       repository in scope: one table per repository with a file, whose rows match its JSON entries,
       a "helper did not run" row for each repository without one, and an "Owner decisions" list
       holding exactly the entries with `renovate-overlap`, `owner-choice-conflict` or `paused` across all files.
-      When any repository's mode is `check`, or no file is given, the section names the
-      `security_settings: apply` opt-in; when every file is in `apply`, it does not.
+      The section names the `security_settings: apply` opt-in unless at least one helper file is
+      accepted and every accepted file's mode is `apply`; a rejected file's claimed mode does not
+      count.
 - [ ] AC-23: When the helper's `repos/{r}` read fails, every writable entry is `unknown` with reason
       `api-error` and the status, no other read or write is made, and the helper exits 1. The
       collector covers every repository in scope when given helper files for only some of them.
@@ -803,7 +811,7 @@ with every read and write succeeding, unless it names another case.
 | AC-19 | Same suite, fixtures: archived private repository run by a non-admin; private admin repository with a keep-off row for secret scanning; private non-admin repository; `check` on a public admin repository with alerts off, `dependabot.yml` and no Renovate. Pass: every entry `unavailable` with `archived` and no admin-only read, exit code 0; secret scanning `unavailable` with `not-free-on-private`; secret scanning and push protection `unavailable` with `not-free-on-private`, alerts, security updates and `code_scanning` `unknown` with `needs-admin`; security updates `not-changed` with `check-only`. A further `apply` fixture: public admin repository with `dependabot.yml`, no Renovate, alerts and security updates off, and a keep-off row for `dependabot_alerts`. Pass: both `left-off` with `owner-choice`, no write recorded, exit code 0. Another `apply` fixture: public admin repository, secret scanning and push protection off, a keep-off row for `secret_scanning` only. Pass: both `left-off` with `owner-choice`, no `PATCH repos/{r}` recorded. |
 | AC-22 | `bun test tests/vh-adlc/maintenance`: render a report for four repositories in scope with three `--security-settings` files, holding a `renovate-overlap`, a `paused` and an `owner-choice-conflict` entry in different repositories. Pass: the section follows `## Security alerts`, each table's rows match its file's entries, the fourth repository has a "helper did not run" row, and the owner decisions list holds exactly those three entries. A second report rendered with no `--security-settings` flag. Pass: the section is present with a "helper did not run" row for each repository in scope. In the first report, where one file's mode is `check`, the section names the `security_settings: apply` opt-in. A third report whose files are all in `apply` has no opt-in line. A report with no files names the opt-in, since no repository is known to be in `apply`. |
 | AC-23 | `bun test tests/vh-adlc/security-settings`, fixture where `repos/{r}` returns 500, and `bun test tests/vh-adlc/maintenance` with a two-repository collector fixture given a helper file for the second repository only. Pass: four `unknown` entries with `api-error` and 500, no other recorded call, exit code 1; the collection covers both repositories. Further `collect` and `report` fixtures each add one bad file listing `dependabot_alerts` as `enabled`: malformed JSON, an out-of-scope repository, a second file for the same repository, and another run ID. Pass: both commands exit 0, no surface gets `alerts-enabled-this-run` from the bad file, and the report shows "helper did not run" with the reason. A last `collect` fixture passes `--applied-repository` for a repository whose alerts endpoint returns alerts and whose helper file is missing. Pass: that Dependabot surface is incomplete with `helper-receipt-missing` and a null count. |
-| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe` in the working tree. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures with committed settings adopting `apply` and a committed keep-off row for secret scanning: the working tree drops that row (pass: secret scanning not written, `left-off` with `owner-choice`), and the working tree adds a repository to `repositories` (pass: `check` with `not-in-committed-scope` for that repository, `apply` for the origin repository, and the helper's JSON for the added repository shows that mode and reason). Further fixtures with settings adopting `apply`: a request `{ "authorized_sweep": false }`, and an authorized run scoped to one pull request; each gives `check`. A fixture adopting `apply` in committed settings with no `project_procedure` gives `apply`; one that also commits `security_policy` gives `apply`; one whose `--default-commit` differs from `origin/<branch>` exits nonzero naming the cause, and the helper's `check` with that same binding then exits as usual with entries and mode reason `committed-settings-unresolved` naming the cause. Another commits `security_settings: maybe` with a valid working tree holding a keep-off row for secret scanning. Pass: `security-settings-mode` exits nonzero naming the field, and the helper's `check` with that binding reports secret scanning `left-off` with `owner-choice` from the working-tree row and mode reason `committed-settings-unresolved`. `bun test tests/vh-adlc/security-settings`: `apply` against committed settings that do not adopt `apply`, and against a target they do not name. A further fixture runs `apply` with `--run-id` for a run recorded with `read_only`, and one for a run scoped to a pull request. Pass: no write recorded, entries identical to `check` output with the same binding, with mode `check` and mode reason `not-adopted`, `not-in-committed-scope`, `request-restricted` naming `read_only`, and `pull-request-scope` respectively. A mode fixture with committed settings that do not adopt `apply` and a `read_only` request prints `request-restricted`. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. The reviewer also reads the maintenance skill step at the implementation commit and confirms the `no_filesystem` rule is stated. |
+| AC-24 | `bun test tests/vh-adlc/maintenance`: `security-settings-mode` with settings adopting `apply` and a request with each of `read_only`, `draft_only`, `no_push`, `no_filesystem` and `no_commit`; with settings adopting `apply` and no request; with settings that do not adopt it and no request; and with `security_settings: maybe` in the working tree. Pass: `check` for the first four, `apply` for `no_commit`, `apply` then `check` for the next two, and a visible failure naming the field for the last. Further fixtures with committed settings adopting `apply` and a committed keep-off row for secret scanning: the working tree drops that row (pass: secret scanning not written, `left-off` with `owner-choice`), and the working tree adds a repository to `repositories` (pass: `check` with `not-in-committed-scope` for that repository, `apply` for the origin repository, and the helper's JSON for the added repository shows that mode and reason). Further fixtures with settings adopting `apply`: a request `{ "authorized_sweep": false }`, and an authorized run scoped to one pull request; each gives `check`. A fixture adopting `apply` in committed settings with no `project_procedure` gives `apply`; one that also commits `security_policy` gives `apply`; one whose `--default-commit` differs from `origin/<branch>` exits nonzero naming the cause, and the helper's `check` with that same binding then exits as usual with entries and mode reason `committed-settings-unresolved` naming the cause. Another, for a public admin repository with secret scanning off, commits `security_settings: maybe` and no keep-off row, with a valid working tree holding a keep-off row for secret scanning. Pass: `security-settings-mode` exits nonzero naming the field, and the helper's `check` with that binding reports secret scanning `left-off` with `owner-choice` from the working-tree row and mode reason `committed-settings-unresolved`. `bun test tests/vh-adlc/security-settings`: `apply` against committed settings that do not adopt `apply`, and against a target they do not name. A further fixture runs `apply` with `--run-id` for a run recorded with `read_only`, and one for a run scoped to a pull request. Pass: no write recorded, entries identical to `check` output with the same binding, with mode `check` and mode reason `not-adopted`, `not-in-committed-scope`, `request-restricted` naming `read_only`, and `pull-request-scope` respectively. A mode fixture with committed settings that do not adopt `apply` and a `read_only` request prints `request-restricted`. Further fixtures where `apply` is only in the working tree, only on an unmerged branch, or in a settings file `AGENTS.md` does not link: each gives `check`. The reviewer also reads the maintenance skill step at the implementation commit and confirms the `no_filesystem` rule is stated. |
 | AC-26 | `bun test tests/vh-adlc/security-settings`, public admin fixtures with alerts on and `automated-security-fixes` returning `{"enabled":true,"paused":true}`: one with `dependabot.yml` and no Renovate, one with `renovate.json`, one with a keep-off row for security updates. Pass: `paused`, `paused`, then `owner-choice-conflict`, all `already-on`; no `PUT automated-security-fixes` recorded; exit code 0; each appears in the Markdown owner decisions list. |
 | AC-25 | `bun test tests/vh-adlc/maintenance`: `resolveStanding` on committed settings with an adopted publication grant plus `security_settings: apply` and one `security_settings_keep_off` row. Pass: the grant resolves as adopted, not `invalid`. |
 | AC-16 | `bun test tests/vh-adlc/maintenance` with collector fixtures for a private admin repository with `security_and_analysis` null whose code scanning read returns 403, and one returning 404. Pass: the surface is `complete-unavailable` with `not-free-on-private` and the status. Fixtures with the same 403 on a public repository, on a private repository read without admin, and on a private repository with `code_security` enabled stay incomplete. |
