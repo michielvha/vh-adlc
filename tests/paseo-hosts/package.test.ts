@@ -14,6 +14,9 @@ test('an installed copy builds and runs --help from an empty module cache', () =
  try {
   const installed = join(root, 'plugin');
   cpSync(plugin, installed, {recursive: true});
+  // Run the toolchain go.mod declares, as an operator host with that Go release would.
+  const goroot = Bun.spawnSync(['go', 'env', 'GOROOT'], {cwd: plugin}).stdout.toString().trim();
+  env.PATH = `${join(goroot, 'bin')}:${process.env.PATH}`;
   const result = Bun.spawnSync(['/usr/bin/env', 'bash', join(installed, 'scripts/paseo-hosts.sh'), '--help'], {cwd: root, env});
   expect(result.exitCode, result.stderr.toString()).toBe(0);
   expect(result.stdout.toString()).toContain('paseo-hosts');
